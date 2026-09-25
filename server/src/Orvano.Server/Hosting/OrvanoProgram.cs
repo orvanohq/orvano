@@ -2,7 +2,7 @@ using Orvano.Core;
 
 namespace Orvano.Server.Hosting;
 
-public static class OrvanoProgram
+internal static class OrvanoProgram
 {
     public static async Task<int> RunAsync(string[] args)
     {

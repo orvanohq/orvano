@@ -5,7 +5,7 @@ using Orvano.Core.Migrations;
 namespace Orvano.Server.Hosting;
 
 /// <summary><c>/internal/readyz</c>: the database is reachable and at the schema version this binary expects.</summary>
-public sealed class SchemaReadyCheck(NpgsqlDataSource db) : IHealthCheck
+internal sealed class SchemaReadyCheck(NpgsqlDataSource db) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)
     {

@@ -6,17 +6,17 @@ namespace Orvano.Server.Tests.Hosting;
 public class RoleSelectorTests
 {
     [Theory]
-    [InlineData("api", OrvanoRole.Api)]
-    [InlineData("worker", OrvanoRole.Worker)]
-    [InlineData("realtime", OrvanoRole.Realtime)]
-    [InlineData("migrate", OrvanoRole.Migrate)]
-    [InlineData("executor", OrvanoRole.Executor)]
-    public void Picks_the_role_named_by_the_first_argument(string arg, OrvanoRole expected)
+    [InlineData("api", nameof(OrvanoRole.Api))]
+    [InlineData("worker", nameof(OrvanoRole.Worker))]
+    [InlineData("realtime", nameof(OrvanoRole.Realtime))]
+    [InlineData("migrate", nameof(OrvanoRole.Migrate))]
+    [InlineData("executor", nameof(OrvanoRole.Executor))]
+    public void Picks_the_role_named_by_the_first_argument(string arg, string expected)
     {
         var selection = RoleSelector.Resolve([arg], envRole: null, out var error);
 
         Assert.Null(error);
-        Assert.Equal(expected, selection.Role);
+        Assert.Equal(expected, selection.Role.ToString());
     }
 
     [Fact]
