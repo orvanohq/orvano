@@ -1,0 +1,77 @@
+# Flutter scenarios on the iOS simulator (spec 0001, AC-13): nightly, on release tags, and on
+# demand, to keep costly macOS minutes off every pull request. macOS runners have no Docker, so
+# Postgres comes from Homebrew and the api role runs from source in the Test environment.
+
+name: SDKs nightly
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: 3.44.2
+  # Throwaway passwords for a database that lives only for this job.
+  ORVANO_ADMIN_PASSWORD: scenarios-admin
+  ORVANO_APP_PASSWORD: scenarios-app
+
+jobs:
+  flutter-ios:
+    name: Scenarios, Flutter on iOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Start Postgres 18
+        run: |
+          brew install postgresql@18
+          PG="$(brew --prefix postgresql@18)/bin"
+          echo "$PG" >> "$GITHUB_PATH"
+          "$PG/initdb" -D "$RUNNER_TEMP/pg" -U postgres --auth=trust
+          "$PG/pg_ctl" -D "$RUNNER_TEMP/pg" -l "$RUNNER_TEMP/pg.log" -o "-p 5432" start
+          POSTGRES_USER=postgres PATH="$PG:$PATH" sh deploy/postgres/initdb/10-orvano-roles.sh
+      - name: Migrate
+        run: dotnet run --project server/src/Orvano.Server -c Release -- migrate
+        env:
+          ORVANO_DB_ADMIN_URL: Host=localhost;Port=5432;Username=orvano_admin;Password=${{ env.ORVANO_ADMIN_PASSWORD }};Database=orvano
+      - name: Start the api role in the Test environment
+        run: |
+          dotnet run --project server/src/Orvano.Server -c Release --no-build -- api > "$RUNNER_TEMP/api.log" 2>&1 &
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:8080/v1/health && exit 0
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/api.log"; exit 1
+        env:
+          ASPNETCORE_ENVIRONMENT: Test
+          ASPNETCORE_URLS: http://localhost:8080
+          ORVANO_DB_URL: Host=localhost;Port=5432;Username=orvano_app;Password=${{ env.ORVANO_APP_PASSWORD }};Database=orvano
+          ORVANO_PUBLIC_URL: http://localhost:8080
+          ORVANO_TEST_FIXTURES: ${{ github.workspace }}/tests/scenarios/fixtures.yaml
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Boot an iPhone simulator
+        id: simulator
+        run: |
+          UDID=$(xcrun simctl list devices available --json \
+            | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for r in sorted(d, reverse=True) if 'iOS' in r for x in d[r] if x['name'].startswith('iPhone')))")
+          xcrun simctl boot "$UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+      - name: Run the scenarios
+        working-directory: tests/scenarios/runners/flutter
+        run: |
+          dart run tool/copy_scenarios.dart
+          flutter test integration_test -d ${{ steps.simulator.outputs.udid }} --dart-define=ORVANO_ENDPOINT=http://localhost:8080
+      - if: failure()
+        run: cat "$RUNNER_TEMP/api.log" "$RUNNER_TEMP/pg.log" || true

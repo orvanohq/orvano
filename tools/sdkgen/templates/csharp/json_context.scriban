@@ -1,0 +1,15 @@
+// {{ header }}
+using System.Text.Json.Serialization;
+
+namespace Orvano;
+
+/// <summary>Source generated JSON metadata for every contract type, used on every target framework.</summary>
+[JsonSourceGenerationOptions(
+    RespectNullableAnnotations = true,
+    RespectRequiredConstructorParameters = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.Never)]
+{{~ for t in types ~}}
+[JsonSerializable(typeof({{ t }}))]
+{{~ end ~}}
+[JsonSerializable(typeof(OrvanoProblem))]
+internal sealed partial class OrvanoJsonContext : JsonSerializerContext;

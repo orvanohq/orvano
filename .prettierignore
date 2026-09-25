@@ -8,3 +8,8 @@ docs/
 server/
 dev/
 deploy/
+contract/dist/
+# Platform folders written by `flutter create`.
+tests/scenarios/runners/flutter/android/
+tests/scenarios/runners/flutter/ios/
+tests/scenarios/runners/flutter/web/

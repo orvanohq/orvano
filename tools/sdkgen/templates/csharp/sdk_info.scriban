@@ -1,0 +1,8 @@
+// {{ header }}
+namespace Orvano;
+
+internal static class SdkInfo
+{
+    /// <summary>The SDK version, from the repo's VERSION file. It shares the server's major.minor.</summary>
+    public const string Version = "{{ version }}";
+}

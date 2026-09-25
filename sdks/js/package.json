@@ -1,0 +1,31 @@
+{
+  "name": "@orvano/js",
+  "version": "0.0.0",
+  "description": "The Orvano SDK for JavaScript and TypeScript: browsers, Node, edge runtimes, Deno, and Bun.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/orvanohq/orvano-js.git"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  }
+}

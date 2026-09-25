@@ -1,0 +1,24 @@
+{
+  "name": "@orvano/scenarios-nextjs",
+  "private": true,
+  "version": "0.0.0",
+  "description": "A Next.js app whose route handler runs the shared scenarios through @orvano/nextjs.",
+  "type": "module",
+  "scripts": {
+    "build": "next build"
+  },
+  "dependencies": {
+    "@orvano/js": "workspace:*",
+    "@orvano/nextjs": "workspace:*",
+    "@orvano/scenarios-js": "workspace:*",
+    "next": "16.3.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "typescript": "~6.0.3"
+  }
+}

@@ -1,7 +1,7 @@
 # 0001. One API contract that generates every Orvano SDK
 
 **Date**: 2026-09-24
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 

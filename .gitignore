@@ -48,3 +48,10 @@ pubspec_overrides.yaml
 
 # Local data
 *.log
+
+# The compiled contract is committed (spec 0001, AC-1).
+!contract/dist/
+
+# Next.js
+.next/
+next-env.d.ts

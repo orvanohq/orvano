@@ -1,0 +1,15 @@
+# The Dart pub workspace (spec 0001): the Dart and Flutter SDK packages and the scenario runners
+# resolve together, so orvano_dart and orvano_flutter depend on orvano_core by version and stay
+# publishable. Run `flutter pub get` here once; every member shares the resolution.
+name: orvano_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+workspace:
+  - sdks/dart/core
+  - sdks/dart/server
+  - sdks/dart/flutter
+  - tests/scenarios/runners/dart
+  - tests/scenarios/runners/flutter

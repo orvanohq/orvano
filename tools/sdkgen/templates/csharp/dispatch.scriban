@@ -1,0 +1,14 @@
+// {{ header }}
+// Test only: maps each operationId to its SDK call for the scenario interpreter. Never published.
+namespace Orvano.Scenarios.Generated;
+
+internal static class Dispatch
+{
+    /// <summary>Every operation in the contract; a null call means the .NET SDK has none.</summary>
+    public static readonly IReadOnlyDictionary<string, DispatchEntry> Operations = new Dictionary<string, DispatchEntry>(StringComparer.Ordinal)
+    {
+{{~ for e in entries ~}}
+        [{{ '"' + e.id + '"' }}] = new({{ e.status }}, {{ e.call ?? "null" }}),
+{{~ end ~}}
+    };
+}

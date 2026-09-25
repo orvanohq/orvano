@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The server's view of the API contract (spec 0001): request and response records, route
+       constants, and the raw openapi.json, for every audience. Generated/ comes from SdkGen.
+       Never packed, so console routes and records never ship in a NuGet package. -->
+  <PropertyGroup>
+    <RootNamespace>Orvano.Contract</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\contract\dist\openapi.json" LogicalName="openapi.json" Link="openapi.json" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,4 @@
+# Seed data for the shared scenarios, loaded by a server started with
+# ORVANO_TEST_FIXTURES=<path to this file> in the Test environment (spec 0001).
+# Its shape waits for the platform data model (scope row 3); the health scenario needs none.
+{}

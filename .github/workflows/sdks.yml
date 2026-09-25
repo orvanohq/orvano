@@ -1,0 +1,233 @@
+# The API contract and SDK pipeline (spec 0001). One job proves the committed contract and generated
+# code are current (AC-1, AC-3); the rest run the shared scenarios on every SDK surface against a
+# real Orvano started in containers (AC-10, AC-13, AC-16). iOS runs nightly (sdks-nightly.yml).
+
+name: SDKs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned so `dart format` in SdkGen matches every machine (AC-3). Keep in step with .tool-versions.
+  FLUTTER_VERSION: 3.44.2
+
+jobs:
+  generated:
+    name: Contract and generated code are current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+      - run: corepack enable pnpm
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+      - run: pnpm install --frozen-lockfile
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      # Resolves the pub workspace, which also fixes the Dart language version dart format uses.
+      - run: flutter pub get
+      - run: pnpm --filter @orvano/contract build
+      - name: The compiled contract is committed (AC-1)
+        run: |
+          if [ -n "$(git status --porcelain -- contract)" ]; then
+            git diff -- contract
+            echo "::error::contract/dist/openapi.json is stale. Run 'pnpm --filter @orvano/contract build' and commit it."
+            exit 1
+          fi
+      - run: dotnet run --project tools/sdkgen
+      - name: Generated code is committed (AC-3)
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --porcelain
+            git diff
+            echo "::error::Generated code is stale. Run 'dotnet run --project tools/sdkgen' and commit the result."
+            exit 1
+          fi
+      - name: A second run changes nothing (AC-3)
+        run: |
+          dotnet run --project tools/sdkgen
+          test -z "$(git status --porcelain)"
+      - name: Analyze the Dart packages
+        run: flutter analyze --fatal-infos sdks/dart tests/scenarios/runners/dart tests/scenarios/runners/flutter
+
+  server-image:
+    name: Scenario server image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -f deploy/server.Dockerfile -t ghcr.io/orvanohq/orvano:dev .
+      - run: docker save ghcr.io/orvanohq/orvano:dev | gzip > server-image.tar.gz
+      - uses: actions/upload-artifact@v7
+        with:
+          name: server-image
+          path: server-image.tar.gz
+          retention-days: 1
+
+  js:
+    name: Scenarios, ${{ matrix.target }}
+    needs: server-image
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [node, bun, deno, browser, workerd, nextjs]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: server-image
+      - run: gunzip -c server-image.tar.gz | docker load
+      - run: docker compose -f tests/scenarios/compose.yml up -d --no-build --wait --wait-timeout 180
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+      - run: corepack enable pnpm
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+      - run: pnpm install --frozen-lockfile
+      - if: matrix.target == 'bun'
+        uses: oven-sh/setup-bun@v2
+      - if: matrix.target == 'deno'
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - if: matrix.target == 'browser'
+        run: pnpm --filter @orvano/scenarios-js exec playwright install --with-deps chromium
+      - run: pnpm --filter "@orvano/scenarios-js..." build
+      - if: matrix.target == 'nextjs'
+        run: pnpm --filter @orvano/scenarios-nextjs build
+      - run: pnpm --filter @orvano/scenarios-js scenarios ${{ matrix.target }}
+      - if: failure()
+        run: docker compose -f tests/scenarios/compose.yml logs
+
+  dart:
+    name: Scenarios, Dart server
+    needs: server-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: server-image
+      - run: gunzip -c server-image.tar.gz | docker load
+      - run: docker compose -f tests/scenarios/compose.yml up -d --no-build --wait --wait-timeout 180
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run bin/run.dart
+        working-directory: tests/scenarios/runners/dart
+      - if: failure()
+        run: docker compose -f tests/scenarios/compose.yml logs
+
+  flutter-web:
+    name: Scenarios, Flutter on Chrome
+    needs: server-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: server-image
+      - run: gunzip -c server-image.tar.gz | docker load
+      - run: docker compose -f tests/scenarios/compose.yml up -d --no-build --wait --wait-timeout 180
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - uses: nanasess/setup-chromedriver@v3
+      - run: chromedriver --port=4444 &
+      - run: flutter pub get
+      - name: Run the scenarios
+        working-directory: tests/scenarios/runners/flutter
+        # The app and the server are on different ports, so Chrome's same origin checks are off.
+        run: |
+          dart run tool/copy_scenarios.dart
+          flutter drive -d web-server --browser-name=chrome \
+            --driver=test_driver/integration_test.dart \
+            --target=integration_test/scenarios_test.dart \
+            --web-browser-flag=--disable-web-security \
+            --dart-define=ORVANO_ENDPOINT=http://localhost:8080
+      - if: failure()
+        run: docker compose -f tests/scenarios/compose.yml logs
+
+  flutter-android:
+    name: Scenarios, Flutter on Android
+    needs: server-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: server-image
+      - run: gunzip -c server-image.tar.gz | docker load
+      - run: docker compose -f tests/scenarios/compose.yml up -d --no-build --wait --wait-timeout 180
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run tool/copy_scenarios.dart
+        working-directory: tests/scenarios/runners/flutter
+      # The emulator reaches the host's port 8080 at 10.0.2.2.
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          working-directory: tests/scenarios/runners/flutter
+          script: flutter test integration_test -d emulator-5554 --dart-define=ORVANO_ENDPOINT=http://10.0.2.2:8080
+      - if: failure()
+        run: docker compose -f tests/scenarios/compose.yml logs
+
+  dotnet:
+    name: Scenarios, .NET
+    needs: server-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: server-image
+      - run: gunzip -c server-image.tar.gz | docker load
+      - run: docker compose -f tests/scenarios/compose.yml up -d --no-build --wait --wait-timeout 180
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: net10.0
+        run: dotnet run --project tests/scenarios/runners/dotnet -f net10.0
+      # net8.0 has no net10.0 asset to pick, so it loads the SDK's netstandard2.0 build.
+      - name: netstandard2.0 (through net8.0)
+        run: dotnet run --project tests/scenarios/runners/dotnet -f net8.0
+      - if: failure()
+        run: docker compose -f tests/scenarios/compose.yml logs

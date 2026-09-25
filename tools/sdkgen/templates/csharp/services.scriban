@@ -1,0 +1,37 @@
+// {{ header }}
+{{~ if uses_globalization ~}}
+using System.Globalization;
+{{~ end ~}}
+
+namespace Orvano;
+{{~ for s in services ~}}
+
+/// <summary>Operations in the <c>{{ s.name }}</c> service.</summary>
+public sealed class {{ s.class_name }}
+{
+    private readonly OrvanoClient _client;
+
+    internal {{ s.class_name }}(OrvanoClient client) => _client = client;
+{{~ for o in s.operations ~}}
+
+    /// <summary>{{ o.summary }}</summary>
+{{~ for d in o.param_docs ~}}
+    /// {{ d }}
+{{~ end ~}}
+    public {{ o.result }} {{ o.name }}({{ o.params }}) =>
+        {{ o.body }};
+{{~ end ~}}
+}
+{{~ end ~}}
+
+public sealed partial class OrvanoClient
+{
+{{~ for s in services ~}}
+    private {{ s.class_name }}? {{ s.field }};
+{{~ end ~}}
+{{~ for s in services ~}}
+
+    /// <summary>Operations in the <c>{{ s.name }}</c> service.</summary>
+    public {{ s.class_name }} {{ s.property }} => {{ s.field }} ??= new {{ s.class_name }}(this);
+{{~ end ~}}
+}

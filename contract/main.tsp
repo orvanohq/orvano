@@ -1,0 +1,20 @@
+// The Orvano API contract (spec 0001). TypeSpec is the only thing people edit; SdkGen reads the
+// compiled dist/openapi.json. Every operation carries an audience and a service group:
+//
+//   @extension("x-orvano-audience", "client" | "server" | "both" | "console")
+//   @extension("x-orvano-service", "<service>")
+//   @operationId("<service>.<method>")
+//
+// info.version must equal the repo's VERSION file; SdkGen refuses to run otherwise.
+import "@typespec/http";
+import "@typespec/openapi";
+import "@typespec/openapi3";
+import "./system/health.tsp";
+
+using Http;
+using OpenAPI;
+
+@service(#{ title: "Orvano" })
+@info(#{ version: "0.0.0" })
+@doc("The Orvano API. Every path lives under /v1.")
+namespace Orvano;

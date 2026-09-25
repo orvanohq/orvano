@@ -1,0 +1,20 @@
+name: health returns version
+requires: []
+steps:
+  - op: health.get
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body:
+        status: ok
+    save:
+      version: $.version
+  - op: health.get
+    as: server
+    input: {}
+    expect:
+      status: 200
+      body:
+        status: ok
+        version: '${version}'

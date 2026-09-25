@@ -55,11 +55,13 @@ internal static class ServerRole
         var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Orvano.Startup");
 
         if (!StartupChecks.TimeZonesAvailable(logger)) return 1;
+        if (!StartupChecks.TestFixturesAllowed(app.Environment, config, logger)) return 1;
         var appDb = app.Services.GetRequiredKeyedService<NpgsqlDataSource>(OrvanoDb.App);
         if (!await StartupChecks.SchemaMatchesAsync(appDb, logger, app.Lifetime.ApplicationStopping)) return 1;
 
         app.UseExceptionHandler();
         app.UseStatusCodePages();
+        if (app.Environment.IsEnvironment(OrvanoEnvironments.Test)) app.UseContractValidation();
 
         app.MapHealthChecks("/internal/healthz", new HealthCheckOptions { Predicate = _ => false });
         app.MapHealthChecks("/internal/readyz", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") });
