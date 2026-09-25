@@ -1,0 +1,62 @@
+# Review, scaffold/stack-architecture, 2026-09-25
+
+**Reviewed by**: Claude Sonnet 5 (author on Claude Opus 5.5)
+**Scope**: 94 files (excluding pnpm-lock.yaml and console/src/routeTree.gen.ts), scaffold/stack-architecture vs main (merge base fe1a3b9)
+**Verdict**: Changes requested
+**Resolution**: All findings addressed on the branch, 2026-09-25. See [Resolution](#resolution).
+
+## Summary
+
+This lands the whole tracer-bullet scaffold for spec 0002: a .NET 10 modular monolith (api/worker/realtime/migrate roles) on Postgres 18 with a transactional outbox, a SKIP LOCKED job queue, a leader-elected scheduler, forward-only SQL migrations with an EF drift check, an Aspire AppHost for local dev, and a Caddy/Compose production shape, plus a placeholder React console. The Postgres isolation model (roles, privileges, `SET LOCAL ROLE`, advisory locks) is implemented carefully and is backed by real-database tests that actively try to break it (SQL injection strings, missing-helper access, concurrent migration runs, lease races). Two prior fixes on this branch — disabling GSS encryption and anchoring the migration/project-ID regexes with `\z` — are correct and covered by regression tests. The remaining issues are a real environment-detection bug between the Aspire AppHost and the `migrate` role, a design gap in event dispatch error isolation, a misleading readiness message, and the fact that this PR's own 196-test suite never runs in CI.
+
+## Major
+
+### 🟠 `migrate` role silently ignores `ASPNETCORE_ENVIRONMENT` under Aspire, `dev/Orvano.AppHost/AppHost.cs:27`, `server/src/Orvano.Server/Hosting/MigrateRole.cs:13`
+**Problem**: `AppHost.cs`'s `Role()` helper sets `ASPNETCORE_ENVIRONMENT=Development` for every role, including `migrate`. But `MigrateRole.RunAsync` builds its host with `Host.CreateApplicationBuilder(args)` — the generic host, not `WebApplication.CreateBuilder`. The generic host reads the environment name from `DOTNET_ENVIRONMENT` (and `--environment`), not `ASPNETCORE_ENVIRONMENT`, which is an ASP.NET Core (web host) convention only. Since `DOTNET_ENVIRONMENT` is never set anywhere (not in `AppHost.cs`, not in `launchSettings.json` for the AppHost's child processes), `MigrateRole` always resolves to `Production`, while `ServerRole` (which uses `WebApplication.CreateBuilder`, honoring `ASPNETCORE_ENVIRONMENT`) correctly resolves to `Development` for `api`/`worker`/`realtime`.
+**Why it matters**: Under `dotnet run --project dev/Orvano.AppHost`, the `migrate` role logs JSON (production format) while the other three roles log human-readable single-line text — an unexplained inconsistency an operator will spend time debugging. It also means `migrate` never loads `appsettings.Development.json`, so any future environment-gated migrate behavior (verbose logging, dev-only seed data, etc.) silently won't apply in local dev. `OrvanoBinaryTests.Writes_only_JSON_log_lines_outside_Development` actually encodes today's buggy default (no environment set → JSON) as the expected behavior, so nothing catches the AppHost/host-builder mismatch.
+**Suggested fix**: Either have `AppHost.cs`'s `Role()` also set `DOTNET_ENVIRONMENT` (simplest, keeps `MigrateRole` on the generic host), or switch `MigrateRole` to `WebApplication.CreateBuilder` (or `HostApplicationBuilder` configured to also read `ASPNETCORE_ENVIRONMENT`) so both variables agree. Add a test/verify step that starts `migrate` with `ASPNETCORE_ENVIRONMENT=Development` and no `DOTNET_ENVIRONMENT`, asserting simple-console output, to catch a regression.
+
+### 🟠 One failing event consumer blocks the entire dispatch batch — and every event behind it — indefinitely, `server/src/Orvano.Core/Events/EventDispatcher.cs:64-69`
+**Problem**: `DispatchBatchAsync` claims up to 100 undispatched events (`ORDER BY id`) and, still inside the same open transaction, calls every registered `EventConsumer` for every event before marking any of them dispatched. If any single consumer throws (e.g., a future module's handler fails to parse a malformed/unexpected payload), the exception propagates out of `DispatchBatchAsync`, the `using`-scoped transaction is disposed without `CommitAsync` (an implicit rollback), and `ExecuteAsync`'s catch just logs and retries on the next poll (every 2 seconds). Because the failing event is always claimed first (lowest `id`, not yet dispatched), it — and every event queued behind it — is retried and re-blocked forever, with no isolation, backoff, or dead-letter path. Contrast this with `JobLoop`, which isolates and records failure per job (`JobStore.FailAsync`, eventual `dead` status) precisely to avoid this class of problem.
+**Why it matters**: Rows 33/34/webhooks/notifications all build on this dispatcher (per spec 0002's "Events and background work" diagram: dispatcher → jobs → webhooks/notifications/functions). A single malformed or unexpected event payload halts *all* durable event-to-job fan-out platform-wide — not just for that event's type — until an operator manually intervenes (e.g., deletes or manually dispatches the offending row). This is a bigger blast radius than the per-job isolation the design otherwise clearly cares about, and there is no test exercising a throwing consumer.
+**Suggested fix**: At minimum, isolate each event's consumer invocations (catch per event, mark the poison event with an error/dead state or skip-and-alert after N failures) so one bad event can't stall the whole outbox. A cheaper interim fix: catch around the per-event consumer loop, log which event id failed, and either dispatch-without-jobs (dropping just that event's jobs, matching "at least once for jobs, not exactly once" is already a background invariant) or skip it and continue the batch, rather than aborting the whole transaction.
+
+### 🟠 CI never runs the 196-test xUnit suite this PR adds, `.github/workflows/ci.yml:16-39`
+**Problem**: The `server` job in CI runs `dotnet build Orvano.slnx -c Release` and the EF model drift check (`dotnet run --project server/tests/Orvano.ModelDriftCheck`), but there is no `dotnet test` (or Microsoft.Testing.Platform equivalent) step anywhere in the workflow. `server/tests/Orvano.Server.Tests` (196 tests, Testcontainers-backed, covering exactly the migration/privilege/dispatcher/scheduler/job-loop surfaces this review relied on) is not referenced at all.
+**Why it matters**: This is the safety net `test-preferences.json` configures (`xunit.v3` + `Testcontainers.PostgreSql`), and it is comprehensive — but it currently only runs on a developer's machine. Every regression this suite is designed to catch (including a real one this review found, the environment-detection bug above) can merge to `main` without CI ever noticing. Given this row is tagged GA and security-heavy, shipping the test infrastructure without wiring it into the gate undercuts the review guide's own basis for treating `TESTS = configured` as a strong signal.
+**Suggested fix**: Add a step to the `server` CI job (or a new job) that starts a Postgres 18 container (Testcontainers can do this itself, or reuse the existing `docker run` step) and runs `dotnet test Orvano.slnx -c Release` (or the Microsoft.Testing.Platform equivalent named in `global.json`) before merge is allowed.
+
+## Minor
+
+### 🟡 Misleading "run the migrate role" message when the database is *ahead* of the build, `server/src/Orvano.Server/Hosting/StartupChecks.cs:37-39`
+**Problem**: `SchemaMatchesAsync` logs `"Database schema version is {Actual} but this build expects {Expected}. Run the migrate role with this build first."` whenever the versions differ, in both directions. When the database version is *higher* than what the binary expects (e.g., a rollback to an older image, or a stray future-versioned row), running `migrate` with this build does nothing useful — `MigrationRunner.Verify` would itself refuse with the correct diagnosis ("The database is newer than this Orvano version; upgrade Orvano instead."), but the reader hits the wrong instruction first.
+**Why it matters**: An operator following the `/internal/readyz` failure message literally will run the wrong remediation before discovering (via the migrate role's own, better error) that they actually need a newer image. Confirmed as a lead going into this review and reproduced by reading the code: the message text is identical regardless of `version < ExpectedVersion` vs `version > ExpectedVersion`.
+**Suggested fix**: Branch the message the same way `MigrationRunner.Verify` already does: "database is behind, run migrate" vs "database is ahead of this build, upgrade Orvano instead."
+
+## Nits
+
+- ⚪ `server/src/Orvano.Core/Events/Outbox.cs:28-31`, `cmd.Parameters.AddWithValue("subject", ...)` and the other `AddWithValue` calls with a boxed nullable `object` skip an explicit `NpgsqlDbType`; works today but is a common source of "could not determine data type" surprises once a column's inferred type is ambiguous — consider `NpgsqlDbType.Text` explicitly for consistency with the `payload` parameter's explicit `Jsonb`.
+- ⚪ `server/src/Orvano.Server/Hosting/RealtimeFanout.cs:16-17`, the bounded channel silently drops the oldest entry (`DropOldest`) under sustained overload with no counter/log — acceptable given "at most once by design," but a debug counter would help diagnose a busy realtime role later.
+
+## Strengths
+
+- The Postgres isolation model is exercised with adversarial tests, not just happy-path ones: `ProjectScopeTests` throws a literal `"abc\"; DROP ROLE orvano_app; --"` at `ProjectScope.RoleName`, and `PlatformPrivilegesTests` positively asserts `orvano_app` is denied `CREATE SCHEMA`, `CREATE ROLE`, `TRUNCATE`, and any write to `schema_migrations` against a real database, not mocks.
+- `MigrationRunnerTests` covers the hard concurrency and failure cases directly (two runners racing for the advisory lock, a migration failing partway leaving no trace, a checksum changing after the fact, a database newer than the build) — this is exactly the kind of coverage a hand-rolled migration runner needs.
+- The two previously-flagged issues on this branch are both cleanly fixed and regression-tested: GSS encryption is disabled in `OrvanoDb.Build` (`OrvanoDbTests.Disables_GSS_encryption_on_pooled_data_sources`), and both `ProjectScope` and `PlatformMigration`'s regexes anchor with `\z` instead of `$`, with an explicit regression test for the trailing-newline bypass (`PlatformMigrationTests`, `"0002_add_users.sql\n"`).
+
+## Test coverage
+
+Coverage of the changed surface is extensive and largely uses a real Postgres 18 (Testcontainers) rather than mocks: connection string parsing, pool budgeting, project-scope isolation, migration runner concurrency/failure/checksum behavior, platform role privileges, event dispatch (including transactional rollback and poll-fallback), job claiming/lease/backoff/dead-lettering, leader election and takeover, LISTEN/NOTIFY reconnect-with-backoff, role selection, startup checks, and end-to-end binary behavior for every role. The one meaningful gap is noted above as a Major: `EventDispatcherTests` never exercises a consumer that throws, so the batch-poisoning behavior has no test either confirming or guarding it. As also noted above, none of this suite currently runs in CI.
+
+## Resolution
+
+Each finding was fixed on `scaffold/stack-architecture` before merge. The full suite (250 tests) passes locally and in CI.
+
+| Finding | Severity | Fixed in | How |
+|---|---|---|---|
+| `migrate` ignores `ASPNETCORE_ENVIRONMENT` under Aspire | 🟠 Major | `fae0c9f` | `migrate` now honors `ASPNETCORE_ENVIRONMENT` like the other roles |
+| One failing consumer blocks the dispatch batch | 🟠 Major | `b03a7aa` (spec), `df24fde` (code) | Failures are contained per consumer and per event, with a savepoint, an `events.redispatch` job, and the `orvano.events.consumer_failures` counter; spec 0002 records the design (S-8) |
+| CI never runs the xUnit suite | 🟠 Major | `d6e588f` | The server job runs `dotnet test --solution Orvano.slnx` |
+| Misleading message when the database is ahead of the build | 🟡 Minor | `59682f7` | The message says to upgrade Orvano when the database is ahead, and to run migrate when it is behind |
+| Nullable parameters without an explicit `NpgsqlDbType` | ⚪ Nit | `d86c6db` | `project_id` and `subject` pass `NpgsqlDbType.Text` |
+| Realtime queue drops silently | ⚪ Nit | `d86c6db` | Each drop increments `orvano.realtime.events_dropped` on the `Orvano.Realtime` meter; covered by `RealtimeFanoutTests` |

@@ -1,7 +1,8 @@
 # 0002. Orvano stack and architecture
 
 **Date**: 2026-09-24
-**Status**: Proposed
+**Updated**: 2026-09-25 (poison events: a failing event consumer no longer stalls the outbox)
+**Status**: Accepted
 
 ## Summary
 
@@ -142,7 +143,7 @@ module code ──(one transaction)──▶ data rows + orvano.events row + pg_
 ```
 
 - **Outbox `orvano.events`**: `id` (bigint identity), `project_id` (text, null for platform events), `type` (for example `rows.created`), `subject`, `payload` (jsonb), `created_at`, `dispatched_at` (null until dispatched). A partial index on `dispatched_at IS NULL`. The notify payload is only the ID (the 8000 byte limit never matters).
-- **Dispatcher** wakes on `NOTIFY` and also polls every 2 seconds, because notifications are not durable across a dropped connection. Durable consumers (webhooks, functions, notifications, added by their rows) register event handlers that only enqueue jobs.
+- **Dispatcher** wakes on `NOTIFY` and also polls every 2 seconds, because notifications are not durable across a dropped connection. Durable consumers (webhooks, functions, notifications, added by their rows) register event handlers that only enqueue jobs. Each consumer has a name, and one consumer failing never holds back another consumer or another event (see *Poison events* below).
 - **Realtime delivery is at most once** by design; a reconnecting client refetches. Row 22 may add replay from `orvano.events`. If the realtime role's own `LISTEN` connection drops, it reconnects with backoff, issues `LISTEN` again, and treats the gap like a client resync (events in the gap are not replayed).
 - **Retention**: dispatched events are deleted after `ORVANO_EVENT_RETENTION_DAYS` (default 7) by an internal scheduled task that runs hourly.
 - **Jobs `orvano.jobs`**: `id`, `queue`, `kind`, `project_id` (null for internal work), `payload` (jsonb), `priority`, `run_at`, `status` (`queued`, `running`, `succeeded`, `failed`, `dead`), `attempts`, `max_attempts`, `lease_until`, `locked_by`, `last_error`, `created_at`, `finished_at`.
@@ -152,6 +153,70 @@ module code ──(one transaction)──▶ data rows + orvano.events row + pg_
   - Delivery is at least once, so every handler must be idempotent.
   - Wake up: `NOTIFY orvano_jobs` on insert, plus a poll fallback.
 - **Internal schedules** (event pruning hourly, the lease reaper every 30 seconds) run in the worker instance that holds the leader lock `pg_advisory_lock(0x4F525641, 2)`. That lock is session level, so it is held on the worker's dedicated leader connection, which is never returned to a pool. If that connection drops, the worker stops leader tasks at once, reconnects, and tries to take the lock again every 10 seconds. Key rewrap is not scheduled; it is a job enqueued when a master key is rotated. Product schedules, per project queues, concurrency limits, and the console view belong to rows 33 and 34 and extend these tables.
+
+### Poison events
+
+A poison event is one that makes a consumer fail every time it runs (a bug, or a payload the consumer did not expect). The dispatcher contains the failure to that one consumer on that one event, hands it to the job queue for retries, and keeps going.
+
+**Registration.** A consumer is registered with a name:
+
+```csharp
+public interface IWorkRegistry
+{
+    void OnEvent(string eventType, string consumerName, EventConsumer consumer);
+    void HandleJob(string kind, string queue, JobHandler handler);
+    void AddInternalSchedule(string name, TimeSpan interval, ScheduledTask task);
+}
+```
+
+- `consumerName` is `<module>.<purpose>`, lowercase letters, digits, `_` and `.` only, at most 100 characters (for example `webhooks.deliver`, `functions.trigger`). It must be unique for its event type, compared ordinally (case sensitive, like job kinds); a duplicate throws `InvalidOperationException` at startup, the same as a duplicate job kind. A name outside the allowed characters also throws at startup.
+- The name is the consumer's stable identity: a redispatch job finds its consumer again by event type plus name. Renaming a consumer is a breaking change for any redispatch job still waiting.
+- `WorkRegistry` shape: `public sealed record NamedConsumer(string Name, EventConsumer Consumer);` in `Orvano.Core.Modules`. `ConsumersFor(OutboxEvent e)` returns `IReadOnlyList<NamedConsumer>` in registration order, and `EventConsumer? ConsumerFor(string eventType, string name)` finds one for the redispatch handler. Consumers of an event run in registration order.
+
+**Dispatch pass** (one transaction, as today):
+
+1. Claim up to 100 undispatched events, `ORDER BY id`, `FOR UPDATE SKIP LOCKED` (unchanged).
+2. For each event, for each consumer in registration order:
+   1. Call the consumer inside its own `try`, and turn the result into a list inside that `try` (a lazy `IEnumerable` would otherwise throw later, outside it).
+   2. Validate every `NewJob` it returned, in memory: `Kind` has a registered job handler; `Queue` is one of the registered queues (otherwise no job loop ever claims it); `PayloadJson` parses as JSON; `MaxAttempts` is at least 1. Validation gives clear errors for the common mistakes; it does not try to copy every Postgres rule.
+   3. If the list is valid and not empty, enqueue it with `JobQueue.EnqueueManyAsync(tx, jobs, savepoint: "consumer", ct)`. It sends one `NpgsqlBatch`: `SAVEPOINT consumer`, one insert per job (the same insert and `pg_notify` as `EnqueueAsync`), `RELEASE SAVEPOINT consumer`. One round trip per consumer, where today there is one per job.
+   4. If Postgres rejects that batch with a deterministic error (a `PostgresException` whose `SqlState` starts with `22`, a data error, or `23`, an integrity error), run `ROLLBACK TO SAVEPOINT consumer`. That undoes only this consumer's inserts and leaves the transaction usable. Example: a payload string containing `\u0000`, which is valid JSON but which `jsonb` rejects with `22P05`.
+   5. If step 1 threw, step 2 found an invalid job, or step 4 rolled back, the consumer's output for this event is dropped as a whole (none of its jobs are enqueued, even the valid ones), and one `events.redispatch` job is enqueued for this event and consumer instead (plain `EnqueueAsync`, no savepoint). The event's other consumers are not affected.
+3. Mark every claimed event dispatched, commit.
+
+**Transient failures.** Any other database error (a dropped connection, a timeout, `40001`, or a `42` error, which means a broken deployment and not a bad event) ends the pass. The transaction rolls back, nothing is marked, and the same events are claimed again on a later pass, by this worker or another. After a failed pass the dispatcher waits 2 seconds, doubling after each failure in a row up to 30 seconds, instead of the fixed 2 second poll. A `NOTIFY` still wakes it early. The first successful pass resets the delay.
+
+**The `events.redispatch` job**:
+
+| Field | Value |
+|---|---|
+| `kind` | `events.redispatch` |
+| `queue` | `internal` |
+| `project_id` | the event's `project_id` |
+| `max_attempts` | 25 (about 10 hours of retries with the existing backoff, so a fix deployed the same day heals on its own) |
+| `payload` | `{"consumer": "<name>", "event": {"id", "projectId", "type", "subject", "payload", "createdAt"}}`, camelCase, the event's `payload` embedded as JSON (not a string) |
+
+- Code home: a static class `EventRedispatch` in `Orvano.Core.Events` with `const string Kind = "events.redispatch"`, `const int MaxAttempts = 25`, and `NewJob For(OutboxEvent e, string consumer)`, which builds the job above. The dispatcher calls `For`; nothing else builds this job.
+- Payload building: `For` builds a `JsonObject`, puts the event's payload in with `JsonNode.Parse(e.Payload)` so it nests as JSON, and serializes with `JsonSerializerDefaults.Web` (camelCase). The handler deserializes the same way into `sealed record EventRedispatchPayload(string Consumer, RedispatchedEvent Event)`, where `RedispatchedEvent` has `long Id, string? ProjectId, string Type, string? Subject, JsonElement Payload, DateTimeOffset CreatedAt`, and rebuilds the `OutboxEvent` with `Payload.GetRawText()`.
+- The job carries a full copy of the event, so event pruning never breaks it.
+- `CoreWork` registers its handler. The handler rebuilds the `OutboxEvent` from the copy and looks up the consumer by event type and name:
+  - Consumer not registered → throw `PermanentJobFailureException` ("Consumer '<name>' for event type '<type>' is no longer registered"). The job goes `dead` at once; no retries.
+  - Consumer found → call it, turn the result into a list, validate it with the same rules as the dispatcher, and enqueue its jobs with `EnqueueManyAsync` (no savepoint needed) in one transaction on the app data source. A throw, a validation failure, or a database rejection is an ordinary job failure (backoff, then `dead` after 25 attempts).
+- Delivery is at least once. If the worker stops after the enqueue commits but before the job is marked `succeeded`, the consumer's jobs are enqueued twice. That is allowed, because every job handler is already idempotent.
+- The event row itself is never touched again. It is dispatched and gets pruned on its normal schedule.
+
+**Permanent job failure** (new, for any handler): `PermanentJobFailureException` in `Orvano.Core.Jobs`. When a handler throws it, the job goes `dead` at once, no matter how many attempts are left. Every other exception keeps the existing retry behavior.
+
+- `JobStore.FailPermanentlyAsync(ClaimedJob job, Exception error, CancellationToken ct)` sets `status = 'dead'`, `finished_at = now()`, `lease_until = NULL`, `locked_by = NULL`, and `last_error` in the same format as `FailAsync` (exception type and message, cut to 2000 characters), guarded by `locked_by = @worker AND status = 'running'` like the others. `attempts` stays as it is (it already counts this attempt).
+- `JobLoop.RunAsync` adds `catch (PermanentJobFailureException ex)` before the general `catch (Exception ex)`, logs at `Error`, and calls `FailPermanentlyAsync`.
+
+**Replay until the jobs console exists** (rows 33 and 34): requeue a dead redispatch job by hand with `UPDATE orvano.jobs SET status = 'queued', attempts = 0, run_at = now(), finished_at = NULL WHERE id = <id>`.
+
+**Observability**:
+
+- Every consumer failure logs at `Error` with the event ID, event type, consumer name, and the exception. It never logs the event payload (it can hold user data). `last_error` on the redispatch job keeps the existing format (exception type and message, cut to 2000 characters).
+- A failed pass logs at `Error` with the failure count so far and the next delay.
+- New meter `Orvano.Events` (registered in `Telemetry.cs` with `AddMeter`): counter `orvano.events.consumer_failures` tagged `event.type`, `consumer`, and `reason` (`threw`, `invalid_job`, or `rejected_by_database`). Row 37 decides the alerts on it.
 
 ### Module structure
 
@@ -220,6 +285,13 @@ deploy/compose/                  docker-compose.yml and .env.example (the produc
 | Migration run | mutual exclusion | `pg_advisory_lock(0x4F525641, 1)` |
 | Pool sizes | `Maximum Pool Size` per role | the connection budget table, set in code |
 | Schedule timing | pruning, reaper, lease, heartbeat | hourly, 30 s, 60 s, 20 s (constants in `Orvano.Core`) |
+| Event dispatch | which consumers run for an event | `WorkRegistry`, by event type; each consumer's name from `OnEvent` |
+| Event dispatch | whether a job from a consumer is valid | the registered job kinds and queues in `WorkRegistry`, plus a JSON parse and `MaxAttempts >= 1` |
+| Event dispatch | whether a database error is the event's fault | `PostgresException.SqlState` class `22` or `23` (anything else is transient) |
+| Event dispatch | delay after a failed pass | 2 s doubling to 30 s, constants in `Timings` |
+| Redispatch job | the event to replay | the copy in the job's `payload.event` (not `orvano.events`, which pruning may empty) |
+| Redispatch job | which consumer to rerun | `payload.consumer`, looked up with `payload.event.type` in `WorkRegistry` |
+| Redispatch job | retry limit | `EventRedispatch.MaxAttempts` (25) in `Orvano.Core.Events` |
 | Telemetry | service name | `OTEL_SERVICE_NAME`, set per role (`orvano-api`, `orvano-worker`, ...) |
 | Image tag | version | `VERSION` file (spec 0001), tags `X.Y.Z` and `X.Y` |
 
@@ -229,6 +301,10 @@ deploy/compose/                  docker-compose.yml and .env.example (the produc
 - One image for every role; the role changes behavior, never the build.
 - Every event is written in the same transaction as the change it describes.
 - Every job handler is idempotent.
+- One consumer failing on one event never delays another consumer, or any other event.
+- Every claimed event is marked dispatched in the pass that claims it, unless the whole pass hits a transient database error.
+- Consumers and job handlers never rely on event order. A consumer that failed delivers its jobs later than jobs from newer events.
+- Logs never contain event payloads.
 - Project data is only touched after `SET LOCAL ROLE p_<id>`; `orvano_app` never inherits project privileges.
 - The public API role never holds DDL or role creation rights.
 - No module touches another module's tables.
@@ -270,6 +346,7 @@ deploy/compose/                  docker-compose.yml and .env.example (the produc
 - The pinned `chiseled-extra` image is smoke tested early: the `api` role connects to Postgres over Npgsql and resolves a named time zone inside the container.
 - `docker compose -f deploy/compose/docker-compose.yml up` with locally built images boots the same system behind Caddy on `http://localhost`, with compose health checks using `orvano healthcheck`.
 - No product modules yet besides the health endpoint; `Orvano.Platform` arrives with rows 3 and 7.
+- Poison events are contained as *Poison events* describes: named consumer registration, isolation per consumer with validation and a savepoint per consumer, the growing delay after failed passes, the `events.redispatch` job and its handler, `PermanentJobFailureException`, and the `Orvano.Events` meter. Tests with a real Postgres cover a throwing consumer, an invalid `NewJob`, a `jsonb` rejection (`\u0000`), a missing consumer on redispatch, and a successful redispatch after the consumer is fixed.
 
 ## Consequences
 
@@ -279,6 +356,8 @@ deploy/compose/                  docker-compose.yml and .env.example (the produc
 - Postgres enforces project isolation, which protects the later SQL editor, data API, and functions.
 - The same image and roles scale out later: run more `api` or `worker` containers and add Valkey as the cache's second level.
 - The Jobs, Webhooks, and Notifications differentiators all build on one queue you own.
+- A bad event or a buggy consumer costs only that consumer's work on that event. Everything else keeps flowing, and the failure heals on its own if a fix ships within about 10 hours.
+- Poison events reuse the job queue's backoff, dead letter state, and (from row 33) its console view and replay, so there is no second failure store to build or learn.
 
 **Negative / tradeoffs**:
 - Postgres is a single point of failure and carries load that a broker or cache would otherwise take. High availability is deferred (cluster install is after 1.0).
@@ -287,6 +366,10 @@ deploy/compose/                  docker-compose.yml and .env.example (the produc
 - In memory rate limits, caches, and presence are per instance; running two `api` or `realtime` containers needs Valkey first.
 - Project creation becomes asynchronous (a provisioning job), which rows 3 and 7 must show in the console.
 - Dev routing (Vite proxy) differs from production routing (Caddy); routing bugs show only in the compose check.
+- A redispatched consumer delivers late (up to about 10 hours) and out of order. Consumers whose work loses value with time (for example a notification) must check the event's `createdAt` and decide whether it is still worth sending.
+- A consumer that hangs (an endless loop, not a throw) still stalls the dispatcher, because synchronous code cannot be cancelled. The only guard is that consumers stay small and do no IO.
+- The `IWorkRegistry.OnEvent` signature changes. Nothing calls it yet, so the change is free now and never again.
+- A failed event is stored twice for a while (the event row and the redispatch job's copy). The jobs table has no retention until row 33 adds it.
 
 **Neutral**:
 - Spec 0001 gains a fourth audience, `console`, and a private generated package.
@@ -301,7 +384,8 @@ deploy/compose/                  docker-compose.yml and .env.example (the produc
 - [ ] Row 6 (installer): generate the database passwords and `ORVANO_MASTER_KEYS`, and warn that the master key must be backed up. Decide whether to keep a hand written compose file or generate it with Aspire's Docker Compose publisher.
 - [ ] Row 22: design the realtime message protocol and decide whether to replay from `orvano.events` on reconnect.
 - [ ] Row 27: choose the sandbox behind the `executor` (gVisor, Firecracker, and Kata are all maintained today).
-- [ ] Row 37: choose storage for logs and metrics behind the OpenTelemetry export.
+- [ ] Row 37: choose storage for logs and metrics behind the OpenTelemetry export, and alert on `orvano.events.consumer_failures` and on dead `events.redispatch` jobs.
+- [ ] Rows 33 and 34: show dead `events.redispatch` jobs in the jobs console with the consumer name and event type, offer a one click replay (replacing the manual SQL in *Poison events*), and add retention for finished jobs.
 - [ ] Row 38: add image signing and an SBOM (software bill of materials) to the release pipeline.
 - [ ] Before the first build, confirm the current React and Vite majors and the Aspire 13.x release to pin; these were not checked in the landscape pass.
 - [ ] The 12 Agent Skills installed for this stack are in `.claude/skills/` but not yet in an `AGENTS.md`. `/audit` (row 2) should list the project wide ones (`dotnet-webapi`, `ef-core`, `optimizing-ef-core-queries`, `configuring-opentelemetry-dotnet`, `aspire`, `aspire-monitoring`, `aspire-deployment`, `multi-stage-dockerfile`, `pnpm`) in root `AGENTS.md` and the console ones (`tanstack-router`, `tanstack-query`, `vercel-react-best-practices`) in `console/AGENTS.md`.

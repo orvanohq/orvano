@@ -1,0 +1,6 @@
+packages:
+  - contract
+  - sdks/js
+  - sdks/nextjs
+  - sdks/console-client
+  - console

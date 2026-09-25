@@ -2,16 +2,16 @@
 
 The ground every version stands on. Nothing here ships as a release by itself; it makes v0.1 possible. See [index.md](index.md) for the full plan.
 
-### 1. Stack & architecture · in-progress · GA
+### 1. Stack & architecture · done · GA
 Decide the server language, the console framework, the database engine setup, the gateway, the worker and event model, and how containers are laid out on one server. Then scaffold a runnable monorepo.
 **Done when:** the stack is recorded in a spec, and the empty scaffold (API, worker, console) boots locally with one command and passes build.
 - [x] Decide the stack (spec): `/architect stack & architecture`
-- [ ] Scaffold from the decision: `/develop stack & architecture`
-- [ ] Verify it: `/check verify stack & architecture`
-- [ ] Test it: `/test stack & architecture`
-- [ ] Review it (fresh model): `/check review stack & architecture`
-- [ ] Document it: `/document stack & architecture`
-Spec [0002](../specs/0002-stack-architecture/index.md)
+- [x] Scaffold from the decision: `/develop stack & architecture`
+- [x] Verify it: `/check verify stack & architecture`
+- [x] Test it: `/test stack & architecture`
+- [x] Review it (fresh model): `/check review stack & architecture`
+- [x] Document it: `/document stack & architecture`
+Spec [0002](../specs/0002-stack-architecture/index.md) · code in `server/`, `console/`, `dev/`, `deploy/`
 
 ### 2. Coding standards & tooling
 Capture conventions from the real scaffold, then install lint, format, type strictness, pre commit hooks, and CI for every package (server, console, and each SDK).

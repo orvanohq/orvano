@@ -44,7 +44,7 @@ Every product feature ships in all of these layers in the same version, unless i
 
 | # | Feature | Phase | Status |
 |---|---------|-------|--------|
-| 1 | Stack & architecture | Foundation | in-progress |
+| 1 | Stack & architecture | Foundation | done |
 | 2 | Coding standards & tooling | Foundation | planned |
 | 3 | Platform data model | Foundation | planned |
 | 4 | API contract & SDK pipeline | Foundation | in-progress |
@@ -86,7 +86,7 @@ Every product feature ships in all of these layers in the same version, unless i
 
 ## Epics
 
-- [Foundations](foundations.md): rows 1 to 6 · 0 of 6 done
+- [Foundations](foundations.md): rows 1 to 6 · 1 of 6 done
 - [Platform & developer experience](platform.md): rows 7, 11, 15, 19, 37 to 39 · 0 of 7 done
 - [Authentication](auth.md): rows 8 to 10, 12 to 14 · 0 of 6 done
 - [Databases](databases.md): rows 16 to 18 · 0 of 3 done
