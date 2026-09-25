@@ -32,7 +32,7 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 - A module is one csproj. Its public types live in its `Contracts` namespace; everything else is `internal sealed`.
 - Inside a module, keep business rules in plain types with no ASP.NET, EF, or Npgsql references. Endpoints, event consumers, and job handlers are thin adapters around them.
 - EF Core only for platform tables in schema `orvano`, mapped with fluent config in `OrvanoDbContext` (no attributes on domain types). Per project tables use raw Npgsql through `ProjectScope`.
-- Platform tables carry the module name as a prefix (`orvano.platform_projects`). Migrations are `NNNN_<name>.sql` and are checksummed when applied, so never edit one after it merges; add a new file instead.
+- Module tables carry the module name as a prefix (`orvano.platform_projects`); the kernel's own tables (`orvano.events`, `orvano.jobs`, `orvano.schema_migrations`) have none. Migrations are `NNNN_<name>.sql` and are checksummed when applied, so never edit one after it merges; add a new file instead.
 - API errors are problem details (`AddProblemDetails` in `ServerRole.cs`); never let a raw exception message reach a client.
 - Tests: one Postgres container per run through `PostgresFixture`, one fresh database per test through `TestDatabase`. No database mocks.
 

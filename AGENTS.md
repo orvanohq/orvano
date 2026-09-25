@@ -7,7 +7,7 @@ Open source, self hosted backend (auth, Postgres databases, storage, functions, 
 - **Server**: C# 14 on .NET 10, ASP.NET Core Minimal APIs, a modular monolith started in roles (`api`, `worker`, `realtime`, `migrate`)
 - **Data**: PostgreSQL 18 only (data, outbox events, job queue); EF Core 10 for platform tables, raw Npgsql for per project tables
 - **Console**: React, Vite, TypeScript, TanStack Router and Query, served static behind Caddy 2
-- **Contract and SDKs**: TypeSpec to OpenAPI 3.1, generated JS/TS, Next.js, Flutter, Dart, and .NET SDKs (spec 0001)
+- **Contract and SDKs** (planned, spec 0001; `contract/` and `sdks/` do not exist yet): TypeSpec to OpenAPI 3.1, generated JS/TS, Next.js, Flutter, Dart, and .NET SDKs
 - **Tooling**: pnpm workspaces via Corepack, Node 24, Aspire 13 for local dev, Docker Compose in production, GitHub Actions
 
 ## Build approach
@@ -65,7 +65,7 @@ Chosen here, installed by `/develop tooling`:
 - [aspire](.claude/skills/aspire/): `microsoft/aspire-skills`, the AppHost and Aspire CLI
 - [aspire-monitoring](.claude/skills/aspire-monitoring/): `microsoft/aspire-skills`, logs, traces, and resource state in dev
 - [aspire-deployment](.claude/skills/aspire-deployment/): `microsoft/aspire-skills`, publishing to Compose and beyond
-- [multi-stage-dockerfile](.claude/skills/multi-stage-dockerfile/): `github/awesome-copilot`, `deploy/*.Dockerfile`
+- [multi-stage-dockerfile](.claude/skills/multi-stage-dockerfile/): `github/awesome-copilot`, `deploy/server.Dockerfile` and `deploy/gateway/Dockerfile`
 - [pnpm](.claude/skills/pnpm/): `antfu/skills`, workspaces, catalogs, overrides
 - [supabase-postgres-best-practices](.claude/skills/supabase-postgres-best-practices/): `supabase/agent-skills`, Postgres schema, roles, migrations, query performance (ignore its Supabase product parts)
 - [lefthook](.claude/skills/lefthook/): `fandhe-ai/agent-reference-skills`, `lefthook.yml` pre commit hooks (written in Japanese)
