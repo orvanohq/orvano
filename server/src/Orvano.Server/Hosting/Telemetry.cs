@@ -1,10 +1,9 @@
 using Npgsql;
-using Orvano.Core.Events;
 using OpenTelemetry;
-using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Orvano.Core.Events;
 
 namespace Orvano.Server.Hosting;
 

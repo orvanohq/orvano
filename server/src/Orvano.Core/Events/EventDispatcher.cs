@@ -81,17 +81,17 @@ public sealed class EventDispatcher(
         if (events.Count == 0) return 0;
 
         foreach (var e in events)
-        foreach (var consumer in work.ConsumersFor(e))
-        {
-            if (await RunConsumerAsync(tx, e, consumer, ct) is not { } failure) continue;
+            foreach (var consumer in work.ConsumersFor(e))
+            {
+                if (await RunConsumerAsync(tx, e, consumer, ct) is not { } failure) continue;
 
-            logger.LogError(failure.Error,
-                "Event consumer {Consumer} failed on event {EventId} ({EventType}): {Reason}; handing it to an {Kind} job",
-                consumer.Name, e.Id, e.Type, failure.Reason, EventRedispatch.Kind);
-            EventTelemetry.ConsumerFailures.Add(1,
-                new("event.type", e.Type), new("consumer", consumer.Name), new("reason", failure.Reason));
-            await JobQueue.EnqueueAsync(tx, EventRedispatch.For(e, consumer.Name), ct);
-        }
+                logger.LogError(failure.Error,
+                    "Event consumer {Consumer} failed on event {EventId} ({EventType}): {Reason}; handing it to an {Kind} job",
+                    consumer.Name, e.Id, e.Type, failure.Reason, EventRedispatch.Kind);
+                EventTelemetry.ConsumerFailures.Add(1,
+                    new("event.type", e.Type), new("consumer", consumer.Name), new("reason", failure.Reason));
+                await JobQueue.EnqueueAsync(tx, EventRedispatch.For(e, consumer.Name), ct);
+            }
 
         await using (var mark = new NpgsqlCommand(
             "UPDATE orvano.events SET dispatched_at = now() WHERE id = ANY(@ids)", conn, tx))

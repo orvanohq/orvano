@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Npgsql;
 using Orvano.Core.Data;
 using Orvano.Core.Events;
 using Orvano.Core.Jobs;
