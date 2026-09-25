@@ -1,0 +1,50 @@
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+*.pem
+
+# Claude Code (local only; shared skills in .claude/skills stay tracked)
+.claude/settings.local.json
+.claude/worktrees/
+
+# Agent caches
+docs/.agent-cache/
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+TestResults/
+*.nupkg
+.aspire/
+aspire-output/
+
+# Node / pnpm / TypeScript
+node_modules/
+dist/
+*.tsbuildinfo
+.pnpm-store/
+coverage/
+.vite/
+npm-debug.log*
+pnpm-debug.log*
+
+# Dart / Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+pubspec_overrides.yaml
+
+# Local data
+*.log
