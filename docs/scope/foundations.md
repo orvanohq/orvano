@@ -9,7 +9,7 @@ Decide the server language, the console framework, the database engine setup, th
 - [x] Scaffold from the decision: `/develop stack & architecture`
 - [ ] Verify it: `/check verify stack & architecture`
 - [x] Test it: `/test stack & architecture`
-- [ ] Review it (fresh model): `/check review stack & architecture`
+- [x] Review it (fresh model): `/check review stack & architecture`
 - [ ] Document it: `/document stack & architecture`
 Spec [0002](../specs/0002-stack-architecture/index.md) · code in `server/`, `console/`, `dev/`, `deploy/`
 
