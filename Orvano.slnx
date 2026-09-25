@@ -9,5 +9,6 @@
   </Folder>
   <Folder Name="/server/tests/">
     <Project Path="server/tests/Orvano.ModelDriftCheck/Orvano.ModelDriftCheck.csproj" />
+    <Project Path="server/tests/Orvano.Server.Tests/Orvano.Server.Tests.csproj" />
   </Folder>
 </Solution>
