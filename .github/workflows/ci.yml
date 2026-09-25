@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   server:
-    name: Server build and EF drift check
+    name: Server build, tests, and EF drift check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -22,6 +22,8 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet build Orvano.slnx -c Release
+      # Testcontainers starts its own Postgres 18 from deploy/postgres/initdb, so this needs only Docker.
+      - run: dotnet test --solution Orvano.slnx -c Release --no-build
       - name: Start an empty Postgres 18
         run: |
           docker run -d --name pg -p 5432:5432 \
