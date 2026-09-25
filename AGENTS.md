@@ -21,6 +21,7 @@ corepack enable pnpm && pnpm install                    # install
 dotnet run --project dev/Orvano.AppHost                 # dev: Postgres, every role, console, Aspire dashboard
 dotnet build Orvano.slnx && pnpm -r build               # build
 dotnet test --solution Orvano.slnx                      # test (Docker must be running)
+dotnet format Orvano.slnx && pnpm lint:fix && pnpm format   # fix lint and format (CI checks all three)
 docker compose -f deploy/compose/docker-compose.yml up --build   # production shape on http://localhost
 ```
 
@@ -43,11 +44,11 @@ Stored in `docs/specs/NNNN-title/` (`index.md`, `rationale.md`, optional `verify
 
 ## Tooling
 
-Chosen here, installed by `/develop tooling`:
+Installed (scope row 2):
 - Lint and format: `.editorconfig` with `dotnet format`, .NET analyzers (`AnalysisLevel` latest, `TreatWarningsAsErrors`) in `Directory.Build.props`; ESLint flat config (typescript-eslint, react hooks) plus Prettier for every pnpm workspace.
-- Pre commit: Lefthook runs `dotnet format` and ESLint/Prettier on staged files only. Builds, typecheck, and tests stay in CI.
+- Pre commit: Lefthook runs `dotnet format` and ESLint/Prettier on staged files only, then restages what they fixed. `pnpm install` installs the hooks; skip once with `LEFTHOOK=0`. Builds, typecheck, and tests stay in CI.
 - Tests: xUnit v3 plus Testcontainers (server, in place); Vitest plus Testing Library (console, when row 5 lands).
-- CI: `.github/workflows/ci.yml` already runs build, tests, the EF drift check, and the compose smoke test; add lint and format checks to it.
+- CI: `.github/workflows/ci.yml` runs lint and format checks (`dotnet format --verify-no-changes`, `pnpm lint`, `pnpm format:check`), build, tests, the EF drift check, and the compose smoke test.
 
 ## Git
 
@@ -69,6 +70,8 @@ Chosen here, installed by `/develop tooling`:
 - [pnpm](.claude/skills/pnpm/): `antfu/skills`, workspaces, catalogs, overrides
 - [supabase-postgres-best-practices](.claude/skills/supabase-postgres-best-practices/): `supabase/agent-skills`, Postgres schema, roles, migrations, query performance (ignore its Supabase product parts)
 - [lefthook](.claude/skills/lefthook/): `fandhe-ai/agent-reference-skills`, `lefthook.yml` pre commit hooks (written in Japanese)
+
+Declined: ESLint, typescript-eslint, and Prettier skills (the configs are small; the ESLint MCP covers live linting)
 
 MCP servers: Aspire MCP (recommended), GitHub MCP (recommended), Postgres MCP Pro, dev database only (recommended), ESLint MCP `@eslint/mcp` (recommended)
 

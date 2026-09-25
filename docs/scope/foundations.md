@@ -13,10 +13,10 @@ Decide the server language, the console framework, the database engine setup, th
 - [x] Document it: `/document stack & architecture`
 Spec [0002](../specs/0002-stack-architecture/index.md) · code in `server/`, `console/`, `dev/`, `deploy/`
 
-### 2. Coding standards & tooling · in-progress
+### 2. Coding standards & tooling · done
 Capture conventions from the real scaffold, then install lint, format, type strictness, pre commit hooks, and CI for every package (server, console, and each SDK).
 **Done when:** root `AGENTS.md` reflects the real stack, and lint, format, and CI run clean across the monorepo.
-- [ ] Capture conventions + tooling choices: `/audit`
+- [x] Capture conventions + tooling choices: `/audit`
 Code in `.editorconfig`, `Directory.Build.props`, `eslint.config.js`, `.prettierrc.json`, `lefthook.yml`, `.github/workflows/ci.yml`
 
 ### 3. Platform data model · needs a decision · GA
