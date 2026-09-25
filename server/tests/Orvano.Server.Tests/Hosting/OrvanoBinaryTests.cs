@@ -113,6 +113,19 @@ public class OrvanoBinaryTests(PostgresFixture postgres)
         Assert.All(orvano.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries), line => Assert.StartsWith("{", line));
     }
 
+    [Fact]
+    public async Task Migrate_honors_ASPNETCORE_ENVIRONMENT_as_the_Aspire_AppHost_sets_it()
+    {
+        await using var database = await postgres.NewDatabaseAsync();
+
+        await using var orvano = await OrvanoProcess.RunAsync(["migrate"], Env(
+            ("ORVANO_DB_ADMIN_URL", database.AdminUrl), ("ASPNETCORE_ENVIRONMENT", "Development")));
+
+        Assert.Equal(0, orvano.ExitCode);
+        Assert.Contains("Hosting environment: Development", orvano.Output);
+        Assert.DoesNotContain(orvano.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries), line => line.StartsWith('{'));
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(2)]

@@ -10,7 +10,11 @@ public static class MigrateRole
 {
     public static async Task<int> RunAsync(string[] args)
     {
-        var builder = Host.CreateApplicationBuilder(args);
+        // The generic host reads only DOTNET_ host settings. Seed ASPNETCORE_ ones first, as
+        // WebApplication.CreateBuilder does, so ASPNETCORE_ENVIRONMENT picks the environment here too.
+        var hostConfig = new ConfigurationManager();
+        hostConfig.AddEnvironmentVariables(prefix: "ASPNETCORE_");
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { Args = args, Configuration = hostConfig });
         var serviceName = builder.Configuration["OTEL_SERVICE_NAME"] ?? "orvano-migrate";
         builder.AddOrvanoTelemetry(serviceName);
 
