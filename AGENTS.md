@@ -56,6 +56,7 @@ Installed (scope row 2):
 - branch prefix: by change type (`feat/`, `fix/`, `chore/`, `docs/`)
 - commit: per-milestone, conventional commits (`feat(server): ...`, `fix(console): ...`)
 - Never commit to `main`; open a PR so CI runs. Ask before merging, force pushing, or deleting branches.
+- One branch at a time: never create a new branch while an earlier one still has an unmerged PR (no stacked PRs). Add follow up work to the open branch, or wait until its PR merges, then branch from the updated `main`.
 
 ## Agent skills
 
