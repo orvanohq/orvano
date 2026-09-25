@@ -32,10 +32,18 @@ public static class StartupChecks
         var version = await WaitForDatabaseAsync(db, logger, ct, conn => SchemaVersion.ReadAsync(conn, ct));
         if (version is null) return false;
 
-        if (version != PlatformSchema.ExpectedVersion)
+        if (version < PlatformSchema.ExpectedVersion)
         {
             logger.LogCritical(
                 "Database schema version is {Actual} but this build expects {Expected}. Run the migrate role with this build first.",
+                version, PlatformSchema.ExpectedVersion);
+            return false;
+        }
+
+        if (version > PlatformSchema.ExpectedVersion)
+        {
+            logger.LogCritical(
+                "Database schema version is {Actual} but this build expects {Expected}. The database is newer than this Orvano version; upgrade Orvano instead.",
                 version, PlatformSchema.ExpectedVersion);
             return false;
         }

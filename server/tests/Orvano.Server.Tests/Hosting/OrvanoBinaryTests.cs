@@ -127,9 +127,9 @@ public class OrvanoBinaryTests(PostgresFixture postgres)
     }
 
     [Theory]
-    [InlineData(0)]
-    [InlineData(2)]
-    public async Task Refuses_to_start_the_api_against_another_schema_version(int version)
+    [InlineData(0, "Run the migrate role with this build first.")]
+    [InlineData(2, "The database is newer than this Orvano version; upgrade Orvano instead.")]
+    public async Task Refuses_to_start_the_api_against_another_schema_version(int version, string remedy)
     {
         await using var database = await postgres.NewDatabaseAsync();
         await database.MigrateAsync();
@@ -140,6 +140,7 @@ public class OrvanoBinaryTests(PostgresFixture postgres)
 
         Assert.Equal(1, orvano.ExitCode);
         Assert.Contains($"Database schema version is {version} but this build expects {PlatformSchema.ExpectedVersion}", orvano.Output);
+        Assert.Contains(remedy, orvano.Output);
     }
 
     [Fact]
