@@ -1,0 +1,10 @@
+# Prettier formats the pnpm workspaces and the repo's own config files (AGENTS.md, Tooling).
+# The .NET side is formatted by `dotnet format`; prose in Markdown is left as written.
+pnpm-lock.yaml
+*.md
+**/*.gen.ts
+.claude/
+docs/
+server/
+dev/
+deploy/

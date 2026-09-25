@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Npgsql;
 using Orvano.Core.Data;
 using Orvano.Core.Modules;
 using Orvano.Core.Scheduling;

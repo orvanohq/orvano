@@ -7,13 +7,29 @@ export const Route = createFileRoute('/')({
   component: Home,
 })
 
-type Health = { status: string; version: string }
+interface Health {
+  status: string
+  version: string
+}
 
 // Plain fetch for now; spec 0001 replaces this with @orvano/console-client.
 async function fetchHealth(): Promise<Health> {
   const res = await fetch('/v1/health')
-  if (!res.ok) throw new Error(`GET /v1/health returned ${res.status}`)
-  return res.json()
+  if (!res.ok) throw new Error(`GET /v1/health returned ${String(res.status)}`)
+  const body: unknown = await res.json()
+  if (!isHealth(body)) throw new Error('GET /v1/health returned an unexpected body')
+  return body
+}
+
+function isHealth(body: unknown): body is Health {
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    'status' in body &&
+    typeof body.status === 'string' &&
+    'version' in body &&
+    typeof body.version === 'string'
+  )
 }
 
 function Home() {

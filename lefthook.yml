@@ -1,0 +1,26 @@
+# Pre commit hooks (AGENTS.md, Tooling). They format and lint staged files only, then restage
+# what they fixed. Builds, typecheck, and tests stay in CI. Skip once with `LEFTHOOK=0 git commit`.
+pre-commit:
+  parallel: true
+  jobs:
+    - name: dotnet format
+      glob: '*.cs'
+      exclude:
+        - '.claude/**'
+      run: dotnet format Orvano.slnx --include {staged_files}
+      stage_fixed: true
+
+    # ESLint then Prettier, one after the other, so they never write the same file at once.
+    - name: js
+      group:
+        piped: true
+        jobs:
+          - name: eslint
+            glob: '*.{js,mjs,cjs,ts,tsx}'
+            run: pnpm exec eslint --fix --no-warn-ignored {staged_files}
+            stage_fixed: true
+
+          - name: prettier
+            glob: '*.{js,mjs,cjs,ts,tsx,json,yml,yaml,css,html}'
+            run: pnpm exec prettier --write --ignore-unknown {staged_files}
+            stage_fixed: true
