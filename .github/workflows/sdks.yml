@@ -110,9 +110,11 @@ jobs:
           deno-version: v2.x
       - if: matrix.target == 'browser'
         run: pnpm --filter @orvano/scenarios-js exec playwright install --with-deps chromium
-      - run: pnpm --filter "@orvano/scenarios-js..." build
+      - if: matrix.target != 'nextjs'
+        run: pnpm --filter "@orvano/scenarios-js..." build
+      # The Next.js app and everything it imports: @orvano/js, @orvano/nextjs, the interpreter.
       - if: matrix.target == 'nextjs'
-        run: pnpm --filter @orvano/scenarios-nextjs build
+        run: pnpm --filter "@orvano/scenarios-nextjs..." build
       - run: pnpm --filter @orvano/scenarios-js scenarios ${{ matrix.target }}
       - if: failure()
         run: docker compose -f tests/scenarios/compose.yml logs

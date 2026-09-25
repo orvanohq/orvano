@@ -22,6 +22,8 @@ docs/.agent-cache/
 # .NET
 bin/
 obj/
+# Dart keeps executables in bin/, so the scenario runner's is source, not build output.
+!tests/scenarios/runners/dart/bin/
 *.user
 *.suo
 TestResults/
