@@ -1,0 +1,162 @@
+# Orvano on one Linux host (spec 0002, containers on one server). Only the gateway publishes
+# ports; Postgres and every role stay on the internal network. The installer (scope row 6)
+# builds on this file. Locally: copy .env.example to .env, then
+#   docker compose -f deploy/compose/docker-compose.yml up --build
+
+name: orvano
+
+x-server: &server
+  image: ${ORVANO_IMAGE:-ghcr.io/orvanohq/orvano}:${ORVANO_VERSION:-dev}
+  build:
+    context: ../..
+    dockerfile: deploy/server.Dockerfile
+  restart: unless-stopped
+
+x-app-db: &app-db
+  ORVANO_DB_URL: Host=postgres;Port=5432;Username=orvano_app;Password=${ORVANO_APP_PASSWORD:?set in .env};Database=orvano
+
+x-healthcheck: &healthcheck
+  test: ["CMD", "/app/orvano", "healthcheck"]
+  interval: 10s
+  timeout: 5s
+  retries: 5
+  start_period: 20s
+
+x-after-migrate: &after-migrate
+  postgres:
+    condition: service_healthy
+  migrate:
+    condition: service_completed_successfully
+
+services:
+  postgres:
+    image: postgres:18.6
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      ORVANO_ADMIN_PASSWORD: ${ORVANO_ADMIN_PASSWORD:?set in .env}
+      ORVANO_APP_PASSWORD: ${ORVANO_APP_PASSWORD:?set in .env}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - effective_cache_size=1536MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - max_connections=100
+    volumes:
+      # Postgres 18 images keep data under /var/lib/postgresql/18/docker.
+      - orvano-pg:/var/lib/postgresql
+      - ../postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Over TCP, so it stays unhealthy while the socket only bootstrap server runs the init script.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "orvano_app", "-d", "orvano"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 1280M
+
+  migrate:
+    <<: *server
+    restart: "no"
+    environment:
+      ORVANO_ROLE: migrate
+      ORVANO_DB_ADMIN_URL: Host=postgres;Port=5432;Username=orvano_admin;Password=${ORVANO_ADMIN_PASSWORD:?set in .env};Database=orvano
+      OTEL_SERVICE_NAME: orvano-migrate
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  api:
+    <<: *server
+    environment:
+      <<: *app-db
+      ORVANO_ROLE: api
+      ORVANO_PUBLIC_URL: ${ORVANO_PUBLIC_URL:?set in .env}
+      ORVANO_MASTER_KEYS: ${ORVANO_MASTER_KEYS:-}
+      OTEL_SERVICE_NAME: orvano-api
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    volumes:
+      - orvano-storage:/var/lib/orvano/storage
+    healthcheck: *healthcheck
+    depends_on: *after-migrate
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+  worker:
+    <<: *server
+    environment:
+      <<: *app-db
+      ORVANO_ROLE: worker
+      ORVANO_DB_ADMIN_URL: Host=postgres;Port=5432;Username=orvano_admin;Password=${ORVANO_ADMIN_PASSWORD:?set in .env};Database=orvano
+      ORVANO_PUBLIC_URL: ${ORVANO_PUBLIC_URL:?set in .env}
+      ORVANO_MASTER_KEYS: ${ORVANO_MASTER_KEYS:-}
+      ORVANO_EVENT_RETENTION_DAYS: ${ORVANO_EVENT_RETENTION_DAYS:-7}
+      OTEL_SERVICE_NAME: orvano-worker
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    volumes:
+      - orvano-storage:/var/lib/orvano/storage
+    healthcheck: *healthcheck
+    depends_on: *after-migrate
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+  realtime:
+    <<: *server
+    environment:
+      <<: *app-db
+      ORVANO_ROLE: realtime
+      OTEL_SERVICE_NAME: orvano-realtime
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    healthcheck: *healthcheck
+    depends_on: *after-migrate
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  gateway:
+    image: ${ORVANO_GATEWAY_IMAGE:-ghcr.io/orvanohq/orvano-gateway}:${ORVANO_VERSION:-dev}
+    build:
+      context: ../..
+      dockerfile: deploy/gateway/Dockerfile
+    restart: unless-stopped
+    environment:
+      ORVANO_PUBLIC_URL: ${ORVANO_PUBLIC_URL:?set in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      # Keeps certificates across recreation (avoids Let's Encrypt rate limits).
+      - orvano-caddy:/data
+    depends_on:
+      api:
+        condition: service_healthy
+      realtime:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  orvano-pg:
+  orvano-storage:
+  orvano-caddy:

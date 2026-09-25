@@ -1,0 +1,11 @@
+{
+  "name": "orvano",
+  "private": true,
+  "packageManager": "pnpm@11.27.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "pnpm -r build"
+  }
+}

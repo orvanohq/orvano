@@ -1,0 +1,25 @@
+# The only public entry point (spec 0002, request routing). ORVANO_PUBLIC_URL is the site
+# address: https://orvano.example.com gets automatic HTTPS, http://localhost stays plain HTTP.
+
+{$ORVANO_PUBLIC_URL} {
+	encode zstd gzip
+
+	# Never proxied. Internal calls such as the on demand TLS `ask` go straight to api:8080.
+	handle /internal/* {
+		respond 404
+	}
+
+	handle /v1/realtime {
+		reverse_proxy realtime:8080
+	}
+
+	handle /v1/* {
+		reverse_proxy api:8080
+	}
+
+	handle {
+		root * /srv/console
+		try_files {path} /index.html
+		file_server
+	}
+}

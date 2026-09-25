@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- CI check (spec 0002): applies every platform migration to an empty Postgres 18 and fails if
+       the EF Core model disagrees with the real tables. Row 2 may move it into the test framework it picks. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orvano.Server\Orvano.Server.csproj" />
+  </ItemGroup>
+
+</Project>
