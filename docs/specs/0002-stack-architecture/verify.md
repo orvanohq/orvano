@@ -1,5 +1,5 @@
-# Verify: Stack & architecture · spec 0002 · updated 2026-09-24
-_Spec 0002 is a decision spec with no numbered acceptance criteria. These steps come from its "What the scaffold must contain" list (labeled S-1 to S-7 below) and its value sourcing table. `/check verify` runs them; `/test` locks the durable ones._
+# Verify: Stack & architecture · spec 0002 · updated 2026-09-25
+_Spec 0002 is a decision spec with no numbered acceptance criteria. These steps come from its "What the scaffold must contain" list (labeled S-1 to S-8 below) and its value sourcing table. `/check verify` runs them; `/test` locks the durable ones._
 
 ## Local dev (Aspire)
 - [ ] `pnpm install`, then `dotnet run --project dev/Orvano.AppHost` → the dashboard shows `postgres` running, `migrate` finished (exit 0), and `api`, `worker`, `realtime`, `console` running and healthy → S-1
@@ -25,6 +25,17 @@ _Spec 0002 is a decision spec with no numbered acceptance criteria. These steps 
 - [ ] `docker compose ... up -d --force-recreate migrate` → "0 migration(s) applied this run" (safe to run again) → S-6
 - [ ] `grep -r "Orvano.Platform" server/` → no matches; `/v1/health` is the only product route → S-7
 
+## Poison events
+_These need a consumer that fails on purpose. Register one from a test only module, or run the matching tests in `Orvano.Server.Tests`._
+- [ ] A consumer that throws on events with subject `poison`: insert a `poison` event, then a normal one → both are dispatched within about 2 seconds; the normal event's jobs exist; one `events.redispatch` job holds the consumer name and a copy of the `poison` event → S-8
+- [ ] Two consumers on one event type, one throws → the healthy consumer's jobs are enqueued; only the failing one gets a redispatch job → S-8
+- [ ] A consumer returns a `NewJob` with an unknown kind, an unregistered queue, a payload that is not JSON, or `MaxAttempts = 0` → handled as a consumer failure (redispatch job), and the events behind it still dispatch → S-8
+- [ ] A consumer returns a payload containing `\u0000` → in the same pass only that consumer's inserts are rolled back (savepoint), it gets a redispatch job, and the event's other consumers and the rest of the batch dispatch → S-8
+- [ ] A redispatch job for a consumer name that is not registered → `dead` after one attempt, and `last_error` names the consumer and event type → S-8
+- [ ] Fix the failing consumer and restart the worker while its redispatch job is still retrying → the job succeeds and the consumer's jobs appear → S-8
+- [ ] Stop Postgres for a minute → the dispatcher logs failed passes at a growing delay capped at 30 seconds, and resumes on its own when Postgres returns, with no event lost → S-8
+- [ ] The consumer failure log line has the event ID, type, and consumer name, and no payload; `orvano.events.consumer_failures` shows in the Aspire dashboard metrics with the right `reason` tag → S-8
+
 ## Value sourcing
 - [ ] Role: run `orvano` with no `ORVANO_ROLE` and no argument → exit 1 with a clear message; `ORVANO_ROLE=api orvano worker` → exit 1 (disagree); `orvano nope` → exit 1 (unknown); `orvano executor` → exit 1 (reserved)
 - [ ] Expected schema version: point a role at a database with `schema_migrations` edited to version 0 or 2 → the role refuses to start (exit 1) and says which version it expected
@@ -47,3 +58,4 @@ _Spec 0002 is a decision spec with no numbered acceptance criteria. These steps 
 - S-5 (chiseled-extra smoke test: Npgsql and time zones): compose job in CI, command step 5 (roles exit on a missing time zone or database)
 - S-6 (compose behind Caddy with `orvano healthcheck`): command steps 5 to 8
 - S-7 (no product modules besides health): command step 9
+- S-8 (poison events contained per consumer, savepoint per consumer, redispatch, delay, meter): poison events steps 1 to 8

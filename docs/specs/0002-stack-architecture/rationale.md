@@ -90,6 +90,48 @@ Caddy wins the gateway because on demand TLS is the exact mechanism rows 29 and 
 - **Module tables prefixed by module name inside schema `orvano`.** Ownership stays visible without one schema per module. Runner up: a schema per module, which complicates EF Core mappings and grants.
 - **Node 24 LTS** for tooling and the console build. Runner up: Node 22, which is closer to end of life.
 
+## Poison events (added 2026-09-25)
+
+### Context
+
+The fresh model review of the scaffold (`docs/reviews/2026-09-25-scaffold-stack-architecture.md`) found that `EventDispatcher` runs every consumer for up to 100 events inside one transaction. If any consumer throws, the transaction rolls back, and the next poll claims the same events in the same order. So one bad event stalls every event behind it, for every consumer, forever, until someone edits the database by hand. The job loop already contains failures to one job; the dispatcher did not.
+
+The forces: webhooks, functions, and notifications (rows sold as differentiators) all hang off this dispatcher, so its blast radius is the whole durable event path. Consumers are synchronous, take only the event, and do no IO, so almost every failure happens again on every retry: a bug, or a payload shape the consumer did not expect. Self hosters rarely watch a dead letter view, so healing without a human matters. Nothing registers a consumer yet, so the registration API can still change for free.
+
+### Options considered
+
+**Isolation unit.**
+- *One consumer on one event (chosen).* Other consumers of the same event still get their jobs. Con: consumers need stable names, and the registration API changes.
+- *The whole event.* Simpler bookkeeping. Con: a bug in one module delays every other module's delivery for that event.
+- *Keep the batch, skip the head event after N failures.* The smallest change. Con: the stall still lasts N polls and still hits unrelated events.
+
+**Where a failure goes.**
+- *An `events.redispatch` job carrying a copy of the event (chosen).* Reuses the job loop's backoff, dead state, and the future jobs console and replay. Pruning cannot lose it. Con: the event is stored twice while the job lives, and the jobs table has no retention yet.
+- *A new `orvano.event_consumer_failures` table.* An explicit failure record. Con: a second dead letter store, its own replay path, and pruning must skip events with open failures.
+- *Attempts and last error on `orvano.events`, retried by the dispatcher.* Con: only fits isolation per event, and it copies the job loop's retry logic.
+
+**Guard against failures in the database itself.**
+- *Validate in memory, plus a savepoint per consumer sent in one `NpgsqlBatch` with its inserts (chosen).* One code path. A database rejection undoes only that consumer's inserts. It costs one round trip per consumer, where today it is one per job. Con: a failed consumer costs one extra round trip (`ROLLBACK TO SAVEPOINT`), and batching inserts needs a new `JobQueue.EnqueueManyAsync`.
+- *Validate in memory, then fall back to one event per transaction with savepoints.* Chosen first in the interview. The normal pass stays savepoint free. Con: two code paths, plus a state machine (how many events to run in single mode, when to return, claiming again fresh for each event so other workers stay safe). The cross check showed the savepoint cost it avoids is smaller than assumed, so it was dropped.
+- *Validate in memory only.* Cheapest. Con: any rule the validator misses (for example `\u0000` in `jsonb`) stalls the outbox again.
+
+### Rationale
+
+Containing a failure to one consumer on one event is the only unit that keeps every module independent, which matters because the three differentiators share this dispatcher. Sending the failure into the job queue makes poison handling almost free: backoff, the dead state, leases, and later the console and replay all exist already or are already planned for row 33. The in memory validation catches the common mistakes with clear errors. The savepoint per consumer catches the database rejections validation cannot predict, in the same pass, with no second mode. Sending the savepoint and the inserts as one batch means the guard costs no more round trips than the dispatcher pays today.
+
+Retrying for about 10 hours (25 attempts) turns a same day hotfix into automatic recovery. For code that fails the same way every time, a short retry window only adds noise; a long one covers the one case where retrying helps, a deploy.
+
+**Decisions made while writing the update** (not asked in the interview):
+- **Drop a failing consumer's whole output, not just its invalid jobs.** Partial output from a buggy consumer is not trustworthy, and a redispatch reruns the consumer from scratch anyway. Runner up: enqueue the valid jobs and redispatch only the invalid ones, which duplicates the valid ones on redispatch.
+- **Deterministic database errors are `SqlState` classes `22` and `23` only.** Those are data and integrity errors caused by the row. A `42` error (undefined table, permission denied) means a broken deployment, which should stall loudly, not quietly turn every event into a redispatch. Runner up: treat every `PostgresException` as deterministic.
+- **A growing delay after failed passes, 2 s up to 30 s.** Stops a database outage from filling the logs every 2 seconds, and still recovers quickly. Runner up: keep the fixed 2 second poll.
+- **`PermanentJobFailureException` as a general job loop feature.** The missing consumer case needs it, and later handlers (a webhook to a deleted endpoint, for example) will too. Runner up: a special case for `events.redispatch` only inside `JobLoop`.
+- **A copy of the event in the job payload.** Keeps redispatch independent of event retention. Runner up: reference the event ID and keep pruning away from events with live redispatch jobs, which couples two tables' lifecycles.
+- **Redispatch is at least once.** Enqueuing and completing the job in one transaction would make it exactly once, but it needs a new `JobStore` path. Every handler is idempotent already, so duplicates are within the contract. Runner up: complete in the same transaction.
+- **A meter named `Orvano.Events` with one counter tagged by reason.** Enough for row 37 to alert on. Runner up: logs only.
+
+**Changed after the cross check** (an independent read of the spec on another model): the database guard moved from a single mode fallback to a savepoint per consumer, confirmed by the engineer. The spec also now pins down the `NamedConsumer` registry shape, `JobStore.FailPermanentlyAsync` and the `JobLoop` catch order, how the redispatch payload is built and read, and the `EventRedispatch` constants.
+
 ## References
 
 **Project sources**:
