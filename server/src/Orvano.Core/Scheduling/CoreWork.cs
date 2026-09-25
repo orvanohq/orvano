@@ -2,16 +2,19 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Orvano.Core.Data;
+using Orvano.Core.Events;
 using Orvano.Core.Jobs;
 using Orvano.Core.Modules;
 
 namespace Orvano.Core.Scheduling;
 
-/// <summary>The shared kernel's own internal schedules: event pruning and the job lease reaper.</summary>
+/// <summary>The shared kernel's own work: the event redispatch job, event pruning, and the job lease reaper.</summary>
 public static class CoreWork
 {
     public static void Register(IWorkRegistry work, int eventRetentionDays)
     {
+        work.HandleJob(EventRedispatch.Kind, JobQueues.Internal, EventRedispatch.HandleAsync);
+
         work.AddInternalSchedule("events.prune", Timings.EventPruneInterval, async (services, ct) =>
         {
             var db = services.GetRequiredKeyedService<NpgsqlDataSource>(OrvanoDb.App);

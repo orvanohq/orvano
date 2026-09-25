@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Npgsql;
 using Orvano.Core.Jobs;
 using Orvano.Core.Modules;
 using Orvano.Core.Notifications;
@@ -71,6 +72,75 @@ public class JobLoopTests(PostgresFixture postgres) : IAsyncLifetime
         Assert.Equal(1, row.Attempts);
         Assert.True(row.Finished);
         Assert.Equal("InvalidOperationException: boom", row.LastError);
+    }
+
+    // Spec 0002, poison events: a permanent failure is dead at once, whatever attempts are left.
+    [Fact]
+    public async Task Marks_a_job_dead_at_once_when_its_handler_fails_permanently()
+    {
+        _work.HandleJob("hopeless", Queue, (_, _) => throw new PermanentJobFailureException("never going to work"));
+        await using var loop = await StartLoopAsync();
+
+        var id = await EnqueueAsync(new NewJob("hopeless", Queue: Queue, MaxAttempts: 5));
+
+        var row = await WaitForStatusAsync(id, "dead");
+        Assert.Equal(1, row.Attempts);
+        Assert.True(row.Finished);
+        Assert.Null(row.LockedBy);
+        Assert.Equal("PermanentJobFailureException: never going to work", row.LastError);
+    }
+
+    [Fact]
+    public async Task Enqueues_several_jobs_in_one_batch_behind_a_savepoint()
+    {
+        await using var conn = await _database.App.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var tx = await conn.BeginTransactionAsync(TestContext.Current.CancellationToken);
+
+        await JobQueue.EnqueueManyAsync(tx, [new NewJob("a", Queue: Queue), new NewJob("b", Queue: Queue)], "consumer", TestContext.Current.CancellationToken);
+        // Released in the same batch, so the name is free again.
+        await JobQueue.EnqueueManyAsync(tx, [new NewJob("c", Queue: Queue)], "consumer", TestContext.Current.CancellationToken);
+        await tx.CommitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(["a", "b", "c"], await TestDatabase.ScalarAsync<string[]>(_database.Superuser, "SELECT array_agg(kind ORDER BY id) FROM orvano.jobs"));
+    }
+
+    [Fact]
+    public async Task Leaves_the_transaction_usable_after_rolling_back_a_rejected_batch()
+    {
+        await using var conn = await _database.App.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var tx = await conn.BeginTransactionAsync(TestContext.Current.CancellationToken);
+        await JobQueue.EnqueueAsync(tx, new NewJob("kept", Queue: Queue), TestContext.Current.CancellationToken);
+
+        var error = await Assert.ThrowsAsync<PostgresException>(() => JobQueue.EnqueueManyAsync(tx,
+            [new NewJob("dropped", Queue: Queue), new NewJob("dropped", "{\"s\":\"\\u0000\"}", Queue)], "consumer", TestContext.Current.CancellationToken));
+        Assert.Equal("22P05", error.SqlState);
+        await tx.RollbackAsync("consumer", TestContext.Current.CancellationToken);
+
+        await JobQueue.EnqueueAsync(tx, new NewJob("after", Queue: Queue), TestContext.Current.CancellationToken);
+        await tx.CommitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(["kept", "after"], await TestDatabase.ScalarAsync<string[]>(_database.Superuser, "SELECT array_agg(kind ORDER BY id) FROM orvano.jobs"));
+    }
+
+    [Fact]
+    public async Task Refuses_a_savepoint_name_that_is_not_a_plain_identifier()
+    {
+        await using var conn = await _database.App.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var tx = await conn.BeginTransactionAsync(TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            JobQueue.EnqueueManyAsync(tx, [new NewJob("a")], "x; DROP TABLE orvano.jobs", TestContext.Current.CancellationToken));
+    }
+
+    // Npgsql writes only UTC offsets to timestamptz; any offset is the same instant.
+    [Fact]
+    public async Task Accepts_a_run_at_with_any_utc_offset()
+    {
+        var runAt = new DateTimeOffset(2030, 1, 1, 9, 0, 0, TimeSpan.FromHours(-7));
+
+        var id = await EnqueueAsync(new NewJob("later", Queue: Queue, RunAt: runAt));
+
+        Assert.Equal(runAt.UtcDateTime, await TestDatabase.ScalarAsync<DateTime>(_database.Superuser, "SELECT run_at FROM orvano.jobs WHERE id = @id", ("id", id)));
     }
 
     [Fact]

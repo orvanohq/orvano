@@ -1,4 +1,5 @@
 using Npgsql;
+using Orvano.Core.Events;
 using OpenTelemetry;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -38,7 +39,7 @@ public static class Telemetry
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
-                .AddMeter("Npgsql"));
+                .AddMeter("Npgsql", EventTelemetry.MeterName));
 
         if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
             otel.UseOtlpExporter();

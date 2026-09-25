@@ -62,7 +62,15 @@ internal sealed class JobStore(NpgsqlDataSource db, string workerId)
         WHERE id = @id AND locked_by = @worker AND status = 'running'
         """, job.Id, ct,
         ("delay", Backoff(job.Attempts)),
-        ("error", Truncate($"{error.GetType().Name}: {error.Message}", 2000)));
+        ("error", Describe(error)));
+
+    /// <summary>Marks the job dead at once, whatever attempts it has left. <c>attempts</c> already counts this one.</summary>
+    public Task FailPermanentlyAsync(ClaimedJob job, Exception error, CancellationToken ct) => ExecuteAsync(
+        """
+        UPDATE orvano.jobs SET status = 'dead', finished_at = now(), last_error = @error, lease_until = NULL, locked_by = NULL
+        WHERE id = @id AND locked_by = @worker AND status = 'running'
+        """, job.Id, ct,
+        ("error", Describe(error)));
 
     /// <summary>Hands a job back on shutdown without counting the interrupted attempt.</summary>
     public Task ReleaseAsync(long id, CancellationToken ct) => ExecuteAsync(
@@ -99,6 +107,8 @@ internal sealed class JobStore(NpgsqlDataSource db, string workerId)
         foreach (var (name, value) in extra) cmd.Parameters.AddWithValue(name, value);
         return await cmd.ExecuteNonQueryAsync(ct);
     }
+
+    private static string Describe(Exception error) => Truncate($"{error.GetType().Name}: {error.Message}", 2000);
 
     private static string Truncate(string value, int max) => value.Length <= max ? value : value[..max];
 }

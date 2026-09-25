@@ -80,6 +80,11 @@ public sealed class JobLoop(
         {
             logger.LogWarning("Job {JobId} ({Kind}) lost its lease and was abandoned", job.Id, job.Kind);
         }
+        catch (PermanentJobFailureException ex)
+        {
+            logger.LogError(ex, "Job {JobId} ({Kind}) failed permanently on attempt {Attempt}; marking it dead", job.Id, job.Kind, job.Attempts);
+            await TryAsync(() => _store.FailPermanentlyAsync(job, ex, CancellationToken.None), job);
+        }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Job {JobId} ({Kind}) failed on attempt {Attempt} of {Max}", job.Id, job.Kind, job.Attempts, job.MaxAttempts);

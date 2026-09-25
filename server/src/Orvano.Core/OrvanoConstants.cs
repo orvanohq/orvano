@@ -18,6 +18,8 @@ public static class Timings
     public static readonly TimeSpan JobHeartbeat = TimeSpan.FromSeconds(20);
     /// <summary>Fallback poll, because NOTIFY is not durable across a dropped connection.</summary>
     public static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
+    /// <summary>After failed dispatch passes the delay doubles from <see cref="PollInterval"/> up to this.</summary>
+    public static readonly TimeSpan EventDispatchMaxRetryDelay = TimeSpan.FromSeconds(30);
     public static readonly TimeSpan LeaderRetry = TimeSpan.FromSeconds(10);
 }
 
