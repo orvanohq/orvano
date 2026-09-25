@@ -1,0 +1,10 @@
+# Compiles the contract to one OpenAPI 3.1 file, committed at dist/openapi.json (spec 0001, AC-1).
+emit:
+  - '@typespec/openapi3'
+options:
+  '@typespec/openapi3':
+    emitter-output-dir: '{project-root}/dist'
+    output-file: openapi.json
+    file-type: json
+    openapi-versions:
+      - 3.1.0

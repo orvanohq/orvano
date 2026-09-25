@@ -1,0 +1,28 @@
+{
+  "name": "@orvano/scenarios-js",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Runs the shared scenarios through @orvano/js in Node, Bun, Deno, Chromium, and workerd, and through @orvano/nextjs.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/interpreter.d.ts",
+      "default": "./dist/interpreter.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node dist/bundle.js",
+    "scenarios": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@orvano/js": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "esbuild": "^0.28.2",
+    "miniflare": "4.20260730.0",
+    "playwright": "1.63.0",
+    "typescript": "~6.0.3",
+    "yaml": "^2.9.1"
+  }
+}

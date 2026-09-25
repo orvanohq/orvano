@@ -22,6 +22,8 @@ docs/.agent-cache/
 # .NET
 bin/
 obj/
+# Dart keeps executables in bin/, so the scenario runner's is source, not build output.
+!tests/scenarios/runners/dart/bin/
 *.user
 *.suo
 TestResults/
@@ -48,3 +50,10 @@ pubspec_overrides.yaml
 
 # Local data
 *.log
+
+# The compiled contract is committed (spec 0001, AC-1).
+!contract/dist/
+
+# Next.js
+.next/
+next-env.d.ts

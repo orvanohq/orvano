@@ -1,0 +1,29 @@
+// {{ header }}
+namespace Orvano.Contract;
+{{~ for s in services ~}}
+
+/// <summary>Route constants for the <c>{{ s.name }}</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class {{ s.class_name }}
+{
+{{~ for o in s.operations ~}}
+    /// <summary>{{ o.summary }}</summary>
+    public static class {{ o.class_name }}
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = {{ o.id }};
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = {{ o.method }};
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = {{ o.route }};
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = {{ o.audience }};
+    }
+{{~ if !for.last ~}}
+
+{{~ end ~}}
+{{~ end ~}}
+}
+{{~ end ~}}

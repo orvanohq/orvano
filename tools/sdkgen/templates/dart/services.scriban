@@ -1,0 +1,39 @@
+// {{ header }}
+{{~ for i in imports ~}}
+import '{{ i }}';
+{{~ end ~}}
+{{~ for s in services ~}}
+
+/// Operations in the `{{ s.name }}` service.
+final class {{ s.class_name }} {
+  /// Creates the service over [client].
+  {{ s.class_name }}(this._client);
+
+  final Client _client;
+{{~ for o in s.operations ~}}
+
+{{ o.doc }}  Future<{{ o.result }}> {{ o.name }}({{ o.params }}) async {
+{{~ if o.return == "" ~}}
+    await _client.send({{ o.call }});
+{{~ else ~}}
+    final json = await _client.send({{ o.call }});
+    return {{ o.return }};
+{{~ end ~}}
+  }
+{{~ end ~}}
+}
+{{~ end ~}}
+
+/// Every service in this package, on one object: `orvano.health.get()`.
+final class Orvano {
+  /// Creates the services over [client].
+  Orvano(this.client){{ if aggregate.size > 0 }} : {{ for s in aggregate }}{{ s.property }} = {{ s.class_name }}(client){{ if !for.last }}, {{ end }}{{ end }}{{ end }};
+
+  /// The client every service sends through.
+  final Client client;
+{{~ for s in aggregate ~}}
+
+  /// Operations in the `{{ s.name }}` service.
+  final {{ s.class_name }} {{ s.property }};
+{{~ end ~}}
+}

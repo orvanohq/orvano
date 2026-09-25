@@ -4,7 +4,12 @@ packages:
   - sdks/nextjs
   - sdks/console-client
   - console
+  - tests/scenarios/runners/js
+  - tests/scenarios/runners/nextjs
 
-# Dependency build scripts pnpm may run. lefthook's postinstall installs the git hooks (skipped in CI).
+# Dependency build scripts pnpm may run. lefthook's postinstall installs the git hooks (skipped in CI);
+# esbuild and workerd (the scenario runners' bundler and edge runtime) check their native binaries.
 allowBuilds:
+  esbuild: true
   lefthook: true
+  workerd: true

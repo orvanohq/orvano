@@ -1,0 +1,57 @@
+// {{ header }}
+{{~ if enums.size > 0 ~}}
+using System.Text.Json;
+{{~ end ~}}
+using System.Text.Json.Serialization;
+
+namespace {{ namespace }};
+{{~ for e in enums ~}}
+
+/// <summary>{{ e.summary }}</summary>
+[JsonConverter(typeof({{ e.name }}JsonConverter))]
+{{ visibility }} enum {{ e.name }}
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+{{~ for m in e.members ~}}
+
+    /// <summary>{{ m.summary }}</summary>
+    {{ m.name }},
+{{~ end ~}}
+}
+
+/// <summary>Reads and writes <see cref="{{ e.name }}"/> by wire value; unknown values read as <see cref="{{ e.name }}.Unknown"/>.</summary>
+{{ visibility }} sealed class {{ e.name }}JsonConverter : JsonConverter<{{ e.name }}>
+{
+    /// <inheritdoc/>
+    public override {{ e.name }} Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+{{~ for m in e.members ~}}
+            {{ m.wire }} => {{ e.name }}.{{ m.name }},
+{{~ end ~}}
+            _ => {{ e.name }}.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, {{ e.name }} value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+{{~ for m in e.members ~}}
+            {{ e.name }}.{{ m.name }} => {{ m.wire }},
+{{~ end ~}}
+            _ => throw new JsonException($"{{ e.name }}.{value} has no wire value"),
+        });
+}
+{{~ end ~}}
+{{~ for m in models ~}}
+
+/// <summary>{{ m.summary }}</summary>
+{{~ for p in m.parameters ~}}
+/// {{ p.doc }}
+{{~ end ~}}
+{{ visibility }} sealed record {{ m.name }}(
+{{~ for p in m.parameters ~}}
+    {{ p.declaration }}{{ if !for.last }},{{ else }});{{ end }}
+{{~ end ~}}
+{{~ end ~}}

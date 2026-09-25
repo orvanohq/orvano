@@ -1,0 +1,61 @@
+# A real Orvano for the shared scenarios (spec 0001, AC-10): Postgres, migrate, and the api role in
+# the Test environment, where every response is checked against the contract. The api listens on
+# http://localhost:8080. It builds the same image as deploy/compose, so the server under test is
+# the one that ships. The passwords are throwaway test values.
+#   docker compose -f tests/scenarios/compose.yml up -d --build --wait
+
+name: orvano-scenarios
+
+x-server: &server
+  image: ${ORVANO_IMAGE:-ghcr.io/orvanohq/orvano}:${ORVANO_VERSION:-dev}
+  build:
+    context: ../..
+    dockerfile: deploy/server.Dockerfile
+
+services:
+  postgres:
+    image: postgres:18.6
+    environment:
+      POSTGRES_PASSWORD: scenarios
+      ORVANO_ADMIN_PASSWORD: scenarios-admin
+      ORVANO_APP_PASSWORD: scenarios-app
+    volumes:
+      - ../../deploy/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-h', '127.0.0.1', '-U', 'orvano_app', '-d', 'orvano']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    <<: *server
+    restart: 'no'
+    environment:
+      ORVANO_ROLE: migrate
+      ORVANO_DB_ADMIN_URL: Host=postgres;Port=5432;Username=orvano_admin;Password=scenarios-admin;Database=orvano
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *server
+    environment:
+      ORVANO_ROLE: api
+      ORVANO_DB_URL: Host=postgres;Port=5432;Username=orvano_app;Password=scenarios-app;Database=orvano
+      ORVANO_PUBLIC_URL: http://localhost:8080
+      ASPNETCORE_ENVIRONMENT: Test
+      ORVANO_TEST_FIXTURES: /fixtures/fixtures.yaml
+    volumes:
+      - ./fixtures.yaml:/fixtures/fixtures.yaml:ro
+    ports:
+      - 127.0.0.1:8080:8080
+    healthcheck:
+      test: ['CMD', '/app/orvano', 'healthcheck']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully

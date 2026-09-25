@@ -1,11 +1,12 @@
+using Orvano.Contract;
 using Orvano.Core.Modules;
 using Orvano.Server.Hosting;
 
 namespace Orvano.Server.Modules;
 
 /// <summary>
-/// The scaffold's only module: <c>GET /v1/health</c>. Spec 0001 later swaps the handwritten
-/// response for the generated <c>Orvano.Contract</c> types.
+/// The scaffold's only module: <c>GET /v1/health</c>, built on the generated
+/// <c>Orvano.Contract</c> types (spec 0001).
 /// </summary>
 internal sealed class SystemModule : IOrvanoModule
 {
@@ -15,13 +16,11 @@ internal sealed class SystemModule : IOrvanoModule
 
     public void MapApi(RouteGroupBuilder v1)
     {
-        v1.MapGet("/health", () => TypedResults.Ok(new HealthResponse("ok", OrvanoVersion.Current)))
-            .WithName("health.get");
+        v1.MapGet(HealthOperations.Get.Route, () => TypedResults.Ok(new Health("ok", OrvanoVersion.Current)))
+            .WithName(HealthOperations.Get.Id);
     }
 
     public void RegisterWork(IWorkRegistry work) { }
 
     public void RegisterRealtime(IRealtimeRegistry realtime) { }
 }
-
-internal sealed record HealthResponse(string Status, string Version);

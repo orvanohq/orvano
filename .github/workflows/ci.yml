@@ -30,6 +30,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Style and analyzer rules from .editorconfig; analyzer errors also fail the server build.
       - run: dotnet format Orvano.slnx --verify-no-changes
+      # Type aware lint rules need the types of workspace packages, which live in their dist/.
+      - run: pnpm --filter "@orvano/scenarios-nextjs^..." build
       - run: pnpm lint
       - run: pnpm format:check
 

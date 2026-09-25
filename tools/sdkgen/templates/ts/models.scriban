@@ -1,0 +1,17 @@
+// {{ header }}
+{{~ for e in enums ~}}
+
+{{ e.doc }}export type {{ e.name }} = {{ e.union }}
+{{~ end ~}}
+{{~ for m in models ~}}
+
+{{ m.doc }}export interface {{ m.name }} {
+{{~ for p in m.properties ~}}
+{{ p.doc }}  {{ p.declaration }}
+{{~ end ~}}
+}
+{{~ end ~}}
+{{~ if enums.size == 0 && models.size == 0 ~}}
+
+export {}
+{{~ end ~}}

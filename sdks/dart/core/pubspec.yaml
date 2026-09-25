@@ -1,0 +1,18 @@
+name: orvano_core
+description: >-
+  The core Dart client for Orvano, the open source backend you host yourself.
+  orvano_flutter builds on it for apps, and orvano_dart for servers.
+version: 0.0.0
+homepage: https://orvano.dev
+repository: https://github.com/orvanohq/orvano-dart
+
+resolution: workspace
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  http: ^1.6.0
+
+dev_dependencies:
+  lints: ^6.1.0

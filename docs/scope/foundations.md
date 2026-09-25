@@ -34,7 +34,7 @@ One machine readable description of every public endpoint is the source of truth
    - [ ] Release pipeline: version stamping and headers, publishing and mirrors, docs snippets, public contract file, breaking change check (AC-11, 12, 15, 17)
 - [ ] Verify it: `/check verify API contract & SDK pipeline`
 - [ ] Test it: `/test API contract & SDK pipeline`
-Spec [0001](../specs/0001-api-contract-sdk-pipeline/index.md)
+Spec [0001](../specs/0001-api-contract-sdk-pipeline/index.md) · code in `contract/`, `tools/sdkgen/`, `sdks/`, `server/src/Orvano.Contract/`, `tests/scenarios/`
 
 ### 5. Design system & console shell · needs a decision
 Visual language, layout, and base components for the console, plus the empty shell: navigation, org and project switcher, light and dark themes.

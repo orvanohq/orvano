@@ -1,0 +1,46 @@
+// {{ header }}
+{{~ for e in enums ~}}
+
+{{ e.doc }}enum {{ e.name }} {
+{{~ for m in e.members ~}}
+  {{ m.name }}({{ m.wire }}),
+{{~ end ~}}
+
+  /// A value this SDK version does not know yet.
+  unknown('');
+
+  const {{ e.name }}(this.value);
+
+  /// The value on the wire.
+  final String value;
+
+  /// Decodes a wire value; values this SDK does not know map to [unknown].
+  static {{ e.name }} fromJson(String value) =>
+      values.firstWhere((e) => e.value == value, orElse: () => unknown);
+}
+{{~ end ~}}
+{{~ for m in models ~}}
+
+{{ m.doc }}final class {{ m.name }} {
+  /// Creates a [{{ m.name }}].
+  const {{ m.name }}({{ if m.fields.size > 0 }}{ {{ for f in m.fields }}{{ f.param }}, {{ end }} }{{ end }});
+
+  /// Decodes a [{{ m.name }}] from JSON.
+  factory {{ m.name }}.fromJson(Map<String, dynamic> json) => {{ m.name }}(
+{{~ for f in m.fields ~}}
+    {{ f.from_json }},
+{{~ end ~}}
+  );
+{{~ for f in m.fields ~}}
+
+{{ f.doc }}  {{ f.declaration }}
+{{~ end ~}}
+
+  /// Encodes this [{{ m.name }}] as JSON.
+  Map<String, dynamic> toJson() => {
+{{~ for f in m.fields ~}}
+    {{ f.to_json }},
+{{~ end ~}}
+  };
+}
+{{~ end ~}}
