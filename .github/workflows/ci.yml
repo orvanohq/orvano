@@ -13,6 +13,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: Lint and format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+      - run: corepack enable pnpm
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+      - run: pnpm install --frozen-lockfile
+      # Style and analyzer rules from .editorconfig; analyzer errors also fail the server build.
+      - run: dotnet format Orvano.slnx --verify-no-changes
+      - run: pnpm lint
+      - run: pnpm format:check
+
   server:
     name: Server build, tests, and EF drift check
     runs-on: ubuntu-latest
