@@ -3,6 +3,7 @@
 **Reviewed by**: Claude Sonnet 5 (author on Claude Opus 5.5)
 **Scope**: 94 files (excluding pnpm-lock.yaml and console/src/routeTree.gen.ts), scaffold/stack-architecture vs main (merge base fe1a3b9)
 **Verdict**: Changes requested
+**Resolution**: All findings addressed on the branch, 2026-09-25. See [Resolution](#resolution).
 
 ## Summary
 
@@ -46,3 +47,16 @@ This lands the whole tracer-bullet scaffold for spec 0002: a .NET 10 modular mon
 ## Test coverage
 
 Coverage of the changed surface is extensive and largely uses a real Postgres 18 (Testcontainers) rather than mocks: connection string parsing, pool budgeting, project-scope isolation, migration runner concurrency/failure/checksum behavior, platform role privileges, event dispatch (including transactional rollback and poll-fallback), job claiming/lease/backoff/dead-lettering, leader election and takeover, LISTEN/NOTIFY reconnect-with-backoff, role selection, startup checks, and end-to-end binary behavior for every role. The one meaningful gap is noted above as a Major: `EventDispatcherTests` never exercises a consumer that throws, so the batch-poisoning behavior has no test either confirming or guarding it. As also noted above, none of this suite currently runs in CI.
+
+## Resolution
+
+Each finding was fixed on `scaffold/stack-architecture` before merge. The full suite (250 tests) passes locally and in CI.
+
+| Finding | Severity | Fixed in | How |
+|---|---|---|---|
+| `migrate` ignores `ASPNETCORE_ENVIRONMENT` under Aspire | 🟠 Major | `fae0c9f` | `migrate` now honors `ASPNETCORE_ENVIRONMENT` like the other roles |
+| One failing consumer blocks the dispatch batch | 🟠 Major | `b03a7aa` (spec), `df24fde` (code) | Failures are contained per consumer and per event, with a savepoint, an `events.redispatch` job, and the `orvano.events.consumer_failures` counter; spec 0002 records the design (S-8) |
+| CI never runs the xUnit suite | 🟠 Major | `d6e588f` | The server job runs `dotnet test --solution Orvano.slnx` |
+| Misleading message when the database is ahead of the build | 🟡 Minor | `59682f7` | The message says to upgrade Orvano when the database is ahead, and to run migrate when it is behind |
+| Nullable parameters without an explicit `NpgsqlDbType` | ⚪ Nit | `d86c6db` | `project_id` and `subject` pass `NpgsqlDbType.Text` |
+| Realtime queue drops silently | ⚪ Nit | `d86c6db` | Each drop increments `orvano.realtime.events_dropped` on the `Orvano.Realtime` meter; covered by `RealtimeFanoutTests` |

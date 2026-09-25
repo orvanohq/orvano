@@ -2,7 +2,7 @@
 
 The ground every version stands on. Nothing here ships as a release by itself; it makes v0.1 possible. See [index.md](index.md) for the full plan.
 
-### 1. Stack & architecture · in-progress · GA
+### 1. Stack & architecture · done · GA
 Decide the server language, the console framework, the database engine setup, the gateway, the worker and event model, and how containers are laid out on one server. Then scaffold a runnable monorepo.
 **Done when:** the stack is recorded in a spec, and the empty scaffold (API, worker, console) boots locally with one command and passes build.
 - [x] Decide the stack (spec): `/architect stack & architecture`

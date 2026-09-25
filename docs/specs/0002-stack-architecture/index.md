@@ -2,7 +2,7 @@
 
 **Date**: 2026-09-24
 **Updated**: 2026-09-25 (poison events: a failing event consumer no longer stalls the outbox)
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
