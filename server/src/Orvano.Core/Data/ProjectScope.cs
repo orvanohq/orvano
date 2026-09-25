@@ -12,7 +12,7 @@ public static partial class ProjectScope
 {
     // Project IDs are limited to [a-z0-9], at most 60 characters, so "p_" plus the ID fits
     // Postgres' 63 byte name limit and is safe to inline as an identifier.
-    [GeneratedRegex("^[a-z0-9]{1,60}$")]
+    [GeneratedRegex(@"^[a-z0-9]{1,60}\z")]
     private static partial Regex ProjectIdPattern();
 
     public static string RoleName(string projectId) =>

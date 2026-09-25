@@ -10,7 +10,7 @@ public sealed partial record PlatformMigration(int Version, string Name, string 
 {
     public const string ResourcePrefix = "migrations/platform/";
 
-    [GeneratedRegex(@"^(\d{4})_([a-z0-9_]+)\.sql$")]
+    [GeneratedRegex(@"^(\d{4})_([a-z0-9_]+)\.sql\z")]
     private static partial Regex FileNamePattern();
 
     public static IReadOnlyList<PlatformMigration> LoadEmbedded(Assembly assembly)
