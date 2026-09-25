@@ -7,7 +7,7 @@ Decide the server language, the console framework, the database engine setup, th
 **Done when:** the stack is recorded in a spec, and the empty scaffold (API, worker, console) boots locally with one command and passes build.
 - [x] Decide the stack (spec): `/architect stack & architecture`
 - [x] Scaffold from the decision: `/develop stack & architecture`
-- [ ] Verify it: `/check verify stack & architecture`
+- [x] Verify it: `/check verify stack & architecture`
 - [x] Test it: `/test stack & architecture`
 - [x] Review it (fresh model): `/check review stack & architecture`
 - [ ] Document it: `/document stack & architecture`
