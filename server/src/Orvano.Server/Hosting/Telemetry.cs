@@ -39,7 +39,7 @@ public static class Telemetry
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
-                .AddMeter("Npgsql", EventTelemetry.MeterName));
+                .AddMeter("Npgsql", EventTelemetry.MeterName, RealtimeFanout.MeterName));
 
         if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
             otel.UseOtlpExporter();

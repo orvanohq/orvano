@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using System.Threading.Channels;
 using Npgsql;
 using Orvano.Core.Data;
@@ -13,8 +14,19 @@ public sealed class RealtimeFanout(
     [FromKeyedServices(OrvanoDb.App)] NpgsqlDataSource db,
     ILogger<RealtimeFanout> logger) : BackgroundService
 {
+    public const string MeterName = "Orvano.Realtime";
+
+    /// <summary>Event IDs waiting to be fetched. Past this, the oldest are dropped (at most once delivery).</summary>
+    public const int Capacity = 10_000;
+
+    private static readonly Counter<long> Dropped = new Meter(MeterName).CreateCounter<long>(
+        "orvano.realtime.events_dropped",
+        unit: "{event}",
+        description: "Event IDs dropped because the realtime role fell behind; affected clients resync.");
+
     private readonly Channel<long> _ids = Channel.CreateBounded<long>(
-        new BoundedChannelOptions(10_000) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true });
+        new BoundedChannelOptions(Capacity) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true },
+        _ => Dropped.Add(1));
 
     /// <summary>Called on the LISTEN read loop; never blocks.</summary>
     public void OnNotify(string payload)

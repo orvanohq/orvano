@@ -25,9 +25,9 @@ public static class Outbox
                 RETURNING id)
             SELECT id, pg_notify('orvano_events', id::text) FROM inserted
             """, tx.Connection, tx);
-        cmd.Parameters.AddWithValue("project_id", (object?)e.ProjectId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("project_id", NpgsqlDbType.Text, (object?)e.ProjectId ?? DBNull.Value);
         cmd.Parameters.AddWithValue("type", e.Type);
-        cmd.Parameters.AddWithValue("subject", (object?)e.Subject ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("subject", NpgsqlDbType.Text, (object?)e.Subject ?? DBNull.Value);
         cmd.Parameters.AddWithValue("payload", NpgsqlDbType.Jsonb, e.PayloadJson);
         return (long)(await cmd.ExecuteScalarAsync(ct))!;
     }

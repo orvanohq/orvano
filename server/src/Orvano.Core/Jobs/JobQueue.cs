@@ -78,7 +78,7 @@ public static partial class JobQueue
     {
         p.AddWithValue("queue", job.Queue);
         p.AddWithValue("kind", job.Kind);
-        p.AddWithValue("project_id", (object?)job.ProjectId ?? DBNull.Value);
+        p.AddWithValue("project_id", NpgsqlDbType.Text, (object?)job.ProjectId ?? DBNull.Value);
         p.AddWithValue("payload", NpgsqlDbType.Jsonb, job.PayloadJson);
         p.AddWithValue("priority", job.Priority);
         // Npgsql only writes UTC offsets to timestamptz; the instant is the same.
