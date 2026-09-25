@@ -17,6 +17,7 @@ public sealed class PgNotificationListener(
 {
     private static readonly TimeSpan MaxBackoff = TimeSpan.FromSeconds(30);
 
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var backoff = TimeSpan.FromSeconds(1);

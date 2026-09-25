@@ -4,9 +4,13 @@ using NpgsqlTypes;
 
 namespace Orvano.Core.Jobs;
 
+/// <summary>Queue names. A job loop claims every queue that has a registered handler.</summary>
 public static class JobQueues
 {
+    /// <summary>The queue for module jobs unless a module picks another.</summary>
     public const string Default = "default";
+
+    /// <summary>The platform's own jobs, such as <see cref="Events.EventRedispatch"/>.</summary>
     public const string Internal = "internal";
 }
 
@@ -22,15 +26,29 @@ public sealed record NewJob(
     DateTimeOffset? RunAt = null,
     int MaxAttempts = NewJob.DefaultMaxAttempts)
 {
+    /// <summary>The attempts a job gets unless it asks for a different number.</summary>
     public const int DefaultMaxAttempts = 10;
 }
 
+/// <summary>A job a worker has claimed and holds the lease on.</summary>
+/// <param name="Id">The job's row ID.</param>
+/// <param name="Queue">The queue it was claimed from.</param>
+/// <param name="Kind">Selects the handler.</param>
+/// <param name="ProjectId">The project the job runs for, or <see langword="null"/> for platform work.</param>
+/// <param name="Payload">The handler's input as JSON text. Never log it.</param>
+/// <param name="Attempts">Claims so far, including this one.</param>
+/// <param name="MaxAttempts">After this many attempts a failing job is dead.</param>
 public sealed record ClaimedJob(long Id, string Queue, string Kind, string? ProjectId, string Payload, int Attempts, int MaxAttempts);
 
+/// <summary>What a <see cref="Modules.JobHandler"/> receives.</summary>
+/// <param name="Job">The claimed job.</param>
+/// <param name="Services">A service scope for this one job run.</param>
 public sealed record JobContext(ClaimedJob Job, IServiceProvider Services);
 
+/// <summary>Enqueues jobs in <c>orvano.jobs</c> and wakes the job loops.</summary>
 public static partial class JobQueue
 {
+    /// <summary>The NOTIFY channel; each notification's payload is the queue name.</summary>
     public const string Channel = "orvano_jobs";
 
     private const string InsertSql =

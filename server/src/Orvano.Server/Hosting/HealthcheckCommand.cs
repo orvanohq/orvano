@@ -4,7 +4,7 @@ namespace Orvano.Server.Hosting;
 /// <c>orvano healthcheck</c>: calls this container's own <c>/internal/readyz</c> and exits 0 or 1.
 /// Chiseled images have no shell or curl, so compose health checks run this instead.
 /// </summary>
-public static class HealthcheckCommand
+internal static class HealthcheckCommand
 {
     public static async Task<int> RunAsync()
     {

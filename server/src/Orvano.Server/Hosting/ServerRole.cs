@@ -13,7 +13,7 @@ using Orvano.Server.Modules;
 namespace Orvano.Server.Hosting;
 
 /// <summary>The long running roles: api, worker, and realtime. Each serves /internal health on HTTP.</summary>
-public static class ServerRole
+internal static class ServerRole
 {
     public static async Task<int> RunAsync(OrvanoRole role, string[] args)
     {

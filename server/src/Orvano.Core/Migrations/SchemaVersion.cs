@@ -2,6 +2,7 @@ using Npgsql;
 
 namespace Orvano.Core.Migrations;
 
+/// <summary>Reads which platform migrations a database has.</summary>
 public static class SchemaVersion
 {
     /// <summary>Highest applied platform migration, or 0 on an empty database.</summary>
@@ -17,6 +18,7 @@ public static class SchemaVersion
         return Convert.ToInt32(await max.ExecuteScalarAsync(ct));
     }
 
+    /// <summary>Highest applied platform migration, or 0 on an empty database, on a new connection.</summary>
     public static async Task<int> ReadAsync(NpgsqlDataSource db, CancellationToken ct)
     {
         await using var conn = await db.OpenConnectionAsync(ct);

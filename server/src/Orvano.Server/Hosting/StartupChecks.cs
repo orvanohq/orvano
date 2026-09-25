@@ -3,7 +3,7 @@ using Orvano.Core.Migrations;
 
 namespace Orvano.Server.Hosting;
 
-public static class StartupChecks
+internal static class StartupChecks
 {
     /// <summary>
     /// Scheduling and Npgsql need real time zone data. Fails loudly on an image without ICU and

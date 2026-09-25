@@ -11,6 +11,9 @@ namespace Orvano.Core.Scheduling;
 /// <summary>The shared kernel's own work: the event redispatch job, event pruning, and the job lease reaper.</summary>
 public static class CoreWork
 {
+    /// <summary>Registers the kernel's job handler and schedules. The host calls it before any module registers.</summary>
+    /// <param name="work">The worker's registry.</param>
+    /// <param name="eventRetentionDays">Dispatched events older than this many days are pruned.</param>
     public static void Register(IWorkRegistry work, int eventRetentionDays)
     {
         work.HandleJob(EventRedispatch.Kind, JobQueues.Internal, EventRedispatch.HandleAsync);

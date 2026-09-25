@@ -1,10 +1,10 @@
 namespace Orvano.Server.Hosting;
 
-public enum OrvanoRole { Api, Worker, Realtime, Migrate, Executor }
+internal enum OrvanoRole { Api, Worker, Realtime, Migrate, Executor }
 
-public sealed record RoleSelection(OrvanoRole Role, string[] RemainingArgs);
+internal sealed record RoleSelection(OrvanoRole Role, string[] RemainingArgs);
 
-public static class RoleSelector
+internal static class RoleSelector
 {
     private static readonly Dictionary<string, OrvanoRole> Names = new(StringComparer.Ordinal)
     {

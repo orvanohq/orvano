@@ -24,6 +24,7 @@ public sealed class EventDispatcher(
     private const int BatchSize = 100;
     private const string Savepoint = "consumer";
 
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var failures = 0;

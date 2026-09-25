@@ -15,6 +15,12 @@
     <ProjectReference Include="..\Orvano.Core\Orvano.Core.csproj" />
   </ItemGroup>
 
+  <!-- The host exposes no public API; its types are internal and only the tests reach in. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orvano.Server.Tests" />
+    <InternalsVisibleTo Include="Orvano.ModelDriftCheck" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Npgsql.OpenTelemetry" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />

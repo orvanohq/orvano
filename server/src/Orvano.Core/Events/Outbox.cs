@@ -3,8 +3,20 @@ using NpgsqlTypes;
 
 namespace Orvano.Core.Events;
 
+/// <summary>An event to write with <see cref="Outbox.WriteAsync"/>.</summary>
+/// <param name="Type">The event type name that consumers subscribe to.</param>
+/// <param name="PayloadJson">The event body as a JSON document. Never log it.</param>
+/// <param name="ProjectId">The project the event belongs to, or <see langword="null"/> for a platform event.</param>
+/// <param name="Subject">The ID of the thing the event is about, if any.</param>
 public sealed record EventDraft(string Type, string PayloadJson, string? ProjectId = null, string? Subject = null);
 
+/// <summary>An event as stored in <c>orvano.events</c>, the form consumers receive.</summary>
+/// <param name="Id">The outbox row ID; also the dispatch order.</param>
+/// <param name="ProjectId">The project the event belongs to, or <see langword="null"/> for a platform event.</param>
+/// <param name="Type">The event type name.</param>
+/// <param name="Subject">The ID of the thing the event is about, if any.</param>
+/// <param name="Payload">The event body as JSON text. Never log it.</param>
+/// <param name="CreatedAt">When the event was written.</param>
 public sealed record OutboxEvent(long Id, string? ProjectId, string Type, string? Subject, string Payload, DateTimeOffset CreatedAt);
 
 /// <summary>
@@ -13,8 +25,11 @@ public sealed record OutboxEvent(long Id, string? ProjectId, string Type, string
 /// </summary>
 public static class Outbox
 {
+    /// <summary>The NOTIFY channel; each notification's payload is the new event's ID.</summary>
     public const string Channel = "orvano_events";
 
+    /// <summary>Inserts the event and queues its NOTIFY in <paramref name="tx"/>, so it exists only if the change commits.</summary>
+    /// <returns>The new event's ID.</returns>
     public static async Task<long> WriteAsync(NpgsqlTransaction tx, EventDraft e, CancellationToken ct)
     {
         await using var cmd = new NpgsqlCommand(
@@ -32,6 +47,7 @@ public static class Outbox
         return (long)(await cmd.ExecuteScalarAsync(ct))!;
     }
 
+    /// <summary>Reads one event by ID, or <see langword="null"/> if it was never written or has been pruned.</summary>
     public static async Task<OutboxEvent?> ReadAsync(NpgsqlDataSource db, long id, CancellationToken ct)
     {
         await using var cmd = db.CreateCommand(

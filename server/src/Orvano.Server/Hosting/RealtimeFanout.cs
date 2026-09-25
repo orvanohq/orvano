@@ -10,7 +10,7 @@ namespace Orvano.Server.Hosting;
 /// Realtime role. Receives event IDs from the LISTEN connection, fetches each event, and will push it
 /// to matching sockets once the realtime protocol exists (scope row 22). Delivery is at most once.
 /// </summary>
-public sealed class RealtimeFanout(
+internal sealed class RealtimeFanout(
     [FromKeyedServices(OrvanoDb.App)] NpgsqlDataSource db,
     ILogger<RealtimeFanout> logger) : BackgroundService
 {

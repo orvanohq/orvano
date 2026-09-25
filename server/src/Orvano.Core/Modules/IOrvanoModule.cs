@@ -10,9 +10,18 @@ namespace Orvano.Core.Modules;
 /// </summary>
 public interface IOrvanoModule
 {
+    /// <summary>The module's short lowercase name, which also prefixes its tables and consumer names.</summary>
     string Name { get; }
-    void ConfigureServices(IServiceCollection services, IConfiguration config); // every role
-    void MapApi(RouteGroupBuilder v1);                                          // api role
-    void RegisterWork(IWorkRegistry work);                                      // worker role: event handlers, job kinds, schedules
-    void RegisterRealtime(IRealtimeRegistry realtime);                          // realtime role
+
+    /// <summary>Registers the module's services. Runs in every role.</summary>
+    void ConfigureServices(IServiceCollection services, IConfiguration config);
+
+    /// <summary>Maps the module's endpoints under <c>/v1</c>. Runs in the <c>api</c> role.</summary>
+    void MapApi(RouteGroupBuilder v1);
+
+    /// <summary>Registers event consumers, job handlers, and schedules. Runs in the <c>worker</c> role.</summary>
+    void RegisterWork(IWorkRegistry work);
+
+    /// <summary>Registers realtime channels. Runs in the <c>realtime</c> role.</summary>
+    void RegisterRealtime(IRealtimeRegistry realtime);
 }

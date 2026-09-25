@@ -6,7 +6,7 @@ using Orvano.Core.Migrations;
 namespace Orvano.Server.Hosting;
 
 /// <summary>One shot: applies platform migrations as orvano_admin, then exits 0.</summary>
-public static class MigrateRole
+internal static class MigrateRole
 {
     public static async Task<int> RunAsync(string[] args)
     {

@@ -14,9 +14,19 @@ public static class OrvanoDb
     /// <summary>Unpooled, as <c>orvano_app</c>, for connections held for the process lifetime (LISTEN, leader lock).</summary>
     public const string Dedicated = "orvano-dedicated";
 
+    /// <summary>A pooled data source capped at <paramref name="maxPoolSize"/> connections (see <see cref="ConnectionBudget"/>).</summary>
+    /// <param name="connectionString">An Npgsql keyword string or a <c>postgres://</c> URL.</param>
+    /// <param name="maxPoolSize">The most connections this role may hold from this source.</param>
+    /// <param name="applicationName">Shown as <c>application_name</c> in <c>pg_stat_activity</c>.</param>
     public static NpgsqlDataSource Create(string connectionString, int maxPoolSize, string applicationName) =>
         Build(connectionString, applicationName, csb => csb.MaxPoolSize = maxPoolSize);
 
+    /// <summary>
+    /// An unpooled data source with TCP keepalive, for a connection held for the process lifetime
+    /// (see <see cref="Dedicated"/>).
+    /// </summary>
+    /// <param name="connectionString">An Npgsql keyword string or a <c>postgres://</c> URL.</param>
+    /// <param name="applicationName">Shown as <c>application_name</c> in <c>pg_stat_activity</c>.</param>
     public static NpgsqlDataSource CreateDedicated(string connectionString, string applicationName) =>
         Build(connectionString, applicationName, csb =>
         {

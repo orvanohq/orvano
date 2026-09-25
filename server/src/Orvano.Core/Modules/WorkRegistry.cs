@@ -6,10 +6,18 @@ using Orvano.Core.Jobs;
 
 namespace Orvano.Core.Modules;
 
+/// <summary>A schedule registered with <see cref="IWorkRegistry.AddInternalSchedule"/>.</summary>
+/// <param name="Name">Names the schedule in logs.</param>
+/// <param name="Interval">Time between runs.</param>
+/// <param name="Task">The work to run.</param>
 public sealed record InternalSchedule(string Name, TimeSpan Interval, ScheduledTask Task);
 
+/// <summary>An event consumer with its stable name.</summary>
+/// <param name="Name">The consumer's identity, <c>&lt;module&gt;.&lt;purpose&gt;</c>.</param>
+/// <param name="Consumer">Maps the event to jobs.</param>
 public sealed record NamedConsumer(string Name, EventConsumer Consumer);
 
+/// <summary>The worker's registry of consumers, job handlers, queues, and schedules, filled by every module at startup.</summary>
 public sealed partial class WorkRegistry : IWorkRegistry
 {
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
@@ -19,6 +27,9 @@ public sealed partial class WorkRegistry : IWorkRegistry
     private readonly HashSet<string> _queues = new(StringComparer.Ordinal);
     private readonly List<InternalSchedule> _schedules = [];
 
+    /// <inheritdoc />
+    /// <exception cref="ArgumentException">The consumer name is not 1 to 100 of <c>[a-z0-9_.]</c>.</exception>
+    /// <exception cref="InvalidOperationException">The event type already has a consumer with that name.</exception>
     public void OnEvent(string eventType, string consumerName, EventConsumer consumer)
     {
         if (consumerName is null || !ConsumerName().IsMatch(consumerName))
@@ -31,6 +42,8 @@ public sealed partial class WorkRegistry : IWorkRegistry
         list.Add(new NamedConsumer(consumerName, consumer));
     }
 
+    /// <inheritdoc />
+    /// <exception cref="InvalidOperationException">The kind already has a handler.</exception>
     public void HandleJob(string kind, string queue, JobHandler handler)
     {
         if (!_handlers.TryAdd(kind, handler))
@@ -38,6 +51,7 @@ public sealed partial class WorkRegistry : IWorkRegistry
         _queues.Add(queue);
     }
 
+    /// <inheritdoc />
     public void AddInternalSchedule(string name, TimeSpan interval, ScheduledTask task) =>
         _schedules.Add(new InternalSchedule(name, interval, task));
 
@@ -45,13 +59,17 @@ public sealed partial class WorkRegistry : IWorkRegistry
     public IReadOnlyList<NamedConsumer> ConsumersFor(OutboxEvent e) =>
         _consumers.TryGetValue(e.Type, out var list) ? list : [];
 
+    /// <summary>One consumer by event type and name, or <see langword="null"/> if it is no longer registered.</summary>
     public EventConsumer? ConsumerFor(string eventType, string name) =>
         _consumers.TryGetValue(eventType, out var list) ? list.Find(c => c.Name == name)?.Consumer : null;
 
+    /// <summary>The handler for a job kind, or <see langword="null"/> if none is registered.</summary>
     public JobHandler? HandlerFor(string kind) => _handlers.GetValueOrDefault(kind);
 
+    /// <summary>Every queue some handler registered; the job loop claims from these.</summary>
     public string[] Queues => [.. _queues];
 
+    /// <summary>Every schedule, in registration order.</summary>
     public IReadOnlyList<InternalSchedule> Schedules => _schedules;
 
     /// <summary>
@@ -114,4 +132,5 @@ public sealed partial class WorkRegistry : IWorkRegistry
     private static partial Regex ConsumerName();
 }
 
+/// <summary>The realtime role's registry. Empty until the realtime protocol lands (scope row 22).</summary>
 public sealed class RealtimeRegistry : IRealtimeRegistry;

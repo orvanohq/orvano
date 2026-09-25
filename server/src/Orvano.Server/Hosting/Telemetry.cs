@@ -7,7 +7,7 @@ using Orvano.Core.Events;
 
 namespace Orvano.Server.Hosting;
 
-public static class Telemetry
+internal static class Telemetry
 {
     /// <summary>
     /// OpenTelemetry traces, metrics, and logs for every role. JSON logs go to stdout; OTLP export is
