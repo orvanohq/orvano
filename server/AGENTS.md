@@ -14,6 +14,8 @@ The Orvano server: one .NET 10 program, built as separate modules, shipped as on
 | `src/Orvano.Core/Modules/IOrvanoModule.cs` | The module contract: services, API, work, realtime hooks |
 | `src/Orvano.Core/Data/ProjectScope.cs` | The only code path allowed to `SET LOCAL ROLE p_<id>` |
 | `src/Orvano.Core/Events/Outbox.cs`, `Jobs/JobQueue.cs` | Events and jobs written in the caller's transaction |
+| `src/Orvano.Contract/` | Generated API records and route constants for every audience, plus the embedded `openapi.json` (spec 0001); never packed |
+| `src/Orvano.Server/Hosting/ContractValidation.cs`, `ContractValidator.cs` | `Test` environment only: checks every `/v1` response against the contract |
 | `migrations/platform/` | Platform SQL migrations, embedded into the binary |
 | `tests/Orvano.ModelDriftCheck/` | Fails when the EF model and the SQL migrations disagree |
 
@@ -35,11 +37,14 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 - EF Core only for platform tables in schema `orvano`, mapped with fluent config in `OrvanoDbContext` (no attributes on domain types). Per project tables use raw Npgsql through `ProjectScope`.
 - Module tables carry the module name as a prefix (`orvano.platform_projects`); the kernel's own tables (`orvano.events`, `orvano.jobs`, `orvano.schema_migrations`) have none. Migrations are `NNNN_<name>.sql` and are checksummed when applied, so never edit one after it merges; add a new file instead.
 - API errors are problem details (`AddProblemDetails` in `ServerRole.cs`); never let a raw exception message reach a client.
+- `/v1` endpoints use the generated `Orvano.Contract` types, never handwritten request or response records: `v1.MapGet(HealthOperations.Get.Route, ...).WithName(HealthOperations.Get.Id)`. The endpoint name must be the operationId, or contract validation rejects the response.
 - Tests: one Postgres container per run through `PostgresFixture`, one fresh database per test through `TestDatabase`. No database mocks.
 
 ## Gotchas
 
 - Every event and job is written in the same transaction as the change it describes. Never write one outside that transaction.
+- In the `Test` environment a response that breaks the contract (extra, missing, or mistyped field, undeclared 2xx status, unnamed endpoint) becomes a 500 `contract_violation`. `ORVANO_TEST_FIXTURES` is refused outside `Test`.
+- `Orvano.Contract` embeds `contract/dist/openapi.json`, so `deploy/server.Dockerfile` copies that file too; a new server project also needs its csproj copied before restore there.
 - Every job handler must be idempotent, and no consumer may rely on event order. A consumer that throws is retried later through the `events.redispatch` job.
 - Consumers stay small and do no IO: a hanging consumer still stalls the dispatcher.
 - `orvano_app` never holds DDL rights. Only `migrate` and `worker` receive `ORVANO_DB_ADMIN_URL`.
