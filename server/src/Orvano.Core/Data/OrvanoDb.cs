@@ -29,6 +29,9 @@ public static class OrvanoDb
     {
         var builder = new NpgsqlDataSourceBuilder(ConnectionStrings.Normalize(connectionString));
         builder.ConnectionStringBuilder.ApplicationName ??= applicationName;
+        // The chiseled image has no libgssapi_krb5, so the default (Prefer) only makes .NET print a
+        // non JSON "cannot load library" error on every role's first connection.
+        builder.ConnectionStringBuilder.GssEncryptionMode = GssEncryptionMode.Disable;
         configure(builder.ConnectionStringBuilder);
         return builder.Build();
     }
