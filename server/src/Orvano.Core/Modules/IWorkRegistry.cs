@@ -15,6 +15,7 @@ public delegate Task JobHandler(JobContext job, CancellationToken ct);
 /// <summary>A task the leader worker runs on an interval.</summary>
 public delegate Task ScheduledTask(IServiceProvider services, CancellationToken ct);
 
+/// <summary>Where a module registers the work the <c>worker</c> role runs.</summary>
 public interface IWorkRegistry
 {
     /// <summary>
@@ -22,7 +23,10 @@ public interface IWorkRegistry
     /// a redispatch job finds its consumer again by event type plus name, so renaming one is a breaking change.
     /// </summary>
     void OnEvent(string eventType, string consumerName, EventConsumer consumer);
+    /// <summary>Registers the handler for a job kind, and makes the worker claim <paramref name="queue"/>. One handler per kind.</summary>
     void HandleJob(string kind, string queue, JobHandler handler);
+
+    /// <summary>Runs <paramref name="task"/> every <paramref name="interval"/> on the leader worker only.</summary>
     void AddInternalSchedule(string name, TimeSpan interval, ScheduledTask task);
 }
 

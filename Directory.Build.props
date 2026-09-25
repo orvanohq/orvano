@@ -16,9 +16,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
-    <!-- Checks XML doc comment syntax and lets IDE0005 (unused usings) run. CS1591 (missing doc
-         comment) stays off until the existing public members are documented; then remove it here. -->
+    <!-- Checks XML doc comments and lets IDE0005 (unused usings) run. A public member without a doc
+         comment (CS1591) is an error; only test projects and the AppHost opt out. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 </Project>

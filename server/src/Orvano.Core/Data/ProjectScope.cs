@@ -15,11 +15,21 @@ public static partial class ProjectScope
     [GeneratedRegex(@"^[a-z0-9]{1,60}\z")]
     private static partial Regex ProjectIdPattern();
 
+    /// <summary>The project's Postgres role and schema name, <c>p_&lt;id&gt;</c>.</summary>
+    /// <exception cref="ArgumentException"><paramref name="projectId"/> is not 1 to 60 characters of <c>[a-z0-9]</c>.</exception>
     public static string RoleName(string projectId) =>
         ProjectIdPattern().IsMatch(projectId)
             ? "p_" + projectId
             : throw new ArgumentException($"'{projectId}' is not a valid project ID.", nameof(projectId));
 
+    /// <summary>
+    /// Runs <paramref name="work"/> in one transaction as the project's role, with its schema as the
+    /// search path, and commits if it returns. A throw rolls everything back.
+    /// </summary>
+    /// <param name="appDb">The <c>orvano_app</c> data source (<see cref="OrvanoDb.App"/>).</param>
+    /// <param name="projectId">The project to act as.</param>
+    /// <param name="work">The work; it must use the connection and transaction it is given.</param>
+    /// <param name="ct">Cancels the work and rolls it back.</param>
     public static async Task<T> RunAsync<T>(
         NpgsqlDataSource appDb,
         string projectId,

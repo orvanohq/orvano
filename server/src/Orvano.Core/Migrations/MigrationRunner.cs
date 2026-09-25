@@ -9,6 +9,9 @@ namespace Orvano.Core.Migrations;
 /// </summary>
 public sealed class MigrationRunner(NpgsqlDataSource adminDb, ILogger<MigrationRunner> logger)
 {
+    /// <summary>Checks the applied migrations against <paramref name="migrations"/>, then applies the pending ones in order.</summary>
+    /// <returns>How many migrations were applied.</returns>
+    /// <exception cref="InvalidOperationException">The database has a migration this build does not know, or an applied migration's file changed.</exception>
     public async Task<int> RunAsync(IReadOnlyList<PlatformMigration> migrations, CancellationToken ct)
     {
         await using var conn = await adminDb.OpenConnectionAsync(ct);

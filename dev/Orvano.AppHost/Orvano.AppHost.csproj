@@ -4,8 +4,9 @@
     <OutputType>Exe</OutputType>
     <UserSecretsId>orvano-apphost</UserSecretsId>
     <IsPackable>false</IsPackable>
-    <!-- dotnet run on this project works without the Aspire CLI bundle; opt in later if a feature needs it. -->
-    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+    <!-- dotnet run on this project works without the Aspire CLI bundle; opt in later if a feature needs it.
+         CS1591: dev only orchestration, no public API to document. -->
+    <NoWarn>$(NoWarn);ASPIRE010;CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

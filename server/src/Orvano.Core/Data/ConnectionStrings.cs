@@ -2,6 +2,7 @@ using Npgsql;
 
 namespace Orvano.Core.Data;
 
+/// <summary>Connection string helpers shared by every role.</summary>
 public static class ConnectionStrings
 {
     /// <summary>

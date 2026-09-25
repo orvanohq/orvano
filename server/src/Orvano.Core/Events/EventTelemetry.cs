@@ -5,6 +5,7 @@ namespace Orvano.Core.Events;
 /// <summary>The <c>Orvano.Events</c> meter. Row 37 decides the alerts on it.</summary>
 public static class EventTelemetry
 {
+    /// <summary>The meter name to subscribe to in OpenTelemetry.</summary>
     public const string MeterName = "Orvano.Events";
 
     private static readonly Meter Meter = new(MeterName);

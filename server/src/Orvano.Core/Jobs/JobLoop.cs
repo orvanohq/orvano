@@ -22,6 +22,7 @@ public sealed class JobLoop(
     private const int Concurrency = 4;
     private readonly JobStore _store = new(db, $"{Environment.MachineName}:{Environment.ProcessId}:{Guid.NewGuid().ToString("N")[..8]}");
 
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var queues = work.Queues;

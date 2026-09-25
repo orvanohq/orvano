@@ -20,6 +20,7 @@ public sealed class LeaderScheduler(
 {
     private static readonly TimeSpan ConnectionCheck = TimeSpan.FromSeconds(5);
 
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)

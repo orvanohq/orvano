@@ -8,10 +8,16 @@ namespace Orvano.Core.Data;
 /// </summary>
 public sealed class OrvanoDbContext(DbContextOptions<OrvanoDbContext> options) : DbContext(options)
 {
+    /// <summary><c>orvano.schema_migrations</c>: one row per applied platform migration.</summary>
     public DbSet<SchemaMigrationRow> SchemaMigrations => Set<SchemaMigrationRow>();
+
+    /// <summary><c>orvano.events</c>: the transactional outbox.</summary>
     public DbSet<EventRow> Events => Set<EventRow>();
+
+    /// <summary><c>orvano.jobs</c>: the job queue.</summary>
     public DbSet<JobRow> Jobs => Set<JobRow>();
 
+    /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder model)
     {
         model.HasDefaultSchema("orvano");
@@ -62,40 +68,92 @@ public sealed class OrvanoDbContext(DbContextOptions<OrvanoDbContext> options) :
     }
 }
 
+/// <summary>A row of <c>orvano.schema_migrations</c>. Only the <c>migrate</c> role writes these.</summary>
 public sealed class SchemaMigrationRow
 {
+    /// <summary>The migration number, the <c>NNNN</c> in <c>NNNN_name.sql</c>.</summary>
     public int Version { get; set; }
+
+    /// <summary>The migration file name without its number or extension.</summary>
     public required string Name { get; set; }
+
+    /// <summary>Hex SHA-256 of the file's LF normalized text, so an edited migration is caught.</summary>
     public required string Sha256 { get; set; }
+
+    /// <summary>When the migration was applied.</summary>
     public DateTimeOffset AppliedAt { get; set; }
 }
 
+/// <summary>A row of <c>orvano.events</c>, the outbox. Write through <see cref="Events.Outbox"/>, not EF.</summary>
 public sealed class EventRow
 {
+    /// <summary>Identity column; also the dispatch order.</summary>
     public long Id { get; set; }
+
+    /// <summary>The project the event belongs to, or <see langword="null"/> for a platform event.</summary>
     public string? ProjectId { get; set; }
+
+    /// <summary>The event type name that consumers subscribe to.</summary>
     public required string Type { get; set; }
+
+    /// <summary>The ID of the thing the event is about, if any.</summary>
     public string? Subject { get; set; }
+
+    /// <summary>The event body as <c>jsonb</c>. Never log it.</summary>
     public required string Payload { get; set; }
+
+    /// <summary>When the event was written.</summary>
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>When the dispatcher ran its consumers, or <see langword="null"/> while it awaits dispatch.</summary>
     public DateTimeOffset? DispatchedAt { get; set; }
 }
 
+/// <summary>A row of <c>orvano.jobs</c>. Enqueue through <see cref="Jobs.JobQueue"/>, not EF.</summary>
 public sealed class JobRow
 {
+    /// <summary>Identity column.</summary>
     public long Id { get; set; }
+
+    /// <summary>The queue a worker claims from (see <see cref="Jobs.JobQueues"/>).</summary>
     public required string Queue { get; set; }
+
+    /// <summary>Selects the handler, for example <c>events.redispatch</c>.</summary>
     public required string Kind { get; set; }
+
+    /// <summary>The project the job runs for, or <see langword="null"/> for platform work.</summary>
     public string? ProjectId { get; set; }
+
+    /// <summary>The handler's input as <c>jsonb</c>. Never log it.</summary>
     public required string Payload { get; set; }
+
+    /// <summary>Lower runs first.</summary>
     public int Priority { get; set; }
+
+    /// <summary>The job is not claimed before this time.</summary>
     public DateTimeOffset RunAt { get; set; }
+
+    /// <summary>One of <c>queued</c>, <c>running</c>, <c>succeeded</c>, <c>failed</c>, or <c>dead</c>.</summary>
     public required string Status { get; set; }
+
+    /// <summary>How many times a worker has claimed the job.</summary>
     public int Attempts { get; set; }
+
+    /// <summary>After this many attempts a failing job is marked <c>dead</c>.</summary>
     public int MaxAttempts { get; set; }
+
+    /// <summary>While <c>running</c>, the lease expiry; the reaper requeues a job whose lease lapsed.</summary>
     public DateTimeOffset? LeaseUntil { get; set; }
+
+    /// <summary>The worker that holds the lease.</summary>
     public string? LockedBy { get; set; }
+
+    /// <summary>The last failure reason. Never includes the payload.</summary>
     public string? LastError { get; set; }
+
+    /// <summary>When the job was enqueued.</summary>
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>When the job finished as <c>succeeded</c> or <c>dead</c>.</summary>
     public DateTimeOffset? FinishedAt { get; set; }
 }
