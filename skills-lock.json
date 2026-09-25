@@ -37,6 +37,12 @@
       "skillPath": "skills/ef-core/SKILL.md",
       "computedHash": "23f0a7c7e8c050337d67303f0af339da1ab8f0aa6a334f13112c3f85250c329c"
     },
+    "lefthook": {
+      "source": "fandhe-ai/agent-reference-skills",
+      "sourceType": "github",
+      "skillPath": "skills/lefthook/SKILL.md",
+      "computedHash": "976ee8abc6c0c18d2ee7dd823c24a444a50c92558238c9129d345c41b6349bcd"
+    },
     "multi-stage-dockerfile": {
       "source": "github/awesome-copilot",
       "sourceType": "github",
@@ -55,6 +61,12 @@
       "skillPath": "skills/pnpm/SKILL.md",
       "computedHash": "2ec08c851c6f901d4ed72c21b826416ed074a487db65662b36249418afd728bf"
     },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "computedHash": "e14e276241805c97dbcfe40dcbea1a3035269cc7293cac4b1832dda41a835e60"
+    },
     "tanstack-query": {
       "source": "tanstack-skills/tanstack-skills",
       "sourceType": "github",
@@ -67,11 +79,23 @@
       "skillPath": "plugins/tanstack-router/skills/tanstack-router/SKILL.md",
       "computedHash": "24beccc4016f91bab65547209cfd849ea5e66f3d5d92820683a9dd84669ced56"
     },
+    "testcontainers-integration-tests": {
+      "source": "aaronontheweb/dotnet-skills",
+      "sourceType": "github",
+      "skillPath": "skills/testcontainers/SKILL.md",
+      "computedHash": "12064a0fbd71dee63df9843ba24d64ddfd02b5da0d6a430d371bdfd3386f201c"
+    },
     "vercel-react-best-practices": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/react-best-practices/SKILL.md",
       "computedHash": "3219a1944e404ffc14d1d9d6aef6dd2e3855b81387ee0a044ccbfe14d34c2357"
+    },
+    "vitest": {
+      "source": "antfu/skills",
+      "sourceType": "github",
+      "skillPath": "skills/vitest/SKILL.md",
+      "computedHash": "943d436114c677802426741980146c07560bf375297666b03062444f4b98a785"
     }
   }
 }
