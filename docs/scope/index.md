@@ -45,7 +45,7 @@ Every product feature ships in all of these layers in the same version, unless i
 | # | Feature | Phase | Status |
 |---|---------|-------|--------|
 | 1 | Stack & architecture | Foundation | done |
-| 2 | Coding standards & tooling | Foundation | in-progress |
+| 2 | Coding standards & tooling | Foundation | done |
 | 3 | Platform data model | Foundation | planned |
 | 4 | API contract & SDK pipeline | Foundation | in-progress |
 | 5 | Design system & console shell | Foundation | planned |
