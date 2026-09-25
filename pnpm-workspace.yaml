@@ -4,3 +4,7 @@ packages:
   - sdks/nextjs
   - sdks/console-client
   - console
+
+# Dependency build scripts pnpm may run. lefthook's postinstall installs the git hooks (skipped in CI).
+allowBuilds:
+  lefthook: true
