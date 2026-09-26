@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Unit tests for the Orvano .NET SDK runtime (spec 0001): headers, the version warning,
+       retries, timeouts, cancellation, and error mapping, against a fake HttpMessageHandler.
+       net8.0 has no net10.0 asset to pick, so it runs the SDK's netstandard2.0 build. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework />
+    <TargetFrameworks>net10.0;net8.0</TargetFrameworks>
+    <RollForward>Major</RollForward>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- Test classes are public for xUnit, not an API to document. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orvano\Orvano.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

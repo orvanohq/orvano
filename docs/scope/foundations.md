@@ -24,7 +24,7 @@ The internal model that every product hangs off: console accounts, organizations
 **Done when:** the model supports many orgs and many projects per install, keeps each project's data isolated, and leaves room for environments, usage metering, and a future cloud.
 - [ ] Design it (spec): `/architect platform data model`
 
-### 4. API contract & SDK pipeline · in-progress
+### 4. API contract & SDK pipeline · done
 One machine readable description of every public endpoint is the source of truth. From it you generate the API reference and the SDKs: core JS/TS, Next.js (wraps core, adds server components and cookie sessions), Flutter, Dart server, and .NET.
 **Done when:** changing one endpoint in the contract regenerates all five SDKs and the reference, and a sample call works from each SDK against the scaffold.
 - [x] Design it (spec): `/architect API contract & SDK pipeline`
@@ -33,7 +33,7 @@ One machine readable description of every public endpoint is the source of truth
    - [x] Shared conventions: errors, audience routing and client pattern, the private console client, cursor pagination, typed events, retries and timeouts, test only operations and temporary auth formats (AC-2, 4, 5, 6, 7, 8, 14, 17, 18)
    - [x] Release pipeline: version stamping and headers, publishing and mirrors, docs snippets, public contract file, breaking change check (AC-11, 12, 15, 17)
 - [x] Verify it: `/check verify API contract & SDK pipeline`
-- [ ] Test it: `/test API contract & SDK pipeline`
+- [x] Test it: `/test API contract & SDK pipeline`
 Spec [0001](../specs/0001-api-contract-sdk-pipeline/index.md) · code in `contract/`, `tools/sdkgen/`, `sdks/`, `server/src/Orvano.Contract/`, `tests/scenarios/`, `.github/workflows/sdks.yml`, `.github/workflows/release.yml`
 
 ### 5. Design system & console shell · needs a decision

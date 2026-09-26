@@ -1,9 +1,16 @@
 {
   "tool": "xunit.v3",
   "gate": null,
-  "additionalTools": ["Testcontainers.PostgreSql"],
+  "additionalTools": ["Testcontainers.PostgreSql", "vitest", "package:test"],
   "e2eTool": "none",
   "testDir": "server/tests/Orvano.Server.Tests",
   "filePattern": "*Tests.cs",
-  "packageManager": "pnpm"
+  "packageManager": "pnpm",
+  "testDirs": {
+    "server": "server/tests/Orvano.Server.Tests",
+    "sdkgen": "tools/tests/Orvano.SdkGen.Tests",
+    "dotnet-sdk": "sdks/dotnet/tests/Orvano.Tests",
+    "js-sdk": "sdks/js/test, sdks/nextjs/test (*.test.ts, Vitest)",
+    "dart-sdk": "sdks/dart/core/test, sdks/dart/server/test (*_test.dart, package:test)"
+  }
 }
