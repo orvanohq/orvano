@@ -36,3 +36,8 @@ Safe in place upgrades between versions, an audit log of console actions, and a 
 Freeze the v1 API, publish every SDK to its registry (npm, pub.dev, NuGet), finish the docs, and cut 1.0.
 **Done when:** all SDKs are published at 1.0, the docs cover every product, and the API contract is marked stable.
 - [ ] Build it: `/develop stable release gate`
+
+### 40. Console account self service · from spec 0004
+Console accounts can change their password, see and end their own sessions, and delete their account (blocked while they are the last owner of an org with members or projects, through `IConsoleAccountGuard`). Spec 0004 builds the engine; this row adds the console screens and `/v1/console/account` operations.
+**Done when:** a console user changes their password and other sessions end, ends a session from the list, and deleting an account that is the last owner of a busy org is refused with a clear message.
+- [ ] Build it: `/develop console account self service`
