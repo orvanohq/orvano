@@ -9,11 +9,12 @@ The five public SDK surfaces (spec 0001). Each is a thin handwritten runtime plu
 | `js/` | `@orvano/js` | root: `client` + `both`; `./server`: `server` + `both` | ESM, zero runtime dependencies, plain `fetch`, built with `tsc` |
 | `nextjs/` | `@orvano/nextjs` | none of its own | Wraps `@orvano/js`; `createServerClient` per request, `createBrowserClient` shared |
 | `dart/core/` | `orvano_core` | `client` + `both` | `package:http`, hand style JSON mapping, no `build_runner` |
-| `dart/flutter/` | `orvano_flutter` | exports core again | Flutter glue arrives with sessions (milestone 2) |
+| `dart/flutter/` | `orvano_flutter` | exports core again | Only exports core for now; secure session storage and deep links arrive with auth |
 | `dart/server/` | `orvano_dart` | `server` only, plus core's `both` | Hides core's `Orvano` and client only services |
 | `dotnet/src/Orvano/` | `Orvano` (NuGet) | `server` + `both` | `net10.0` and `netstandard2.0` |
+| `console-client/` | `@orvano/console-client` (`private`, never published) | `console` only | Built on the `@orvano/js` runtime, used by the console; sends the `orvano_console` cookie |
 
-`console` operations go only to the private `@orvano/console-client` (milestone 2), never here.
+`console` operations go only to `console-client/`. No published package may depend on it, and CI checks the whole production dependency graph for that.
 
 ## Key files
 
@@ -22,6 +23,8 @@ The five public SDK surfaces (spec 0001). Each is a thin handwritten runtime plu
 | `js/src/runtime/client.ts`, `js/src/runtime/error.ts` | The TS `Client` and `OrvanoError` |
 | `dart/core/lib/src/client.dart`, `orvano_exception.dart` | The Dart `Client` and `OrvanoException` |
 | `dotnet/src/Orvano/OrvanoClient.cs`, `OrvanoRequest.cs`, `OrvanoException.cs` | The .NET client, request shape, and exception |
+| `js/src/runtime/auth.ts`, `api-key.ts`, `server-client.ts`; `dart/core/lib/src/auth.dart`, `dart/server/lib/src/client.dart`; `dotnet/src/Orvano/OrvanoHeaders.cs` | Auth providers and the temporary auth names (`X-Orvano-Session`, `X-Orvano-Key`) |
+| `js/src/runtime/pagination.ts`, `events.ts`; `dart/core/lib/src/pagination.dart`, `events.dart`; `dotnet/src/Orvano/OrvanoPagination.cs`, `OrvanoEvents.cs` | The page iterator helper and the event decoder |
 | `*/generated/`, `*/Generated/` | SdkGen output; never edit by hand |
 
 ## Commands
@@ -39,12 +42,16 @@ dotnet build sdks/dotnet/src/Orvano
 - Every failure is one error type with status, stable `code` (`unknown` when absent), message, and request ID (problem body first, then `X-Request-Id`).
 - TS: `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `erasableSyntaxOnly`; bind `fetch` to `globalThis` (Workers reject it otherwise).
 - Dart: one pub workspace from the root `pubspec.yaml`. Members use `resolution: workspace` and depend on each other by version (`^0.0.0`), never by path, so they stay publishable. Shared lints in `dart/analysis_options.yaml`.
+- Auth is a pluggable provider on the `Client`: none, session, or API key. Each temporary auth name (`X-Orvano-Key`, `X-Orvano-Session`, the `orvano_session` cookie in `nextjs/`, the `orvano_console` cookie in `console-client/`) is defined once per runtime, never inline, so the auth spec (row 8) swaps it in one place.
+- An API key setter exists only in server packages, and it throws in a browser.
+- Retries: GET, HEAD, and `idempotent` calls retry on 429 and 503, honoring `Retry-After`, else backoff with jitter from 250 ms, 3 retries by default. The timeout covers the whole call, retry waits included, and every call accepts cancellation.
+- The pagination helper and the event decoder are public API in TS and Dart, because the scenario runners build their test services on them; the decoder takes a registry. In .NET the runner reaches the internal `SendAsync` through `InternalsVisibleTo("Orvano.Scenarios")`, so keep that signature stable.
 - .NET: one source generated `OrvanoJsonContext` for both targets. The `System.Text.Json` package is referenced only for `netstandard2.0`. Avoid APIs `netstandard2.0` lacks (`required`, `HttpMethod.Patch`, token overloads); use `#if NET` where needed.
 
 ## Gotchas
 
 - Type aware ESLint reads workspace packages' types from `dist/`, so build them before linting (CI does).
-- Still to come per spec 0001: auth providers and the API key guard, retries and timeouts, pagination, typed events (milestone 2); version headers and publishing (milestone 3).
+- Still to come per spec 0001: version headers and publishing (milestone 3).
 
 ## Related specs
 

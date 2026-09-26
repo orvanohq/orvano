@@ -16,6 +16,9 @@ The Orvano server: one .NET 10 program, built as separate modules, shipped as on
 | `src/Orvano.Core/Events/Outbox.cs`, `Jobs/JobQueue.cs` | Events and jobs written in the caller's transaction |
 | `src/Orvano.Contract/` | Generated API records and route constants for every audience, plus the embedded `openapi.json` (spec 0001); never packed |
 | `src/Orvano.Server/Hosting/ContractValidation.cs`, `ContractValidator.cs` | `Test` environment only: checks every `/v1` response against the contract |
+| `src/Orvano.Server/Hosting/Problems.cs` | Problem details normalized to the contract's `Problem`, `Problems.Result` for handlers, and `X-Request-Id` on every response |
+| `src/Orvano.Server/Hosting/ConsoleSessions.cs`, `OrvanoHeaders.cs` | The `/v1/console` rule (401 `console_session_required`) and the temporary auth names, defined only here |
+| `src/Orvano.Server/Modules/TestingModule.cs` | The fixed answers of the test only operations; registered only in `Test` |
 | `migrations/platform/` | Platform SQL migrations, embedded into the binary |
 | `tests/Orvano.ModelDriftCheck/` | Fails when the EF model and the SQL migrations disagree |
 
@@ -36,13 +39,14 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 - Inside a module, keep business rules in plain types with no ASP.NET, EF, or Npgsql references. Endpoints, event consumers, and job handlers are thin adapters around them.
 - EF Core only for platform tables in schema `orvano`, mapped with fluent config in `OrvanoDbContext` (no attributes on domain types). Per project tables use raw Npgsql through `ProjectScope`.
 - Module tables carry the module name as a prefix (`orvano.platform_projects`); the kernel's own tables (`orvano.events`, `orvano.jobs`, `orvano.schema_migrations`) have none. Migrations are `NNNN_<name>.sql` and are checksummed when applied, so never edit one after it merges; add a new file instead.
-- API errors are problem details (`AddProblemDetails` in `ServerRole.cs`); never let a raw exception message reach a client.
+- API errors are problem details (`AddOrvanoProblems` in `Hosting/Problems.cs`); never let a raw exception message reach a client. A handler returns `Problems.Result(status, ErrorCode.X, detail)` with a generated error code and a short safe `detail`.
 - `/v1` endpoints use the generated `Orvano.Contract` types, never handwritten request or response records: `v1.MapGet(HealthOperations.Get.Route, ...).WithName(HealthOperations.Get.Id)`. The endpoint name must be the operationId, or contract validation rejects the response.
 - Tests: one Postgres container per run through `PostgresFixture`, one fresh database per test through `TestDatabase`. No database mocks.
 
 ## Gotchas
 
 - Every event and job is written in the same transaction as the change it describes. Never write one outside that transaction.
+- Test only routes (`/v1/test/*`, `/v1/console/test/*`) exist only in `Test`, because `OrvanoModules` adds `TestingModule` only there. Outside `Test` no console session is valid yet, so every console route answers 401 until the auth rows land.
 - In the `Test` environment a response that breaks the contract (extra, missing, or mistyped field, undeclared 2xx status, unnamed endpoint) becomes a 500 `contract_violation`. `ORVANO_TEST_FIXTURES` is refused outside `Test`.
 - `Orvano.Contract` embeds `contract/dist/openapi.json`, so `deploy/server.Dockerfile` copies that file too; a new server project also needs its csproj copied before restore there.
 - Every job handler must be idempotent, and no consumer may rely on event order. A consumer that throws is retried later through the `events.redispatch` job.
