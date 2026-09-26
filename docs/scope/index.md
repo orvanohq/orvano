@@ -48,7 +48,7 @@ Every product feature ships in all of these layers in the same version, unless i
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Platform data model | Foundation | in-progress |
 | 4 | API contract & SDK pipeline | Foundation | done |
-| 5 | Design system & console shell | Foundation | planned |
+| 5 | Design system & console shell | Foundation | in-progress |
 | 6 | Self host installer | Foundation | planned |
 | 7 | Console accounts, orgs & projects | v0.1 | in-progress |
 | 8 | App user sign up & sign in | v0.1 | in-progress |
@@ -112,6 +112,8 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Importers**: move a project in from Appwrite, Supabase, or Firebase (a strong growth lever) · needs a decision
 - **Enterprise SSO**: SAML and OIDC for app users and console · needs a decision · GA
 - **GraphQL API**: an alternative to the data API · needs a decision
+- **Console command palette**: `Ctrl+K` to jump to any org, project, or page · from spec 0005
+- **Console preferences on the account**: theme and density follow you across devices · from spec 0005
 
 ## Legend
 
