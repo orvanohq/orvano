@@ -51,9 +51,9 @@ Stored in `docs/specs/NNNN-title/` (`index.md`, `rationale.md`, optional `verify
 Installed (scope row 2):
 - Lint and format: `.editorconfig` with `dotnet format`, .NET analyzers (`AnalysisLevel` latest, `TreatWarningsAsErrors`) in `Directory.Build.props`; ESLint flat config (typescript-eslint, react hooks) plus Prettier for every pnpm workspace.
 - Pre commit: Lefthook runs `dotnet format` and ESLint/Prettier on staged files only, then restages what they fixed. `pnpm install` installs the hooks; skip once with `LEFTHOOK=0`. Builds, typecheck, and tests stay in CI.
-- Tests: xUnit v3 plus Testcontainers (server, in place); Vitest plus Testing Library (console, when row 5 lands).
+- Tests: xUnit v3 plus Testcontainers (server, in place), xUnit for SdkGen (`tools/tests/`) and the .NET SDK (`sdks/dotnet/tests/`); Vitest for the JS SDKs (`sdks/js/test/`, `sdks/nextjs/test/`), plus Testing Library for the console when row 5 lands; `package:test` for the Dart SDKs (`sdks/dart/*/test/`).
 - CI: `.github/workflows/ci.yml` runs lint and format checks (`dotnet format --verify-no-changes`, `pnpm lint`, `pnpm format:check`), build, tests, the EF drift check, and the compose smoke test.
-- SDK CI: `.github/workflows/sdks.yml` fails when `contract/dist/openapi.json` or generated code is stale, then runs the shared scenarios on Node, Bun, Deno, Chromium, workerd, Next.js, Dart, Flutter (Chrome, Android), and .NET (`net10.0`, `netstandard2.0`). `sdks-nightly.yml` runs Flutter on the iOS simulator. `sdks.yml` also reports breaking changes since the last release tag (oasdiff).
+- SDK CI: `.github/workflows/sdks.yml` fails when `contract/dist/openapi.json` or generated code is stale, then runs the shared scenarios on Node, Bun, Deno, Chromium, workerd, Next.js, Dart, Flutter (Chrome, Android), and .NET (`net10.0`, `netstandard2.0`). `sdks-nightly.yml` runs Flutter on the iOS simulator. `sdks.yml` also runs the TS and Dart SDK unit tests and reports breaking changes since the last release tag (oasdiff).
 - Release: pushing the tag `v<VERSION>` runs `.github/workflows/release.yml`, which runs `sdks.yml` and then publishes to npm, pub.dev, and NuGet and updates the `orvano-js`, `orvano-dart`, and `orvano-dotnet` mirrors. It is a dry run until 0.1, and a manual run is always a dry run. Flutter 3.44.2 is pinned in `.tool-versions` and both workflows so `dart format` output matches everywhere.
 
 ## Git
@@ -80,6 +80,9 @@ Installed (scope row 2):
 - [flutter-add-integration-test](.agents/skills/flutter-add-integration-test/): `flutter/agent-plugins`, `integration_test` in the Flutter scenario runner
 - [dart-write-documentation](.agents/skills/dart-write-documentation/): `flutter/agent-plugins`, `///` API docs for the published Dart packages
 - [dart-run-static-analysis](.agents/skills/dart-run-static-analysis/): `flutter/agent-plugins`, `dart analyze` and `dart fix` (CI runs `--fatal-infos`)
+- [dart-add-unit-test](.agents/skills/dart-add-unit-test/): `dart-lang/skills`, `package:test` unit tests for the Dart SDK packages
+- [dart-test-fundamentals](.agents/skills/dart-test-fundamentals/): `kevmoo/dash_skills`, `package:test` groups, lifecycle, platforms (`-p chrome`), `dart_test.yaml`
+- [dart-collect-coverage](.agents/skills/dart-collect-coverage/): `dart-lang/skills`, LCOV coverage for Dart packages
 - [nextjs-app-router-patterns](.agents/skills/nextjs-app-router-patterns/): `wshobson/agents`, App Router, server components, route handlers, middleware for `@orvano/nextjs`
 - [workers-best-practices](.agents/skills/workers-best-practices/): `cloudflare/skills`, Workers runtime rules (the edge target the JS SDK must run on)
 - [playwright-cli](.agents/skills/playwright-cli/): `microsoft/playwright-cli`, driving a real browser with Playwright
