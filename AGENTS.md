@@ -98,6 +98,7 @@ MCP servers: Aspire MCP (recommended), GitHub MCP (recommended), Postgres MCP Pr
 ## Context files
 
 - [server/AGENTS.md](server/AGENTS.md) (.NET server: modules, Core kernel, migrations, tests)
+- [server/src/Orvano.Platform/AGENTS.md](server/src/Orvano.Platform/AGENTS.md): the Platform module, its layers, unit of work, jobs, and console endpoints
 - [console/AGENTS.md](console/AGENTS.md) (React console: routes, data fetching, UI rules)
 - [contract/AGENTS.md](contract/AGENTS.md): the TypeSpec API contract, operation metadata, how to add an endpoint
 - [tools/sdkgen/AGENTS.md](tools/sdkgen/AGENTS.md): SdkGen, the C# generator, its templates and type mapping
