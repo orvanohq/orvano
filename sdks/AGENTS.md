@@ -69,9 +69,14 @@ dotnet test --project sdks/dotnet/tests/Orvano.Tests     # net10.0 and net8.0 (t
 
 - [vitest](../.claude/skills/vitest/): `antfu/skills`, Vitest tests and mocking for `js/` and `nextjs/`
 - The Dart test skills (`dart-add-unit-test`, `dart-test-fundamentals`, `dart-collect-coverage`) are listed in the root `AGENTS.md`.
+- [jwt-validate](../.claude/skills/jwt-validate/): `jsonwebtoken/jwt-skills`, correct JWT and JWKS validation (alg, kid, exp, aud) for the server SDK verifiers
+- [nextjs-authentication](../.claude/skills/nextjs-authentication/): `giuseppe-trisciuoglio/developer-kit`, cookie and middleware auth in Next.js; written for Auth.js, so spec 0004 wins (security scan: one alert, read it before relying on it)
+- [flutter-security](../.claude/skills/flutter-security/): `dhruvanbhalara/skills`, Flutter app security and secure token storage for `orvano_flutter`
+- [managing-secure-storage](../.claude/skills/managing-secure-storage/): `poorgramer-zack/dart-expert-skills`, `flutter_secure_storage` v10 specifics
 
 ## Related specs
 
 - [0001 API contract and SDK pipeline](../docs/specs/0001-api-contract-sdk-pipeline/index.md)
+- [0004 App user sign up, sign in, and sessions](../docs/specs/0004-app-user-auth/index.md) (session stores, refresh, and token verification in every SDK)
 
 _Drafted by /sync from the introducing change, worth a quick human pass._
