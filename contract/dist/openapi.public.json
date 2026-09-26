@@ -56,7 +56,14 @@
           "invalid_request",
           "invalid_cursor",
           "console_session_required",
-          "contract_violation"
+          "contract_violation",
+          "project_not_found",
+          "project_not_ready",
+          "forbidden",
+          "last_owner",
+          "org_not_empty",
+          "org_not_active",
+          "signup_closed"
         ],
         "description": "Every stable error code the server sends in `Problem.code`."
       },

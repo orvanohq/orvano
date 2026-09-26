@@ -24,7 +24,7 @@ The internal model that every product hangs off: console accounts, organizations
 **Done when:** the model supports many orgs and many projects per install, keeps each project's data isolated, and leaves room for environments, usage metering, and a future cloud.
 - [x] Design it (spec): `/architect platform data model`
 - [ ] Build it: lands with the rows that first use each part (Tracer Bullet), no separate `/develop` run
-   - [ ] Row 7 slice: platform tables, domain rules, console sign up rules, project and org lifecycle jobs, API keys and platforms, events and fixtures: `/develop console accounts, orgs & projects` (AC-1 to 5, 7 to 15, 17 to 19)
+   - [x] Row 7 slice: platform tables, domain rules, console sign up rules, project and org lifecycle jobs, API keys and platforms, events and fixtures: `/develop console accounts, orgs & projects` (AC-1 to 5, 7 to 15, 17 to 19)
    - [ ] Row 8 slice: `auth_users`, request authentication (project lookup, key verification, scopes, origins), console accounts as users of `console`: `/develop app user sign up & sign in` (AC-4 to 8, 12 to 14, 16, 17)
    - [ ] Row 15 slice: invitations and member management: `/develop console team members & roles` (AC-7, 9, 10)
 - [ ] Verify it: `/check verify platform data model`

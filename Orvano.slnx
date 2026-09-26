@@ -12,6 +12,7 @@
   <Folder Name="/server/src/">
     <Project Path="server/src/Orvano.Contract/Orvano.Contract.csproj" />
     <Project Path="server/src/Orvano.Core/Orvano.Core.csproj" />
+    <Project Path="server/src/Orvano.Platform/Orvano.Platform.csproj" />
     <Project Path="server/src/Orvano.Server/Orvano.Server.csproj" />
   </Folder>
   <Folder Name="/server/tests/">

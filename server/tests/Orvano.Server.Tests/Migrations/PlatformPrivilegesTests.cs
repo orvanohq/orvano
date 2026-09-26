@@ -1,4 +1,5 @@
 using Npgsql;
+using Orvano.Server.Hosting;
 using Orvano.Server.Tests.Infrastructure;
 
 namespace Orvano.Server.Tests.Migrations;
@@ -65,7 +66,7 @@ public class PlatformPrivilegesTests(PostgresFixture postgres) : IAsyncLifetime
     {
         var version = await TestDatabase.ScalarAsync<int>(_database.App, "SELECT max(version) FROM orvano.schema_migrations");
 
-        Assert.Equal(1, version);
+        Assert.Equal(PlatformSchema.ExpectedVersion, version);
     }
 
     [Theory]

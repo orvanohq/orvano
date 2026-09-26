@@ -8,6 +8,8 @@ using Orvano.Core.Jobs;
 using Orvano.Core.Modules;
 using Orvano.Core.Notifications;
 using Orvano.Core.Scheduling;
+using Orvano.Platform.Application;
+using Orvano.Platform.Fixtures;
 using Orvano.Server.Modules;
 
 namespace Orvano.Server.Hosting;
@@ -60,6 +62,11 @@ internal static class ServerRole
         if (!StartupChecks.TestFixturesUsable(fixtures, logger)) return 1;
         var appDb = app.Services.GetRequiredKeyedService<NpgsqlDataSource>(OrvanoDb.App);
         if (!await StartupChecks.SchemaMatchesAsync(appDb, logger, app.Lifetime.ApplicationStopping)) return 1;
+        if (role == OrvanoRole.Api && fixtures.Owner is { } owner)
+        {
+            await PlatformFixtures.SeedAsync(
+                app.Services.GetRequiredService<PlatformStore>(), owner, fixtures.Projects, fixtures.ApiKeys, logger, app.Lifetime.ApplicationStopping);
+        }
 
         app.UseRequestIds();
         app.UseVersionHeader();
@@ -96,7 +103,7 @@ internal static class ServerRole
         var services = builder.Services;
         services.AddSingleton(work);
         services.AddSingleton<WakeSignals>();
-        // Admin connections are for provisioning jobs only.
+        // Admin connections are for the jobs that issue DDL only: project provisioning and purge.
         services.AddKeyedSingleton(OrvanoDb.Admin, (_, _) => OrvanoDb.Create(adminUrl, ConnectionBudget.WorkerAdmin, serviceName));
         services.AddKeyedSingleton(OrvanoDb.Dedicated, (_, _) => OrvanoDb.CreateDedicated(appUrl, serviceName));
 

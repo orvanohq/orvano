@@ -21,7 +21,7 @@ public class MigrationRunnerTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Creates_schema_orvano_owned_by_orvano_admin_with_the_three_platform_tables()
+    public async Task Creates_schema_orvano_owned_by_orvano_admin_with_the_kernel_and_platform_tables()
     {
         await using var database = await postgres.NewDatabaseAsync();
 
@@ -32,7 +32,11 @@ public class MigrationRunnerTests(PostgresFixture postgres)
         var tables = await TestDatabase.ScalarAsync<string[]>(database.Superuser,
             "SELECT array_agg(tablename::text ORDER BY tablename) FROM pg_tables WHERE schemaname = 'orvano'");
         Assert.Equal("orvano_admin", owner);
-        Assert.Equal(["events", "jobs", "schema_migrations"], tables);
+        Assert.Equal(
+        [
+            "events", "jobs", "platform_api_keys", "platform_install_admins", "platform_install_settings",
+            "platform_memberships", "platform_orgs", "platform_platforms", "platform_projects", "schema_migrations",
+        ], tables);
     }
 
     [Fact]

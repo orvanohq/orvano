@@ -1,7 +1,7 @@
 # 0003. Platform data model: orgs, projects, keys, platforms, and app users
 
 **Date**: 2026-09-26
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 

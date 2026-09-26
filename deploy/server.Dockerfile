@@ -9,6 +9,7 @@ WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props VERSION ./
 COPY server/src/Orvano.Contract/Orvano.Contract.csproj server/src/Orvano.Contract/
 COPY server/src/Orvano.Core/Orvano.Core.csproj server/src/Orvano.Core/
+COPY server/src/Orvano.Platform/Orvano.Platform.csproj server/src/Orvano.Platform/
 COPY server/src/Orvano.Server/Orvano.Server.csproj server/src/Orvano.Server/
 RUN dotnet restore server/src/Orvano.Server/Orvano.Server.csproj -a $TARGETARCH
 

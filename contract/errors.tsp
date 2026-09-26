@@ -57,6 +57,27 @@ enum ErrorCode {
 
   @doc("`Test` environment only: a response broke the API contract (500).")
   contract_violation,
+
+  @doc("The project is unknown, purged, being deleted, or not yours to see (404).")
+  project_not_found,
+
+  @doc("The project is still provisioning, or provisioning failed (409).")
+  project_not_ready,
+
+  @doc("Your console role does not allow this action (403).")
+  forbidden,
+
+  @doc("The action would leave an org without an owner (409).")
+  last_owner,
+
+  @doc("The org still has projects that are not being deleted (409).")
+  org_not_empty,
+
+  @doc("The org is being deleted, so it and its projects can't change until it is restored (409).")
+  org_not_active,
+
+  @doc("Console sign up is invite only and no valid invitation was given (403).")
+  signup_closed,
 }
 
 @doc("Error codes only the test operations send. Generated only into the scenario runners.")

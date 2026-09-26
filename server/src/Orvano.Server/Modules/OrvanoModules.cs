@@ -1,4 +1,5 @@
 using Orvano.Core.Modules;
+using Orvano.Platform;
 using Orvano.Server.Hosting;
 
 namespace Orvano.Server.Modules;
@@ -10,6 +11,7 @@ internal static class OrvanoModules
     public static IReadOnlyList<IOrvanoModule> Product { get; } =
     [
         new SystemModule(),
+        new PlatformModule(),
     ];
 
     /// <summary>

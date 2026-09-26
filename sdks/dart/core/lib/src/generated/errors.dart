@@ -8,6 +8,9 @@ abstract final class ErrorCode {
   /// `contract_violation`
   static const contractViolation = 'contract_violation';
 
+  /// `forbidden`
+  static const forbidden = 'forbidden';
+
   /// `internal_error`
   static const internalError = 'internal_error';
 
@@ -17,6 +20,24 @@ abstract final class ErrorCode {
   /// `invalid_request`
   static const invalidRequest = 'invalid_request';
 
+  /// `last_owner`
+  static const lastOwner = 'last_owner';
+
   /// `not_found`
   static const notFound = 'not_found';
+
+  /// `org_not_active`
+  static const orgNotActive = 'org_not_active';
+
+  /// `org_not_empty`
+  static const orgNotEmpty = 'org_not_empty';
+
+  /// `project_not_found`
+  static const projectNotFound = 'project_not_found';
+
+  /// `project_not_ready`
+  static const projectNotReady = 'project_not_ready';
+
+  /// `signup_closed`
+  static const signupClosed = 'signup_closed';
 }

@@ -40,6 +40,15 @@ public sealed class TestDatabase(PostgresFixture fixture, string name) : IAsyncD
         new MigrationRunner(Admin, NullLogger<MigrationRunner>.Instance)
             .RunAsync(PlatformSchema.Migrations, TestContext.Current.CancellationToken);
 
+    /// <summary>Makes the recorded schema version <paramref name="version"/>: drops newer ledger rows, or records a future one.</summary>
+    public Task<int> SetSchemaVersionAsync(int version) =>
+        ExecuteAsync(Admin,
+            """
+            DELETE FROM orvano.schema_migrations WHERE version > @v;
+            INSERT INTO orvano.schema_migrations (version, name, sha256)
+            SELECT @v, 'future', 'test' WHERE @v > 0 AND NOT EXISTS (SELECT 1 FROM orvano.schema_migrations WHERE version = @v);
+            """, ("v", version));
+
     public static async Task<T> ScalarAsync<T>(NpgsqlDataSource db, string sql, params (string Name, object Value)[] parameters)
     {
         await using var cmd = db.CreateCommand(sql);

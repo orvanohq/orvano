@@ -10,10 +10,1019 @@
       "name": "health"
     },
     {
+      "name": "console"
+    },
+    {
       "name": "test"
     }
   ],
   "paths": {
+    "/v1/console/install/settings": {
+      "get": {
+        "operationId": "consoleInstall.getSettings",
+        "description": "Gets the install settings. Install admins only.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleInstall",
+        "x-orvano-audience": "console"
+      },
+      "patch": {
+        "operationId": "consoleInstall.updateSettings",
+        "description": "Changes the install settings. Install admins only.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInstallSettingsRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "consoleInstall",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/orgs": {
+      "get": {
+        "operationId": "consoleOrgs.list",
+        "description": "Lists the orgs the caller is a member of, deleting ones included.",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Orgs per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleOrgs",
+        "x-orvano-audience": "console"
+      },
+      "post": {
+        "operationId": "consoleOrgs.create",
+        "description": "Creates an org with the caller as its owner.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Org"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrgRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "consoleOrgs",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/orgs/{orgId}": {
+      "get": {
+        "operationId": "consoleOrgs.get",
+        "description": "Gets one org the caller is a member of.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "description": "The org ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Org"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleOrgs",
+        "x-orvano-audience": "console"
+      },
+      "patch": {
+        "operationId": "consoleOrgs.update",
+        "description": "Renames an org. Owners only; fails with `org_not_active` while the org is deleting.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "description": "The org ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Org"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrgRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "consoleOrgs",
+        "x-orvano-audience": "console"
+      },
+      "delete": {
+        "operationId": "consoleOrgs.delete",
+        "description": "Deletes an org: it moves to `deleting` and is purged after the grace period. Owners only. Fails with\n`org_not_empty` while any of its projects is not deleting.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "description": "The org ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Org"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleOrgs",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/orgs/{orgId}/projects": {
+      "get": {
+        "operationId": "consoleProjects.list",
+        "description": "Lists an org's projects, deleting ones included.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "description": "The org ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Projects per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleProjects",
+        "x-orvano-audience": "console"
+      },
+      "post": {
+        "operationId": "consoleProjects.create",
+        "description": "Creates a project in `provisioning`; it turns `active` once its database schema exists. Owners and\ndevelopers; fails with `org_not_active` while the org is deleting.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "description": "The org ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "consoleProjects",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/orgs/{orgId}/restore": {
+      "post": {
+        "operationId": "consoleOrgs.restore",
+        "description": "Restores a deleting org before its purge. Owners only. Its projects are restored one by one.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "description": "The org ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Org"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-service": "consoleOrgs",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project": {
+      "get": {
+        "operationId": "consoleProjects.get",
+        "description": "Gets the project named by `X-Orvano-Project`, in any state.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleProjects",
+        "x-orvano-audience": "console"
+      },
+      "patch": {
+        "operationId": "consoleProjects.update",
+        "description": "Renames the project. Owners and developers.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "consoleProjects",
+        "x-orvano-audience": "console"
+      },
+      "delete": {
+        "operationId": "consoleProjects.delete",
+        "description": "Deletes the project: it stops being served at once and is purged after the grace period, with its\ndata, keys, platforms, and users. Owners only.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleProjects",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/keys": {
+      "get": {
+        "operationId": "consoleApiKeys.list",
+        "description": "Lists the API keys of the project named by `X-Orvano-Project`.",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Keys per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleApiKeys",
+        "x-orvano-audience": "console"
+      },
+      "post": {
+        "operationId": "consoleApiKeys.create",
+        "description": "Creates an API key and returns its secret, once. Owners and developers.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedApiKey"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApiKeyRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "consoleApiKeys",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/keys/{keyId}": {
+      "delete": {
+        "operationId": "consoleApiKeys.delete",
+        "description": "Deletes an API key, which stops it working at once. Owners delete any key, developers their own.",
+        "parameters": [
+          {
+            "name": "keyId",
+            "in": "path",
+            "required": true,
+            "description": "The key ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleApiKeys",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/platforms": {
+      "get": {
+        "operationId": "consolePlatforms.list",
+        "description": "Lists the platforms of the project named by `X-Orvano-Project`.",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Platforms per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consolePlatforms",
+        "x-orvano-audience": "console"
+      },
+      "post": {
+        "operationId": "consolePlatforms.create",
+        "description": "Adds a platform. Owners and developers.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Platform"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlatformRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "consolePlatforms",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/platforms/{platformId}": {
+      "patch": {
+        "operationId": "consolePlatforms.update",
+        "description": "Renames a platform or changes its identifier. Owners and developers.",
+        "parameters": [
+          {
+            "name": "platformId",
+            "in": "path",
+            "required": true,
+            "description": "The platform ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Platform"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePlatformRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "consolePlatforms",
+        "x-orvano-audience": "console"
+      },
+      "delete": {
+        "operationId": "consolePlatforms.delete",
+        "description": "Removes a platform. Owners and developers.",
+        "parameters": [
+          {
+            "name": "platformId",
+            "in": "path",
+            "required": true,
+            "description": "The platform ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consolePlatforms",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/restore": {
+      "post": {
+        "operationId": "consoleProjects.restore",
+        "description": "Restores a deleting project before its purge; it passes through `provisioning`. Owners only.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleProjects",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/retry-provisioning": {
+      "post": {
+        "operationId": "consoleProjects.retryProvisioning",
+        "description": "Retries provisioning a `failed` project. Owners and developers.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleProjects",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/retry-purge": {
+      "post": {
+        "operationId": "consoleProjects.retryPurge",
+        "description": "Retries the purge of a deleting project whose purge ran out of attempts. Owners and install admins.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleProjects",
+        "x-orvano-audience": "console"
+      }
+    },
     "/v1/console/test/ping": {
       "get": {
         "operationId": "test.consolePing",
@@ -171,6 +1180,248 @@
   },
   "components": {
     "schemas": {
+      "ApiKey": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "prefix",
+          "scopes",
+          "expiresAt",
+          "lastUsedAt",
+          "createdByUserId",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The key ID.",
+            "examples": [
+              "01924f5e-8d2b-7c4d-8e21-3d5e6f7a8b9c"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "A name to recognize the key by, 1 to 100 characters.",
+            "examples": [
+              "Backend"
+            ]
+          },
+          "prefix": {
+            "type": "string",
+            "description": "The first 12 characters of the secret, to tell keys apart.",
+            "examples": [
+              "orv_sk_Xy3aB"
+            ]
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiKeyScope"
+            },
+            "description": "What the key may do."
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the key stops working; null for never."
+          },
+          "lastUsedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the key was last used, to the minute; null if never."
+          },
+          "createdByUserId": {
+            "type": "string",
+            "description": "The console user who created the key.",
+            "examples": [
+              "01924f5e-6b0a-7f2e-8c01-1b2c3d4e5f60"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the key was created."
+          }
+        },
+        "description": "An API key for server code. Its secret is never shown again after creation."
+      },
+      "ApiKeyPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiKey"
+            },
+            "description": "The keys on this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass it as `cursor` to get the next page; null on the last page."
+          }
+        },
+        "description": "One page of a project's API keys, oldest first."
+      },
+      "ApiKeyScope": {
+        "type": "string",
+        "enum": [
+          "users.read",
+          "users.write"
+        ],
+        "description": "What an API key may do: `<resource>.<read|write>`. A `write` scope does not imply `read`. Each product\nadds its own scopes."
+      },
+      "ConsoleSignupMode": {
+        "type": "string",
+        "enum": [
+          "invite",
+          "open"
+        ],
+        "description": "Who may create a console account."
+      },
+      "CreateApiKeyRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "scopes"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "A name to recognize the key by; trimmed, 1 to 100 characters.",
+            "examples": [
+              "Backend"
+            ]
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiKeyScope"
+            },
+            "description": "What the key may do; at least one scope."
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the key stops working, in the future; null or absent for never."
+          }
+        },
+        "description": "A new API key."
+      },
+      "CreateOrgRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The org name; trimmed, 1 to 100 characters.",
+            "examples": [
+              "Acme"
+            ]
+          }
+        },
+        "description": "A new org. The caller becomes its owner."
+      },
+      "CreatePlatformRequest": {
+        "type": "object",
+        "required": [
+          "type",
+          "name",
+          "identifier"
+        ],
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/PlatformType",
+            "description": "Where the app runs."
+          },
+          "name": {
+            "type": "string",
+            "description": "A name to recognize it by; trimmed, 1 to 100 characters.",
+            "examples": [
+              "Storefront"
+            ]
+          },
+          "identifier": {
+            "type": "string",
+            "description": "The host pattern or app ID; see `Platform.identifier`.",
+            "examples": [
+              "app.example.com"
+            ]
+          }
+        },
+        "description": "A new platform. Unique per project, type, and identifier, ignoring case."
+      },
+      "CreateProjectRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The project name; trimmed, 1 to 100 characters.",
+            "examples": [
+              "Shop"
+            ]
+          }
+        },
+        "description": "A new project."
+      },
+      "CreatedApiKey": {
+        "type": "object",
+        "required": [
+          "apiKey",
+          "secret"
+        ],
+        "properties": {
+          "apiKey": {
+            "$ref": "#/components/schemas/ApiKey",
+            "description": "The key."
+          },
+          "secret": {
+            "type": "string",
+            "description": "The secret to send as the API key: `orv_sk_` plus 43 characters. Store it now; it can't be shown again.",
+            "examples": [
+              "orv_sk_Xy3aBcD4eF5gH6iJ7kL8mN9oP0qR1sT2uV3wX4yZ5a"
+            ]
+          }
+        },
+        "description": "A new API key with its secret. The secret is shown only here, once."
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -179,7 +1430,14 @@
           "invalid_request",
           "invalid_cursor",
           "console_session_required",
-          "contract_violation"
+          "contract_violation",
+          "project_not_found",
+          "project_not_ready",
+          "forbidden",
+          "last_owner",
+          "org_not_empty",
+          "org_not_active",
+          "signup_closed"
         ],
         "description": "Every stable error code the server sends in `Problem.code`."
       },
@@ -206,6 +1464,231 @@
           }
         },
         "description": "Whether the server is up, and which Orvano version it runs."
+      },
+      "InstallSettings": {
+        "type": "object",
+        "required": [
+          "consoleSignup",
+          "updatedAt"
+        ],
+        "properties": {
+          "consoleSignup": {
+            "$ref": "#/components/schemas/ConsoleSignupMode",
+            "description": "Who may create a console account."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the settings last changed."
+          }
+        },
+        "description": "Settings for the whole install."
+      },
+      "Org": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "status",
+          "role",
+          "deletedAt",
+          "purgeAfter",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The org ID.",
+            "examples": [
+              "01924f5e-7c1a-7a3b-9f10-2c4d5e6f7a8b"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "The org name, 1 to 100 characters.",
+            "examples": [
+              "Acme"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/OrgStatus",
+            "description": "Whether the org is in use or being deleted."
+          },
+          "role": {
+            "$ref": "#/components/schemas/OrgRole",
+            "description": "The calling console user's role in this org."
+          },
+          "deletedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the org was deleted; null unless `deleting`."
+          },
+          "purgeAfter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When a deleted org is purged for good; null unless `deleting`."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the org was created."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the org last changed."
+          }
+        },
+        "description": "An org: the owner of projects and the unit teammates join."
+      },
+      "OrgPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Org"
+            },
+            "description": "The orgs on this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass it as `cursor` to get the next page; null on the last page."
+          }
+        },
+        "description": "One page of the caller's orgs, oldest first."
+      },
+      "OrgRole": {
+        "type": "string",
+        "enum": [
+          "owner",
+          "developer",
+          "viewer"
+        ],
+        "description": "A console member's one role in an org."
+      },
+      "OrgStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "deleting"
+        ],
+        "description": "An org's lifecycle state."
+      },
+      "Platform": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "name",
+          "identifier",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The platform ID.",
+            "examples": [
+              "01924f5e-9e3c-7d5e-9f32-4e6f7a8b9c0d"
+            ]
+          },
+          "type": {
+            "$ref": "#/components/schemas/PlatformType",
+            "description": "Where the app runs."
+          },
+          "name": {
+            "type": "string",
+            "description": "A name to recognize it by, 1 to 100 characters.",
+            "examples": [
+              "Storefront"
+            ]
+          },
+          "identifier": {
+            "type": "string",
+            "description": "Web: a hostname (`app.example.com`), `*.` plus a hostname of at least two labels, `localhost`, or an IPv4\naddress, matched on any scheme and port. Android: the package name. iOS and macOS: the bundle ID.\nWindows and Linux: a label.",
+            "examples": [
+              "app.example.com"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the platform was added."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the platform last changed."
+          }
+        },
+        "description": "An app allowed to use a project."
+      },
+      "PlatformPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Platform"
+            },
+            "description": "The platforms on this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass it as `cursor` to get the next page; null on the last page."
+          }
+        },
+        "description": "One page of a project's platforms, oldest first."
+      },
+      "PlatformType": {
+        "type": "string",
+        "enum": [
+          "web",
+          "android",
+          "ios",
+          "macos",
+          "windows",
+          "linux"
+        ],
+        "description": "Where an app runs."
       },
       "Problem": {
         "type": "object",
@@ -259,6 +1742,132 @@
           }
         },
         "description": "An RFC 9457 problem details body. Every operation declares it as its `default` response, sent\nas `application/problem+json`."
+      },
+      "Project": {
+        "type": "object",
+        "required": [
+          "id",
+          "orgId",
+          "name",
+          "status",
+          "deletedAt",
+          "purgeAfter",
+          "purgeFailedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The project ID, 20 characters of `a` to `z` and `0` to `9`. Sent as `X-Orvano-Project`.",
+            "examples": [
+              "k3v9q2x7m1p8r4t6w0yz"
+            ]
+          },
+          "orgId": {
+            "type": "string",
+            "description": "The org that owns the project.",
+            "examples": [
+              "01924f5e-7c1a-7a3b-9f10-2c4d5e6f7a8b"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "The project name, 1 to 100 characters.",
+            "examples": [
+              "Shop"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProjectStatus",
+            "description": "Where the project is in its lifecycle."
+          },
+          "deletedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the project was deleted; null unless `deleting`."
+          },
+          "purgeAfter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When a deleted project is purged for good; null unless `deleting`."
+          },
+          "purgeFailedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the purge ran out of attempts; an owner can retry it. Null otherwise."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the project was created."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the project last changed."
+          }
+        },
+        "description": "A project: one app's isolated backend."
+      },
+      "ProjectPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Project"
+            },
+            "description": "The projects on this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass it as `cursor` to get the next page; null on the last page."
+          }
+        },
+        "description": "One page of an org's projects, oldest first."
+      },
+      "ProjectStatus": {
+        "type": "string",
+        "enum": [
+          "provisioning",
+          "active",
+          "failed",
+          "deleting"
+        ],
+        "description": "A project's lifecycle state."
       },
       "TestConsolePing": {
         "type": "object",
@@ -354,6 +1963,71 @@
         "description": "The payload of the `test.pinged` event.",
         "x-orvano-event": "test.pinged",
         "x-orvano-test": true
+      },
+      "UpdateInstallSettingsRequest": {
+        "type": "object",
+        "required": [
+          "consoleSignup"
+        ],
+        "properties": {
+          "consoleSignup": {
+            "$ref": "#/components/schemas/ConsoleSignupMode",
+            "description": "Who may create a console account."
+          }
+        },
+        "description": "Changes to the install settings."
+      },
+      "UpdateOrgRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The new org name; trimmed, 1 to 100 characters.",
+            "examples": [
+              "Acme Inc"
+            ]
+          }
+        },
+        "description": "Changes to an org."
+      },
+      "UpdatePlatformRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "A new name; trimmed, 1 to 100 characters.",
+            "examples": [
+              "Storefront (staging)"
+            ]
+          },
+          "identifier": {
+            "type": "string",
+            "description": "A new host pattern or app ID; see `Platform.identifier`.",
+            "examples": [
+              "staging.example.com"
+            ]
+          }
+        },
+        "description": "Changes to a platform. Its type never changes."
+      },
+      "UpdateProjectRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The new project name; trimmed, 1 to 100 characters.",
+            "examples": [
+              "Shop (production)"
+            ]
+          }
+        },
+        "description": "Changes to a project."
       }
     }
   }
