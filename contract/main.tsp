@@ -14,6 +14,11 @@ import "@typespec/openapi";
 import "@typespec/openapi3";
 import "./errors.tsp";
 import "./system/health.tsp";
+import "./platform/orgs.tsp";
+import "./platform/projects.tsp";
+import "./platform/api-keys.tsp";
+import "./platform/platforms.tsp";
+import "./platform/install.tsp";
 import "./test/test.tsp";
 
 using Http;

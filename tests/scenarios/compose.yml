@@ -1,5 +1,6 @@
-# A real Orvano for the shared scenarios (spec 0001, AC-10): Postgres, migrate, and the api role in
-# the Test environment, where every response is checked against the contract. The api listens on
+# A real Orvano for the shared scenarios (spec 0001, AC-10): Postgres, migrate, the api role in the
+# Test environment, where every response is checked against the contract, and a worker, which
+# provisions the fixture projects (spec 0003). The api listens on
 # http://localhost:8080. It builds the same image as deploy/compose, so the server under test is
 # the one that ships. The passwords are throwaway test values.
 #   docker compose -f tests/scenarios/compose.yml up -d --build --wait
@@ -49,6 +50,24 @@ services:
       - ./fixtures.yaml:/fixtures/fixtures.yaml:ro
     ports:
       - 127.0.0.1:8080:8080
+    healthcheck:
+      test: ['CMD', '/app/orvano', 'healthcheck']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *server
+    environment:
+      ORVANO_ROLE: worker
+      ORVANO_DB_URL: Host=postgres;Port=5432;Username=orvano_app;Password=scenarios-app;Database=orvano
+      ORVANO_DB_ADMIN_URL: Host=postgres;Port=5432;Username=orvano_admin;Password=scenarios-admin;Database=orvano
+      ASPNETCORE_ENVIRONMENT: Test
     healthcheck:
       test: ['CMD', '/app/orvano', 'healthcheck']
       interval: 2s

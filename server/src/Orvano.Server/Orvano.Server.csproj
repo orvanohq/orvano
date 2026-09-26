@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Orvano.Contract\Orvano.Contract.csproj" />
     <ProjectReference Include="..\Orvano.Core\Orvano.Core.csproj" />
+    <ProjectReference Include="..\Orvano.Platform\Orvano.Platform.csproj" />
   </ItemGroup>
 
   <!-- The host exposes no public API; its types are internal and only the tests reach in. -->

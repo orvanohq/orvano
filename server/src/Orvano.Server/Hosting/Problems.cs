@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.WebUtilities;
 using Orvano.Contract;
+using Orvano.Core.Http;
 
 namespace Orvano.Server.Hosting;
 
@@ -12,7 +13,7 @@ namespace Orvano.Server.Hosting;
 /// </summary>
 internal static class Problems
 {
-    private const string CodeKey = "code";
+    private const string CodeKey = ApiProblem.CodeKey;
     private const string RequestIdKey = "requestId";
     private static readonly object RequestIdItem = new();
 
@@ -51,8 +52,7 @@ internal static class Problems
         });
 
     /// <summary>A problem result for a handler: the status, a stable code, and a safe sentence.</summary>
-    public static ProblemHttpResult Result(int status, string code, string? detail = null) =>
-        TypedResults.Problem(detail: detail, statusCode: status, extensions: new Dictionary<string, object?> { [CodeKey] = code });
+    public static ProblemHttpResult Result(int status, string code, string? detail = null) => ApiProblem.Result(status, code, detail);
 
     /// <summary>Writes a problem from middleware, through the same normalization.</summary>
     public static Task WriteAsync(HttpContext context, int status, string code, string? detail = null) =>

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Logging;
 using Orvano.Core.Data;
 using Orvano.Core.Migrations;
+using Orvano.Platform.Data;
 using Orvano.Server.Hosting;
 
 var adminUrl = Environment.GetEnvironmentVariable("ORVANO_DB_ADMIN_URL");
@@ -20,7 +21,13 @@ await new MigrationRunner(db, loggerFactory.CreateLogger<MigrationRunner>()).Run
 // Actual columns: (schema, table) -> column -> (type, nullable)
 var actual = new Dictionary<(string, string), Dictionary<string, (string Type, bool Nullable)>>();
 await using (var cmd = db.CreateCommand(
-    "SELECT table_schema, table_name, column_name, data_type, is_nullable = 'YES' FROM information_schema.columns"))
+    // Arrays report data_type ARRAY; their element type is udt_name without its leading underscore.
+    """
+    SELECT table_schema, table_name, column_name,
+           CASE WHEN data_type = 'ARRAY' THEN substr(udt_name, 2) || '[]' ELSE data_type END,
+           is_nullable = 'YES'
+    FROM information_schema.columns
+    """))
 await using (var reader = await cmd.ExecuteReaderAsync())
 {
     while (await reader.ReadAsync())
@@ -31,13 +38,17 @@ await using (var reader = await cmd.ExecuteReaderAsync())
     }
 }
 
-var options = new DbContextOptionsBuilder<OrvanoDbContext>().UseNpgsql(db).Options;
-await using var context = new OrvanoDbContext(options);
-var model = context.GetService<IDesignTimeModel>().Model;
+// Every context that maps platform tables: the kernel's, then each module's (spec 0003).
+await using var conn = await db.OpenConnectionAsync();
+await using var kernel = new OrvanoDbContext(new DbContextOptionsBuilder<OrvanoDbContext>().UseNpgsql(conn).Options);
+await using var platform = PlatformDbContext.On(conn);
+DbContext[] contexts = [kernel, platform];
 
 var problems = new List<string>();
-foreach (var entity in model.GetEntityTypes())
+var tables = 0;
+foreach (var entity in contexts.SelectMany(c => c.GetService<IDesignTimeModel>().Model.GetEntityTypes()))
 {
+    tables++;
     var table = StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema());
     var name = $"{table.Schema}.{table.Name}";
     if (!actual.TryGetValue((table.Schema!, table.Name), out var columns))
@@ -73,5 +84,5 @@ if (problems.Count > 0)
     return 1;
 }
 
-Console.WriteLine($"EF model matches the database ({model.GetEntityTypes().Count()} tables checked).");
+Console.WriteLine($"EF model matches the database ({tables} tables checked).");
 return 0;

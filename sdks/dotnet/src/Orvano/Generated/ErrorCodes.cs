@@ -10,6 +10,9 @@ public static class ErrorCode
     /// <summary>The <c>contract_violation</c> error code.</summary>
     public const string ContractViolation = "contract_violation";
 
+    /// <summary>The <c>forbidden</c> error code.</summary>
+    public const string Forbidden = "forbidden";
+
     /// <summary>The <c>internal_error</c> error code.</summary>
     public const string InternalError = "internal_error";
 
@@ -19,6 +22,24 @@ public static class ErrorCode
     /// <summary>The <c>invalid_request</c> error code.</summary>
     public const string InvalidRequest = "invalid_request";
 
+    /// <summary>The <c>last_owner</c> error code.</summary>
+    public const string LastOwner = "last_owner";
+
     /// <summary>The <c>not_found</c> error code.</summary>
     public const string NotFound = "not_found";
+
+    /// <summary>The <c>org_not_active</c> error code.</summary>
+    public const string OrgNotActive = "org_not_active";
+
+    /// <summary>The <c>org_not_empty</c> error code.</summary>
+    public const string OrgNotEmpty = "org_not_empty";
+
+    /// <summary>The <c>project_not_found</c> error code.</summary>
+    public const string ProjectNotFound = "project_not_found";
+
+    /// <summary>The <c>project_not_ready</c> error code.</summary>
+    public const string ProjectNotReady = "project_not_ready";
+
+    /// <summary>The <c>signup_closed</c> error code.</summary>
+    public const string SignupClosed = "signup_closed";
 }

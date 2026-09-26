@@ -19,13 +19,13 @@ public class StartupChecksTests(PostgresFixture postgres)
     }
 
     [Theory]
-    [InlineData(0)]
-    [InlineData(2)]
-    public async Task Refuses_a_database_at_any_other_version(int version)
+    [InlineData(-1)]
+    [InlineData(1)]
+    public async Task Refuses_a_database_at_any_other_version(int offset)
     {
         await using var database = await postgres.NewDatabaseAsync();
         await database.MigrateAsync();
-        await TestDatabase.ExecuteAsync(database.Admin, "UPDATE orvano.schema_migrations SET version = @v", ("v", version));
+        await database.SetSchemaVersionAsync(PlatformSchema.ExpectedVersion + offset);
 
         Assert.False(await StartupChecks.SchemaMatchesAsync(database.App, NullLogger.Instance, TestContext.Current.CancellationToken));
     }

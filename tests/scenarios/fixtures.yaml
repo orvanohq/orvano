@@ -1,6 +1,16 @@
 # Seed data for the shared scenarios, loaded by a server started with
-# ORVANO_TEST_FIXTURES=<path to this file> in the Test environment (spec 0001).
-# Its full shape waits for the platform data model (scope row 3). Until then it holds only the
-# console session tokens the server accepts; the JS runner sends the first for `as: console` steps.
+# ORVANO_TEST_FIXTURES=<path to this file> in the Test environment (spec 0001, spec 0003).
+# consoleSessions: the console session tokens the server accepts, each acting as its own console
+#   user until row 8's real sessions; the JS runner sends the first for `as: console` steps.
+# projects: seeded in the first session's `Fixtures` org, then provisioned by the worker.
+# apiKeys: known secrets (orv_sk_ plus 43 base64url characters) for the fixture projects.
+# Row 8 adds users.
 consoleSessions:
   - test-console-session
+projects:
+  - id: scenarios0000000000a
+    name: Scenarios
+apiKeys:
+  - project: scenarios0000000000a
+    secret: orv_sk_scenarioScenarioScenarioScenarioScenario000
+    scopes: [users.read, users.write]

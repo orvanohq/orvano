@@ -6,14 +6,28 @@ export const ErrorCode = {
   consoleSessionRequired: 'console_session_required',
   /** `contract_violation` */
   contractViolation: 'contract_violation',
+  /** `forbidden` */
+  forbidden: 'forbidden',
   /** `internal_error` */
   internalError: 'internal_error',
   /** `invalid_cursor` */
   invalidCursor: 'invalid_cursor',
   /** `invalid_request` */
   invalidRequest: 'invalid_request',
+  /** `last_owner` */
+  lastOwner: 'last_owner',
   /** `not_found` */
   notFound: 'not_found',
+  /** `org_not_active` */
+  orgNotActive: 'org_not_active',
+  /** `org_not_empty` */
+  orgNotEmpty: 'org_not_empty',
+  /** `project_not_found` */
+  projectNotFound: 'project_not_found',
+  /** `project_not_ready` */
+  projectNotReady: 'project_not_ready',
+  /** `signup_closed` */
+  signupClosed: 'signup_closed',
 } as const
 
 /** One of the codes in {@link ErrorCode}. */

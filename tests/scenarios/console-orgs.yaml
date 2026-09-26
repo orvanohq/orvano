@@ -1,0 +1,30 @@
+name: a console user creates an org and a project in it
+requires: []
+steps:
+  - op: consoleOrgs.create
+    as: console
+    input:
+      body: { name: Scenario org }
+    expect:
+      status: 201
+      body: { name: Scenario org, status: active, role: owner }
+    save:
+      orgId: $.id
+  - op: consoleOrgs.get
+    as: console
+    input: { orgId: '${orgId}' }
+    expect:
+      status: 200
+      body: { name: Scenario org }
+  - op: consoleProjects.create
+    as: console
+    input:
+      orgId: '${orgId}'
+      body: { name: Scenario project }
+    expect:
+      status: 201
+      body: { name: Scenario project, status: provisioning }
+  - op: consoleOrgs.delete
+    as: console
+    input: { orgId: '${orgId}' }
+    expect: { status: 409, code: org_not_empty }

@@ -127,13 +127,14 @@ public class OrvanoBinaryTests(PostgresFixture postgres)
     }
 
     [Theory]
-    [InlineData(0, "Run the migrate role with this build first.")]
-    [InlineData(2, "The database is newer than this Orvano version; upgrade Orvano instead.")]
-    public async Task Refuses_to_start_the_api_against_another_schema_version(int version, string remedy)
+    [InlineData(-1, "Run the migrate role with this build first.")]
+    [InlineData(1, "The database is newer than this Orvano version; upgrade Orvano instead.")]
+    public async Task Refuses_to_start_the_api_against_another_schema_version(int offset, string remedy)
     {
         await using var database = await postgres.NewDatabaseAsync();
         await database.MigrateAsync();
-        await TestDatabase.ExecuteAsync(database.Admin, "UPDATE orvano.schema_migrations SET version = @v", ("v", version));
+        var version = PlatformSchema.ExpectedVersion + offset;
+        await database.SetSchemaVersionAsync(version);
 
         await using var orvano = OrvanoProcess.Start(["api"], Env(("ORVANO_DB_URL", database.AppUrl)), listen: true);
         await orvano.WaitForExitAsync(TimeSpan.FromSeconds(60));
@@ -213,7 +214,7 @@ public class OrvanoBinaryTests(PostgresFixture postgres)
         await using var api = await StartRoleAsync("api", database);
         using var http = api.Http();
 
-        await TestDatabase.ExecuteAsync(database.Admin, "UPDATE orvano.schema_migrations SET version = 2");
+        await database.SetSchemaVersionAsync(PlatformSchema.ExpectedVersion + 1);
         using var response = await http.GetAsync("/internal/readyz", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
@@ -248,7 +249,7 @@ public class OrvanoBinaryTests(PostgresFixture postgres)
         await using var database = await postgres.NewDatabaseAsync();
         await database.MigrateAsync();
         await using var api = await StartRoleAsync("api", database);
-        await TestDatabase.ExecuteAsync(database.Admin, "UPDATE orvano.schema_migrations SET version = 2");
+        await database.SetSchemaVersionAsync(PlatformSchema.ExpectedVersion + 1);
 
         await using var check = await OrvanoProcess.RunAsync(["healthcheck"], Env(("ASPNETCORE_HTTP_PORTS", api.Port!.Value.ToString())));
 

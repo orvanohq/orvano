@@ -28,4 +28,16 @@ public static class OrvanoConfig
             ? value
             : throw new OrvanoConfigException($"{key} must be a positive whole number, got '{raw}'.");
     }
+
+    /// <summary>The value of <paramref name="key"/> as a whole number from <paramref name="min"/> to <paramref name="max"/>, or <paramref name="fallback"/> when unset.</summary>
+    /// <exception cref="OrvanoConfigException">The setting is set but is not a whole number in the range.</exception>
+    public static int IntInRange(IConfiguration config, string key, int min, int max, int fallback)
+    {
+        var raw = config[key];
+        if (string.IsNullOrWhiteSpace(raw)) return fallback;
+        return int.TryParse(raw, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var value)
+            && value >= min && value <= max
+            ? value
+            : throw new OrvanoConfigException($"{key} must be a whole number from {min} to {max}, got '{raw}'.");
+    }
 }

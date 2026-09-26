@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Platform module (spec 0003): orgs, memberships, projects, API keys, platforms, and the
+       install settings. Public types live only in the Contracts namespace; the host reaches the
+       module entry point through InternalsVisibleTo. -->
+  <PropertyGroup>
+    <RootNamespace>Orvano.Platform</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orvano.Contract\Orvano.Contract.csproj" />
+    <ProjectReference Include="..\Orvano.Core\Orvano.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="orvano" />
+    <InternalsVisibleTo Include="Orvano.Server.Tests" />
+    <InternalsVisibleTo Include="Orvano.ModelDriftCheck" />
+  </ItemGroup>
+
+</Project>
