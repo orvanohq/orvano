@@ -36,7 +36,7 @@ pnpm --filter @orvano/console build
 - Named exports only. Route files keep the `Route` export TanStack Router requires.
 - Components are PascalCase; other files are kebab-case.
 - WCAG AA: every control reachable by keyboard with visible focus, labelled inputs, AA contrast.
-- Tests: Vitest plus Testing Library, set up when row 5 brings real screens.
+- Tests: Vitest browser mode in real Chromium (Playwright provider) with axe, plus Playwright end to end tests, set up when row 5 brings real screens (spec 0005).
 
 ## Gotchas
 
@@ -48,9 +48,20 @@ pnpm --filter @orvano/console build
 - [tanstack-query](../.claude/skills/tanstack-query/): `tanstack-skills/tanstack-skills`, queries, mutations, cache invalidation
 - [vercel-react-best-practices](../.claude/skills/vercel-react-best-practices/): `vercel-labs/agent-skills`, React performance and rendering patterns
 - [vitest](../.claude/skills/vitest/): `antfu/skills`, Vitest tests, mocking, coverage
+- [shadcn](../.claude/skills/shadcn/): `shadcn-ui/ui`, the shadcn CLI, `components.json`, and component patterns (this console uses the Base UI flavor: `render`, not `asChild`)
+- [tailwind-v4-shadcn](../.claude/skills/tailwind-v4-shadcn/): `secondsky/claude-skills`, Tailwind v4 `@theme` tokens and dark mode with shadcn (spec 0005's `theme-init.js` replaces its React theme provider)
+- [accessibility](../.claude/skills/accessibility/): `addyosmani/web-quality-skills`, WCAG 2.2 practices: focus, ARIA, contrast, keyboard
+- [tanstack-form](../.claude/skills/tanstack-form/): `tanstack-skills/tanstack-skills`, typed forms with Standard Schema validation
+- [tanstack-table](../.claude/skills/tanstack-table/): `tanstack-skills/tanstack-skills`, headless tables behind `DataTable`
+- [zod](../.claude/skills/zod/): `pproenca/dot-skills`, Zod schemas and parsing (the console uses Zod 4)
+
+MCP servers: shadcn MCP `npx shadcn@latest mcp` (recommended)
+
+Declined: Base UI MCP, a11y MCP `ronantakizawa/a11ymcp`
 
 ## Related specs
 
 - [0002 Stack and architecture](../docs/specs/0002-stack-architecture/index.md) (console, request routing)
+- [0005 Console design system and shell](../docs/specs/0005-console-design-system-shell/index.md) (tokens, components, shell, security headers, tests)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
