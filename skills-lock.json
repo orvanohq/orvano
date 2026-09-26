@@ -55,6 +55,24 @@
       "skillPath": "skills/dart-write-documentation/SKILL.md",
       "computedHash": "48724a1c25019504248ae10bdc37d77b077dcca2a26d4830860201c9d7a77126"
     },
+    "dotnet-api-security": {
+      "source": "wshaddix/dotnet-skills",
+      "sourceType": "github",
+      "skillPath": "skills/dotnet-api-security/SKILL.md",
+      "computedHash": "0c6fb8822a1e85085fec61d220669356fd3c5ee88ee998c6692e8647f91eb067"
+    },
+    "dotnet-cryptography": {
+      "source": "envoydev/claude-stack",
+      "sourceType": "github",
+      "skillPath": "stack/skills/dotnet-cryptography/SKILL.md",
+      "computedHash": "9dea1a1d23cb27dc137c381b5a56fd61d80bd93efd5f581d03d4b8ee33ead557"
+    },
+    "dotnet-jwt-authentication": {
+      "source": "ronnythedev/dotnet-clean-architecture-skills",
+      "sourceType": "github",
+      "skillPath": "skills/12-dotnet-jwt-authentication/SKILL.md",
+      "computedHash": "fd046596e640fddf78838351714d8dcba7652345bb30d7411ae2a94e0543edd3"
+    },
     "dotnet-webapi": {
       "source": "dotnet/skills",
       "sourceType": "github",
@@ -67,17 +85,47 @@
       "skillPath": "skills/ef-core/SKILL.md",
       "computedHash": "23f0a7c7e8c050337d67303f0af339da1ab8f0aa6a334f13112c3f85250c329c"
     },
+    "email-and-password-best-practices": {
+      "source": "better-auth/skills",
+      "sourceType": "github",
+      "skillPath": "better-auth/emailAndPassword/SKILL.md",
+      "computedHash": "863886759f729081e265941f4f72c503835d55a1f34f6d63cebe6571159fff4a"
+    },
     "flutter-add-integration-test": {
       "source": "flutter/agent-plugins",
       "sourceType": "github",
       "skillPath": "skills/flutter-add-integration-test/SKILL.md",
       "computedHash": "9ead37fef54371fed6ad07a9ba3de7a908135a0867b05baf74c28b7095343999"
     },
+    "flutter-security": {
+      "source": "dhruvanbhalara/skills",
+      "sourceType": "github",
+      "skillPath": "skills/flutter/flutter-security/SKILL.md",
+      "computedHash": "1e9a4c3cbb38a8011c5ba8fd80214d0ef5c5e05328ac4554f32fff56726c428f"
+    },
+    "jwt-validate": {
+      "source": "jsonwebtoken/jwt-skills",
+      "sourceType": "github",
+      "skillPath": "jwt-validate/SKILL.md",
+      "computedHash": "165ddd0ad5a960266d6dca93b7b237a85c08e9d0e70d54ba0de6b7134dbfb605"
+    },
     "lefthook": {
       "source": "fandhe-ai/agent-reference-skills",
       "sourceType": "github",
       "skillPath": "skills/lefthook/SKILL.md",
       "computedHash": "976ee8abc6c0c18d2ee7dd823c24a444a50c92558238c9129d345c41b6349bcd"
+    },
+    "libsodium": {
+      "source": "claude-dev-suite/claude-dev-suite",
+      "sourceType": "github",
+      "skillPath": "skills/security/libsodium/SKILL.md",
+      "computedHash": "ae2529d89a7051a8bbc1002717337a3d8e57ca017439104e071bbf5ff63ccefb"
+    },
+    "managing-secure-storage": {
+      "source": "poorgramer-zack/dart-expert-skills",
+      "sourceType": "github",
+      "skillPath": "skills/flutter-secure-storage/SKILL.md",
+      "computedHash": "d0fee5253e1e91bec4a0201b8030d52c7f243b7ce4547c85625c67a237865194"
     },
     "multi-stage-dockerfile": {
       "source": "github/awesome-copilot",
@@ -91,11 +139,23 @@
       "skillPath": "plugins/frontend-mobile-development/skills/nextjs-app-router-patterns/SKILL.md",
       "computedHash": "b4fea42eecf1f803155ef7fa133d5286ee8f2dbba3e616954e9e43c6f0ffc144"
     },
+    "nextjs-authentication": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-typescript/skills/nextjs-authentication/SKILL.md",
+      "computedHash": "f237aeab71b4ca34699c91d83d82505c7db0d003997e4bdd3dc99ed10c564cbc"
+    },
     "optimizing-ef-core-queries": {
       "source": "dotnet/skills",
       "sourceType": "github",
       "skillPath": "plugins/dotnet-data/skills/optimizing-ef-core-queries/SKILL.md",
       "computedHash": "98eb6bb1ab357806cf068908b5b00c3992b898b9428b587a7f357adb3387c8aa"
+    },
+    "owasp-top-10-testing": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/owasp-top-10-testing/SKILL.md",
+      "computedHash": "da33339f2d052ea5445b9fb7fc75e3fe4dd9eafc51ea8141e2b3ceab722fbe0e"
     },
     "playwright-cli": {
       "source": "microsoft/playwright-cli",
@@ -108,6 +168,18 @@
       "sourceType": "github",
       "skillPath": "skills/pnpm/SKILL.md",
       "computedHash": "2ec08c851c6f901d4ed72c21b826416ed074a487db65662b36249418afd728bf"
+    },
+    "security-and-hardening": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-and-hardening/SKILL.md",
+      "computedHash": "1e0cd727cccd3c8c0834ce7722a8a2851e2e849f1352ee972f39311437b021d3"
+    },
+    "session-management": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/session-management/skills/session-management/SKILL.md",
+      "computedHash": "5fc64dbd3e6492ebc00968bf841c1f57246a070c4de52e53576c78e5a853990d"
     },
     "supabase-postgres-best-practices": {
       "source": "supabase/agent-skills",

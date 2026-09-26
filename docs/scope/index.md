@@ -51,7 +51,7 @@ Every product feature ships in all of these layers in the same version, unless i
 | 5 | Design system & console shell | Foundation | planned |
 | 6 | Self host installer | Foundation | planned |
 | 7 | Console accounts, orgs & projects | v0.1 | planned |
-| 8 | App user sign up & sign in | v0.1 | planned |
+| 8 | App user sign up & sign in | v0.1 | in-progress |
 | 9 | Transactional email | v0.2 | planned |
 | 10 | Email verification, recovery & passwordless | v0.2 | planned |
 | 11 | Docs site & quickstarts | v0.2 | planned |
@@ -83,11 +83,12 @@ Every product feature ships in all of these layers in the same version, unless i
 | 37 | Observability & usage | v0.15 | planned |
 | 38 | Upgrades, audit logs & hardening | v0.15 | planned |
 | 39 | Stable release gate | v1.0 | planned |
+| 40 | Console account self service | v0.3 | planned |
 
 ## Epics
 
 - [Foundations](foundations.md): rows 1 to 6 · 3 of 6 done
-- [Platform & developer experience](platform.md): rows 7, 11, 15, 19, 37 to 39 · 0 of 7 done
+- [Platform & developer experience](platform.md): rows 7, 11, 15, 19, 37 to 40 · 0 of 8 done
 - [Authentication](auth.md): rows 8 to 10, 12 to 14 · 0 of 6 done
 - [Databases](databases.md): rows 16 to 18 · 0 of 3 done
 - [Storage](storage.md): rows 20 to 21 · 0 of 2 done
