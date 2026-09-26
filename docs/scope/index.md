@@ -86,7 +86,7 @@ Every product feature ships in all of these layers in the same version, unless i
 
 ## Epics
 
-- [Foundations](foundations.md): rows 1 to 6 · 1 of 6 done
+- [Foundations](foundations.md): rows 1 to 6 · 2 of 6 done
 - [Platform & developer experience](platform.md): rows 7, 11, 15, 19, 37 to 39 · 0 of 7 done
 - [Authentication](auth.md): rows 8 to 10, 12 to 14 · 0 of 6 done
 - [Databases](databases.md): rows 16 to 18 · 0 of 3 done
