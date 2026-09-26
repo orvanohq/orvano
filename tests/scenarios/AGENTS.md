@@ -9,8 +9,8 @@ One list of scenarios every SDK surface runs against a real Orvano (spec 0001, A
 | Path | Owns |
 |---|---|
 | `*.yaml` (except `fixtures.yaml`) | One scenario each; picked up by every runner automatically |
-| `fixtures.yaml` | Seed data for `ORVANO_TEST_FIXTURES`; its shape waits for the platform data model (scope row 3). Today it holds only `consoleSessions` |
-| `compose.yml` | Postgres, migrate, and the api role in the `Test` environment on `:8080` |
+| `fixtures.yaml` | Seed data for `ORVANO_TEST_FIXTURES`: `consoleSessions` (each a stable console user), `projects` (seeded in the first session's `Fixtures` org), and `apiKeys` (known secrets, `orv_sk_` plus exactly 43 characters, or the api refuses to start). Row 8 adds `users` |
+| `compose.yml` | Postgres, migrate, the api role in the `Test` environment on `:8080`, and a worker that provisions the fixture projects |
 | `runners/js/` | Interpreter for Node, Bun, Deno, Chromium, workerd, and the Next.js driver (`src/cli.ts`) |
 | `runners/nextjs/` | Next.js app; its route handler and server component page use `@orvano/nextjs` |
 | `runners/dart/` | Dart interpreter shared with Flutter; `bin/run.dart` is the Dart server runner |
@@ -24,6 +24,7 @@ One list of scenarios every SDK surface runs against a real Orvano (spec 0001, A
 - A step whose operation has no call for that role in a surface skips the whole scenario there; an unknown operation fails. `console` steps run only in the JS interpreter (through `@orvano/console-client`, sending the first `consoleSessions` token); every other runner skips that scenario.
 - A runner fails when any scenario fails or none passed.
 - Server clients send the API key `test-server-key` (none in a browser, where setting a key throws). Dart runners build both clients with `Surface.connect`; Flutter passes its own client from `orvano_flutter`.
+- The console client is bound to one project, and steps have no per step project, so project scoped console operations (keys, platforms) are covered by the server's HTTP tests, not scenarios.
 - Quote substitutions in YAML (`'${version}'`); a bare `{` starts a flow map.
 
 ## Gotchas

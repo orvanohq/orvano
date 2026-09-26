@@ -10,6 +10,7 @@ The Orvano API written once in TypeSpec (spec 0001). It compiles to `dist/openap
 |---|---|
 | `main.tsp` | The service, and `@info` version, which must equal the repo's `VERSION` (SdkGen refuses to run otherwise) |
 | `system/health.tsp` | `GET /v1/health`, the thin thread operation |
+| `platform/` | The console operations for orgs, projects, API keys, platforms, and install settings (spec 0003), and the `ApiKeyScope` catalog |
 | `errors.tsp` | The `Problem` error body, the public `ErrorCode` catalog, and the runner only `TestErrorCode` |
 | `test/test.tsp` | Test only operations and models (`test.*`) that prove the SDK conventions; they never ship |
 | `tspconfig.yaml` | Emits OpenAPI 3.1 JSON to `dist/openapi.json` |
@@ -29,7 +30,8 @@ Commit `dist/openapi.json` and the generated code together. The server's handler
 
 - One folder per product (`system/`, later `auth/`, ...), each imported from `main.tsp`.
 - Every operation carries `@operationId("<service>.<method>")` in camelCase, `@extension("x-orvano-audience", "client" | "server" | "both" | "console")`, and `@extension("x-orvano-service", "<service>")` matching the operationId prefix.
-- Paths live under `/v1/`; `console` operations, and only they, live under `/v1/console/`.
+- Paths live under `/v1/`; `console` operations, and only they, live under `/v1/console/`. Project scoped console operations take the project from `X-Orvano-Project` (never a path parameter) and live under `/v1/console/project/`.
+- A create answers 201 with the created model; a delete with nothing to return answers 204 (`NoContentResponse`). A PATCH uses `@patch(#{ implicitOptionality: false })` with an explicit request model.
 - Every operation returns `| Problem` (its `default` response). A new error code goes in `enum ErrorCode`, which SdkGen turns into constants in every SDK and the server.
 - A list operation is a GET with optional query `cursor` (string) and `limit` (int32) that returns a model of exactly `items: T[]` and `nextCursor: string | null`; SdkGen then adds an async iterator (`listAll`, `ListAllAsync`).
 - A realtime event is its payload model marked `@extension("x-orvano-event", "<name>")`; SdkGen adds it to each SDK's event registry.
