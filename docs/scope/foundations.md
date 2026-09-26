@@ -19,10 +19,19 @@ Capture conventions from the real scaffold, then install lint, format, type stri
 - [x] Capture conventions + tooling choices: `/audit`
 Code in `.editorconfig`, `Directory.Build.props`, `eslint.config.js`, `.prettierrc.json`, `lefthook.yml`, `.github/workflows/ci.yml`
 
-### 3. Platform data model · needs a decision · GA
+### 3. Platform data model · in-progress · GA
 The internal model that every product hangs off: console accounts, organizations, members and roles, projects, API keys and scopes, platforms (allowed web origins and app bundle IDs), and project scoped app users. Environments must fit in later without a breaking migration.
 **Done when:** the model supports many orgs and many projects per install, keeps each project's data isolated, and leaves room for environments, usage metering, and a future cloud.
-- [ ] Design it (spec): `/architect platform data model`
+- [x] Design it (spec): `/architect platform data model`
+- [ ] Build it: lands with the rows that first use each part (Tracer Bullet), no separate `/develop` run
+   - [ ] Row 7 slice: platform tables, domain rules, console sign up rules, project and org lifecycle jobs, API keys and platforms, events and fixtures: `/develop console accounts, orgs & projects` (AC-1 to 5, 7 to 15, 17 to 19)
+   - [ ] Row 8 slice: `auth_users`, request authentication (project lookup, key verification, scopes, origins), console accounts as users of `console`: `/develop app user sign up & sign in` (AC-4 to 8, 12 to 14, 16, 17)
+   - [ ] Row 15 slice: invitations and member management: `/develop console team members & roles` (AC-7, 9, 10)
+- [ ] Verify it: `/check verify platform data model`
+- [ ] Test it: `/test platform data model`
+- [ ] Review it (fresh model): `/check review platform data model`
+- [ ] Document it: `/document platform data model`
+Spec [0003](../specs/0003-platform-data-model/index.md) · code in `server/src/Orvano.Platform/`, `server/src/Orvano.Auth/`, `server/migrations/platform/`
 
 ### 4. API contract & SDK pipeline · done
 One machine readable description of every public endpoint is the source of truth. From it you generate the API reference and the SDKs: core JS/TS, Next.js (wraps core, adds server components and cookie sessions), Flutter, Dart server, and .NET.

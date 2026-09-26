@@ -46,7 +46,7 @@ Every product feature ships in all of these layers in the same version, unless i
 |---|---------|-------|--------|
 | 1 | Stack & architecture | Foundation | done |
 | 2 | Coding standards & tooling | Foundation | done |
-| 3 | Platform data model | Foundation | planned |
+| 3 | Platform data model | Foundation | in-progress |
 | 4 | API contract & SDK pipeline | Foundation | done |
 | 5 | Design system & console shell | Foundation | planned |
 | 6 | Self host installer | Foundation | planned |
