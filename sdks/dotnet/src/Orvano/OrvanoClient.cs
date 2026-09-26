@@ -133,7 +133,7 @@ public sealed partial class OrvanoClient : IDisposable
         }
 
         if (MajorMinor(serverVersion) == MajorMinor(SdkInfo.Version)) return;
-        Log.VersionMismatch(_logger, SdkInfo.Name, SdkInfo.Version, MajorMinor(SdkInfo.Version), _endpoint, serverVersion, MajorMinor(serverVersion));
+        Log.VersionMismatch(_logger, SdkInfo.Version, MajorMinor(SdkInfo.Version), _endpoint, serverVersion, SdkInfo.Name, MajorMinor(serverVersion));
     }
 
     private static string MajorMinor(string version) => string.Join(".", version.Split('.').Take(2));
@@ -211,7 +211,7 @@ public sealed partial class OrvanoClient : IDisposable
 
     private static partial class Log
     {
-        [LoggerMessage(1, LogLevel.Warning, "{Sdk} {SdkVersion} targets Orvano {Target}, but the server at {Endpoint} runs {ServerVersion}. Calls still work; use {Sdk} {Match}.x to match.")]
-        public static partial void VersionMismatch(ILogger logger, string sdk, string sdkVersion, string target, string endpoint, string serverVersion, string match);
+        [LoggerMessage(1, LogLevel.Warning, "The Orvano .NET SDK {SdkVersion} targets Orvano {Target}, but the server at {Endpoint} runs {ServerVersion}. Calls still work; update the {Package} package to {Match}.x to match.")]
+        public static partial void VersionMismatch(ILogger logger, string sdkVersion, string target, string endpoint, string serverVersion, string package, string match);
     }
 }

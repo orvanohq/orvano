@@ -198,8 +198,12 @@ internal static class Dart
             var type = Type(p.Type) + (nullable ? "?" : "");
             var source = $"json['{p.Name}']";
             var fromJson = nullable ? $"{source} == null ? null : {FromJson(p.Type, source)}" : FromJson(p.Type, source);
+            // An optional value that needs no conversion uses a null aware element (`'x': ?x`);
+            // `--fatal-infos` rejects the `if (x case final v?)` form for it (use_null_aware_elements).
             var toJson = p.Optional
-                ? $"if ({p.Name} case final v?) '{p.Name}': {ToJson(p.Type, "v")}"
+                ? ToJson(p.Type, "v") == "v"
+                    ? $"'{p.Name}': ?{p.Name}"
+                    : $"if ({p.Name} case final v?) '{p.Name}': {ToJson(p.Type, "v")}"
                 : p.Nullable && ToJson(p.Type, "v") != "v"
                     ? $"'{p.Name}': switch ({p.Name}) {{ final v? => {ToJson(p.Type, "v")}, null => null }}"
                     : $"'{p.Name}': {ToJson(p.Type, p.Name)}";

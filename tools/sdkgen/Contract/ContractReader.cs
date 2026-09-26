@@ -533,7 +533,7 @@ internal static partial class ContractReader
                 JsonSchemaType.Boolean => new PrimitiveType(PrimitiveKind.Boolean),
                 JsonSchemaType.Array => ResolveType(schema.Items, $"{where} items").Type is { } item ? new ArrayType(item) : null,
                 JsonSchemaType.Object when schema.Properties is { Count: > 0 } => Unsupported("inline objects; declare a named model"),
-                JsonSchemaType.Object when schema.AdditionalProperties is { } values =>
+                JsonSchemaType.Object when MapValues(schema) is { } values =>
                     ResolveType(values, $"{where} values").Type is { } value ? new MapType(value) : null,
                 _ => Unsupported($"schema type '{type}'"),
             };
@@ -545,6 +545,13 @@ internal static partial class ContractReader
                 return null;
             }
         }
+
+        /// <summary>
+        /// The value schema of a <c>Record&lt;T&gt;</c>. TypeSpec's OpenAPI 3.1 emitter writes it as
+        /// <c>unevaluatedProperties</c>; other tools write <c>additionalProperties</c>.
+        /// </summary>
+        private static IOpenApiSchema? MapValues(IOpenApiSchema schema) =>
+            schema.AdditionalProperties ?? (schema as IOpenApiSchemaMissingProperties)?.UnevaluatedPropertiesSchema;
 
         /// <summary>The schema's first <c>@example</c> value, for docs snippets (AC-15).</summary>
         private static JsonNode? ExampleOf(IOpenApiSchema schema) => schema.Examples?.FirstOrDefault();

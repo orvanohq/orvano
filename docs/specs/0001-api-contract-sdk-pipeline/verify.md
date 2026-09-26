@@ -57,7 +57,7 @@ Milestone 2 (shared conventions) · added 2026-09-25. Same scenario server as ab
 ## Value sourcing
 - [x] Server client built with `apiKey: test-server-key` → requests carry `X-Orvano-Key: test-server-key`; client entry requests never do (API key from server `Client` config)
 - [x] Client with a `MemorySessionStore('t')` → `X-Orvano-Session: t` (session token from the session store)
-- [x] JS runner console steps send `Cookie: orvano_console=test-console-session`; change `consoleSessions` in `fixtures.yaml` and restart the api → the console scenario now fails with 401 (console session from fixtures)
+- [x] JS runner console steps send `Cookie: orvano_console=test-console-session`; change `consoleSessions` in `fixtures.yaml` and restart the api → the old token now gets 401 and the new one 200, and the JS console scenario still passes, because the server and the runner both read the token from that file (console session from fixtures)
 - [x] Edit the item count or `test_conflict` in `TestingModule` → the pagination or errors scenario fails in every runner (test operation answers from `TestingModule`)
 - [x] A Problem body with `detail` → the SDK message is `detail`; without it → `title`; `requestId` from the body, else `X-Request-Id` (error fields from Problem Details)
 - [x] A 503 without `Retry-After` → the retry waits roughly 250 ms, then 500 ms, with jitter, at most 3 retries (retry delay from runtime defaults)
