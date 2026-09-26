@@ -88,6 +88,29 @@ Decisions made while writing the spec (not asked in the interview):
 - **A fourth audience, `console`, in a private generated package** (the engineer chose this during spec 0002). The console calls platform operations through typed, contract checked code, and AC-9's response validation covers them, while no public SDK ever contains them. They live under `/v1/console/*` so the server can accept only a console session there, and they are exempt from the 1.0 freeze because the console and server always ship together. Runner up: the Appwrite approach, where the console reuses public server operations, which would put platform administration into public server SDKs.
 - **Server types are records, route constants, and error codes, not full endpoint interfaces.** The server keeps freedom to structure handlers; contract tests catch behavior drift. Runner up: generated endpoint interfaces, which lock the server into one handler shape early.
 
+## Milestone 2 gaps (update, 2026-09-25)
+
+`/develop` stopped before Milestone 2 because two values had no source in this spec. First, where do operations that exist only to prove the conventions live (a 409, a paged list, a console operation, an event), given that no product operation needs them yet? Second, what do the SDKs actually send for an API key, an app session, and a console session, when the auth spec (row 8) and console sessions (rows 7 and 8) are not decided? Both were settled with the engineer as an in place update.
+
+### Test only operations: options
+
+1. **Flag plus runner only output (chosen).** Mark them `x-orvano-test`, keep them in `openapi.json`, route them by audience as usual, but write their generated code only into the scenario runners; map their server routes only in `Test`.
+   Pros: one generator input stays true; audience routing and templates are still exercised; the server compiles against them and response validation covers them; nothing reaches a package, the docs, or production. Cons: a second output target per runner; runner code needs SDK internals, so TS and Dart helpers become public and .NET needs `InternalsVisibleTo`.
+2. **A separate `openapi.test.json`.** TypeSpec compiles test operations to their own file, which SdkGen also reads. Pros: a clean physical split. Cons: breaks the "one input file" invariant; response validation needs two documents; templates would have to merge two models anyway.
+3. **Ship them in every SDK, 404 in production.** Pros: no new generator path. Cons: `orvano.test.*` would sit in every published package forever and after 1.0 fall under the freeze; docs and breaking change checks would need exclusions anyway.
+4. **No test operations; wait for real ones.** Pros: nothing to build. Cons: AC-6, AC-7, AC-8, and AC-17 stay unproven until unrelated product rows land, which defeats the tracer bullet order.
+
+Why option 1: the tracer bullet approach wants every convention proven end to end in Milestone 2, and the key invariants already say public packages carry nothing they shouldn't. Option 1 is the only one that keeps both the single input file and a clean public surface. Its cost (a public pagination helper and event decoder, an `InternalsVisibleTo` line) is small, and those helpers are ones real users of a raw call benefit from anyway. Generating the test console operation into the runner rather than into `@orvano/console-client` keeps one rule for every test operation, at the price of the console client having no generated operations until a real console row lands.
+
+### Temporary auth wire formats: options
+
+1. **Distinct `X-Orvano-*` headers and cookies (chosen).** `X-Orvano-Key` for API keys, `X-Orvano-Session` for app sessions (`orvano_session` cookie in Next.js), and the `orvano_console` same origin cookie for the console.
+   Pros: the server knows the credential kind from the header name alone, which is exactly what the console 401 rule needs; each name is one constant per runtime, so row 8 can swap it in one place; follows a proven BaaS pattern (Appwrite sends keys and sessions in separate named headers). Cons: nonstandard headers need CORS allowances later; row 8 may still choose `Authorization`, making this a throwaway.
+2. **`Authorization: Bearer` for every credential.** Pros: the standard header, friendly to proxies and tools. Cons: telling a key from a session needs a token prefix format, which is itself row 8's decision, so this would quietly decide auth early.
+3. **No concrete format; only the provider interface.** Pros: decides nothing ahead of row 8. Cons: AC-4's API key provider and AC-17's 401 checks can't be proven, and `/develop` would have to invent a format anyway.
+
+Why option 1: it decides the minimum needed to prove AC-4 and AC-17 now, and its failure mode (row 8 picks something else) costs one constant per runtime. Keys and sessions are sent but not validated until row 8; that is acceptable only because no product data exists yet, which the spec's security model states as a constraint on row 8's timing.
+
 ## References
 
 **Project sources**:
