@@ -2,10 +2,20 @@
 
 App user identity for projects built on Orvano. See [index.md](index.md) for the full plan.
 
-### 8. App user sign up & sign in · needs a decision · GA
+### 8. App user sign up & sign in · in-progress · GA
 The thinnest real auth thread: email and password sign up, sign in, sign out, and "get current user". Decides the session model (tokens, refresh, and cookie sessions for Next.js server rendering). Together with row 7 this is v0.1.
 **Done when:** a Next.js app and a Flutter app sign a user up and in; a .NET and a Dart server verify that user's session and list users; the user shows in the console Users page.
-- [ ] Design it (spec): `/architect app user sign up & sign in`
+- [x] Design it (spec): `/architect app user sign up & sign in`
+- [ ] Build it: `/develop app user sign up & sign in` (after row 7's Platform tables and domain; see the spec's Build plan for the order across rows 7 and 8)
+   - [ ] Foundations: envelope encryption, trusted proxies, cache and rate limiter in the kernel; the `Orvano.Auth` module, its four tables, and the domain rules (AC-2, 8, 9, 30, 31, 34)
+   - [ ] Thin thread and sessions: sign up, sign in, current user, signing keys and JWKS, refresh with reuse detection, sign out, session lists, self service, events, retention (AC-1, 3 to 16, 20, 21, 30 to 33)
+   - [ ] Servers and client SDKs: API key authentication and scopes, `users.*`, token verification in .NET, Dart, and JS servers; session handling in JS, Next.js, and Flutter (AC-17 to 19, 23 to 26, 35)
+   - [ ] Console: console account sessions with the CSRF rule, the Users page, and signing key rotation (AC-22, 27 to 29, 35)
+- [ ] Verify it: `/check verify app user sign up & sign in`
+- [ ] Test it: `/test app user sign up & sign in`
+- [ ] Review it (fresh model): `/check review app user sign up & sign in`
+- [ ] Document it: `/document app user sign up & sign in`
+Spec [0004](../specs/0004-app-user-auth/index.md) · code in `server/src/Orvano.Auth/`, `contract/auth/`, `sdks/`, `console/`
 
 ### 9. Transactional email · needs a decision
 Send email from a project through SMTP you configure, with editable templates. Auth uses it first; messaging reuses it later.
