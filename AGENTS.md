@@ -53,7 +53,8 @@ Installed (scope row 2):
 - Pre commit: Lefthook runs `dotnet format` and ESLint/Prettier on staged files only, then restages what they fixed. `pnpm install` installs the hooks; skip once with `LEFTHOOK=0`. Builds, typecheck, and tests stay in CI.
 - Tests: xUnit v3 plus Testcontainers (server, in place); Vitest plus Testing Library (console, when row 5 lands).
 - CI: `.github/workflows/ci.yml` runs lint and format checks (`dotnet format --verify-no-changes`, `pnpm lint`, `pnpm format:check`), build, tests, the EF drift check, and the compose smoke test.
-- SDK CI: `.github/workflows/sdks.yml` fails when `contract/dist/openapi.json` or generated code is stale, then runs the shared scenarios on Node, Bun, Deno, Chromium, workerd, Next.js, Dart, Flutter (Chrome, Android), and .NET (`net10.0`, `netstandard2.0`). `sdks-nightly.yml` runs Flutter on the iOS simulator. Flutter 3.44.2 is pinned in `.tool-versions` and both workflows so `dart format` output matches everywhere.
+- SDK CI: `.github/workflows/sdks.yml` fails when `contract/dist/openapi.json` or generated code is stale, then runs the shared scenarios on Node, Bun, Deno, Chromium, workerd, Next.js, Dart, Flutter (Chrome, Android), and .NET (`net10.0`, `netstandard2.0`). `sdks-nightly.yml` runs Flutter on the iOS simulator. `sdks.yml` also reports breaking changes since the last release tag (oasdiff).
+- Release: pushing the tag `v<VERSION>` runs `.github/workflows/release.yml`, which runs `sdks.yml` and then publishes to npm, pub.dev, and NuGet and updates the `orvano-js`, `orvano-dart`, and `orvano-dotnet` mirrors. It is a dry run until 0.1, and a manual run is always a dry run. Flutter 3.44.2 is pinned in `.tool-versions` and both workflows so `dart format` output matches everywhere.
 
 ## Git
 

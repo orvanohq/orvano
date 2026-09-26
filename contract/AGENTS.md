@@ -14,6 +14,7 @@ The Orvano API written once in TypeSpec (spec 0001). It compiles to `dist/openap
 | `test/test.tsp` | Test only operations and models (`test.*`) that prove the SDK conventions; they never ship |
 | `tspconfig.yaml` | Emits OpenAPI 3.1 JSON to `dist/openapi.json` |
 | `dist/openapi.json` | The compiled contract; committed, CI fails when it is stale |
+| `dist/openapi.public.json`, `dist/examples/` | Written by SdkGen: the public contract (the docs reference and the breaking change check read it) and the docs snippets; committed |
 
 ## Commands
 
@@ -37,11 +38,13 @@ Commit `dist/openapi.json` and the generated code together. The server's handler
 - Parameters are path or query only, and primitive (string, number, boolean, date).
 - Models are PascalCase with camelCase properties. Enums are named string enums. No inline objects, no unions except `T | null`; discriminated unions are not supported by SdkGen yet.
 - Mark a retry safe operation with `@extension("x-orvano-idempotent", true)`.
-- Write `@doc` on every model, property, and operation (it becomes SDK docs) and `@example` values (they feed docs snippets later).
+- Write `@doc` on every model, property, and operation (it becomes SDK docs) and `@example` values on model properties (they feed the docs snippets in `dist/examples/`).
 
 ## Gotchas
 
 - After 1.0, an operation's `operationId`, audience, and service never change without a major version (`console` operations are exempt).
+- CI runs oasdiff on `dist/openapi.public.json` against the last release tag: a breaking change to a public operation warns before 1.0 and fails from 1.0 on. The full contract is compared for information only.
+- To bump the version, change `VERSION` and `@info` in `main.tsp` together, rebuild, and run SdkGen, which stamps every package manifest.
 - The contract is embedded in the server (`Orvano.Contract`) and validates every `/v1` response in the `Test` environment, so the contract and the server must agree.
 
 ## Related specs
