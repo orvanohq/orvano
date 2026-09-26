@@ -78,3 +78,26 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+
+  # The console end to end tests (spec 0005): the gateway image (Caddy plus the console build) in
+  # front of the api above, at http://localhost:8081. Only `--profile console` starts it, so the
+  # scenario SDK jobs never build or run it.
+  #   docker compose -f tests/scenarios/compose.yml --profile console up -d --build --wait
+  gateway:
+    profiles: [console]
+    image: orvano-gateway:scenarios
+    build:
+      context: ../..
+      dockerfile: deploy/gateway/Dockerfile
+    environment:
+      ORVANO_PUBLIC_URL: http://localhost:8081
+    ports:
+      - 127.0.0.1:8081:8081
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://localhost:8081/theme-init.js']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      api:
+        condition: service_healthy

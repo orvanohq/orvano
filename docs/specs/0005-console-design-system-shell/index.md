@@ -1,7 +1,7 @@
 # 0005. Console design system and shell
 
 **Date**: 2026-09-26
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 

@@ -49,12 +49,12 @@ Spec [0001](../specs/0001-api-contract-sdk-pipeline/index.md) · code in `contra
 Visual language, layout, and base components for the console, plus the empty shell: navigation, org and project switcher, light and dark themes.
 **Done when:** `design.md` covers type, color, spacing, and components; the shell renders with working navigation; base components handle focus and keyboard.
 - [x] Design it (spec): `/architect design system & console shell`
-- [ ] Build it: `/develop design system & console shell`
-   - [ ] Thin thread: Tailwind v4 and shadcn (Base UI) set up, dark tokens, fonts, theme bootstrap, the session guard and org switcher on real orgs, the AppHost fixtures switch, browser tests with axe in CI (AC-8, 10, 13, 20, 25)
-   - [ ] Design system: full tokens in both themes and densities, theme and density menu, contrast and color literal tests, `console/design.md` (AC-1 to 4, 7)
-   - [ ] Components and catalog: the full inventory, keyboard scripts, form, toast, table, and role patterns, the dev only `/dev/components` catalog (AC-5, 6, 7, 9, 21, 22)
-   - [ ] Shell complete: org and project routes, nav registry, sidebar rail and drawer, both switchers with paging, status gating, not found, errors, landing, titles and focus, 360 px layout (AC-10 to 23)
-   - [ ] Production shape: Caddy security and cache headers, the `console` compose profile with the gateway, end to end tests in CI (AC-8, 9, 24, 26)
+- [x] Build it: `/develop design system & console shell`
+   - [x] Thin thread: Tailwind v4 and shadcn (Base UI) set up, dark tokens, fonts, theme bootstrap, the session guard and org switcher on real orgs, the AppHost fixtures switch, browser tests with axe in CI (AC-8, 10, 13, 20, 25)
+   - [x] Design system: full tokens in both themes and densities, theme and density menu, contrast and color literal tests, `console/design.md` (AC-1 to 4, 7)
+   - [x] Components and catalog: the full inventory, keyboard scripts, form, toast, table, and role patterns, the dev only `/dev/components` catalog (AC-5, 6, 7, 9, 21, 22)
+   - [x] Shell complete: org and project routes, nav registry, sidebar rail and drawer, both switchers with paging, status gating, not found, errors, landing, titles and focus, 360 px layout (AC-10 to 23)
+   - [x] Production shape: Caddy security and cache headers, the `console` compose profile with the gateway, end to end tests in CI (AC-8, 9, 24, 26)
 - [ ] Verify it: `/check verify design system & console shell`
 - [ ] Test it: `/test design system & console shell`
 Spec [0005](../specs/0005-console-design-system-shell/index.md) · code in `console/`, `deploy/gateway/Caddyfile`, `dev/Orvano.AppHost/`, `tests/scenarios/compose.yml`
