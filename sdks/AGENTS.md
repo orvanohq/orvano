@@ -24,6 +24,7 @@ The five public SDK surfaces (spec 0001). Each is a thin handwritten runtime plu
 | `dart/core/lib/src/client.dart`, `orvano_exception.dart` | The Dart `Client` and `OrvanoException` |
 | `dotnet/src/Orvano/OrvanoClient.cs`, `OrvanoRequest.cs`, `OrvanoException.cs` | The .NET client, request shape, and exception |
 | `js/src/runtime/auth.ts`, `api-key.ts`, `server-client.ts`; `dart/core/lib/src/auth.dart`, `dart/server/lib/src/client.dart`; `dotnet/src/Orvano/OrvanoHeaders.cs` | Auth providers and the temporary auth names (`X-Orvano-Session`, `X-Orvano-Key`) |
+| `js/src/runtime/version.ts`, `dart/core/lib/src/version.dart`, `dotnet/src/Orvano/OrvanoClient.cs` (`CheckVersion`) | `X-Orvano-SDK` on every request and the once per client major.minor mismatch warning |
 | `js/src/runtime/pagination.ts`, `events.ts`; `dart/core/lib/src/pagination.dart`, `events.dart`; `dotnet/src/Orvano/OrvanoPagination.cs`, `OrvanoEvents.cs` | The page iterator helper and the event decoder |
 | `*/generated/`, `*/Generated/` | SdkGen output; never edit by hand |
 
@@ -46,12 +47,14 @@ dotnet build sdks/dotnet/src/Orvano
 - An API key setter exists only in server packages, and it throws in a browser.
 - Retries: GET, HEAD, and `idempotent` calls retry on 429 and 503, honoring `Retry-After`, else backoff with jitter from 250 ms, 3 retries by default. The timeout covers the whole call, retry waits included, and every call accepts cancellation.
 - The pagination helper and the event decoder are public API in TS and Dart, because the scenario runners build their test services on them; the decoder takes a registry. In .NET the runner reaches the internal `SendAsync` through `InternalsVisibleTo("Orvano.Scenarios")`, so keep that signature stable.
+- Every request sends `X-Orvano-SDK: <package>/<version>` (`@orvano/js`, `orvano_core` or `orvano_dart`, `Orvano`). The first response carrying `X-Orvano-Version` is compared by major.minor, and a mismatch warns once per client through the client's warning hook: TS `logger` (default `console`), Dart `onWarning` (default `print`), .NET `OrvanoClientOptions.Logger` (an `ILogger`, none by default).
+- Versions are stamped, never edited: SdkGen writes `VERSION` into every package.json, pubspec, and `orvano_*` constraint. Publishing happens only through `.github/workflows/release.yml` on a `v<VERSION>` tag, a dry run until 0.1; private packages never publish.
 - .NET: one source generated `OrvanoJsonContext` for both targets. The `System.Text.Json` package is referenced only for `netstandard2.0`. Avoid APIs `netstandard2.0` lacks (`required`, `HttpMethod.Patch`, token overloads); use `#if NET` where needed.
 
 ## Gotchas
 
 - Type aware ESLint reads workspace packages' types from `dist/`, so build them before linting (CI does).
-- Still to come per spec 0001: version headers and publishing (milestone 3).
+- Each Dart package needs its own `README.md`, `CHANGELOG.md`, and `LICENSE`, or `pub publish` refuses it. SdkGen adds a `## <version>` section to each CHANGELOG when `VERSION` changes; write the real notes there by hand.
 
 ## Related specs
 

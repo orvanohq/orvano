@@ -17,6 +17,7 @@ The Orvano server: one .NET 10 program, built as separate modules, shipped as on
 | `src/Orvano.Contract/` | Generated API records and route constants for every audience, plus the embedded `openapi.json` (spec 0001); never packed |
 | `src/Orvano.Server/Hosting/ContractValidation.cs`, `ContractValidator.cs` | `Test` environment only: checks every `/v1` response against the contract |
 | `src/Orvano.Server/Hosting/Problems.cs` | Problem details normalized to the contract's `Problem`, `Problems.Result` for handlers, and `X-Request-Id` on every response |
+| `src/Orvano.Server/Hosting/OrvanoVersion.cs` | The server version (from `VERSION`) and `X-Orvano-Version` on every response, which SDKs compare to their own |
 | `src/Orvano.Server/Hosting/ConsoleSessions.cs`, `OrvanoHeaders.cs` | The `/v1/console` rule (401 `console_session_required`) and the temporary auth names, defined only here |
 | `src/Orvano.Server/Modules/TestingModule.cs` | The fixed answers of the test only operations; registered only in `Test` |
 | `migrations/platform/` | Platform SQL migrations, embedded into the binary |
