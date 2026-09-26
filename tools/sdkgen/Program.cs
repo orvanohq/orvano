@@ -3,7 +3,8 @@ using Orvano.SdkGen.Languages;
 using Orvano.SdkGen.Rendering;
 
 // Orvano SdkGen (spec 0001). Reads contract/dist/openapi.json, validates it (AC-2), and regenerates
-// every SDK's generated layer, the server contract types, and the scenario dispatch tables (AC-3).
+// every SDK's generated layer, the server contract types, the scenario dispatch tables (AC-3), the
+// public contract and docs snippets (AC-15), and stamps VERSION into the package manifests (AC-11).
 // Output is sorted and formatted, so running it twice produces no diff.
 
 var root = FindRepoRoot(Directory.GetCurrentDirectory());
@@ -37,11 +38,16 @@ List<GeneratedOutput> outputs =
     .. TypeScript.Generate(contract, renderer),
     .. Dart.Generate(contract, renderer),
     .. CSharp.Generate(contract, renderer),
+    .. Snippets.Generate(contract, renderer),
+    new("Public contract", "contract/dist", Formatter.None,
+        [new("contract/dist/openapi.public.json", PublicContract.Build(await File.ReadAllTextAsync(openApi)))],
+        OwnsDirectory: false),
 ];
 
 try
 {
     await OutputWriter.WriteAsync(root, outputs);
+    await ManifestStamper.StampAsync(root, version);
 }
 catch (InvalidOperationException ex)
 {

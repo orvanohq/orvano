@@ -62,6 +62,7 @@ internal static class ServerRole
         if (!await StartupChecks.SchemaMatchesAsync(appDb, logger, app.Lifetime.ApplicationStopping)) return 1;
 
         app.UseRequestIds();
+        app.UseVersionHeader();
         // Outside the error handlers, so it checks the problem bodies they write too.
         if (app.Environment.IsEnvironment(OrvanoEnvironments.Test)) app.UseContractValidation();
         app.UseExceptionHandler();

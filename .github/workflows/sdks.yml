@@ -1,6 +1,8 @@
 # The API contract and SDK pipeline (spec 0001). One job proves the committed contract and generated
-# code are current (AC-1, AC-3); the rest run the shared scenarios on every SDK surface against a
-# real Orvano started in containers (AC-10, AC-13, AC-16). iOS runs nightly (sdks-nightly.yml).
+# code are current (AC-1, AC-3), one reports breaking changes since the last release (AC-15), and
+# the rest run the shared scenarios on every SDK surface against a real Orvano started in
+# containers (AC-10, AC-13, AC-16). iOS runs nightly (sdks-nightly.yml). release.yml calls this
+# whole workflow and publishes only when it passes (AC-12).
 
 name: SDKs
 
@@ -8,6 +10,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -64,10 +67,14 @@ jobs:
         run: |
           dotnet run --project tools/sdkgen
           test -z "$(git status --porcelain)"
-      - name: No test operation reaches a package (AC-18)
+      - name: No test operation reaches a package, a docs snippet, or the public contract (AC-17, AC-18)
         run: |
-          if grep -rElI --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=bin --exclude-dir=obj --exclude-dir=.dart_tool '/v1/(console/)?test/' sdks; then
+          if grep -rElI --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=bin --exclude-dir=obj --exclude-dir=.dart_tool '/v1/(console/)?test/' sdks contract/dist/examples; then
             echo "::error::The files above contain a test only route. x-orvano-test operations belong only in tests/scenarios/runners."
+            exit 1
+          fi
+          if grep -ElI 'x-orvano-test|/v1/console/|"console"' contract/dist/openapi.public.json contract/dist/examples -r; then
+            echo "::error::The public contract or a docs snippet contains a test or console operation."
             exit 1
           fi
       - name: No published package depends on @orvano/console-client (AC-17)
@@ -85,6 +92,65 @@ jobs:
             }'
       - name: Analyze the Dart packages
         run: flutter analyze --fatal-infos sdks/dart tests/scenarios/runners/dart tests/scenarios/runners/flutter
+
+  breaking:
+    name: Breaking changes since the last release
+    runs-on: ubuntu-latest
+    env:
+      OASDIFF_VERSION: 1.32.1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Find the last release
+        id: base
+        run: |
+          # The newest release tag this commit builds on, other than its own version's tag.
+          tag=$(git tag --list 'v[0-9]*' --sort=-v:refname --merged HEAD | grep -vx "v$(cat VERSION)" | head -n 1 || true)
+          if [ -z "$tag" ]; then
+            echo "::notice::No earlier release tag yet, so there is nothing to compare against."
+          elif ! git cat-file -e "$tag:contract/dist/openapi.public.json" 2>/dev/null; then
+            echo "::notice::$tag has no contract/dist/openapi.public.json, so there is nothing to compare against."
+            tag=""
+          else
+            git show "$tag:contract/dist/openapi.public.json" > base.public.json
+            git show "$tag:contract/dist/openapi.json" > base.full.json
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Install oasdiff
+        if: steps.base.outputs.tag != ''
+        run: |
+          archive="oasdiff_${OASDIFF_VERSION}_linux_amd64.tar.gz"
+          base="https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}"
+          curl -sSfLO "$base/$archive"
+          curl -sSfL "$base/checksums.txt" | grep " $archive\$" | sha256sum --check
+          tar -xzf "$archive" oasdiff
+      # Public operations: a warning before 1.0, a failure from 1.0 on (AC-15).
+      - name: Public contract (openapi.public.json)
+        if: steps.base.outputs.tag != ''
+        env:
+          TAG: ${{ steps.base.outputs.tag }}
+        run: |
+          status=0
+          ./oasdiff breaking base.public.json contract/dist/openapi.public.json --format text --fail-on ERR > public.txt || status=$?
+          { echo "### Public operations since $TAG"; echo '```'; cat public.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          cat public.txt
+          if [ "$status" -ne 0 ]; then
+            if [ "$(cut -d. -f1 VERSION)" -ge 1 ]; then
+              echo "::error::Breaking changes to public operations since $TAG. After 1.0 they need a major version."
+              exit 1
+            fi
+            echo "::warning::Breaking changes to public operations since $TAG. Allowed before 1.0; see the job summary."
+          fi
+      # Every operation, console and test ones included: information only (AC-15, AC-17).
+      - name: Full contract (openapi.json)
+        if: steps.base.outputs.tag != ''
+        env:
+          TAG: ${{ steps.base.outputs.tag }}
+        run: |
+          ./oasdiff breaking base.full.json contract/dist/openapi.json --format text > full.txt
+          { echo "### Every operation since $TAG (information only)"; echo '```'; cat full.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          cat full.txt
 
   server-image:
     name: Scenario server image

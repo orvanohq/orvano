@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace Orvano;
 
 /// <summary>Settings for an <see cref="OrvanoClient"/>.</summary>
@@ -43,6 +45,12 @@ public sealed class OrvanoClientOptions
 
     /// <summary>How many times a safe call (GET, HEAD, or marked idempotent) is retried after a 429 or 503. Defaults to 3.</summary>
     public int MaxRetries { get; set; } = 3;
+
+    /// <summary>
+    /// Where warnings go, for example the one logged when the server's major.minor differs from
+    /// this SDK's. None by default; pass one from <c>ILoggerFactory</c> to see them.
+    /// </summary>
+    public ILogger? Logger { get; set; }
 
     private static bool InBrowser =>
 #if NET

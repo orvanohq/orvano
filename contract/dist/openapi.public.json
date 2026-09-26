@@ -1,0 +1,142 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Orvano",
+    "version": "0.0.0",
+    "description": "The Orvano API. Every path lives under /v1."
+  },
+  "tags": [
+    {
+      "name": "health"
+    }
+  ],
+  "paths": {
+    "/v1/health": {
+      "get": {
+        "operationId": "health.get",
+        "description": "Checks that the server is up and returns its version.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "health"
+        ],
+        "x-orvano-service": "health",
+        "x-orvano-audience": "both"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "internal_error",
+          "not_found",
+          "invalid_request",
+          "invalid_cursor",
+          "console_session_required",
+          "contract_violation"
+        ],
+        "description": "Every stable error code the server sends in `Problem.code`."
+      },
+      "Health": {
+        "type": "object",
+        "required": [
+          "status",
+          "version"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Always `ok` when the server answers.",
+            "examples": [
+              "ok"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "description": "The Orvano server version, major.minor.patch.",
+            "examples": [
+              "0.4.2"
+            ]
+          }
+        },
+        "description": "Whether the server is up, and which Orvano version it runs."
+      },
+      "Problem": {
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "requestId"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Identifies the error: `https://orvano.dev/errors/<code>`.",
+            "examples": [
+              "https://orvano.dev/errors/not_found"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "description": "The standard HTTP reason phrase for the status.",
+            "examples": [
+              "Not Found"
+            ]
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The HTTP status code.",
+            "examples": [
+              404
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "description": "A short, safe sentence about this occurrence, when the server has one."
+          },
+          "code": {
+            "type": "string",
+            "description": "Orvano's stable error code, from the `ErrorCode` catalog. SDKs treat it as a plain string.",
+            "examples": [
+              "not_found"
+            ]
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The request ID to quote when reporting a problem; also sent as `X-Request-Id`.",
+            "examples": [
+              "4bf92f3577b34da6a3ce929d0e0e4736"
+            ]
+          }
+        },
+        "description": "An RFC 9457 problem details body. Every operation declares it as its `default` response, sent\nas `application/problem+json`."
+      }
+    }
+  }
+}

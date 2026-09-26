@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace Orvano.SdkGen.Contract;
 
 /// <summary>Who may call an operation, from <c>x-orvano-audience</c>. It decides which packages carry it.</summary>
@@ -40,7 +42,8 @@ internal sealed record EnumType(string Name) : TypeRef;
 
 // Optional: not in the schema's `required` list, omitted from JSON when null.
 // Nullable: the value may be JSON null.
-internal sealed record ContractProperty(string Name, TypeRef Type, bool Optional, bool Nullable, string? Doc);
+// Example: the first `@example` value, which docs snippets use (AC-15); null when there is none.
+internal sealed record ContractProperty(string Name, TypeRef Type, bool Optional, bool Nullable, string? Doc, JsonNode? Example = null);
 
 // Test: marked `x-orvano-test`, so it reaches only the scenario runners and the server (AC-18).
 // Event: the `x-orvano-event` name when this model is an event payload (AC-8).
@@ -51,7 +54,7 @@ internal sealed record ContractEnum(string Name, string? Doc, IReadOnlyList<stri
 /// <summary>One stable error code from the <c>ErrorCode</c> or <c>TestErrorCode</c> catalog (AC-6).</summary>
 internal sealed record ContractErrorCode(string Code, bool Test);
 
-internal sealed record ContractParam(string Name, ParamLocation In, PrimitiveType Type, bool Required, string? Doc);
+internal sealed record ContractParam(string Name, ParamLocation In, PrimitiveType Type, bool Required, string? Doc, JsonNode? Example = null);
 
 // Id: the operationId, always `service.method`. Name: the method name, the part after the dot.
 // Result: the success response body, or null when the operation returns no content.

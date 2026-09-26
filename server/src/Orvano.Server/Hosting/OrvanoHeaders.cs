@@ -17,4 +17,7 @@ internal static class OrvanoHeaders
 
     /// <summary>The request ID on every response, also <c>requestId</c> in problem details.</summary>
     public const string RequestId = "X-Request-Id";
+
+    /// <summary>The server's Orvano version, on every response. SDKs compare it to their own.</summary>
+    public const string Version = "X-Orvano-Version";
 }

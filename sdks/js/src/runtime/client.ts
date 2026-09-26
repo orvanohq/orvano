@@ -1,6 +1,9 @@
 import { MemorySessionStore, sessionHeader } from './auth.js'
 import type { SessionStore } from './auth.js'
 import { OrvanoError } from './error.js'
+import { sdkHeader, sdkName, serverVersionHeader, versionMismatch } from './version.js'
+import type { Logger } from './version.js'
+import { sdkVersion } from '../generated/version.js'
 
 /** Settings for a {@link Client}. */
 export interface ClientConfig {
@@ -18,6 +21,11 @@ export interface ClientConfig {
   maxRetries?: number
   /** A custom `fetch`, for tests or runtimes without a global one. */
   fetch?: typeof fetch
+  /**
+   * Where warnings go, for example the one logged when the server's major.minor differs from
+   * this SDK's. Defaults to `console`.
+   */
+  logger?: Logger
 }
 
 /** Per call settings, the last argument of every generated method. */
@@ -63,6 +71,8 @@ export class Client {
   readonly #timeoutMs: number
   readonly #maxRetries: number
   readonly #fetch: typeof fetch
+  readonly #logger: Logger
+  #versionChecked = false
 
   constructor(config: ClientConfig) {
     let url: URL
@@ -79,6 +89,7 @@ export class Client {
     this.#maxRetries = config.maxRetries ?? defaultMaxRetries
     // Bound, because some runtimes (Cloudflare Workers) reject a fetch called on another `this`.
     this.#fetch = config.fetch ?? globalThis.fetch.bind(globalThis)
+    this.#logger = config.logger ?? console
   }
 
   /**
@@ -106,6 +117,7 @@ export class Client {
     for (let attempt = 0; ; attempt++) {
       const headers = new Headers(this.#headers)
       headers.set('Accept', 'application/json')
+      headers.set(sdkHeader, `${sdkName}/${sdkVersion}`)
       if (this.#project !== undefined) headers.set('X-Orvano-Project', this.#project)
       await this.authorize(headers)
 
@@ -117,6 +129,7 @@ export class Client {
       if (signal !== undefined) init.signal = signal
 
       const response = await this.#fetch(url, init)
+      this.#checkVersion(response)
       if (response.ok) {
         if (response.status === 204 || spec.method === 'HEAD') return undefined as T
         return (await response.json()) as T
@@ -133,6 +146,16 @@ export class Client {
       }
       throw await OrvanoError.fromResponse(response)
     }
+  }
+
+  /** Warns once per client when the server's major.minor differs from this SDK's. */
+  #checkVersion(response: Response): void {
+    if (this.#versionChecked) return
+    const version = response.headers.get(serverVersionHeader)
+    if (version === null) return
+    this.#versionChecked = true
+    const warning = versionMismatch(version, this.#endpoint)
+    if (warning !== null) this.#logger.warn(warning)
   }
 
   /** The call's timeout and the caller's signal, combined. */

@@ -1,0 +1,18 @@
+// {{ header }}
+// app/page.tsx, a server component. Route handlers and server actions use createServerClient too.
+import { cookies } from 'next/headers'
+import { createServerClient } from '@orvano/nextjs'
+
+export default async function Page() {
+  const orvano = createServerClient({
+    endpoint: process.env.ORVANO_ENDPOINT!,
+    cookies: await cookies(),
+  })
+{{~ if result != "" ~}}
+  const {{ result }} = await {{ call }}
+  return <pre>{JSON.stringify({{ result }}, null, 2)}</pre>
+{{~ else ~}}
+  await {{ call }}
+  return <p>Done</p>
+{{~ end ~}}
+}

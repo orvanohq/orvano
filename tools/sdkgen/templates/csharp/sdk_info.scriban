@@ -3,6 +3,9 @@ namespace Orvano;
 
 internal static class SdkInfo
 {
+    /// <summary>The SDK's name, the NuGet package ID, sent with <see cref="Version"/> as <c>X-Orvano-SDK</c>.</summary>
+    public const string Name = "Orvano";
+
     /// <summary>The SDK version, from the repo's VERSION file. It shares the server's major.minor.</summary>
     public const string Version = "{{ version }}";
 }

@@ -68,3 +68,33 @@ Milestone 2 (shared conventions) · added 2026-09-25. Same scenario server as ab
 ## Acceptance-criteria coverage (Milestone 2)
 - AC-2 test path rule · AC-4 browser key guard and entry split · AC-5 Next.js cookie forward · AC-6 problem body, request ID, generated codes, typed error in every runner · AC-7 cursor list, iterators, bad cursor and limit · AC-8 event scenario in every runner · AC-14 retry, timeout, cancellation mock steps · AC-17 console 401s, console scenario, CI dependency guard, `IsPackable=false` · AC-18 test route isolation, output grep, runner only models
 - Still open: AC-11, 12, 15 (Milestone 3)
+
+---
+
+Milestone 3 (release pipeline) · added 2026-09-26. Same scenario server as above; rebuild its image first (`--build`) so it sends `X-Orvano-Version`.
+
+## Commands
+- [ ] `curl -si localhost:8080/v1/health` and `curl -si localhost:8080/v1/nope` → both carry `X-Orvano-Version` equal to `VERSION` (a problem response too) → AC-11
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "*ApiConventionsTests"` → all pass, including `Every_response_carries_the_server_version_from_the_VERSION_file` → AC-11
+- [ ] Point each SDK at a server (or a fake `fetch`, `MockClient`, `HttpMessageHandler`) that answers with `X-Orvano-Version: 0.2.0`, call `health.get` twice → requests carry `X-Orvano-SDK: @orvano/js/0.0.0`, `orvano_core/0.0.0` (`orvano_dart/0.0.0` from the server client), `Orvano/0.0.0`; exactly one warning per client (TS `logger.warn`, Dart `onWarning`, .NET `ILogger` on the options); a server on `0.0.9` gives no warning → AC-11
+- [ ] Every scenario runner from Milestones 1 and 2 still passes with the new headers → AC-10, AC-11
+- [ ] Set `VERSION` and the `@info` version in `contract/main.tsp` to `0.1.0`, rebuild the contract, run SdkGen → every SDK package.json, the Dart pubspec `version:` lines, every `orvano_*: ^0.1.0` constraint, and a `## 0.1.0` section in each Dart CHANGELOG are stamped; a second run changes nothing; revert → AC-11
+- [ ] `dotnet run --project tools/sdkgen` → `contract/dist/openapi.public.json` has only `/v1/health` and the schemas `ErrorCode`, `Health`, `Problem`: no `/v1/console/`, no `/v1/test/`, no `x-orvano-test` → AC-15, AC-17, AC-18
+- [ ] `ls contract/dist/examples/*` → one `health.get` file each under `js`, `nextjs`, `flutter`, `dart`, `dotnet`, and nothing for `test.*` operations → AC-15, AC-17, AC-18
+- [ ] Add a temporary public operation with path, query, and body parameters (an enum, a date, an array of a model), rebuild, run SdkGen → a snippet per SDK that carries it, using `@example` values where the model has them; each compiles against its SDK (TS in the JS runner, Dart with `dart analyze`, C# in a console project referencing `Orvano.csproj`); remove it and rerun → the snippets are deleted → AC-15
+- [ ] Open a PR that removes `version` from `Health`, with a release tag present → the `SDKs / Breaking changes since the last release` job warns (before 1.0) and lists `response-required-property-removed` in its summary; with `VERSION` at `1.0.0` it fails; the full contract run reports only → AC-15
+- [ ] With no release tag yet → that job notes there is nothing to compare and passes → AC-15
+- [ ] Run `Release` by hand (Actions, workflow dispatch) → the SDK workflow passes first, then npm `publish --dry-run` lists `@orvano/js` and `@orvano/nextjs` and never `@orvano/console-client`, `pub publish --dry-run` shows 0 warnings for `orvano_core`, `orvano_dart`, `orvano_flutter`, `dotnet pack` uploads `Orvano.<version>.nupkg` with the README, and each mirror job prints its commit (`js/`, `nextjs/`; `orvano_core/`, `orvano_flutter/`, `orvano_dart/`; `src/Orvano` plus the build props) without pushing → AC-12
+- [ ] Push a tag that doesn't match `VERSION` → `Plan the release` fails naming both → AC-12
+- [ ] Before 0.1: a `v0.0.x` tag is still a dry run end to end → AC-12
+
+## Value sourcing
+- [ ] `X-Orvano-SDK` version equals `VERSION` in all three runtimes, since the constant is generated from it (SDK version from `VERSION`)
+- [ ] `X-Orvano-Version` equals the server's informational version, which `Directory.Build.props` reads from `VERSION` (server version)
+- [ ] The warning compares the header against the generated SDK constant: `0.0.9` vs `0.0.0` → no warning, `0.2.0` → a warning (version warning from `X-Orvano-Version`)
+- [ ] Change the `@example` on a body model's property → its value changes in every snippet; remove it → a placeholder by type (`'<name>'`, `1`, `true`, `2026-01-01`) (snippet values from `@example`, else placeholders)
+- [ ] Mark a new operation `console` → it's missing from `openapi.public.json` and the snippets, but present in `openapi.json` (docs reference from `openapi.public.json`)
+
+## Acceptance-criteria coverage (Milestone 3)
+- AC-11 headers, warning, stamping · AC-12 release workflow dry run, tag check, private package skip, mirrors · AC-15 snippets, public contract, both oasdiff runs · AC-17 console left out of the public contract and snippets
+- Needs a real registry release (0.1) to fully close: AC-12's actual upload to npm, pub.dev, NuGet and the mirror push

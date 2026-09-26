@@ -28,13 +28,13 @@ The internal model that every product hangs off: console accounts, organizations
 One machine readable description of every public endpoint is the source of truth. From it you generate the API reference and the SDKs: core JS/TS, Next.js (wraps core, adds server components and cookie sessions), Flutter, Dart server, and .NET.
 **Done when:** changing one endpoint in the contract regenerates all five SDKs and the reference, and a sample call works from each SDK against the scaffold.
 - [x] Design it (spec): `/architect API contract & SDK pipeline`
-- [ ] Build it: `/develop API contract & SDK pipeline`
+- [x] Build it: `/develop API contract & SDK pipeline`
    - [x] Thin thread: health operation from TypeSpec through SdkGen to all five SDK surfaces and the server, scenarios green in CI (AC-1, 2, 3, 5, 9, 10, 13, 16)
    - [x] Shared conventions: errors, audience routing and client pattern, the private console client, cursor pagination, typed events, retries and timeouts, test only operations and temporary auth formats (AC-2, 4, 5, 6, 7, 8, 14, 17, 18)
-   - [ ] Release pipeline: version stamping and headers, publishing and mirrors, docs snippets, public contract file, breaking change check (AC-11, 12, 15, 17)
+   - [x] Release pipeline: version stamping and headers, publishing and mirrors, docs snippets, public contract file, breaking change check (AC-11, 12, 15, 17)
 - [ ] Verify it: `/check verify API contract & SDK pipeline`
 - [ ] Test it: `/test API contract & SDK pipeline`
-Spec [0001](../specs/0001-api-contract-sdk-pipeline/index.md) · code in `contract/`, `tools/sdkgen/`, `sdks/`, `server/src/Orvano.Contract/`, `tests/scenarios/`
+Spec [0001](../specs/0001-api-contract-sdk-pipeline/index.md) · code in `contract/`, `tools/sdkgen/`, `sdks/`, `server/src/Orvano.Contract/`, `tests/scenarios/`, `.github/workflows/sdks.yml`, `.github/workflows/release.yml`
 
 ### 5. Design system & console shell · needs a decision
 Visual language, layout, and base components for the console, plus the empty shell: navigation, org and project switcher, light and dark themes.

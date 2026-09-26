@@ -8,7 +8,8 @@ docs/
 server/
 dev/
 deploy/
-contract/dist/
+# The compiled contracts; SdkGen formats the docs snippets beside them.
+contract/dist/*.json
 # Platform folders written by `flutter create`.
 tests/scenarios/runners/flutter/android/
 tests/scenarios/runners/flutter/ios/

@@ -1,0 +1,19 @@
+// {{ header }}
+import 'dart:io';
+
+import 'package:orvano_dart/orvano_dart.dart';
+
+Future<void> main() async {
+  final orvano = Orvano(
+    Client(
+      endpoint: 'https://orvano.example.com',
+      apiKey: Platform.environment['ORVANO_API_KEY'],
+    ),
+  );
+{{~ if result != "" ~}}
+  final {{ result }} = await {{ call }};
+  print({{ result }}{{ if model }}.toJson(){{ end }});
+{{~ else ~}}
+  await {{ call }};
+{{~ end ~}}
+}

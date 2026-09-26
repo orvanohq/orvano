@@ -210,7 +210,7 @@ internal static partial class ContractReader
 
                 var (type, nullable) = ResolveType(propSchema, where);
                 if (type is null) continue;
-                properties.Add(new ContractProperty(propName, type, !required.Contains(propName), nullable, Describe(propSchema)));
+                properties.Add(new ContractProperty(propName, type, !required.Contains(propName), nullable, Describe(propSchema), ExampleOf(propSchema)));
             }
 
             return new ContractModel(
@@ -412,7 +412,8 @@ internal static partial class ContractReader
                     continue;
                 }
 
-                result.Add(new ContractParam(name, location.Value, primitive, p.Required || location == ParamLocation.Path, p.Description));
+                result.Add(new ContractParam(name, location.Value, primitive, p.Required || location == ParamLocation.Path, p.Description,
+                    p.Example ?? (p.Schema is null ? null : ExampleOf(p.Schema))));
             }
 
             foreach (var segment in path.Split('/').Where(s => s.StartsWith('{')))
@@ -544,6 +545,9 @@ internal static partial class ContractReader
                 return null;
             }
         }
+
+        /// <summary>The schema's first <c>@example</c> value, for docs snippets (AC-15).</summary>
+        private static JsonNode? ExampleOf(IOpenApiSchema schema) => schema.Examples?.FirstOrDefault();
 
         private static string? Describe(IOpenApiSchema schema) =>
             schema.Description ?? (schema is OpenApiSchemaReference r ? r.Target?.Description : null);

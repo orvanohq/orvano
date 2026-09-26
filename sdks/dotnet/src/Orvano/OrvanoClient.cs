@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Orvano;
 
@@ -20,6 +22,7 @@ namespace Orvano;
 public sealed partial class OrvanoClient : IDisposable
 {
     private static readonly TimeSpan BackoffBase = TimeSpan.FromMilliseconds(250);
+    private static readonly string SdkHeaderValue = $"{SdkInfo.Name}/{SdkInfo.Version}";
 #if !NET
     private static readonly Random Jitter = new();
 #endif
@@ -32,6 +35,8 @@ public sealed partial class OrvanoClient : IDisposable
     private readonly IOrvanoSessionStore? _session;
     private readonly TimeSpan _timeout;
     private readonly int _maxRetries;
+    private readonly ILogger _logger;
+    private int _versionChecked;
 
     /// <summary>Creates a client.</summary>
     /// <param name="options">Where the server is, which project to use, and how to authenticate.</param>
@@ -48,6 +53,7 @@ public sealed partial class OrvanoClient : IDisposable
         _session = options.Session;
         _timeout = options.Timeout;
         _maxRetries = options.MaxRetries;
+        _logger = options.Logger ?? NullLogger.Instance;
         _ownsHttp = httpClient is null;
         _http = httpClient ?? new HttpClient { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
     }
@@ -79,6 +85,7 @@ public sealed partial class OrvanoClient : IDisposable
             {
                 using var message = BuildMessage(request);
                 using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                CheckVersion(response);
                 if (response.IsSuccessStatusCode) return await read(response, ct).ConfigureAwait(false);
 
                 var status = (int)response.StatusCode;
@@ -101,6 +108,7 @@ public sealed partial class OrvanoClient : IDisposable
     {
         var message = new HttpRequestMessage(new HttpMethod(request.Method), BuildUri(request));
         message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        message.Headers.TryAddWithoutValidation(OrvanoHeaders.Sdk, SdkHeaderValue);
         if (_project is not null) message.Headers.Add(OrvanoHeaders.Project, _project);
         if (_session?.Token is { Length: > 0 } token) message.Headers.Add(OrvanoHeaders.Session, token);
         if (_apiKey is not null) message.Headers.Add(OrvanoHeaders.ApiKey, _apiKey);
@@ -112,6 +120,23 @@ public sealed partial class OrvanoClient : IDisposable
 
         return message;
     }
+
+    /// <summary>Warns once per client when the server's major.minor differs from this SDK's.</summary>
+    private void CheckVersion(HttpResponseMessage response)
+    {
+        if (Volatile.Read(ref _versionChecked) != 0
+            || !response.Headers.TryGetValues(OrvanoHeaders.ServerVersion, out var values)
+            || values.FirstOrDefault() is not { Length: > 0 } serverVersion
+            || Interlocked.Exchange(ref _versionChecked, 1) != 0)
+        {
+            return;
+        }
+
+        if (MajorMinor(serverVersion) == MajorMinor(SdkInfo.Version)) return;
+        Log.VersionMismatch(_logger, SdkInfo.Name, SdkInfo.Version, MajorMinor(SdkInfo.Version), _endpoint, serverVersion, MajorMinor(serverVersion));
+    }
+
+    private static string MajorMinor(string version) => string.Join(".", version.Split('.').Take(2));
 
     private Uri BuildUri(OrvanoRequest request)
     {
@@ -182,5 +207,11 @@ public sealed partial class OrvanoClient : IDisposable
     public void Dispose()
     {
         if (_ownsHttp) _http.Dispose();
+    }
+
+    private static partial class Log
+    {
+        [LoggerMessage(1, LogLevel.Warning, "{Sdk} {SdkVersion} targets Orvano {Target}, but the server at {Endpoint} runs {ServerVersion}. Calls still work; use {Sdk} {Match}.x to match.")]
+        public static partial void VersionMismatch(ILogger logger, string sdk, string sdkVersion, string target, string endpoint, string serverVersion, string match);
     }
 }
