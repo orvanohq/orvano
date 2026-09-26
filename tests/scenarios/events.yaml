@@ -1,0 +1,7 @@
+name: an event decodes to its typed model
+requires: []
+steps:
+  - event: test.pinged
+    raw: { message: hello, at: '2026-01-01T00:00:00Z' }
+    expect:
+      body: { message: hello }

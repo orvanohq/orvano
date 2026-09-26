@@ -6,6 +6,19 @@ import 'package:yaml/yaml.dart';
 
 import 'dispatch_table.dart';
 import 'generated/dispatch.dart';
+import 'generated/test_client.dart';
+import 'generated/test_events.dart';
+import 'generated/test_server.dart';
+
+/// The API key scenario runners send; the server ignores keys until the auth
+/// spec (row 8).
+const testServerKey = 'test-server-key';
+
+const _inBrowser = bool.fromEnvironment('dart.library.js_interop');
+
+/// The package's events plus the test events, as the spec has runners decode
+/// them.
+const _events = {...core.eventRegistry, ...testEventRegistry};
 
 /// What happened to one scenario.
 final class ScenarioResult {
@@ -26,10 +39,31 @@ final class ScenarioResult {
 
 /// The SDK objects a surface offers, one per role.
 final class Surface {
+  /// Wraps SDK objects the caller built.
   const Surface({required this.client, required this.server});
 
-  final core.Orvano client;
-  final srv.Orvano server;
+  /// The client and server SDK objects for [endpoint], as every Dart runner
+  /// builds them: the server one sends [testServerKey], except in a browser,
+  /// where setting a key throws. Pass [client] to run the client steps through
+  /// a client built elsewhere (the Flutter runner's, from `orvano_flutter`).
+  factory Surface.connect(String endpoint, {core.Client? client}) => Surface(
+    client: ClientSurface(client ?? core.Client(endpoint: endpoint)),
+    server: ServerSurface(
+      srv.Client(endpoint: endpoint, apiKey: _inBrowser ? null : testServerKey),
+    ),
+  );
+
+  /// `orvano_core` plus the test services.
+  final ClientSurface client;
+
+  /// `orvano_dart` plus the test services.
+  final ServerSurface server;
+
+  /// Closes both clients' connections.
+  void close() {
+    client.client.close();
+    server.client.close();
+  }
 }
 
 /// Parses one scenario file into plain JSON values.
@@ -77,33 +111,58 @@ Future<void> _runScenario(
   final steps = (scenario['steps'] as List<Object?>)
       .cast<Map<String, Object?>>();
   for (final (index, step) in steps.indexed) {
-    final op = step['op'] as String;
-    final role = step['as'] as String;
-    final where = 'step ${index + 1} ($op as $role)';
-    final entry = dispatch[op];
-    if (entry == null) {
-      throw _StepFailure('$where: the contract has no operation $op');
-    }
-
-    final input =
-        _substitute(step['input'] ?? <String, Object?>{}, vars)
-            as Map<String, Object?>;
+    final op = step['op'] as String?;
+    final event = step['event'] as String?;
+    final role = step['as'] as String?;
+    final where =
+        'step ${index + 1} (${op ?? 'event ${event ?? '?'}'}'
+        '${role == null ? '' : ' as $role'})';
     final expect = _substitute(step['expect'], vars) as Map<String, Object?>;
 
-    int status;
+    int? status;
     String? code;
     Object? body;
-    try {
-      body = await _call(op, role, entry, surface, input);
-      status = entry.status;
-    } on core.OrvanoException catch (e) {
-      status = e.status;
-      code = e.code;
+    if (event != null) {
+      final decoded = core.decodeEvent(
+        event,
+        _substitute(step['raw'], vars),
+        registry: _events,
+      );
+      if (decoded == null) {
+        throw _StepFailure('$where: the contract has no event $event');
+      }
+      body = jsonDecode(jsonEncode(decoded));
+    } else {
+      // Console operations are not in this dispatch table, so skip first.
+      if (role == 'console') {
+        throw _Skipped('console steps run only in the JS interpreter');
+      }
+      final entry = op == null ? null : dispatch[op];
+      if (entry == null) {
+        throw _StepFailure('$where: the contract has no operation $op');
+      }
+      final input =
+          _substitute(step['input'] ?? <String, Object?>{}, vars)
+              as Map<String, Object?>;
+      try {
+        body = await _call(
+          op!,
+          role,
+          step['paginate'] == true,
+          entry,
+          surface,
+          input,
+        );
+        status = entry.status;
+      } on core.OrvanoException catch (e) {
+        status = e.status;
+        code = e.code;
+      }
     }
 
-    if (status != expect['status']) {
+    if (expect['status'] case final int expected when expected != status) {
       throw _StepFailure(
-        '$where: expected status ${expect['status']}, got $status'
+        '$where: expected status $expected, got $status'
         '${code == null ? '' : ' ($code)'}',
       );
     }
@@ -123,22 +182,31 @@ Future<void> _runScenario(
 
 Future<Object?> _call(
   String op,
-  String role,
+  String? role,
+  bool all,
   DispatchEntry entry,
   Surface surface,
   ScenarioInput input,
-) {
+) async {
+  _Skipped missing(String sdk) =>
+      _Skipped('$op has no ${all ? 'paged ' : ''}$role call in $sdk');
   switch (role) {
     case 'client':
-      final call = entry.client;
-      if (call == null) throw _Skipped('$op has no client call in orvano_core');
+      if (all) {
+        final call = entry.clientAll ?? (throw missing('orvano_core'));
+        return {'items': await call(surface.client, input).toList()};
+      }
+      final call = entry.client ?? (throw missing('orvano_core'));
       return call(surface.client, input);
     case 'server':
-      final call = entry.server;
-      if (call == null) throw _Skipped('$op has no server call in orvano_dart');
+      if (all) {
+        final call = entry.serverAll ?? (throw missing('orvano_dart'));
+        return {'items': await call(surface.server, input).toList()};
+      }
+      final call = entry.server ?? (throw missing('orvano_dart'));
       return call(surface.server, input);
-    case 'console':
-      throw _Skipped('console steps run only in the JS interpreter');
+    case null:
+      throw _StepFailure('$op: an operation step needs `as`');
     default:
       throw _StepFailure('unknown role $role');
   }

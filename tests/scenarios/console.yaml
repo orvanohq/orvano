@@ -1,0 +1,9 @@
+name: the console client reaches a console route with a console session
+requires: []
+steps:
+  - op: test.consolePing
+    as: console
+    input: {}
+    expect:
+      status: 200
+      body: { status: ok }

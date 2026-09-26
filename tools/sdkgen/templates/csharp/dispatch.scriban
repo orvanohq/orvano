@@ -4,11 +4,11 @@ namespace Orvano.Scenarios.Generated;
 
 internal static class Dispatch
 {
-    /// <summary>Every operation in the contract; a null call means the .NET SDK has none.</summary>
+    /// <summary>Every non console operation; a null call means the .NET SDK has none.</summary>
     public static readonly IReadOnlyDictionary<string, DispatchEntry> Operations = new Dictionary<string, DispatchEntry>(StringComparer.Ordinal)
     {
 {{~ for e in entries ~}}
-        [{{ '"' + e.id + '"' }}] = new({{ e.status }}, {{ e.call ?? "null" }}),
+        [{{ '"' + e.id + '"' }}] = new({{ e.status }}, {{ e.call ?? "null" }}, {{ e.paginate ?? "null" }}),
 {{~ end ~}}
     };
 }

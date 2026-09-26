@@ -3,7 +3,7 @@
 using System.Globalization;
 {{~ end ~}}
 
-namespace Orvano;
+namespace {{ namespace }};
 {{~ for s in services ~}}
 
 /// <summary>Operations in the <c>{{ s.name }}</c> service.</summary>
@@ -11,18 +11,21 @@ public sealed class {{ s.class_name }}
 {
     private readonly OrvanoClient _client;
 
-    internal {{ s.class_name }}(OrvanoClient client) => _client = client;
+    /// <summary>Creates the service over <paramref name="client"/>.</summary>
+    /// <param name="client">The client every call sends through.</param>
+    {{ constructor_visibility }} {{ s.class_name }}(OrvanoClient client) => _client = client;
 {{~ for o in s.operations ~}}
 
     /// <summary>{{ o.summary }}</summary>
 {{~ for d in o.param_docs ~}}
     /// {{ d }}
 {{~ end ~}}
-    public {{ o.result }} {{ o.name }}({{ o.params }}) =>
+    public {{ o.signature }} =>
         {{ o.body }};
 {{~ end ~}}
 }
 {{~ end ~}}
+{{~ if partial_client ~}}
 
 public sealed partial class OrvanoClient
 {
@@ -35,3 +38,4 @@ public sealed partial class OrvanoClient
     public {{ s.class_name }} {{ s.property }} => {{ s.field }} ??= new {{ s.class_name }}(this);
 {{~ end ~}}
 }
+{{~ end ~}}

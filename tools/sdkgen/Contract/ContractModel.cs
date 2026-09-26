@@ -42,14 +42,20 @@ internal sealed record EnumType(string Name) : TypeRef;
 // Nullable: the value may be JSON null.
 internal sealed record ContractProperty(string Name, TypeRef Type, bool Optional, bool Nullable, string? Doc);
 
-internal sealed record ContractModel(string Name, string? Doc, IReadOnlyList<ContractProperty> Properties);
+// Test: marked `x-orvano-test`, so it reaches only the scenario runners and the server (AC-18).
+// Event: the `x-orvano-event` name when this model is an event payload (AC-8).
+internal sealed record ContractModel(string Name, string? Doc, IReadOnlyList<ContractProperty> Properties, bool Test, string? Event);
 
-internal sealed record ContractEnum(string Name, string? Doc, IReadOnlyList<string> Values);
+internal sealed record ContractEnum(string Name, string? Doc, IReadOnlyList<string> Values, bool Test);
+
+/// <summary>One stable error code from the <c>ErrorCode</c> or <c>TestErrorCode</c> catalog (AC-6).</summary>
+internal sealed record ContractErrorCode(string Code, bool Test);
 
 internal sealed record ContractParam(string Name, ParamLocation In, PrimitiveType Type, bool Required, string? Doc);
 
 // Id: the operationId, always `service.method`. Name: the method name, the part after the dot.
 // Result: the success response body, or null when the operation returns no content.
+// PageItem: for a cursor list operation (AC-7), the type of one item in `items`; otherwise null.
 internal sealed record ContractOperation(
     string Id,
     string Service,
@@ -62,15 +68,27 @@ internal sealed record ContractOperation(
     ModelType? Body,
     int SuccessStatus,
     TypeRef? Result,
-    bool Idempotent);
+    bool Idempotent,
+    bool Test,
+    TypeRef? PageItem)
+{
+    public bool IsClient => Audience is Audience.Client or Audience.Both;
+
+    public bool IsServer => Audience is Audience.Server or Audience.Both;
+}
 
 /// <summary>The whole contract, sorted so every rendering is byte stable.</summary>
 internal sealed record ApiContract(
     string Version,
     IReadOnlyList<ContractOperation> Operations,
     IReadOnlyList<ContractModel> Models,
-    IReadOnlyList<ContractEnum> Enums)
+    IReadOnlyList<ContractEnum> Enums,
+    IReadOnlyList<ContractErrorCode> ErrorCodes)
 {
+    /// <summary>Event payload models, in event name order.</summary>
+    public IReadOnlyList<ContractModel> Events =>
+        [.. Models.Where(m => m.Event is not null).OrderBy(m => m.Event, StringComparer.Ordinal)];
+
     /// <summary>Operations grouped by service, services and operations in name order.</summary>
     public IReadOnlyList<(string Service, IReadOnlyList<ContractOperation> Operations)> Services =>
         [.. Operations
@@ -79,12 +97,25 @@ internal sealed record ApiContract(
             .Select(g => (g.Key, (IReadOnlyList<ContractOperation>)[.. g.OrderBy(o => o.Name, StringComparer.Ordinal)]))];
 
     /// <summary>
-    /// The operations whose audience passes <paramref name="include"/>, with only the models and
-    /// enums they reach. This is how a package gets exactly its audiences (AC-4, AC-17).
+    /// The operations that pass <paramref name="operations"/> and the events that pass
+    /// <paramref name="events"/>, with only the models and enums they reach. This is how a package
+    /// gets exactly its audiences (AC-4, AC-17) and a runner exactly its test code (AC-18).
     /// </summary>
-    public ApiContract Slice(Func<Audience, bool> include)
+    public ApiContract Slice(Func<ContractOperation, bool> operations, Func<ContractModel, bool> events)
     {
-        var operations = Operations.Where(o => include(o.Audience)).ToList();
+        var kept = Operations.Where(operations).ToList();
+        var reached = Reach(kept, Models.Where(m => m.Event is not null && events(m)));
+        return this with
+        {
+            Operations = kept,
+            Models = [.. Models.Where(m => reached.Contains(m.Name))],
+            Enums = [.. Enums.Where(e => reached.Contains(e.Name))],
+        };
+    }
+
+    /// <summary>Every model and enum name reachable from these operations and event payloads.</summary>
+    public HashSet<string> Reach(IEnumerable<ContractOperation> operations, IEnumerable<ContractModel> events)
+    {
         var models = Models.ToDictionary(m => m.Name, StringComparer.Ordinal);
         var reached = new HashSet<string>(StringComparer.Ordinal);
 
@@ -95,8 +126,8 @@ internal sealed record ApiContract(
                 case ArrayType a: Visit(a.Item); break;
                 case MapType m: Visit(m.Value); break;
                 case EnumType e: reached.Add(e.Name); break;
-                case ModelType m when reached.Add(m.Name):
-                    foreach (var p in models[m.Name].Properties) Visit(p.Type);
+                case ModelType m when reached.Add(m.Name) && models.TryGetValue(m.Name, out var model):
+                    foreach (var p in model.Properties) Visit(p.Type);
                     break;
             }
         }
@@ -107,11 +138,7 @@ internal sealed record ApiContract(
             Visit(op.Result);
         }
 
-        return this with
-        {
-            Operations = operations,
-            Models = [.. Models.Where(m => reached.Contains(m.Name))],
-            Enums = [.. Enums.Where(e => reached.Contains(e.Name))],
-        };
+        foreach (var e in events) Visit(new ModelType(e.Name));
+        return reached;
     }
 }

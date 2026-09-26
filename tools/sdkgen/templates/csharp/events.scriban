@@ -1,0 +1,20 @@
+// {{ header }}
+using System.Text.Json.Serialization.Metadata;
+
+namespace {{ namespace }};
+
+{{~ if namespace == "Orvano" ~}}
+/// <summary>Typed realtime events: decode a raw event payload by its name.</summary>
+{{~ else ~}}
+/// <summary>The test events, by name, for <see cref="OrvanoEvents.Decode"/>.</summary>
+{{~ end ~}}
+{{ declaration }}
+{
+    /// <summary>Every event this code knows, by name: its payload type.</summary>
+    public static IReadOnlyDictionary<string, JsonTypeInfo> Registry { get; } = new Dictionary<string, JsonTypeInfo>(StringComparer.Ordinal)
+    {
+{{~ for e in events ~}}
+        [{{ e.name }}] = {{ e.type }},
+{{~ end ~}}
+    };
+}

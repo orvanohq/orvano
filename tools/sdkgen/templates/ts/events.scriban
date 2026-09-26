@@ -1,0 +1,12 @@
+// {{ header }}
+import type { EventRegistry } from '{{ runtime }}'
+{{~ if model_imports != "" ~}}
+import type { {{ model_imports }} } from '{{ models }}'
+{{~ end ~}}
+
+/** Every event this code knows, by name: its payload type, for `decodeEvent`. */
+export const {{ name }} = {
+{{~ for e in events ~}}
+  {{ e.name }}: (raw: unknown): {{ e.type }} => raw as {{ e.type }},
+{{~ end ~}}
+} satisfies EventRegistry

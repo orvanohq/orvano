@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:orvano_dart/orvano_dart.dart' as srv;
 import 'package:orvano_flutter/orvano_flutter.dart';
 import 'package:orvano_scenarios/orvano_scenarios.dart';
 
@@ -32,13 +31,12 @@ void main() {
     final scenarios = [
       for (final f in files) parseScenario(await rootBundle.loadString(f)),
     ];
-    final results = await runScenarios(
-      scenarios,
-      Surface(
-        client: Orvano(Client(endpoint: endpoint)),
-        server: srv.Orvano(srv.Client(endpoint: endpoint)),
-      ),
+    final surface = Surface.connect(
+      endpoint,
+      client: Client(endpoint: endpoint),
     );
+    final results = await runScenarios(scenarios, surface);
+    surface.close();
 
     for (final r in results) {
       debugPrint(r.toString());

@@ -2,7 +2,7 @@
 import 'package:orvano_core/orvano_core.dart';
 
 /// Every service in this package, on one object: `orvano.health.get()`.
-final class Orvano {
+base class Orvano {
   /// Creates the services over [client].
   Orvano(this.client) : health = HealthService(client);
 

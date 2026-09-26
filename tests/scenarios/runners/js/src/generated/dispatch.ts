@@ -2,11 +2,31 @@
 // Test only: maps each operationId to its SDK call for the scenario interpreter. Never published.
 import type { DispatchTable } from '../dispatch-table.js'
 
-/** Every operation in the contract; a missing `client` or `server` call means this SDK has none. */
+/** Every non console operation; a missing `client` or `server` call means the SDK has none. */
 export const dispatch: DispatchTable = {
   'health.get': {
     status: 200,
     client: (o, _input) => o.health.get(),
     server: (o, _input) => o.health.get(),
+  },
+  'test.conflict': {
+    status: 204,
+    client: (o, _input) => o.test.conflict(),
+    server: (o, _input) => o.test.conflict(),
+  },
+  'test.list': {
+    status: 200,
+    client: (o, input) =>
+      o.test.list({
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    server: (o, input) =>
+      o.test.list({
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    clientAll: (o, input) => o.test.listAll({ limit: input.limit as number | undefined }),
+    serverAll: (o, input) => o.test.listAll({ limit: input.limit as number | undefined }),
   },
 }

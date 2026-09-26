@@ -10,14 +10,14 @@ final class HealthService {
   final Client _client;
 
   /// Checks that the server is up and returns its version.
-  Future<Health> get() async {
-    final json = await _client.send('GET', '/v1/health');
+  Future<Health> get({RequestOptions? options}) async {
+    final json = await _client.send('GET', '/v1/health', options: options);
     return Health.fromJson(json as Map<String, dynamic>);
   }
 }
 
 /// Every service in this package, on one object: `orvano.health.get()`.
-final class Orvano {
+base class Orvano {
   /// Creates the services over [client].
   Orvano(this.client) : health = HealthService(client);
 

@@ -88,6 +88,16 @@ importers:
         specifier: 1.16.0
         version: 1.16.0(@typespec/compiler@1.16.0(@types/node@24.13.6))(@typespec/http@1.16.0(@typespec/compiler@1.16.0(@types/node@24.13.6)))(@typespec/openapi@1.16.0(@typespec/compiler@1.16.0(@types/node@24.13.6))(@typespec/http@1.16.0(@typespec/compiler@1.16.0(@types/node@24.13.6))))
 
+  sdks/console-client:
+    dependencies:
+      '@orvano/js':
+        specifier: workspace:*
+        version: link:../js
+    devDependencies:
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+
   sdks/js:
     devDependencies:
       typescript:
@@ -106,6 +116,9 @@ importers:
 
   tests/scenarios/runners/js:
     dependencies:
+      '@orvano/console-client':
+        specifier: workspace:*
+        version: link:../../../../sdks/console-client
       '@orvano/js':
         specifier: workspace:*
         version: link:../../../../sdks/js
@@ -131,6 +144,9 @@ importers:
 
   tests/scenarios/runners/nextjs:
     dependencies:
+      '@orvano/console-client':
+        specifier: workspace:*
+        version: link:../../../../sdks/console-client
       '@orvano/js':
         specifier: workspace:*
         version: link:../../../../sdks/js

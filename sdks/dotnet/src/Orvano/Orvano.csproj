@@ -19,7 +19,14 @@
   </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" />
     <PackageReference Include="System.Text.Json" />
+  </ItemGroup>
+
+  <!-- The scenario runner's generated test services call the internal SendAsync with their own
+       JSON context, so test operations never ship in this package (spec 0001, AC-18). -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orvano.Scenarios" />
   </ItemGroup>
 
 </Project>

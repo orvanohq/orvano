@@ -16,4 +16,12 @@ internal static class Args
         input[name] is null ? default : input[name].Deserialize<T>(Options);
 
     public static JsonNode? ToJson<T>(T value) => JsonSerializer.SerializeToNode(value, Options);
+
+    /// <summary>Walks an SDK async iterator to the end: <c>{ items: [...] }</c>.</summary>
+    public static async Task<JsonNode?> CollectAsync<T>(IAsyncEnumerable<T> items, CancellationToken ct)
+    {
+        var all = new JsonArray();
+        await foreach (var item in items.WithCancellation(ct)) all.Add(ToJson(item));
+        return new JsonObject { ["items"] = all };
+    }
 }

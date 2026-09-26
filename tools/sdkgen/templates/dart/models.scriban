@@ -1,4 +1,15 @@
 // {{ header }}
+{{~ for i in imports ~}}
+{{ i }}
+{{~ end ~}}
+{{~ if catalog ~}}
+
+{{ catalog.doc }}abstract final class {{ catalog.name }} {
+{{~ for c in catalog.codes ~}}
+{{ c.doc }}  static const {{ c.name }} = {{ c.value }};
+{{~ end ~}}
+}
+{{~ end ~}}
 {{~ for e in enums ~}}
 
 {{ e.doc }}enum {{ e.name }} {

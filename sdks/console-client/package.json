@@ -1,0 +1,27 @@
+{
+  "name": "@orvano/console-client",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The Orvano console's own client for console operations. Private: never published (spec 0001, AC-17).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@orvano/js": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  }
+}

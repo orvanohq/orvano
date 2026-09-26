@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization.Metadata;
 using System.Text.RegularExpressions;
 using Orvano.Scenarios.Generated;
 
@@ -14,13 +16,23 @@ internal sealed record ScenarioResult(string Name, string Outcome, string? Reaso
     public override string ToString() => $"{Outcome,-7} {Name}{(Reason is null ? "" : ": " + Reason)}";
 }
 
+/// <summary>The SDK clients a run uses, one per role. The .NET SDK is server side only, so both are <see cref="OrvanoClient"/>.</summary>
+/// <param name="Client">For <c>as: client</c> steps: no API key.</param>
+/// <param name="Server">For <c>as: server</c> steps: the scenario API key.</param>
+internal sealed record Surface(OrvanoClient Client, OrvanoClient Server);
+
 /// <summary>
-/// The .NET scenario interpreter. The SDK is server side only, so every role uses the same client;
-/// a step whose operation the SDK lacks (a <c>client</c> operation) skips the scenario.
+/// The .NET scenario interpreter. The SDK is server side only, so a step whose operation it lacks
+/// (a <c>client</c> or <c>console</c> operation) skips the scenario.
 /// </summary>
 internal static partial class Interpreter
 {
-    public static async Task<List<ScenarioResult>> RunAsync(IEnumerable<JsonObject> scenarios, OrvanoClient client, CancellationToken ct)
+    /// <summary>The SDK's events plus the test events, as the spec has runners decode them.</summary>
+    private static readonly Dictionary<string, JsonTypeInfo> Events = OrvanoEvents.Registry
+        .Concat(TestEvents.Registry)
+        .ToDictionary(e => e.Key, e => e.Value, StringComparer.Ordinal);
+
+    public static async Task<List<ScenarioResult>> RunAsync(IEnumerable<JsonObject> scenarios, Surface surface, CancellationToken ct)
     {
         var results = new List<ScenarioResult>();
         foreach (var scenario in scenarios)
@@ -28,7 +40,7 @@ internal static partial class Interpreter
             var name = scenario["name"]!.GetValue<string>();
             try
             {
-                await RunScenarioAsync(scenario, client, ct);
+                await RunScenarioAsync(scenario, surface, ct);
                 results.Add(new ScenarioResult(name, "passed"));
             }
             catch (ScenarioSkipped e)
@@ -44,43 +56,61 @@ internal static partial class Interpreter
         return results;
     }
 
-    private static async Task RunScenarioAsync(JsonObject scenario, OrvanoClient client, CancellationToken ct)
+    private static async Task RunScenarioAsync(JsonObject scenario, Surface surface, CancellationToken ct)
     {
         var vars = new Dictionary<string, JsonNode?>(StringComparer.Ordinal);
         var steps = scenario["steps"]!.AsArray();
         for (var i = 0; i < steps.Count; i++)
         {
             var step = steps[i]!.AsObject();
-            var op = step["op"]!.GetValue<string>();
-            var role = step["as"]!.GetValue<string>();
-            var where = $"step {i + 1} ({op} as {role})";
-            if (!Dispatch.Operations.TryGetValue(op, out var entry))
-                throw new ScenarioFailure($"{where}: the contract has no operation {op}");
-            if (role == "console")
-                throw new ScenarioSkipped("console steps run only in the JS interpreter");
-            if (entry.Call is null)
-                throw new ScenarioSkipped($"{op} has no call in the .NET SDK");
-
-            var input = Substitute(step["input"] ?? new JsonObject(), vars)!.AsObject();
+            var op = step["op"]?.GetValue<string>();
+            var eventName = step["event"]?.GetValue<string>();
+            var role = step["as"]?.GetValue<string>();
+            var where = $"step {i + 1} ({op ?? $"event {eventName ?? "?"}"}{(role is null ? "" : $" as {role}")})";
             var expect = Substitute(step["expect"], vars)!.AsObject();
 
-            int status;
+            int? status = null;
             string? code = null;
-            JsonNode? body = null;
-            try
+            JsonNode? body;
+            if (eventName is not null)
             {
-                body = await entry.Call(client, input, ct);
-                status = entry.Status;
+                using var raw = JsonDocument.Parse(Substitute(step["raw"], vars)?.ToJsonString() ?? "null");
+                var decoded = OrvanoEvents.Decode(eventName, raw.RootElement, Events)
+                    ?? throw new ScenarioFailure($"{where}: the contract has no event {eventName}");
+                body = JsonSerializer.SerializeToNode(decoded, Events[eventName]);
             }
-            catch (OrvanoException e)
+            else
             {
-                status = e.Status;
-                code = e.Code;
+                // Console operations are not in this dispatch table, so the role decides first.
+                var client = role switch
+                {
+                    "client" => surface.Client,
+                    "server" => surface.Server,
+                    "console" => throw new ScenarioSkipped("console steps run only in the JS interpreter"),
+                    _ => throw new ScenarioFailure($"{where}: an operation step needs `as`"),
+                };
+                if (op is null || !Dispatch.Operations.TryGetValue(op, out var entry))
+                    throw new ScenarioFailure($"{where}: the contract has no operation {op ?? "?"}");
+                var paginate = step["paginate"]?.GetValue<bool>() == true;
+                var call = (paginate ? entry.All : entry.Call)
+                    ?? throw new ScenarioSkipped($"{op} has no {(paginate ? "paged " : "")}call in the .NET SDK");
+
+                var input = Substitute(step["input"] ?? new JsonObject(), vars)!.AsObject();
+                body = null;
+                try
+                {
+                    body = await call(client, input, ct);
+                    status = entry.Status;
+                }
+                catch (OrvanoException e)
+                {
+                    status = e.Status;
+                    code = e.Code;
+                }
             }
 
-            var expectedStatus = expect["status"]!.GetValue<int>();
-            if (status != expectedStatus)
-                throw new ScenarioFailure($"{where}: expected status {expectedStatus}, got {status}{(code is null ? "" : $" ({code})")}");
+            if (expect["status"]?.GetValue<int>() is { } expectedStatus && status != expectedStatus)
+                throw new ScenarioFailure($"{where}: expected status {expectedStatus}, got {status?.ToString(CultureInfo.InvariantCulture) ?? "none"}{(code is null ? "" : $" ({code})")}");
             if (expect["code"]?.GetValue<string>() is { } expectedCode && expectedCode != code)
                 throw new ScenarioFailure($"{where}: expected code {expectedCode}, got {code ?? "none"}");
             if (expect.ContainsKey("body") && SubsetMismatch(expect["body"], body, "$") is { } mismatch)

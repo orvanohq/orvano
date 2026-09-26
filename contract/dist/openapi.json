@@ -8,9 +8,47 @@
   "tags": [
     {
       "name": "health"
+    },
+    {
+      "name": "test"
     }
   ],
   "paths": {
+    "/v1/console/test/ping": {
+      "get": {
+        "operationId": "test.consolePing",
+        "description": "Answers `{ status: ok }` to a valid console session.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestConsolePing"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "test"
+        ],
+        "x-orvano-test": true,
+        "x-orvano-service": "test",
+        "x-orvano-audience": "console"
+      }
+    },
     "/v1/health": {
       "get": {
         "operationId": "health.get",
@@ -26,6 +64,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -34,10 +82,107 @@
         "x-orvano-service": "health",
         "x-orvano-audience": "both"
       }
+    },
+    "/v1/test/conflict": {
+      "post": {
+        "operationId": "test.conflict",
+        "description": "Always answers 409 with code `test_conflict`.",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "test"
+        ],
+        "x-orvano-test": true,
+        "x-orvano-service": "test",
+        "x-orvano-audience": "both"
+      }
+    },
+    "/v1/test/items": {
+      "get": {
+        "operationId": "test.list",
+        "description": "Pages through five fixed items.",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Items per page, 1 to 100. Defaults to 2.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestItemPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "test"
+        ],
+        "x-orvano-test": true,
+        "x-orvano-service": "test",
+        "x-orvano-audience": "both"
+      }
     }
   },
   "components": {
     "schemas": {
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "internal_error",
+          "not_found",
+          "invalid_request",
+          "invalid_cursor",
+          "console_session_required",
+          "contract_violation"
+        ],
+        "description": "Every stable error code the server sends in `Problem.code`."
+      },
       "Health": {
         "type": "object",
         "required": [
@@ -61,6 +206,154 @@
           }
         },
         "description": "Whether the server is up, and which Orvano version it runs."
+      },
+      "Problem": {
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "requestId"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Identifies the error: `https://orvano.dev/errors/<code>`.",
+            "examples": [
+              "https://orvano.dev/errors/not_found"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "description": "The standard HTTP reason phrase for the status.",
+            "examples": [
+              "Not Found"
+            ]
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The HTTP status code.",
+            "examples": [
+              404
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "description": "A short, safe sentence about this occurrence, when the server has one."
+          },
+          "code": {
+            "type": "string",
+            "description": "Orvano's stable error code, from the `ErrorCode` catalog. SDKs treat it as a plain string.",
+            "examples": [
+              "not_found"
+            ]
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The request ID to quote when reporting a problem; also sent as `X-Request-Id`.",
+            "examples": [
+              "4bf92f3577b34da6a3ce929d0e0e4736"
+            ]
+          }
+        },
+        "description": "An RFC 9457 problem details body. Every operation declares it as its `default` response, sent\nas `application/problem+json`."
+      },
+      "TestConsolePing": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Always `ok`.",
+            "examples": [
+              "ok"
+            ]
+          }
+        },
+        "description": "The answer to `test.consolePing`.",
+        "x-orvano-test": true
+      },
+      "TestErrorCode": {
+        "type": "string",
+        "enum": [
+          "test_conflict"
+        ],
+        "description": "Error codes only the test operations send. Generated only into the scenario runners.",
+        "x-orvano-test": true
+      },
+      "TestItem": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "`item-1` to `item-5`.",
+            "examples": [
+              "item-1"
+            ]
+          }
+        },
+        "description": "One fixed item in the `test.list` page.",
+        "x-orvano-test": true
+      },
+      "TestItemPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestItem"
+            },
+            "description": "The items on this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass it as `cursor` to get the next page; null on the last page."
+          }
+        },
+        "description": "One page of `test.list`.",
+        "x-orvano-test": true
+      },
+      "TestPinged": {
+        "type": "object",
+        "required": [
+          "message",
+          "at"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Any text.",
+            "examples": [
+              "hello"
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the ping happened."
+          }
+        },
+        "description": "The payload of the `test.pinged` event.",
+        "x-orvano-event": "test.pinged",
+        "x-orvano-test": true
       }
     }
   }

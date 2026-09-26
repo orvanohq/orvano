@@ -9,3 +9,42 @@ namespace Orvano.Contract;
 public sealed record Health(
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("version")] string Version);
+
+/// <summary>An RFC 9457 problem details body. Every operation declares it as its <c>default</c> response, sent as <c>application/problem+json</c>.</summary>
+/// <param name="Type">Identifies the error: <c>https://orvano.dev/errors/&lt;code&gt;</c>.</param>
+/// <param name="Title">The standard HTTP reason phrase for the status.</param>
+/// <param name="Status">The HTTP status code.</param>
+/// <param name="Code">Orvano's stable error code, from the <c>ErrorCode</c> catalog. SDKs treat it as a plain string.</param>
+/// <param name="RequestId">The request ID to quote when reporting a problem; also sent as <c>X-Request-Id</c>.</param>
+/// <param name="Detail">A short, safe sentence about this occurrence, when the server has one.</param>
+public sealed record Problem(
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("title")] string Title,
+    [property: JsonPropertyName("status")] int Status,
+    [property: JsonPropertyName("code")] string Code,
+    [property: JsonPropertyName("requestId")] string RequestId,
+    [property: JsonPropertyName("detail"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Detail = null);
+
+/// <summary>The answer to <c>test.consolePing</c>.</summary>
+/// <param name="Status">Always <c>ok</c>.</param>
+public sealed record TestConsolePing(
+    [property: JsonPropertyName("status")] string Status);
+
+/// <summary>One fixed item in the <c>test.list</c> page.</summary>
+/// <param name="Id"><c>item-1</c> to <c>item-5</c>.</param>
+public sealed record TestItem(
+    [property: JsonPropertyName("id")] string Id);
+
+/// <summary>One page of <c>test.list</c>.</summary>
+/// <param name="Items">The items on this page.</param>
+/// <param name="NextCursor">Pass it as <c>cursor</c> to get the next page; null on the last page.</param>
+public sealed record TestItemPage(
+    [property: JsonPropertyName("items")] IReadOnlyList<TestItem> Items,
+    [property: JsonPropertyName("nextCursor")] string? NextCursor);
+
+/// <summary>The payload of the <c>test.pinged</c> event.</summary>
+/// <param name="Message">Any text.</param>
+/// <param name="At">When the ping happened.</param>
+public sealed record TestPinged(
+    [property: JsonPropertyName("message")] string Message,
+    [property: JsonPropertyName("at")] DateTimeOffset At);
