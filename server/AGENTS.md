@@ -58,10 +58,15 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 ## Agent skills
 
 - [testcontainers-integration-tests](../.claude/skills/testcontainers-integration-tests/): `aaronontheweb/dotnet-skills`, xUnit integration tests against real Postgres in Docker
+- [dotnet-cryptography](../.claude/skills/dotnet-cryptography/): `envoydev/claude-stack`, `System.Security.Cryptography` primitives (ECDsa, AesGcm, RandomNumberGenerator) for signing keys and envelope encryption
+- [dotnet-api-security](../.claude/skills/dotnet-api-security/): `wshaddix/dotnet-skills`, ASP.NET Core API auth, JWT bearer, CORS, and rate limiting
+- [dotnet-jwt-authentication](../.claude/skills/dotnet-jwt-authentication/): `ronnythedev/dotnet-clean-architecture-skills`, JWT issuing and validation in .NET (spec 0004 wins where it assumes a single issuer)
+- [libsodium](../.claude/skills/libsodium/): `claude-dev-suite/claude-dev-suite`, libsodium and Argon2id, used through NSec for password hashing (security scan: medium risk, read it before relying on it)
 
 ## Related specs
 
 - [0002 Stack and architecture](../docs/specs/0002-stack-architecture/index.md) (roles, Postgres layout, events, invariants)
 - [0001 API contract and SDK pipeline](../docs/specs/0001-api-contract-sdk-pipeline/index.md) (generated `Orvano.Contract` types)
+- [0004 App user sign up, sign in, and sessions](../docs/specs/0004-app-user-auth/index.md) (`Orvano.Auth`, tokens, sessions, signing keys)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

@@ -86,6 +86,10 @@ Installed (scope row 2):
 - [nextjs-app-router-patterns](.agents/skills/nextjs-app-router-patterns/): `wshobson/agents`, App Router, server components, route handlers, middleware for `@orvano/nextjs`
 - [workers-best-practices](.agents/skills/workers-best-practices/): `cloudflare/skills`, Workers runtime rules (the edge target the JS SDK must run on)
 - [playwright-cli](.agents/skills/playwright-cli/): `microsoft/playwright-cli`, driving a real browser with Playwright
+- [security-and-hardening](.claude/skills/security-and-hardening/): `addyosmani/agent-skills`, hardening input handling, auth, sessions, and personal data (GDPR)
+- [session-management](.claude/skills/session-management/): `secondsky/claude-skills`, refresh token rotation and cookie rules (it assumes Redis; spec 0004 wins)
+- [email-and-password-best-practices](.claude/skills/email-and-password-best-practices/): `better-auth/skills`, password auth flows and policies (written for Better Auth; use the practices, not the library)
+- [owasp-top-10-testing](.claude/skills/owasp-top-10-testing/): `usestrix/strix`, OWASP Top 10 testing for GA reviews (security scan: one alert, read it before relying on it)
 
 Declined: ESLint, typescript-eslint, and Prettier skills (the configs are small; the ESLint MCP covers live linting)
 
