@@ -1,0 +1,13 @@
+// {{ header }}
+using Orvano;
+
+using var orvano = new OrvanoClient(new OrvanoClientOptions(new Uri("https://orvano.example.com"))
+{
+    ApiKey = Environment.GetEnvironmentVariable("ORVANO_API_KEY"),
+});
+{{~ if result != "" ~}}
+var {{ result }} = await {{ call }};
+Console.WriteLine({{ result }});
+{{~ else ~}}
+await {{ call }};
+{{~ end ~}}

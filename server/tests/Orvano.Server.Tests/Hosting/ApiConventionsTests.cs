@@ -83,6 +83,20 @@ public class ApiConventionsTests(PostgresFixture postgres)
         Assert.Matches("^[0-9a-f]{32}$", Assert.Single(response.Headers.GetValues("X-Request-Id")));
     }
 
+    [Theory]
+    [InlineData("/v1/health")]
+    [InlineData("/v1/projects")] // a problem response carries it too
+    public async Task Every_response_carries_the_server_version_from_the_VERSION_file(string url)
+    {
+        await using var api = await StartApiAsync("Test");
+        using var http = api.Http();
+        var version = (await File.ReadAllTextAsync(RepoPaths.Combine("VERSION"), Ct)).Trim();
+
+        using var response = await http.GetAsync(url, Ct);
+
+        Assert.Equal(version, Assert.Single(response.Headers.GetValues("X-Orvano-Version")));
+    }
+
     [Fact]
     public async Task A_route_that_does_not_exist_is_a_not_found_problem()
     {

@@ -12,4 +12,10 @@ internal static class OrvanoHeaders
     public const string Project = "X-Orvano-Project";
 
     public const string RequestId = "X-Request-Id";
+
+    /// <summary>On every request: the SDK's name and version, <c>Orvano/0.4.2</c>.</summary>
+    public const string Sdk = "X-Orvano-SDK";
+
+    /// <summary>On every response: the server's Orvano version.</summary>
+    public const string ServerVersion = "X-Orvano-Version";
 }

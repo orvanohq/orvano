@@ -1,0 +1,222 @@
+# Releases the public SDKs (spec 0001, AC-12). Pushing a tag `v<VERSION>` runs the whole SDK
+# workflow first (generated code current, AC-3; scenarios on every surface, AC-10), then publishes
+# to npm, pub.dev, and NuGet, then updates the read only mirror repos.
+#
+# Until Orvano reaches 0.1 every step is a dry run: packages are packed and validated, and mirror
+# commits are built, but nothing is uploaded or pushed. Running this workflow by hand is always a
+# dry run, so the pipeline can be tried from any branch.
+#
+# Private packages never publish: pnpm skips every package marked `"private": true` (so
+# @orvano/console-client never leaves the repo), and only the three named Dart packages and the one
+# .NET project are published.
+#
+# Credentials: OIDC trusted publishing where the registry offers it. The secrets NPM_TOKEN and
+# NUGET_API_KEY are only for when it isn't set up (a brand new npm package must be published once
+# with a token before trusted publishing can be configured). NUGET_USER (a variable) is the
+# nuget.org account the trusted publishing policy belongs to. MIRROR_PUSH_TOKEN may write only to
+# the three mirror repos.
+
+name: Release
+
+on:
+  push:
+    tags: ['v[0-9]*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: 3.44.2
+
+jobs:
+  plan:
+    name: Plan the release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      dry-run: ${{ steps.plan.outputs.dry-run }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: plan
+        run: |
+          version=$(cat VERSION)
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::The tag $GITHUB_REF_NAME does not match VERSION ($version). Tag v$version instead."
+            exit 1
+          fi
+          major=$(echo "$version" | cut -d. -f1)
+          minor=$(echo "$version" | cut -d. -f2)
+          dry=false
+          if [ "$GITHUB_EVENT_NAME" != push ] || { [ "$major" -eq 0 ] && [ "$minor" -eq 0 ]; }; then dry=true; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "dry-run=$dry" >> "$GITHUB_OUTPUT"
+          echo "Releasing $version (dry run: $dry)" >> "$GITHUB_STEP_SUMMARY"
+
+  sdks:
+    name: SDKs
+    needs: plan
+    uses: ./.github/workflows/sdks.yml
+
+  npm:
+    name: Publish to npm
+    needs: [plan, sdks]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DRY_RUN: ${{ needs.plan.outputs.dry-run }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+          registry-url: https://registry.npmjs.org
+      - run: corepack enable pnpm
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter "./sdks/**" build
+      # pnpm skips private packages and versions already on the registry, and turns `workspace:*`
+      # into the real version. Without NPM_TOKEN it authenticates through OIDC.
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          flags="--access public --no-git-checks"
+          if [ "$DRY_RUN" = true ]; then flags="$flags --dry-run"; fi
+          pnpm --filter "./sdks/**" -r publish $flags
+
+  pub:
+    name: Publish to pub.dev
+    needs: [plan, sdks]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DRY_RUN: ${{ needs.plan.outputs.dry-run }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      # pub.dev automated publishing: exchange the GitHub OIDC token for a pub.dev one. Each package
+      # must allow this repo and the tag pattern `v{{version}}` in its pub.dev admin page.
+      - name: Sign in to pub.dev
+        if: env.DRY_RUN != 'true'
+        run: |
+          token=$(curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://pub.dev" | jq -r .value)
+          echo "::add-mask::$token"
+          echo "PUB_TOKEN=$token" >> "$GITHUB_ENV"
+          dart pub token add https://pub.dev --env-var PUB_TOKEN
+      # orvano_core first: the other two depend on it.
+      - name: Publish
+        run: |
+          flag=--force
+          if [ "$DRY_RUN" = true ]; then flag=--dry-run; fi
+          (cd sdks/dart/core && dart pub publish $flag)
+          (cd sdks/dart/server && dart pub publish $flag)
+          (cd sdks/dart/flutter && flutter pub publish $flag)
+
+  nuget:
+    name: Publish to NuGet
+    needs: [plan, sdks]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DRY_RUN: ${{ needs.plan.outputs.dry-run }}
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - run: dotnet pack sdks/dotnet/src/Orvano -c Release -o artifacts
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nuget-package
+          path: artifacts/*.nupkg
+      - name: Sign in to NuGet (trusted publishing)
+        id: login
+        if: env.DRY_RUN != 'true' && env.NUGET_API_KEY == ''
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+      - name: Publish
+        if: env.DRY_RUN != 'true'
+        env:
+          KEY: ${{ env.NUGET_API_KEY || steps.login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key "$KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  mirrors:
+    name: Mirror ${{ matrix.repo }}
+    needs: [plan, npm, pub, nuget]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repo: orvano-js
+            paths: sdks/js:js sdks/nextjs:nextjs
+          - repo: orvano-dart
+            paths: sdks/dart/core:orvano_core sdks/dart/flutter:orvano_flutter sdks/dart/server:orvano_dart
+          - repo: orvano-dotnet
+            paths: sdks/dotnet/src/Orvano:src/Orvano Directory.Build.props:Directory.Build.props Directory.Packages.props:Directory.Packages.props global.json:global.json VERSION:VERSION
+    env:
+      DRY_RUN: ${{ needs.plan.outputs.dry-run }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      REPO: ${{ matrix.repo }}
+      PATHS: ${{ matrix.paths }}
+      MIRROR_PUSH_TOKEN: ${{ secrets.MIRROR_PUSH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: monorepo
+      # The mirror holds exactly the tracked files of each path; everything else is replaced.
+      - name: Build the mirror commit
+        run: |
+          if [ "$DRY_RUN" = true ]; then
+            git init -q -b main mirror
+          elif [ -z "$MIRROR_PUSH_TOKEN" ]; then
+            echo "::error::MIRROR_PUSH_TOKEN is not set, so the mirror can't be updated."
+            exit 1
+          else
+            git clone -q "https://x-access-token:${MIRROR_PUSH_TOKEN}@github.com/orvanohq/${REPO}.git" mirror
+          fi
+          find mirror -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          for pair in $PATHS; do
+            src="${pair%%:*}"; dest="${pair#*:}"
+            (cd monorepo && git ls-files -z -- "$src") | while IFS= read -r -d '' file; do
+              target="mirror/$dest${file#"$src"}"
+              mkdir -p "$(dirname "$target")"
+              cp "monorepo/$file" "$target"
+            done
+          done
+          cp monorepo/LICENSE mirror/LICENSE
+          sha=$(git -C monorepo rev-parse HEAD)
+          printf '%s\n' \
+            "# ${REPO}" "" \
+            "A read only mirror of the Orvano SDK packages at v${VERSION}." "" \
+            "They are generated and released from [orvanohq/orvano](https://github.com/orvanohq/orvano) (commit \`${sha}\`)." \
+            "Please open issues and pull requests there." > mirror/README.md
+          cd mirror
+          git -c user.name=orvano-release -c user.email=release@orvano.dev add -A
+          git -c user.name=orvano-release -c user.email=release@orvano.dev commit -q -m "Release v${VERSION}" -m "From orvanohq/orvano@${sha}"
+          git tag "v${VERSION}"
+          git show --stat --format='%s%n%b' HEAD
+      - name: Push
+        if: env.DRY_RUN != 'true'
+        working-directory: mirror
+        run: git push origin HEAD:main "refs/tags/v${VERSION}"

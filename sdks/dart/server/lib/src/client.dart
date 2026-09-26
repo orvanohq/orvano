@@ -20,12 +20,16 @@ final class Client extends core.Client {
     super.timeout,
     super.maxRetries,
     super.httpClient,
+    super.onWarning,
     String? apiKey,
   }) {
     if (apiKey != null) this.apiKey = apiKey;
   }
 
   String? _apiKey;
+
+  @override
+  String get sdkName => 'orvano_dart';
 
   /// Sets the API key sent with every call, or removes it with null. Throws
   /// [UnsupportedError] in a browser.

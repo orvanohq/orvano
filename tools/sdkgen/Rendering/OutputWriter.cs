@@ -21,7 +21,7 @@ internal static class OutputWriter
             }
 
             foreach (var stale in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
-                .Select(Path.GetFullPath).Where(p => !written.Contains(p)))
+                .Select(Path.GetFullPath).Where(p => output.OwnsDirectory && !written.Contains(p)))
             {
                 File.Delete(stale);
                 Console.WriteLine($"  removed {Path.GetRelativePath(root, stale)}");
@@ -35,6 +35,8 @@ internal static class OutputWriter
             var directories = group.Select(o => o.Directory).ToList();
             switch (group.Key)
             {
+                case Formatter.None:
+                    break;
                 case Formatter.Prettier:
                     await RunAsync(root, "pnpm", ["exec", "prettier", "--write", "--log-level", "warn", .. directories]);
                     break;

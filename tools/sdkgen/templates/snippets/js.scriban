@@ -1,0 +1,19 @@
+// {{ header }}
+{{~ if server ~}}
+import { Client, Orvano } from '@orvano/js/server'
+
+const orvano = new Orvano(
+  new Client({ endpoint: 'https://orvano.example.com', apiKey: process.env.ORVANO_API_KEY }),
+)
+{{~ else ~}}
+import { Client, Orvano } from '@orvano/js'
+
+const orvano = new Orvano(new Client({ endpoint: 'https://orvano.example.com' }))
+{{~ end ~}}
+
+{{~ if result != "" ~}}
+const {{ result }} = await {{ call }}
+console.log({{ result }})
+{{~ else ~}}
+await {{ call }}
+{{~ end ~}}

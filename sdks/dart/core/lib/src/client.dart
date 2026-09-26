@@ -6,7 +6,9 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show parseHttpDate;
 
 import 'auth.dart';
+import 'generated/version.dart';
 import 'orvano_exception.dart';
+import 'version.dart';
 
 /// Per call settings, the last argument of every generated method.
 final class RequestOptions {
@@ -27,7 +29,9 @@ base class Client {
   /// `https://orvano.example.com`. [session] holds the signed in user's
   /// token (memory by default). [timeout] bounds one call, retries included;
   /// [maxRetries] caps the retries of a safe call. Pass [httpClient] to reuse
-  /// or mock the underlying HTTP client.
+  /// or mock the underlying HTTP client. [onWarning] receives warnings, for
+  /// example the one sent when the server's major.minor differs from this
+  /// SDK's; it prints them by default.
   Client({
     required String endpoint,
     this.project,
@@ -36,10 +40,12 @@ base class Client {
     this.timeout = const Duration(seconds: 30),
     this.maxRetries = 3,
     http.Client? httpClient,
+    void Function(String message)? onWarning,
   }) : endpoint = _parseEndpoint(endpoint),
        session = session ?? MemorySessionStore(),
        _headers = Map.unmodifiable(headers),
-       _http = httpClient ?? http.Client();
+       _http = httpClient ?? http.Client(),
+       _onWarning = onWarning ?? print;
 
   /// The server's base URL, without a trailing slash.
   final String endpoint;
@@ -59,7 +65,13 @@ base class Client {
 
   final Map<String, String> _headers;
   final http.Client _http;
+  final void Function(String message) _onWarning;
   final Random _random = Random();
+  bool _versionChecked = false;
+
+  /// The SDK's name, sent with its version in `X-Orvano-SDK`. Packages that
+  /// build on this client name themselves here.
+  String get sdkName => 'orvano_core';
 
   static const _backoffBase = Duration(milliseconds: 250);
 
@@ -108,6 +120,7 @@ base class Client {
         final headers = <String, String>{
           ..._headers,
           'Accept': 'application/json',
+          sdkHeader: '$sdkName/$sdkVersion',
           'X-Orvano-Project': ?project,
         };
         await authorize(headers);
@@ -126,6 +139,7 @@ base class Client {
           throw TimeoutException('Orvano $method $path timed out', limit);
         }
 
+        _checkVersion(response.headers[serverVersionHeader.toLowerCase()]);
         final status = response.statusCode;
         if (status >= 200 && status < 300) {
           if (status == 204 || method == 'HEAD' || response.body.isEmpty) {
@@ -152,6 +166,15 @@ base class Client {
     } finally {
       timer?.cancel();
     }
+  }
+
+  /// Warns once per client when the server's major.minor differs from this
+  /// SDK's.
+  void _checkVersion(String? serverVersion) {
+    if (_versionChecked || serverVersion == null) return;
+    _versionChecked = true;
+    final warning = versionMismatch(sdkName, serverVersion, endpoint);
+    if (warning != null) _onWarning(warning);
   }
 
   /// Waits [wait], or less when [deadline] arrives first; false then. The

@@ -1,0 +1,12 @@
+// {{ header }}
+import 'package:orvano_flutter/orvano_flutter.dart';
+
+Future<void> main() async {
+  final orvano = Orvano(Client(endpoint: 'https://orvano.example.com'));
+{{~ if result != "" ~}}
+  final {{ result }} = await {{ call }};
+  print({{ result }}{{ if model }}.toJson(){{ end }});
+{{~ else ~}}
+  await {{ call }};
+{{~ end ~}}
+}
