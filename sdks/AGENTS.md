@@ -27,6 +27,7 @@ The five public SDK surfaces (spec 0001). Each is a thin handwritten runtime plu
 | `js/src/runtime/version.ts`, `dart/core/lib/src/version.dart`, `dotnet/src/Orvano/OrvanoClient.cs` (`CheckVersion`) | `X-Orvano-SDK` on every request and the once per client major.minor mismatch warning |
 | `js/src/runtime/pagination.ts`, `events.ts`; `dart/core/lib/src/pagination.dart`, `events.dart`; `dotnet/src/Orvano/OrvanoPagination.cs`, `OrvanoEvents.cs` | The page iterator helper and the event decoder |
 | `*/generated/`, `*/Generated/` | SdkGen output; never edit by hand |
+| `js/test/`, `nextjs/test/`, `dart/*/test/`, `dotnet/tests/Orvano.Tests/` | Runtime unit tests, each tagged with the spec 0001 AC it covers |
 
 ## Commands
 
@@ -34,6 +35,11 @@ The five public SDK surfaces (spec 0001). Each is a thin handwritten runtime plu
 pnpm --filter @orvano/js --filter @orvano/nextjs build
 flutter analyze --fatal-infos sdks/dart
 dotnet build sdks/dotnet/src/Orvano
+
+# Runtime unit tests (the shared scenarios in tests/scenarios/ cover the real server)
+pnpm --filter @orvano/js build && pnpm --filter @orvano/js --filter @orvano/nextjs test
+(cd sdks/dart/core && dart test) && (cd sdks/dart/server && dart test && dart test -p chrome)
+dotnet test --project sdks/dotnet/tests/Orvano.Tests     # net10.0 and net8.0 (the netstandard2.0 build)
 ```
 
 ## Conventions
@@ -54,7 +60,15 @@ dotnet build sdks/dotnet/src/Orvano
 ## Gotchas
 
 - Type aware ESLint reads workspace packages' types from `dist/`, so build them before linting (CI does).
+- TS tests live in `test/`, outside `src/`, with their own `test/tsconfig.json`, so `tsc` never builds them into `dist/` and ESLint's project service still sees them. `@orvano/nextjs` tests import `@orvano/js` from its `dist/`, so build it first.
+- Dart runtime tests run against a real local `HttpServer` (`dart/core/test/fake_orvano.dart`), so timeouts go through the real abort path. The API key browser guard is a compile time constant, so it's only testable with `dart test -p chrome`.
+- The .NET tests reach the internal `SendAsync` by reflection to send a POST (public packages carry only GET operations so far); keep its shape stable.
 - Each Dart package needs its own `README.md`, `CHANGELOG.md`, and `LICENSE`, or `pub publish` refuses it. SdkGen adds a `## <version>` section to each CHANGELOG when `VERSION` changes; write the real notes there by hand.
+
+## Agent skills
+
+- [vitest](../.claude/skills/vitest/): `antfu/skills`, Vitest tests and mocking for `js/` and `nextjs/`
+- The Dart test skills (`dart-add-unit-test`, `dart-test-fundamentals`, `dart-collect-coverage`) are listed in the root `AGENTS.md`.
 
 ## Related specs
 
