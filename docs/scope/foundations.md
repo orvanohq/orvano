@@ -30,7 +30,7 @@ One machine readable description of every public endpoint is the source of truth
 - [x] Design it (spec): `/architect API contract & SDK pipeline`
 - [ ] Build it: `/develop API contract & SDK pipeline`
    - [x] Thin thread: health operation from TypeSpec through SdkGen to all five SDK surfaces and the server, scenarios green in CI (AC-1, 2, 3, 5, 9, 10, 13, 16)
-   - [ ] Shared conventions: errors, audience routing and client pattern, the private console client, cursor pagination, typed events, retries and timeouts (AC-2, 4, 6, 7, 8, 14, 17)
+   - [ ] Shared conventions: errors, audience routing and client pattern, the private console client, cursor pagination, typed events, retries and timeouts, test only operations and temporary auth formats (AC-2, 4, 5, 6, 7, 8, 14, 17, 18)
    - [ ] Release pipeline: version stamping and headers, publishing and mirrors, docs snippets, public contract file, breaking change check (AC-11, 12, 15, 17)
 - [ ] Verify it: `/check verify API contract & SDK pipeline`
 - [ ] Test it: `/test API contract & SDK pipeline`
