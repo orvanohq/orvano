@@ -1,5 +1,7 @@
+import tailwindcss from '@tailwindcss/vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import react from '@vitejs/plugin-react'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 
 // Local dev only: Aspire starts the api and realtime roles and passes their
@@ -9,12 +11,36 @@ const apiUrl = process.env.API_HTTP ?? process.env.services__api__http__0 ?? 'ht
 const realtimeUrl =
   process.env.REALTIME_HTTP ?? process.env.services__realtime__http__0 ?? 'http://localhost:8081'
 
+// Local dev only, set by the AppHost's OrvanoDev:Fixtures switch: the console cookie the fixture
+// session uses, added to proxied /v1/console calls so the dev console opens signed in.
+const devSession = process.env.CONSOLE_DEV_SESSION
+
 export default defineConfig({
-  plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), react()],
+  plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss()],
+  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+  build: {
+    // Fonts stay files served from this origin: the Content Security Policy allows no data: fonts.
+    assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/.test(file) ? false : undefined),
+  },
   server: {
     proxy: {
       '/v1/realtime': { target: realtimeUrl, ws: true, changeOrigin: true },
-      '/v1': { target: apiUrl, changeOrigin: true },
+      '/v1': {
+        target: apiUrl,
+        changeOrigin: true,
+        configure: (proxy) => {
+          if (devSession === undefined || devSession === '') return
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (!req.url?.startsWith('/v1/console')) return
+            const existing = proxyReq.getHeader('cookie')
+            const cookie = `orvano_console=${devSession}`
+            proxyReq.setHeader(
+              'cookie',
+              typeof existing === 'string' && existing !== '' ? `${existing}; ${cookie}` : cookie,
+            )
+          })
+        },
+      },
     },
   },
 })

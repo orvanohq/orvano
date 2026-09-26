@@ -1,0 +1,218 @@
+/*
+ * Design tokens (spec 0005, Design tokens). This is the only file in console/src that may hold a
+ * color literal; components use the tokens through the Tailwind utilities `@theme inline` maps at
+ * the bottom. Dark is the default, `[data-theme='light']` overrides it, and
+ * `[data-density='comfortable']` overrides the density tokens. console/design.md documents every
+ * value here; if the contrast test (AC-4) forces a lightness change, change both.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Color, dark */
+  --background: oklch(0.155 0.006 280);
+  --foreground: oklch(0.965 0.004 280);
+  --card: oklch(0.185 0.007 280);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.205 0.008 280);
+  --popover-foreground: var(--foreground);
+  --muted: oklch(0.235 0.008 280);
+  --muted-foreground: oklch(0.72 0.012 280);
+  --secondary: oklch(0.255 0.009 280);
+  --secondary-foreground: var(--foreground);
+  --accent: oklch(0.27 0.012 280);
+  --accent-foreground: var(--foreground);
+  --primary: oklch(0.54 0.21 280);
+  --primary-foreground: oklch(0.99 0 0);
+  --link: oklch(0.76 0.12 280);
+  --ring: oklch(0.72 0.15 280);
+  --border: oklch(0.28 0.008 280);
+  --input: oklch(0.52 0.012 280);
+  --destructive: oklch(0.54 0.2 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --danger-text: oklch(0.72 0.17 22);
+  --success: oklch(0.52 0.13 155);
+  --success-foreground: oklch(0.99 0 0);
+  --success-text: oklch(0.78 0.15 155);
+  --warning: oklch(0.72 0.15 75);
+  --warning-foreground: oklch(0.2 0.02 75);
+  --warning-text: oklch(0.82 0.14 80);
+  --sidebar: oklch(0.135 0.006 280);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.24 0.02 280);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  /* Elevation: shadows only on overlays */
+  --shadow-overlay: 0 8px 24px oklch(0 0 0 / 0.45);
+
+  /* Density, compact (the default) */
+  --control-h: 2rem;
+  --control-h-sm: 1.75rem;
+  --control-px: 0.625rem;
+  --row-h: 2.25rem;
+  --icon: 1rem;
+  --stack: 0.75rem;
+
+  /* Type by role; `@theme inline` below maps these to text-body, text-small, text-mono */
+  --fs-body: 0.875rem;
+  --lh-body: 1.25rem;
+  --fs-small: 0.75rem;
+  --lh-small: 1rem;
+  --fs-mono: 0.8125rem;
+  --lh-mono: 1.25rem;
+  --fs-h3: 0.9375rem;
+  --lh-h3: 1.375rem;
+
+  /* Radius: shadcn's scale gives 4, 6, 8, and 12 px */
+  --radius: 0.5rem;
+
+  /* Layout */
+  --topbar-h: 3rem;
+  --sidebar-w: 15rem;
+  --sidebar-w-rail: 3.5rem;
+  --drawer-w: 17.5rem;
+  --page-px: 1rem;
+
+  /* Layers */
+  --z-sticky: 10;
+  --z-sidebar: 20;
+  --z-overlay: 50;
+  --z-toast: 100;
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --duration-enter: 150ms;
+  --duration-enter-drawer: 200ms;
+  --duration-exit: 100ms;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --background: oklch(0.985 0.002 280);
+  --foreground: oklch(0.21 0.01 280);
+  --card: oklch(1 0 0);
+  --popover: oklch(1 0 0);
+  --muted: oklch(0.962 0.004 280);
+  --muted-foreground: oklch(0.48 0.015 280);
+  --secondary: oklch(0.945 0.005 280);
+  --accent: oklch(0.94 0.012 280);
+  --primary: oklch(0.51 0.23 280);
+  --link: oklch(0.48 0.2 280);
+  --ring: oklch(0.51 0.23 280);
+  --border: oklch(0.905 0.005 280);
+  --input: oklch(0.62 0.012 280);
+  --destructive: oklch(0.54 0.21 27);
+  --danger-text: oklch(0.5 0.19 27);
+  --success: oklch(0.5 0.13 155);
+  --success-text: oklch(0.45 0.12 155);
+  --warning: oklch(0.8 0.15 80);
+  --warning-foreground: oklch(0.25 0.04 70);
+  --warning-text: oklch(0.48 0.11 70);
+  --sidebar: oklch(0.97 0.003 280);
+  --sidebar-accent: oklch(0.93 0.02 280);
+
+  --shadow-overlay: 0 8px 24px oklch(0.2 0.02 280 / 0.12);
+}
+
+:root[data-density='comfortable'] {
+  --control-h: 2.5rem;
+  --control-h-sm: 2rem;
+  --control-px: 0.875rem;
+  --row-h: 2.75rem;
+  --icon: 1.125rem;
+  --stack: 1rem;
+
+  --fs-body: 1rem;
+  --lh-body: 1.5rem;
+  --fs-small: 0.875rem;
+  --lh-small: 1.25rem;
+  --fs-mono: 0.875rem;
+  --lh-mono: 1.25rem;
+  --fs-h3: 1rem;
+  --lh-h3: 1.5rem;
+}
+
+@media (min-width: 40rem) {
+  :root {
+    --page-px: 1.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-enter: 0ms;
+    --duration-enter-drawer: 0ms;
+    --duration-exit: 0ms;
+  }
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-link: var(--link);
+  --color-ring: var(--ring);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-danger-text: var(--danger-text);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-text: var(--success-text);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-text: var(--warning-text);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Copied shadcn components use text-sm and text-xs; those follow the density type roles. */
+  --text-sm: var(--fs-body);
+  --text-sm--line-height: var(--lh-body);
+  --text-xs: var(--fs-small);
+  --text-xs--line-height: var(--lh-small);
+  --text-body: var(--fs-body);
+  --text-body--line-height: var(--lh-body);
+  --text-small: var(--fs-small);
+  --text-small--line-height: var(--lh-small);
+  --text-mono: var(--fs-mono);
+  --text-mono--line-height: var(--lh-mono);
+  --text-h3: var(--fs-h3);
+  --text-h3--line-height: var(--lh-h3);
+
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.75);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.5);
+
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem;
+}
