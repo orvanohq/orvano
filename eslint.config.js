@@ -22,6 +22,7 @@ export default defineConfig(
     'server/',
     'dev/',
     'deploy/',
+    'console/public/',
   ]),
 
   js.configs.recommended,
@@ -66,6 +67,19 @@ export default defineConfig(
       'no-restricted-syntax': [
         'error',
         { selector: 'ExportDefaultDeclaration', message: 'Use a named export.' },
+      ],
+      // TanStack Router's control flow: `throw redirect(...)` and `throw notFound()`.
+      '@typescript-eslint/only-throw-error': [
+        'error',
+        {
+          allow: [
+            {
+              from: 'package',
+              package: '@tanstack/router-core',
+              name: ['Redirect', 'NotFoundError'],
+            },
+          ],
+        },
       ],
     },
   },

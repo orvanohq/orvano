@@ -1,15 +1,57 @@
-:root {
-  color-scheme: light dark;
-  font-family: system-ui, sans-serif;
-  line-height: 1.5;
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+@import './styles/shadcn.css';
+@import './styles/tokens.css';
+
+/* Tailwind's dark variant follows the data-theme attribute theme-init.js sets before first paint. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply font-sans;
+    font-feature-settings: 'cv11';
+  }
+
+  body {
+    @apply bg-background text-body text-foreground;
+    margin: 0;
+  }
+
+  /* One focus style for everything interactive (spec 0005, Focus). */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  :where(input, textarea, select):focus-visible {
+    outline-offset: 0;
+  }
+
+  code,
+  kbd,
+  samp,
+  pre {
+    @apply font-mono;
+    font-size: var(--text-mono);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0s !important;
+      animation-delay: 0s !important;
+      transition-duration: 0s !important;
+    }
+  }
 }
 
-body {
-  margin: 0;
-}
-
-main {
-  max-width: 40rem;
-  margin: 4rem auto;
-  padding: 0 1rem;
+.skip-link {
+  @apply bg-primary text-primary-foreground absolute top-2 left-2 z-[100] -translate-y-16 rounded-md px-3 py-2 focus:translate-y-0;
 }

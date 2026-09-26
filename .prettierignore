@@ -14,3 +14,7 @@ contract/dist/*.json
 tests/scenarios/runners/flutter/android/
 tests/scenarios/runners/flutter/ios/
 tests/scenarios/runners/flutter/web/
+
+console/test-results/
+console/playwright-report/
+console/.vitest/

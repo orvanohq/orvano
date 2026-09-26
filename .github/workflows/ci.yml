@@ -76,6 +76,45 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
 
+  console-tests:
+    name: Console tests (unit and browser)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+      - run: corepack enable pnpm
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+      - run: pnpm install --frozen-lockfile
+      # The console imports the private console client, which builds on the JS runtime.
+      - run: pnpm --filter "@orvano/console^..." build
+      - run: pnpm --filter @orvano/console exec playwright install --with-deps chromium
+      # Contrast, color literal, keyboard script, axe, density, and role tests (spec 0005).
+      - run: pnpm --filter @orvano/console test
+
+  console-e2e:
+    name: Console end to end (gateway, real API)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+      - run: corepack enable pnpm
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @orvano/console exec playwright install --with-deps chromium
+      # The gateway (Caddy plus the console build) in front of the scenario server, on :8081.
+      - run: docker compose -f tests/scenarios/compose.yml --profile console up -d --build --wait
+      - run: pnpm --filter @orvano/console test:e2e
+      - if: failure()
+        run: docker compose -f tests/scenarios/compose.yml --profile console logs
+      - if: always()
+        run: docker compose -f tests/scenarios/compose.yml --profile console down -v
+
   compose:
     name: Images and compose smoke test
     runs-on: ubuntu-latest

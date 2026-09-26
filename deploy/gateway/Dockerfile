@@ -6,10 +6,15 @@ ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable pnpm
 WORKDIR /src
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+# The console builds against the private console client, which builds on the JS runtime.
 COPY console/package.json console/
+COPY sdks/js/package.json sdks/js/
+COPY sdks/console-client/package.json sdks/console-client/
 RUN pnpm install --frozen-lockfile --filter @orvano/console...
+COPY sdks/js/ sdks/js/
+COPY sdks/console-client/ sdks/console-client/
 COPY console/ console/
-RUN pnpm --filter @orvano/console build
+RUN pnpm --filter @orvano/console... build
 
 FROM caddy:2.11.4-alpine
 COPY deploy/gateway/Caddyfile /etc/caddy/Caddyfile
