@@ -1,0 +1,25 @@
+name: a list pages by cursor and iterates every page
+requires: []
+steps:
+  - op: test.list
+    as: client
+    input: { limit: 2 }
+    expect:
+      status: 200
+      body: { items: [{ id: item-1 }, { id: item-2 }] }
+  - op: test.list
+    as: client
+    input: { limit: 2 }
+    paginate: true
+    expect:
+      status: 200
+      body:
+        { items: [{ id: item-1 }, { id: item-2 }, { id: item-3 }, { id: item-4 }, { id: item-5 }] }
+  - op: test.list
+    as: server
+    input: { limit: 2 }
+    paginate: true
+    expect:
+      status: 200
+      body:
+        { items: [{ id: item-1 }, { id: item-2 }, { id: item-3 }, { id: item-4 }, { id: item-5 }] }

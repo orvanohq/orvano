@@ -1,20 +1,17 @@
 // {{ header }}
 // Test only: maps each operationId to its SDK call for the scenario interpreter. Never published.
-{{~ if model_imports != "" ~}}
-import type { {{ model_imports }} } from '@orvano/js'
+{{~ for i in imports ~}}
+{{ i }}
 {{~ end ~}}
 import type { DispatchTable } from '../dispatch-table.js'
 
-/** Every operation in the contract; a missing `client` or `server` call means this SDK has none. */
-export const dispatch: DispatchTable = {
+/** {{ doc }} */
+export const {{ name }}: DispatchTable = {
 {{~ for e in entries ~}}
   '{{ e.id }}': {
     status: {{ e.status }},
-{{~ if e.client ~}}
-    client: {{ e.client }},
-{{~ end ~}}
-{{~ if e.server ~}}
-    server: {{ e.server }},
+{{~ for c in e.calls ~}}
+    {{ c.key }}: {{ c.fn }},
 {{~ end ~}}
   },
 {{~ end ~}}

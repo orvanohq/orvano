@@ -24,29 +24,14 @@ internal static class StartupChecks
     }
 
     /// <summary>
-    /// <c>ORVANO_TEST_FIXTURES</c> seeds known projects, users, and keys for the shared scenarios
-    /// (spec 0001). It is refused outside the <c>Test</c> environment, and the file must exist.
+    /// <c>ORVANO_TEST_FIXTURES</c> seeds known data for the shared scenarios (spec 0001). It is
+    /// refused outside the <c>Test</c> environment, and the file must exist and parse.
     /// </summary>
-    public static bool TestFixturesAllowed(IHostEnvironment environment, IConfiguration config, ILogger logger)
+    public static bool TestFixturesUsable(TestFixtures fixtures, ILogger logger)
     {
-        var path = config[TestFixtures.Setting];
-        if (string.IsNullOrEmpty(path)) return true;
-
-        if (!environment.IsEnvironment(OrvanoEnvironments.Test))
-        {
-            logger.LogCritical(
-                "{Setting} is set but the environment is {Environment}; it is only allowed in {Test}",
-                TestFixtures.Setting, environment.EnvironmentName, OrvanoEnvironments.Test);
-            return false;
-        }
-
-        if (!File.Exists(path))
-        {
-            logger.LogCritical("{Setting} points at {Path}, which does not exist", TestFixtures.Setting, path);
-            return false;
-        }
-
-        return true;
+        if (fixtures.Problem is null) return true;
+        logger.LogCritical("Test fixtures refused: {Problem}", fixtures.Problem);
+        return false;
     }
 
     /// <summary>

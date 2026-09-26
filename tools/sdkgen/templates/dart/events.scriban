@@ -1,0 +1,11 @@
+// {{ header }}
+{{~ for i in imports ~}}
+import '{{ i }}';
+{{~ end ~}}
+
+/// Every event this code knows, by name: its payload type, for `decodeEvent`.
+const Map<String, EventDecoder> {{ name }} = {
+{{~ for e in events ~}}
+  {{ e.name }}: {{ e.type }}.fromJson,
+{{~ end ~}}
+};

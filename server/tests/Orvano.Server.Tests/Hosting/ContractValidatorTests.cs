@@ -48,6 +48,37 @@ public class ContractValidatorTests
         Assert.NotNull(Check(HealthOperations.Get.Id, 201, """{"status":"ok","version":"0.0.0"}"""));
 
     [Fact]
+    public void Accepts_a_problem_for_an_error_status()
+    {
+        const string problem = """{"type":"https://orvano.dev/errors/not_found","title":"Not Found","status":404,"code":"not_found","requestId":"abc"}""";
+
+        Assert.Null(Check(HealthOperations.Get.Id, 404, problem, "application/problem+json"));
+    }
+
+    [Fact]
+    public void Rejects_an_error_body_that_is_not_problem_json() =>
+        Assert.NotNull(Check(HealthOperations.Get.Id, 500, """{"type":"t","title":"t","status":500,"code":"c","requestId":"r"}"""));
+
+    [Fact]
+    public void Rejects_a_problem_with_a_member_the_contract_lacks()
+    {
+        const string problem = """{"type":"t","title":"t","status":500,"code":"c","requestId":"r","traceId":"x"}""";
+
+        var violation = Check(HealthOperations.Get.Id, 500, problem, "application/problem+json");
+
+        Assert.NotNull(violation);
+        Assert.Contains("/traceId", violation, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Rejects_a_problem_without_a_code() =>
+        Assert.NotNull(Check(HealthOperations.Get.Id, 400, """{"type":"t","title":"t","status":400,"requestId":"r"}""", "application/problem+json"));
+
+    [Fact]
+    public void Rejects_a_body_on_a_no_content_response() =>
+        Assert.NotNull(Check(TestOperations.Conflict.Id, 204, "{}"));
+
+    [Fact]
     public void Never_puts_body_values_in_the_violation()
     {
         var violation = Check(HealthOperations.Get.Id, 200, """{"status":"ok","version":"0.0.0","secret":"hunter2"}""");

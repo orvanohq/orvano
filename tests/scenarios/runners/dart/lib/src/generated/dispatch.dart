@@ -3,7 +3,7 @@
 // ignore_for_file: unnecessary_cast, prefer_expression_function_bodies
 import '../dispatch_table.dart';
 
-/// Every operation in the contract; a missing `client` or `server` call means this SDK has none.
+/// Every non console operation; a missing `client` or `server` call means the SDK has none.
 final Map<String, DispatchEntry> dispatch = {
   'health.get': DispatchEntry(
     status: 200,
@@ -15,5 +15,47 @@ final Map<String, DispatchEntry> dispatch = {
       final r = await o.health.get();
       return r.toJson();
     },
+  ),
+  'test.conflict': DispatchEntry(
+    status: 204,
+    client: (o, input) async {
+      await o.test.conflict();
+      return null;
+    },
+    server: (o, input) async {
+      await o.test.conflict();
+      return null;
+    },
+  ),
+  'test.list': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.test.list(
+        cursor: input['cursor'] == null ? null : input['cursor'] as String,
+        limit: input['limit'] == null ? null : (input['limit'] as num).toInt(),
+      );
+      return r.toJson();
+    },
+    server: (o, input) async {
+      final r = await o.test.list(
+        cursor: input['cursor'] == null ? null : input['cursor'] as String,
+        limit: input['limit'] == null ? null : (input['limit'] as num).toInt(),
+      );
+      return r.toJson();
+    },
+    clientAll: (o, input) => o.test
+        .listAll(
+          limit: input['limit'] == null
+              ? null
+              : (input['limit'] as num).toInt(),
+        )
+        .map((e) => e.toJson()),
+    serverAll: (o, input) => o.test
+        .listAll(
+          limit: input['limit'] == null
+              ? null
+              : (input['limit'] as num).toInt(),
+        )
+        .map((e) => e.toJson()),
   ),
 };

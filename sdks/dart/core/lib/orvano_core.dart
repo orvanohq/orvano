@@ -8,8 +8,13 @@
 /// ```
 library;
 
+export 'src/auth.dart' show MemorySessionStore, SessionStore;
 export 'src/client.dart';
+export 'src/events.dart';
+export 'src/generated/errors.dart';
+export 'src/generated/events.dart';
 export 'src/generated/models.dart';
 export 'src/generated/services.dart';
 export 'src/generated/version.dart';
 export 'src/orvano_exception.dart';
+export 'src/pagination.dart';

@@ -14,6 +14,19 @@ internal static partial class ContractReader
     private const string AudienceExtension = "x-orvano-audience";
     private const string ServiceExtension = "x-orvano-service";
     private const string IdempotentExtension = "x-orvano-idempotent";
+    private const string TestExtension = "x-orvano-test";
+    private const string EventExtension = "x-orvano-event";
+
+    /// <summary>The error code catalogs (AC-6). They become constants, never enum types.</summary>
+    private const string ErrorCatalog = "ErrorCode";
+    private const string TestErrorCatalog = "TestErrorCode";
+
+    /// <summary>The problem details model every operation declares as its <c>default</c> response.</summary>
+    private const string ProblemModel = "Problem";
+    private const string ProblemMediaType = "application/problem+json";
+
+    /// <summary>Names the generated methods use for their own parameters.</summary>
+    private static readonly string[] ReservedParams = ["body", "query", "options", "cancellationToken"];
 
     public static async Task<(ApiContract? Contract, IReadOnlyList<string> Errors)> ReadAsync(
         string openApiPath, string expectedVersion)
@@ -38,6 +51,12 @@ internal static partial class ContractReader
     [GeneratedRegex("^[A-Z][a-zA-Z0-9]*$")]
     private static partial Regex PascalCasePattern();
 
+    [GeneratedRegex("^[a-z][a-zA-Z0-9]*(\\.[a-z][a-zA-Z0-9]*)+$")]
+    private static partial Regex EventNamePattern();
+
+    [GeneratedRegex("^[a-z][a-z0-9]*(_[a-z0-9]+)*$")]
+    private static partial Regex SnakeCasePattern();
+
     private sealed class Reader(OpenApiDocument doc, List<string> errors)
     {
         private readonly IDictionary<string, IOpenApiSchema> _schemas =
@@ -51,11 +70,18 @@ internal static partial class ContractReader
 
             var models = new List<ContractModel>();
             var enums = new List<ContractEnum>();
+            var errorCodes = new List<ContractErrorCode>();
             foreach (var (name, schema) in _schemas.OrderBy(s => s.Key, StringComparer.Ordinal))
             {
                 if (!PascalCasePattern().IsMatch(name))
                 {
                     errors.Add($"schema '{name}': model and enum names must be PascalCase");
+                    continue;
+                }
+
+                if (name is ErrorCatalog or TestErrorCatalog)
+                {
+                    errorCodes.AddRange(ReadErrorCatalog(name, schema));
                     continue;
                 }
 
@@ -74,8 +100,84 @@ internal static partial class ContractReader
                 errors.Add($"schema '{name}': only object models with properties and string enums are supported");
             }
 
+            if (!_schemas.ContainsKey(ErrorCatalog))
+                errors.Add($"the contract needs an enum {ErrorCatalog} (contract/errors.tsp): the catalog of stable error codes");
+            foreach (var duplicate in errorCodes.GroupBy(c => c.Code, StringComparer.Ordinal).Where(g => g.Count() > 1))
+                errors.Add($"error code '{duplicate.Key}' is in both {ErrorCatalog} and {TestErrorCatalog}");
+            CheckProblem(models);
+            CheckEvents(models);
+
             var operations = ReadOperations();
-            return new ApiContract(version, operations, models, enums);
+            var contract = new ApiContract(version, operations, models, enums, [.. errorCodes.OrderBy(c => c.Code, StringComparer.Ordinal)]);
+            CheckTestIsolation(contract);
+            return contract;
+        }
+
+        private IEnumerable<ContractErrorCode> ReadErrorCatalog(string name, IOpenApiSchema schema)
+        {
+            var test = IsTest(schema.Extensions, $"enum '{name}'");
+            if (test != (name == TestErrorCatalog))
+                errors.Add($"enum '{name}': {TestErrorCatalog}, and only it, is marked {TestExtension}");
+
+            foreach (var v in schema.Enum ?? [])
+            {
+                if (v is JsonValue jv && jv.TryGetValue<string>(out var code) && SnakeCasePattern().IsMatch(code))
+                    yield return new ContractErrorCode(code, test);
+                else
+                    errors.Add($"enum '{name}': error codes must be snake_case strings, found {v?.ToJsonString() ?? "null"}");
+            }
+        }
+
+        /// <summary>The <c>Problem</c> model must carry every member spec 0001 requires (AC-6).</summary>
+        private void CheckProblem(List<ContractModel> models)
+        {
+            var problem = models.FirstOrDefault(m => m.Name == ProblemModel);
+            if (problem is null)
+            {
+                errors.Add($"the contract needs a model {ProblemModel} (contract/errors.tsp): every operation's default response");
+                return;
+            }
+
+            foreach (var required in new[] { "type", "title", "status", "code", "requestId" })
+                if (!problem.Properties.Any(p => p.Name == required && !p.Optional && !p.Nullable))
+                    errors.Add($"model '{ProblemModel}': needs the required property '{required}'");
+        }
+
+        private void CheckEvents(List<ContractModel> models)
+        {
+            var seen = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var m in models.Where(m => m.Event is not null))
+            {
+                var where = $"model '{m.Name}', event '{m.Event}'";
+                if (!EventNamePattern().IsMatch(m.Event!))
+                    errors.Add($"{where}: event names look like 'service.event' in camelCase");
+                if (seen.TryGetValue(m.Event!, out var first))
+                    errors.Add($"{where}: duplicate event name, already used by model '{first}'");
+                else
+                    seen[m.Event!] = m.Name;
+                if (m.Test != m.Event!.StartsWith("test.", StringComparison.Ordinal))
+                    errors.Add($"{where}: test events, and only they, are named 'test.*' and marked {TestExtension}");
+            }
+        }
+
+        /// <summary>
+        /// Test code never leaks into a published package, and code only tests use is marked (AC-18):
+        /// a public operation or event may not reach a test model, and a model or enum that only test
+        /// operations and events reach must carry <c>x-orvano-test</c>.
+        /// </summary>
+        private void CheckTestIsolation(ApiContract contract)
+        {
+            var events = contract.Events;
+            var publicReach = contract.Reach(contract.Operations.Where(o => !o.Test), events.Where(e => !e.Test));
+            var testReach = contract.Reach(contract.Operations.Where(o => o.Test), events.Where(e => e.Test));
+            var flagged = contract.Models.Where(m => m.Test).Select(m => m.Name)
+                .Concat(contract.Enums.Where(e => e.Test).Select(e => e.Name))
+                .ToHashSet(StringComparer.Ordinal);
+
+            foreach (var name in publicReach.Where(flagged.Contains).Order(StringComparer.Ordinal))
+                errors.Add($"schema '{name}' is marked {TestExtension} but a public operation or event uses it");
+            foreach (var name in testReach.Where(n => !publicReach.Contains(n) && !flagged.Contains(n)).Order(StringComparer.Ordinal))
+                errors.Add($"schema '{name}' is used only by test operations or events; mark it {TestExtension}");
         }
 
         private ContractEnum ReadEnum(string name, IOpenApiSchema schema, IList<JsonNode> values)
@@ -87,7 +189,7 @@ internal static partial class ContractReader
                 else errors.Add($"enum '{name}': only string values are supported, found {v?.ToJsonString() ?? "null"}");
             }
 
-            return new ContractEnum(name, schema.Description, wire);
+            return new ContractEnum(name, schema.Description, wire, IsTest(schema.Extensions, $"enum '{name}'"));
         }
 
         private ContractModel ReadModel(string name, IOpenApiSchema schema)
@@ -111,7 +213,12 @@ internal static partial class ContractReader
                 properties.Add(new ContractProperty(propName, type, !required.Contains(propName), nullable, Describe(propSchema)));
             }
 
-            return new ContractModel(name, schema.Description, properties);
+            return new ContractModel(
+                name,
+                schema.Description,
+                properties,
+                IsTest(schema.Extensions, $"model '{name}'"),
+                ReadString(schema.Extensions, EventExtension));
         }
 
         private List<ContractOperation> ReadOperations()
@@ -145,21 +252,30 @@ internal static partial class ContractReader
                     if (audience is Audience.Console != path.StartsWith("/v1/console/", StringComparison.Ordinal))
                         errors.Add($"{where}: console operations, and only they, live under /v1/console/");
 
-                    var service = ReadString(op, ServiceExtension);
+                    var service = ReadString(op.Extensions, ServiceExtension);
                     if (service is null)
                         errors.Add($"{where}: missing {ServiceExtension}");
                     else if (id is not null && !id.StartsWith(service + ".", StringComparison.Ordinal))
                         errors.Add($"{where}: operationId must start with its service '{service}.'");
 
-                    var idempotent = ReadBool(op, IdempotentExtension, where);
+                    var test = IsTest(op.Extensions, where);
+                    var testPath = path.StartsWith("/v1/test/", StringComparison.Ordinal) || path.StartsWith("/v1/console/test/", StringComparison.Ordinal);
+                    if (test != testPath)
+                        errors.Add($"{where}: {TestExtension} operations, and only they, live under /v1/test/ or /v1/console/test/");
+                    if (service is not null && test != (service == "test"))
+                        errors.Add($"{where}: {TestExtension} operations, and only they, are in the 'test' service");
+
+                    var idempotent = ReadBool(op.Extensions, IdempotentExtension, where);
                     var parameters = ReadParams(op, path, where);
                     var body = ReadBody(op, where);
                     var (status, result) = ReadSuccess(op, where);
+                    ReadDefault(op, where);
+                    var pageItem = ReadPage(httpMethod, parameters, result, where);
 
                     if (errors.Count > count || id is null || service is null || audience is null) continue;
                     operations.Add(new ContractOperation(
                         id, service, id[(service.Length + 1)..], httpMethod, path, audience.Value,
-                        op.Description ?? op.Summary, parameters, body, status, result, idempotent));
+                        op.Description ?? op.Summary, parameters, body, status, result, idempotent, test, pageItem));
                 }
             }
 
@@ -168,7 +284,7 @@ internal static partial class ContractReader
 
         private Audience? ReadAudience(OpenApiOperation op, string where)
         {
-            var value = ReadString(op, AudienceExtension);
+            var value = ReadString(op.Extensions, AudienceExtension);
             switch (value)
             {
                 case null:
@@ -184,18 +300,78 @@ internal static partial class ContractReader
             }
         }
 
-        private static string? ReadString(OpenApiOperation op, string name) =>
-            op.Extensions is not null && op.Extensions.TryGetValue(name, out var ext)
+        private static string? ReadString(IDictionary<string, IOpenApiExtension>? extensions, string name) =>
+            extensions is not null && extensions.TryGetValue(name, out var ext)
                 && ext is JsonNodeExtension { Node: JsonValue v } && v.TryGetValue<string>(out var s)
                 ? s
                 : null;
 
-        private bool ReadBool(OpenApiOperation op, string name, string where)
+        private bool ReadBool(IDictionary<string, IOpenApiExtension>? extensions, string name, string where)
         {
-            if (op.Extensions is null || !op.Extensions.TryGetValue(name, out var ext)) return false;
+            if (extensions is null || !extensions.TryGetValue(name, out var ext)) return false;
             if (ext is JsonNodeExtension { Node: JsonValue v } && v.TryGetValue<bool>(out var b)) return b;
             errors.Add($"{where}: {name} must be true or false");
             return false;
+        }
+
+        private bool IsTest(IDictionary<string, IOpenApiExtension>? extensions, string where) =>
+            ReadBool(extensions, TestExtension, where);
+
+        /// <summary>Every operation's <c>default</c> response is <c>Problem</c> as problem+json (AC-6).</summary>
+        private void ReadDefault(OpenApiOperation op, string where)
+        {
+            if (op.Responses is null || !op.Responses.TryGetValue("default", out var response)
+                || response.Content is not { Count: 1 } content
+                || !content.TryGetValue(ProblemMediaType, out var media)
+                || media.Schema is not OpenApiSchemaReference { Reference.Id: ProblemModel })
+            {
+                errors.Add($"{where}: the default response must be {ProblemModel} as {ProblemMediaType}; return `T | {ProblemModel}`");
+            }
+
+            foreach (var code in (op.Responses ?? []).Keys.Where(k => k != "default" && k[0] != '2'))
+                errors.Add($"{where}: declare errors through the default {ProblemModel} response, not a {code} response");
+        }
+
+        /// <summary>
+        /// A cursor list operation (AC-7) takes an optional <c>cursor</c> and <c>limit</c> and returns
+        /// <c>{ items, nextCursor }</c>. Returns the item type for a list operation, else null.
+        /// </summary>
+        private TypeRef? ReadPage(string httpMethod, List<ContractParam> parameters, TypeRef? result, string where)
+        {
+            var cursor = parameters.FirstOrDefault(p => p.Name == "cursor");
+            var page = result is ModelType m && _schemas.TryGetValue(m.Name, out var schema) ? PageShape(schema) : null;
+            if (cursor is null && page is null) return null;
+
+            var limit = parameters.FirstOrDefault(p => p.Name == "limit");
+            if (httpMethod != "GET"
+                || cursor is not { In: ParamLocation.Query, Required: false, Type.Kind: PrimitiveKind.String }
+                || limit is not { In: ParamLocation.Query, Required: false, Type.Kind: PrimitiveKind.Int32 }
+                || page is null)
+            {
+                errors.Add($"{where}: a list operation is a GET with optional query parameters `cursor` (string) and `limit` (int32) that returns a model of exactly `items: T[]` and `nextCursor: string | null`");
+                return null;
+            }
+
+            return page;
+        }
+
+        /// <summary>The item type when <paramref name="schema"/> is exactly <c>{ items: T[], nextCursor: string | null }</c>.</summary>
+        private TypeRef? PageShape(IOpenApiSchema schema)
+        {
+            if (schema.Properties is not { Count: 2 } properties
+                || !properties.TryGetValue("items", out var items) || !properties.TryGetValue("nextCursor", out var next)
+                || schema.Required is not { } required || !required.Contains("items") || !required.Contains("nextCursor"))
+            {
+                return null;
+            }
+
+            var scratch = new List<string>();
+            var itemType = new Reader(doc, scratch).ResolveType(items, "items");
+            var nextType = new Reader(doc, scratch).ResolveType(next, "nextCursor");
+            return scratch.Count == 0 && itemType is { Type: ArrayType array, Nullable: false }
+                && nextType is { Type: PrimitiveType { Kind: PrimitiveKind.String }, Nullable: true }
+                ? array.Item
+                : null;
         }
 
         private List<ContractParam> ReadParams(OpenApiOperation op, string path, string where)
@@ -219,6 +395,12 @@ internal static partial class ContractReader
                 if (!CamelCasePattern().IsMatch(name))
                 {
                     errors.Add($"{where}: parameter '{name}' must be camelCase");
+                    continue;
+                }
+
+                if (ReservedParams.Contains(name, StringComparer.Ordinal))
+                {
+                    errors.Add($"{where}: parameter '{name}' is reserved for the generated methods ({string.Join(", ", ReservedParams)})");
                     continue;
                 }
 
@@ -290,7 +472,7 @@ internal static partial class ContractReader
         }
 
         /// <summary>Maps a schema to a <see cref="TypeRef"/>, reporting anything outside the mapping rules.</summary>
-        private (TypeRef? Type, bool Nullable) ResolveType(IOpenApiSchema? schema, string where)
+        public (TypeRef? Type, bool Nullable) ResolveType(IOpenApiSchema? schema, string where)
         {
             if (schema is null)
             {
@@ -304,6 +486,12 @@ internal static partial class ContractReader
                 if (!_schemas.TryGetValue(id, out var target))
                 {
                     errors.Add($"{where}: unknown schema reference '{id}'");
+                    return (null, false);
+                }
+
+                if (id is ErrorCatalog or TestErrorCatalog)
+                {
+                    errors.Add($"{where}: {id} is a catalog of constants; use `string` (see Problem.code)");
                     return (null, false);
                 }
 

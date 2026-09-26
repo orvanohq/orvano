@@ -8,23 +8,33 @@ namespace Orvano;
 
 /// <summary>
 /// Sends requests to one Orvano server. Generated services (<c>client.Health</c>, ...) are
-/// properties on it.
+/// properties on it. It retries safe calls (GET, HEAD, and operations marked idempotent) on 429
+/// and 503, honoring <c>Retry-After</c>, and gives every call a timeout.
 /// </summary>
 /// <example>
 /// <code>
-/// using var orvano = new OrvanoClient(new OrvanoClientOptions(new Uri("https://orvano.example.com")));
+/// using var orvano = new OrvanoClient(new OrvanoClientOptions(new Uri("https://orvano.example.com")) { ApiKey = apiKey });
 /// var health = await orvano.Health.GetAsync();
 /// </code>
 /// </example>
 public sealed partial class OrvanoClient : IDisposable
 {
+    private static readonly TimeSpan BackoffBase = TimeSpan.FromMilliseconds(250);
+#if !NET
+    private static readonly Random Jitter = new();
+#endif
+
     private readonly HttpClient _http;
     private readonly bool _ownsHttp;
     private readonly string _endpoint;
     private readonly string? _project;
+    private readonly string? _apiKey;
+    private readonly IOrvanoSessionStore? _session;
+    private readonly TimeSpan _timeout;
+    private readonly int _maxRetries;
 
     /// <summary>Creates a client.</summary>
-    /// <param name="options">Where the server is and which project to use.</param>
+    /// <param name="options">Where the server is, which project to use, and how to authenticate.</param>
     /// <param name="httpClient">
     /// An <see cref="HttpClient"/> to send through, for example one from <c>IHttpClientFactory</c>.
     /// The caller keeps ownership of it. When null, the client creates and disposes its own.
@@ -34,41 +44,73 @@ public sealed partial class OrvanoClient : IDisposable
         if (options is null) throw new ArgumentNullException(nameof(options));
         _endpoint = options.Endpoint.AbsoluteUri.TrimEnd('/');
         _project = options.Project;
+        _apiKey = options.ApiKey;
+        _session = options.Session;
+        _timeout = options.Timeout;
+        _maxRetries = options.MaxRetries;
         _ownsHttp = httpClient is null;
-        _http = httpClient ?? new HttpClient();
+        _http = httpClient ?? new HttpClient { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
     }
 
-    internal async Task<T> SendAsync<T>(OrvanoRequest request, JsonTypeInfo<T> resultType, CancellationToken cancellationToken)
-    {
-        using var response = await SendCoreAsync(request, cancellationToken).ConfigureAwait(false);
-#if NET
-        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-#else
-        using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-#endif
-        var result = await JsonSerializer.DeserializeAsync(stream, resultType, cancellationToken).ConfigureAwait(false);
-        return result ?? throw new OrvanoException((int)response.StatusCode, "invalid_response", "The server sent an empty body.", RequestIdOf(response));
-    }
-
-    internal async Task SendAsync(OrvanoRequest request, CancellationToken cancellationToken)
-    {
-        using var response = await SendCoreAsync(request, cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task<HttpResponseMessage> SendCoreAsync(OrvanoRequest request, CancellationToken cancellationToken)
-    {
-        using var message = new HttpRequestMessage(new HttpMethod(request.Method), BuildUri(request));
-        message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        if (_project is not null) message.Headers.Add("X-Orvano-Project", _project);
-        message.Content = request.Content;
-
-        var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        if (response.IsSuccessStatusCode) return response;
-
-        using (response)
+    internal Task<T> SendAsync<T>(OrvanoRequest request, JsonTypeInfo<T> resultType, CancellationToken cancellationToken) =>
+        SendAsync(request, async (response, ct) =>
         {
-            throw await ToExceptionAsync(response, cancellationToken).ConfigureAwait(false);
+#if NET
+            using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+#else
+            using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+#endif
+            var result = await JsonSerializer.DeserializeAsync(stream, resultType, ct).ConfigureAwait(false);
+            return result ?? throw new OrvanoException((int)response.StatusCode, "invalid_response", "The server sent an empty body.", RequestIdOf(response));
+        }, cancellationToken);
+
+    internal Task SendAsync(OrvanoRequest request, CancellationToken cancellationToken) =>
+        SendAsync(request, (_, _) => Task.FromResult(true), cancellationToken);
+
+    /// <summary>Sends with retries under one timeout, reading the successful response with <paramref name="read"/>.</summary>
+    private async Task<T> SendAsync<T>(OrvanoRequest request, Func<HttpResponseMessage, CancellationToken, Task<T>> read, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (_timeout > TimeSpan.Zero && _timeout != System.Threading.Timeout.InfiniteTimeSpan) timeout.CancelAfter(_timeout);
+        var ct = timeout.Token;
+        try
+        {
+            for (var attempt = 0; ; attempt++)
+            {
+                using var message = BuildMessage(request);
+                using var response = await _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                if (response.IsSuccessStatusCode) return await read(response, ct).ConfigureAwait(false);
+
+                var status = (int)response.StatusCode;
+                if (request.Retryable && attempt < _maxRetries && status is 429 or 503)
+                {
+                    await Task.Delay(RetryDelay(response, attempt), ct).ConfigureAwait(false);
+                    continue;
+                }
+
+                throw await ToExceptionAsync(response, ct).ConfigureAwait(false);
+            }
         }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"Orvano {request.Method} {request.Path} timed out after {_timeout}.");
+        }
+    }
+
+    private HttpRequestMessage BuildMessage(OrvanoRequest request)
+    {
+        var message = new HttpRequestMessage(new HttpMethod(request.Method), BuildUri(request));
+        message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        if (_project is not null) message.Headers.Add(OrvanoHeaders.Project, _project);
+        if (_session?.Token is { Length: > 0 } token) message.Headers.Add(OrvanoHeaders.Session, token);
+        if (_apiKey is not null) message.Headers.Add(OrvanoHeaders.ApiKey, _apiKey);
+        if (request.Body is not null)
+        {
+            message.Content = new ByteArrayContent(request.Body);
+            message.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
+        }
+
+        return message;
     }
 
     private Uri BuildUri(OrvanoRequest request)
@@ -83,6 +125,27 @@ public sealed partial class OrvanoClient : IDisposable
         }
 
         return new Uri(url.ToString());
+    }
+
+    /// <summary><c>Retry-After</c> (seconds or an HTTP date), else exponential backoff with full jitter.</summary>
+    private static TimeSpan RetryDelay(HttpResponseMessage response, int attempt)
+    {
+        switch (response.Headers.RetryAfter)
+        {
+            case { Delta: { } delta }:
+                return delta < TimeSpan.Zero ? TimeSpan.Zero : delta;
+            case { Date: { } date }:
+                var wait = date - DateTimeOffset.UtcNow;
+                return wait < TimeSpan.Zero ? TimeSpan.Zero : wait;
+        }
+
+#if NET
+        var sample = Random.Shared.NextDouble();
+#else
+        double sample;
+        lock (Jitter) sample = Jitter.NextDouble();
+#endif
+        return TimeSpan.FromMilliseconds(sample * BackoffBase.TotalMilliseconds * Math.Pow(2, attempt));
     }
 
     private static async Task<OrvanoException> ToExceptionAsync(HttpResponseMessage response, CancellationToken cancellationToken)
@@ -111,7 +174,7 @@ public sealed partial class OrvanoClient : IDisposable
     }
 
     private static string? RequestIdOf(HttpResponseMessage response) =>
-        response.Headers.TryGetValues("X-Request-Id", out var values) ? values.FirstOrDefault() : null;
+        response.Headers.TryGetValues(OrvanoHeaders.RequestId, out var values) ? values.FirstOrDefault() : null;
 
     private static string? NonEmpty(string? s) => string.IsNullOrEmpty(s) ? null : s;
 

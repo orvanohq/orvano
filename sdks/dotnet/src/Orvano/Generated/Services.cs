@@ -7,6 +7,8 @@ public sealed class HealthService
 {
     private readonly OrvanoClient _client;
 
+    /// <summary>Creates the service over <paramref name="client"/>.</summary>
+    /// <param name="client">The client every call sends through.</param>
     internal HealthService(OrvanoClient client) => _client = client;
 
     /// <summary>Checks that the server is up and returns its version.</summary>

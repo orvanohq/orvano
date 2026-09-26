@@ -20,8 +20,12 @@ var scenarios = Directory.GetFiles(scenariosDir, "*.yaml")
     .Select(f => JsonSerializer.SerializeToNode(yaml.Deserialize<object>(File.ReadAllText(f)))!.AsObject())
     .ToList();
 
+// The API key scenario runners send; the server ignores keys until the auth spec (row 8).
+const string TestServerKey = "test-server-key";
+
 using var client = new OrvanoClient(new OrvanoClientOptions(new Uri(endpoint)));
-var results = await Interpreter.RunAsync(scenarios, client, CancellationToken.None);
+using var server = new OrvanoClient(new OrvanoClientOptions(new Uri(endpoint)) { ApiKey = TestServerKey });
+var results = await Interpreter.RunAsync(scenarios, new Surface(client, server), CancellationToken.None);
 
 var sdkTarget = typeof(OrvanoClient).Assembly.GetCustomAttribute<TargetFrameworkAttribute>()?.FrameworkName;
 var surface = $".NET ({RuntimeInformation.FrameworkDescription}, SDK built for {sdkTarget})";

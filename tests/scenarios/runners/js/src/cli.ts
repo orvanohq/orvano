@@ -23,6 +23,16 @@ const marker = 'ORVANO_SCENARIO_RESULTS '
 type Target = 'node' | 'bun' | 'deno' | 'browser' | 'workerd' | 'nextjs'
 const targets: readonly Target[] = ['node', 'bun', 'deno', 'browser', 'workerd', 'nextjs']
 
+/** The first console session in `fixtures.yaml`, which the server accepts in the Test environment. */
+async function loadConsoleSession(): Promise<string | undefined> {
+  const fixtures = parse(await readFile(join(scenariosDir, 'fixtures.yaml'), 'utf8')) as {
+    consoleSessions?: string[]
+  } | null
+  return fixtures?.consoleSessions?.[0]
+}
+
+const consoleSession = await loadConsoleSession()
+
 async function loadScenarios(): Promise<Scenario[]> {
   const files = (await readdir(scenariosDir))
     .filter((f) => f.endsWith('.yaml') && f !== 'fixtures.yaml')
@@ -62,13 +72,17 @@ async function inRuntime(
   const stdout = await exec(command, [...args, 'dist/entries/file-runner.js'], {
     ORVANO_SCENARIOS_FILE: file,
     ORVANO_ENDPOINT: endpoint,
+    ...(consoleSession === undefined ? {} : { ORVANO_CONSOLE_SESSION: consoleSession }),
   })
   const line = stdout.split('\n').find((l) => l.startsWith(marker))
   if (line === undefined) throw new Error(`no results from ${command}:\n${stdout}`)
   return JSON.parse(line.slice(marker.length)) as ScenarioResult[]
 }
 
-/** Chromium through Playwright, on a page that proxies /v1 to Orvano so calls are same origin. */
+/**
+ * Chromium through Playwright, on a page that proxies /v1 to Orvano so calls are same origin. The
+ * proxy passes headers (the browser's cookies included) and bodies through unchanged.
+ */
 async function inBrowser(scenarios: Scenario[]): Promise<ScenarioResult[]> {
   const { chromium } = await import('playwright')
   const bundle = await readFile(join(packageDir, 'dist/bundles/browser.js'))
@@ -76,9 +90,18 @@ async function inBrowser(scenarios: Scenario[]): Promise<ScenarioResult[]> {
     void (async () => {
       const url = req.url ?? '/'
       if (url.startsWith('/v1/')) {
+        const headers = new Headers()
+        for (const [name, value] of Object.entries(req.headers)) {
+          if (name === 'host' || name === 'connection' || value === undefined) continue
+          headers.set(name, Array.isArray(value) ? value.join(', ') : value)
+        }
+        const chunks: Buffer[] = []
+        for await (const chunk of req) chunks.push(chunk as Buffer)
+        const method = req.method ?? 'GET'
         const upstream = await fetch(endpoint + url, {
-          method: req.method ?? 'GET',
-          headers: { accept: 'application/json' },
+          method,
+          headers,
+          ...(method === 'GET' || method === 'HEAD' ? {} : { body: Buffer.concat(chunks) }),
         })
         res.writeHead(upstream.status, Object.fromEntries(upstream.headers))
         res.end(Buffer.from(await upstream.arrayBuffer()))
@@ -98,7 +121,12 @@ async function inBrowser(scenarios: Scenario[]): Promise<ScenarioResult[]> {
 
   const browser = await chromium.launch()
   try {
-    const page = await browser.newPage()
+    const context = await browser.newContext()
+    // The console signs in by cookie; the browser sends it on same origin calls by itself.
+    if (consoleSession !== undefined) {
+      await context.addCookies([{ name: 'orvano_console', value: consoleSession, url: origin }])
+    }
+    const page = await context.newPage()
     await page.goto(origin)
     await page.waitForFunction(() => typeof window.orvanoRunScenarios === 'function')
     return await page.evaluate((s) => window.orvanoRunScenarios(s), scenarios)
@@ -115,7 +143,10 @@ async function inWorkerd(scenarios: Scenario[]): Promise<ScenarioResult[]> {
     modules: true,
     scriptPath: join(packageDir, 'dist/bundles/worker.js'),
     compatibilityDate: '2026-07-30',
-    bindings: { ORVANO_ENDPOINT: endpoint },
+    bindings: {
+      ORVANO_ENDPOINT: endpoint,
+      ...(consoleSession === undefined ? {} : { ORVANO_CONSOLE_SESSION: consoleSession }),
+    },
   })
   try {
     const response = await mf.dispatchFetch('http://scenarios.invalid/', {
@@ -136,7 +167,11 @@ async function inNextjs(scenarios: Scenario[]): Promise<ScenarioResult[]> {
   const port = String(3100 + Math.floor(Math.random() * 800))
   const child = spawn('pnpm', ['exec', 'next', 'start', '--port', port], {
     cwd: appDir,
-    env: { ...process.env, ORVANO_ENDPOINT: endpoint },
+    env: {
+      ...process.env,
+      ORVANO_ENDPOINT: endpoint,
+      ...(consoleSession === undefined ? {} : { ORVANO_CONSOLE_SESSION: consoleSession }),
+    },
     stdio: ['ignore', 'inherit', 'inherit'],
   })
   try {
@@ -168,7 +203,7 @@ async function inNextjs(scenarios: Scenario[]): Promise<ScenarioResult[]> {
 async function run(target: Target, scenarios: Scenario[]): Promise<ScenarioResult[]> {
   switch (target) {
     case 'node':
-      return runScenarios(scenarios, createSurface(endpoint))
+      return runScenarios(scenarios, createSurface(endpoint, { consoleSession }))
     case 'bun':
       return inRuntime('bun', ['run'], scenarios)
     case 'deno':

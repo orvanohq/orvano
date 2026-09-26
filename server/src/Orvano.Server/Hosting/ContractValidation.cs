@@ -9,8 +9,6 @@ namespace Orvano.Server.Hosting;
 /// </summary>
 internal static class ContractValidation
 {
-    public const string ViolationCode = "contract_violation";
-
     public static IApplicationBuilder UseContractValidation(this IApplicationBuilder app)
     {
         ContractValidator validator;
@@ -56,12 +54,7 @@ internal static class ContractValidation
 
             logger.LogError("Contract violation: {Violation}", violation);
             context.Response.Clear();
-            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-            await TypedResults.Problem(
-                detail: violation,
-                statusCode: StatusCodes.Status500InternalServerError,
-                title: "The response does not match the API contract",
-                extensions: new Dictionary<string, object?> { ["code"] = ViolationCode }).ExecuteAsync(context);
+            await Problems.WriteAsync(context, StatusCodes.Status500InternalServerError, ErrorCode.ContractViolation, violation);
         });
     }
 }

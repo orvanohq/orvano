@@ -29,7 +29,7 @@ on that surface.
 |---|---|---|
 | JS core in Node, Bun, Deno, Chromium, workerd | `runners/js` | `pnpm --filter @orvano/scenarios-js scenarios <node\|bun\|deno\|browser\|workerd>` |
 | Next.js | `runners/nextjs` (driven by `runners/js`) | `pnpm --filter @orvano/scenarios-js scenarios nextjs` |
-| Dart server | `runners/dart` | `dart run orvano_scenarios:run` (in `runners/dart`) |
+| Dart server | `runners/dart` | `dart run bin/run.dart` (in `runners/dart`) |
 | Flutter (iOS, Android, web) | `runners/flutter` | see `runners/flutter/README.md` |
 | .NET (`net10.0`, and `netstandard2.0` through `net8.0`) | `runners/dotnet` | `dotnet run --project tests/scenarios/runners/dotnet -f net10.0` |
 

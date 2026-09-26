@@ -1,7 +1,6 @@
 // {{ header }}
-import type { Client } from '../runtime/client.js'
-{{~ if model_imports != "" ~}}
-import type { {{ model_imports }} } from './models.js'
+{{~ for i in imports ~}}
+{{ i }}
 {{~ end ~}}
 {{~ for s in services ~}}
 
@@ -14,24 +13,29 @@ export class {{ s.class_name }} {
   }
 {{~ for o in s.operations ~}}
 
-{{ o.doc }}  {{ o.name }}({{ o.params }}): Promise<{{ o.result }}> {
-    return this.#client.request<{{ o.result }}>({{ o.request }})
+{{ o.doc }}  {{ o.signature }} {
+    {{ o.body }}
   }
 {{~ end ~}}
 }
 {{~ end ~}}
 
-/** Every service in this entry, on one object: `orvano.health.get()`. */
-export class Orvano {
+{{ aggregate.doc }}export class {{ aggregate.name }}{{ if aggregate.base }} extends {{ aggregate.base }}{{ end }} {
+{{~ if !aggregate.base ~}}
   /** The client every service sends through. */
   readonly client: Client
+{{~ end ~}}
 {{~ for s in services ~}}
   /** Operations in the `{{ s.name }}` service. */
   readonly {{ s.property }}: {{ s.class_name }}
 {{~ end ~}}
 
   constructor(client: Client) {
+{{~ if aggregate.base ~}}
+    super(client)
+{{~ else ~}}
     this.client = client
+{{~ end ~}}
 {{~ for s in services ~}}
     this.{{ s.property }} = new {{ s.class_name }}(client)
 {{~ end ~}}

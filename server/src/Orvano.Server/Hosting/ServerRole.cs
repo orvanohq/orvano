@@ -22,7 +22,9 @@ internal static class ServerRole
         var serviceName = config["OTEL_SERVICE_NAME"] ?? $"orvano-{role.Name()}";
         builder.AddOrvanoTelemetry(serviceName);
 
-        builder.Services.AddProblemDetails();
+        builder.Services.AddOrvanoProblems();
+        var modules = OrvanoModules.For(builder.Environment);
+        var fixtures = TestFixtures.Load(builder.Environment, config);
 
         var appUrl = OrvanoConfig.Required(config, "ORVANO_DB_URL");
         var appPool = role switch
@@ -39,15 +41,15 @@ internal static class ServerRole
             HealthStatus.Unhealthy,
             ["ready"]));
 
-        foreach (var module in OrvanoModules.All) module.ConfigureServices(builder.Services, config);
+        foreach (var module in modules) module.ConfigureServices(builder.Services, config);
 
         switch (role)
         {
             case OrvanoRole.Worker:
-                AddWorker(builder, appUrl, serviceName);
+                AddWorker(builder, modules, appUrl, serviceName);
                 break;
             case OrvanoRole.Realtime:
-                AddRealtime(builder, appUrl, serviceName);
+                AddRealtime(builder, modules, appUrl, serviceName);
                 break;
         }
 
@@ -55,13 +57,16 @@ internal static class ServerRole
         var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Orvano.Startup");
 
         if (!StartupChecks.TimeZonesAvailable(logger)) return 1;
-        if (!StartupChecks.TestFixturesAllowed(app.Environment, config, logger)) return 1;
+        if (!StartupChecks.TestFixturesUsable(fixtures, logger)) return 1;
         var appDb = app.Services.GetRequiredKeyedService<NpgsqlDataSource>(OrvanoDb.App);
         if (!await StartupChecks.SchemaMatchesAsync(appDb, logger, app.Lifetime.ApplicationStopping)) return 1;
 
+        app.UseRequestIds();
+        // Outside the error handlers, so it checks the problem bodies they write too.
+        if (app.Environment.IsEnvironment(OrvanoEnvironments.Test)) app.UseContractValidation();
         app.UseExceptionHandler();
         app.UseStatusCodePages();
-        if (app.Environment.IsEnvironment(OrvanoEnvironments.Test)) app.UseContractValidation();
+        app.UseConsoleSessions(fixtures);
 
         app.MapHealthChecks("/internal/healthz", new HealthCheckOptions { Predicate = _ => false });
         app.MapHealthChecks("/internal/readyz", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") });
@@ -69,7 +74,7 @@ internal static class ServerRole
         if (role == OrvanoRole.Api)
         {
             var v1 = app.MapGroup("/v1");
-            foreach (var module in OrvanoModules.All) module.MapApi(v1);
+            foreach (var module in modules) module.MapApi(v1);
         }
 
         logger.LogInformation("Starting Orvano {Version} as {Role}", OrvanoVersion.Current, role.Name());
@@ -77,7 +82,7 @@ internal static class ServerRole
         return 0;
     }
 
-    private static void AddWorker(WebApplicationBuilder builder, string appUrl, string serviceName)
+    private static void AddWorker(WebApplicationBuilder builder, IReadOnlyList<IOrvanoModule> modules, string appUrl, string serviceName)
     {
         var config = builder.Configuration;
         var adminUrl = OrvanoConfig.Required(config, "ORVANO_DB_ADMIN_URL");
@@ -85,7 +90,7 @@ internal static class ServerRole
 
         var work = new WorkRegistry();
         CoreWork.Register(work, retentionDays);
-        foreach (var module in OrvanoModules.All) module.RegisterWork(work);
+        foreach (var module in modules) module.RegisterWork(work);
 
         var services = builder.Services;
         services.AddSingleton(work);
@@ -112,10 +117,10 @@ internal static class ServerRole
         services.AddHostedService<LeaderScheduler>();
     }
 
-    private static void AddRealtime(WebApplicationBuilder builder, string appUrl, string serviceName)
+    private static void AddRealtime(WebApplicationBuilder builder, IReadOnlyList<IOrvanoModule> modules, string appUrl, string serviceName)
     {
         var realtime = new RealtimeRegistry();
-        foreach (var module in OrvanoModules.All) module.RegisterRealtime(realtime);
+        foreach (var module in modules) module.RegisterRealtime(realtime);
 
         var services = builder.Services;
         services.AddSingleton(realtime);

@@ -1,22 +1,18 @@
 // {{ header }}
 // Test only: maps each operationId to its SDK call for the scenario interpreter. Never published.
 // ignore_for_file: unnecessary_cast, prefer_expression_function_bodies
-{{~ if uses_core ~}}
-import 'package:orvano_core/orvano_core.dart' as core;
-
+{{~ for i in imports ~}}
+{{ i }}
 {{~ end ~}}
 import '../dispatch_table.dart';
 
-/// Every operation in the contract; a missing `client` or `server` call means this SDK has none.
+/// Every non console operation; a missing `client` or `server` call means the SDK has none.
 final Map<String, DispatchEntry> dispatch = {
 {{~ for e in entries ~}}
   '{{ e.id }}': DispatchEntry(
     status: {{ e.status }},
-{{~ if e.client ~}}
-    client: {{ e.client }},
-{{~ end ~}}
-{{~ if e.server ~}}
-    server: {{ e.server }},
+{{~ for c in e.calls ~}}
+    {{ c.key }}: {{ c.fn }},
 {{~ end ~}}
   ),
 {{~ end ~}}

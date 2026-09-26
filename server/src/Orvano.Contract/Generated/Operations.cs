@@ -20,3 +20,55 @@ public static class HealthOperations
         public const string Audience = "both";
     }
 }
+
+/// <summary>Route constants for the <c>test</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class TestOperations
+{
+    /// <summary>POST /v1/test/conflict: Always answers 409 with code <c>test_conflict</c>.</summary>
+    public static class Conflict
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "test.conflict";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/test/conflict";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "both";
+    }
+
+    /// <summary>GET /v1/console/test/ping: Answers <c>{ status: ok }</c> to a valid console session.</summary>
+    public static class ConsolePing
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "test.consolePing";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/test/ping";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/test/items: Pages through five fixed items.</summary>
+    public static class List
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "test.list";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/test/items";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "both";
+    }
+}

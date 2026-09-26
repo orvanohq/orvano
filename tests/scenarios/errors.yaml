@@ -1,0 +1,11 @@
+name: an error is one exception with a stable code
+requires: []
+steps:
+  - op: test.conflict
+    as: client
+    input: {}
+    expect: { status: 409, code: test_conflict }
+  - op: test.conflict
+    as: server
+    input: {}
+    expect: { status: 409, code: test_conflict }

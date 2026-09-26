@@ -8,6 +8,7 @@
     "build": "next build"
   },
   "dependencies": {
+    "@orvano/console-client": "workspace:*",
     "@orvano/js": "workspace:*",
     "@orvano/nextjs": "workspace:*",
     "@orvano/scenarios-js": "workspace:*",

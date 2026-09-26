@@ -1,0 +1,16 @@
+// {{ header }}
+namespace {{ namespace }};
+{{~ for c in catalogs ~}}
+
+/// <summary>{{ c.summary }}</summary>
+public static class {{ c.name }}
+{
+{{~ for k in c.codes ~}}
+    /// <summary>{{ k.summary }}</summary>
+    public const string {{ k.name }} = {{ k.value }};
+{{~ if !for.last ~}}
+
+{{~ end ~}}
+{{~ end ~}}
+}
+{{~ end ~}}

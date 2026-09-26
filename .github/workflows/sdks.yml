@@ -64,6 +64,25 @@ jobs:
         run: |
           dotnet run --project tools/sdkgen
           test -z "$(git status --porcelain)"
+      - name: No test operation reaches a package (AC-18)
+        run: |
+          if grep -rElI --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=bin --exclude-dir=obj --exclude-dir=.dart_tool '/v1/(console/)?test/' sdks; then
+            echo "::error::The files above contain a test only route. x-orvano-test operations belong only in tests/scenarios/runners."
+            exit 1
+          fi
+      - name: No published package depends on @orvano/console-client (AC-17)
+        run: |
+          pnpm -r ls --json --depth Infinity --prod | node --input-type=module -e '
+            import { readFileSync } from "node:fs"
+            const reaches = (deps) => Object.entries(deps ?? {}).some(([name, dep]) =>
+              name === "@orvano/console-client" || reaches(dep.dependencies))
+            const bad = JSON.parse(readFileSync(0, "utf8"))
+              .filter((p) => p.private !== true && reaches(p.dependencies))
+              .map((p) => p.name)
+            if (bad.length > 0) {
+              console.log(`::error::${bad.join(", ")} depend on @orvano/console-client, which is never published.`)
+              process.exit(1)
+            }'
       - name: Analyze the Dart packages
         run: flutter analyze --fatal-infos sdks/dart tests/scenarios/runners/dart tests/scenarios/runners/flutter
 

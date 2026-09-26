@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/interpreter.d.ts",
       "default": "./dist/interpreter.js"
+    },
+    "./surfaces": {
+      "types": "./dist/surfaces.d.ts",
+      "default": "./dist/surfaces.js"
     }
   },
   "scripts": {
@@ -15,6 +19,7 @@
     "scenarios": "node dist/cli.js"
   },
   "dependencies": {
+    "@orvano/console-client": "workspace:*",
     "@orvano/js": "workspace:*"
   },
   "devDependencies": {

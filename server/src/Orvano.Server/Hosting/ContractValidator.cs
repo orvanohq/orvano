@@ -9,18 +9,28 @@ namespace Orvano.Server.Hosting;
 /// <c>openapi.json</c>, strips keywords only OpenAPI uses, and builds one JSON Schema 2020-12
 /// document per declared response with every component schema under <c>$defs</c>, so
 /// <c>#/components/schemas/X</c> references resolve. Object models are closed
-/// (<c>unevaluatedProperties: false</c>), so a field the contract lacks is caught too.
+/// (<c>unevaluatedProperties: false</c>), so a field the contract lacks is caught too. An error
+/// status is checked against the operation's <c>default</c> response, the <c>Problem</c> model.
 /// </summary>
 internal sealed class ContractValidator
 {
+    private const string DefaultStatus = "default";
     private static readonly string[] OpenApiOnlyKeywords = ["discriminator", "example", "xml", "externalDocs"];
 
-    private readonly Dictionary<(string OperationId, int Status), JsonSchema?> _responses;
+    /// <summary>A declared response: its one media type and schema, or neither for no content.</summary>
+    private sealed record Declared(string? MediaType, JsonSchema? Schema);
 
-    private ContractValidator(Dictionary<(string, int), JsonSchema?> responses) => _responses = responses;
+    // Status is null for the `default` response.
+    private readonly Dictionary<(string OperationId, int? Status), Declared> _responses;
+
+    private ContractValidator(Dictionary<(string, int?), Declared> responses)
+    {
+        _responses = responses;
+        OperationIds = responses.Keys.Select(k => k.Item1).ToHashSet(StringComparer.Ordinal);
+    }
 
     /// <summary>The operationIds the contract declares.</summary>
-    public IReadOnlySet<string> OperationIds => _responses.Keys.Select(k => k.OperationId).ToHashSet(StringComparer.Ordinal);
+    public IReadOnlySet<string> OperationIds { get; }
 
     public static ContractValidator Load(Stream openApiJson)
     {
@@ -29,7 +39,7 @@ internal sealed class ContractValidator
         foreach (var (name, schema) in doc["components"]?["schemas"]?.AsObject() ?? [])
             defs[name] = Prepare(schema!.DeepClone());
 
-        var responses = new Dictionary<(string, int), JsonSchema?>();
+        var responses = new Dictionary<(string, int?), Declared>();
         foreach (var (path, item) in doc["paths"]?.AsObject() ?? [])
         {
             foreach (var (method, operation) in item!.AsObject())
@@ -38,9 +48,14 @@ internal sealed class ContractValidator
                     ?? throw new InvalidDataException($"{method} {path} has no operationId");
                 foreach (var (status, response) in operation["responses"]?.AsObject() ?? [])
                 {
-                    if (!int.TryParse(status, out var code)) continue;
-                    var schema = response?["content"]?["application/json"]?["schema"];
-                    responses[(id, code)] = schema is null ? null : Build(schema, defs, id, code);
+                    int? code = status == DefaultStatus ? null
+                        : int.TryParse(status, out var parsed) ? parsed
+                        : throw new InvalidDataException($"{id} declares a response '{status}', which is not a status");
+                    // SdkGen allows one media type per response (JSON, or problem+json for errors).
+                    var content = response?["content"]?.AsObject().FirstOrDefault();
+                    responses[(id, code)] = content?.Value?["schema"] is { } schema
+                        ? new Declared(content.Value.Key, Build(schema, defs, id, status))
+                        : new Declared(null, null);
                 }
             }
         }
@@ -49,22 +64,27 @@ internal sealed class ContractValidator
     }
 
     /// <summary>
-    /// Returns why the response breaks the contract, or null when it conforms. Error statuses the
-    /// contract does not declare are not checked (problem details join the contract later).
+    /// Returns why the response breaks the contract, or null when it conforms. A status the
+    /// operation does not declare is checked against its <c>default</c> response when it is an
+    /// error; an undeclared 2xx is always a violation.
     /// </summary>
     public string? Check(string? operationId, int status, string? contentType, ReadOnlyMemory<byte> body)
     {
         if (operationId is null || !OperationIds.Contains(operationId))
             return $"the endpoint '{operationId ?? "(unnamed)"}' is not in the contract";
 
-        if (!_responses.TryGetValue((operationId, status), out var schema))
-            return status is >= 200 and < 300 ? $"{operationId} returned {status}, which the contract does not declare" : null;
+        if (!_responses.TryGetValue((operationId, status), out var declared))
+        {
+            if (status is >= 200 and < 300) return $"{operationId} returned {status}, which the contract does not declare";
+            if (!_responses.TryGetValue((operationId, null), out declared)) return null;
+        }
 
-        if (schema is null)
+        if (declared.Schema is null)
             return body.IsEmpty ? null : $"{operationId} {status} has a body, but the contract declares none";
 
-        if (contentType is null || !contentType.StartsWith("application/json", StringComparison.OrdinalIgnoreCase))
-            return $"{operationId} {status} has content type '{contentType}', expected application/json";
+        if (contentType is null || !MediaTypeOf(contentType).Equals(declared.MediaType, StringComparison.OrdinalIgnoreCase))
+            return $"{operationId} {status} has content type '{contentType}', expected {declared.MediaType}";
+        var schema = declared.Schema;
 
         JsonDocument json;
         try
@@ -90,7 +110,10 @@ internal sealed class ContractValidator
         }
     }
 
-    private static JsonSchema Build(JsonNode schema, JsonObject defs, string operationId, int status)
+    private static string MediaTypeOf(string contentType) =>
+        contentType.Split(';', 2)[0].Trim();
+
+    private static JsonSchema Build(JsonNode schema, JsonObject defs, string operationId, string status)
     {
         var root = Prepare(schema.DeepClone()).AsObject();
         root["$schema"] = "https://json-schema.org/draft/2020-12/schema";

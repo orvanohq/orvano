@@ -1,5 +1,6 @@
 import "@typespec/http";
 import "@typespec/openapi";
+import "../errors.tsp";
 
 using Http;
 using OpenAPI;
@@ -25,5 +26,5 @@ interface HealthApi {
   @extension("x-orvano-audience", "both")
   @extension("x-orvano-service", "health")
   @get
-  get(): Health;
+  get(): Health | Problem;
 }

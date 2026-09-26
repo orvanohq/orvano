@@ -1,6 +1,6 @@
 // {{ header }}
 {{~ for i in imports ~}}
-import '{{ i }}';
+{{ i }}
 {{~ end ~}}
 {{~ for s in services ~}}
 
@@ -12,26 +12,22 @@ final class {{ s.class_name }} {
   final Client _client;
 {{~ for o in s.operations ~}}
 
-{{ o.doc }}  Future<{{ o.result }}> {{ o.name }}({{ o.params }}) async {
-{{~ if o.return == "" ~}}
-    await _client.send({{ o.call }});
-{{~ else ~}}
-    final json = await _client.send({{ o.call }});
-    return {{ o.return }};
-{{~ end ~}}
-  }
+{{ o.doc }}  {{ o.signature }} {{ o.body }}
 {{~ end ~}}
 }
 {{~ end ~}}
 
-/// Every service in this package, on one object: `orvano.health.get()`.
-final class Orvano {
+{{ aggregate.doc }}{{ if aggregate.base }}final{{ else }}base{{ end }} class {{ aggregate.name }}{{ if aggregate.base }} extends {{ aggregate.base }}{{ end }} {
   /// Creates the services over [client].
-  Orvano(this.client){{ if aggregate.size > 0 }} : {{ for s in aggregate }}{{ s.property }} = {{ s.class_name }}(client){{ if !for.last }}, {{ end }}{{ end }}{{ end }};
+{{~ if aggregate.base ~}}
+  {{ aggregate.name }}(super.client){{ if aggregate.services.size > 0 }} : {{ for s in aggregate.services }}{{ s.property }} = {{ s.class_name }}(client){{ if !for.last }}, {{ end }}{{ end }}{{ end }};
+{{~ else ~}}
+  {{ aggregate.name }}(this.client){{ if aggregate.services.size > 0 }} : {{ for s in aggregate.services }}{{ s.property }} = {{ s.class_name }}(client){{ if !for.last }}, {{ end }}{{ end }}{{ end }};
 
   /// The client every service sends through.
   final Client client;
-{{~ for s in aggregate ~}}
+{{~ end ~}}
+{{~ for s in aggregate.services ~}}
 
   /// Operations in the `{{ s.name }}` service.
   final {{ s.class_name }} {{ s.property }};
