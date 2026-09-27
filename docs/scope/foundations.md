@@ -45,7 +45,7 @@ One machine readable description of every public endpoint is the source of truth
 - [x] Test it: `/test API contract & SDK pipeline`
 Spec [0001](../specs/0001-api-contract-sdk-pipeline/index.md) · code in `contract/`, `tools/sdkgen/`, `sdks/`, `server/src/Orvano.Contract/`, `tests/scenarios/`, `.github/workflows/sdks.yml`, `.github/workflows/release.yml`
 
-### 5. Design system & console shell · in-progress
+### 5. Design system & console shell · done
 Visual language, layout, and base components for the console, plus the empty shell: navigation, org and project switcher, light and dark themes.
 **Done when:** `design.md` covers type, color, spacing, and components; the shell renders with working navigation; base components handle focus and keyboard.
 - [x] Design it (spec): `/architect design system & console shell`
@@ -55,7 +55,7 @@ Visual language, layout, and base components for the console, plus the empty she
    - [x] Components and catalog: the full inventory, keyboard scripts, form, toast, table, and role patterns, the dev only `/dev/components` catalog (AC-5, 6, 7, 9, 21, 22)
    - [x] Shell complete: org and project routes, nav registry, sidebar rail and drawer, both switchers with paging, status gating, not found, errors, landing, titles and focus, 360 px layout (AC-10 to 23)
    - [x] Production shape: Caddy security and cache headers, the `console` compose profile with the gateway, end to end tests in CI (AC-8, 9, 24, 26)
-- [ ] Verify it: `/check verify design system & console shell`
+- [x] Verify it: `/check verify design system & console shell`
 - [x] Test it: `/test design system & console shell`
 Spec [0005](../specs/0005-console-design-system-shell/index.md) · code in `console/`, `deploy/gateway/Caddyfile`, `dev/Orvano.AppHost/`, `tests/scenarios/compose.yml`
 
