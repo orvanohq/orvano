@@ -14,7 +14,7 @@ internal static class Dart
 
     public sealed record Model(string Doc, string Name, IReadOnlyList<Field> Fields);
 
-    public sealed record EnumMember(string Name, string Wire);
+    public sealed record EnumMember(string Doc, string Name, string Wire);
 
     public sealed record EnumDef(string Doc, string Name, IReadOnlyList<EnumMember> Members);
 
@@ -168,7 +168,7 @@ internal static class Dart
         Enums = slice.Enums.Select(e => new EnumDef(
             Doc(e.Doc, ""),
             e.Name,
-            [.. e.Values.Select(v => new EnumMember(Naming.MemberFromWire(v), Naming.QuotedString(v)))])).ToList(),
+            [.. e.Values.Select(v => new EnumMember($"  /// The wire value `{v}`.\n", Naming.MemberFromWire(v), Naming.QuotedString(v)))])).ToList(),
         Models = slice.Models.Select(ToModel).ToList(),
     };
 
@@ -195,18 +195,19 @@ internal static class Dart
         var fields = m.Properties.Select(p =>
         {
             var nullable = p.Optional || p.Nullable;
-            var type = Type(p.Type) + (nullable ? "?" : "");
-            var source = $"json['{p.Name}']";
+            // Any JSON value is already `Object?`.
+            var type = Type(p.Type) + (nullable && p.Type is not JsonValueType ? "?" : "");
+            var source = $"json['{p.Wire}']";
             var fromJson = nullable ? $"{source} == null ? null : {FromJson(p.Type, source)}" : FromJson(p.Type, source);
             // An optional value that needs no conversion uses a null aware element (`'x': ?x`);
             // `--fatal-infos` rejects the `if (x case final v?)` form for it (use_null_aware_elements).
             var toJson = p.Optional
                 ? ToJson(p.Type, "v") == "v"
-                    ? $"'{p.Name}': ?{p.Name}"
-                    : $"if ({p.Name} case final v?) '{p.Name}': {ToJson(p.Type, "v")}"
+                    ? $"'{p.Wire}': ?{p.Name}"
+                    : $"if ({p.Name} case final v?) '{p.Wire}': {ToJson(p.Type, "v")}"
                 : p.Nullable && ToJson(p.Type, "v") != "v"
-                    ? $"'{p.Name}': switch ({p.Name}) {{ final v? => {ToJson(p.Type, "v")}, null => null }}"
-                    : $"'{p.Name}': {ToJson(p.Type, p.Name)}";
+                    ? $"'{p.Wire}': switch ({p.Name}) {{ final v? => {ToJson(p.Type, "v")}, null => null }}"
+                    : $"'{p.Wire}': {ToJson(p.Type, p.Name)}";
             return new Field(
                 Doc(p.Doc, "  "),
                 $"final {type} {p.Name};",
@@ -232,6 +233,7 @@ internal static class Dart
             call.Add("query: {" + string.Join(", ", query.Select(q => $"'{q.Name}': {QueryValue(q)}")) + "}");
         if (op.Body is not null) call.Add("body: body.toJson()");
         if (op.Idempotent) call.Add("idempotent: true");
+        if (op.Session != SessionEffect.None) call.Add($"session: SessionChange.{op.Session.ToString().ToLowerInvariant()}");
         call.Add("options: options");
 
         var result = op.Result is null ? "void" : Type(op.Result);
@@ -313,6 +315,7 @@ internal static class Dart
         MapType m => $"Map<String, {Type(m.Value)}>",
         ModelType m => m.Name,
         EnumType e => e.Name,
+        JsonValueType => "Object?",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 
@@ -325,9 +328,11 @@ internal static class Dart
         PrimitiveType { Kind: PrimitiveKind.Float64 } => $"({source} as num).toDouble()",
         PrimitiveType { Kind: PrimitiveKind.Boolean } => $"{source} as bool",
         ArrayType a => $"({source} as List<dynamic>).map((e) => {FromJson(a.Item, "e")}).toList()",
+        MapType { Value: JsonValueType } => $"Map<String, Object?>.from({source} as Map<String, dynamic>)",
         MapType m => $"({source} as Map<String, dynamic>).map((k, v) => MapEntry(k, {FromJson(m.Value, "v")}))",
         ModelType m => $"{m.Name}.fromJson({source} as Map<String, dynamic>)",
         EnumType e => $"{e.Name}.fromJson({source} as String)",
+        JsonValueType => source,
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 
@@ -340,6 +345,7 @@ internal static class Dart
         MapType m => ToJson(m.Value, "v") == "v" ? value : $"{value}.map((k, v) => MapEntry(k, {ToJson(m.Value, "v")}))",
         ModelType => $"{value}.toJson()",
         EnumType => $"{value}.value",
+        JsonValueType => value,
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 

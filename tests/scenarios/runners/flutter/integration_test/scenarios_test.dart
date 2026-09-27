@@ -31,9 +31,13 @@ void main() {
     final scenarios = [
       for (final f in files) parseScenario(await rootBundle.loadString(f)),
     ];
+    final project = fixtureProject(
+      await rootBundle.loadString('assets/scenarios/fixtures.yaml'),
+    );
     final surface = Surface.connect(
       endpoint,
-      client: Client(endpoint: endpoint),
+      project: project,
+      client: Client(endpoint: endpoint, project: project),
     );
     final results = await runScenarios(scenarios, surface);
     surface.close();

@@ -162,6 +162,8 @@ internal static partial class CSharp
     {
         Namespace = ns,
         Visibility = visibility,
+        // JsonElement (any JSON value) and the enum converters need System.Text.Json itself.
+        UsesJson = slice.Enums.Count > 0 || slice.Models.Any(m => m.Properties.Any(p => MentionsJsonValue(p.Type))),
         Enums = slice.Enums.Select(e => new EnumDef(
             Xml(Summary(e.Doc, e.Name)),
             e.Name,
@@ -173,12 +175,20 @@ internal static partial class CSharp
             [.. m.Properties.OrderBy(p => p.Optional).Select(p =>
             {
                 var type = Type(p.Type) + (p.Optional || p.Nullable ? "?" : "");
-                var attributes = $"[property: JsonPropertyName({Naming.CsString(p.Name)})"
+                var attributes = $"[property: JsonPropertyName({Naming.CsString(p.Wire)})"
                     + (p.Optional ? ", JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]" : "]");
                 return new Parameter(
                     $"{attributes} {type} {Naming.Pascal(p.Name)}{(p.Optional ? " = null" : "")}",
                     $"<param name=\"{Naming.Pascal(p.Name)}\">{Xml(Summary(p.Doc, p.Name))}</param>");
             })])).ToList(),
+    };
+
+    private static bool MentionsJsonValue(TypeRef type) => type switch
+    {
+        JsonValueType => true,
+        ArrayType a => MentionsJsonValue(a.Item),
+        MapType m => MentionsJsonValue(m.Value),
+        _ => false,
     };
 
     private static List<string> SerializableTypes(ApiContract slice)
@@ -318,6 +328,7 @@ internal static partial class CSharp
         MapType m => $"IReadOnlyDictionary<string, {Type(m.Value)}>",
         ModelType m => m.Name,
         EnumType e => e.Name,
+        JsonValueType => "JsonElement",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 
@@ -331,6 +342,7 @@ internal static partial class CSharp
         PrimitiveType p => p.Kind.ToString(),
         ModelType m => m.Name,
         EnumType e => e.Name,
+        JsonValueType => "JsonElement",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 

@@ -8,9 +8,142 @@
   "tags": [
     {
       "name": "health"
+    },
+    {
+      "name": "account"
+    },
+    {
+      "name": "keys"
     }
   ],
   "paths": {
+    "/v1/account": {
+      "post": {
+        "operationId": "account.create",
+        "description": "Signs a new user up with an email and password, and signs them in.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccountRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-session": "start",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      },
+      "get": {
+        "operationId": "account.get",
+        "description": "Gets the signed in user. A server can call it with a user's access token to check that the session is still active.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "both"
+      }
+    },
+    "/v1/account/sessions/password": {
+      "post": {
+        "operationId": "account.createPasswordSession",
+        "description": "Signs a user in with their email and password.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePasswordSessionRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-session": "start",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/health": {
       "get": {
         "operationId": "health.get",
@@ -44,10 +177,178 @@
         "x-orvano-service": "health",
         "x-orvano-audience": "both"
       }
+    },
+    "/v1/projects/{projectId}/.well-known/jwks.json": {
+      "get": {
+        "operationId": "keys.getJwks",
+        "description": "Gets a project's public signing keys, to check its access tokens.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "description": "The project ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Jwks"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "keys"
+        ],
+        "x-orvano-service": "keys",
+        "x-orvano-audience": "both"
+      }
+    },
+    "/v1/projects/{projectId}/.well-known/openid-configuration": {
+      "get": {
+        "operationId": "keys.getOpenIdConfiguration",
+        "description": "Gets a project's discovery document, for JWT libraries that configure themselves from the issuer.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "description": "The project ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenIdConfiguration"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "keys"
+        ],
+        "x-orvano-service": "keys",
+        "x-orvano-audience": "both"
+      }
     }
   },
   "components": {
     "schemas": {
+      "AuthResult": {
+        "type": "object",
+        "required": [
+          "user",
+          "session"
+        ],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User",
+            "description": "The user."
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionTokens",
+            "description": "The new session's tokens."
+          }
+        },
+        "description": "A signed in user and their new session."
+      },
+      "CreateAccountRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email, trimmed, at most 320 characters. Unique in the project, ignoring case.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "description": "8 to 256 characters after Unicode NFKC normalization.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A display name, at most 256 characters.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          }
+        },
+        "description": "A new user with an email and password."
+      },
+      "CreatePasswordSessionRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email the user signed up with; case does not matter.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "description": "The user's password.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          }
+        },
+        "description": "A sign in with an email and password."
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -108,6 +409,135 @@
         },
         "description": "Whether the server is up, and which Orvano version it runs."
       },
+      "Jwk": {
+        "type": "object",
+        "required": [
+          "kty",
+          "crv",
+          "x",
+          "y",
+          "kid",
+          "alg",
+          "use"
+        ],
+        "properties": {
+          "kty": {
+            "type": "string",
+            "description": "The key type, `EC`.",
+            "examples": [
+              "EC"
+            ]
+          },
+          "crv": {
+            "type": "string",
+            "description": "The curve, `P-256`.",
+            "examples": [
+              "P-256"
+            ]
+          },
+          "x": {
+            "type": "string",
+            "description": "The public point's x coordinate, base64url.",
+            "examples": [
+              "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU"
+            ]
+          },
+          "y": {
+            "type": "string",
+            "description": "The public point's y coordinate, base64url.",
+            "examples": [
+              "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+            ]
+          },
+          "kid": {
+            "type": "string",
+            "description": "The key ID, the `kid` in a token's header.",
+            "examples": [
+              "AZJPXo0rfE2OIT1ebzqLnA"
+            ]
+          },
+          "alg": {
+            "type": "string",
+            "description": "The algorithm, `ES256`.",
+            "examples": [
+              "ES256"
+            ]
+          },
+          "use": {
+            "type": "string",
+            "description": "What the key is for, `sig`.",
+            "examples": [
+              "sig"
+            ]
+          }
+        },
+        "description": "One public signing key, as a JSON Web Key (RFC 7517)."
+      },
+      "Jwks": {
+        "type": "object",
+        "required": [
+          "keys"
+        ],
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Jwk"
+            },
+            "description": "The keys."
+          }
+        },
+        "description": "A project's public signing keys: the active key and any key retired within the last 24 hours."
+      },
+      "OpenIdConfiguration": {
+        "type": "object",
+        "required": [
+          "issuer",
+          "jwks_uri",
+          "id_token_signing_alg_values_supported",
+          "subject_types_supported",
+          "response_types_supported"
+        ],
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "description": "The issuer, the `iss` of every access token of the project.",
+            "examples": [
+              "https://orvano.example.com/v1/projects/shop"
+            ]
+          },
+          "jwks_uri": {
+            "type": "string",
+            "description": "Where the project's JWKS lives.",
+            "examples": [
+              "https://orvano.example.com/v1/projects/shop/.well-known/jwks.json"
+            ]
+          },
+          "id_token_signing_alg_values_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Always `[\"ES256\"]`."
+          },
+          "subject_types_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Always `[\"public\"]`."
+          },
+          "response_types_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Always `[\"token\"]`."
+          }
+        },
+        "description": "The discovery document standard JWT libraries configure themselves from. Orvano is not an OpenID provider;\nthis exists so tools that take an issuer URL find the keys. Its names are the standard snake case ones.",
+        "x-orvano-standard-names": true
+      },
       "Problem": {
         "type": "object",
         "required": [
@@ -160,6 +590,149 @@
           }
         },
         "description": "An RFC 9457 problem details body. Every operation declares it as its `default` response, sent\nas `application/problem+json`."
+      },
+      "SessionTokens": {
+        "type": "object",
+        "required": [
+          "accessToken",
+          "accessTokenExpiresAt",
+          "refreshToken",
+          "refreshTokenExpiresAt",
+          "sessionId"
+        ],
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "An ES256 JWT, valid for 15 minutes.",
+            "examples": [
+              "eyJhbGciOiJFUzI1NiIsImtpZCI6Ii4uLiJ9.e30.c2ln"
+            ]
+          },
+          "accessTokenExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the access token expires."
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Trades itself for a new pair once; keep it secret.",
+            "examples": [
+              "orv_rt_AZJPXo0rfE2OIT1ebzqLnA.Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9v"
+            ]
+          },
+          "refreshTokenExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the session ends unless it refreshes first: 30 days idle, or 365 days after sign in."
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "The session ID, also the `sid` claim of the access token.",
+            "examples": [
+              "01924f5e-9a1b-7c4d-8e21-3d5e6f7a8b9c"
+            ]
+          }
+        },
+        "description": "A session's tokens. Send the access token as `Authorization: Bearer`; trade the refresh token for a new pair\nbefore the access token expires. The SDKs do both for you."
+      },
+      "User": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "emailVerified",
+          "name",
+          "status",
+          "metadata",
+          "createdAt",
+          "lastSignInAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The user ID.",
+            "examples": [
+              "01924f5e-8d2b-7c4d-8e21-3d5e6f7a8b9c"
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The email, as typed at sign up; null for a user without one.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Whether the email has been verified.",
+            "examples": [
+              false
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The display name; null when none was given.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/UserStatus",
+            "description": "Whether the user may sign in."
+          },
+          "metadata": {
+            "type": "object",
+            "unevaluatedProperties": {},
+            "description": "Your own data about the user: a JSON object of at most 16 KB."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the user signed up."
+          },
+          "lastSignInAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the user last signed in; null if never."
+          }
+        },
+        "description": "A user of a project."
+      },
+      "UserStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "blocked"
+        ],
+        "description": "Whether a user may sign in."
+      }
+    },
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "Bearer",
+        "description": "A signed in user's access token: `Authorization: Bearer <access token>`, an ES256 JWT."
       }
     }
   }

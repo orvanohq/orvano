@@ -58,7 +58,8 @@ internal static partial class Interpreter
 
     private static async Task RunScenarioAsync(JsonObject scenario, Surface surface, CancellationToken ct)
     {
-        var vars = new Dictionary<string, JsonNode?>(StringComparer.Ordinal);
+        // `${unique}` is fresh per scenario run, so runs never collide on unique values such as emails.
+        var vars = new Dictionary<string, JsonNode?>(StringComparer.Ordinal) { ["unique"] = JsonValue.Create(UniqueValue()) };
         var steps = scenario["steps"]!.AsArray();
         for (var i = 0; i < steps.Count; i++)
         {
@@ -128,6 +129,10 @@ internal static partial class Interpreter
     private static partial Regex Embedded();
 
     /// <summary>Replaces <c>${name}</c> with saved values; a string that is exactly one keeps the value's type.</summary>
+    /// <summary>Twelve lowercase letters and digits, random per call.</summary>
+    private static string UniqueValue() =>
+        System.Security.Cryptography.RandomNumberGenerator.GetString("0123456789abcdefghijklmnopqrstuvwxyz", 12);
+
     private static JsonNode? Substitute(JsonNode? node, Dictionary<string, JsonNode?> vars)
     {
         JsonNode? Lookup(string name) => vars.TryGetValue(name, out var value)

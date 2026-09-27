@@ -7,6 +7,7 @@ import { createSurface } from '../surface.js'
 interface Env {
   ORVANO_ENDPOINT: string
   ORVANO_CONSOLE_SESSION?: string
+  ORVANO_PROJECT?: string
 }
 
 export default {
@@ -14,6 +15,7 @@ export default {
     const scenarios = (await request.json()) as Scenario[]
     const surface = createSurface(env.ORVANO_ENDPOINT, {
       consoleSession: env.ORVANO_CONSOLE_SESSION,
+      project: env.ORVANO_PROJECT,
     })
     return Response.json(await runScenarios(scenarios, surface))
   },

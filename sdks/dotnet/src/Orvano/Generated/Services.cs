@@ -2,6 +2,21 @@
 
 namespace Orvano;
 
+/// <summary>Operations in the <c>account</c> service.</summary>
+public sealed class AccountService
+{
+    private readonly OrvanoClient _client;
+
+    /// <summary>Creates the service over <paramref name="client"/>.</summary>
+    /// <param name="client">The client every call sends through.</param>
+    internal AccountService(OrvanoClient client) => _client = client;
+
+    /// <summary>Gets the signed in user. A server can call it with a user's access token to check that the session is still active.</summary>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task<User> GetAsync(CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("GET", "/v1/account", null, null, false), OrvanoJsonContext.Default.User, cancellationToken);
+}
+
 /// <summary>Operations in the <c>health</c> service.</summary>
 public sealed class HealthService
 {
@@ -17,10 +32,40 @@ public sealed class HealthService
         _client.SendAsync(new OrvanoRequest("GET", "/v1/health", null, null, false), OrvanoJsonContext.Default.Health, cancellationToken);
 }
 
+/// <summary>Operations in the <c>keys</c> service.</summary>
+public sealed class KeysService
+{
+    private readonly OrvanoClient _client;
+
+    /// <summary>Creates the service over <paramref name="client"/>.</summary>
+    /// <param name="client">The client every call sends through.</param>
+    internal KeysService(OrvanoClient client) => _client = client;
+
+    /// <summary>Gets a project's public signing keys, to check its access tokens.</summary>
+    /// <param name="projectId">The project ID.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task<Jwks> GetJwksAsync(string projectId, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("GET", $"/v1/projects/{Uri.EscapeDataString(projectId)}/.well-known/jwks.json", null, null, false), OrvanoJsonContext.Default.Jwks, cancellationToken);
+
+    /// <summary>Gets a project's discovery document, for JWT libraries that configure themselves from the issuer.</summary>
+    /// <param name="projectId">The project ID.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task<OpenIdConfiguration> GetOpenIdConfigurationAsync(string projectId, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("GET", $"/v1/projects/{Uri.EscapeDataString(projectId)}/.well-known/openid-configuration", null, null, false), OrvanoJsonContext.Default.OpenIdConfiguration, cancellationToken);
+}
+
 public sealed partial class OrvanoClient
 {
+    private AccountService? _account;
     private HealthService? _health;
+    private KeysService? _keys;
+
+    /// <summary>Operations in the <c>account</c> service.</summary>
+    public AccountService Account => _account ??= new AccountService(this);
 
     /// <summary>Operations in the <c>health</c> service.</summary>
     public HealthService Health => _health ??= new HealthService(this);
+
+    /// <summary>Operations in the <c>keys</c> service.</summary>
+    public KeysService Keys => _keys ??= new KeysService(this);
 }

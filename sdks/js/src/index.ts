@@ -16,7 +16,7 @@
 export { Client } from './runtime/client.js'
 export type { ClientConfig, HttpMethod, RequestOptions, RequestSpec } from './runtime/client.js'
 export { MemorySessionStore } from './runtime/auth.js'
-export type { SessionStore } from './runtime/auth.js'
+export type { AuthSession, SessionStore } from './runtime/auth.js'
 export { OrvanoError } from './runtime/error.js'
 export { paginate } from './runtime/pagination.js'
 export type { Page } from './runtime/pagination.js'

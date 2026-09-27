@@ -1,4 +1,4 @@
-import { MemorySessionStore, sessionHeader } from './auth.js'
+import { MemorySessionStore, authorizationHeader, sessionFrom } from './auth.js'
 import type { SessionStore } from './auth.js'
 import { OrvanoError } from './error.js'
 import { sdkHeader, sdkName, serverVersionHeader, versionMismatch } from './version.js'
@@ -51,6 +51,11 @@ export interface RequestSpec {
   body?: unknown
   /** Marked `x-orvano-idempotent` in the contract, so it is safe to retry. */
   idempotent?: boolean
+  /**
+   * Marked `x-orvano-session` in the contract: on success, `start` stores the response's
+   * `session`, `refresh` stores the response itself, and `end` clears the stored session.
+   */
+  session?: 'start' | 'refresh' | 'end'
 }
 
 const defaultTimeoutMs = 30_000
@@ -93,12 +98,13 @@ export class Client {
   }
 
   /**
-   * Adds this client's credentials to an outgoing request: the session token, when there is one.
-   * Clients for other audiences add theirs here too.
+   * Adds this client's credentials to an outgoing request: the access token as
+   * `Authorization: Bearer`, when someone is signed in. Clients for other audiences add theirs here
+   * too.
    */
   protected async authorize(headers: Headers): Promise<void> {
-    const token = await this.session.get()
-    if (token !== null && token !== '') headers.set(sessionHeader, token)
+    const session = await this.session.get()
+    if (session !== null) headers.set(authorizationHeader, `Bearer ${session.accessToken}`)
   }
 
   /**
@@ -131,8 +137,10 @@ export class Client {
       const response = await this.#fetch(url, init)
       this.#checkVersion(response)
       if (response.ok) {
-        if (response.status === 204 || spec.method === 'HEAD') return undefined as T
-        return (await response.json()) as T
+        const result: unknown =
+          response.status === 204 || spec.method === 'HEAD' ? undefined : await response.json()
+        await this.#applySession(spec.session, result)
+        return result as T
       }
 
       if (
@@ -145,6 +153,23 @@ export class Client {
         continue
       }
       throw await OrvanoError.fromResponse(response)
+    }
+  }
+
+  /** Stores or clears the session after a successful sign in, refresh, or sign out. */
+  async #applySession(change: RequestSpec['session'], result: unknown): Promise<void> {
+    switch (change) {
+      case undefined:
+        return
+      case 'start':
+        await this.session.set(sessionFrom((result as { session?: unknown } | undefined)?.session))
+        return
+      case 'refresh':
+        await this.session.set(sessionFrom(result))
+        return
+      case 'end':
+        await this.session.set(null)
+        return
     }
   }
 

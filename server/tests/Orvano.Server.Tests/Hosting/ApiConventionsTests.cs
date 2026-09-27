@@ -28,7 +28,7 @@ public class ApiConventionsTests(PostgresFixture postgres)
 
     [Theory]
     [InlineData("X-Orvano-Key", "test-server-key")]
-    [InlineData("X-Orvano-Session", "an-app-session")]
+    [InlineData("Authorization", "Bearer an-app-access-token")]
     public async Task A_console_route_rejects_an_API_key_or_an_app_session_even_with_a_console_session(string header, string value)
     {
         await using var api = await StartApiAsync("Test");

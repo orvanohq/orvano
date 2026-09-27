@@ -14,7 +14,7 @@
 
 {{ e.doc }}enum {{ e.name }} {
 {{~ for m in e.members ~}}
-  {{ m.name }}({{ m.wire }}),
+{{ m.doc }}  {{ m.name }}({{ m.wire }}),
 {{~ end ~}}
 
   /// A value this SDK version does not know yet.

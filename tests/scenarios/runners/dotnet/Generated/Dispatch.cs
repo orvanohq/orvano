@@ -7,7 +7,12 @@ internal static class Dispatch
     /// <summary>Every non console operation; a null call means the .NET SDK has none.</summary>
     public static readonly IReadOnlyDictionary<string, DispatchEntry> Operations = new Dictionary<string, DispatchEntry>(StringComparer.Ordinal)
     {
+        ["account.create"] = new(201, null, null),
+        ["account.createPasswordSession"] = new(201, null, null),
+        ["account.get"] = new(200, async (client, input, ct) => Args.ToJson(await client.Account.GetAsync(cancellationToken: ct)), null),
         ["health.get"] = new(200, async (client, input, ct) => Args.ToJson(await client.Health.GetAsync(cancellationToken: ct)), null),
+        ["keys.getJwks"] = new(200, async (client, input, ct) => Args.ToJson(await client.Keys.GetJwksAsync(Args.Required<string>(input, "projectId"), cancellationToken: ct)), null),
+        ["keys.getOpenIdConfiguration"] = new(200, async (client, input, ct) => Args.ToJson(await client.Keys.GetOpenIdConfigurationAsync(Args.Required<string>(input, "projectId"), cancellationToken: ct)), null),
         ["test.conflict"] = new(204, async (client, input, ct) => { await new TestService(client).ConflictAsync(cancellationToken: ct); return null; }, null),
         ["test.list"] = new(200, async (client, input, ct) => Args.ToJson(await new TestService(client).ListAsync(cursor: Args.Optional<string?>(input, "cursor"), limit: Args.Optional<int?>(input, "limit"), cancellationToken: ct)), (client, input, ct) => Args.CollectAsync(new TestService(client).ListAllAsync(limit: Args.Optional<int?>(input, "limit"), cancellationToken: ct), ct)),
     };

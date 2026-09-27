@@ -1,7 +1,8 @@
 /**
  * Orvano for Next.js. It wraps `@orvano/js` and has no endpoint code of its own: every operation
- * comes from the core SDK, so it can never drift from the contract. On the server the user's
- * session lives in the `orvano_session` cookie (`HttpOnly`, `Secure`, `SameSite=Lax`).
+ * comes from the core SDK, so it can never drift from the contract. The user's session lives in two
+ * cookies (spec 0004, AC-23): `orvano_access` holds the access token and `orvano_refresh`
+ * (`HttpOnly`) the refresh token, both `Secure`, `SameSite=Lax`, and host only.
  *
  * @example
  * ```ts
@@ -22,23 +23,24 @@
  * @packageDocumentation
  */
 import { Client, Orvano } from '@orvano/js'
-import type { ClientConfig, SessionStore } from '@orvano/js'
+import type { ClientConfig, AuthSession, SessionStore } from '@orvano/js'
 
 export { Client, ErrorCode, Orvano, OrvanoError } from '@orvano/js'
-export type { ClientConfig, RequestOptions, SessionStore } from '@orvano/js'
+export type { ClientConfig, RequestOptions, AuthSession, SessionStore } from '@orvano/js'
 
-/**
- * The cookie the session lives in. Temporary: the auth spec (scope row 8) may replace it, and this
- * is the only place `@orvano/nextjs` names it.
- */
-export const sessionCookie = 'orvano_session'
+/** The cookie that holds the access token; browser code can read it. Named only here. */
+export const accessCookie = 'orvano_access'
 
-/** Options for the session cookie. */
+/** The `HttpOnly` cookie that holds the refresh token. Named only here. */
+export const refreshCookie = 'orvano_refresh'
+
+/** Options for a session cookie. Neither has a `Domain`, so sibling subdomains never see them. */
 export interface CookieOptions {
   httpOnly: boolean
   secure: boolean
   sameSite: 'lax'
   path: string
+  expires: Date
 }
 
 /**
@@ -54,11 +56,24 @@ export interface CookieStore {
   delete?(name: string): unknown
 }
 
-const cookieOptions: CookieOptions = { httpOnly: true, secure: true, sameSite: 'lax', path: '/' }
+/** The `exp` and `sid` claims of an access token, or null when it is not a readable JWT. */
+function accessClaims(token: string): { exp: number; sid: string } | null {
+  const payload = token.split('.')[1]
+  if (payload === undefined) return null
+  try {
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    const claims = JSON.parse(json) as { exp?: unknown; sid?: unknown }
+    return typeof claims.exp === 'number' && typeof claims.sid === 'string'
+      ? { exp: claims.exp, sid: claims.sid }
+      : null
+  } catch {
+    return null
+  }
+}
 
 /**
- * A {@link SessionStore} in the `orvano_session` cookie. Reads from `read`; writes to every store
- * in `write` (in middleware, the request and the response).
+ * A {@link SessionStore} in the `orvano_access` and `orvano_refresh` cookies. Reads from `read`;
+ * writes to every store in `write` (in middleware, the request and the response).
  */
 export class CookieSessionStore implements SessionStore {
   readonly #read: CookieStore
@@ -69,16 +84,45 @@ export class CookieSessionStore implements SessionStore {
     this.#write = write
   }
 
-  get(): string | null {
-    const value = this.#read.get(sessionCookie)?.value
-    return value === undefined || value === '' ? null : value
+  get(): AuthSession | null {
+    const accessToken = this.#read.get(accessCookie)?.value
+    if (accessToken === undefined || accessToken === '') return null
+    const claims = accessClaims(accessToken)
+    if (claims === null) return null
+    const refreshToken = this.#read.get(refreshCookie)?.value
+    return {
+      accessToken,
+      accessTokenExpiresAt: new Date(claims.exp * 1000).toISOString(),
+      refreshToken: refreshToken === undefined || refreshToken === '' ? null : refreshToken,
+      refreshTokenExpiresAt: null,
+      sessionId: claims.sid,
+    }
   }
 
-  set(token: string | null): void {
+  set(session: AuthSession | null): void {
     for (const store of this.#write) {
       try {
-        if (token === null) store.delete?.(sessionCookie)
-        else store.set?.(sessionCookie, token, cookieOptions)
+        if (session === null) {
+          store.delete?.(accessCookie)
+          store.delete?.(refreshCookie)
+          continue
+        }
+        store.set?.(accessCookie, session.accessToken, {
+          httpOnly: false,
+          secure: true,
+          sameSite: 'lax',
+          path: '/',
+          expires: new Date(session.accessTokenExpiresAt),
+        })
+        if (session.refreshToken !== null && session.refreshTokenExpiresAt !== null) {
+          store.set?.(refreshCookie, session.refreshToken, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'lax',
+            path: '/',
+            expires: new Date(session.refreshTokenExpiresAt),
+          })
+        }
       } catch {
         // Server components can't set cookies; the session is read only there by design.
       }
@@ -124,8 +168,8 @@ const browserClients = new Map<string, Orvano>()
 
 /**
  * An Orvano client for client components. Returns one shared instance per endpoint and project,
- * so calling it on every render is cheap. The `orvano_session` cookie is `HttpOnly`, so browser
- * code never sees the token; calls that need the session belong in server code.
+ * so calling it on every render is cheap. AuthSession handling in the browser (reading `orvano_access`,
+ * refreshing through the app's route handler) arrives with spec 0004's client session work.
  */
 export function createBrowserClient(config: ClientConfig): Orvano {
   const key = `${config.endpoint}\n${config.project ?? ''}`

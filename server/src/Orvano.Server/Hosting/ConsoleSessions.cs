@@ -25,7 +25,7 @@ internal static class ConsoleSessions
 
             var request = context.Request;
             var valid = !request.Headers.ContainsKey(OrvanoHeaders.ApiKey)
-                && !request.Headers.ContainsKey(OrvanoHeaders.Session)
+                && !request.Headers.ContainsKey(OrvanoHeaders.Authorization)
                 && request.Cookies.TryGetValue(OrvanoHeaders.ConsoleCookie, out var token)
                 && token is not null
                 && fixtures.ConsoleSessions.TryGetValue(token, out userId);

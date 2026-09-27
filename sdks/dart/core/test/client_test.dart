@@ -48,19 +48,29 @@ void main() {
       );
     });
 
-    test(
-      'sends the project and the session token, and never an API key (AC-4)',
-      () async {
-        await serve([health()]);
+    test('sends the project and the access token as a bearer, and never an API '
+        'key (AC-4; spec 0004 AC-7)', () async {
+      await serve([health()]);
 
-        await app(project: 'p1', session: MemorySessionStore('t')).health.get();
+      await app(
+        project: 'p1',
+        session: MemorySessionStore(
+          AuthSession(
+            accessToken: 't',
+            accessTokenExpiresAt: DateTime.utc(2030),
+            refreshToken: 'r',
+            refreshTokenExpiresAt: DateTime.utc(2030),
+            sessionId: 's',
+          ),
+        ),
+      ).health.get();
 
-        final headers = server().requests.single;
-        expect(headers.value('X-Orvano-Project'), 'p1');
-        expect(headers.value('X-Orvano-Session'), 't');
-        expect(headers.value('X-Orvano-Key'), isNull);
-      },
-    );
+      final headers = server().requests.single;
+      expect(headers.value('X-Orvano-Project'), 'p1');
+      expect(headers.value('Authorization'), 'Bearer t');
+      expect(headers.value('X-Orvano-Session'), isNull);
+      expect(headers.value('X-Orvano-Key'), isNull);
+    });
 
     test('joins the endpoint and the operation path with one slash', () async {
       await serve([health()]);

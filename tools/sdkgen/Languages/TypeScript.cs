@@ -142,7 +142,7 @@ internal static class TypeScript
             Models = slice.Models.Select(m => new Model(
                 Doc(m.Doc, ""),
                 m.Name,
-                [.. m.Properties.Select(p => new Property(Doc(p.Doc, "  "), $"{p.Name}{(p.Optional ? "?" : "")}: {Type(p.Type)}{(p.Nullable ? " | null" : "")}"))])).ToList(),
+                [.. m.Properties.Select(p => new Property(Doc(p.Doc, "  "), $"{p.Wire}{(p.Optional ? "?" : "")}: {Type(p.Type)}{(p.Nullable ? " | null" : "")}"))])).ToList(),
             Catalog = catalog,
         };
     }
@@ -224,6 +224,7 @@ internal static class TypeScript
         if (op.Params.Any(p => p.In == ParamLocation.Query)) request.Add("query");
         if (op.Body is not null) request.Add("body");
         if (op.Idempotent) request.Add("idempotent: true");
+        if (op.Session != SessionEffect.None) request.Add($"session: '{op.Session.ToString().ToLowerInvariant()}'");
 
         yield return new Operation(
             Doc(op.Doc, "  "),
@@ -305,6 +306,7 @@ internal static class TypeScript
         MapType m => $"Record<string, {Type(m.Value)}>",
         ModelType m => m.Name,
         EnumType e => e.Name,
+        JsonValueType => "unknown",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 

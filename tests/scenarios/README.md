@@ -18,6 +18,10 @@ steps:
       version: $.version     # later steps can use '${version}' (quote it, YAML reads { } as a map)
 ```
 
+`${unique}` is built in: twelve random lowercase letters and digits, fresh for each scenario run, so
+runs against one server never collide on unique values such as emails. Client and server steps
+send the first fixture project as `X-Orvano-Project`.
+
 SdkGen writes a test only dispatch table per language (`operationId` to the generated method), so
 each SDK has one small interpreter instead of one test per scenario. A step whose operation has no
 call for that role in an SDK (a `client` operation in the .NET SDK, for example) skips the scenario

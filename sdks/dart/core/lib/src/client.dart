@@ -10,6 +10,19 @@ import 'generated/version.dart';
 import 'orvano_exception.dart';
 import 'version.dart';
 
+/// What a successful call does to the client's stored session, from the
+/// contract's `x-orvano-session`.
+enum SessionChange {
+  /// A sign in: the response's `session` becomes the stored session.
+  start,
+
+  /// A refresh: the response itself is the new session.
+  refresh,
+
+  /// A sign out: the stored session is cleared.
+  end,
+}
+
 /// Per call settings, the last argument of every generated method.
 final class RequestOptions {
   /// Creates options for one call.
@@ -87,12 +100,14 @@ base class Client {
     return endpoint.replaceFirst(RegExp(r'/+$'), '');
   }
 
-  /// Adds this client's credentials to an outgoing request: the session
-  /// token, when there is one. Clients for other audiences add theirs here
-  /// too.
+  /// Adds this client's credentials to an outgoing request: the access token
+  /// as `Authorization: Bearer`, when someone is signed in. Clients for other
+  /// audiences add theirs here too.
   Future<void> authorize(Map<String, String> headers) async {
-    final token = await session.read();
-    if (token != null && token.isNotEmpty) headers[sessionHeader] = token;
+    final current = await session.read();
+    if (current != null) {
+      headers[authorizationHeader] = 'Bearer ${current.accessToken}';
+    }
   }
 
   /// Sends one request and returns the decoded JSON body, or null when the
@@ -104,6 +119,7 @@ base class Client {
     Map<String, String?> query = const {},
     Object? body,
     bool idempotent = false,
+    SessionChange? session,
     RequestOptions? options,
   }) async {
     final params = {for (final e in query.entries) e.key: ?e.value};
@@ -124,9 +140,11 @@ base class Client {
           'X-Orvano-Project': ?project,
         };
         await authorize(headers);
-        final request =
-            http.AbortableRequest(method, uri, abortTrigger: deadline?.future)
-              ..headers.addAll(headers);
+        final request = http.AbortableRequest(
+          method,
+          uri,
+          abortTrigger: deadline?.future,
+        )..headers.addAll(headers);
         if (encoded != null) {
           request.headers['Content-Type'] = 'application/json';
           request.body = encoded;
@@ -142,10 +160,12 @@ base class Client {
         _checkVersion(response.headers[serverVersionHeader.toLowerCase()]);
         final status = response.statusCode;
         if (status >= 200 && status < 300) {
-          if (status == 204 || method == 'HEAD' || response.body.isEmpty) {
-            return null;
-          }
-          return jsonDecode(response.body);
+          final Object? result =
+              status == 204 || method == 'HEAD' || response.body.isEmpty
+              ? null
+              : jsonDecode(response.body);
+          await _applySession(session, result);
+          return result;
         }
 
         if (retryable &&
@@ -165,6 +185,22 @@ base class Client {
       }
     } finally {
       timer?.cancel();
+    }
+  }
+
+  /// Stores or clears the session after a successful sign in, refresh, or
+  /// sign out.
+  Future<void> _applySession(SessionChange? change, Object? result) async {
+    switch (change) {
+      case null:
+        return;
+      case SessionChange.start:
+        final body = result is Map<String, dynamic> ? result : null;
+        await session.write(AuthSession.fromJson(body?['session']));
+      case SessionChange.refresh:
+        await session.write(AuthSession.fromJson(result));
+      case SessionChange.end:
+        await session.write(null);
     }
   }
 

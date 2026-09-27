@@ -260,4 +260,47 @@ public class ContractReaderTests
         var version = contract!.Models.Single(m => m.Name == "Health").Properties.Single(p => p.Name == "version");
         Assert.Equal("0.4.2", version.Example?.GetValue<string>());
     }
+
+    [Fact]
+    public async Task Reads_any_JSON_value_standard_names_and_session_changes_from_the_auth_contract() // spec 0004
+    {
+        var (contract, errors) = await Repo.ReadAsync(Repo.OpenApi());
+
+        Assert.Empty(errors);
+        var metadata = contract!.Models.Single(m => m.Name == "User").Properties.Single(p => p.Name == "metadata");
+        Assert.Equal(new MapType(JsonValueType.Instance), metadata.Type);
+        var jwks = contract.Models.Single(m => m.Name == "OpenIdConfiguration").Properties.Single(p => p.Wire == "jwks_uri");
+        Assert.Equal("jwksUri", jwks.Name);
+        Assert.Equal(SessionEffect.Start, contract.Operations.Single(o => o.Id == "account.create").Session);
+        Assert.Equal(SessionEffect.None, contract.Operations.Single(o => o.Id == "account.get").Session);
+    }
+
+    [Fact]
+    public async Task Refuses_snake_case_names_outside_a_standard_document() // spec 0004
+    {
+        var doc = Repo.OpenApi();
+        doc["components"]!["schemas"]!["OpenIdConfiguration"]!.AsObject().Remove("x-orvano-standard-names");
+
+        var (contract, errors) = await Repo.ReadAsync(doc);
+
+        Assert.Null(contract);
+        Assert.Contains(errors, e => e.Contains("'jwks_uri'", StringComparison.Ordinal) && e.Contains("x-orvano-standard-names", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("/v1/account", "post", "later", "expected start, refresh, or end")]
+    [InlineData("/v1/account", "post", "refresh", "returns a session model")]
+    [InlineData("/v1/health", "get", "end", "only for client operations")]
+    public async Task Refuses_a_session_change_that_does_not_fit_the_operation(string path, string method, string value, string message) // spec 0004
+    {
+        var doc = Repo.OpenApi();
+        var op = Repo.Operation(doc, path, method);
+        op["x-orvano-session"] = value;
+        if (path == "/v1/health") op["x-orvano-audience"] = "server";
+
+        var (contract, errors) = await Repo.ReadAsync(doc);
+
+        Assert.Null(contract);
+        Assert.Contains(errors, e => e.Contains(message, StringComparison.Ordinal));
+    }
 }

@@ -73,7 +73,8 @@ export async function runScenarios(
 }
 
 async function runScenario(scenario: Scenario, surface: Surface): Promise<void> {
-  const vars = new Map<string, unknown>()
+  // `${unique}` is fresh per scenario run, so runs never collide on unique values such as emails.
+  const vars = new Map<string, unknown>([['unique', uniqueValue()]])
   for (const [index, step] of scenario.steps.entries()) {
     const where = `step ${String(index + 1)} (${step.op ?? `event ${step.event ?? '?'}`}${step.as === undefined ? '' : ` as ${step.as}`})`
     const expect = substitute(step.expect, vars) as ScenarioStep['expect']
@@ -163,6 +164,12 @@ async function collect(items: AsyncIterable<unknown>): Promise<{ items: unknown[
   const all: unknown[] = []
   for await (const item of items) all.push(item)
   return { items: all }
+}
+
+/** Twelve lowercase letters and digits, random per call. */
+function uniqueValue(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(12))
+  return Array.from(bytes, (b) => '0123456789abcdefghijklmnopqrstuvwxyz'[b % 36]).join('')
 }
 
 /** Replaces `${name}` with saved values. A string that is exactly `${name}` keeps the value's type. */

@@ -8,7 +8,7 @@
 /// ```
 library;
 
-export 'src/auth.dart' show MemorySessionStore, SessionStore;
+export 'src/auth.dart' show AuthSession, MemorySessionStore, SessionStore;
 export 'src/client.dart';
 export 'src/events.dart';
 export 'src/generated/errors.dart';

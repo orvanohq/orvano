@@ -18,7 +18,9 @@ public class PublicContractTests
     {
         var result = Build(Repo.OpenApi());
 
-        Assert.Equal(["/v1/health"], Paths(result));
+        Assert.Contains("/v1/health", Paths(result));
+        Assert.Contains("/v1/account", Paths(result));
+        Assert.DoesNotContain(Paths(result), p => p.StartsWith("/v1/test/", StringComparison.Ordinal) || p.StartsWith("/v1/console/", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -26,7 +28,9 @@ public class PublicContractTests
     {
         var result = Build(Repo.OpenApi());
 
-        Assert.Equal(["ErrorCode", "Health", "Problem"], Schemas(result).Order(StringComparer.Ordinal));
+        Assert.Superset(new HashSet<string>(["ErrorCode", "Health", "Problem", "User"]), Schemas(result).ToHashSet());
+        Assert.DoesNotContain("TestErrorCode", Schemas(result));
+        Assert.DoesNotContain("Org", Schemas(result)); // console only
         Assert.DoesNotContain("x-orvano-test", result.ToJsonString(), StringComparison.Ordinal);
     }
 
@@ -35,7 +39,10 @@ public class PublicContractTests
     {
         var result = Build(Repo.OpenApi());
 
-        Assert.Equal(["health"], result["tags"]!.AsArray().Select(t => t!["name"]!.GetValue<string>()));
+        var tags = result["tags"]!.AsArray().Select(t => t!["name"]!.GetValue<string>()).ToList();
+        Assert.Contains("health", tags);
+        Assert.DoesNotContain("test", tags);
+        Assert.DoesNotContain("console", tags);
     }
 
     [Fact]

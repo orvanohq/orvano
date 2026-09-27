@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orvano.Auth.Application;
 using Orvano.Auth.Contracts;
 using Orvano.Auth.Domain;
+using Orvano.Auth.Endpoints;
 using Orvano.Core.Modules;
 
 namespace Orvano.Auth;
@@ -24,9 +25,18 @@ internal sealed class AuthModule : IOrvanoModule
         services.AddSingleton<AuthStore>();
         services.AddSingleton<UserDirectory>();
         services.AddSingleton<IUserDirectory>(sp => sp.GetRequiredService<UserDirectory>());
+        services.AddSingleton<SigningKeys>();
+        services.AddSingleton<AccessTokens>();
+        services.AddSingleton<SessionChecks>();
+        services.AddSingleton<Sessions>();
+        services.AddSingleton<AccountService>();
     }
 
-    public void MapApi(RouteGroupBuilder v1) { }
+    public void MapApi(RouteGroupBuilder v1)
+    {
+        AccountEndpoints.Map(v1);
+        KeysEndpoints.Map(v1);
+    }
 
     public void RegisterWork(IWorkRegistry work) { }
 

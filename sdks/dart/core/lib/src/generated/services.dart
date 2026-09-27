@@ -2,6 +2,50 @@
 import '../client.dart';
 import 'models.dart';
 
+/// Operations in the `account` service.
+final class AccountService {
+  /// Creates the service over [client].
+  AccountService(this._client);
+
+  final Client _client;
+
+  /// Signs a new user up with an email and password, and signs them in.
+  Future<AuthResult> create(
+    CreateAccountRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account',
+      body: body.toJson(),
+      session: SessionChange.start,
+      options: options,
+    );
+    return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Signs a user in with their email and password.
+  Future<AuthResult> createPasswordSession(
+    CreatePasswordSessionRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/sessions/password',
+      body: body.toJson(),
+      session: SessionChange.start,
+      options: options,
+    );
+    return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Gets the signed in user. A server can call it with a user's access token to check that the session is still active.
+  Future<User> get({RequestOptions? options}) async {
+    final json = await _client.send('GET', '/v1/account', options: options);
+    return User.fromJson(json as Map<String, dynamic>);
+  }
+}
+
 /// Operations in the `health` service.
 final class HealthService {
   /// Creates the service over [client].
@@ -16,14 +60,54 @@ final class HealthService {
   }
 }
 
+/// Operations in the `keys` service.
+final class KeysService {
+  /// Creates the service over [client].
+  KeysService(this._client);
+
+  final Client _client;
+
+  /// Gets a project's public signing keys, to check its access tokens.
+  Future<Jwks> getJwks(String projectId, {RequestOptions? options}) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/projects/${Uri.encodeComponent(projectId)}/.well-known/jwks.json',
+      options: options,
+    );
+    return Jwks.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Gets a project's discovery document, for JWT libraries that configure themselves from the issuer.
+  Future<OpenIdConfiguration> getOpenIdConfiguration(
+    String projectId, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/projects/${Uri.encodeComponent(projectId)}/.well-known/openid-configuration',
+      options: options,
+    );
+    return OpenIdConfiguration.fromJson(json as Map<String, dynamic>);
+  }
+}
+
 /// Every service in this package, on one object: `orvano.health.get()`.
 base class Orvano {
   /// Creates the services over [client].
-  Orvano(this.client) : health = HealthService(client);
+  Orvano(this.client)
+    : account = AccountService(client),
+      health = HealthService(client),
+      keys = KeysService(client);
 
   /// The client every service sends through.
   final Client client;
 
+  /// Operations in the `account` service.
+  final AccountService account;
+
   /// Operations in the `health` service.
   final HealthService health;
+
+  /// Operations in the `keys` service.
+  final KeysService keys;
 }

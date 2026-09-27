@@ -9,5 +9,10 @@ namespace Orvano;
     RespectRequiredConstructorParameters = true,
     DefaultIgnoreCondition = JsonIgnoreCondition.Never)]
 [JsonSerializable(typeof(Health))]
+[JsonSerializable(typeof(Jwk))]
+[JsonSerializable(typeof(Jwks))]
+[JsonSerializable(typeof(OpenIdConfiguration))]
+[JsonSerializable(typeof(User))]
+[JsonSerializable(typeof(UserStatus))]
 [JsonSerializable(typeof(OrvanoProblem))]
 internal sealed partial class OrvanoJsonContext : JsonSerializerContext;

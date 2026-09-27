@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:orvano_core/orvano_core.dart' as core;
 import 'package:orvano_dart/orvano_dart.dart' as srv;
@@ -43,13 +44,24 @@ final class Surface {
   const Surface({required this.client, required this.server});
 
   /// The client and server SDK objects for [endpoint], as every Dart runner
-  /// builds them: the server one sends [testServerKey], except in a browser,
-  /// where setting a key throws. Pass [client] to run the client steps through
-  /// a client built elsewhere (the Flutter runner's, from `orvano_flutter`).
-  factory Surface.connect(String endpoint, {core.Client? client}) => Surface(
-    client: ClientSurface(client ?? core.Client(endpoint: endpoint)),
+  /// builds them: both send [project] (the fixture project), and the server
+  /// one sends [testServerKey], except in a browser, where setting a key
+  /// throws. Pass [client] to run the client steps through a client built
+  /// elsewhere (the Flutter runner's, from `orvano_flutter`).
+  factory Surface.connect(
+    String endpoint, {
+    core.Client? client,
+    String? project,
+  }) => Surface(
+    client: ClientSurface(
+      client ?? core.Client(endpoint: endpoint, project: project),
+    ),
     server: ServerSurface(
-      srv.Client(endpoint: endpoint, apiKey: _inBrowser ? null : testServerKey),
+      srv.Client(
+        endpoint: endpoint,
+        project: project,
+        apiKey: _inBrowser ? null : testServerKey,
+      ),
     ),
   );
 
@@ -64,6 +76,16 @@ final class Surface {
     client.client.close();
     server.client.close();
   }
+}
+
+/// The first project in `fixtures.yaml`, which the server seeds in the Test
+/// environment; null when there is none.
+String? fixtureProject(String fixturesYaml) {
+  final fixtures = jsonDecode(jsonEncode(loadYaml(fixturesYaml)));
+  return switch (fixtures) {
+    {'projects': [{'id': final String id}, ...]} => id,
+    _ => null,
+  };
 }
 
 /// Parses one scenario file into plain JSON values.
@@ -107,7 +129,9 @@ Future<void> _runScenario(
   Map<String, Object?> scenario,
   Surface surface,
 ) async {
-  final vars = <String, Object?>{};
+  // `${unique}` is fresh per scenario run, so runs never collide on unique
+  // values such as emails.
+  final vars = <String, Object?>{'unique': _uniqueValue()};
   final steps = (scenario['steps'] as List<Object?>)
       .cast<Map<String, Object?>>();
   for (final (index, step) in steps.indexed) {
@@ -278,3 +302,11 @@ String? _subsetMismatch(Object? expected, Object? actual, String at) {
           : '$at: expected ${jsonEncode(expected)}, got ${jsonEncode(actual)}';
   }
 }
+
+final _random = Random.secure();
+
+/// Twelve lowercase letters and digits, random per call.
+String _uniqueValue() => String.fromCharCodes([
+  for (var i = 0; i < 12; i++)
+    '0123456789abcdefghijklmnopqrstuvwxyz'.codeUnitAt(_random.nextInt(36)),
+]);

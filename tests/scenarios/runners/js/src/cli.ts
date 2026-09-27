@@ -23,15 +23,29 @@ const marker = 'ORVANO_SCENARIO_RESULTS '
 type Target = 'node' | 'bun' | 'deno' | 'browser' | 'workerd' | 'nextjs'
 const targets: readonly Target[] = ['node', 'bun', 'deno', 'browser', 'workerd', 'nextjs']
 
-/** The first console session in `fixtures.yaml`, which the server accepts in the Test environment. */
-async function loadConsoleSession(): Promise<string | undefined> {
+/**
+ * The first console session and the first project in `fixtures.yaml`, which the server seeds in
+ * the Test environment.
+ */
+async function loadFixtures(): Promise<{ consoleSession?: string; project?: string }> {
   const fixtures = parse(await readFile(join(scenariosDir, 'fixtures.yaml'), 'utf8')) as {
     consoleSessions?: string[]
+    projects?: { id?: string }[]
   } | null
-  return fixtures?.consoleSessions?.[0]
+  const consoleSession = fixtures?.consoleSessions?.[0]
+  const project = fixtures?.projects?.[0]?.id
+  return {
+    ...(consoleSession === undefined ? {} : { consoleSession }),
+    ...(project === undefined ? {} : { project }),
+  }
 }
 
-const consoleSession = await loadConsoleSession()
+const { consoleSession, project } = await loadFixtures()
+/** The fixtures every runtime needs, as environment variables. */
+const fixtureEnv: Record<string, string> = {
+  ...(consoleSession === undefined ? {} : { ORVANO_CONSOLE_SESSION: consoleSession }),
+  ...(project === undefined ? {} : { ORVANO_PROJECT: project }),
+}
 
 async function loadScenarios(): Promise<Scenario[]> {
   const files = (await readdir(scenariosDir))
@@ -72,7 +86,7 @@ async function inRuntime(
   const stdout = await exec(command, [...args, 'dist/entries/file-runner.js'], {
     ORVANO_SCENARIOS_FILE: file,
     ORVANO_ENDPOINT: endpoint,
-    ...(consoleSession === undefined ? {} : { ORVANO_CONSOLE_SESSION: consoleSession }),
+    ...fixtureEnv,
   })
   const line = stdout.split('\n').find((l) => l.startsWith(marker))
   if (line === undefined) throw new Error(`no results from ${command}:\n${stdout}`)
@@ -129,7 +143,10 @@ async function inBrowser(scenarios: Scenario[]): Promise<ScenarioResult[]> {
     const page = await context.newPage()
     await page.goto(origin)
     await page.waitForFunction(() => typeof window.orvanoRunScenarios === 'function')
-    return await page.evaluate((s) => window.orvanoRunScenarios(s), scenarios)
+    return await page.evaluate(([s, p]) => window.orvanoRunScenarios(s, p), [
+      scenarios,
+      project,
+    ] as const)
   } finally {
     await browser.close()
     server.close()
@@ -145,7 +162,7 @@ async function inWorkerd(scenarios: Scenario[]): Promise<ScenarioResult[]> {
     compatibilityDate: '2026-07-30',
     bindings: {
       ORVANO_ENDPOINT: endpoint,
-      ...(consoleSession === undefined ? {} : { ORVANO_CONSOLE_SESSION: consoleSession }),
+      ...fixtureEnv,
     },
   })
   try {
@@ -170,7 +187,7 @@ async function inNextjs(scenarios: Scenario[]): Promise<ScenarioResult[]> {
     env: {
       ...process.env,
       ORVANO_ENDPOINT: endpoint,
-      ...(consoleSession === undefined ? {} : { ORVANO_CONSOLE_SESSION: consoleSession }),
+      ...fixtureEnv,
     },
     stdio: ['ignore', 'inherit', 'inherit'],
   })
@@ -203,7 +220,7 @@ async function inNextjs(scenarios: Scenario[]): Promise<ScenarioResult[]> {
 async function run(target: Target, scenarios: Scenario[]): Promise<ScenarioResult[]> {
   switch (target) {
     case 'node':
-      return runScenarios(scenarios, createSurface(endpoint, { consoleSession }))
+      return runScenarios(scenarios, createSurface(endpoint, { consoleSession, project }))
     case 'bun':
       return inRuntime('bun', ['run'], scenarios)
     case 'deno':

@@ -255,6 +255,42 @@ public sealed class ProjectStatusJsonConverter : JsonConverter<ProjectStatus>
         });
 }
 
+/// <summary>Whether a user may sign in.</summary>
+[JsonConverter(typeof(UserStatusJsonConverter))]
+public enum UserStatus
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>active</c>.</summary>
+    Active,
+
+    /// <summary>The wire value <c>blocked</c>.</summary>
+    Blocked,
+}
+
+/// <summary>Reads and writes <see cref="UserStatus"/> by wire value; unknown values read as <see cref="UserStatus.Unknown"/>.</summary>
+public sealed class UserStatusJsonConverter : JsonConverter<UserStatus>
+{
+    /// <inheritdoc/>
+    public override UserStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "active" => UserStatus.Active,
+            "blocked" => UserStatus.Blocked,
+            _ => UserStatus.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, UserStatus value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            UserStatus.Active => "active",
+            UserStatus.Blocked => "blocked",
+            _ => throw new JsonException($"UserStatus.{value} has no wire value"),
+        });
+}
+
 /// <summary>An API key for server code. Its secret is never shown again after creation.</summary>
 /// <param name="Id">The key ID.</param>
 /// <param name="Name">A name to recognize the key by, 1 to 100 characters.</param>
@@ -281,6 +317,22 @@ public sealed record ApiKeyPage(
     [property: JsonPropertyName("items")] IReadOnlyList<ApiKey> Items,
     [property: JsonPropertyName("nextCursor")] string? NextCursor);
 
+/// <summary>A signed in user and their new session.</summary>
+/// <param name="User">The user.</param>
+/// <param name="Session">The new session's tokens.</param>
+public sealed record AuthResult(
+    [property: JsonPropertyName("user")] User User,
+    [property: JsonPropertyName("session")] SessionTokens Session);
+
+/// <summary>A new user with an email and password.</summary>
+/// <param name="Email">The email, trimmed, at most 320 characters. Unique in the project, ignoring case.</param>
+/// <param name="Password">8 to 256 characters after Unicode NFKC normalization.</param>
+/// <param name="Name">A display name, at most 256 characters.</param>
+public sealed record CreateAccountRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null);
+
 /// <summary>A new API key.</summary>
 /// <param name="Name">A name to recognize the key by; trimmed, 1 to 100 characters.</param>
 /// <param name="Scopes">What the key may do; at least one scope.</param>
@@ -294,6 +346,13 @@ public sealed record CreateApiKeyRequest(
 /// <param name="Name">The org name; trimmed, 1 to 100 characters.</param>
 public sealed record CreateOrgRequest(
     [property: JsonPropertyName("name")] string Name);
+
+/// <summary>A sign in with an email and password.</summary>
+/// <param name="Email">The email the user signed up with; case does not matter.</param>
+/// <param name="Password">The user's password.</param>
+public sealed record CreatePasswordSessionRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("password")] string Password);
 
 /// <summary>A new platform. Unique per project, type, and identifier, ignoring case.</summary>
 /// <param name="Type">Where the app runs.</param>
@@ -334,6 +393,41 @@ public sealed record InstallSettings(
 /// <param name="SetupRequired">True while no install admin exists: the first console account must come from the installer's setup link.</param>
 public sealed record InstallSetup(
     [property: JsonPropertyName("setupRequired")] bool SetupRequired);
+
+/// <summary>One public signing key, as a JSON Web Key (RFC 7517).</summary>
+/// <param name="Kty">The key type, <c>EC</c>.</param>
+/// <param name="Crv">The curve, <c>P-256</c>.</param>
+/// <param name="X">The public point's x coordinate, base64url.</param>
+/// <param name="Y">The public point's y coordinate, base64url.</param>
+/// <param name="Kid">The key ID, the <c>kid</c> in a token's header.</param>
+/// <param name="Alg">The algorithm, <c>ES256</c>.</param>
+/// <param name="Use">What the key is for, <c>sig</c>.</param>
+public sealed record Jwk(
+    [property: JsonPropertyName("kty")] string Kty,
+    [property: JsonPropertyName("crv")] string Crv,
+    [property: JsonPropertyName("x")] string X,
+    [property: JsonPropertyName("y")] string Y,
+    [property: JsonPropertyName("kid")] string Kid,
+    [property: JsonPropertyName("alg")] string Alg,
+    [property: JsonPropertyName("use")] string Use);
+
+/// <summary>A project's public signing keys: the active key and any key retired within the last 24 hours.</summary>
+/// <param name="Keys">The keys.</param>
+public sealed record Jwks(
+    [property: JsonPropertyName("keys")] IReadOnlyList<Jwk> Keys);
+
+/// <summary>The discovery document standard JWT libraries configure themselves from. Orvano is not an OpenID provider; this exists so tools that take an issuer URL find the keys. Its names are the standard snake case ones.</summary>
+/// <param name="Issuer">The issuer, the <c>iss</c> of every access token of the project.</param>
+/// <param name="JwksUri">Where the project's JWKS lives.</param>
+/// <param name="IdTokenSigningAlgValuesSupported">Always <c>["ES256"]</c>.</param>
+/// <param name="SubjectTypesSupported">Always <c>["public"]</c>.</param>
+/// <param name="ResponseTypesSupported">Always <c>["token"]</c>.</param>
+public sealed record OpenIdConfiguration(
+    [property: JsonPropertyName("issuer")] string Issuer,
+    [property: JsonPropertyName("jwks_uri")] string JwksUri,
+    [property: JsonPropertyName("id_token_signing_alg_values_supported")] IReadOnlyList<string> IdTokenSigningAlgValuesSupported,
+    [property: JsonPropertyName("subject_types_supported")] IReadOnlyList<string> SubjectTypesSupported,
+    [property: JsonPropertyName("response_types_supported")] IReadOnlyList<string> ResponseTypesSupported);
 
 /// <summary>An org: the owner of projects and the unit teammates join.</summary>
 /// <param name="Id">The org ID.</param>
@@ -426,6 +520,19 @@ public sealed record ProjectPage(
     [property: JsonPropertyName("items")] IReadOnlyList<Project> Items,
     [property: JsonPropertyName("nextCursor")] string? NextCursor);
 
+/// <summary>A session's tokens. Send the access token as <c>Authorization: Bearer</c>; trade the refresh token for a new pair before the access token expires. The SDKs do both for you.</summary>
+/// <param name="AccessToken">An ES256 JWT, valid for 15 minutes.</param>
+/// <param name="AccessTokenExpiresAt">When the access token expires.</param>
+/// <param name="RefreshToken">Trades itself for a new pair once; keep it secret.</param>
+/// <param name="RefreshTokenExpiresAt">When the session ends unless it refreshes first: 30 days idle, or 365 days after sign in.</param>
+/// <param name="SessionId">The session ID, also the <c>sid</c> claim of the access token.</param>
+public sealed record SessionTokens(
+    [property: JsonPropertyName("accessToken")] string AccessToken,
+    [property: JsonPropertyName("accessTokenExpiresAt")] DateTimeOffset AccessTokenExpiresAt,
+    [property: JsonPropertyName("refreshToken")] string RefreshToken,
+    [property: JsonPropertyName("refreshTokenExpiresAt")] DateTimeOffset RefreshTokenExpiresAt,
+    [property: JsonPropertyName("sessionId")] string SessionId);
+
 /// <summary>The answer to <c>test.consolePing</c>.</summary>
 /// <param name="Status">Always <c>ok</c>.</param>
 public sealed record TestConsolePing(
@@ -471,3 +578,22 @@ public sealed record UpdatePlatformRequest(
 /// <param name="Name">The new project name; trimmed, 1 to 100 characters.</param>
 public sealed record UpdateProjectRequest(
     [property: JsonPropertyName("name")] string Name);
+
+/// <summary>A user of a project.</summary>
+/// <param name="Id">The user ID.</param>
+/// <param name="Email">The email, as typed at sign up; null for a user without one.</param>
+/// <param name="EmailVerified">Whether the email has been verified.</param>
+/// <param name="Name">The display name; null when none was given.</param>
+/// <param name="Status">Whether the user may sign in.</param>
+/// <param name="Metadata">Your own data about the user: a JSON object of at most 16 KB.</param>
+/// <param name="CreatedAt">When the user signed up.</param>
+/// <param name="LastSignInAt">When the user last signed in; null if never.</param>
+public sealed record User(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("email")] string? Email,
+    [property: JsonPropertyName("emailVerified")] bool EmailVerified,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("status")] UserStatus Status,
+    [property: JsonPropertyName("metadata")] IReadOnlyDictionary<string, JsonElement> Metadata,
+    [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt);

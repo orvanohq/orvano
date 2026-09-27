@@ -9,7 +9,10 @@ import { createSurface } from '../surface.js'
 
 declare global {
   interface Window {
-    orvanoRunScenarios: (scenarios: Scenario[]) => Promise<ScenarioResult[]>
+    orvanoRunScenarios: (
+      scenarios: Scenario[],
+      project: string | undefined,
+    ) => Promise<ScenarioResult[]>
   }
 }
 
@@ -28,7 +31,7 @@ function keyGuard(): ScenarioResult {
   }
 }
 
-window.orvanoRunScenarios = async (scenarios) => [
+window.orvanoRunScenarios = async (scenarios, project) => [
   keyGuard(),
-  ...(await runScenarios(scenarios, createSurface(location.origin, { browser: true }))),
+  ...(await runScenarios(scenarios, createSurface(location.origin, { browser: true, project }))),
 ]
