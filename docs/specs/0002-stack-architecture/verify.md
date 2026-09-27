@@ -1,4 +1,4 @@
-# Verify: Stack & architecture · spec 0002 · updated 2026-09-25
+# Verify: Stack & architecture · spec 0002 · updated 2026-09-27
 _Spec 0002 is a decision spec with no numbered acceptance criteria. These steps come from its "What the scaffold must contain" list (labeled S-1 to S-8 below) and its value sourcing table. `/check verify` runs them; `/test` locks the durable ones._
 
 ## Local dev (Aspire)
@@ -7,6 +7,7 @@ _Spec 0002 is a decision spec with no numbered acceptance criteria. These steps 
 - [x] `curl <console-url>/v1/health` → `{"status":"ok","version":"0.0.0"}` answered through the Vite proxy (same origin) → S-1
 - [x] `curl <role-url>/internal/readyz` for api, worker, realtime → `Healthy` 200 on each → S-3
 - [x] Worker logs show "This worker is the scheduler leader" and "Listening on orvano_events, orvano_jobs", with no errors while idle → S-3
+- [x] Start `api`, `worker`, and `realtime` each in Development with only its own settings (no `ORVANO_PUBLIC_URL` outside `api`, no `ORVANO_MASTER_KEYS` in `realtime`) → each starts listening with no service validation error. Locked by `Starts_every_long_running_role_in_Development_with_only_its_own_settings` → S-3
 
 ## Database
 - [x] In the dev Postgres: schema `orvano` owned by `orvano_admin`, and tables `schema_migrations`, `events`, `jobs` exist → S-2
@@ -53,7 +54,7 @@ _These need a consumer that fails on purpose. Register one from a test only modu
 ## Acceptance criteria coverage
 - S-1 (one command starts everything, console placeholder, health through the console origin): local dev steps 1 to 3
 - S-2 (first migration creates the schema and tables; roles and privileges): database steps 1 and 2
-- S-3 (dispatcher, job loop, pruning idle without errors; readyz on every role): local dev steps 4 and 5, database steps 3 and 4
+- S-3 (dispatcher, job loop, pruning idle without errors; readyz on every role; every role starts with only its own settings): local dev steps 4 to 6, database steps 3 and 4
 - S-4 (dotnet and pnpm builds, CI, drift check): command steps 1 to 4
 - S-5 (chiseled-extra smoke test: Npgsql and time zones): compose job in CI, command step 5 (roles exit on a missing time zone or database)
 - S-6 (compose behind Caddy with `orvano healthcheck`): command steps 5 to 8

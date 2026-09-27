@@ -132,6 +132,33 @@ Retrying for about 10 hours (25 attempts) turns a same day hotfix into automatic
 
 **Changed after the cross check** (an independent read of the spec on another model): the database guard moved from a single mode fallback to a savepoint per consumer, confirmed by the engineer. The spec also now pins down the `NamedConsumer` registry shape, `JobStore.FailPermanentlyAsync` and the `JobLoop` catch order, how the redispatch payload is built and read, and the `EventRedispatch` constants.
 
+## Role specific module services (added 2026-09-27)
+
+### Context
+
+The original module interface had one services hook, `ConfigureServices`, run in every role. That was safe while every kernel service existed in every role. Spec 0004 changed that: `PublicUrl` (and the forwarded headers setup) is built only in `api`, and `SecretBox`, which holds the master key, only in `api` and `worker`. The Auth module then registered its token and session services (`SigningKeys`, `AccessTokens`, `Sessions`, `AccountService`, `SessionService`, `UsersService`, `IConsoleSessions`) in `ConfigureServices`, so `worker` and `realtime` registered services whose dependencies they did not have.
+
+Development validates every registration when the app starts, so under the Aspire AppHost the `worker` and `realtime` roles crashed on launch. With no worker in dev, new projects never left provisioning. `Test` and `Production` skip that validation and never resolve those services outside `api`, so the tests, the scenarios, and the compose check all stayed green. PR #41 (commit `333f62b`) fixed it in code; this entry records the decision.
+
+The forces: the set of role specific kernel services will grow (the admin data source is already worker only, and later rows add worker jobs that decrypt secrets). Modules must stay simple to write, and existing modules should not change when a hook is added. The master key must stay out of `realtime`, which is the role most exposed to long lived client connections.
+
+### Options considered
+
+- *A default interface method per role hook, starting with `ConfigureApiServices` (chosen).* The host calls it only in `api`, right after `ConfigureServices`. Existing modules compile unchanged because the body defaults to empty. Each role's registrations are visible by the method name. Con: one more hook to know about, and the right hook depends on facts (which kernel service lives where) that the compiler does not check.
+- *Pass the role into `ConfigureServices`* (`ConfigureServices(services, config, role)`). One hook, full flexibility. Con: every module grows `if (role == ...)` branches, the choice hides in method bodies instead of the interface, every existing module changes signature, and the `OrvanoRole` enum leaks from the host into every module.
+- *Register `PublicUrl` and `SecretBox` in every role.* No module change at all. Con: `realtime` would need `ORVANO_MASTER_KEYS` and hold the master key in memory, which spec 0002's least privilege stance rejects on purpose; `worker` and `realtime` would also need `ORVANO_PUBLIC_URL`, a setting they never use and that every self hoster must then set per role. Rejected.
+- *Let each module resolve role specific dependencies lazily* (`IServiceProvider` or factories). Con: hides the dependency, turns a startup failure into a failure on the first request, and defeats the Development validation that caught this bug.
+
+### Rationale
+
+The default interface method keeps the role decision where you can see it, at the hook name, and costs existing modules nothing. It matches how the interface already splits the other hooks by role (`MapApi`, `RegisterWork`, `RegisterRealtime`). Passing the role in would scatter the same decision through every module's body. Widening the kernel would trade a one time code change for a permanent security cost in `realtime`, the one role that should never be able to decrypt a secret.
+
+**Worker and realtime hooks wait for a real caller.** You suggested adding `ConfigureWorkerServices` and `ConfigureRealtimeServices` later, and that is the right call. No module needs one today: Auth's worker jobs use only the database. Job handlers already reach `SecretBox` and the admin data source through `job.Services` (the Platform provisioning jobs do), so the gap a worker hook fills is narrow: a service class that wraps one of them. A hook with no caller is an extension point nobody tests. Adding one later is cheap because a default empty body changes no module, and its placement is already fixed in `index.md` so the first caller has nothing to decide. The likely first callers are named in `index.md` (*Module structure*).
+
+**Decisions made while writing the update** (not asked):
+- **`ConfigureApiServices` runs after `ConfigureServices`, in addition to it.** In .NET dependency injection the last registration of a type wins, so running the api hook second means an api registration can deliberately replace a shared one, never the other way round by accident. Runner up: run it first.
+- **The guard is a startup test per role in Development, with only that role's settings.** It reproduces how the AppHost starts each role, so it catches a misplaced registration whatever the service is. Runner up: turn on registration validation in `Test` too, so the shared scenarios catch it. That would have caught the worker half of this bug, but the scenario compose file runs no `realtime` role, so it would have missed the realtime half.
+
 ## References
 
 **Project sources**:
@@ -141,6 +168,8 @@ Retrying for about 10 hours (25 attempts) turns a same day hotfix into automatic
 - `docs/specs/0001-api-contract-sdk-pipeline/`: .NET 10, C# generator, audiences, `Test` environment, GitHub Actions assumption
 - Installed skills: `aspire-deployment` (`.claude/skills/aspire-deployment/`) for Aspire 13.x and its Docker Compose publishing
 - Engineer's picks in the design interview, 2026-09-24
+- PR #41 (commit `333f62b`): `IOrvanoModule.ConfigureApiServices`, the Auth registrations it moved, and the regression test in `server/tests/Orvano.Server.Tests/Hosting/OrvanoBinaryTests.cs`
+- `docs/specs/0004-app-user-auth/`: the role specific kernel services (`PublicUrl` in `api`, `SecretBox` in `api` and `worker`)
 
 **Practices & standards**:
 - Monolith first; premature microservices failure pattern
