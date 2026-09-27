@@ -1,7 +1,7 @@
 # 0002. Orvano stack and architecture
 
 **Date**: 2026-09-24
-**Updated**: 2026-09-27 (the installer follow up is settled by spec 0006); 2026-09-25 (poison events: a failing event consumer no longer stalls the outbox)
+**Updated**: 2026-09-27 (module hooks: `ConfigureApiServices` for services only the api role can build, from PR #41); 2026-09-27 (the installer follow up is settled by spec 0006); 2026-09-25 (poison events: a failing event consumer no longer stalls the outbox)
 **Status**: Accepted
 
 ## Summary
@@ -228,12 +228,25 @@ public interface IWorkRegistry
 public interface IOrvanoModule
 {
     string Name { get; }
-    void ConfigureServices(IServiceCollection services, IConfiguration config); // every role
-    void MapApi(RouteGroupBuilder v1);                                          // api role
-    void RegisterWork(IWorkRegistry work);                                      // worker role: event handlers, job kinds, schedules
-    void RegisterRealtime(IRealtimeRegistry realtime);                          // realtime role
+    void ConfigureServices(IServiceCollection services, IConfiguration config);        // every role
+    void ConfigureApiServices(IServiceCollection services, IConfiguration config) { }  // api role, right after ConfigureServices
+    void MapApi(RouteGroupBuilder v1);                                                 // api role
+    void RegisterWork(IWorkRegistry work);                                             // worker role: event handlers, job kinds, schedules
+    void RegisterRealtime(IRealtimeRegistry realtime);                                 // realtime role
 }
 ```
+
+- **Register a service in the hook for the roles that can build it.** `ConfigureServices` runs in every role, so a module registers there only services that every role can build (the database, the cache, the rate limits, and config it validates at startup). A service that needs a role specific kernel service goes in the matching role hook. Today the role specific kernel services are:
+
+  | Kernel service | Built in | So a module service that needs it goes in |
+  |---|---|---|
+  | `PublicUrl` (`ORVANO_PUBLIC_URL`), forwarded headers (`ORVANO_TRUSTED_PROXIES`) | `api` | `ConfigureApiServices` |
+  | `SecretBox` (`ORVANO_MASTER_KEYS`) | `api` and `worker` | `ConfigureApiServices` for an api service; a worker job handler resolves it from `job.Services` (see the next point) |
+  | The `OrvanoDb.Admin` data source (`ORVANO_DB_ADMIN_URL`) | `worker` | nowhere yet: a job handler resolves it from `job.Services` (see the next point) |
+
+  The `realtime` role never gets `SecretBox`: it holds no master key on purpose.
+- **Only the api has its own services hook.** `ConfigureWorkerServices` and `ConfigureRealtimeServices` are added when a module first needs one, following the same pattern: a default empty body, run only in that role, right after every module's `ConfigureServices` and before the host's own `AddWorker` or `AddRealtime`. The order matters only when a module deliberately replaces a shared registration (the last registration of a type wins). "Needs one" means a module wants to register a service (a class other code depends on, not just a handler passed to `RegisterWork`) that depends on a worker only kernel service. Until then, a job handler that needs `SecretBox` or the admin data source resolves it from `job.Services` when it runs, as `ProjectJobs` does for the admin data source, and a module service registered in `ConfigureServices` never depends on either. The likely first caller of a worker hook is a service that decrypts a secret (row 24's provider credentials or row 31's webhook signing secrets) or one that runs DDL through the admin data source (row 19's per project migrations).
+- **The guard is a test, not the environment.** Development validates every registration when the app starts, but `Test` and `Production` do not, so a wrongly placed registration passes CI and the compose check and then crashes the role under the Aspire AppHost. `Starts_every_long_running_role_in_Development_with_only_its_own_settings` (`server/tests/Orvano.Server.Tests/Hosting/OrvanoBinaryTests.cs`) starts `api`, `worker`, and `realtime` in Development with only the settings each role gets, so it fails on the next misplaced registration. It checks registrations, not handler bodies: a handler must resolve only what its own role builds (the worker has `SecretBox` and the admin data source, realtime has neither), and a mistake there fails only when the handler runs, so that job's own integration tests cover it.
 
 - A module never reads or writes another module's tables; it calls the other module's public contract. Platform tables carry the module name as a prefix (`orvano.platform_projects`, `orvano.auth_users`) so ownership is visible in SQL.
 
@@ -368,6 +381,7 @@ deploy/compose/                  docker-compose.yml and .env.example (the produc
 - Dev routing (Vite proxy) differs from production routing (Caddy); routing bugs show only in the compose check.
 - A redispatched consumer delivers late (up to about 10 hours) and out of order. Consumers whose work loses value with time (for example a notification) must check the event's `createdAt` and decide whether it is still worth sending.
 - A consumer that hangs (an endless loop, not a throw) still stalls the dispatcher, because synchronous code cannot be cancelled. The only guard is that consumers stay small and do no IO.
+- Where a module registers a service now depends on which kernel services the role has, and the compiler cannot check it. A misplaced registration shows up only when a role starts in Development, so the regression test in *Module structure* is the one guard; a new long running role must join its cases.
 - The `IWorkRegistry.OnEvent` signature changes. Nothing calls it yet, so the change is free now and never again.
 - A failed event is stored twice for a while (the event row and the redispatch job's copy). The jobs table has no retention until row 33 adds it.
 
