@@ -11,9 +11,6 @@ internal static class InstallCommand
 {
     public const int Refused = 2;
 
-    /// <summary>The line <c>install.sh</c> reads to learn what this run did.</summary>
-    public const string ResultPrefix = "ORVANO_INSTALL_RESULT";
-
     public static async Task<int> RunAsync(IReadOnlyList<string> args, InstallHost host)
     {
         var options = InstallOptions.Parse(args, out var error);
@@ -107,7 +104,7 @@ internal static class InstallCommand
             : $"Postgres tuning for {memTotal} MiB");
 
         await host.Out.WriteLineAsync($"Orvano {version}: {mode.ToString().ToLowerInvariant()} at {result.PublicUrl}");
-        await host.Out.WriteLineAsync($"{ResultPrefix} generated_master_key={(result.GeneratedMasterKey ? 1 : 0)}");
+        await files.WriteResultAsync(result.GeneratedMasterKey);
         return 0;
     }
 

@@ -38,9 +38,11 @@ flag_help=0
 say() { printf '%s\n' "$@"; }
 
 # Appends one timestamped line to install.log once the install directory exists. Never pass a secret.
+# The group sends the shell's own "Permission denied" (a non root run) to /dev/null too: a redirect on
+# the command itself would open install.log before 2>/dev/null takes effect.
 log() {
   if [ -d "$flag_dir" ]; then
-    printf '%s install.sh: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >>"$flag_dir/install.log" 2>/dev/null || :
+    { printf '%s install.sh: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >>"$flag_dir/install.log"; } 2>/dev/null || :
   fi
 }
 
@@ -333,32 +335,27 @@ run_installer() {
     pull_policy=never
   fi
 
-  work=$(mktemp -d) || fail "Could not create a temporary directory."
-  trap 'rm -rf "$work"' EXIT
+  # orvano install writes what it did to this file; a stale one from an earlier run must not count.
+  result_file="$flag_dir/.install-result"
+  rm -f "$result_file"
 
   # Prompts read the terminal, because under `curl ... | sh` standard input is this script.
-  if (: </dev/tty) 2>/dev/null; then
-    {
-      docker run --rm --pull "$pull_policy" --user 0:0 --network host -v "$flag_dir:/install" -it \
-        "$installer_image" install --existing-data="$existing_data" --version "$version" "$@" </dev/tty
-      echo $? >"$work/rc"
-    } 2>&1 | tee "$work/out"
+  if has_tty; then
+    docker run --rm --pull "$pull_policy" --user 0:0 --network host -v "$flag_dir:/install" -it \
+      "$installer_image" install --existing-data="$existing_data" --version "$version" "$@" </dev/tty
   else
-    {
-      docker run --rm --pull "$pull_policy" --user 0:0 --network host -v "$flag_dir:/install" \
-        "$installer_image" install --existing-data="$existing_data" --version "$version" "$@" </dev/null
-      echo $? >"$work/rc"
-    } 2>&1 | tee "$work/out"
+    docker run --rm --pull "$pull_policy" --user 0:0 --network host -v "$flag_dir:/install" \
+      "$installer_image" install --existing-data="$existing_data" --version "$version" "$@" </dev/null
   fi
-
-  rc=$(cat "$work/rc" 2>/dev/null || echo 1)
+  rc=$?
   case $rc in
     0) ;;
     2) log "orvano install refused"; exit 2 ;;
     *) log "orvano install failed with exit code $rc"; exit 1 ;;
   esac
 
-  generated_master_key=$(tr -d '\r' <"$work/out" | sed -n 's/^ORVANO_INSTALL_RESULT .*generated_master_key=\([01]\).*$/\1/p' | tail -n 1)
+  generated_master_key=$(sed -n 's/^generated_master_key=\([01]\)$/\1/p' "$result_file" 2>/dev/null | tail -n 1)
+  rm -f "$result_file"
 }
 
 # Reads a key from .env as root (unquoted values, which is how the installer writes these keys).

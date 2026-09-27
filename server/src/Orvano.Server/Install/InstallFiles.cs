@@ -14,6 +14,7 @@ internal sealed class InstallFiles(string directory)
     public const string Env = ".env";
     public const string PreviousEnv = ".env.previous";
     public const string Log = "install.log";
+    public const string Result = ".install-result";
 
     private const UnixFileMode Private = UnixFileMode.UserRead | UnixFileMode.UserWrite;
     private const UnixFileMode Public = Private | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
@@ -39,6 +40,13 @@ internal sealed class InstallFiles(string directory)
         if (previous is not null) await WriteAsync(PreviousEnv, previous, Private);
         await WriteAsync(Env, content, Private);
     }
+
+    /// <summary>
+    /// Writes <c>.install-result</c> (0600), which <c>install.sh</c> reads and deletes to learn what
+    /// this run did. A file, not a printed line, so you never see it and prompts reach you unfiltered.
+    /// </summary>
+    public Task WriteResultAsync(bool generatedMasterKey) =>
+        WriteAsync(Result, $"generated_master_key={(generatedMasterKey ? 1 : 0)}\n", Private);
 
     /// <summary>Appends one timestamped line to <c>install.log</c> (0600). Never pass a secret.</summary>
     public async Task LogAsync(DateTimeOffset now, string message)

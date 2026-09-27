@@ -31,12 +31,13 @@ public sealed class InstallCommandTests : IDisposable
     private string Read(string file) => File.ReadAllText(Path.Combine(_dir, file));
 
     [Fact]
-    public async Task A_fresh_install_writes_the_files_and_the_result_line()
+    public async Task A_fresh_install_writes_the_files_and_the_result_file()
     {
         var exit = await RunAsync("--domain", "localhost", "--existing-data=no", "--yes", "--no-pull", "--dir", "/opt/orvano", "--timeout", "300");
 
         Assert.Equal(0, exit);
-        Assert.Contains("ORVANO_INSTALL_RESULT generated_master_key=1", _out.ToString());
+        Assert.Equal("generated_master_key=1\n", Read(".install-result"));
+        Assert.DoesNotContain("generated_master_key", _out.ToString());
         Assert.Equal(File.ReadAllText(RepoPaths.Combine("deploy", "compose", "docker-compose.yml")), Read("docker-compose.yml"));
         Assert.Equal(File.ReadAllText(RepoPaths.Combine("deploy", "compose", "initdb", "10-orvano-roles.sh")), Read("initdb/10-orvano-roles.sh"));
         Assert.False(File.Exists(Path.Combine(_dir, "docker-compose.override.yml")));
@@ -51,6 +52,7 @@ public sealed class InstallCommandTests : IDisposable
         {
             Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(Path.Combine(_dir, ".env")));
             Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(Path.Combine(_dir, "install.log")));
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(Path.Combine(_dir, ".install-result")));
             Assert.Equal((UnixFileMode)0b110_100_100, File.GetUnixFileMode(Path.Combine(_dir, "docker-compose.yml")));
             Assert.Equal((UnixFileMode)0b111_101_101, File.GetUnixFileMode(Path.Combine(_dir, "initdb", "10-orvano-roles.sh")));
         }
@@ -68,7 +70,7 @@ public sealed class InstallCommandTests : IDisposable
 
         Assert.Equal(0, exit);
         Assert.Equal(env, Read(".env"));
-        Assert.Contains("ORVANO_INSTALL_RESULT generated_master_key=0", _out.ToString());
+        Assert.Equal("generated_master_key=0\n", Read(".install-result"));
         Assert.Equal("services: {}\n", Read("docker-compose.override.yml"));
         Assert.NotEqual("edited\n", Read("docker-compose.yml"));
         Assert.False(File.Exists(Path.Combine(_dir, ".env.previous")));

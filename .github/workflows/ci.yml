@@ -140,8 +140,15 @@ jobs:
       # The chiseled-extra image must connect to Postgres over Npgsql and resolve a named time zone;
       # the roles refuse to start otherwise, so healthy containers prove both. The first run also
       # proves `orvano install` runs as --user 0:0 in the chiseled image.
+      # The master key block shows only when this run generated the key; the result install.sh reads
+      # it from is a file it deletes, never a line you see.
       - name: First install
-        run: sudo sh deploy/install/install.sh --version "$V" --domain localhost --yes --no-pull
+        shell: bash
+        run: |
+          sudo sh deploy/install/install.sh --version "$V" --domain localhost --yes --no-pull 2>&1 | tee "$RUNNER_TEMP/first.out"
+          grep -q 'Back up your master key now' "$RUNNER_TEMP/first.out"
+          if grep -q 'generated_master_key' "$RUNNER_TEMP/first.out"; then echo "the result line was shown"; exit 1; fi
+          if sudo test -e /opt/orvano/.install-result; then echo ".install-result was left behind"; exit 1; fi
       - name: Caddyfile is valid with and without an ACME email
         run: |
           for email in "" ops@example.com; do
@@ -156,9 +163,11 @@ jobs:
           # HSTS only on HTTPS installs (spec 0006, AC-26).
           if curl -sI http://localhost/ | grep -qi '^strict-transport-security'; then echo "HSTS sent on http://localhost"; exit 1; fi
       - name: Second install changes no secret
+        shell: bash
         run: |
           sudo cp /opt/orvano/.env "$RUNNER_TEMP/env.first"
-          sudo sh deploy/install/install.sh --version "$V" --domain localhost --yes --no-pull
+          sudo sh deploy/install/install.sh --version "$V" --domain localhost --yes --no-pull 2>&1 | tee "$RUNNER_TEMP/second.out"
+          if grep -q 'Back up your master key now' "$RUNNER_TEMP/second.out"; then echo "the master key block showed on a rerun"; exit 1; fi
           for key in POSTGRES_PASSWORD ORVANO_ADMIN_PASSWORD ORVANO_APP_PASSWORD ORVANO_MASTER_KEYS ORVANO_SETUP_TOKEN; do
             first=$(sudo grep "^$key=" "$RUNNER_TEMP/env.first")
             second=$(sudo grep "^$key=" /opt/orvano/.env)
