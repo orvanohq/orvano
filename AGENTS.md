@@ -20,12 +20,14 @@ Tracer Bullet: each version ships one capability end to end through every layer 
 corepack enable pnpm && pnpm install                    # install
 flutter pub get                                         # install the Dart workspace (SDKs and scenario runners)
 dotnet run --project dev/Orvano.AppHost                 # dev: Postgres, every role, console, Aspire dashboard
+dotnet run --project dev/Orvano.AppHost -- --OrvanoDev:Fixtures=true   # dev with api and worker in Test and the console signed in to the Fixtures org (row 8 removes it)
 dotnet build Orvano.slnx && pnpm -r build               # build
 dotnet test --solution Orvano.slnx                      # test (Docker must be running)
 dotnet format Orvano.slnx && pnpm lint:fix && pnpm format   # fix lint and format (CI checks all three)
 docker compose -f deploy/compose/docker-compose.yml up --build   # production shape on http://localhost
 pnpm --filter @orvano/contract build && dotnet run --project tools/sdkgen   # after a contract change: regenerate, then commit both
 docker compose -f tests/scenarios/compose.yml up -d --build --wait   # Test server on :8080 for the shared scenarios
+docker compose -f tests/scenarios/compose.yml --profile console up -d --build --wait   # adds the gateway (Caddy plus the console build) on :8081; then `pnpm --filter @orvano/console test:e2e`
 ```
 
 ## Specs
@@ -51,8 +53,8 @@ Stored in `docs/specs/NNNN-title/` (`index.md`, `rationale.md`, optional `verify
 Installed (scope row 2):
 - Lint and format: `.editorconfig` with `dotnet format`, .NET analyzers (`AnalysisLevel` latest, `TreatWarningsAsErrors`) in `Directory.Build.props`; ESLint flat config (typescript-eslint, react hooks) plus Prettier for every pnpm workspace.
 - Pre commit: Lefthook runs `dotnet format` and ESLint/Prettier on staged files only, then restages what they fixed. `pnpm install` installs the hooks; skip once with `LEFTHOOK=0`. Builds, typecheck, and tests stay in CI.
-- Tests: xUnit v3 plus Testcontainers (server, in place), xUnit for SdkGen (`tools/tests/`) and the .NET SDK (`sdks/dotnet/tests/`); Vitest for the JS SDKs (`sdks/js/test/`, `sdks/nextjs/test/`), plus Testing Library for the console when row 5 lands; `package:test` for the Dart SDKs (`sdks/dart/*/test/`).
-- CI: `.github/workflows/ci.yml` runs lint and format checks (`dotnet format --verify-no-changes`, `pnpm lint`, `pnpm format:check`), build, tests, the EF drift check, and the compose smoke test.
+- Tests: xUnit v3 plus Testcontainers (server, in place), xUnit for SdkGen (`tools/tests/`) and the .NET SDK (`sdks/dotnet/tests/`); Vitest for the JS SDKs (`sdks/js/test/`, `sdks/nextjs/test/`), Vitest browser mode in real Chromium with axe (`*.browser.test.tsx`) and Playwright end to end tests (`console/e2e/`) for the console; `package:test` for the Dart SDKs (`sdks/dart/*/test/`).
+- CI: `.github/workflows/ci.yml` runs lint and format checks (`dotnet format --verify-no-changes`, `pnpm lint`, `pnpm format:check`), build, tests, the console browser and end to end tests, the EF drift check, and the compose smoke test.
 - SDK CI: `.github/workflows/sdks.yml` fails when `contract/dist/openapi.json` or generated code is stale, then runs the shared scenarios on Node, Bun, Deno, Chromium, workerd, Next.js, Dart, Flutter (Chrome, Android), and .NET (`net10.0`, `netstandard2.0`). `sdks-nightly.yml` runs Flutter on the iOS simulator. `sdks.yml` also runs the TS and Dart SDK unit tests and reports breaking changes since the last release tag (oasdiff).
 - Release: pushing the tag `v<VERSION>` runs `.github/workflows/release.yml`, which runs `sdks.yml` and then publishes to npm, pub.dev, and NuGet and updates the `orvano-js`, `orvano-dart`, and `orvano-dotnet` mirrors. It is a dry run until 0.1, and a manual run is always a dry run. Flutter 3.44.2 is pinned in `.tool-versions` and both workflows so `dart format` output matches everywhere.
 
