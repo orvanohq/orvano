@@ -28,7 +28,7 @@ Commit `dist/openapi.json` and the generated code together. The server's handler
 
 ## Conventions (SdkGen enforces these and names every violation)
 
-- One folder per product (`system/`, later `auth/`, ...), each imported from `main.tsp`.
+- One folder per product (`system/`, `platform/`, `auth/`, ...), each imported from `main.tsp`.
 - Every operation carries `@operationId("<service>.<method>")` in camelCase, `@extension("x-orvano-audience", "client" | "server" | "both" | "console")`, and `@extension("x-orvano-service", "<service>")` matching the operationId prefix.
 - Paths live under `/v1/`; `console` operations, and only they, live under `/v1/console/`. Project scoped console operations take the project from `X-Orvano-Project` (never a path parameter) and live under `/v1/console/project/`.
 - A create answers 201 with the created model; a delete with nothing to return answers 204 (`NoContentResponse`). A PATCH uses `@patch(#{ implicitOptionality: false })` with an explicit request model.
@@ -40,6 +40,9 @@ Commit `dist/openapi.json` and the generated code together. The server's handler
 - Parameters are path or query only, and primitive (string, number, boolean, date).
 - Models are PascalCase with camelCase properties. Enums are named string enums. No inline objects, no unions except `T | null`; discriminated unions are not supported by SdkGen yet.
 - Mark a retry safe operation with `@extension("x-orvano-idempotent", true)`.
+- Every operation that needs a credential names it with `@useAuth(bearer)`, `@useAuth(apiKey)`, or `@useAuth(consoleSession)` (the schemes in `auth/security.tsp`); sign up, sign in, and refresh need none. An `apiKey` operation must also carry `@extension("x-orvano-scope", "<an ApiKeyScope value>")`, and no other operation may.
+- An operation that changes the client's stored session carries `@extension("x-orvano-session", "start" | "refresh" | "end" | "user")` (sign in, refresh, sign out, the signed in user changed); the generated call updates the session through the runtime.
+- A model whose wire names follow an outside standard (the JWKS in `auth/keys.tsp`) carries `@extension("x-orvano-standard-names", true)`, so its snake_case JSON names stay as they are. Use `unknown` only for JSON the API stores without a schema (user metadata).
 - Write `@doc` on every model, property, and operation (it becomes SDK docs) and `@example` values on model properties (they feed the docs snippets in `dist/examples/`).
 
 ## Gotchas
@@ -52,5 +55,6 @@ Commit `dist/openapi.json` and the generated code together. The server's handler
 ## Related specs
 
 - [0001 API contract and SDK pipeline](../docs/specs/0001-api-contract-sdk-pipeline/index.md)
+- [0004 App user sign up, sign in, and sessions](../docs/specs/0004-app-user-auth/index.md) (auth schemes, scopes, session effects)
 
 _Drafted by /sync from the introducing change, worth a quick human pass._

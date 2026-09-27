@@ -20,7 +20,6 @@ Tracer Bullet: each version ships one capability end to end through every layer 
 corepack enable pnpm && pnpm install                    # install
 flutter pub get                                         # install the Dart workspace (SDKs and scenario runners)
 dotnet run --project dev/Orvano.AppHost                 # dev: Postgres, every role, console, Aspire dashboard
-dotnet run --project dev/Orvano.AppHost -- --OrvanoDev:Fixtures=true   # dev with api and worker in Test and the console signed in to the Fixtures org (row 8 removes it)
 dotnet build Orvano.slnx && pnpm -r build               # build
 dotnet test --solution Orvano.slnx                      # test (Docker must be running)
 dotnet format Orvano.slnx && pnpm lint:fix && pnpm format   # fix lint and format (CI checks all three)
@@ -101,6 +100,7 @@ MCP servers: Aspire MCP (recommended), GitHub MCP (recommended), Postgres MCP Pr
 
 - [server/AGENTS.md](server/AGENTS.md) (.NET server: modules, Core kernel, migrations, tests)
 - [server/src/Orvano.Platform/AGENTS.md](server/src/Orvano.Platform/AGENTS.md): the Platform module, its layers, unit of work, jobs, and console endpoints
+- [server/src/Orvano.Auth/AGENTS.md](server/src/Orvano.Auth/AGENTS.md): the Auth module, app users and console accounts, sessions, signing keys, and which hook registers what
 - [console/AGENTS.md](console/AGENTS.md) (React console: routes, data fetching, UI rules)
 - [contract/AGENTS.md](contract/AGENTS.md): the TypeSpec API contract, operation metadata, how to add an endpoint
 - [tools/sdkgen/AGENTS.md](tools/sdkgen/AGENTS.md): SdkGen, the C# generator, its templates and type mapping
