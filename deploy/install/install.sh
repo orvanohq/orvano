@@ -21,9 +21,13 @@ DATA_VOLUME="orvano_orvano-pg"
 DOCKER_DOCS="https://docs.docker.com/engine/install/"
 MIN_DOCKER=24
 MIN_COMPOSE=2.24
+# MemTotal floors in kB: 1.8 GiB refuses, 3.5 GiB warns (spec 0006, AC-2 and AC-3).
+MEM_FLOOR_KB=1887437
+MEM_WARN_KB=3670016
 
 flag_version=""
 flag_dir="/opt/orvano"
+flag_yes=0
 flag_no_pull=0
 flag_timeout=300
 flag_help=0
@@ -44,6 +48,37 @@ refuse() {
   printf '%s\n' "$*" >&2
   log "refused: $*"
   exit 2
+}
+
+warn() { printf 'Warning: %s\n' "$*"; }
+
+# True when there is a terminal to ask on. Under `curl ... | sh` standard input is this script, so
+# questions read /dev/tty.
+has_tty() { (: </dev/tty) 2>/dev/null; }
+
+# A yes or no question whose default is no. --yes answers yes; without a terminal it takes the default.
+confirm() {
+  if [ "$flag_yes" = 1 ]; then
+    say "$1 yes (--yes)"
+    return 0
+  fi
+  if ! has_tty; then
+    say "$1 no (no terminal; pass --yes to continue)"
+    return 1
+  fi
+  printf '%s [y/N] ' "$1" >/dev/tty
+  read -r answer </dev/tty || return 1
+  case $answer in
+    y | Y | yes | YES | Yes) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Warns, then asks whether to go on (default no). A no stops the run with exit 2.
+warn_and_ask() {
+  warn "$1"
+  log "warning: $1"
+  confirm "Continue anyway?" || refuse "Stopped before changing anything."
 }
 
 fail() {
@@ -102,7 +137,7 @@ parse_flags() {
           --timeout) flag_timeout=$value ;;
         esac
         ;;
-      --yes) ;;
+      --yes) flag_yes=1 ;;
       --no-pull) flag_no_pull=1 ;;
       --no-ip-lookup) ;;
       --help | -h) flag_help=1 ;;
@@ -125,26 +160,98 @@ check_arch() {
   esac
 }
 
+# Sets `distro` and `supported` from /etc/os-release: Ubuntu 22.04 or 24.04, Debian 12 or 13.
+check_distro() {
+  distro_id=$(sed -n 's/^ID=//p' /etc/os-release 2>/dev/null | tr -d '"')
+  distro_version=$(sed -n 's/^VERSION_ID=//p' /etc/os-release 2>/dev/null | tr -d '"')
+  distro="${distro_id:-unknown} ${distro_version}"
+  case "$distro_id $distro_version" in
+    "ubuntu 22.04" | "ubuntu 24.04" | "debian 12" | "debian 13") supported=1 ;;
+    *) supported=0 ;;
+  esac
+}
+
+check_memory() {
+  mem_kb=$(sed -n 's/^MemTotal:[[:space:]]*\([0-9]*\) kB$/\1/p' /proc/meminfo 2>/dev/null)
+  [ -n "$mem_kb" ] || return 0
+  mem_mib=$((mem_kb / 1024))
+  if [ "$mem_kb" -lt "$MEM_FLOOR_KB" ]; then
+    refuse "This server has $mem_mib MiB of memory; Orvano needs at least 1.8 GiB (2 GB servers are the minimum)."
+  fi
+  if [ "$mem_kb" -lt "$MEM_WARN_KB" ]; then
+    warn_and_ask "This server has $mem_mib MiB of memory. Orvano runs, but 4 GB or more is recommended."
+  fi
+}
+
+check_firewall() {
+  command -v ufw >/dev/null 2>&1 || return 0
+  rules=$(ufw status 2>/dev/null) || return 0
+  case $rules in
+    *"Status: active"*) ;;
+    *) return 0 ;;
+  esac
+  allows_80=$(printf '%s\n' "$rules" | grep -E '^(80|80/tcp|80,443/tcp|80,443|Nginx Full|WWW Full)[[:space:]].*ALLOW' || :)
+  allows_443=$(printf '%s\n' "$rules" | grep -E '^(443|443/tcp|80,443/tcp|80,443|Nginx Full|WWW Full)[[:space:]].*ALLOW' || :)
+  if [ -z "$allows_80" ] || [ -z "$allows_443" ]; then
+    warn_and_ask "ufw is active and does not allow ports 80 and 443, so Orvano may not be reachable. Allow them with: ufw allow 80/tcp && ufw allow 443"
+  fi
+}
+
+check_clock() {
+  command -v timedatectl >/dev/null 2>&1 || return 0
+  synced=$(timedatectl show -p NTPSynchronized --value 2>/dev/null) || return 0
+  if [ "$synced" = no ]; then
+    warn_and_ask "The clock is not synchronized (NTP), and Let's Encrypt fails on a wrong clock. Turn it on with: timedatectl set-ntp true"
+  fi
+}
+
 # True when version $1 (X.Y[.Z]) is at least $2.
 version_at_least() {
   printf '%s\n%s\n' "$2" "$1" | sort -c -t. -k1,1n -k2,2n -k3,3n 2>/dev/null
 }
 
-check_docker() {
+# Sets `docker_problem` to why Docker is not usable yet, or empty when it is.
+find_docker_problem() {
+  docker_problem=""
   if ! command -v docker >/dev/null 2>&1; then
-    refuse "Docker is not installed. Install Docker Engine $MIN_DOCKER or later with the Compose plugin: $DOCKER_DOCS"
+    docker_problem="Docker is not installed."
+    return
   fi
-
-  docker_version=$(docker version --format '{{.Server.Version}}' 2>/dev/null) ||
-    refuse "Docker is installed but not running (docker version failed). Start it, then run the installer again."
-  version_at_least "${docker_version%%[-+]*}" "$MIN_DOCKER" ||
-    refuse "Docker Engine $docker_version is too old; Orvano needs $MIN_DOCKER or later: $DOCKER_DOCS"
-
-  compose_version=$(docker compose version --short 2>/dev/null) ||
-    refuse "The Docker Compose plugin is missing. Install Compose $MIN_COMPOSE or later: $DOCKER_DOCS"
+  if ! docker_version=$(docker version --format '{{.Server.Version}}' 2>/dev/null); then
+    docker_problem="Docker is installed but not running (docker version failed)."
+    return
+  fi
+  if ! version_at_least "${docker_version%%[-+]*}" "$MIN_DOCKER"; then
+    docker_problem="Docker Engine $docker_version is too old; Orvano needs $MIN_DOCKER or later."
+    return
+  fi
+  if ! compose_version=$(docker compose version --short 2>/dev/null); then
+    docker_problem="The Docker Compose plugin is missing."
+    return
+  fi
   compose_version=${compose_version#v}
-  version_at_least "${compose_version%%[-+]*}" "$MIN_COMPOSE" ||
-    refuse "Docker Compose $compose_version is too old; Orvano needs $MIN_COMPOSE or later: $DOCKER_DOCS"
+  if ! version_at_least "${compose_version%%[-+]*}" "$MIN_COMPOSE"; then
+    docker_problem="Docker Compose $compose_version is too old; Orvano needs $MIN_COMPOSE or later."
+  fi
+}
+
+check_docker() {
+  find_docker_problem
+  if [ "$supported" = 0 ]; then
+    [ -z "$docker_problem" ] ||
+      refuse "$docker_problem Orvano's installer supports Ubuntu 22.04 and 24.04 and Debian 12 and 13; on $distro, install Docker Engine $MIN_DOCKER or later with Compose $MIN_COMPOSE or later yourself: $DOCKER_DOCS"
+    warn_and_ask "$distro is not a supported system (Ubuntu 22.04 or 24.04, Debian 12 or 13), but a new enough Docker is present."
+  elif [ -n "$docker_problem" ]; then
+    say "$docker_problem"
+    if ! confirm "Install Docker with Docker's official install script (https://get.docker.com)?"; then
+      refuse "Install Docker Engine $MIN_DOCKER or later with the Compose plugin, then run the installer again: $DOCKER_DOCS"
+    fi
+    curl -fsSL https://get.docker.com | sh || fail "Docker's install script failed. See $DOCKER_DOCS"
+    command -v systemctl >/dev/null 2>&1 && systemctl enable --now docker >/dev/null 2>&1
+    find_docker_problem
+    [ -z "$docker_problem" ] || fail "$docker_problem See $DOCKER_DOCS"
+    docker_installed=1
+  fi
 
   case $(docker info --format '{{.SecurityOptions}}' 2>/dev/null) in
     *rootless* | *userns*)
@@ -190,8 +297,23 @@ check_data() {
     if [ ! -f "$flag_dir/.env" ]; then
       refuse "The Orvano database volume $DATA_VOLUME exists but $flag_dir/.env does not. Restore .env from your backup (it holds the database passwords and the master key), then run the installer again."
     fi
+  elif [ -f "$flag_dir/.env" ] && [ -n "$(env_value ORVANO_VERSION)" ]; then
+    warn_and_ask "Orvano $(env_value ORVANO_VERSION) was installed here, but its database volume $DATA_VOLUME is gone. Continuing starts with an empty database."
   fi
   log "existing data: $existing_data"
+}
+
+# Ports 80 and 443 must be free, or published by this install's own gateway (AC-2).
+check_ports() {
+  command -v ss >/dev/null 2>&1 || { log "ss is missing, port check skipped"; return 0; }
+  for port in 80 443; do
+    [ -n "$(ss -Htln "sport = :$port" 2>/dev/null)" ] || continue
+    ours=$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT" \
+      --filter "label=com.docker.compose.service=gateway" --filter "publish=$port" 2>/dev/null)
+    [ -z "$ours" ] || continue
+    holder=$(ss -Htlnp "sport = :$port" 2>/dev/null | sed -n 's/.*users:(("\([^"]*\)".*/\1/p' | head -n 1)
+    refuse "Port $port is in use by ${holder:-another program}. Orvano's gateway needs ports 80 and 443; stop that program, then run the installer again."
+  done
 }
 
 # Images -------------------------------------------------------------------------------------------
@@ -373,6 +495,13 @@ print_master_key() {
       "" \
       "  ORVANO_MASTER_KEYS=$(env_value ORVANO_MASTER_KEYS)" \
       "================================================================================"
+    if [ "$flag_yes" = 0 ] && has_tty; then
+      while :; do
+        printf 'Type saved once you have stored it somewhere safe: ' >/dev/tty
+        read -r answer </dev/tty || break
+        [ "$answer" != saved ] || break
+      done
+    fi
   else
     say "Reminder: keep a backup of $flag_dir/.env; it holds your master key."
   fi
@@ -396,11 +525,18 @@ main() {
 
   check_root
   check_arch
+  check_distro
+  check_memory
+  check_firewall
+  check_clock
+  docker_installed=0
   check_docker
   take_lock
-  log "install.sh started for $version (Docker $docker_version, Compose $compose_version)"
+  log "install.sh started for $version on $distro (Docker $docker_version, Compose $compose_version)"
+  [ "$docker_installed" = 0 ] || log "installed Docker with get.docker.com"
   check_one_install
   check_data
+  check_ports
   run_installer "$@"
   start_services
 

@@ -153,6 +153,7 @@ services:
     logging: *logging
     environment:
       ORVANO_PUBLIC_URL: ${ORVANO_PUBLIC_URL:?set in .env}
+      ORVANO_ACME_EMAIL: ${ORVANO_ACME_EMAIL:-}
     ports:
       - "80:80"
       - "443:443"

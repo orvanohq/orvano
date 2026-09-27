@@ -142,10 +142,18 @@ jobs:
       # proves `orvano install` runs as --user 0:0 in the chiseled image.
       - name: First install
         run: sudo sh deploy/install/install.sh --version "$V" --domain localhost --yes --no-pull
+      - name: Caddyfile is valid with and without an ACME email
+        run: |
+          for email in "" ops@example.com; do
+            docker run --rm -e ORVANO_ACME_EMAIL="$email" -e ORVANO_PUBLIC_URL=https://orvano.example.com \
+              "ghcr.io/orvanohq/orvano-gateway:$V" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          done
       - name: GET /v1/health through Caddy, and /internal stays closed
         run: |
           curl -fsS http://localhost/v1/health
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/internal/readyz)" = 404
+          # HSTS only on HTTPS installs (spec 0006, AC-26).
+          if curl -sI http://localhost/ | grep -qi '^strict-transport-security'; then echo "HSTS sent on http://localhost"; exit 1; fi
       - name: Second install changes no secret
         run: |
           sudo cp /opt/orvano/.env "$RUNNER_TEMP/env.first"

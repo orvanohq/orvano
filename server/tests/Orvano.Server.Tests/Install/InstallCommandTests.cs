@@ -1,3 +1,4 @@
+using System.Net;
 using Orvano.Server.Install;
 using Orvano.Server.Tests.Infrastructure;
 
@@ -20,8 +21,12 @@ public sealed class InstallCommandTests : IDisposable
         File.Delete(_meminfo);
     }
 
+    private readonly FakeNetwork _network = new();
+
+    private FakeTerminal? _terminal;
+
     private Task<int> RunAsync(params string[] args) =>
-        InstallCommand.RunAsync(args, new InstallHost(_dir, _meminfo, Version, TimeProvider.System, _out, _err));
+        InstallCommand.RunAsync(args, new InstallHost(_dir, _meminfo, Version, TimeProvider.System, _out, _err, _terminal, _network));
 
     private string Read(string file) => File.ReadAllText(Path.Combine(_dir, file));
 
@@ -98,7 +103,7 @@ public sealed class InstallCommandTests : IDisposable
     }
 
     [Theory]
-    [InlineData(new[] { "--existing-data=no" }, "--domain is required on a fresh install.")]
+    [InlineData(new[] { "--existing-data=no" }, "--domain is required on a fresh install (there is no terminal to ask on).")]
     [InlineData(new[] { "--domain", "https://x.example.com", "--existing-data=no" }, "'https://x.example.com' is not a valid domain.")]
     [InlineData(new[] { "--domain", "localhost", "--email", "nope", "--existing-data=no" }, "'nope' is not a valid email address.")]
     [InlineData(new[] { "--domain", "localhost" }, "--existing-data is missing.")]
@@ -123,5 +128,125 @@ public sealed class InstallCommandTests : IDisposable
         Assert.Equal("ORVANO_VERSION=0.2.0\n", Read(".env"));
         Assert.False(File.Exists(Path.Combine(_dir, "docker-compose.yml")));
         Assert.Contains("refused:", Read("install.log"));
+    }
+
+    [Fact]
+    public async Task Asks_for_the_domain_and_email_on_a_terminal_and_asks_again_on_a_bad_answer()
+    {
+        _terminal = new FakeTerminal("https://nope", "LOCALHOST", "localhost", "not-an-email", "ops@example.com");
+
+        Assert.Equal(0, await RunAsync("--existing-data=no"));
+
+        var env = EnvFile.Parse(Read(".env"));
+        Assert.Equal("http://localhost", env.Get("ORVANO_PUBLIC_URL"));
+        Assert.Equal("ops@example.com", env.Get("ORVANO_ACME_EMAIL"));
+        Assert.Equal(5, _terminal.Prompts.Count);
+        Assert.Contains("'https://nope' is not a valid domain.", _out.ToString());
+        Assert.Contains("'not-an-email' is not a valid email address.", _out.ToString());
+        Assert.Contains("not for production", _out.ToString());
+    }
+
+    [Fact]
+    public async Task A_rerun_offers_the_current_domain_and_email_as_defaults()
+    {
+        await RunAsync("--domain", "localhost", "--email", "ops@example.com", "--existing-data=no");
+        _terminal = new FakeTerminal("", "");
+
+        Assert.Equal(0, await RunAsync("--existing-data=yes"));
+
+        Assert.Equal("Your domain (for example orvano.example.com, or localhost) [localhost]: ", _terminal.Prompts[0]);
+        Assert.Equal("Email for Let's Encrypt notices [ops@example.com]: ", _terminal.Prompts[1]);
+        Assert.Equal("ops@example.com", EnvFile.Parse(Read(".env")).Get("ORVANO_ACME_EMAIL"));
+    }
+
+    [Fact]
+    public async Task Stops_when_DNS_does_not_point_here_unless_you_say_yes()
+    {
+        _network.Records = [IPAddress.Parse("203.0.113.9")];
+
+        Assert.Equal(2, await RunAsync("--domain", "orvano.example.com", "--existing-data=no"));
+        Assert.Contains("orvano.example.com points to 203.0.113.9, which is not this server", _out.ToString());
+        Assert.Contains("Continue anyway? no (no terminal; pass --yes to continue)", _out.ToString());
+        Assert.False(File.Exists(Path.Combine(_dir, ".env")));
+
+        Assert.Equal(0, await RunAsync("--domain", "orvano.example.com", "--existing-data=no", "--yes"));
+        Assert.Equal("https://orvano.example.com", EnvFile.Parse(Read(".env")).Get("ORVANO_PUBLIC_URL"));
+        Assert.Equal(2, _network.PublicLookups);
+    }
+
+    [Fact]
+    public async Task Passes_DNS_that_points_at_an_interface_or_public_address()
+    {
+        _network.Records = [IPAddress.Parse("10.0.0.5")];
+        _network.Interfaces = [IPAddress.Parse("10.0.0.5")];
+        Assert.Equal(0, await RunAsync("--domain", "orvano.example.com", "--existing-data=no"));
+        Assert.Equal(0, _network.PublicLookups);
+
+        _network.Records = [IPAddress.Parse("198.51.100.7")];
+        _network.Public = [IPAddress.Parse("198.51.100.7")];
+        Assert.Equal(0, await RunAsync("--domain", "orvano.example.com", "--existing-data=yes"));
+        Assert.Contains("DNS for orvano.example.com points here (198.51.100.7)", Read("install.log"));
+    }
+
+    [Fact]
+    public async Task No_ip_lookup_skips_the_public_address_lookup()
+    {
+        _network.Records = [IPAddress.Parse("198.51.100.7")];
+        _network.Public = [IPAddress.Parse("198.51.100.7")];
+
+        Assert.Equal(2, await RunAsync("--domain", "orvano.example.com", "--existing-data=no", "--no-ip-lookup"));
+        Assert.Equal(0, _network.PublicLookups);
+    }
+
+    [Fact]
+    public async Task Warns_before_moving_an_install_to_another_address()
+    {
+        await RunAsync("--domain", "localhost", "--existing-data=no");
+        var before = Read(".env");
+        _network.Records = [IPAddress.Parse("10.0.0.5")];
+        _network.Interfaces = [IPAddress.Parse("10.0.0.5")];
+
+        Assert.Equal(2, await RunAsync("--domain", "orvano.example.com", "--existing-data=yes"));
+        Assert.Contains("Every signed in app user and console user must sign in again.", _out.ToString());
+        Assert.Equal(before, Read(".env"));
+
+        _terminal = new FakeTerminal("", "y");
+        Assert.Equal(0, await RunAsync("--domain", "orvano.example.com", "--existing-data=yes"));
+        Assert.Equal("Change the address? [y/N] ", _terminal.Prompts[^1]);
+        Assert.Equal("https://orvano.example.com", EnvFile.Parse(Read(".env")).Get("ORVANO_PUBLIC_URL"));
+    }
+
+    private sealed class FakeTerminal(params string[] answers) : IInstallTerminal
+    {
+        private readonly Queue<string> _answers = new(answers);
+
+        public List<string> Prompts { get; } = [];
+
+        public string? Ask(string prompt)
+        {
+            Prompts.Add(prompt);
+            return _answers.TryDequeue(out var answer) ? answer : null;
+        }
+    }
+
+    private sealed class FakeNetwork : IInstallNetwork
+    {
+        public IReadOnlyList<IPAddress> Records { get; set; } = [];
+
+        public IReadOnlyList<IPAddress> Interfaces { get; set; } = [IPAddress.Loopback];
+
+        public IReadOnlyList<IPAddress> Public { get; set; } = [];
+
+        public int PublicLookups { get; private set; }
+
+        public Task<IReadOnlyList<IPAddress>> ResolveAsync(string domain) => Task.FromResult(Records);
+
+        public IReadOnlyList<IPAddress> InterfaceAddresses() => Interfaces;
+
+        public Task<IReadOnlyList<IPAddress>> PublicAddressesAsync()
+        {
+            PublicLookups++;
+            return Task.FromResult(Public);
+        }
     }
 }

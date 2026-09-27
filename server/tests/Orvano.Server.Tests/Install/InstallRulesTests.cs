@@ -1,3 +1,4 @@
+using System.Net;
 using Orvano.Server.Install;
 
 namespace Orvano.Server.Tests.Install;
@@ -140,4 +141,16 @@ public class InstallRulesTests
     [InlineData("ost_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA+A", false)]
     public void Setup_token_shape_is_ost_and_43_base64url_characters(string token, bool valid) =>
         Assert.Equal(valid, InstallSecrets.IsSetupToken(token));
+
+    [Fact]
+    public void Dns_check_matches_records_to_server_addresses()
+    {
+        var records = new[] { IPAddress.Parse("203.0.113.9"), IPAddress.Parse("2001:db8::1") };
+
+        Assert.Equal([IPAddress.Parse("2001:db8::1")], DnsCheck.Matches(records, [IPAddress.Parse("2001:db8::1"), IPAddress.Loopback]));
+        Assert.Equal([IPAddress.Parse("203.0.113.9")], DnsCheck.Matches(records, [IPAddress.Parse("::ffff:203.0.113.9")]));
+        Assert.Empty(DnsCheck.Matches(records, [IPAddress.Loopback]));
+        Assert.Null(DnsCheck.Problem("x.example.com", records, [records[0]]));
+        Assert.Equal("x.example.com has no A or AAAA record yet, so HTTPS will fail until its DNS points to this server.", DnsCheck.Problem("x.example.com", [], []));
+    }
 }

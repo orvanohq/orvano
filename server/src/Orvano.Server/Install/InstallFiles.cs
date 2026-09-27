@@ -26,7 +26,9 @@ internal sealed class InstallFiles(string directory)
     /// <summary>Rewrites the compose file and the init script from the copies embedded in this image (AC-10).</summary>
     public async Task WriteManagedFilesAsync()
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(PathOf(InitdbScript))!);
+        var initdb = Path.GetDirectoryName(PathOf(InitdbScript))!;
+        if (OperatingSystem.IsWindows()) Directory.CreateDirectory(initdb);
+        else Directory.CreateDirectory(initdb, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
         await WriteAsync(ComposeFile, await ReadResourceAsync("install/docker-compose.yml"), Public);
         await WriteAsync(InitdbScript, await ReadResourceAsync("install/initdb/10-orvano-roles.sh"), Executable);
     }

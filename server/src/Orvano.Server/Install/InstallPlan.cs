@@ -49,6 +49,13 @@ internal static class InstallPlan
     }
 
     /// <summary>
+    /// True when a run on an existing install (one with <c>ORVANO_VERSION</c>) would move it to a
+    /// different public URL, which signs every user out (AC-18).
+    /// </summary>
+    public static bool ChangesPublicUrl(EnvFile? existing, string domain) =>
+        existing?.HasValue(Version) == true && existing.Get(PublicUrl) != DomainRule.PublicUrl(domain);
+
+    /// <summary>
     /// Steps 11 and 12: the new <c>.env</c>. Missing secrets are generated, managed keys are set, and
     /// every other line stays as it was (AC-8, AC-9, AC-11).
     /// </summary>
@@ -56,8 +63,7 @@ internal static class InstallPlan
     {
         var before = existing?.ToString();
         var env = existing ?? EnvFile.Create(Header);
-        var previousUrl = existing?.Get(PublicUrl);
-        var installed = existing?.HasValue(Version) == true;
+        var publicUrlChanged = ChangesPublicUrl(existing, inputs.Domain);
         var publicUrl = DomainRule.PublicUrl(inputs.Domain);
 
         env.Set(Version, inputs.Version);
@@ -91,7 +97,7 @@ internal static class InstallPlan
             Generated: generated,
             ManualTuning: manualTuning,
             PublicUrl: publicUrl,
-            PublicUrlChanged: installed && previousUrl != publicUrl);
+            PublicUrlChanged: publicUrlChanged);
     }
 }
 

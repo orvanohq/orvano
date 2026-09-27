@@ -48,22 +48,39 @@ internal static class InstallCommand
 
         await files.LogAsync(now, $"{mode.ToString().ToLowerInvariant()} of {version} (installed: {existing?.Get(InstallPlan.Version) ?? "none"}, existing data: {(existingData ? "yes" : "no")})");
 
-        var domain = options.Domain ?? DomainRule.HostOf(existing?.Get(InstallPlan.PublicUrl));
+        var questions = new InstallQuestions(host.Terminal, host.Out, options.Yes);
+
+        var currentDomain = DomainRule.HostOf(existing?.Get(InstallPlan.PublicUrl));
+        if (options.Domain is { } flagDomain && !DomainRule.IsValid(flagDomain)) return await RefuseAsync(host, InvalidDomain(flagDomain));
+        var domain = options.Domain ?? questions.AskValue("Your domain (for example orvano.example.com, or localhost)", currentDomain, DomainRule.IsValid, InvalidDomain);
         if (domain is null)
         {
-            return await RefuseAsync(host, "--domain is required on a fresh install.");
+            return await RefuseAsync(host, "--domain is required on a fresh install (there is no terminal to ask on).");
         }
 
-        if (!DomainRule.IsValid(domain))
+        if (!DomainRule.IsValid(domain)) return await RefuseAsync(host, InvalidDomain(domain));
+
+        if (options.Email is { } flagEmail && !EmailRule.IsValid(flagEmail)) return await RefuseAsync(host, InvalidEmail(flagEmail));
+        var email = options.Email
+            ?? questions.AskValue("Email for Let's Encrypt notices", existing?.Get(InstallPlan.AcmeEmail) ?? "", EmailRule.IsValid, InvalidEmail, allowEmpty: true)
+            ?? "";
+        if (!EmailRule.IsValid(email)) return await RefuseAsync(host, InvalidEmail(email));
+
+        if (domain == DomainRule.Localhost)
         {
-            return await RefuseAsync(host,
-                $"'{domain}' is not a valid domain. Use a lowercase hostname such as orvano.example.com (no scheme, port, or path), or localhost.");
+            await host.Out.WriteLineAsync("Warning: localhost serves plain HTTP on this server only. It is not for production.");
+        }
+        else if (!await CheckDnsAsync(host, questions, domain, options.NoIpLookup, files, now))
+        {
+            return await RefuseAsync(host, $"Stopped: point the DNS of {domain} to this server, then run the installer again.");
         }
 
-        var email = options.Email ?? existing?.Get(InstallPlan.AcmeEmail) ?? "";
-        if (!EmailRule.IsValid(email))
+        if (InstallPlan.ChangesPublicUrl(existing, domain))
         {
-            return await RefuseAsync(host, $"'{email}' is not a valid email address. Leave it empty to skip it.");
+            await host.Out.WriteLineAsync(
+                $"Warning: this moves Orvano from {existing!.Get(InstallPlan.PublicUrl)} to {DomainRule.PublicUrl(domain)}. Every signed in app user and console user must sign in again.");
+            if (!questions.Confirm("Change the address?")) return await RefuseAsync(host, "Stopped: the address was not changed.");
+            await files.LogAsync(now, $"public URL changes to {DomainRule.PublicUrl(domain)}");
         }
 
         var memTotal = PgTuning.ParseMemTotalMib(await File.ReadAllTextAsync(host.MeminfoPath))
@@ -94,6 +111,33 @@ internal static class InstallCommand
         return 0;
     }
 
+    /// <summary>The DNS check (AC-6): true to go on, false when you chose to stop.</summary>
+    private static async Task<bool> CheckDnsAsync(InstallHost host, InstallQuestions questions, string domain, bool noIpLookup, InstallFiles files, DateTimeOffset now)
+    {
+        var records = await host.Network.ResolveAsync(domain);
+        var matches = DnsCheck.Matches(records, host.Network.InterfaceAddresses());
+        if (matches.Count == 0 && records.Count > 0 && !noIpLookup)
+        {
+            matches = DnsCheck.Matches(records, await host.Network.PublicAddressesAsync());
+        }
+
+        var problem = DnsCheck.Problem(domain, records, matches);
+        if (problem is null)
+        {
+            await files.LogAsync(now, $"DNS for {domain} points here ({string.Join(", ", matches)})");
+            return true;
+        }
+
+        await files.LogAsync(now, $"DNS warning: {problem}");
+        await host.Out.WriteLineAsync($"Warning: {problem}");
+        return questions.Confirm("Continue anyway?");
+    }
+
+    private static string InvalidDomain(string domain) =>
+        $"'{domain}' is not a valid domain. Use a lowercase hostname such as orvano.example.com (no scheme, port, or path), or localhost.";
+
+    private static string InvalidEmail(string email) => $"'{email}' is not a valid email address. Leave it empty to skip it.";
+
     private static async Task<int> RefuseAsync(InstallHost host, string message)
     {
         await host.Error.WriteLineAsync(message);
@@ -102,9 +146,21 @@ internal static class InstallCommand
 }
 
 /// <summary>What <see cref="InstallCommand"/> reads and writes outside its flags.</summary>
-internal sealed record InstallHost(string TargetDir, string MeminfoPath, string ImageVersion, TimeProvider Clock, TextWriter Out, TextWriter Error)
+internal sealed record InstallHost(
+    string TargetDir,
+    string MeminfoPath,
+    string ImageVersion,
+    TimeProvider Clock,
+    TextWriter Out,
+    TextWriter Error,
+    IInstallTerminal? Terminal,
+    IInstallNetwork Network)
 {
-    /// <summary>Inside the installer container: the install directory mounted at <c>/install</c>.</summary>
+    /// <summary>
+    /// Inside the installer container: the install directory mounted at <c>/install</c>, and a
+    /// terminal only when <c>install.sh</c> passed <c>-it</c> (standard input is not redirected).
+    /// </summary>
     public static InstallHost Container() =>
-        new("/install", "/proc/meminfo", OrvanoVersion.Current, TimeProvider.System, Console.Out, Console.Error);
+        new("/install", "/proc/meminfo", OrvanoVersion.Current, TimeProvider.System, Console.Out, Console.Error,
+            Console.IsInputRedirected ? null : new ConsoleTerminal(), new InstallNetwork());
 }

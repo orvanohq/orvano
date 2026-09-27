@@ -1,8 +1,17 @@
 # The only public entry point (spec 0002, request routing). ORVANO_PUBLIC_URL is the site
 # address: https://orvano.example.com gets automatic HTTPS, http://localhost stays plain HTTP.
 
+{
+	# The Let's Encrypt account email, written at start by entrypoint.sh (spec 0006, AC-7).
+	import /etc/caddy/global.caddy
+}
+
 {$ORVANO_PUBLIC_URL} {
 	encode zstd gzip
+
+	# HTTPS installs only (spec 0006, AC-26). No includeSubDomains: other subdomains may not be Orvano's.
+	@https protocol https
+	header @https Strict-Transport-Security "max-age=31536000"
 
 	# Never proxied. Internal calls such as the on demand TLS `ask` go straight to api:8080.
 	handle /internal/* {
