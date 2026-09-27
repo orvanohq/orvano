@@ -1,6 +1,7 @@
 # 0004. App user sign up, sign in, and sessions
 
 **Date**: 2026-09-26
+**Updated**: 2026-09-27 (`setupToken` on console sign up, `consoleInstall.getSetup` works without a session and has its own limit, spec 0006)
 **Status**: Proposed
 
 ## Summary
@@ -250,7 +251,7 @@ The discovery document exists only so standard JWT libraries (ASP.NET JwtBearer 
 
 | Operation | Method and path | Notes |
 |---|---|---|
-| `consoleAccount.create` | POST `/console/account` | `email`, `password`, `name?`, `inviteToken?`; runs `AdmitAsync` then `OnCreatedAsync` in the sign up transaction; sets both cookies |
+| `consoleAccount.create` | POST `/console/account` | `email`, `password`, `name?`, `inviteToken?`, `setupToken?` (spec 0006); runs `AdmitAsync` then `OnCreatedAsync` in the sign up transaction; sets both cookies |
 | `consoleAccount.createSession` | POST `/console/account/session` | sign in; sets both cookies |
 | `consoleAccount.refreshSession` | POST `/console/account/session/refresh` | reads `orvano_console_refresh`, sets both cookies |
 | `consoleAccount.deleteSession` | DELETE `/console/account/session` | ends the session, clears both cookies |
@@ -259,11 +260,11 @@ The discovery document exists only so standard JWT libraries (ASP.NET JwtBearer 
 | `consoleAuthKeys.list` | GET `/console/projects/{projectId}/auth/keys` | `id`, `status`, `createdAt`, `retireAfter` |
 | `consoleAuthKeys.rotate` | POST `/console/projects/{projectId}/auth/keys/rotate` | owner only |
 
-The first four console account operations are the only console routes that work without a console session. Console account self service (password change, sessions, deletion through `IConsoleAccountGuard`) is left for a later row.
+The first four console account operations, plus spec 0006's `consoleInstall.getSetup` (GET `/console/install/setup`, answers only `setupRequired`), are the only console routes that work without a console session. Console account self service (password change, sessions, deletion through `IConsoleAccountGuard`) is left for a later row.
 
 **Models**: `User` (AC-12), `Session` (AC-16), `SessionTokens` (`accessToken`, `accessTokenExpiresAt`, `refreshToken`, `refreshTokenExpiresAt` = the session's `least(idle_expires_at, expires_at)`, `sessionId`), `AuthResult` (`user`, `session: SessionTokens`), `UserList`, `SessionList`, `Jwk`, `Jwks`, `OpenIdConfiguration`, and `enum UserStatus { active, blocked }`.
 
-**New error codes** in `contract/errors.tsp`: `invalid_password` (400), `invalid_credentials` (401), `session_required` (401), `invalid_token` (401), `token_expired` (401), `invalid_refresh_token` (401), `user_blocked` (403), `csrf_rejected` (403), `user_not_found` (404), `session_not_found` (404), `user_already_exists` (409), `rate_limited` (429), `server_busy` (503). Spec 0003's `invalid_api_key`, `insufficient_scope`, and `origin_not_allowed` land here too. `console_session_required` stays for console routes.
+**New error codes** in `contract/errors.tsp`: `invalid_password` (400), `invalid_credentials` (401), `session_required` (401), `invalid_token` (401), `token_expired` (401), `invalid_refresh_token` (401), `user_blocked` (403), `csrf_rejected` (403), `user_not_found` (404), `session_not_found` (404), `user_already_exists` (409), `rate_limited` (429), `server_busy` (503). Spec 0003's `invalid_api_key`, `insufficient_scope`, and `origin_not_allowed` land here too. `console_session_required` stays for console routes. `consoleAccount.create` can also return spec 0006's `setup_token_invalid` (403), which that spec adds.
 
 **Scopes**: `ApiKeyScope` gets `users.read` and `users.write` (spec 0003).
 
@@ -293,6 +294,7 @@ In memory, fixed window, per `api` process (spec 0002's middleware). The connect
 | `account.createPasswordSession`, `consoleAccount.createSession` | project + lower(email) | 10 per 15 minutes |
 | same | connection IP | 300 per 15 minutes |
 | `account.create`, `users.create`, `consoleAccount.create` | connection IP | 60 per hour |
+| `consoleInstall.getSetup` (spec 0006) | connection IP | 60 per minute |
 | `account.updatePassword`, `account.delete` | user ID | 10 per 15 minutes |
 | `account.refreshSession`, `consoleAccount.refreshSession` | session ID (from the token) | 60 per 15 minutes |
 | same, counting only refreshes answered 401 | connection IP | 60 per 15 minutes |
@@ -397,7 +399,7 @@ A sign in within the limit counts whether it succeeds or not. Row 14 makes these
 - Next.js: the middleware refreshes an access token with 30 seconds left and sets both cookies; the route handler refuses a POST with a foreign `Origin` and one with no `Origin`; neither cookie has a `Domain` attribute; the refresh cookie is `HttpOnly` and the access cookie is not. Verifies **AC-23**.
 - Browser tabs: two tabs sharing `localStorage` refresh once (the Web Lock), and the second tab receives `tokenRefreshed`. Verifies **AC-24**, **AC-26**.
 - Flutter: tokens survive an app restart on Android and iOS, a resume with an expired access token refreshes before the next call, and an offline refresh keeps the session. Verifies **AC-25**, **AC-26**.
-- Limits: the 11th sign in for one email within 15 minutes gets 429 with `Retry-After`; 50 sign ins for 50 emails from one IP pass; the 61st refresh with a made up session ID from one IP within 15 minutes gets 429, while 100 successful refreshes of different sessions from that IP pass. Verifies **AC-30**.
+- Limits: the 11th sign in for one email within 15 minutes gets 429 with `Retry-After`; 50 sign ins for 50 emails from one IP pass; the 61st refresh with a made up session ID from one IP within 15 minutes gets 429, while 100 successful refreshes of different sessions from that IP pass; the 61st `consoleInstall.getSetup` from one IP within a minute gets 429 (spec 0006 AC-22). Verifies **AC-30**.
 - Session records: a Next.js sign in stores the forwarded client IP and user agent, while the limit counts the Next.js server's IP. Verifies **AC-31**, **AC-30**.
 - Retention: sessions ended 31 days ago are deleted by the schedule, and those ended 29 days ago stay. Verifies **AC-32**.
 - Secrets: after a full scenario run, no log line, event payload, or problem body contains `orv_rt_`, a JWT, a password, an email, or an IP; the database has no plain refresh token or private key. Verifies **AC-33**, **AC-34**.
@@ -407,14 +409,14 @@ A sign in within the limit counts whether it succeeds or not. Row 14 makes these
 
 Tracer Bullet: task 3 is the thin thread (sign up, sign in, get the current user, from the contract through the server to a real SDK scenario), then each task thickens it. This row also builds spec 0003's tasks 7, 8, and 9. It depends on row 7's `Orvano.Platform` (spec 0003 tasks 1 to 4, and 6 for fixtures): build row 7's tasks 1 and 2 first, then row 8's tasks 1 to 3 alongside row 7's tasks 3 and 4, as spec 0003 says. Row 8's task 8 needs row 7's task 3 (the sign up gate), and task 9 needs row 5's console shell and row 7's project pages.
 
-1. **Kernel pieces** in `Orvano.Core` and the host: spec 0002's envelope encryption (`SecretBox`, with `ORVANO_MASTER_KEYS` validated at startup for `api` and `worker`), forwarded headers with `ORVANO_TRUSTED_PROXIES`, `ORVANO_PUBLIC_URL` validation, `HybridCache` registration, and the rate limiter with named policies. Unit tests plus a Testcontainers round trip. Satisfies **AC-30**, **AC-31**, **AC-34**.
+1. **Kernel pieces** in `Orvano.Core` and the host: spec 0002's envelope encryption (`SecretBox`, with `ORVANO_MASTER_KEYS` validated at startup for `api` and `worker`), forwarded headers with `ORVANO_TRUSTED_PROXIES`, `ORVANO_PUBLIC_URL` validation, `HybridCache` registration, and the rate limiter with named policies (including spec 0006's `consoleInstall.getSetup` policy). Unit tests plus a Testcontainers round trip. Satisfies **AC-30**, **AC-31**, **AC-34**.
 2. **`Orvano.Auth` module and domain** (spec 0003 task 7): the project, `OrvanoModules`, the solution, and the Dockerfile restore step; migration `NNNN_auth.sql` with `auth_users` (spec 0003 plus `last_sign_in_at` and the prefix index), `auth_passwords`, `auth_sessions`, `auth_signing_keys`; `AuthDbContext` in the drift check; `IUserDirectory`. Domain types with unit tests, free of ASP.NET, EF, and Npgsql: `PasswordPolicy` (NFKC, 8 to 256), `EmailRule`, `PasswordHasher` (NSec, encoded string, rehash check, dummy hash, 4 way gate), `RefreshToken` (format, parse, hash), `SessionLifetime`, `RefreshDecision` (rotate, replay, reuse), `AccessTokenClaims`, `AuthTimings`. Smoke test that NSec's native libsodium loads in the chiseled `chiseled-extra` image on amd64 and arm64. Satisfies **AC-2**, **AC-8**, **AC-9**, **AC-34**.
 3. **Thin thread** (end to end): contract `auth/` folder with `account.create`, `account.createPasswordSession`, `account.get`, the `bearer` security scheme, and the error codes; server endpoints; lazy signing keys and `keys.getJwks` and `keys.getOpenIdConfiguration`; bearer validation with the cached session check; the JS session auth provider sending `Authorization: Bearer` (memory store); the baseline sign in and sign up limits; `tests/scenarios/auth.yaml` (sign up, get, sign in) passing in the JS, Next.js, and Flutter runners on fixture projects. Satisfies **AC-1**, **AC-3**, **AC-4**, **AC-5**, **AC-6**, **AC-7**, **AC-12**, **AC-20**, **AC-21**, **AC-30**.
 4. **Sessions**: `account.refreshSession` with rotation, grace, and reuse detection; sign out; `listSessions`, `deleteSession`, `deleteOtherSessions`; session info capture, including `X-Orvano-Client-*`; the hourly retention schedule and key cleanup; the `auth.*` events. Satisfies **AC-8**, **AC-9**, **AC-10**, **AC-11**, **AC-16**, **AC-31**, **AC-32**, **AC-33**.
 5. **Self service**: `account.update`, `account.updatePassword`, `account.delete`, the remaining limits, and rehash on sign in. Satisfies **AC-13**, **AC-14**, **AC-15**, **AC-30**.
 6. **Servers** (spec 0003 task 8): request authentication for keys (`IApiKeyVerifier`, scopes through `x-orvano-scope` in SdkGen with the amended rule from *Scope rule amendment*, origin check), `ApiKeyScope` with `users.read` and `users.write`, the `apiKey` scheme, the `users.*` operations, block and unblock ending sessions; `verifyAccessToken` in the .NET SDK, `orvano_dart`, and `@orvano/js/server` with JWKS caching and `online`; .NET and Dart scenarios (verify a token, list users). Satisfies **AC-17**, **AC-18**, **AC-19**, plus spec 0003's **AC-4**, **AC-5**, **AC-12**, **AC-13**.
 7. **Client session handling**: `@orvano/js` browser store with Web Locks and storage sync; auth state listeners in JS and Dart; refresh before calls and the failure policy; `@orvano/nextjs` cookies, `updateSession` middleware helper, `createOrvanoRouteHandler`, and client IP forwarding; `orvano_flutter` with `flutter_secure_storage` and the resume check. Remove `X-Orvano-Session` everywhere. Satisfies **AC-23**, **AC-24**, **AC-25**, **AC-26**, **AC-35**.
-8. **Console session** (spec 0003 task 9): `consoleAccount.*` with the sign up gate, both cookies, the Fetch Metadata CSRF rule on all console routes, the `consoleSession` scheme, the console client's refresh and retry; the Auth consumer `auth.purge_users` and its job (now also clearing sessions, passwords, and keys); fixtures gain console users, and `consoleSessions` plus the in memory check go away; `as: console` scenarios sign in for real. Satisfies **AC-27**, **AC-28**, **AC-35**, plus spec 0003's **AC-6**, **AC-7**, **AC-8**, **AC-14**.
+8. **Console session** (spec 0003 task 9): `consoleAccount.*` with the sign up gate (passing `setupToken` to `AdmitAsync`, spec 0006 task 7), both cookies, the Fetch Metadata CSRF rule on all console routes, the `consoleSession` scheme, the console client's refresh and retry; the Auth consumer `auth.purge_users` and its job (now also clearing sessions, passwords, and keys); fixtures gain console users, and `consoleSessions` plus the in memory check go away; `as: console` scenarios sign in for real. Satisfies **AC-27**, **AC-28**, **AC-35**, plus spec 0003's **AC-6**, **AC-7**, **AC-8**, **AC-14**.
 9. **Console screens**: the project's Users page (list, prefix search, paging, detail with sessions, create, block, unblock, delete, end sessions) with viewer read only, and the signing keys panel in project settings with owner only rotation; `consoleUsers.*` and `consoleAuthKeys.*`; accessibility checks for WCAG AA. Satisfies **AC-22**, **AC-29**.
 
 ## Consequences
@@ -456,7 +458,7 @@ Tracer Bullet: task 3 is the thin thread (sign up, sign in, get the current user
 - [ ] Row 12: `account.delete` for users without a password needs a recent sign in check.
 - [ ] Row 38: build the durable audit log from the `auth.*` events (required for this GA feature before 1.0).
 - [ ] A later console row: console account self service (password change, sessions, deletion through `IConsoleAccountGuard`).
-- [ ] Row 6 (installer): generate `ORVANO_MASTER_KEYS`, set `ORVANO_PUBLIC_URL`, and document key backup; the API now refuses to start without them.
+- [x] Row 6 (installer): generate `ORVANO_MASTER_KEYS`, set `ORVANO_PUBLIC_URL`, and document key backup; the API now refuses to start without them. Done in [spec 0006](../0006-self-host-installer/index.md) (AC-5, AC-8, AC-15).
 - [ ] Row 11 (docs): a page on verifying Orvano tokens in your own server, including the 15 minute revocation window and `online: true`.
 - [ ] Before 1.0: an outside security review of `Orvano.Auth` and the SDK session code.
 - [ ] Spec 0001: mark its row 8 follow up item (auth wire formats) and its console session item done, pointing here.

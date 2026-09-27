@@ -315,9 +315,9 @@ Tracer Bullet: the first three tasks make a thin, real thread (repo compose file
 
 ## Follow-up
 
-- [ ] Spec 0003: note on AC-7 that the first account also needs the setup token when `ORVANO_SETUP_TOKEN` is set (spec 0006 AC-20).
-- [ ] Spec 0004: add `setupToken?` to `consoleAccount.create`, `consoleInstall.getSetup` to the routes that work without a session, and its limit to *Rate limits*.
-- [ ] Spec 0002: mark the follow up about generating secrets and the compose file choice as settled by spec 0006.
+- [x] Spec 0003: note on AC-7 that the first account also needs the setup token when `ORVANO_SETUP_TOKEN` is set (spec 0006 AC-20).
+- [x] Spec 0004: add `setupToken?` to `consoleAccount.create`, `consoleInstall.getSetup` to the routes that work without a session, and its limit to *Rate limits*.
+- [x] Spec 0002: mark the follow up about generating secrets and the compose file choice as settled by spec 0006.
 - [ ] Row 38 (upgrades): back up the database and `.env` before an upgrade, and consider a short maintenance window message.
 - [ ] Row 35 (backups): include `.env` (the master key) in backups, as spec 0002 asks.
 - [ ] Row 11 (docs site): move the README install section into the docs site.
