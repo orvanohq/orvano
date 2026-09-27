@@ -1,6 +1,9 @@
-# Releases the public SDKs (spec 0001, AC-12). Pushing a tag `v<VERSION>` runs the whole SDK
-# workflow first (generated code current, AC-3; scenarios on every surface, AC-10), then publishes
-# to npm, pub.dev, and NuGet, then updates the read only mirror repos.
+# Releases the public SDKs (spec 0001, AC-12) and the server (spec 0006, AC-29). Pushing a tag
+# `v<VERSION>` runs the whole SDK workflow first (generated code current, AC-3; scenarios on every
+# surface, AC-10), then publishes to npm, pub.dev, and NuGet, then updates the read only mirror repos.
+# Alongside, it pushes the two images to GHCR for amd64 and arm64 and creates the GitHub Release
+# with install.sh (its version stamped in) and install.sh.sha256, marked latest, so
+# `releases/latest/download/install.sh` always serves the newest installer.
 #
 # Until Orvano reaches 0.1 every step is a dry run: packages are packed and validated, and mirror
 # commits are built, but nothing is uploaded or pushed. Running this workflow by hand is always a
@@ -159,6 +162,86 @@ jobs:
         env:
           KEY: ${{ env.NUGET_API_KEY || steps.login.outputs.NUGET_API_KEY }}
         run: dotnet nuget push "artifacts/*.nupkg" --api-key "$KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  images:
+    name: Image ${{ matrix.image }}
+    needs: [plan, sdks]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: orvano
+            dockerfile: deploy/server.Dockerfile
+          - image: orvano-gateway
+            dockerfile: deploy/gateway/Dockerfile
+    env:
+      DRY_RUN: ${{ needs.plan.outputs.dry-run }}
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: tags
+        run: |
+          minor=$(echo "$VERSION" | cut -d. -f1,2)
+          {
+            echo "tags<<EOF"
+            echo "ghcr.io/orvanohq/${{ matrix.image }}:$VERSION"
+            echo "ghcr.io/orvanohq/${{ matrix.image }}:$minor"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+      # Both Dockerfiles compile on the build platform, so only the final copy runs emulated.
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - if: env.DRY_RUN != 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/orvanohq/orvano
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.licenses=Apache-2.0
+          push: ${{ env.DRY_RUN != 'true' }}
+
+  github-release:
+    name: GitHub Release with install.sh
+    needs: [plan, images]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      DRY_RUN: ${{ needs.plan.outputs.dry-run }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Stamp the version into install.sh
+        run: |
+          mkdir -p dist
+          sed "s/^STAMPED_VERSION=\"\"\$/STAMPED_VERSION=\"$VERSION\"/" deploy/install/install.sh > dist/install.sh
+          grep -qx "STAMPED_VERSION=\"$VERSION\"" dist/install.sh || { echo "::error::install.sh has no STAMPED_VERSION line to stamp."; exit 1; }
+          sh dist/install.sh --help >/dev/null
+          (cd dist && sha256sum install.sh > install.sh.sha256)
+          cat dist/install.sh.sha256
+      - uses: actions/upload-artifact@v7
+        with:
+          name: install-sh
+          path: dist/
+      - name: Create the release
+        if: env.DRY_RUN != 'true'
+        run: |
+          gh release create "v$VERSION" --verify-tag --latest --title "Orvano $VERSION" --generate-notes \
+            dist/install.sh dist/install.sh.sha256
 
   mirrors:
     name: Mirror ${{ matrix.repo }}
