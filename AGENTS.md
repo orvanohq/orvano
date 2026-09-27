@@ -106,6 +106,7 @@ MCP servers: Aspire MCP (recommended), GitHub MCP (recommended), Postgres MCP Pr
 - [tools/sdkgen/AGENTS.md](tools/sdkgen/AGENTS.md): SdkGen, the C# generator, its templates and type mapping
 - [sdks/AGENTS.md](sdks/AGENTS.md): the five SDK surfaces, generated versus handwritten code, audience routing
 - [tests/scenarios/AGENTS.md](tests/scenarios/AGENTS.md): the shared scenarios and one runner per SDK surface
+- [deploy/AGENTS.md](deploy/AGENTS.md): the server and gateway images, the Compose file, the Postgres bootstrap, and what else reuses them
 - [deploy/install/AGENTS.md](deploy/install/AGENTS.md): the self host installer, what `install.sh` owns versus `orvano install`, exit codes, and how to try it safely
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
