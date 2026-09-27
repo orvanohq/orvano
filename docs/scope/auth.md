@@ -9,7 +9,7 @@ The thinnest real auth thread: email and password sign up, sign in, sign out, an
 - [ ] Build it: `/develop app user sign up & sign in` (after row 7's Platform tables and domain; see the spec's Build plan for the order across rows 7 and 8)
    - [x] Foundations: envelope encryption, trusted proxies, cache and rate limiter in the kernel; the `Orvano.Auth` module, its four tables, and the domain rules (AC-2, 8, 9, 30, 31, 34)
    - [x] Thin thread and sessions: sign up, sign in, current user, signing keys and JWKS, refresh with reuse detection, sign out, session lists, self service, events, retention (AC-1, 3 to 16, 20, 21, 30 to 33)
-   - [ ] Servers and client SDKs: API key authentication and scopes, `users.*`, token verification in .NET, Dart, and JS servers; session handling in JS, Next.js, and Flutter (AC-17 to 19, 23 to 26, 35)
+   - [x] Servers and client SDKs: API key authentication and scopes, `users.*`, token verification in .NET, Dart, and JS servers; session handling in JS, Next.js, and Flutter (AC-17 to 19, 23 to 26, 35)
    - [ ] Console: console account sessions with the CSRF rule, the Users page, and signing key rotation (AC-22, 27 to 29, 35)
 - [ ] Verify it: `/check verify app user sign up & sign in`
 - [ ] Test it: `/test app user sign up & sign in`

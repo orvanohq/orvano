@@ -151,6 +151,7 @@
             "bearer": []
           }
         ],
+        "x-orvano-session": "user",
         "x-orvano-service": "account",
         "x-orvano-audience": "client"
       }

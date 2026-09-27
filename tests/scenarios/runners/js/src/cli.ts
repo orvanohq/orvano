@@ -13,6 +13,7 @@ import { parse } from 'yaml'
 import { runScenarios } from './interpreter.js'
 import type { Scenario, ScenarioResult } from './interpreter.js'
 import { createSurface } from './surface.js'
+import type { BrowserContext } from 'playwright'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const packageDir = resolve(here, '..')
@@ -108,9 +109,11 @@ async function inRuntime(
 async function inBrowser(scenarios: Scenario[]): Promise<ScenarioResult[]> {
   const { chromium } = await import('playwright')
   const bundle = await readFile(join(packageDir, 'dist/bundles/browser.js'))
+  let refreshes = 0
   const server = createServer((req, res) => {
     void (async () => {
       const url = req.url ?? '/'
+      if (url.startsWith('/v1/account/sessions/refresh')) refreshes++
       if (url.startsWith('/v1/')) {
         const headers = new Headers()
         for (const [name, value] of Object.entries(req.headers)) {
@@ -151,13 +154,59 @@ async function inBrowser(scenarios: Scenario[]): Promise<ScenarioResult[]> {
     const page = await context.newPage()
     await page.goto(origin)
     await page.waitForFunction(() => typeof window.orvanoRunScenarios === 'function')
-    return await page.evaluate(([s, p]) => window.orvanoRunScenarios(s, p), [
+    const results = await page.evaluate(([s, p]) => window.orvanoRunScenarios(s, p), [
       scenarios,
       project,
     ] as const)
+    return [...results, await twoTabs(context, origin, () => refreshes)]
   } finally {
     await browser.close()
     server.close()
+  }
+}
+
+/**
+ * Spec 0004 AC-24 in a real browser: two tabs share one stored session about to expire and call
+ * at once. Exactly one refresh reaches Orvano (the Web Lock), and the second tab hears
+ * `tokenRefreshed`.
+ */
+async function twoTabs(
+  context: BrowserContext,
+  origin: string,
+  refreshes: () => number,
+): Promise<ScenarioResult> {
+  const name = 'browser: two tabs refresh once, and the other tab hears it (spec 0004 AC-24)'
+  try {
+    const [first, second] = [await context.newPage(), await context.newPage()]
+    for (const tab of [first, second]) {
+      await tab.goto(origin)
+      await tab.waitForFunction(() => typeof window.orvanoTabs === 'object')
+    }
+    await first.evaluate((p) => window.orvanoTabs.signUp(p), project)
+    for (const tab of [first, second])
+      await tab.evaluate((p) => {
+        window.orvanoTabs.watch(p)
+      }, project)
+    const before = refreshes()
+    const ids = await Promise.all(
+      [first, second].map((tab) => tab.evaluate(() => window.orvanoTabs.call())),
+    )
+    await second.waitForTimeout(200)
+    const events = await second.evaluate(() => window.orvanoTabs.events())
+    const count = refreshes() - before
+    if (ids[0] !== ids[1])
+      return { name, outcome: 'failed', reason: 'the tabs saw different users' }
+    if (count !== 1)
+      return { name, outcome: 'failed', reason: `${String(count)} refreshes reached Orvano` }
+    if (!events.includes('tokenRefreshed'))
+      return { name, outcome: 'failed', reason: `the second tab heard ${JSON.stringify(events)}` }
+    return { name, outcome: 'passed' }
+  } catch (error) {
+    return {
+      name,
+      outcome: 'failed',
+      reason: error instanceof Error ? error.message : String(error),
+    }
   }
 }
 

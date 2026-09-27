@@ -337,14 +337,15 @@ internal static partial class ContractReader
 
         /// <summary>
         /// <c>x-orvano-session</c>: <c>start</c> (the result has a <c>session</c> model), <c>refresh</c> (the result is
-        /// the session model), or <c>end</c>. Only client operations change the client's session.
+        /// the session model), <c>end</c>, or <c>user</c> (the signed in user changed; the result is a model). Only
+        /// client operations change the client's session.
         /// </summary>
         private SessionEffect ReadSession(OpenApiOperation op, Audience? audience, TypeRef? result, string where)
         {
             var value = ReadString(op.Extensions, SessionExtension);
             if (value is null)
             {
-                if (op.Extensions?.ContainsKey(SessionExtension) == true) errors.Add($"{where}: {SessionExtension} must be start, refresh, or end");
+                if (op.Extensions?.ContainsKey(SessionExtension) == true) errors.Add($"{where}: {SessionExtension} must be start, refresh, end, or user");
                 return SessionEffect.None;
             }
 
@@ -368,8 +369,12 @@ internal static partial class ContractReader
                     return SessionEffect.Refresh;
                 case "end":
                     return SessionEffect.End;
+                case "user":
+                    if (result is not ModelType)
+                        errors.Add($"{where}: a {SessionExtension} 'user' operation returns the changed user as a model");
+                    return SessionEffect.User;
                 default:
-                    errors.Add($"{where}: {SessionExtension} is '{value}', expected start, refresh, or end");
+                    errors.Add($"{where}: {SessionExtension} is '{value}', expected start, refresh, end, or user");
                     return SessionEffect.None;
             }
         }

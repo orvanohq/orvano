@@ -17,9 +17,21 @@
 export { Client } from './runtime/server-client.js'
 export type { ServerClientConfig } from './runtime/server-client.js'
 export type { VerifiedAccessToken, VerifyAccessTokenOptions } from './runtime/access-tokens.js'
-export type { ClientConfig, HttpMethod, RequestOptions, RequestSpec } from './runtime/client.js'
-export { MemorySessionStore } from './runtime/auth.js'
-export type { AuthSession, SessionStore } from './runtime/auth.js'
+export { refreshMarginMs, refreshWithToken } from './runtime/client.js'
+export type {
+  ClientConfig,
+  HttpMethod,
+  RequestOptions,
+  RequestSpec,
+  SessionRefresher,
+} from './runtime/client.js'
+export {
+  LocalStorageSessionStore,
+  MemorySessionStore,
+  refreshLockName,
+  sessionStorageKey,
+} from './runtime/auth.js'
+export type { AuthEvent, AuthSession, AuthStateListener, SessionStore } from './runtime/auth.js'
 export { OrvanoError } from './runtime/error.js'
 export { paginate } from './runtime/pagination.js'
 export type { Page } from './runtime/pagination.js'

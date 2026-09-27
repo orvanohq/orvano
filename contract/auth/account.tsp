@@ -220,6 +220,7 @@ interface AccountApi {
   @operationId("account.update")
   @extension("x-orvano-audience", "client")
   @extension("x-orvano-service", "account")
+  @extension("x-orvano-session", "user")
   @useAuth(bearer)
   @patch(#{ implicitOptionality: false })
   update(@body request: UpdateAccountRequest): User | Problem;

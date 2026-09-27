@@ -3,6 +3,8 @@ import type { VerifiedAccessToken, VerifyAccessTokenOptions } from './access-tok
 import { apiKeyHeader, assertNotInBrowser } from './api-key.js'
 import { Client as BaseClient } from './client.js'
 import type { ClientConfig } from './client.js'
+import { MemorySessionStore } from './auth.js'
+import type { AuthSession } from './auth.js'
 
 /** Settings for the server {@link Client}. */
 export interface ServerClientConfig extends ClientConfig {
@@ -22,7 +24,8 @@ export class Client extends BaseClient {
   readonly #verifier = new AccessTokenVerifier(this)
 
   constructor(config: ServerClientConfig) {
-    super(config)
+    // Servers never share a browser's stored session: memory unless told otherwise.
+    super({ ...config, session: config.session ?? new MemorySessionStore() })
     if (config.apiKey !== undefined) this.setKey(config.apiKey)
   }
 
@@ -49,8 +52,8 @@ export class Client extends BaseClient {
     return this.#verifier.verify(token, options)
   }
 
-  protected override async authorize(headers: Headers): Promise<void> {
-    await super.authorize(headers)
+  protected override async authorize(headers: Headers, session: AuthSession | null): Promise<void> {
+    await super.authorize(headers, session)
     if (this.#apiKey !== undefined) headers.set(apiKeyHeader, this.#apiKey)
   }
 }

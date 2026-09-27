@@ -121,6 +121,8 @@ jobs:
       # The API key guard only exists in a browser build.
       - run: dart test -p chrome
         working-directory: sdks/dart/server
+      - run: flutter test
+        working-directory: sdks/dart/flutter
 
   breaking:
     name: Breaking changes since the last release

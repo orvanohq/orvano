@@ -273,6 +273,7 @@ public class ContractReaderTests
         Assert.Equal("jwksUri", jwks.Name);
         Assert.Equal(SessionEffect.Start, contract.Operations.Single(o => o.Id == "account.create").Session);
         Assert.Equal(SessionEffect.None, contract.Operations.Single(o => o.Id == "account.get").Session);
+        Assert.Equal(SessionEffect.User, contract.Operations.Single(o => o.Id == "account.update").Session);
     }
 
     [Fact]
@@ -288,7 +289,8 @@ public class ContractReaderTests
     }
 
     [Theory]
-    [InlineData("/v1/account", "post", "later", "expected start, refresh, or end")]
+    [InlineData("/v1/account", "post", "later", "expected start, refresh, end, or user")]
+    [InlineData("/v1/account/sessions/current", "delete", "user", "returns the changed user as a model")]
     [InlineData("/v1/account", "post", "refresh", "returns a session model")]
     [InlineData("/v1/health", "get", "end", "only for client operations")]
     public async Task Refuses_a_session_change_that_does_not_fit_the_operation(string path, string method, string value, string message) // spec 0004

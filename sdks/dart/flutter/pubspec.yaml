@@ -15,7 +15,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_secure_storage: ^11.2.0
+  http: ^1.6.0
   orvano_core: ^0.0.0
 
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
   lints: ^6.1.0

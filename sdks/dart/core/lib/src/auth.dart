@@ -61,8 +61,7 @@ final class AuthSession {
 }
 
 /// Where a client keeps the signed in user's session between calls. The
-/// default keeps it in memory; `orvano_flutter` will keep it in secure
-/// storage.
+/// default keeps it in memory; `orvano_flutter` keeps it in secure storage.
 abstract interface class SessionStore {
   /// The current session, or null when nobody is signed in.
   FutureOr<AuthSession?> read();
@@ -88,3 +87,36 @@ final class MemorySessionStore implements SessionStore {
 /// The header the access token travels in, as `Bearer <token>`; named only
 /// here in the Dart runtime.
 const authorizationHeader = 'Authorization';
+
+/// What happened to the signed in user, as `Client.authStateChanges` tells
+/// it (spec 0004, AC-26).
+enum AuthEvent {
+  /// Someone signed in (or signed up).
+  signedIn,
+
+  /// The session ended: a sign out, or a refresh Orvano refused.
+  signedOut,
+
+  /// The session traded its refresh token for a fresh pair.
+  tokenRefreshed,
+
+  /// The signed in user changed their name or metadata.
+  userUpdated,
+}
+
+/// One change to the signed in user: the [event] and the [session] after it
+/// (null after [AuthEvent.signedOut]).
+final class AuthStateChange {
+  /// Creates a change.
+  const AuthStateChange(this.event, this.session);
+
+  /// What happened.
+  final AuthEvent event;
+
+  /// The session after it.
+  final AuthSession? session;
+}
+
+/// The key a Flutter app keeps a project's session under:
+/// `orvano.session.<projectId>`.
+String sessionStorageKey(String? project) => 'orvano.session.${project ?? ''}';

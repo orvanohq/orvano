@@ -117,7 +117,10 @@ export class AccountService {
 
   /** Changes the signed in user's name or metadata. */
   update(body: UpdateAccountRequest, options?: RequestOptions): Promise<User> {
-    return this.#client.request<User>({ method: 'PATCH', path: '/v1/account', body }, options)
+    return this.#client.request<User>(
+      { method: 'PATCH', path: '/v1/account', body, session: 'user' },
+      options,
+    )
   }
 
   /** Changes the signed in user's password and ends every other session of theirs. */

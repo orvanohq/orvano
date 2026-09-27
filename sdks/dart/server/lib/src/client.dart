@@ -62,8 +62,11 @@ final class Client extends core.Client {
   }) => _verifier.verify(token, online: online);
 
   @override
-  Future<void> authorize(Map<String, String> headers) async {
-    await super.authorize(headers);
+  Future<void> authorize(
+    Map<String, String> headers,
+    core.AuthSession? current,
+  ) async {
+    await super.authorize(headers, current);
     if (_apiKey case final key?) headers[apiKeyHeader] = key;
   }
 }

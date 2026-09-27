@@ -5,7 +5,7 @@
  *
  * @packageDocumentation
  */
-import { Client as BaseClient } from '@orvano/js'
+import { Client as BaseClient, MemorySessionStore } from '@orvano/js'
 import type { ClientConfig } from '@orvano/js'
 
 export { OrvanoError } from '@orvano/js'
@@ -34,7 +34,8 @@ export class Client extends BaseClient {
 
   constructor(config: ConsoleClientConfig) {
     const { consoleToken, ...rest } = config
-    super(rest)
+    // Console routes never take an app session, so none is ever stored or refreshed here.
+    super({ ...rest, session: new MemorySessionStore() })
     this.#consoleToken = consoleToken
   }
 

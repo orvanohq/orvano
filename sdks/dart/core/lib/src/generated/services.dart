@@ -135,6 +135,7 @@ final class AccountService {
       'PATCH',
       '/v1/account',
       body: body.toJson(),
+      session: SessionChange.user,
       options: options,
     );
     return User.fromJson(json as Map<String, dynamic>);

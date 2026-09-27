@@ -13,6 +13,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
     }
   },
   "files": [
@@ -26,7 +30,13 @@
     "@orvano/js": "workspace:*"
   },
   "devDependencies": {
+    "next": "16.3.6",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "typescript": "~6.0.3",
     "vitest": "^5.0.2"
+  },
+  "peerDependencies": {
+    "next": ">=15.0.0"
   }
 }

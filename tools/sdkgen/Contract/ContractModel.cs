@@ -59,6 +59,9 @@ internal enum SessionEffect
 
     /// <summary>A sign out: the stored session is cleared.</summary>
     End,
+
+    /// <summary>The signed in user changed: the session stays, and the client tells its listeners.</summary>
+    User,
 }
 
 // Optional: not in the schema's `required` list, omitted from JSON when null.
