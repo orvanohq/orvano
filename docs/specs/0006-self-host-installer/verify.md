@@ -32,7 +32,7 @@ Run the host steps on a throwaway Linux server or VM (Ubuntu 24.04), or in a `do
 - [x] `--email nope` → exit 2; `--email ""` → allowed → AC-7
 - [x] On an installed `localhost`, rerun with `--domain orvano.example.com` → sign in again warning, default no; `--yes` changes it → AC-18
 - [x] `--no-pull` with an image missing → exit 2 naming the image → AC-14
-- [ ] `--version 9.9.9` (not a released version), without `--no-pull` → exit 1, one plain line naming `ghcr.io/orvanohq/orvano:9.9.9` and pointing to `--version` and the network, no Docker error on screen, Docker's error in `install.log` → AC-14
+- [x] `--version 9.9.9` (not a released version), without `--no-pull` → exit 1, one plain line naming `ghcr.io/orvanohq/orvano:9.9.9` and pointing to `--version` and the network, no Docker error on screen, Docker's error in `install.log` → AC-14
 - [x] No terminal, fresh install, no `--domain` → exit 2 naming `--domain`, never waits → AC-28
 - [x] `sh install.sh --help` → prints every flag, exit 0 → AC-28
 
