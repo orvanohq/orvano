@@ -13,6 +13,7 @@ Spec [0003](../specs/0003-platform-data-model/index.md) · code in `server/src/O
 ### 11. Docs site & quickstarts · needs a decision
 Public docs with a quickstart per SDK and the generated API reference. From here on, every feature adds its own docs page.
 **Done when:** a new developer can follow the Next.js or Flutter quickstart from install to a signed in user without help.
+**Also:** move the README install section into the docs site · from spec 0006
 - [ ] Design it (spec): `/architect docs site & quickstarts`
 
 ### 15. Console team members & roles
@@ -33,6 +34,7 @@ Logs explorer across all products, request and usage metrics per project, and a 
 ### 38. Upgrades, audit logs & hardening · GA
 Safe in place upgrades between versions, an audit log of console actions, and a security pass over every surface before 1.0.
 **Done when:** upgrading from the previous version keeps all data; every console action is in the audit log; the security review finds no open high severity issue.
+**Also:** back up the database and `.env` before an upgrade, and consider a short maintenance window message · from spec 0006
 - [ ] Build it: `/develop upgrades, audit logs & hardening`
 
 ### 39. Stable release gate · GA

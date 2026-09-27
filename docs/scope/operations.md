@@ -5,6 +5,7 @@ Orvano's fourth differentiator. Appwrite keeps automatic backups for its paid cl
 ### 35. Backups & point in time restore ★ · needs a decision · GA
 Scheduled backups of databases, files, and project config to any S3 compatible target you choose, with retention rules and restore to a point in time or into a new project.
 **Done when:** a daily backup runs on schedule to your storage, and restoring to a chosen time recovers deleted rows and files without touching other projects.
+**Also:** include `.env` in backups, since it holds the master key and stored secrets are unreadable without it (spec 0002) · from spec 0006
 - [ ] Design it (spec): `/architect backups & point in time restore`
 
 ### 36. Environments & schema promotion ★ · needs a decision · GA
