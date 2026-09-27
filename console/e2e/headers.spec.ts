@@ -26,6 +26,17 @@ test('hashed assets cache for a year, and the shell revalidates (AC-24)', async 
   )
 })
 
+test('a missing hashed asset is a 404 that is not cached for a year (AC-24)', async ({
+  request,
+}) => {
+  const response = await request.get('/assets/does-not-exist-abc123.js')
+  expect(response.status()).toBe(404)
+  expect(response.headers()['cache-control'] ?? '').not.toContain('immutable')
+  // The 404 is still a console file, so it keeps the security headers.
+  expect(response.headers()['content-security-policy']).toContain("default-src 'self'")
+  expect(response.headers()['x-content-type-options']).toBe('nosniff')
+})
+
 test('every shell page runs without a CSP violation (AC-24)', async ({ signedIn: page }) => {
   await page.addInitScript(() => {
     const seen: string[] = []

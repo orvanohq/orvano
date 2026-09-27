@@ -6,6 +6,7 @@ import { useRef } from 'react'
 import { Sidebar, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { orgQuery, projectQuery } from '@/lib/queries'
+import { useCloseDrawerOnNavigate } from '@/shell/drawer'
 import { orgNav, projectNav } from '@/shell/nav'
 import { OrgSwitcher } from '@/shell/org-switcher'
 import { ProjectSwitcher } from '@/shell/project-switcher'
@@ -30,6 +31,7 @@ function Frame() {
   const { orgId: orgParam, projectId } = useParams({ strict: false })
   const mainRef = useRef<HTMLElement | null>(null)
   const { isDesktop } = useSidebar()
+  useCloseDrawerOnNavigate()
 
   const project = useQuery({ ...projectQuery(projectId ?? ''), enabled: projectId !== undefined })
   const orgId = orgParam ?? project.data?.orgId
