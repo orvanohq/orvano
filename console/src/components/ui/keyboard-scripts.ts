@@ -311,6 +311,10 @@ export const keyboardScripts: readonly KeyboardScript[] = [
     start: '[data-testid=toast-error]',
     steps: [
       { keys: '{Enter}', then: [{ text: { selector: 'body', contains: 'Could not save' } }] },
+      // F6 moves to the toast region, Tab reaches the toast, Escape dismisses it.
+      { keys: '{F6}', then: [{ focused: '[aria-label=Notifications]' }] },
+      { keys: '{Tab}', then: [{ focused: '[role=dialog]' }] },
+      { keys: '{Escape}', then: [{ absent: '[role=dialog]' }] },
     ],
   },
   {

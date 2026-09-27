@@ -76,4 +76,48 @@ describe('toasts (AC-21)', () => {
 
     await expect.poll(() => toastTexts().join('')).not.toContain('Could not delete the key')
   })
+
+  it('moves focus to the toast region with F6, then Escape dismisses a focused toast', async () => {
+    await render(<Toaster />)
+    notifyError('Could not delete the key')
+    await expect.poll(text).toContain('Could not delete the key')
+
+    await userEvent.keyboard('{F6}')
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Notifications')
+
+    // The next Tab stop inside the region is the toast itself.
+    await userEvent.tab()
+    expect(document.activeElement?.getAttribute('role')).toBe('dialog')
+
+    await userEvent.keyboard('{Escape}')
+    await expect.poll(() => toastTexts().join('')).not.toContain('Could not delete the key')
+  })
+
+  it('dismisses only the focused toast when several are stacked', async () => {
+    await render(<Toaster />)
+    notifyError('First failure')
+    notifyError('Second failure')
+    const toastCount = () => document.querySelectorAll('[role=dialog]').length
+    await expect.poll(toastCount).toBe(2)
+
+    await userEvent.keyboard('{F6}')
+    await userEvent.tab()
+    await userEvent.keyboard('{Escape}')
+
+    await expect.poll(toastCount).toBe(1)
+  })
+
+  it('dismisses a toast with Escape while its Dismiss button has focus', async () => {
+    await render(<Toaster />)
+    notifyError('Could not delete the key')
+    await expect.poll(text).toContain('Could not delete the key')
+
+    await userEvent.keyboard('{F6}')
+    await userEvent.tab()
+    await userEvent.tab()
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Dismiss')
+
+    await userEvent.keyboard('{Escape}')
+    await expect.poll(() => toastTexts().join('')).not.toContain('Could not delete the key')
+  })
 })

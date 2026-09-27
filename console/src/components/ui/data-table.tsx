@@ -90,7 +90,9 @@ export function DataTable<T>({
         aria-busy={loading || undefined}
         className="max-w-full overflow-auto rounded-lg border border-border"
       >
-        <Table className="tabular-nums">
+        {/* The region above is the one scroller: focusable and labelled, so a keyboard user can
+            scroll a wide table. `Table`'s own wrapper must not scroll instead. */}
+        <Table className="tabular-nums" containerClassName="overflow-visible">
           <TableHeader className="sticky top-0 z-(--z-sticky) bg-card">
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
