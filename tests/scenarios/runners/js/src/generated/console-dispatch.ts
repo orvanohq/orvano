@@ -2,6 +2,8 @@
 // Test only: maps each operationId to its SDK call for the scenario interpreter. Never published.
 import type {
   CreateApiKeyRequest,
+  CreateConsoleAccountRequest,
+  CreateConsoleSessionRequest,
   CreateOrgRequest,
   CreatePlatformRequest,
   CreateProjectRequest,
@@ -14,6 +16,27 @@ import type { DispatchTable } from '../dispatch-table.js'
 
 /** Every console operation, called through `@orvano/console-client`. */
 export const consoleDispatch: DispatchTable = {
+  'consoleAccount.create': {
+    status: 201,
+    console: (o, input) => o.consoleAccount.create(input.body as CreateConsoleAccountRequest),
+  },
+  'consoleAccount.createSession': {
+    status: 201,
+    console: (o, input) =>
+      o.consoleAccount.createSession(input.body as CreateConsoleSessionRequest),
+  },
+  'consoleAccount.deleteSession': {
+    status: 204,
+    console: (o, _input) => o.consoleAccount.deleteSession(),
+  },
+  'consoleAccount.get': {
+    status: 200,
+    console: (o, _input) => o.consoleAccount.get(),
+  },
+  'consoleAccount.refreshSession': {
+    status: 204,
+    console: (o, _input) => o.consoleAccount.refreshSession(),
+  },
   'consoleApiKeys.create': {
     status: 201,
     console: (o, input) => o.consoleApiKeys.create(input.body as CreateApiKeyRequest),

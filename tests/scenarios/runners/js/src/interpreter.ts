@@ -45,6 +45,8 @@ export interface Surface {
   client: ClientSurface
   server: ServerSurface
   console?: ConsoleSurface | undefined
+  /** Signs the fixture console account in; console steps await it first. */
+  consoleReady?: (() => Promise<void>) | undefined
   serverKey?: boolean
 }
 
@@ -155,7 +157,8 @@ async function call(
       return entry.server(surface.server, input)
     case 'console':
       if (surface.console === undefined)
-        throw new ScenarioSkipped('no console session on this surface (fixtures.yaml)')
+        throw new ScenarioSkipped('no console account on this surface (fixtures.yaml)')
+      await surface.consoleReady?.()
       if (all) {
         if (entry.consoleAll === undefined) throw missing('@orvano/console-client')
         return collect(entry.consoleAll(surface.console, input))

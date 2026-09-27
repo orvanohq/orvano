@@ -1,21 +1,40 @@
-import { UserRound } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
+import { LogOut, UserRound } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { consoleApi } from '@/lib/console-client'
 import { usePreferences, type Density, type ThemeChoice } from '@/lib/preferences'
+import { accountQuery } from '@/lib/queries'
+import { notifyError } from '@/lib/toast'
 
-/** The account menu: theme and density now; row 8 adds name, email, and Sign out. */
+/** The account menu: who is signed in, theme and density, and Sign out (spec 0004, AC-27). */
 export function AccountMenu() {
   const { theme, density, setTheme, setDensity } = usePreferences()
+  const account = useQuery(accountQuery())
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const signOut = async () => {
+    try {
+      await consoleApi().consoleAccount.deleteSession()
+    } catch (error) {
+      notifyError("Couldn't sign out", error)
+      return
+    }
+    queryClient.clear()
+    await navigate({ to: '/sign-in', replace: true })
+  }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -23,7 +42,22 @@ export function AccountMenu() {
       >
         <UserRound aria-hidden />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-56">
+        {account.data === undefined ? null : (
+          <>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="flex flex-col gap-0.5">
+                <span className="truncate font-medium text-foreground">
+                  {account.data.name ?? account.data.email}
+                </span>
+                {account.data.name === null ? null : (
+                  <span className="truncate text-muted-foreground">{account.data.email}</span>
+                )}
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuGroup>
           <DropdownMenuLabel>Theme</DropdownMenuLabel>
           <DropdownMenuRadioGroup
@@ -50,6 +84,15 @@ export function AccountMenu() {
             <DropdownMenuRadioItem value="comfortable">Comfortable</DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
         </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => {
+            void signOut()
+          }}
+        >
+          <LogOut aria-hidden />
+          Sign out
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

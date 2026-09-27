@@ -1842,6 +1842,12 @@
       }
     },
     "securitySchemes": {
+      "consoleSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "orvano_console",
+        "description": "A console account's session: the `orvano_console` cookie (`HttpOnly`, `SameSite=Strict`), set by\n`consoleAccount.create` and `consoleAccount.createSession`. Browsers send it themselves."
+      },
       "bearer": {
         "type": "http",
         "scheme": "Bearer",

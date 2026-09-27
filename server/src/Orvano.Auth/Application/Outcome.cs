@@ -33,6 +33,12 @@ internal sealed record Failure(FailureKind Kind, string Code, string Detail)
     public static Failure UserAlreadyExists { get; } =
         new(FailureKind.Conflict, ErrorCode.UserAlreadyExists, "A user with this email already exists.");
 
+    public static Failure SignupClosed { get; } =
+        new(FailureKind.Forbidden, ErrorCode.SignupClosed, "Console sign up is invite only.");
+
+    public static Failure SetupTokenInvalid { get; } =
+        new(FailureKind.Forbidden, ErrorCode.SetupTokenInvalid, "This setup link is not valid. Run the installer again on your server to see the right link.");
+
     public static Failure UserNotFound { get; } = new(FailureKind.NotFound, ErrorCode.UserNotFound, "No such user.");
 
     public static Failure SessionNotFound { get; } = new(FailureKind.NotFound, ErrorCode.SessionNotFound, "No such session.");

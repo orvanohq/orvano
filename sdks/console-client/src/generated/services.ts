@@ -3,6 +3,8 @@ import type {
   ApiKey,
   ApiKeyPage,
   CreateApiKeyRequest,
+  CreateConsoleAccountRequest,
+  CreateConsoleSessionRequest,
   CreateOrgRequest,
   CreatePlatformRequest,
   CreateProjectRequest,
@@ -20,8 +22,58 @@ import type {
   UpdatePlatformRequest,
   UpdateProjectRequest,
 } from './models.js'
-import type { Client, RequestOptions } from '@orvano/js'
+import type { Client, RequestOptions, User } from '@orvano/js'
 import { paginate } from '@orvano/js'
+
+/** Operations in the `consoleAccount` service. */
+export class ConsoleAccountService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /**
+   * Creates a console account and signs it in, setting the session cookies. The install's sign up policy decides
+   * who may: the first account (with the setup token when the install has one), anyone while sign up is open, or
+   * an invitation.
+   */
+  create(body: CreateConsoleAccountRequest, options?: RequestOptions): Promise<User> {
+    return this.#client.request<User>(
+      { method: 'POST', path: '/v1/console/account', body },
+      options,
+    )
+  }
+
+  /** Signs a console account in with its email and password, setting the session cookies. */
+  createSession(body: CreateConsoleSessionRequest, options?: RequestOptions): Promise<User> {
+    return this.#client.request<User>(
+      { method: 'POST', path: '/v1/console/account/session', body },
+      options,
+    )
+  }
+
+  /** Signs out: ends the console session and clears both cookies. */
+  deleteSession(options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'DELETE', path: '/v1/console/account/session' },
+      options,
+    )
+  }
+
+  /** Gets the signed in console account. */
+  get(options?: RequestOptions): Promise<User> {
+    return this.#client.request<User>({ method: 'GET', path: '/v1/console/account' }, options)
+  }
+
+  /** Trades the refresh cookie for a new pair of session cookies. The console client calls it after `token_expired`. */
+  refreshSession(options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'POST', path: '/v1/console/account/session/refresh', idempotent: true },
+      options,
+    )
+  }
+}
 
 /** Operations in the `consoleApiKeys` service. */
 export class ConsoleApiKeysService {
@@ -325,6 +377,8 @@ export class ConsoleProjectsService {
 export class Orvano {
   /** The client every service sends through. */
   readonly client: Client
+  /** Operations in the `consoleAccount` service. */
+  readonly consoleAccount: ConsoleAccountService
   /** Operations in the `consoleApiKeys` service. */
   readonly consoleApiKeys: ConsoleApiKeysService
   /** Operations in the `consoleInstall` service. */
@@ -338,6 +392,7 @@ export class Orvano {
 
   constructor(client: Client) {
     this.client = client
+    this.consoleAccount = new ConsoleAccountService(client)
     this.consoleApiKeys = new ConsoleApiKeysService(client)
     this.consoleInstall = new ConsoleInstallService(client)
     this.consoleOrgs = new ConsoleOrgsService(client)

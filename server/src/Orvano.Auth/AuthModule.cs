@@ -33,6 +33,7 @@ internal sealed class AuthModule : IOrvanoModule
         services.AddSingleton<AccountService>();
         services.AddSingleton<SessionService>();
         services.AddSingleton<UsersService>();
+        services.AddSingleton<IConsoleSessions, ConsoleSessionChecks>();
     }
 
     public void MapApi(RouteGroupBuilder v1)
@@ -40,10 +41,15 @@ internal sealed class AuthModule : IOrvanoModule
         AccountEndpoints.Map(v1);
         KeysEndpoints.Map(v1);
         UsersEndpoints.Map(v1);
+        ConsoleAccountEndpoints.Map(v1);
     }
 
-    public void RegisterWork(IWorkRegistry work) =>
+    public void RegisterWork(IWorkRegistry work)
+    {
         work.AddInternalSchedule(AuthRetention.Name, AuthRetention.Interval, AuthRetention.RunScheduledAsync);
+        work.HandleJob(AuthJobs.PurgeUsers, AuthJobs.Queue, AuthJobs.PurgeUsersAsync);
+        work.OnEvent(AuthJobs.ProjectPurgedEvent, AuthJobs.PurgeConsumer, AuthJobs.OnProjectPurged);
+    }
 
     public void RegisterRealtime(IRealtimeRegistry realtime) { }
 }

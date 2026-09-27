@@ -6,10 +6,28 @@ export const switcherPageSize = 100
 
 /** Query keys, one place (spec 0005, Query setup). */
 export const keys = {
+  account: ['console', 'account'] as const,
+  setup: ['console', 'install', 'setup'] as const,
   orgs: ['console', 'orgs'] as const,
   org: (orgId: string) => ['console', 'orgs', orgId] as const,
   orgProjects: (orgId: string) => ['console', 'orgs', orgId, 'projects'] as const,
   project: (projectId: string) => ['console', 'projects', projectId] as const,
+}
+
+/** The signed in console account; the session guard's probe (spec 0005, AC-20). */
+export function accountQuery() {
+  return queryOptions({
+    queryKey: keys.account,
+    queryFn: ({ signal }) => consoleApi().consoleAccount.get({ signal }),
+  })
+}
+
+/** Whether the install still waits for its first admin (spec 0006, AC-22); needs no session. */
+export function setupQuery() {
+  return queryOptions({
+    queryKey: keys.setup,
+    queryFn: ({ signal }) => consoleApi().consoleInstall.getSetup({ signal }),
+  })
 }
 
 /** The caller's orgs, paged by cursor. */

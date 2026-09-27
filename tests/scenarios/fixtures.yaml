@@ -1,16 +1,19 @@
 # Seed data for the shared scenarios, loaded by a server started with
 # ORVANO_TEST_FIXTURES=<path to this file> in the Test environment (spec 0001, spec 0003, spec 0004).
-# consoleSessions: the console session tokens the server accepts, each acting as its own console
-#   user until row 8's real console sessions; the JS runner sends the first for `as: console` steps.
-# projects: seeded in the first session's `Fixtures` org, then provisioned by the worker. Runners
-#   send the first as X-Orvano-Project.
+# consoleUsers: console accounts with known passwords, signed up through the console's own path;
+#   the first is the install admin and owns the `Fixtures` org. The JS runner signs the first in
+#   for `as: console` steps, and the console's end to end tests sign in as it.
+# projects: seeded in the first console account's `Fixtures` org, then provisioned by the worker.
+#   Runners send the first as X-Orvano-Project.
 # apiKeys: known secrets (orv_sk_ plus 43 base64url characters) for the fixture projects. Server
 #   steps send the first.
 # platforms: a web platform lets browsers of that host call the project (the browser runners serve
 #   their pages from localhost or 127.0.0.1).
 # users: app users with known passwords, hashed at load like any sign up.
-consoleSessions:
-  - test-console-session
+consoleUsers:
+  - email: fixture-admin@example.com
+    password: fixture console password
+    name: Fixture Admin
 projects:
   - id: scenarios0000000000a
     name: Scenarios

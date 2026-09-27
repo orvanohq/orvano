@@ -16,7 +16,11 @@ const densities: Density[] = ['compact', 'comfortable']
 export function Catalog() {
   const { theme, density, setTheme, setDensity } = usePreferences()
   return (
-    <main id="main" data-marker={marker} className="mx-auto flex max-w-5xl flex-col gap-10 px-(--page-px) py-8">
+    <main
+      id="main"
+      data-marker={marker}
+      className="mx-auto flex max-w-5xl flex-col gap-10 px-(--page-px) py-8"
+    >
       <div className="flex flex-col gap-4">
         <PageHeading>Components</PageHeading>
         <p className="text-muted-foreground">
@@ -35,7 +39,12 @@ export function Catalog() {
         </nav>
       </div>
       {Object.entries(examples).map(([id, { title, render }]) => (
-        <section key={id} id={`example-${id}`} aria-labelledby={`title-${id}`} className="flex flex-col gap-3">
+        <section
+          key={id}
+          id={`example-${id}`}
+          aria-labelledby={`title-${id}`}
+          className="flex flex-col gap-3"
+        >
           <h2 id={`title-${id}`} className="border-b border-border pb-2 text-lg/7 font-semibold">
             {title}
           </h2>

@@ -6,12 +6,14 @@ import { Client as ServerClient } from '@orvano/js/server'
 import { runScenarios } from '../interpreter.js'
 import type { Scenario, ScenarioResult } from '../interpreter.js'
 import { createSurface } from '../surface.js'
+import type { ConsoleUser } from '../surface.js'
 
 declare global {
   interface Window {
     orvanoRunScenarios: (
       scenarios: Scenario[],
       project: string | undefined,
+      consoleUser: ConsoleUser | undefined,
     ) => Promise<ScenarioResult[]>
     orvanoTabs: TabCheck
   }
@@ -70,7 +72,10 @@ function keyGuard(): ScenarioResult {
   }
 }
 
-window.orvanoRunScenarios = async (scenarios, project) => [
+window.orvanoRunScenarios = async (scenarios, project, consoleUser) => [
   keyGuard(),
-  ...(await runScenarios(scenarios, createSurface(location.origin, { browser: true, project }))),
+  ...(await runScenarios(
+    scenarios,
+    createSurface(location.origin, { browser: true, project, consoleUser }),
+  )),
 ]

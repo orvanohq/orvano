@@ -47,10 +47,9 @@ beforeEach(() => {
 })
 
 describe('isSessionError (AC-20)', () => {
-  it('is true for the API answer that means there is no console session', () => {
-    expect(isSessionError(new OrvanoError(401, 'console_session_required', 'Sign in.', null))).toBe(
-      true,
-    )
+  it('is true for the API answers that mean there is no usable console session (spec 0004)', () => {
+    for (const code of ['console_session_required', 'token_expired', 'invalid_refresh_token'])
+      expect(isSessionError(new OrvanoError(401, code, 'Sign in.', null))).toBe(true)
   })
 
   it('is false for another 401 code', () => {

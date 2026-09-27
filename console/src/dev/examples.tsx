@@ -55,8 +55,20 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { FormAlert } from '@/components/ui/form-alert'
 import { Input } from '@/components/ui/input'
 import { Kbd } from '@/components/ui/kbd'
-import { Popover, PopoverContent, PopoverDescription, PopoverTitle, PopoverTrigger } from '@/components/ui/popover'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverTitle,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Sidebar, SidebarProvider, SidebarToggle } from '@/components/ui/sidebar'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -219,7 +231,9 @@ function FormExample() {
                   field.handleChange(event.target.value)
                 }}
               />
-              {invalid ? <FieldError id="form-name-error" errors={field.state.meta.errors} /> : null}
+              {invalid ? (
+                <FieldError id="form-name-error" errors={field.state.meta.errors} />
+              ) : null}
             </Field>
           )
         }}
@@ -439,7 +453,14 @@ function TableExample() {
   return (
     <div className="flex max-w-lg flex-col gap-4">
       <div data-testid="table">
-        <DataTable label="Apps" columns={columns} data={rows} sortable hasMore onLoadMore={() => undefined} />
+        <DataTable
+          label="Apps"
+          columns={columns}
+          data={rows}
+          sortable
+          hasMore
+          onLoadMore={() => undefined}
+        />
       </div>
       <DataTable label="Loading apps" columns={columns} data={[]} loading />
       <DataTable
@@ -454,7 +475,12 @@ function TableExample() {
           </Empty>
         }
       />
-      <DataTable label="Broken apps" columns={columns} data={[]} error={new Error('The API is down')} />
+      <DataTable
+        label="Broken apps"
+        columns={columns}
+        data={[]}
+        error={new Error('The API is down')}
+      />
     </div>
   )
 }

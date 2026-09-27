@@ -31,6 +31,19 @@ public class KernelSettingsTests
     }
 
     [Fact]
+    public void A_dev_master_key_of_42_random_letters_and_digits_and_an_A_is_32_bytes()
+    {
+        // The AppHost generates exactly this shape (dev/Orvano.AppHost), read as base64url: the 43rd
+        // character carries 2 unused bits, which must be zero, as they are in `A`.
+        for (var i = 0; i < 200; i++)
+        {
+            var key = System.Security.Cryptography.RandomNumberGenerator.GetString("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 42);
+
+            Assert.Equal("kdev", Orvano.Core.Secrets.MasterKeys.Parse($"kdev:{key}A").ActiveId);
+        }
+    }
+
+    [Fact]
     public void Trusted_proxies_default_to_the_private_ranges()
     {
         var proxies = TrustedProxies.Parse("private");

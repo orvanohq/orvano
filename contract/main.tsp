@@ -23,6 +23,7 @@ import "./auth/security.tsp";
 import "./auth/account.tsp";
 import "./auth/keys.tsp";
 import "./auth/users.tsp";
+import "./auth/console-account.tsp";
 import "./test/test.tsp";
 
 using Http;

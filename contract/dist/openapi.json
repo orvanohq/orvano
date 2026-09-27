@@ -498,6 +498,184 @@
         "x-orvano-audience": "client"
       }
     },
+    "/v1/console/account": {
+      "post": {
+        "operationId": "consoleAccount.create",
+        "description": "Creates a console account and signs it in, setting the session cookies. The install's sign up policy decides\nwho may: the first account (with the setup token when the install has one), anyone while sign up is open, or\nan invitation.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConsoleAccountRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      },
+      "get": {
+        "operationId": "consoleAccount.get",
+        "description": "Gets the signed in console account.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/session": {
+      "post": {
+        "operationId": "consoleAccount.createSession",
+        "description": "Signs a console account in with its email and password, setting the session cookies.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConsoleSessionRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      },
+      "delete": {
+        "operationId": "consoleAccount.deleteSession",
+        "description": "Signs out: ends the console session and clears both cookies.",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/session/refresh": {
+      "post": {
+        "operationId": "consoleAccount.refreshSession",
+        "description": "Trades the refresh cookie for a new pair of session cookies. The console client calls it after `token_expired`.",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
     "/v1/console/install/settings": {
       "get": {
         "operationId": "consoleInstall.getSettings",
@@ -527,6 +705,11 @@
         },
         "tags": [
           "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
         ],
         "x-orvano-service": "consoleInstall",
         "x-orvano-audience": "console"
@@ -570,6 +753,11 @@
             }
           }
         },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consoleInstall",
         "x-orvano-audience": "console"
       }
@@ -660,6 +848,11 @@
         "tags": [
           "console"
         ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consoleOrgs",
         "x-orvano-audience": "console"
       },
@@ -702,6 +895,11 @@
             }
           }
         },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consoleOrgs",
         "x-orvano-audience": "console"
       }
@@ -745,6 +943,11 @@
         },
         "tags": [
           "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
         ],
         "x-orvano-service": "consoleOrgs",
         "x-orvano-audience": "console"
@@ -798,6 +1001,11 @@
             }
           }
         },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consoleOrgs",
         "x-orvano-audience": "console"
       },
@@ -839,6 +1047,11 @@
         },
         "tags": [
           "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
         ],
         "x-orvano-service": "consoleOrgs",
         "x-orvano-audience": "console"
@@ -905,6 +1118,11 @@
         "tags": [
           "console"
         ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consoleProjects",
         "x-orvano-audience": "console"
       },
@@ -957,6 +1175,11 @@
             }
           }
         },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consoleProjects",
         "x-orvano-audience": "console"
       }
@@ -1001,6 +1224,11 @@
         "tags": [
           "console"
         ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-idempotent": true,
         "x-orvano-service": "consoleOrgs",
         "x-orvano-audience": "console"
@@ -1035,6 +1263,11 @@
         },
         "tags": [
           "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
         ],
         "x-orvano-service": "consoleProjects",
         "x-orvano-audience": "console"
@@ -1078,6 +1311,11 @@
             }
           }
         },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consoleProjects",
         "x-orvano-audience": "console"
       },
@@ -1109,6 +1347,11 @@
         },
         "tags": [
           "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
         ],
         "x-orvano-service": "consoleProjects",
         "x-orvano-audience": "console"
@@ -1166,6 +1409,11 @@
         "tags": [
           "console"
         ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consoleApiKeys",
         "x-orvano-audience": "console"
       },
@@ -1208,6 +1456,11 @@
             }
           }
         },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consoleApiKeys",
         "x-orvano-audience": "console"
       }
@@ -1244,6 +1497,11 @@
         },
         "tags": [
           "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
         ],
         "x-orvano-service": "consoleApiKeys",
         "x-orvano-audience": "console"
@@ -1301,6 +1559,11 @@
         "tags": [
           "console"
         ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consolePlatforms",
         "x-orvano-audience": "console"
       },
@@ -1343,6 +1606,11 @@
             }
           }
         },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consolePlatforms",
         "x-orvano-audience": "console"
       }
@@ -1397,6 +1665,11 @@
             }
           }
         },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consolePlatforms",
         "x-orvano-audience": "console"
       },
@@ -1432,6 +1705,11 @@
         "tags": [
           "console"
         ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consolePlatforms",
         "x-orvano-audience": "console"
       }
@@ -1465,6 +1743,11 @@
         },
         "tags": [
           "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
         ],
         "x-orvano-service": "consoleProjects",
         "x-orvano-audience": "console"
@@ -1500,6 +1783,11 @@
         "tags": [
           "console"
         ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consoleProjects",
         "x-orvano-audience": "console"
       }
@@ -1534,6 +1822,11 @@
         "tags": [
           "console"
         ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consoleProjects",
         "x-orvano-audience": "console"
       }
@@ -1567,6 +1860,11 @@
         },
         "tags": [
           "test"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
         ],
         "x-orvano-test": true,
         "x-orvano-service": "test",
@@ -2507,6 +2805,90 @@
           }
         },
         "description": "A new API key."
+      },
+      "CreateConsoleAccountRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email, trimmed, at most 320 characters. Unique among console accounts, ignoring case.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "description": "8 to 256 characters after Unicode NFKC normalization.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A display name, at most 256 characters.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          },
+          "inviteToken": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The token of the invitation this sign up came from, if any."
+          },
+          "setupToken": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The setup token from the installer's setup link; needed only for the install's first account."
+          }
+        },
+        "description": "A new console account."
+      },
+      "CreateConsoleSessionRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The console account's email; case does not matter.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "description": "The console account's password.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          }
+        },
+        "description": "A console sign in with an email and password."
       },
       "CreateOrgRequest": {
         "type": "object",
@@ -3777,6 +4159,12 @@
       }
     },
     "securitySchemes": {
+      "consoleSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "orvano_console",
+        "description": "A console account's session: the `orvano_console` cookie (`HttpOnly`, `SameSite=Strict`), set by\n`consoleAccount.create` and `consoleAccount.createSession`. Browsers send it themselves."
+      },
       "bearer": {
         "type": "http",
         "scheme": "Bearer",

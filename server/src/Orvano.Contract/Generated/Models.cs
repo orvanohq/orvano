@@ -342,6 +342,26 @@ public sealed record CreateApiKeyRequest(
     [property: JsonPropertyName("scopes")] IReadOnlyList<ApiKeyScope> Scopes,
     [property: JsonPropertyName("expiresAt"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTimeOffset? ExpiresAt = null);
 
+/// <summary>A new console account.</summary>
+/// <param name="Email">The email, trimmed, at most 320 characters. Unique among console accounts, ignoring case.</param>
+/// <param name="Password">8 to 256 characters after Unicode NFKC normalization.</param>
+/// <param name="Name">A display name, at most 256 characters.</param>
+/// <param name="InviteToken">The token of the invitation this sign up came from, if any.</param>
+/// <param name="SetupToken">The setup token from the installer's setup link; needed only for the install's first account.</param>
+public sealed record CreateConsoleAccountRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null,
+    [property: JsonPropertyName("inviteToken"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? InviteToken = null,
+    [property: JsonPropertyName("setupToken"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SetupToken = null);
+
+/// <summary>A console sign in with an email and password.</summary>
+/// <param name="Email">The console account's email; case does not matter.</param>
+/// <param name="Password">The console account's password.</param>
+public sealed record CreateConsoleSessionRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("password")] string Password);
+
 /// <summary>A new org. The caller becomes its owner.</summary>
 /// <param name="Name">The org name; trimmed, 1 to 100 characters.</param>
 public sealed record CreateOrgRequest(

@@ -18,11 +18,11 @@ public sealed record Reply(HttpStatusCode Status, HttpResponseHeaders Headers, J
 
 /// <summary>
 /// The real api binary in the Test environment (every response checked against the contract), with a fixture console
-/// session that owns one active project. Spec 0004's HTTP tests call it as an app, a server, or the console would.
+/// account that owns the active fixture projects. Spec 0004's HTTP tests call it as an app, a server, or the console would.
 /// </summary>
 public sealed class AuthApi : IAsyncDisposable
 {
-    public const string ConsoleSession = "auth-api-tests";
+    public const string ConsoleUser = "auth-api-tests@x.com";
     public const string Project = "authproject0001";
     public const string OtherProject = "authproject0002";
     public const string ServerKey = "orv_sk_authAuthAuthAuthAuthAuthAuthAuthAuthAuthAut";
@@ -45,16 +45,17 @@ public sealed class AuthApi : IAsyncDisposable
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    /// <summary>Starts the api on a fresh database, with two active fixture projects.</summary>
-    public static async Task<AuthApi> StartAsync(PostgresFixture postgres, IReadOnlyDictionary<string, string>? env = null)
+    /// <summary>
+    /// Starts the api on a fresh database, with two active fixture projects owned by a fixture console account, or,
+    /// with <paramref name="fixtures"/> false, with no fixtures at all (an install that waits for its first admin).
+    /// </summary>
+    public static async Task<AuthApi> StartAsync(PostgresFixture postgres, IReadOnlyDictionary<string, string>? env = null, bool fixtures = true)
     {
         var database = await postgres.NewDatabaseAsync();
         await database.MigrateAsync();
-        var fixtures = Path.Combine(Path.GetTempPath(), $"orvano-auth-fixtures-{Guid.NewGuid():N}.yaml");
-        await File.WriteAllTextAsync(fixtures, $"""
-            consoleSessions:
-              - {ConsoleSession}
-            projects:
+        var fixturesPath = Path.Combine(Path.GetTempPath(), $"orvano-auth-fixtures-{Guid.NewGuid():N}.yaml");
+        await File.WriteAllTextAsync(fixturesPath, $"""
+            {ConsoleSignIn.Fixtures(ConsoleUser)}projects:
               - id: {Project}
                 name: Auth project
               - id: {OtherProject}
@@ -85,8 +86,8 @@ public sealed class AuthApi : IAsyncDisposable
         {
             ["ORVANO_DB_URL"] = database.AppUrl,
             ["ASPNETCORE_ENVIRONMENT"] = "Test",
-            ["ORVANO_TEST_FIXTURES"] = fixtures,
         };
+        if (fixtures) settings["ORVANO_TEST_FIXTURES"] = fixturesPath;
         foreach (var (key, value) in env ?? new Dictionary<string, string>()) settings[key] = value;
 
         var process = OrvanoProcess.Start(["api"], settings, listen: true);
@@ -131,9 +132,16 @@ public sealed class AuthApi : IAsyncDisposable
     public Task<Reply> AsServerAsync(HttpMethod method, string url, object? body = null, string key = ServerKey, string? project = Project) =>
         SendAsync(method, url, body, project, headers: new Dictionary<string, string> { ["X-Orvano-Key"] = key });
 
-    /// <summary>Calls a console operation as the fixture console session.</summary>
-    public Task<Reply> AsConsoleAsync(HttpMethod method, string url, object? body = null, string? project = Project) =>
-        SendAsync(method, url, body, project, headers: new Dictionary<string, string> { ["Cookie"] = $"orvano_console={ConsoleSession}" });
+    /// <summary>Calls a console operation as the fixture console account, signed in for real.</summary>
+    public async Task<Reply> AsConsoleAsync(HttpMethod method, string url, object? body = null, string? project = Project) =>
+        await SendAsync(method, url, body, project, headers: await ConsoleHeadersAsync());
+
+    /// <summary>The fixture console account's cookie and the same origin header a console call carries.</summary>
+    public async Task<Dictionary<string, string>> ConsoleHeadersAsync() => new()
+    {
+        ["Cookie"] = $"orvano_console={await ConsoleSignIn.CookieAsync(Http, ConsoleUser, Ct)}",
+        ["Sec-Fetch-Site"] = "same-origin",
+    };
 
     public static string AccessToken(Reply signedIn) => signedIn.Body.GetProperty("session").GetProperty("accessToken").GetString()!;
 

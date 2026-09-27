@@ -16,6 +16,7 @@ using Orvano.Core.Scheduling;
 using Orvano.Core.Secrets;
 using Orvano.Platform.Application;
 using Orvano.Platform.Contracts;
+using Orvano.Platform.Domain;
 using Orvano.Platform.Fixtures;
 using Orvano.Server.Modules;
 
@@ -72,12 +73,15 @@ internal static class ServerRole
         var appDb = app.Services.GetRequiredKeyedService<NpgsqlDataSource>(OrvanoDb.App);
         if (!await StartupChecks.SchemaMatchesAsync(appDb, logger, app.Lifetime.ApplicationStopping)) return 1;
         if (role == OrvanoRole.Api && !await StartupChecks.FirstAdminProtectedAsync(app.Environment, config, app.Services.GetRequiredService<IInstallSetupState>(), logger, app.Lifetime.ApplicationStopping)) return 1;
-        if (role == OrvanoRole.Api && fixtures.Owner is { } owner)
+        if (role == OrvanoRole.Api && fixtures.ConsoleUsers.Count > 0)
         {
+            var stopping = app.Lifetime.ApplicationStopping;
+            var authStore = app.Services.GetRequiredService<AuthStore>();
+            var accounts = app.Services.GetRequiredService<AccountService>();
+            var owner = await AuthFixtures.SeedConsoleUsersAsync(authStore, accounts, fixtures.ConsoleUsers, config[InstallSetupToken.Setting], logger, stopping);
             await PlatformFixtures.SeedAsync(
-                app.Services.GetRequiredService<PlatformStore>(), owner, fixtures.Projects, fixtures.ApiKeys, fixtures.Platforms, logger, app.Lifetime.ApplicationStopping);
-            await AuthFixtures.SeedAsync(
-                app.Services.GetRequiredService<AuthStore>(), app.Services.GetRequiredService<AccountService>(), fixtures.Users, logger, app.Lifetime.ApplicationStopping);
+                app.Services.GetRequiredService<PlatformStore>(), owner!.Value, fixtures.Projects, fixtures.ApiKeys, fixtures.Platforms, logger, stopping);
+            await AuthFixtures.SeedAsync(authStore, accounts, fixtures.Users, logger, stopping);
         }
 
         if (role == OrvanoRole.Api) app.UseForwardedHeaders();
@@ -88,7 +92,7 @@ internal static class ServerRole
         if (app.Environment.IsEnvironment(OrvanoEnvironments.Test)) app.UseContractValidation();
         app.UseExceptionHandler();
         app.UseStatusCodePages();
-        app.UseConsoleSessions(fixtures);
+        if (role == OrvanoRole.Api) app.UseConsoleSessions();
 
         app.MapHealthChecks("/internal/healthz", new HealthCheckOptions { Predicate = _ => false });
         app.MapHealthChecks("/internal/readyz", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") });

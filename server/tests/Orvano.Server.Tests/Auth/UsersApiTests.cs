@@ -218,8 +218,9 @@ public class UsersApiTests(PostgresFixture postgres)
         preflight.Headers.Add("Access-Control-Request-Method", "POST");
         preflight.Headers.Add("Access-Control-Request-Headers", "content-type, x-orvano-project, authorization");
         using var answer = await api.Http.SendAsync(preflight, TestContext.Current.CancellationToken);
-        using var console = await api.SendAsync(HttpMethod.Get, "/v1/console/orgs", project: null,
-            headers: new Dictionary<string, string> { ["Origin"] = "https://app.example.com", ["Cookie"] = $"orvano_console={AuthApi.ConsoleSession}" });
+        var consoleHeaders = await api.ConsoleHeadersAsync();
+        consoleHeaders["Origin"] = "https://app.example.com";
+        using var console = await api.SendAsync(HttpMethod.Get, "/v1/console/orgs", project: null, headers: consoleHeaders);
 
         Assert.Equal(HttpStatusCode.NoContent, answer.StatusCode);
         Assert.Equal("https://app.example.com", answer.Headers.GetValues("Access-Control-Allow-Origin").Single());
@@ -272,7 +273,7 @@ public class AuthFixturesTests(PostgresFixture postgres)
     {
         var path = Path.Combine(Path.GetTempPath(), $"orvano-bad-fixtures-{Guid.NewGuid():N}.yaml");
         File.WriteAllText(path, $"""
-            consoleSessions: [owner]
+            consoleUsers: [{"{"} email: owner@x.com, password: owner horse battery {"}"}]
             projects:
               - {"{"} id: authproject0001, name: Auth {"}"}
             {entry}

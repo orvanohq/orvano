@@ -3,6 +3,7 @@ using Npgsql;
 using NpgsqlTypes;
 using Orvano.Auth.Data;
 using Orvano.Auth.Domain;
+using Orvano.Platform.Contracts;
 
 namespace Orvano.Auth.Application;
 
@@ -19,11 +20,24 @@ internal sealed record SignedIn(UserRow User, SessionTokensView Session);
 internal sealed record AccountChanges(bool SetName, string? Name, string? Metadata);
 
 /// <summary>
+/// What a console sign up carried for the install's sign up gate (spec 0003 AC-7, spec 0006). <paramref name="Seeded"/>
+/// is only for the <c>Test</c> fixtures' later accounts: admitted as if sign up were open, never as the first account.
+/// </summary>
+internal sealed record ConsoleGate(string? InviteToken, string? SetupToken, bool Seeded = false);
+
+/// <summary>
 /// The signed in user's own account (spec 0004, <c>account</c> service): sign up, sign in, the current user, and self
 /// service. Use cases know no HTTP; they return an <see cref="Outcome{T}"/>.
 /// </summary>
 internal sealed class AccountService(
-    AuthStore store, PasswordHasher hasher, Sessions sessions, SessionChecks checks, AccessTokens tokens, SigningKeys keys)
+    AuthStore store,
+    PasswordHasher hasher,
+    Sessions sessions,
+    SessionChecks checks,
+    AccessTokens tokens,
+    SigningKeys keys,
+    IConsoleSignupPolicy signupPolicy,
+    IConsoleAccountCreated accountCreated)
 {
     public const string EmailIndex = "auth_users_email_key";
 
@@ -31,11 +45,19 @@ internal sealed class AccountService(
     /// Sign up (AC-1 to AC-3): creates the user, their password row, and a session in one transaction. The password is
     /// hashed before the transaction opens, so no connection waits on Argon2id.
     /// </summary>
-    public async Task<Outcome<SignedIn>> SignUpAsync(string projectId, string? email, string? password, string? name, ClientInfo client, CancellationToken ct)
+    public async Task<Outcome<SignedIn>> SignUpAsync(
+        string projectId, string? email, string? password, string? name, ClientInfo client, CancellationToken ct, ConsoleGate? gate = null)
     {
         await keys.GetActiveAsync(projectId, ct); // the first token of a project creates its key, before any commit
-        var outcome = await CreateAsync(projectId, email, password, name, userId => Actor.User(userId), client, ct);
+        var outcome = await CreateAsync(projectId, email, password, name, userId => Actor.User(userId), client, ct, gate);
         return outcome.Succeeded ? await SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant!, ct) : outcome.Failure!;
+    }
+
+    /// <summary>A console account created without signing it in: the <c>Test</c> fixtures' seeding.</summary>
+    public async Task<Outcome<UserRow>> CreateConsoleAccountAsync(string? email, string? password, string? name, ConsoleGate gate, CancellationToken ct)
+    {
+        var outcome = await CreateAsync(ConsoleProject.Id, email, password, name, userId => Actor.User(userId), client: null, ct, gate);
+        return outcome.Succeeded ? outcome.Value.User : outcome.Failure!;
     }
 
     /// <summary>A server or console creates a user (AC-17): the same rules as sign up, and no session.</summary>
@@ -45,8 +67,14 @@ internal sealed class AccountService(
         return outcome.Succeeded ? outcome.Value.User : outcome.Failure!;
     }
 
+    /// <summary>
+    /// Creates the user and their password row, and a session when <paramref name="client"/> is given. A console sign
+    /// up passes <paramref name="gate"/>: Platform's <c>AdmitAsync</c> decides first and <c>OnCreatedAsync</c> runs
+    /// after the insert, both in this transaction (spec 0003 AC-7, AC-8).
+    /// </summary>
     private async Task<Outcome<(UserRow User, SessionGrant? Grant)>> CreateAsync(
-        string projectId, string? email, string? password, string? name, Func<Guid, Actor> actorOf, ClientInfo? client, CancellationToken ct)
+        string projectId, string? email, string? password, string? name, Func<Guid, Actor> actorOf, ClientInfo? client, CancellationToken ct,
+        ConsoleGate? gate = null)
     {
         if (!EmailRule.TryNormalize(email, out var trimmed)) return Failure.Invalid("The email must be an address of at most 320 characters.");
         if (!UserName.IsValid(name)) return Failure.Invalid($"The name must be at most {UserName.MaxLength} characters.");
@@ -57,9 +85,29 @@ internal sealed class AccountService(
 
         return await store.WriteAsync<(UserRow User, SessionGrant? Grant)>(async (uow, token) =>
         {
+            SignupAdmission.Admitted? admitted = null;
+            if (gate is { Seeded: true })
+            {
+                admitted = new SignupAdmission.Admitted(IsFirstAccount: false);
+            }
+            else if (gate is not null)
+            {
+                switch (await signupPolicy.AdmitAsync(uow.Tx, trimmed, gate.InviteToken, gate.SetupToken, token))
+                {
+                    case SignupAdmission.Admitted admission:
+                        admitted = admission;
+                        break;
+                    case SignupAdmission.SetupTokenInvalid:
+                        return Failure.SetupTokenInvalid;
+                    default:
+                        return Failure.SignupClosed;
+                }
+            }
+
             if (await InsertUserAsync(uow, projectId, trimmed, name, token) is not { } userId) return Failure.UserAlreadyExists;
 
             await InsertPasswordAsync(uow, userId, projectId, hash, token);
+            if (admitted is not null) await accountCreated.OnCreatedAsync(uow.Tx, userId, name, trimmed, admitted, token);
             var actor = actorOf(userId);
             await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserCreated, projectId, actor, userId.ToString(),
                 new Dictionary<string, string> { ["userId"] = userId.ToString() }, ct: token);

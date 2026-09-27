@@ -174,6 +174,38 @@ internal sealed class SessionService(AuthStore store, Sessions sessions, Session
     }
 
     /// <summary>
+    /// Signs out with the refresh token instead of an access token (the console's sign out once its access cookie has
+    /// expired). Only the session's current secret ends it, checked on the locked row, so a session ID alone never
+    /// can. Anything else changes nothing.
+    /// </summary>
+    public async Task SignOutWithRefreshTokenAsync(string projectId, string? refreshToken, CancellationToken ct)
+    {
+        if (!RefreshToken.TryParse(refreshToken, out var presented)) return;
+
+        var outcome = await store.WriteAsync<bool>(async (uow, token) =>
+        {
+            Guid userId;
+            byte[] currentHash;
+            await using (var read = new NpgsqlCommand(
+                "SELECT user_id, refresh_hash FROM orvano.auth_sessions WHERE id = @id AND project_id = @project AND ended_at IS NULL FOR UPDATE",
+                uow.Tx.Connection, uow.Tx))
+            {
+                read.Parameters.AddWithValue("id", presented.SessionId);
+                read.Parameters.AddWithValue("project", projectId);
+                await using var reader = await read.ExecuteReaderAsync(token);
+                if (!await reader.ReadAsync(token)) return false;
+                userId = reader.GetGuid(0);
+                currentHash = reader.GetFieldValue<byte[]>(1);
+            }
+
+            if (!System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(presented.SecretHash, currentHash)) return false;
+            return await sessions.EndAsync(uow, projectId, userId, presented.SessionId, SessionEndReason.SignOut, Actor.User(userId), token);
+        }, ct);
+
+        if (outcome.Value) await checks.EvictAsync(presented.SessionId, ct);
+    }
+
+    /// <summary>
     /// Ends one session of the user (AC-16, AC-17, <c>revoked</c>). A session of another user, or none at all, is
     /// 404 <c>session_not_found</c>; one of the user's that has already ended answers as done.
     /// </summary>

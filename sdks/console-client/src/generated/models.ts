@@ -59,6 +59,28 @@ export interface CreateApiKeyRequest {
   expiresAt?: string | null
 }
 
+/** A new console account. */
+export interface CreateConsoleAccountRequest {
+  /** The email, trimmed, at most 320 characters. Unique among console accounts, ignoring case. */
+  email: string
+  /** 8 to 256 characters after Unicode NFKC normalization. */
+  password: string
+  /** A display name, at most 256 characters. */
+  name?: string | null
+  /** The token of the invitation this sign up came from, if any. */
+  inviteToken?: string | null
+  /** The setup token from the installer's setup link; needed only for the install's first account. */
+  setupToken?: string | null
+}
+
+/** A console sign in with an email and password. */
+export interface CreateConsoleSessionRequest {
+  /** The console account's email; case does not matter. */
+  email: string
+  /** The console account's password. */
+  password: string
+}
+
 /** A new org. The caller becomes its owner. */
 export interface CreateOrgRequest {
   /** The org name; trimmed, 1 to 100 characters. */

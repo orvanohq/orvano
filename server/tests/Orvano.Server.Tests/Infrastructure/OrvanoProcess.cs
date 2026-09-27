@@ -107,7 +107,8 @@ public sealed class OrvanoProcess : IAsyncDisposable
         await _process.WaitForExitAsync(TestContext.Current.CancellationToken); // drains redirected output
     }
 
-    public HttpClient Http() => new()
+    /// <summary>A client for this process. It keeps no cookies of its own: tests send the ones they mean to.</summary>
+    public HttpClient Http() => new(new SocketsHttpHandler { UseCookies = false })
     {
         BaseAddress = new Uri($"http://127.0.0.1:{Port ?? throw new InvalidOperationException("This process does not listen.")}"),
         Timeout = TimeSpan.FromSeconds(5),

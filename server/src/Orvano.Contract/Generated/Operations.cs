@@ -181,6 +181,90 @@ public static class AccountOperations
     }
 }
 
+/// <summary>Route constants for the <c>consoleAccount</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleAccountOperations
+{
+    /// <summary>POST /v1/console/account: Creates a console account and signs it in, setting the session cookies. The install's sign up policy decides</summary>
+    public static class Create
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.create";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/account/session: Signs a console account in with its email and password, setting the session cookies.</summary>
+    public static class CreateSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.createSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/session";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>DELETE /v1/console/account/session: Signs out: ends the console session and clears both cookies.</summary>
+    public static class DeleteSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.deleteSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/session";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/console/account: Gets the signed in console account.</summary>
+    public static class Get
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.get";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/account/session/refresh: Trades the refresh cookie for a new pair of session cookies. The console client calls it after <c>token_expired</c>.</summary>
+    public static class RefreshSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.refreshSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/session/refresh";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
 /// <summary>Route constants for the <c>consoleApiKeys</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class ConsoleApiKeysOperations
 {

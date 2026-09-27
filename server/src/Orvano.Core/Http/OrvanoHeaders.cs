@@ -23,8 +23,14 @@ public static class OrvanoHeaders
     /// <summary>The project a call is for, on every project scoped call, console ones included.</summary>
     public const string Project = "X-Orvano-Project";
 
-    /// <summary>The console session cookie, the only credential <c>/v1/console</c> accepts.</summary>
+    /// <summary>The console session cookie (the access token), the only credential <c>/v1/console</c> accepts.</summary>
     public const string ConsoleCookie = "orvano_console";
+
+    /// <summary>The console's refresh token cookie, sent only to <see cref="ConsoleRefreshPath"/>.</summary>
+    public const string ConsoleRefreshCookie = "orvano_console_refresh";
+
+    /// <summary>The path the console refresh cookie is scoped to: the console session operations.</summary>
+    public const string ConsoleRefreshPath = "/v1/console/account/session";
 
     /// <summary>The request ID on every response, also <c>requestId</c> in problem details.</summary>
     public const string RequestId = "X-Request-Id";

@@ -13,6 +13,7 @@ import { parse } from 'yaml'
 import { runScenarios } from './interpreter.js'
 import type { Scenario, ScenarioResult } from './interpreter.js'
 import { createSurface } from './surface.js'
+import type { ConsoleUser } from './surface.js'
 import type { BrowserContext } from 'playwright'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -25,33 +26,39 @@ type Target = 'node' | 'bun' | 'deno' | 'browser' | 'workerd' | 'nextjs'
 const targets: readonly Target[] = ['node', 'bun', 'deno', 'browser', 'workerd', 'nextjs']
 
 /**
- * The first console session and the first project in `fixtures.yaml`, which the server seeds in
- * the Test environment.
+ * The first console account, the first project, and its API key in `fixtures.yaml`, which the
+ * server seeds in the Test environment.
  */
 async function loadFixtures(): Promise<{
-  consoleSession?: string
+  consoleUser?: ConsoleUser
   project?: string
   apiKey?: string
 }> {
   const fixtures = parse(await readFile(join(scenariosDir, 'fixtures.yaml'), 'utf8')) as {
-    consoleSessions?: string[]
+    consoleUsers?: { email?: string; password?: string }[]
     projects?: { id?: string }[]
     apiKeys?: { project?: string; secret?: string }[]
   } | null
-  const consoleSession = fixtures?.consoleSessions?.[0]
+  const first = fixtures?.consoleUsers?.[0]
+  const consoleUser =
+    first?.email === undefined || first.password === undefined
+      ? undefined
+      : { email: first.email, password: first.password }
   const project = fixtures?.projects?.[0]?.id
   const apiKey = fixtures?.apiKeys?.find((k) => k.project === project)?.secret
   return {
-    ...(consoleSession === undefined ? {} : { consoleSession }),
+    ...(consoleUser === undefined ? {} : { consoleUser }),
     ...(project === undefined ? {} : { project }),
     ...(apiKey === undefined ? {} : { apiKey }),
   }
 }
 
-const { consoleSession, project, apiKey } = await loadFixtures()
+const { consoleUser, project, apiKey } = await loadFixtures()
 /** The fixtures every runtime needs, as environment variables. */
 const fixtureEnv: Record<string, string> = {
-  ...(consoleSession === undefined ? {} : { ORVANO_CONSOLE_SESSION: consoleSession }),
+  ...(consoleUser === undefined
+    ? {}
+    : { ORVANO_CONSOLE_EMAIL: consoleUser.email, ORVANO_CONSOLE_PASSWORD: consoleUser.password }),
   ...(project === undefined ? {} : { ORVANO_PROJECT: project }),
   ...(apiKey === undefined ? {} : { ORVANO_API_KEY: apiKey }),
 }
@@ -128,7 +135,12 @@ async function inBrowser(scenarios: Scenario[]): Promise<ScenarioResult[]> {
           headers,
           ...(method === 'GET' || method === 'HEAD' ? {} : { body: Buffer.concat(chunks) }),
         })
-        res.writeHead(upstream.status, Object.fromEntries(upstream.headers))
+        // Every Set-Cookie separately: a plain object would keep only the last one.
+        const forwarded: [string, string][] = [...upstream.headers].filter(
+          ([name]) => name !== 'set-cookie',
+        )
+        for (const cookie of upstream.headers.getSetCookie()) forwarded.push(['set-cookie', cookie])
+        res.writeHead(upstream.status, forwarded.flat())
         res.end(Buffer.from(await upstream.arrayBuffer()))
       } else if (url === '/browser.js') {
         res.writeHead(200, { 'content-type': 'text/javascript' }).end(bundle)
@@ -147,16 +159,13 @@ async function inBrowser(scenarios: Scenario[]): Promise<ScenarioResult[]> {
   const browser = await chromium.launch()
   try {
     const context = await browser.newContext()
-    // The console signs in by cookie; the browser sends it on same origin calls by itself.
-    if (consoleSession !== undefined) {
-      await context.addCookies([{ name: 'orvano_console', value: consoleSession, url: origin }])
-    }
     const page = await context.newPage()
     await page.goto(origin)
     await page.waitForFunction(() => typeof window.orvanoRunScenarios === 'function')
-    const results = await page.evaluate(([s, p]) => window.orvanoRunScenarios(s, p), [
+    const results = await page.evaluate(([s, p, c]) => window.orvanoRunScenarios(s, p, c), [
       scenarios,
       project,
+      consoleUser,
     ] as const)
     return [...results, await twoTabs(context, origin, () => refreshes)]
   } finally {
@@ -277,7 +286,7 @@ async function inNextjs(scenarios: Scenario[]): Promise<ScenarioResult[]> {
 async function run(target: Target, scenarios: Scenario[]): Promise<ScenarioResult[]> {
   switch (target) {
     case 'node':
-      return runScenarios(scenarios, createSurface(endpoint, { consoleSession, project, apiKey }))
+      return runScenarios(scenarios, createSurface(endpoint, { consoleUser, project, apiKey }))
     case 'bun':
       return inRuntime('bun', ['run'], scenarios)
     case 'deno':

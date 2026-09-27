@@ -12,12 +12,15 @@ export function bindSession(boundRouter: AnyRouter, boundQueryClient: QueryClien
   queryClient = boundQueryClient
 }
 
-/** True for the API's "no console session" answer. Row 8 adds its own session codes here. */
+/**
+ * True for the API's "no usable console session" answers: none at all, or one whose refresh the
+ * console client already tried and Orvano refused (spec 0004, AC-27).
+ */
 export function isSessionError(error: unknown): boolean {
   return (
     error instanceof OrvanoError &&
     error.status === 401 &&
-    error.code === 'console_session_required'
+    ['console_session_required', 'token_expired', 'invalid_refresh_token'].includes(error.code)
   )
 }
 
