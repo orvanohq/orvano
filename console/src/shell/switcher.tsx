@@ -1,6 +1,6 @@
 import { Combobox } from '@base-ui/react/combobox'
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode, type Ref } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -51,23 +51,24 @@ export function Switcher({
 }: SwitcherProps) {
   // State, not refs: the popup mounts after this component renders, and the effect must re-run then.
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null)
-  const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null)
+  const [lastOption, setLastOption] = useState<HTMLDivElement | null>(null)
   const canLoadMore = hasNextPage && !isFetchingNextPage
 
-  // Watch the last row of the list; when it scrolls into view, load the next page.
+  // Watch the last option; when it scrolls into view, load the next page. A search that matches
+  // nothing has no last option, so paging waits for "Load more to search further" instead.
   useEffect(() => {
-    if (sentinel === null || scroller === null || !canLoadMore) return
+    if (lastOption === null || scroller === null || !canLoadMore) return
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) fetchNextPage()
       },
       { root: scroller, rootMargin: '0px 0px 96px 0px' },
     )
-    observer.observe(sentinel)
+    observer.observe(lastOption)
     return () => {
       observer.disconnect()
     }
-  }, [sentinel, scroller, canLoadMore, fetchNextPage])
+  }, [lastOption, scroller, canLoadMore, fetchNextPage])
 
   return (
     <Combobox.Root<SwitcherItem>
@@ -119,16 +120,13 @@ export function Switcher({
                   </Button>
                 ) : null}
               </Combobox.Empty>
-              <Combobox.List aria-label={label} className="p-1">
-                {(item: SwitcherItem) => <SwitcherRow key={item.id} item={item} />}
-              </Combobox.List>
+              <SwitcherList label={label} lastOptionRef={setLastOption} />
               {isFetchingNextPage ? (
                 <div className="flex items-center gap-2 px-3 py-2 text-small text-muted-foreground">
                   <Loader2 aria-hidden className="size-3.5 animate-spin" />
                   Loading more
                 </div>
               ) : null}
-              <div ref={setSentinel} aria-hidden className="h-px" />
             </div>
             {footer === undefined ? null : (
               <div data-slot="switcher-footer" className="border-t border-border p-1">
@@ -142,11 +140,34 @@ export function Switcher({
   )
 }
 
-function SwitcherRow({ item }: { item: SwitcherItem }) {
+/** The filtered options; the last one gets `lastOptionRef` so the paging observer can watch it. */
+function SwitcherList({
+  label,
+  lastOptionRef,
+}: {
+  label: string
+  lastOptionRef: Ref<HTMLDivElement>
+}) {
+  const lastIndex = Combobox.useFilteredItems<SwitcherItem>().length - 1
+  return (
+    <Combobox.List aria-label={label} className="p-1">
+      {(item: SwitcherItem, index: number) => (
+        <SwitcherRow
+          key={item.id}
+          item={item}
+          ref={index === lastIndex ? lastOptionRef : undefined}
+        />
+      )}
+    </Combobox.List>
+  )
+}
+
+function SwitcherRow({ item, ref }: { item: SwitcherItem; ref?: Ref<HTMLDivElement> | undefined }) {
   const { label, tone } = statusLabel(item.status)
   const dimmed = item.status === 'deleting'
   return (
     <Combobox.Item
+      ref={ref}
       value={item}
       className="flex min-h-(--row-h) cursor-default items-center gap-2 rounded-md px-2 text-body select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-[disabled]:opacity-50"
     >

@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react'
+import { useMemo, useState, type ComponentProps } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
@@ -35,6 +35,35 @@ describe('Switcher paging (AC-13)', () => {
     // Closed: nothing is observed yet, so no page is requested.
     expect(fetchNextPage).not.toHaveBeenCalled()
     await userEvent.click(trigger())
+    await expect.poll(() => fetchNextPage.mock.calls.length).toBeGreaterThan(0)
+  })
+
+  it('asks for the next page only once you scroll to the last option of a long list', async () => {
+    const fetchNextPage = vi.fn()
+    const many: SwitcherItem[] = Array.from({ length: 100 }, (_, i) => ({
+      id: String(i),
+      name: `Org ${String(i)}`,
+      status: 'active',
+    }))
+    await render(
+      <Switcher
+        label="Switch org"
+        placeholder="Select org"
+        current={undefined}
+        items={many}
+        hasNextPage
+        isFetchingNextPage={false}
+        fetchNextPage={fetchNextPage}
+        onPick={() => undefined}
+      />,
+    )
+    await userEvent.click(trigger())
+    await expect.poll(() => document.querySelectorAll('[role=option]').length).toBe(100)
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(fetchNextPage).not.toHaveBeenCalled()
+
+    document.querySelector('[role=option]:last-child')?.scrollIntoView()
+
     await expect.poll(() => fetchNextPage.mock.calls.length).toBeGreaterThan(0)
   })
 
@@ -85,6 +114,10 @@ const search = () =>
 const options = () => [...document.querySelectorAll('[role=option]')]
 const optionNames = () => options().map((option) => option.textContent)
 const popupText = () => document.querySelector('[role=listbox]')?.parentElement?.textContent ?? ''
+const loadMoreButton = () =>
+  [...document.querySelectorAll('button')].find(
+    (button) => button.textContent === 'Load more to search further',
+  )
 
 async function openAndType(typed: string) {
   await userEvent.click(trigger())
@@ -118,15 +151,62 @@ describe('Switcher filtering (AC-13)', () => {
     await new Promise((resolve) => setTimeout(resolve, 300))
     const before = vi.mocked(props.fetchNextPage).mock.calls.length
 
-    const loadMore = [...document.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Load more to search further',
-    )
-    expect(loadMore).toBeDefined()
-    await userEvent.click(loadMore ?? document.body)
+    expect(loadMoreButton()).toBeDefined()
+    await userEvent.click(loadMoreButton() ?? document.body)
 
     await expect
       .poll(() => vi.mocked(props.fetchNextPage).mock.calls.length)
       .toBeGreaterThan(before)
+  })
+
+  it('keeps "Load more" until clicked, and never chains through pages on a search with no match', async () => {
+    // A stand in for useInfiniteQuery: 3 pages of 100, each fetch lands after a short delay.
+    const page = (n: number): SwitcherItem[] =>
+      Array.from({ length: 100 }, (_, i) => ({
+        id: `${String(n)}-${String(i)}`,
+        name: `Org ${String(n)}-${String(i)}`,
+        status: 'active',
+      }))
+    const fetchNextPage = vi.fn()
+    function Paged() {
+      const [pages, setPages] = useState(1)
+      const [fetching, setFetching] = useState(false)
+      const loaded = useMemo(() => Array.from({ length: pages }, (_, n) => page(n)).flat(), [pages])
+      return (
+        <Switcher
+          label="Switch org"
+          placeholder="Select org"
+          current={undefined}
+          items={loaded}
+          hasNextPage={pages < 3}
+          isFetchingNextPage={fetching}
+          fetchNextPage={() => {
+            fetchNextPage()
+            setFetching(true)
+            setTimeout(() => {
+              setPages((count) => count + 1)
+              setFetching(false)
+            }, 20)
+          }}
+          onPick={() => undefined}
+        />
+      )
+    }
+    await render(<Paged />)
+    await openAndType('zzz')
+    await expect.poll(popupText).toContain('No match.')
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    // Nothing loads on its own, and the option stays.
+    expect(fetchNextPage).not.toHaveBeenCalled()
+    expect(loadMoreButton()).toBeDefined()
+
+    // One click loads exactly one page, and the option comes back for the last page.
+    await userEvent.click(loadMoreButton() ?? document.body)
+    await expect.poll(() => fetchNextPage.mock.calls.length).toBe(1)
+    await expect.poll(() => loadMoreButton()?.hasAttribute('disabled')).toBe(false)
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    expect(fetchNextPage).toHaveBeenCalledTimes(1)
   })
 
   it('does not offer to load more when there are no more pages', async () => {
