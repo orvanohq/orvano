@@ -11,6 +11,7 @@
     "sdkgen": "tools/tests/Orvano.SdkGen.Tests",
     "dotnet-sdk": "sdks/dotnet/tests/Orvano.Tests",
     "js-sdk": "sdks/js/test, sdks/nextjs/test (*.test.ts, Vitest)",
-    "dart-sdk": "sdks/dart/core/test, sdks/dart/server/test (*_test.dart, package:test)"
+    "dart-sdk": "sdks/dart/core/test, sdks/dart/server/test (*_test.dart, package:test)",
+    "console": "console/src beside the source (*.unit.test.ts in Node, *.browser.test.tsx in Chromium via Vitest browser mode; run with pnpm --filter @orvano/console test), console/e2e (*.spec.ts, Playwright against the compose gateway)"
   }
 }
