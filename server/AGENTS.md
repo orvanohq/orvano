@@ -32,7 +32,7 @@ The Orvano server: one .NET 10 program, built as separate modules, shipped as on
 # Tests (Docker must be running; Testcontainers starts Postgres 18)
 dotnet test --solution Orvano.slnx
 
-# EF model drift check (needs an empty Postgres bootstrapped by deploy/postgres/initdb)
+# EF model drift check (needs an empty Postgres bootstrapped by deploy/compose/initdb)
 ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...;Database=orvano" dotnet run --project server/tests/Orvano.ModelDriftCheck
 ```
 

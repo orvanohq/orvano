@@ -1,4 +1,5 @@
 using Orvano.Core;
+using Orvano.Server.Install;
 
 namespace Orvano.Server.Hosting;
 
@@ -9,6 +10,10 @@ internal static class OrvanoProgram
         // Compose runs this inside a container whose ORVANO_ROLE names the role, so it is
         // checked before role selection.
         if (args is ["healthcheck", ..]) return await HealthcheckCommand.RunAsync();
+
+        // The installer runs the image with no ORVANO_ROLE, and asks the running api for setup-status (spec 0006).
+        if (args is ["setup-status", ..]) return await SetupStatusCommand.RunAsync();
+        if (args is ["install", .. var installArgs]) return await InstallCommand.RunAsync(installArgs, InstallHost.Container());
 
         var selection = RoleSelector.Resolve(args, Environment.GetEnvironmentVariable("ORVANO_ROLE"), out var error);
         if (error is not null)

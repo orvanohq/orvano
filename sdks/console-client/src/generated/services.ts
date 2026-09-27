@@ -8,6 +8,7 @@ import type {
   CreateProjectRequest,
   CreatedApiKey,
   InstallSettings,
+  InstallSetup,
   Org,
   OrgPage,
   Platform,
@@ -78,6 +79,17 @@ export class ConsoleInstallService {
   getSettings(options?: RequestOptions): Promise<InstallSettings> {
     return this.#client.request<InstallSettings>(
       { method: 'GET', path: '/v1/console/install/settings' },
+      options,
+    )
+  }
+
+  /**
+   * Tells whether the install still waits for its first admin. Needs no console session, so the console can
+   * send you to the setup screen before anyone can sign in.
+   */
+  getSetup(options?: RequestOptions): Promise<InstallSetup> {
+    return this.#client.request<InstallSetup>(
+      { method: 'GET', path: '/v1/console/install/setup' },
       options,
     )
   }

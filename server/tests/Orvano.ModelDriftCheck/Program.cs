@@ -10,7 +10,7 @@ using Orvano.Server.Hosting;
 var adminUrl = Environment.GetEnvironmentVariable("ORVANO_DB_ADMIN_URL");
 if (string.IsNullOrWhiteSpace(adminUrl))
 {
-    Console.Error.WriteLine("Set ORVANO_DB_ADMIN_URL to an empty database bootstrapped by deploy/postgres/initdb.");
+    Console.Error.WriteLine("Set ORVANO_DB_ADMIN_URL to an empty database bootstrapped by deploy/compose/initdb.");
     return 1;
 }
 

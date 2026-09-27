@@ -330,6 +330,11 @@ public sealed record InstallSettings(
     [property: JsonPropertyName("consoleSignup")] ConsoleSignupMode ConsoleSignup,
     [property: JsonPropertyName("updatedAt")] DateTimeOffset UpdatedAt);
 
+/// <summary>Whether the install still waits for its first admin.</summary>
+/// <param name="SetupRequired">True while no install admin exists: the first console account must come from the installer's setup link.</param>
+public sealed record InstallSetup(
+    [property: JsonPropertyName("setupRequired")] bool SetupRequired);
+
 /// <summary>An org: the owner of projects and the unit teammates join.</summary>
 /// <param name="Id">The org ID.</param>
 /// <param name="Name">The org name, 1 to 100 characters.</param>

@@ -72,6 +72,22 @@ public static class ConsoleInstallOperations
         public const string Audience = "console";
     }
 
+    /// <summary>GET /v1/console/install/setup: Tells whether the install still waits for its first admin. Needs no console session, so the console can</summary>
+    public static class GetSetup
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleInstall.getSetup";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/install/setup";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>PATCH /v1/console/install/settings: Changes the install settings. Install admins only.</summary>
     public static class UpdateSettings
     {

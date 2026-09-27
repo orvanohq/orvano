@@ -38,6 +38,9 @@ abstract final class ErrorCode {
   /// `project_not_ready`
   static const projectNotReady = 'project_not_ready';
 
+  /// `setup_token_invalid`
+  static const setupTokenInvalid = 'setup_token_invalid';
+
   /// `signup_closed`
   static const signupClosed = 'signup_closed';
 }

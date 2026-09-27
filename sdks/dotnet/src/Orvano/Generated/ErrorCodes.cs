@@ -40,6 +40,9 @@ public static class ErrorCode
     /// <summary>The <c>project_not_ready</c> error code.</summary>
     public const string ProjectNotReady = "project_not_ready";
 
+    /// <summary>The <c>setup_token_invalid</c> error code.</summary>
+    public const string SetupTokenInvalid = "setup_token_invalid";
+
     /// <summary>The <c>signup_closed</c> error code.</summary>
     public const string SignupClosed = "signup_closed";
 }

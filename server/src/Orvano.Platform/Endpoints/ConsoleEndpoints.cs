@@ -124,6 +124,12 @@ internal static class ConsoleEndpoints
 
     private static void MapInstall(RouteGroupBuilder v1)
     {
+        // Needs no console session (the host lets this one route through): the console asks it before anyone can
+        // sign in (spec 0006, AC-22).
+        v1.MapGet(Api.ConsoleInstallOperations.GetSetup.Route, async (InstallService install, CancellationToken ct) =>
+            Results.Ok(new Api.InstallSetup(await install.IsSetupRequiredAsync(ct))))
+            .WithName(Api.ConsoleInstallOperations.GetSetup.Id);
+
         v1.MapGet(Api.ConsoleInstallOperations.GetSettings.Route, async (HttpContext http, InstallService install, CancellationToken ct) =>
             Ok(await install.GetAsync(User(http), ct), InstallSettings))
             .WithName(Api.ConsoleInstallOperations.GetSettings.Id);

@@ -225,6 +225,7 @@ public class ApiConventionsTests(PostgresFixture postgres)
         {
             ["ORVANO_DB_URL"] = database.AppUrl,
             ["ASPNETCORE_ENVIRONMENT"] = environment,
+            ["ORVANO_SETUP_TOKEN"] = OrvanoProcess.SetupToken,
         };
         if (environment == "Test") env["ORVANO_TEST_FIXTURES"] = await WriteFixturesAsync();
 

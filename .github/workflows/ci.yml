@@ -44,13 +44,13 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet build Orvano.slnx -c Release
-      # Testcontainers starts its own Postgres 18 from deploy/postgres/initdb, so this needs only Docker.
+      # Testcontainers starts its own Postgres 18 from deploy/compose/initdb, so this needs only Docker.
       - run: dotnet test --solution Orvano.slnx -c Release --no-build
       - name: Start an empty Postgres 18
         run: |
           docker run -d --name pg -p 5432:5432 \
             -e POSTGRES_PASSWORD=ci -e ORVANO_ADMIN_PASSWORD=ci-admin -e ORVANO_APP_PASSWORD=ci-app \
-            -v "$PWD/deploy/postgres/initdb:/docker-entrypoint-initdb.d:ro" \
+            -v "$PWD/deploy/compose/initdb:/docker-entrypoint-initdb.d:ro" \
             postgres:18.6
           for i in $(seq 1 30); do
             docker exec pg pg_isready -h 127.0.0.1 -U orvano_admin -d orvano -q && exit 0
@@ -115,33 +115,68 @@ jobs:
       - if: always()
         run: docker compose -f tests/scenarios/compose.yml --profile console down -v
 
-  compose:
-    name: Images and compose smoke test
-    runs-on: ubuntu-latest
+  install:
+    # The real install path, twice, on both architectures (spec 0006, AC-30): images built from this
+    # commit and tagged from VERSION, then install.sh with --no-pull, as on an air gapped server.
+    name: Install with install.sh (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
-      - name: Write a throwaway .env
+      - name: ShellCheck
         run: |
-          {
-            echo "ORVANO_PUBLIC_URL=http://localhost"
-            for v in POSTGRES_PASSWORD ORVANO_ADMIN_PASSWORD ORVANO_APP_PASSWORD; do
-              echo "$v=$(openssl rand -hex 24)"
-            done
-          } > deploy/compose/.env
-      # The chiseled-extra image must connect to Postgres over Npgsql and resolve a named time
-      # zone; the roles refuse to start otherwise, so healthy containers prove both.
-      - run: docker compose -f deploy/compose/docker-compose.yml up -d --build
-      - name: GET /v1/health through Caddy
+          command -v shellcheck >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq shellcheck; }
+          shellcheck --shell=sh deploy/install/install.sh
+      - name: Build the images
         run: |
-          for i in $(seq 1 60); do
-            if curl -fsS http://localhost/v1/health; then
-              test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/internal/readyz)" = 404
-              exit 0
-            fi
-            sleep 2
+          V=$(cat VERSION)
+          echo "V=$V" >> "$GITHUB_ENV"
+          docker build -f deploy/server.Dockerfile -t "ghcr.io/orvanohq/orvano:$V" .
+          docker build -f deploy/gateway/Dockerfile -t "ghcr.io/orvanohq/orvano-gateway:$V" .
+          docker pull -q postgres:18.6
+      # The chiseled-extra image must connect to Postgres over Npgsql and resolve a named time zone;
+      # the roles refuse to start otherwise, so healthy containers prove both. The first run also
+      # proves `orvano install` runs as --user 0:0 in the chiseled image.
+      # The master key block shows only when this run generated the key; the result install.sh reads
+      # it from is a file it deletes, never a line you see.
+      - name: First install
+        shell: bash
+        run: |
+          sudo sh deploy/install/install.sh --version "$V" --domain localhost --yes --no-pull 2>&1 | tee "$RUNNER_TEMP/first.out"
+          grep -q 'Back up your master key now' "$RUNNER_TEMP/first.out"
+          if grep -q 'generated_master_key' "$RUNNER_TEMP/first.out"; then echo "the result line was shown"; exit 1; fi
+          if sudo test -e /opt/orvano/.install-result; then echo ".install-result was left behind"; exit 1; fi
+      - name: Caddyfile is valid with and without an ACME email
+        run: |
+          for email in "" ops@example.com; do
+            docker run --rm -e ORVANO_ACME_EMAIL="$email" -e ORVANO_PUBLIC_URL=https://orvano.example.com \
+              "ghcr.io/orvanohq/orvano-gateway:$V" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
           done
-          exit 1
+      - name: GET /v1/health through Caddy, and /internal stays closed
+        run: |
+          curl -fsS http://localhost/v1/health
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/internal/readyz)" = 404
+          test "$(cd /opt/orvano && sudo docker compose exec -T api /app/orvano setup-status)" = required
+          # HSTS only on HTTPS installs (spec 0006, AC-26).
+          if curl -sI http://localhost/ | grep -qi '^strict-transport-security'; then echo "HSTS sent on http://localhost"; exit 1; fi
+      - name: Second install changes no secret
+        shell: bash
+        run: |
+          sudo cp /opt/orvano/.env "$RUNNER_TEMP/env.first"
+          sudo sh deploy/install/install.sh --version "$V" --domain localhost --yes --no-pull 2>&1 | tee "$RUNNER_TEMP/second.out"
+          if grep -q 'Back up your master key now' "$RUNNER_TEMP/second.out"; then echo "the master key block showed on a rerun"; exit 1; fi
+          for key in POSTGRES_PASSWORD ORVANO_ADMIN_PASSWORD ORVANO_APP_PASSWORD ORVANO_MASTER_KEYS ORVANO_SETUP_TOKEN; do
+            first=$(sudo grep "^$key=" "$RUNNER_TEMP/env.first")
+            second=$(sudo grep "^$key=" /opt/orvano/.env)
+            test -n "$first" && test "$first" = "$second" || { echo "$key changed"; exit 1; }
+          done
+          sudo cmp "$RUNNER_TEMP/env.first" /opt/orvano/.env
       - if: failure()
-        run: docker compose -f deploy/compose/docker-compose.yml logs
+        run: |
+          sudo cat /opt/orvano/install.log || true
+          cd /opt/orvano && sudo docker compose ps --all && sudo docker compose logs
       - if: always()
-        run: docker compose -f deploy/compose/docker-compose.yml down -v
+        run: cd /opt/orvano && sudo docker compose down -v || true

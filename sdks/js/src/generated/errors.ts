@@ -26,6 +26,8 @@ export const ErrorCode = {
   projectNotFound: 'project_not_found',
   /** `project_not_ready` */
   projectNotReady: 'project_not_ready',
+  /** `setup_token_invalid` */
+  setupTokenInvalid: 'setup_token_invalid',
   /** `signup_closed` */
   signupClosed: 'signup_closed',
 } as const

@@ -1,5 +1,6 @@
 using Npgsql;
 using Orvano.Core.Migrations;
+using Orvano.Platform.Contracts;
 
 namespace Orvano.Server.Hosting;
 
@@ -60,6 +61,23 @@ internal static class StartupChecks
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// In <c>Production</c>, the api refuses to start while no install admin exists and no
+    /// <c>ORVANO_SETUP_TOKEN</c> is set, or a stranger could claim the install first (spec 0006, AC-21).
+    /// <c>Development</c> and <c>Test</c> leave the first sign up open. A malformed token is refused earlier, in
+    /// every environment, when the Platform module reads it.
+    /// </summary>
+    public static async Task<bool> FirstAdminProtectedAsync(
+        IHostEnvironment environment, IConfiguration config, IInstallSetupState setup, ILogger logger, CancellationToken ct)
+    {
+        if (!environment.IsProduction() || !string.IsNullOrEmpty(config["ORVANO_SETUP_TOKEN"])) return true;
+        if (!await setup.IsSetupRequiredAsync(ct)) return true;
+
+        logger.LogCritical(
+            "ORVANO_SETUP_TOKEN is not set and this install has no admin yet, so anyone could create the first admin. Run the installer, or set ORVANO_SETUP_TOKEN as .env.example shows.");
+        return false;
     }
 
     public static async Task<T?> WaitForDatabaseAsync<T>(

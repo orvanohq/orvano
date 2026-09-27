@@ -271,7 +271,7 @@ public class OrvanoBinaryTests(PostgresFixture postgres)
 
     private static async Task<OrvanoProcess> StartRoleAsync(string role, TestDatabase database)
     {
-        var env = Env(("ORVANO_DB_URL", database.AppUrl), ("ORVANO_DB_ADMIN_URL", database.AdminUrl));
+        var env = Env(("ORVANO_DB_URL", database.AppUrl), ("ORVANO_DB_ADMIN_URL", database.AdminUrl), ("ORVANO_SETUP_TOKEN", OrvanoProcess.SetupToken));
         var orvano = OrvanoProcess.Start([role], env, listen: true);
         try
         {

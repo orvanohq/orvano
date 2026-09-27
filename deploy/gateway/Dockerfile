@@ -18,4 +18,7 @@ RUN pnpm --filter @orvano/console... build
 
 FROM caddy:2.11.4-alpine
 COPY deploy/gateway/Caddyfile /etc/caddy/Caddyfile
+COPY --chmod=755 deploy/gateway/entrypoint.sh /usr/local/bin/orvano-gateway-entrypoint
 COPY --from=console /src/console/dist /srv/console
+ENTRYPOINT ["/usr/local/bin/orvano-gateway-entrypoint"]
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
