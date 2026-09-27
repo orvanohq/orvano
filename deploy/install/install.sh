@@ -325,14 +325,25 @@ require_local_image() {
     refuse "--no-pull is set but the image $1 is not on this server. Load it (docker load), or run without --no-pull."
 }
 
+# Pulls the installer image before `docker run`, so a version that does not exist or a network that
+# cannot reach the registry ends in one plain message rather than Docker's raw error (AC-14). Pull
+# progress still shows; Docker's error goes to install.log only.
+pull_installer_image() {
+  docker image inspect "$1" >/dev/null 2>&1 && return 0
+  say "Pulling $1"
+  { pull_error=$(docker pull "$1" 2>&1 >&3); } 3>&1 && return 0
+  log "docker pull $1: $(printf '%s' "$pull_error" | tr '\n' ' ')"
+  fail "Could not get the installer image $1. Check that --version $version is a released Orvano version and that this server can reach ghcr.io, then run the installer again."
+}
+
 # The installer ------------------------------------------------------------------------------------
 
 run_installer() {
   installer_image="$IMAGE:$version"
-  pull_policy=missing
   if [ "$flag_no_pull" = 1 ]; then
     require_local_image "$installer_image"
-    pull_policy=never
+  else
+    pull_installer_image "$installer_image"
   fi
 
   # orvano install writes what it did to this file; a stale one from an earlier run must not count.
@@ -341,10 +352,10 @@ run_installer() {
 
   # Prompts read the terminal, because under `curl ... | sh` standard input is this script.
   if has_tty; then
-    docker run --rm --pull "$pull_policy" --user 0:0 --network host -v "$flag_dir:/install" -it \
+    docker run --rm --pull never --user 0:0 --network host -v "$flag_dir:/install" -it \
       "$installer_image" install --existing-data="$existing_data" --version "$version" "$@" </dev/tty
   else
-    docker run --rm --pull "$pull_policy" --user 0:0 --network host -v "$flag_dir:/install" \
+    docker run --rm --pull never --user 0:0 --network host -v "$flag_dir:/install" \
       "$installer_image" install --existing-data="$existing_data" --version "$version" "$@" </dev/null
   fi
   rc=$?
