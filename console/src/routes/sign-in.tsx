@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 
+import { usePageTitle } from '@/lib/page-title'
 import { safeRedirect } from '@/lib/redirect'
 import { LogoMark } from '@/shell/logo'
 import { PageHeading } from '@/shell/page-heading'
@@ -10,12 +11,12 @@ export const Route = createFileRoute('/sign-in')({
     const redirect = safeRedirect(search.redirect)
     return redirect === undefined ? {} : { redirect }
   },
-  head: () => ({ meta: [{ title: 'Sign in · Orvano' }] }),
   component: SignIn,
 })
 
 // Placeholder until row 8 builds the real sign in.
 function SignIn() {
+  usePageTitle('Sign in')
   return (
     <main id="main" className="mx-auto max-w-md px-(--page-px) py-24">
       <LogoMark className="mb-6 size-10 text-primary" />

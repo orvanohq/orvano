@@ -16,7 +16,7 @@ interface SidebarNavProps {
 
 /** The sidebar's links, filtered by role. The current entry carries `aria-current="page"`. */
 export function SidebarNav({ label, entries, params, role }: SidebarNavProps) {
-  const { collapsed, isDesktop } = useSidebar()
+  const { collapsed, isDesktop, setDrawerOpen } = useSidebar()
   const rail = collapsed && isDesktop
   return (
     <>
@@ -37,6 +37,10 @@ export function SidebarNav({ label, entries, params, role }: SidebarNavProps) {
                     rail && 'justify-center px-0',
                   )}
                   activeProps={{ 'aria-current': 'page' }}
+                  // The location does not change when you pick the page you are on, so close here too.
+                  onClick={() => {
+                    setDrawerOpen(false)
+                  }}
                 >
                   <Icon aria-hidden className="size-(--icon) shrink-0" />
                   <span className={rail ? 'sr-only' : undefined}>{entry.label}</span>

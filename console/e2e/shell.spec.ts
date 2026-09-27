@@ -121,6 +121,36 @@ test('titles and focus follow navigation (AC-23)', async ({ signedIn: page }) =>
   await expect(page.locator('#page-title')).toBeFocused()
 })
 
+test('pages outside the shell set their own title (AC-23)', async ({ signedIn: page }) => {
+  await page.goto('/no/such/page')
+  await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
+  await expect(page).toHaveTitle('Page not found · Orvano')
+  await page.goto('/sign-in')
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  await expect(page).toHaveTitle('Sign in · Orvano')
+})
+
+test('the drawer closes on navigation and focus lands on the page title (AC-16, AC-23)', async ({
+  signedIn: page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 740 })
+  await page.goto(`/projects/${scenariosProject}`)
+  const drawer = page.getByRole('dialog')
+
+  // A link to the page you are already on still closes it.
+  await page.getByRole('button', { name: 'Open navigation' }).click()
+  await drawer.getByRole('link', { name: 'Overview' }).click()
+  await expect(drawer).toBeHidden()
+
+  // A switcher inside the drawer moves you to another page: the drawer closes, focus follows the title.
+  await page.getByRole('button', { name: 'Open navigation' }).click()
+  await drawer.getByRole('combobox', { name: /^Switch org/ }).click()
+  await page.getByRole('option', { name: 'Fixtures' }).click()
+  await expect(page).toHaveURL(/\/orgs\/[^/]+$/)
+  await expect(drawer).toBeHidden()
+  await expect(page.locator('#page-title')).toBeFocused()
+})
+
 test('a failed load shows the error panel with a Retry (AC-21)', async ({
   signedIn: page,
   request,
