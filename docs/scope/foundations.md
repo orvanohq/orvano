@@ -56,7 +56,7 @@ Visual language, layout, and base components for the console, plus the empty she
    - [x] Shell complete: org and project routes, nav registry, sidebar rail and drawer, both switchers with paging, status gating, not found, errors, landing, titles and focus, 360 px layout (AC-10 to 23)
    - [x] Production shape: Caddy security and cache headers, the `console` compose profile with the gateway, end to end tests in CI (AC-8, 9, 24, 26)
 - [ ] Verify it: `/check verify design system & console shell`
-- [ ] Test it: `/test design system & console shell`
+- [x] Test it: `/test design system & console shell`
 Spec [0005](../specs/0005-console-design-system-shell/index.md) · code in `console/`, `deploy/gateway/Caddyfile`, `dev/Orvano.AppHost/`, `tests/scenarios/compose.yml`
 
 ### 6. Self host installer · needs a decision
