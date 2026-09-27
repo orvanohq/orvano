@@ -39,7 +39,7 @@ Version, repair, upgrade
 - **AC-14**: `--no-pull` never pulls: the installer image and every service image must already be present locally (for air gapped servers and CI), otherwise it exits 2 naming the missing image.
 
 Master key
-- **AC-15**: When this run generated `ORVANO_MASTER_KEYS`, the installer prints the key, the `.env` path, and a warning that losing it makes stored secrets unrecoverable, then waits until you type `saved`. With `--yes` or no terminal it prints the same block and does not wait. A run that did not generate the key never prints it, only a one line reminder with the `.env` path. This happens whether or not AC-16 succeeded.
+- **AC-15**: When this run generated `ORVANO_MASTER_KEYS`, the installer prints the key, the `.env` path, and a warning that losing it makes stored secrets unrecoverable, then waits until you type `saved`. With `--yes` or no terminal it prints the same block and does not wait. A run that did not generate the key never prints it, only a one line reminder with the `.env` path. If `orvano install` exited 0 but its result file is missing or unreadable, the script cannot tell, so it prints the full block (a lost key is unrecoverable, and root can already read `.env`) and logs `could not read .install-result`. This happens whether or not AC-16 succeeded.
 
 Start and verify
 - **AC-16**: After `docker compose up -d --remove-orphans`, the installer waits up to `--timeout` seconds (default 300) until `migrate` has exited 0 and `postgres`, `api`, `worker`, and `realtime` report healthy and `gateway` is running. It then retries `GET <ORVANO_PUBLIC_URL>/v1/health` for up to 120 seconds (time for the first certificate). All passing exits 0.
@@ -90,7 +90,8 @@ install.sh (host, root)                         orvano install (container)
    missing → offer get.docker.com (AC-4)
 4. data volume exists? .env exists? other `orvano` project elsewhere?
 5. ports 80/443 free, or published by our gateway container
-6. docker run --rm --user 0:0 --network host \
+6. delete any stale <dir>/.install-result, then
+   docker run --rm --user 0:0 --network host \
      -v <dir>:/install [-it </dev/tty] \
      ghcr.io/orvanohq/orvano:<version> install   ──► 7. read /install/.env (if any)
      --existing-data=<yes|no> [flags]                8. version rule (fresh, repair, upgrade, refuse)
@@ -99,9 +100,10 @@ install.sh (host, root)                         orvano install (container)
                                                      11. generate missing secrets, PG tuning from /proc/meminfo
                                                      12. write .env (temp + rename), docker-compose.yml,
                                                          initdb/10-orvano-roles.sh
-                                                     13. print a machine readable result line:
-                                                         ORVANO_INSTALL_RESULT generated_master_key=<0|1>
-                                     ◄──────────────
+                                                     13. write the result file /install/.install-result
+                                                         (temp + rename, 0600): generated_master_key=<0|1>
+   exit 0 only: read, then delete
+   <dir>/.install-result             ◄──────────────
 14. cd <dir>; docker compose pull (unless --no-pull)
 15. docker compose up -d --remove-orphans
 16. poll `docker compose ps --all --format json` (AC-16)
@@ -146,6 +148,7 @@ Prompts read from `/dev/tty`, because under `curl ... | sh` standard input is th
 | `initdb/10-orvano-roles.sh` | installer | 0755 | rewritten from the image |
 | `install.log` | installer | 0600 | appended, never holds secrets |
 | `.install.lock` | installer | 0600 | lock file for `flock` |
+| `.install-result` | installer | 0600 | written by `orvano install` when it succeeds, read and deleted by `install.sh` in the same run; never left behind after a successful run |
 
 `.env` keys:
 
@@ -195,7 +198,7 @@ The compose file reads each with spec 0002's value as the fallback (`${ORVANO_PG
 |---|---|---|---|---|---|
 | `consoleInstall.getSetup` (new) | GET `/v1/console/install/setup` | none | `setupRequired: boolean` | none (the fifth console route without a session, next to spec 0004's four) | 429 `rate_limited` |
 | `consoleAccount.create` (spec 0004, changed) | POST `/v1/console/account` | adds `setupToken?: string` | unchanged | none | 403 `setup_token_invalid` (new), plus spec 0004's |
-| `orvano install` (CLI, container) | `docker run ... orvano:<v> install [flags]` | *Command line*, `--existing-data` from the script | files in `/install`, result line, exit code | root in the container, only the install dir mounted | exit 2 |
+| `orvano install` (CLI, container) | `docker run ... orvano:<v> install [flags]` | *Command line*, `--existing-data` from the script | files in `/install` (including `.install-result`), exit code | root in the container, only the install dir mounted | exit 2 |
 | `orvano setup-status` (CLI, container) | `docker compose exec -T api /app/orvano setup-status` | none | `required` or `done` | runs inside `api` | exit 1 |
 | `install.sh` (host) | `curl ... \| sudo sh -s -- [flags]` | *Command line* | running install, summary | root | exit 2, 3 |
 
@@ -221,7 +224,7 @@ A new Platform contract, `IInstallSetupState.IsSetupRequiredAsync(CancellationTo
 | `orvano install` | every secret | `RandomNumberGenerator`, formats in *Install layout* |
 | `orvano install` | master key ID date | UTC clock at generation |
 | `orvano install` | compose file and init script | embedded resources of the running image |
-| `install.sh` | whether a master key was generated | the `ORVANO_INSTALL_RESULT` line printed by `orvano install` |
+| `install.sh` | whether a master key was generated | `generated_master_key=<0\|1>` in `<dir>/.install-result`, written by `orvano install` (never printed, so you never see it); missing or unreadable after exit 0 counts as generated (AC-15) |
 | `install.sh` | master key and setup token to print | `.env`, read by the script as root |
 | `install.sh` | service health | `docker compose ps --all --format json` |
 | `install.sh` | setup link needed | `orvano setup-status` inside `api` |
@@ -279,7 +282,7 @@ A new Platform contract, `IInstallSetupState.IsSetupRequiredAsync(CancellationTo
 Tracer Bullet: the first three tasks make a thin, real thread (repo compose file, then `orvano install`, then `install.sh`, proven by CI on `localhost`). Later tasks thicken it with the checks, the first admin gate, the console screens, and publishing.
 
 1. **Compose file ready to embed**: make `docker-compose.yml` image only and add `docker-compose.build.yml`; move `deploy/postgres/initdb` to `deploy/compose/initdb` and update `tests/scenarios/compose.yml` and `ci.yml`; add the `x-logging` anchor and the five `ORVANO_PG_*` keys with spec 0002 fallbacks; update `.env.example`. Satisfies **AC-10**, **AC-11**, **AC-27**.
-2. **`orvano install`, thin**: an `Install/` folder in `Orvano.Server` with plain, unit tested types (no Docker, no ASP.NET): `EnvFile` (parse and write keeping unknown lines and order), `InstallSecrets` (formats above), `PgTuning`, `VersionRule`, `DomainRule`, `EmailRule`, `InstallPlan` (inputs to decisions and files). The `install` subcommand is checked before role selection, like `healthcheck`, and writes files from embedded resources with flags only (no prompts yet), `.env` written atomically, `.env.previous`, `install.log`, and the result line. Embed the resources in the csproj and copy `deploy/compose/` in the Dockerfile. Satisfies **AC-8**, **AC-9**, **AC-11**, **AC-12**, **AC-13**.
+2. **`orvano install`, thin**: an `Install/` folder in `Orvano.Server` with plain, unit tested types (no Docker, no ASP.NET): `EnvFile` (parse and write keeping unknown lines and order), `InstallSecrets` (formats above), `PgTuning`, `VersionRule`, `DomainRule`, `EmailRule`, `InstallPlan` (inputs to decisions and files). The `install` subcommand is checked before role selection, like `healthcheck`, and writes files from embedded resources with flags only (no prompts yet), `.env` written atomically, `.env.previous`, `install.log`, and the result file `.install-result`. Embed the resources in the csproj and copy `deploy/compose/` in the Dockerfile. Satisfies **AC-8**, **AC-9**, **AC-11**, **AC-12**, **AC-13**.
 3. **`install.sh`, thin, plus CI**: `deploy/install/install.sh` in POSIX `sh` with flag parsing, `flock`, root and architecture checks, Docker and Compose version checks (refusing when missing), the rootless and `userns-remap` refusal, the one install per host check, the data volume and `.env` check, `docker run` of the installer, `pull` (unless `--no-pull`), `up -d --remove-orphans`, the health poll, the public health check, the failure report, and the summary. The CI job from AC-30 (amd64 and arm64 runners, images tagged from `VERSION`, which also proves `--user 0:0` works in the chiseled image), with ShellCheck, replaces the compose smoke test. Satisfies **AC-2** (root, arch, lost `.env`), **AC-14**, **AC-16**, **AC-17**, **AC-25**, **AC-30**.
 4. **Interactive and preflight depth**: prompts through `/dev/tty`, `--help`, the no terminal rules; the domain and email prompts with validation; the DNS check with IPv4 and IPv6 interface addresses and `icanhazip.com`; the domain change warning; distro detection, the RAM floor and warning, the port check (our gateway by Compose labels, anything else named through `ss`), the `ufw`, NTP, and missing data volume warnings; the Docker install offer through `get.docker.com`; the master key block with the typed `saved` confirmation. Satisfies **AC-1**, **AC-2**, **AC-3**, **AC-4**, **AC-5**, **AC-6**, **AC-15**, **AC-18**, **AC-28**.
 5. **Gateway**: the entrypoint script writing `global.caddy`, the Caddyfile import and the HSTS rule, and `ORVANO_ACME_EMAIL` in compose. Checked by `caddy validate` with and without an email, and by the CI install (no HSTS on `localhost`). Satisfies **AC-7**, **AC-26**.

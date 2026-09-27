@@ -6,6 +6,8 @@ Run the host steps on a throwaway Linux server or VM (Ubuntu 24.04), or in a `do
 ## Commands: install, repair, upgrade
 - [x] `sudo sh deploy/install/install.sh --version <V> --domain localhost --yes --no-pull` on a clean host → exit 0, prints the console URL, the setup link, and the master key block → AC-1, AC-16, AC-19, AC-15
 - [x] `ls -la /opt/orvano /opt/orvano/initdb` → `.env` and `install.log` 0600, `docker-compose.yml` 0644, `initdb/10-orvano-roles.sh` 0755, all root, no `docker-compose.override.yml` → AC-8
+- [ ] On the first install and on a rerun → the output never shows `generated_master_key` or `ORVANO_INSTALL_RESULT`, and `/opt/orvano/.install-result` does not exist afterwards → AC-15, value sourcing
+- [ ] Make `orvano install` exit 0 without leaving `.install-result` (for example, an image that skips the write) → the full master key block prints and `install.log` has `could not read .install-result` → AC-15, value sourcing
 - [x] Run the same command again → exit 0, `.env` byte for byte the same, no master key printed (one line reminder only) → AC-9, AC-13 (repair), AC-15
 - [x] Add `MY_KEY=1` and a comment to `.env`, rerun → both kept in place → AC-9
 - [x] Put `ORVANO_PG_TUNING=manual` and `ORVANO_PG_SHARED_BUFFERS=2GB` in `.env`, rerun → the five `ORVANO_PG_*` values untouched; remove it → values follow `MemTotal` → AC-11
@@ -17,6 +19,7 @@ Run the host steps on a throwaway Linux server or VM (Ubuntu 24.04), or in a `do
 
 ## Commands: refusals and warnings
 - [x] Run as a non root user → exit 2 "Run the installer as root" → AC-2
+- [ ] Run as a non root user on a host where root owned `/opt/orvano/install.log` exists → only the "Run the installer as root" line prints, no "Permission denied" → AC-2
 - [x] Remove `.env` while `orvano_orvano-pg` exists, rerun → exit 2 naming the volume and `.env` → AC-2
 - [x] Hold port 80 with another program (for example `nc -lk -p 80`), rerun → exit 2 naming it; with only Orvano's own gateway on 80 and 443 → passes → AC-2
 - [x] Start a second run while one holds `/opt/orvano/.install.lock` → exit 2 "Another install is running" → AC-25
