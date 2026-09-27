@@ -26,9 +26,17 @@ internal sealed class AuthModule : IOrvanoModule
         services.AddSingleton<AuthStore>();
         services.AddSingleton<UserDirectory>();
         services.AddSingleton<IUserDirectory>(sp => sp.GetRequiredService<UserDirectory>());
+        services.AddSingleton<SessionChecks>();
+    }
+
+    /// <summary>
+    /// The request path: token signing needs the public URL (api only) and the master key (not in realtime), so
+    /// these are built in the api role alone. The worker's jobs use only the database.
+    /// </summary>
+    public void ConfigureApiServices(IServiceCollection services, IConfiguration config)
+    {
         services.AddSingleton<SigningKeys>();
         services.AddSingleton<AccessTokens>();
-        services.AddSingleton<SessionChecks>();
         services.AddSingleton<Sessions>();
         services.AddSingleton<AccountService>();
         services.AddSingleton<SessionService>();

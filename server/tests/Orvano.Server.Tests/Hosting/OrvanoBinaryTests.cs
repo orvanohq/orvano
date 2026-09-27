@@ -191,6 +191,26 @@ public class OrvanoBinaryTests(PostgresFixture postgres)
         Assert.Equal("Healthy", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
 
+    // Development validates every service registration at startup, so a role that registers a service whose
+    // dependency only another role has crashes there (as under the Aspire AppHost). Each role gets only the
+    // settings the AppHost gives it: the master key for api and worker, the public URL for api.
+    [Theory]
+    [InlineData("api")]
+    [InlineData("worker")]
+    [InlineData("realtime")]
+    public async Task Starts_every_long_running_role_in_Development_with_only_its_own_settings(string role)
+    {
+        await using var database = await postgres.NewDatabaseAsync();
+        await database.MigrateAsync();
+        var env = Env(("ORVANO_DB_URL", database.AppUrl), ("ASPNETCORE_ENVIRONMENT", "Development"));
+        if (role == "worker") env["ORVANO_DB_ADMIN_URL"] = database.AdminUrl;
+        if (role == "realtime") env["ORVANO_MASTER_KEYS"] = "";
+        if (role != "api") env["ORVANO_PUBLIC_URL"] = "";
+        await using var orvano = OrvanoProcess.Start([role], env, listen: true);
+
+        await orvano.WaitUntilListeningAsync();
+    }
+
     [Theory]
     [InlineData("worker")]
     [InlineData("realtime")]

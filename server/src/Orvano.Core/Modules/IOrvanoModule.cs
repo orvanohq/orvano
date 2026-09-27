@@ -16,6 +16,12 @@ public interface IOrvanoModule
     /// <summary>Registers the module's services. Runs in every role.</summary>
     void ConfigureServices(IServiceCollection services, IConfiguration config);
 
+    /// <summary>
+    /// Registers services only the <c>api</c> role builds, such as those that need the kernel's api only services
+    /// (the public URL). Runs in the <c>api</c> role, after <see cref="ConfigureServices"/>.
+    /// </summary>
+    void ConfigureApiServices(IServiceCollection services, IConfiguration config) { }
+
     /// <summary>Maps the module's endpoints under <c>/v1</c>. Runs in the <c>api</c> role.</summary>
     void MapApi(RouteGroupBuilder v1);
 

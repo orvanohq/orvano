@@ -53,6 +53,10 @@ internal static class ServerRole
 
         AddKernel(builder, role);
         foreach (var module in modules) module.ConfigureServices(builder.Services, config);
+        if (role == OrvanoRole.Api)
+        {
+            foreach (var module in modules) module.ConfigureApiServices(builder.Services, config);
+        }
 
         switch (role)
         {
