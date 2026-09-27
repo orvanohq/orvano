@@ -1,0 +1,21 @@
+# Builds the two Orvano images from this checkout instead of pulling them (repo only; the installer
+# never ships this file). From deploy/compose:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
+
+x-server-build: &server-build
+  context: ../..
+  dockerfile: deploy/server.Dockerfile
+
+services:
+  migrate:
+    build: *server-build
+  api:
+    build: *server-build
+  worker:
+    build: *server-build
+  realtime:
+    build: *server-build
+  gateway:
+    build:
+      context: ../..
+      dockerfile: deploy/gateway/Dockerfile

@@ -8,7 +8,7 @@ using Testcontainers.PostgreSql;
 namespace Orvano.Server.Tests.Infrastructure;
 
 /// <summary>
-/// One Postgres 18 container for the whole run, bootstrapped by the real deploy/postgres/initdb
+/// One Postgres 18 container for the whole run, bootstrapped by the real deploy/compose/initdb
 /// script, so orvano_admin and orvano_app exist exactly as they do in production. Tests never share
 /// a database: each calls <see cref="NewDatabaseAsync"/>.
 /// </summary>
@@ -20,7 +20,7 @@ public sealed class PostgresFixture : IAsyncLifetime
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18.6")
         .WithEnvironment("ORVANO_ADMIN_PASSWORD", AdminPassword)
         .WithEnvironment("ORVANO_APP_PASSWORD", AppPassword)
-        .WithBindMount(RepoPaths.Combine("deploy", "postgres", "initdb"), "/docker-entrypoint-initdb.d", AccessMode.ReadOnly)
+        .WithBindMount(RepoPaths.Combine("deploy", "compose", "initdb"), "/docker-entrypoint-initdb.d", AccessMode.ReadOnly)
         .WithCommand("-c", "max_connections=300")
         .Build();
 

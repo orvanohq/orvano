@@ -1,16 +1,27 @@
 # Orvano on one Linux host (spec 0002, containers on one server). Only the gateway publishes
-# ports; Postgres and every role stay on the internal network. The installer (scope row 6)
-# builds on this file. Locally: copy .env.example to .env, then
-#   docker compose -f deploy/compose/docker-compose.yml up --build
+# ports; Postgres and every role stay on the internal network.
+#
+# Managed by the Orvano installer (spec 0006): every install run rewrites this file from the image
+# of the version it installs, so your edits here are lost. Put your changes in
+# docker-compose.override.yml next to it instead; the installer never touches that file, and Compose
+# merges it. Override a service's keys there, not the `x-` anchors below (anchors are resolved
+# before the files merge).
+#
+# From a checkout of the repo, build the images locally and run the production shape with
+#   cd deploy/compose && docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
 
 name: orvano
 
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
 x-server: &server
   image: ${ORVANO_IMAGE:-ghcr.io/orvanohq/orvano}:${ORVANO_VERSION:-dev}
-  build:
-    context: ../..
-    dockerfile: deploy/server.Dockerfile
   restart: unless-stopped
+  logging: *logging
 
 x-app-db: &app-db
   ORVANO_DB_URL: Host=postgres;Port=5432;Username=orvano_app;Password=${ORVANO_APP_PASSWORD:?set in .env};Database=orvano
@@ -32,26 +43,29 @@ services:
   postgres:
     image: postgres:18.6
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
       ORVANO_ADMIN_PASSWORD: ${ORVANO_ADMIN_PASSWORD:?set in .env}
       ORVANO_APP_PASSWORD: ${ORVANO_APP_PASSWORD:?set in .env}
+    # The installer sizes these from the server's memory (spec 0006, Postgres tuning); the fallbacks
+    # are spec 0002's values for a 4 GB server.
     command:
       - postgres
       - -c
-      - shared_buffers=512MB
+      - shared_buffers=${ORVANO_PG_SHARED_BUFFERS:-512MB}
       - -c
-      - effective_cache_size=1536MB
+      - effective_cache_size=${ORVANO_PG_EFFECTIVE_CACHE_SIZE:-1536MB}
       - -c
-      - work_mem=8MB
+      - work_mem=${ORVANO_PG_WORK_MEM:-8MB}
       - -c
-      - maintenance_work_mem=128MB
+      - maintenance_work_mem=${ORVANO_PG_MAINTENANCE_WORK_MEM:-128MB}
       - -c
       - max_connections=100
     volumes:
       # Postgres 18 images keep data under /var/lib/postgresql/18/docker.
       - orvano-pg:/var/lib/postgresql
-      - ../postgres/initdb:/docker-entrypoint-initdb.d:ro
+      - ./initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       # Over TCP, so it stays unhealthy while the socket only bootstrap server runs the init script.
       test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "orvano_app", "-d", "orvano"]
@@ -61,7 +75,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1280M
+          memory: ${ORVANO_PG_MEMORY_LIMIT:-1280M}
 
   migrate:
     <<: *server
@@ -135,10 +149,8 @@ services:
 
   gateway:
     image: ${ORVANO_GATEWAY_IMAGE:-ghcr.io/orvanohq/orvano-gateway}:${ORVANO_VERSION:-dev}
-    build:
-      context: ../..
-      dockerfile: deploy/gateway/Dockerfile
     restart: unless-stopped
+    logging: *logging
     environment:
       ORVANO_PUBLIC_URL: ${ORVANO_PUBLIC_URL:?set in .env}
     ports:

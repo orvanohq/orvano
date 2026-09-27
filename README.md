@@ -24,7 +24,7 @@ pnpm install
 dotnet run --project dev/Orvano.AppHost
 ```
 
-This starts Postgres 18, applies the platform migrations, then starts the API, worker, realtime roles, and the console, with the Aspire dashboard for logs and traces. To try the production shape behind Caddy on `http://localhost`, copy `deploy/compose/.env.example` to `deploy/compose/.env`, fill in the passwords, and run `docker compose -f deploy/compose/docker-compose.yml up --build`.
+This starts Postgres 18, applies the platform migrations, then starts the API, worker, realtime roles, and the console, with the Aspire dashboard for logs and traces. To try the production shape behind Caddy on `http://localhost`, copy `deploy/compose/.env.example` to `deploy/compose/.env`, fill in the passwords, and run `docker compose -f docker-compose.yml -f docker-compose.build.yml up --build` from `deploy/compose/`.
 
 ## Where to read more
 

@@ -21,7 +21,7 @@ services:
       ORVANO_ADMIN_PASSWORD: scenarios-admin
       ORVANO_APP_PASSWORD: scenarios-app
     volumes:
-      - ../../deploy/postgres/initdb:/docker-entrypoint-initdb.d:ro
+      - ../../deploy/compose/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ['CMD', 'pg_isready', '-h', '127.0.0.1', '-U', 'orvano_app', '-d', 'orvano']
       interval: 2s

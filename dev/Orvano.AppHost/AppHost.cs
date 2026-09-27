@@ -22,7 +22,7 @@ var postgres = builder.AddPostgres("postgres")
     .WithImageTag("18.6")
     .WithEnvironment("ORVANO_ADMIN_PASSWORD", adminPassword)
     .WithEnvironment("ORVANO_APP_PASSWORD", appPassword)
-    .WithInitFiles("../../deploy/postgres/initdb");
+    .WithInitFiles("../../deploy/compose/initdb");
 
 var endpoint = postgres.Resource.PrimaryEndpoint;
 var adminDb = ReferenceExpression.Create(

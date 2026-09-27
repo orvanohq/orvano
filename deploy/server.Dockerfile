@@ -14,8 +14,10 @@ COPY server/src/Orvano.Server/Orvano.Server.csproj server/src/Orvano.Server/
 RUN dotnet restore server/src/Orvano.Server/Orvano.Server.csproj -a $TARGETARCH
 
 COPY server/ server/
-# Orvano.Contract embeds the compiled contract (spec 0001).
+# Orvano.Contract embeds the compiled contract (spec 0001), and the server embeds the compose file
+# and init script that `orvano install` writes (spec 0006). .dockerignore keeps any local .env out.
 COPY contract/dist/openapi.json contract/dist/
+COPY deploy/compose/ deploy/compose/
 RUN dotnet publish server/src/Orvano.Server/Orvano.Server.csproj -c Release -a $TARGETARCH --no-restore -o /app
 
 # The storage volume mount point, owned by the non root app user (UID 1654 in .NET images).
