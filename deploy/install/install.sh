@@ -356,6 +356,11 @@ run_installer() {
 
   generated_master_key=$(sed -n 's/^generated_master_key=\([01]\)$/\1/p' "$result_file" 2>/dev/null | tail -n 1)
   rm -f "$result_file"
+  # Without a result we cannot tell, so show the key: a new key never shown is lost for good (AC-15).
+  if [ -z "$generated_master_key" ]; then
+    log "could not read .install-result"
+    generated_master_key=1
+  fi
 }
 
 # Reads a key from .env as root (unquoted values, which is how the installer writes these keys).
