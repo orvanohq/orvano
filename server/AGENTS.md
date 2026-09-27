@@ -10,6 +10,8 @@ The Orvano server: one .NET 10 program, built as separate modules, shipped as on
 |---|---|
 | `src/Orvano.Server/Hosting/OrvanoProgram.cs` | Role selection and startup |
 | `src/Orvano.Server/Hosting/StartupChecks.cs` | Config validation; a role refuses to start on a bad value |
+| `src/Orvano.Server/Install/` | `orvano install` (spec 0006): plain, unit tested rules (`EnvFile`, `InstallSecrets`, `PgTuning`, `VersionRule`, `DomainRule`, `EmailRule`, `InstallPlan`) behind `InstallCommand`, which writes every file in the install directory and never talks to Docker; see [deploy/install/AGENTS.md](../deploy/install/AGENTS.md) |
+| `src/Orvano.Server/Hosting/SetupStatusCommand.cs` | `orvano setup-status`, run inside `api`: prints `required` or `done` |
 | `src/Orvano.Server/Modules/OrvanoModules.cs` | The explicit module list (no assembly scanning) |
 | `src/Orvano.Core/Modules/IOrvanoModule.cs` | The module contract: services, API, work, realtime hooks |
 | `src/Orvano.Core/Data/ProjectScope.cs` | The only code path allowed to `SET LOCAL ROLE p_<id>` |
@@ -53,6 +55,8 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 - Test only routes (`/v1/test/*`, `/v1/console/test/*`) exist only in `Test`, because `OrvanoModules` adds `TestingModule` only there. Outside `Test` no console session is valid yet, so every console route answers 401 until the auth rows land.
 - In the `Test` environment a response that breaks the contract (extra, missing, or mistyped field, undeclared 2xx status, unnamed endpoint) becomes a 500 `contract_violation`. `ORVANO_TEST_FIXTURES` is refused outside `Test`.
 - `Orvano.Contract` embeds `contract/dist/openapi.json`, so `deploy/server.Dockerfile` copies that file too; a new server project also needs its csproj copied before restore there.
+- `Orvano.Server` embeds `deploy/compose/docker-compose.yml` and `deploy/compose/initdb/10-orvano-roles.sh`, which `orvano install` writes to every install, so editing either changes what the next release installs. `install`, `setup-status`, and `healthcheck` are checked before role selection in `OrvanoProgram`, so they run with no `ORVANO_ROLE`.
+- In `Production`, `api` refuses to start while no install admin exists and `ORVANO_SETUP_TOKEN` is unset; a malformed token is refused in every environment (spec 0006, AC-21).
 - Every job handler must be idempotent, and no consumer may rely on event order. A consumer that throws is retried later through the `events.redispatch` job.
 - Consumers stay small and do no IO: a hanging consumer still stalls the dispatcher.
 - `orvano_app` never holds DDL rights. Only `migrate` and `worker` receive `ORVANO_DB_ADMIN_URL`.
@@ -74,5 +78,6 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 - [0003 Platform data model](../docs/specs/0003-platform-data-model/index.md) (orgs, projects, keys, platforms, module contracts)
 - [0001 API contract and SDK pipeline](../docs/specs/0001-api-contract-sdk-pipeline/index.md) (generated `Orvano.Contract` types)
 - [0004 App user sign up, sign in, and sessions](../docs/specs/0004-app-user-auth/index.md) (`Orvano.Auth`, tokens, sessions, signing keys)
+- [0006 Self host installer](../docs/specs/0006-self-host-installer/index.md) (`orvano install`, `setup-status`, the setup token)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
