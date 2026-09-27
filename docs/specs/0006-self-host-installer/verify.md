@@ -6,8 +6,8 @@ Run the host steps on a throwaway Linux server or VM (Ubuntu 24.04), or in a `do
 ## Commands: install, repair, upgrade
 - [x] `sudo sh deploy/install/install.sh --version <V> --domain localhost --yes --no-pull` on a clean host → exit 0, prints the console URL, the setup link, and the master key block → AC-1, AC-16, AC-19, AC-15
 - [x] `ls -la /opt/orvano /opt/orvano/initdb` → `.env` and `install.log` 0600, `docker-compose.yml` 0644, `initdb/10-orvano-roles.sh` 0755, all root, no `docker-compose.override.yml` → AC-8
-- [ ] On the first install and on a rerun → the output never shows `generated_master_key` or `ORVANO_INSTALL_RESULT`, and `/opt/orvano/.install-result` does not exist afterwards → AC-15, value sourcing
-- [ ] Make `orvano install` exit 0 without leaving `.install-result` (for example, an image that skips the write) → the full master key block prints and `install.log` has `could not read .install-result` → AC-15, value sourcing
+- [x] On the first install and on a rerun → the output never shows `generated_master_key` or `ORVANO_INSTALL_RESULT`, and `/opt/orvano/.install-result` does not exist afterwards → AC-15, value sourcing
+- [x] Make `orvano install` exit 0 without leaving `.install-result` (for example, an image that skips the write) → the full master key block prints and `install.log` has `could not read .install-result` → AC-15, value sourcing
 - [x] Run the same command again → exit 0, `.env` byte for byte the same, no master key printed (one line reminder only) → AC-9, AC-13 (repair), AC-15
 - [x] Add `MY_KEY=1` and a comment to `.env`, rerun → both kept in place → AC-9
 - [x] Put `ORVANO_PG_TUNING=manual` and `ORVANO_PG_SHARED_BUFFERS=2GB` in `.env`, rerun → the five `ORVANO_PG_*` values untouched; remove it → values follow `MemTotal` → AC-11
@@ -19,14 +19,14 @@ Run the host steps on a throwaway Linux server or VM (Ubuntu 24.04), or in a `do
 
 ## Commands: refusals and warnings
 - [x] Run as a non root user → exit 2 "Run the installer as root" → AC-2
-- [ ] Run as a non root user on a host where root owned `/opt/orvano/install.log` exists → only the "Run the installer as root" line prints, no "Permission denied" → AC-2
+- [x] Run as a non root user on a host where root owned `/opt/orvano/install.log` exists → only the "Run the installer as root" line prints, no "Permission denied" → AC-2
 - [x] Remove `.env` while `orvano_orvano-pg` exists, rerun → exit 2 naming the volume and `.env` → AC-2
 - [x] Hold port 80 with another program (for example `nc -lk -p 80`), rerun → exit 2 naming it; with only Orvano's own gateway on 80 and 443 → passes → AC-2
 - [x] Start a second run while one holds `/opt/orvano/.install.lock` → exit 2 "Another install is running" → AC-25
 - [x] `--dir /opt/other` while `/opt/orvano` is installed → exit 2 naming `/opt/orvano` → AC-2
 - [x] On an unsupported distro with Docker present, without `--yes` and no terminal → warns, "Continue anyway? no", exit 2; with `--yes` → continues → AC-3, AC-28
 - [x] Remove the data volume but keep `.env` with `ORVANO_VERSION` → "starting with an empty database" warning, default no → AC-3
-- [ ] On a supported distro without Docker, answer no → exit 2 with Docker's install docs link; answer yes → installs through get.docker.com and continues → AC-4
+- [x] On a supported distro without Docker, answer no → exit 2 with Docker's install docs link; answer yes → installs through get.docker.com and continues → AC-4
 - [x] `--domain https://x.example.com`, `--domain 1.2.3.4`, `--domain Example.COM` → exit 2 "not a valid domain"; `--domain localhost` → "not for production" warning → AC-5
 - [x] `--domain <a name that points elsewhere>` without `--yes` → explains DNS, exit 2; with `--yes` → continues; `--no-ip-lookup` skips icanhazip → AC-6
 - [x] `--email nope` → exit 2; `--email ""` → allowed → AC-7
@@ -58,7 +58,7 @@ Run the host steps on a throwaway Linux server or VM (Ubuntu 24.04), or in a `do
 - [ ] After the first real release: `releases/latest/download/install.sh` serves the stamped script and `sha256sum -c install.sh.sha256` passes → AC-1, AC-29
 
 ## Value sourcing
-- [ ] Rerun with a different server memory (or edit `/proc/meminfo` in a test) → Postgres values follow `MemTotal`; exactly 4096 MiB gives `512MB, 1536MB, 8MB, 128MB, 1280M` → Postgres values
+- [x] Rerun with a different server memory (or edit `/proc/meminfo` in a test) → Postgres values follow `MemTotal`; exactly 4096 MiB gives `512MB, 1536MB, 8MB, 128MB, 1280M` → Postgres values
 - [x] Rerun without `--domain` and `--email` → the current domain and email are kept (defaults from `.env`) → domain, ACME email
 - [x] Master key ID date is the UTC date of generation, even when the server's local date differs → master key ID date
 - [x] `docker volume rm` the data volume (throwaway host), rerun → `--existing-data=no` path; with it present → `yes` → data volume exists
