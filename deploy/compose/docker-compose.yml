@@ -99,10 +99,11 @@ services:
       <<: *app-db
       ORVANO_ROLE: api
       ORVANO_PUBLIC_URL: ${ORVANO_PUBLIC_URL:?set in .env}
-      ORVANO_MASTER_KEYS: ${ORVANO_MASTER_KEYS:-}
+      ORVANO_MASTER_KEYS: ${ORVANO_MASTER_KEYS:?set in .env}
       # Only the holder of the installer's setup link can create the first admin (spec 0006).
       ORVANO_SETUP_TOKEN: ${ORVANO_SETUP_TOKEN:-}
       ORVANO_DELETE_GRACE_DAYS: ${ORVANO_DELETE_GRACE_DAYS:-7}
+      ORVANO_TRUSTED_PROXIES: ${ORVANO_TRUSTED_PROXIES:-private}
       OTEL_SERVICE_NAME: orvano-api
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     volumes:
@@ -121,7 +122,7 @@ services:
       ORVANO_ROLE: worker
       ORVANO_DB_ADMIN_URL: Host=postgres;Port=5432;Username=orvano_admin;Password=${ORVANO_ADMIN_PASSWORD:?set in .env};Database=orvano
       ORVANO_PUBLIC_URL: ${ORVANO_PUBLIC_URL:?set in .env}
-      ORVANO_MASTER_KEYS: ${ORVANO_MASTER_KEYS:-}
+      ORVANO_MASTER_KEYS: ${ORVANO_MASTER_KEYS:?set in .env}
       ORVANO_EVENT_RETENTION_DAYS: ${ORVANO_EVENT_RETENTION_DAYS:-7}
       ORVANO_DELETE_GRACE_DAYS: ${ORVANO_DELETE_GRACE_DAYS:-7}
       OTEL_SERVICE_NAME: orvano-worker

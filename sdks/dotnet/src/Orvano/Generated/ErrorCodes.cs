@@ -10,17 +10,38 @@ public static class ErrorCode
     /// <summary>The <c>contract_violation</c> error code.</summary>
     public const string ContractViolation = "contract_violation";
 
+    /// <summary>The <c>csrf_rejected</c> error code.</summary>
+    public const string CsrfRejected = "csrf_rejected";
+
     /// <summary>The <c>forbidden</c> error code.</summary>
     public const string Forbidden = "forbidden";
+
+    /// <summary>The <c>insufficient_scope</c> error code.</summary>
+    public const string InsufficientScope = "insufficient_scope";
 
     /// <summary>The <c>internal_error</c> error code.</summary>
     public const string InternalError = "internal_error";
 
+    /// <summary>The <c>invalid_api_key</c> error code.</summary>
+    public const string InvalidApiKey = "invalid_api_key";
+
+    /// <summary>The <c>invalid_credentials</c> error code.</summary>
+    public const string InvalidCredentials = "invalid_credentials";
+
     /// <summary>The <c>invalid_cursor</c> error code.</summary>
     public const string InvalidCursor = "invalid_cursor";
 
+    /// <summary>The <c>invalid_password</c> error code.</summary>
+    public const string InvalidPassword = "invalid_password";
+
+    /// <summary>The <c>invalid_refresh_token</c> error code.</summary>
+    public const string InvalidRefreshToken = "invalid_refresh_token";
+
     /// <summary>The <c>invalid_request</c> error code.</summary>
     public const string InvalidRequest = "invalid_request";
+
+    /// <summary>The <c>invalid_token</c> error code.</summary>
+    public const string InvalidToken = "invalid_token";
 
     /// <summary>The <c>last_owner</c> error code.</summary>
     public const string LastOwner = "last_owner";
@@ -34,15 +55,42 @@ public static class ErrorCode
     /// <summary>The <c>org_not_empty</c> error code.</summary>
     public const string OrgNotEmpty = "org_not_empty";
 
+    /// <summary>The <c>origin_not_allowed</c> error code.</summary>
+    public const string OriginNotAllowed = "origin_not_allowed";
+
     /// <summary>The <c>project_not_found</c> error code.</summary>
     public const string ProjectNotFound = "project_not_found";
 
     /// <summary>The <c>project_not_ready</c> error code.</summary>
     public const string ProjectNotReady = "project_not_ready";
 
+    /// <summary>The <c>rate_limited</c> error code.</summary>
+    public const string RateLimited = "rate_limited";
+
+    /// <summary>The <c>server_busy</c> error code.</summary>
+    public const string ServerBusy = "server_busy";
+
+    /// <summary>The <c>session_not_found</c> error code.</summary>
+    public const string SessionNotFound = "session_not_found";
+
+    /// <summary>The <c>session_required</c> error code.</summary>
+    public const string SessionRequired = "session_required";
+
     /// <summary>The <c>setup_token_invalid</c> error code.</summary>
     public const string SetupTokenInvalid = "setup_token_invalid";
 
     /// <summary>The <c>signup_closed</c> error code.</summary>
     public const string SignupClosed = "signup_closed";
+
+    /// <summary>The <c>token_expired</c> error code.</summary>
+    public const string TokenExpired = "token_expired";
+
+    /// <summary>The <c>user_already_exists</c> error code.</summary>
+    public const string UserAlreadyExists = "user_already_exists";
+
+    /// <summary>The <c>user_blocked</c> error code.</summary>
+    public const string UserBlocked = "user_blocked";
+
+    /// <summary>The <c>user_not_found</c> error code.</summary>
+    public const string UserNotFound = "user_not_found";
 }

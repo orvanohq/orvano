@@ -81,6 +81,54 @@ enum ErrorCode {
 
   @doc("The first console sign up on an install needs its setup token, and none or the wrong one was given (403).")
   setup_token_invalid,
+
+  @doc("The password is not 8 to 256 characters after Unicode NFKC normalization (400).")
+  invalid_password,
+
+  @doc("The email and password do not match a user, or the password given to confirm an action is wrong (401).")
+  invalid_credentials,
+
+  @doc("The operation needs a signed in user's access token in `Authorization: Bearer` (401).")
+  session_required,
+
+  @doc("The access token is malformed, signed by an unknown key, for another project, or its session has ended (401).")
+  invalid_token,
+
+  @doc("The access token has expired; refresh the session and try again (401).")
+  token_expired,
+
+  @doc("The refresh token is malformed, reused, or its session has ended or expired; sign in again (401).")
+  invalid_refresh_token,
+
+  @doc("The API key is unknown, expired, or belongs to another project (401).")
+  invalid_api_key,
+
+  @doc("The user is blocked (403).")
+  user_blocked,
+
+  @doc("The API key lacks the scope this operation needs (403).")
+  insufficient_scope,
+
+  @doc("The browser origin matches none of the project's web platforms (403).")
+  origin_not_allowed,
+
+  @doc("A console call that changes something came from another site (403).")
+  csrf_rejected,
+
+  @doc("No such user in the project (404).")
+  user_not_found,
+
+  @doc("No such session for this user (404).")
+  session_not_found,
+
+  @doc("A user with this email already exists in the project (409).")
+  user_already_exists,
+
+  @doc("Too many requests; wait for the number of seconds in `Retry-After` (429).")
+  rate_limited,
+
+  @doc("The server is too busy to check a password right now; retry after `Retry-After` (503).")
+  server_busy,
 }
 
 @doc("Error codes only the test operations send. Generated only into the scenario runners.")

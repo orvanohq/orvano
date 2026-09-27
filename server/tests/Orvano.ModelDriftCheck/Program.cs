@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Logging;
+using Orvano.Auth.Data;
 using Orvano.Core.Data;
 using Orvano.Core.Migrations;
 using Orvano.Platform.Data;
@@ -42,7 +43,8 @@ await using (var reader = await cmd.ExecuteReaderAsync())
 await using var conn = await db.OpenConnectionAsync();
 await using var kernel = new OrvanoDbContext(new DbContextOptionsBuilder<OrvanoDbContext>().UseNpgsql(conn).Options);
 await using var platform = PlatformDbContext.On(conn);
-DbContext[] contexts = [kernel, platform];
+await using var auth = AuthDbContext.On(conn);
+DbContext[] contexts = [kernel, platform, auth];
 
 var problems = new List<string>();
 var tables = 0;

@@ -44,6 +44,8 @@ services:
       ORVANO_ROLE: api
       ORVANO_DB_URL: Host=postgres;Port=5432;Username=orvano_app;Password=scenarios-app;Database=orvano
       ORVANO_PUBLIC_URL: http://localhost:8080
+      # A throwaway master key; secrets in this database are test values only.
+      ORVANO_MASTER_KEYS: kscenarios:b3J2YW5vLXNjZW5hcmlvcy10ZXN0LW1hc3Rlci1rZXk=
       ASPNETCORE_ENVIRONMENT: Test
       ORVANO_TEST_FIXTURES: /fixtures/fixtures.yaml
       # A throwaway token, so the first console sign up behaves as on an installed server (spec 0006).
@@ -69,6 +71,7 @@ services:
       ORVANO_ROLE: worker
       ORVANO_DB_URL: Host=postgres;Port=5432;Username=orvano_app;Password=scenarios-app;Database=orvano
       ORVANO_DB_ADMIN_URL: Host=postgres;Port=5432;Username=orvano_admin;Password=scenarios-admin;Database=orvano
+      ORVANO_MASTER_KEYS: kscenarios:b3J2YW5vLXNjZW5hcmlvcy10ZXN0LW1hc3Rlci1rZXk=
       ASPNETCORE_ENVIRONMENT: Test
     healthcheck:
       test: ['CMD', '/app/orvano', 'healthcheck']

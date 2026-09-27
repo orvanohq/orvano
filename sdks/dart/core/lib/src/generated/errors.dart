@@ -8,17 +8,38 @@ abstract final class ErrorCode {
   /// `contract_violation`
   static const contractViolation = 'contract_violation';
 
+  /// `csrf_rejected`
+  static const csrfRejected = 'csrf_rejected';
+
   /// `forbidden`
   static const forbidden = 'forbidden';
+
+  /// `insufficient_scope`
+  static const insufficientScope = 'insufficient_scope';
 
   /// `internal_error`
   static const internalError = 'internal_error';
 
+  /// `invalid_api_key`
+  static const invalidApiKey = 'invalid_api_key';
+
+  /// `invalid_credentials`
+  static const invalidCredentials = 'invalid_credentials';
+
   /// `invalid_cursor`
   static const invalidCursor = 'invalid_cursor';
 
+  /// `invalid_password`
+  static const invalidPassword = 'invalid_password';
+
+  /// `invalid_refresh_token`
+  static const invalidRefreshToken = 'invalid_refresh_token';
+
   /// `invalid_request`
   static const invalidRequest = 'invalid_request';
+
+  /// `invalid_token`
+  static const invalidToken = 'invalid_token';
 
   /// `last_owner`
   static const lastOwner = 'last_owner';
@@ -32,15 +53,42 @@ abstract final class ErrorCode {
   /// `org_not_empty`
   static const orgNotEmpty = 'org_not_empty';
 
+  /// `origin_not_allowed`
+  static const originNotAllowed = 'origin_not_allowed';
+
   /// `project_not_found`
   static const projectNotFound = 'project_not_found';
 
   /// `project_not_ready`
   static const projectNotReady = 'project_not_ready';
 
+  /// `rate_limited`
+  static const rateLimited = 'rate_limited';
+
+  /// `server_busy`
+  static const serverBusy = 'server_busy';
+
+  /// `session_not_found`
+  static const sessionNotFound = 'session_not_found';
+
+  /// `session_required`
+  static const sessionRequired = 'session_required';
+
   /// `setup_token_invalid`
   static const setupTokenInvalid = 'setup_token_invalid';
 
   /// `signup_closed`
   static const signupClosed = 'signup_closed';
+
+  /// `token_expired`
+  static const tokenExpired = 'token_expired';
+
+  /// `user_already_exists`
+  static const userAlreadyExists = 'user_already_exists';
+
+  /// `user_blocked`
+  static const userBlocked = 'user_blocked';
+
+  /// `user_not_found`
+  static const userNotFound = 'user_not_found';
 }

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Orvano.Core.Http;
+using Orvano.Core.RateLimiting;
 using Orvano.Platform.Application;
 using static Orvano.Platform.Endpoints.ApiMapping;
 using Api = Orvano.Contract;
@@ -126,8 +127,12 @@ internal static class ConsoleEndpoints
     {
         // Needs no console session (the host lets this one route through): the console asks it before anyone can
         // sign in (spec 0006, AC-22).
-        v1.MapGet(Api.ConsoleInstallOperations.GetSetup.Route, async (InstallService install, CancellationToken ct) =>
-            Results.Ok(new Api.InstallSetup(await install.IsSetupRequiredAsync(ct))))
+        v1.MapGet(Api.ConsoleInstallOperations.GetSetup.Route, async (HttpContext http, InstallService install, RateLimits limits, CancellationToken ct) =>
+        {
+            var limit = limits.Acquire(RateLimitPolicies.ConsoleSetupPerIp, ConnectionIp.Key(http));
+            if (!limit.Allowed) return (IResult)ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
+            return Results.Ok(new Api.InstallSetup(await install.IsSetupRequiredAsync(ct)));
+        })
             .WithName(Api.ConsoleInstallOperations.GetSetup.Id);
 
         v1.MapGet(Api.ConsoleInstallOperations.GetSettings.Route, async (HttpContext http, InstallService install, CancellationToken ct) =>

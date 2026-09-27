@@ -1,0 +1,36 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
+using Orvano.Auth.Data;
+using Orvano.Core.Data;
+
+namespace Orvano.Auth.Application;
+
+/// <summary>One transaction: the EF context on it, and the Npgsql transaction for outbox events and module hooks.</summary>
+internal sealed record AuthUnitOfWork(AuthDbContext Db, NpgsqlTransaction Tx);
+
+/// <summary>
+/// Opens the Auth module's units of work on the <c>orvano_app</c> data source. A write commits only when its use case
+/// succeeds, so a refusal never leaves a half change or an event behind.
+/// </summary>
+internal sealed class AuthStore([FromKeyedServices(OrvanoDb.App)] NpgsqlDataSource db)
+{
+    public async Task<Outcome<T>> WriteAsync<T>(Func<AuthUnitOfWork, CancellationToken, Task<Outcome<T>>> work, CancellationToken ct)
+    {
+        await using var conn = await db.OpenConnectionAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+        await using var context = AuthDbContext.On(conn);
+        await context.Database.UseTransactionAsync(tx, ct);
+
+        var outcome = await work(new AuthUnitOfWork(context, tx), ct);
+        if (outcome.Succeeded) await tx.CommitAsync(ct);
+        return outcome;
+    }
+
+    public async Task<T> ReadAsync<T>(Func<AuthDbContext, CancellationToken, Task<T>> work, CancellationToken ct)
+    {
+        await using var conn = await db.OpenConnectionAsync(ct);
+        await using var context = AuthDbContext.On(conn);
+        return await work(context, ct);
+    }
+}

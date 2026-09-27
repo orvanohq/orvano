@@ -54,6 +54,7 @@ jobs:
           ASPNETCORE_URLS: http://localhost:8080
           ORVANO_DB_URL: Host=localhost;Port=5432;Username=orvano_app;Password=${{ env.ORVANO_APP_PASSWORD }};Database=orvano
           ORVANO_PUBLIC_URL: http://localhost:8080
+          ORVANO_MASTER_KEYS: kscenarios:b3J2YW5vLXNjZW5hcmlvcy10ZXN0LW1hc3Rlci1rZXk=
           ORVANO_TEST_FIXTURES: ${{ github.workspace }}/tests/scenarios/fixtures.yaml
       - uses: subosito/flutter-action@v2
         with:
