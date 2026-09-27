@@ -29,6 +29,12 @@ export interface CreatePasswordSessionRequest {
   password: string
 }
 
+/** A request to delete the signed in user. */
+export interface DeleteAccountRequest {
+  /** The user's current password. */
+  password: string
+}
+
 /** Whether the server is up, and which Orvano version it runs. */
 export interface Health {
   /** Always `ok` when the server answers. */
@@ -78,6 +84,38 @@ export interface OpenIdConfiguration {
   response_types_supported: string[]
 }
 
+/** A trade of a refresh token for a new pair. */
+export interface RefreshSessionRequest {
+  /** The session's current refresh token. */
+  refreshToken: string
+}
+
+/** An active session of a user: one signed in device or browser. */
+export interface Session {
+  /** The session ID. */
+  id: string
+  /** When the user signed in. */
+  createdAt: string
+  /** When the session last traded its refresh token. */
+  lastRefreshedAt: string
+  /** The user agent that signed in, at most 512 characters; null when none was sent. */
+  userAgent: string | null
+  /** The SDK that signed in, from `X-Orvano-SDK`; null when none was sent. */
+  sdk: string | null
+  /** The IP address last seen for the session; null when unknown. */
+  ipAddress: string | null
+  /** Whether this is the session making the call. */
+  current: boolean
+}
+
+/** One page of a user's active sessions, newest first. */
+export interface SessionPage {
+  /** The sessions on this page. */
+  items: Session[]
+  /** Pass it as `cursor` to get the next page; null on the last page. */
+  nextCursor: string | null
+}
+
 /**
  * A session's tokens. Send the access token as `Authorization: Bearer`; trade the refresh token for a new pair
  * before the access token expires. The SDKs do both for you.
@@ -93,6 +131,22 @@ export interface SessionTokens {
   refreshTokenExpiresAt: string
   /** The session ID, also the `sid` claim of the access token. */
   sessionId: string
+}
+
+/** Changes to the signed in user. A field left out stays as it is. */
+export interface UpdateAccountRequest {
+  /** A new display name of at most 256 characters, or null to remove it. */
+  name?: string | null
+  /** New metadata, replacing the old: a JSON object of at most 16 KB. */
+  metadata?: Record<string, unknown>
+}
+
+/** A password change. */
+export interface UpdatePasswordRequest {
+  /** The user's current password. */
+  currentPassword: string
+  /** The new password: 8 to 256 characters after Unicode NFKC normalization. */
+  newPassword: string
 }
 
 /** A user of a project. */

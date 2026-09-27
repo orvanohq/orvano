@@ -25,7 +25,7 @@ internal sealed record ClientInfo(string? UserAgent, string? Sdk, IPAddress? Ip)
 /// <summary>A new or rotated session and its refresh token, before the access token is issued.</summary>
 internal sealed record SessionGrant(Guid SessionId, RefreshToken RefreshToken, DateTimeOffset RefreshTokenExpiresAt);
 
-/// <summary>Creates session rows inside the caller's transaction (spec 0004, data model and AC-31).</summary>
+/// <summary>Creates and ends session rows inside the caller's transaction (spec 0004, data model, state transitions, AC-31).</summary>
 internal sealed class Sessions(SecretBox secrets)
 {
     public const string Table = "auth_sessions";
@@ -75,6 +75,58 @@ internal sealed class Sessions(SecretBox secrets)
             new Dictionary<string, string> { ["userId"] = userId.ToString(), ["sessionId"] = sessionId.ToString() }, ct: ct);
         return new SessionGrant(sessionId, token, new DateTimeOffset(endsAt, TimeSpan.Zero));
     }
+
+    /// <summary>
+    /// Ends one session of the user, if it is still open: one conditional <c>UPDATE</c>, so two racing ends write one
+    /// <c>auth.session.ended</c>. False when the session is not the user's or has already ended. Evict it from
+    /// <see cref="SessionChecks"/> after the commit.
+    /// </summary>
+    public async Task<bool> EndAsync(AuthUnitOfWork uow, string projectId, Guid userId, Guid sessionId, string reason, Actor actor, CancellationToken ct)
+    {
+        await using var end = new NpgsqlCommand(
+            """
+            UPDATE orvano.auth_sessions SET ended_at = now(), end_reason = @reason
+            WHERE id = @id AND user_id = @user AND project_id = @project AND ended_at IS NULL
+            """, uow.Tx.Connection, uow.Tx);
+        end.Parameters.AddWithValue("reason", reason);
+        end.Parameters.AddWithValue("id", sessionId);
+        end.Parameters.AddWithValue("user", userId);
+        end.Parameters.AddWithValue("project", projectId);
+        if (await end.ExecuteNonQueryAsync(ct) == 0) return false;
+
+        await WriteEndedAsync(uow, projectId, userId, sessionId, reason, actor, ct);
+        return true;
+    }
+
+    /// <summary>
+    /// Ends every open session of the user except <paramref name="keep"/>, each with its own
+    /// <c>auth.session.ended</c>, and returns the ended IDs to evict after the commit.
+    /// </summary>
+    public async Task<IReadOnlyList<Guid>> EndAllAsync(AuthUnitOfWork uow, string projectId, Guid userId, string reason, Actor actor, Guid? keep, CancellationToken ct)
+    {
+        var ended = new List<Guid>();
+        await using (var end = new NpgsqlCommand(
+            """
+            UPDATE orvano.auth_sessions SET ended_at = now(), end_reason = @reason
+            WHERE user_id = @user AND project_id = @project AND ended_at IS NULL AND id IS DISTINCT FROM @keep
+            RETURNING id
+            """, uow.Tx.Connection, uow.Tx))
+        {
+            end.Parameters.AddWithValue("reason", reason);
+            end.Parameters.AddWithValue("user", userId);
+            end.Parameters.AddWithValue("project", projectId);
+            end.Parameters.AddWithValue("keep", NpgsqlDbType.Uuid, (object?)keep ?? DBNull.Value);
+            await using var reader = await end.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct)) ended.Add(reader.GetGuid(0));
+        }
+
+        foreach (var sessionId in ended) await WriteEndedAsync(uow, projectId, userId, sessionId, reason, actor, ct);
+        return ended;
+    }
+
+    private static Task WriteEndedAsync(AuthUnitOfWork uow, string projectId, Guid userId, Guid sessionId, string reason, Actor actor, CancellationToken ct) =>
+        AuthEvents.WriteAsync(uow.Tx, AuthEvents.SessionEnded, projectId, actor, userId.ToString(),
+            new Dictionary<string, string> { ["userId"] = userId.ToString(), ["sessionId"] = sessionId.ToString() }, reason: reason, ct: ct);
 
     /// <summary>The refresh token, envelope encrypted and bound to its session row.</summary>
     public byte[] Seal(RefreshToken token, Guid sessionId) =>

@@ -375,6 +375,11 @@ public sealed record CreatedApiKey(
     [property: JsonPropertyName("apiKey")] ApiKey ApiKey,
     [property: JsonPropertyName("secret")] string Secret);
 
+/// <summary>A request to delete the signed in user.</summary>
+/// <param name="Password">The user's current password.</param>
+public sealed record DeleteAccountRequest(
+    [property: JsonPropertyName("password")] string Password);
+
 /// <summary>Whether the server is up, and which Orvano version it runs.</summary>
 /// <param name="Status">Always <c>ok</c> when the server answers.</param>
 /// <param name="Version">The Orvano server version, major.minor.patch.</param>
@@ -520,6 +525,35 @@ public sealed record ProjectPage(
     [property: JsonPropertyName("items")] IReadOnlyList<Project> Items,
     [property: JsonPropertyName("nextCursor")] string? NextCursor);
 
+/// <summary>A trade of a refresh token for a new pair.</summary>
+/// <param name="RefreshToken">The session's current refresh token.</param>
+public sealed record RefreshSessionRequest(
+    [property: JsonPropertyName("refreshToken")] string RefreshToken);
+
+/// <summary>An active session of a user: one signed in device or browser.</summary>
+/// <param name="Id">The session ID.</param>
+/// <param name="CreatedAt">When the user signed in.</param>
+/// <param name="LastRefreshedAt">When the session last traded its refresh token.</param>
+/// <param name="UserAgent">The user agent that signed in, at most 512 characters; null when none was sent.</param>
+/// <param name="Sdk">The SDK that signed in, from <c>X-Orvano-SDK</c>; null when none was sent.</param>
+/// <param name="IpAddress">The IP address last seen for the session; null when unknown.</param>
+/// <param name="Current">Whether this is the session making the call.</param>
+public sealed record Session(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("lastRefreshedAt")] DateTimeOffset LastRefreshedAt,
+    [property: JsonPropertyName("userAgent")] string? UserAgent,
+    [property: JsonPropertyName("sdk")] string? Sdk,
+    [property: JsonPropertyName("ipAddress")] string? IpAddress,
+    [property: JsonPropertyName("current")] bool Current);
+
+/// <summary>One page of a user's active sessions, newest first.</summary>
+/// <param name="Items">The sessions on this page.</param>
+/// <param name="NextCursor">Pass it as <c>cursor</c> to get the next page; null on the last page.</param>
+public sealed record SessionPage(
+    [property: JsonPropertyName("items")] IReadOnlyList<Session> Items,
+    [property: JsonPropertyName("nextCursor")] string? NextCursor);
+
 /// <summary>A session's tokens. Send the access token as <c>Authorization: Bearer</c>; trade the refresh token for a new pair before the access token expires. The SDKs do both for you.</summary>
 /// <param name="AccessToken">An ES256 JWT, valid for 15 minutes.</param>
 /// <param name="AccessTokenExpiresAt">When the access token expires.</param>
@@ -557,6 +591,13 @@ public sealed record TestPinged(
     [property: JsonPropertyName("message")] string Message,
     [property: JsonPropertyName("at")] DateTimeOffset At);
 
+/// <summary>Changes to the signed in user. A field left out stays as it is.</summary>
+/// <param name="Name">A new display name of at most 256 characters, or null to remove it.</param>
+/// <param name="Metadata">New metadata, replacing the old: a JSON object of at most 16 KB.</param>
+public sealed record UpdateAccountRequest(
+    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null,
+    [property: JsonPropertyName("metadata"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<string, JsonElement>? Metadata = null);
+
 /// <summary>Changes to the install settings.</summary>
 /// <param name="ConsoleSignup">Who may create a console account.</param>
 public sealed record UpdateInstallSettingsRequest(
@@ -566,6 +607,13 @@ public sealed record UpdateInstallSettingsRequest(
 /// <param name="Name">The new org name; trimmed, 1 to 100 characters.</param>
 public sealed record UpdateOrgRequest(
     [property: JsonPropertyName("name")] string Name);
+
+/// <summary>A password change.</summary>
+/// <param name="CurrentPassword">The user's current password.</param>
+/// <param name="NewPassword">The new password: 8 to 256 characters after Unicode NFKC normalization.</param>
+public sealed record UpdatePasswordRequest(
+    [property: JsonPropertyName("currentPassword")] string CurrentPassword,
+    [property: JsonPropertyName("newPassword")] string NewPassword);
 
 /// <summary>Changes to a platform. Its type never changes.</summary>
 /// <param name="Name">A new name; trimmed, 1 to 100 characters.</param>

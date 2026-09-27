@@ -1,0 +1,70 @@
+name: a user refreshes, lists and ends sessions, and signs out
+requires: []
+steps:
+  - op: account.create
+    as: client
+    input:
+      body: { email: 'eve-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }
+    save:
+      first: $.session.sessionId
+      refresh: $.session.refreshToken
+  - op: account.refreshSession
+    as: client
+    input:
+      body: { refreshToken: '${refresh}' }
+    expect:
+      status: 200
+      body: { sessionId: '${first}' }
+    save:
+      next: $.refreshToken
+  # Within 10 seconds the previous token answers with the same pair, so a retried refresh is safe.
+  - op: account.refreshSession
+    as: client
+    input:
+      body: { refreshToken: '${refresh}' }
+    expect:
+      status: 200
+      body: { refreshToken: '${next}' }
+  - op: account.listSessions
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body:
+        items: [{ id: '${first}', current: true }]
+        nextCursor: null
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'eve-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }
+  - op: account.deleteSession
+    as: client
+    input: { sessionId: '${first}' }
+    expect: { status: 204 }
+  - op: account.refreshSession
+    as: client
+    input:
+      body: { refreshToken: '${next}' }
+    expect: { status: 401, code: invalid_refresh_token }
+  - op: account.deleteOtherSessions
+    as: client
+    input: {}
+    expect: { status: 204 }
+  - op: account.listSessions
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body:
+        items: [{ current: true }]
+  - op: account.deleteCurrentSession
+    as: client
+    input: {}
+    expect: { status: 204 }
+  # Signing out clears the SDK's stored session, so the next call has no bearer token.
+  - op: account.get
+    as: client
+    input: {}
+    expect: { status: 401, code: session_required }

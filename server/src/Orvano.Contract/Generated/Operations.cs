@@ -36,6 +36,70 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>POST /v1/account/delete: Deletes the signed in user with all their sessions. It can't be undone.</summary>
+    public static class Delete
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.delete";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/delete";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>DELETE /v1/account/sessions/current: Signs out: ends the current session.</summary>
+    public static class DeleteCurrentSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.deleteCurrentSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/current";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>DELETE /v1/account/sessions: Ends every session of the signed in user except the current one.</summary>
+    public static class DeleteOtherSessions
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.deleteOtherSessions";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>DELETE /v1/account/sessions/{sessionId}: Ends one of the signed in user's sessions.</summary>
+    public static class DeleteSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.deleteSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/{sessionId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>GET /v1/account: Gets the signed in user. A server can call it with a user's access token to check that the session is still active.</summary>
     public static class Get
     {
@@ -50,6 +114,70 @@ public static class AccountOperations
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "both";
+    }
+
+    /// <summary>GET /v1/account/sessions: Lists the signed in user's active sessions, newest first.</summary>
+    public static class ListSessions
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.listSessions";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/sessions/refresh: Trades the current refresh token for a new pair. The old token keeps answering with the same pair for 10 seconds, so a retry is safe.</summary>
+    public static class RefreshSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.refreshSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/refresh";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>PATCH /v1/account: Changes the signed in user's name or metadata.</summary>
+    public static class Update
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.update";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PATCH";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>PUT /v1/account/password: Changes the signed in user's password and ends every other session of theirs.</summary>
+    public static class UpdatePassword
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.updatePassword";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PUT";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/password";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
     }
 }
 

@@ -56,6 +56,17 @@ internal static class ApiMapping
         view.RefreshTokenExpiresAt,
         view.SessionId.ToString());
 
+    public static Api.Session Session(SessionView view) => new(
+        view.Id.ToString(),
+        view.CreatedAt,
+        view.LastRefreshedAt,
+        view.UserAgent,
+        view.Sdk,
+        view.IpAddress?.ToString(),
+        view.Current);
+
+    public static Api.SessionPage SessionPage(Page<SessionView> page) => new([.. page.Items.Select(Session)], page.NextCursor);
+
     public static Api.AuthResult AuthResult(SignedIn signedIn) => new(User(signedIn.User), SessionTokens(signedIn.Session));
 
     public static Api.Jwk Jwk(PublicSigningKey key) =>

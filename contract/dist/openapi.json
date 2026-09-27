@@ -103,6 +103,262 @@
         ],
         "x-orvano-service": "account",
         "x-orvano-audience": "both"
+      },
+      "patch": {
+        "operationId": "account.update",
+        "description": "Changes the signed in user's name or metadata.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccountRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/delete": {
+      "post": {
+        "operationId": "account.delete",
+        "description": "Deletes the signed in user with all their sessions. It can't be undone.",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-session": "end",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/password": {
+      "put": {
+        "operationId": "account.updatePassword",
+        "description": "Changes the signed in user's password and ends every other session of theirs.",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePasswordRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/sessions": {
+      "get": {
+        "operationId": "account.listSessions",
+        "description": "Lists the signed in user's active sessions, newest first.",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Sessions per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      },
+      "delete": {
+        "operationId": "account.deleteOtherSessions",
+        "description": "Ends every session of the signed in user except the current one.",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/sessions/current": {
+      "delete": {
+        "operationId": "account.deleteCurrentSession",
+        "description": "Signs out: ends the current session.",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-session": "end",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
       }
     },
     "/v1/account/sessions/password": {
@@ -146,6 +402,94 @@
           }
         },
         "x-orvano-session": "start",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/sessions/refresh": {
+      "post": {
+        "operationId": "account.refreshSession",
+        "description": "Trades the current refresh token for a new pair. The old token keeps answering with the same pair for 10 seconds, so a retry is safe.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionTokens"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshSessionRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-idempotent": true,
+        "x-orvano-session": "refresh",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/sessions/{sessionId}": {
+      "delete": {
+        "operationId": "account.deleteSession",
+        "description": "Ends one of the signed in user's sessions.",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "description": "The session to end.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "x-orvano-service": "account",
         "x-orvano-audience": "client"
       }
@@ -1757,6 +2101,22 @@
         },
         "description": "A new API key with its secret. The secret is shown only here, once."
       },
+      "DeleteAccountRequest": {
+        "type": "object",
+        "required": [
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "The user's current password.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          }
+        },
+        "description": "A request to delete the signed in user."
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -2366,6 +2726,131 @@
         ],
         "description": "A project's lifecycle state."
       },
+      "RefreshSessionRequest": {
+        "type": "object",
+        "required": [
+          "refreshToken"
+        ],
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "The session's current refresh token.",
+            "examples": [
+              "orv_rt_AZJPXo0rfE2OIT1ebzqLnA.Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9v"
+            ]
+          }
+        },
+        "description": "A trade of a refresh token for a new pair."
+      },
+      "Session": {
+        "type": "object",
+        "required": [
+          "id",
+          "createdAt",
+          "lastRefreshedAt",
+          "userAgent",
+          "sdk",
+          "ipAddress",
+          "current"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The session ID.",
+            "examples": [
+              "01924f5e-9a1b-7c4d-8e21-3d5e6f7a8b9c"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the user signed in."
+          },
+          "lastRefreshedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the session last traded its refresh token."
+          },
+          "userAgent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The user agent that signed in, at most 512 characters; null when none was sent.",
+            "examples": [
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
+            ]
+          },
+          "sdk": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The SDK that signed in, from `X-Orvano-SDK`; null when none was sent.",
+            "examples": [
+              "orvano-js/0.1.0"
+            ]
+          },
+          "ipAddress": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IP address last seen for the session; null when unknown.",
+            "examples": [
+              "203.0.113.7"
+            ]
+          },
+          "current": {
+            "type": "boolean",
+            "description": "Whether this is the session making the call.",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "description": "An active session of a user: one signed in device or browser."
+      },
+      "SessionPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Session"
+            },
+            "description": "The sessions on this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass it as `cursor` to get the next page; null on the last page."
+          }
+        },
+        "description": "One page of a user's active sessions, newest first."
+      },
       "SessionTokens": {
         "type": "object",
         "required": [
@@ -2505,6 +2990,31 @@
         "x-orvano-event": "test.pinged",
         "x-orvano-test": true
       },
+      "UpdateAccountRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A new display name of at most 256 characters, or null to remove it.",
+            "examples": [
+              "Ada King"
+            ]
+          },
+          "metadata": {
+            "type": "object",
+            "unevaluatedProperties": {},
+            "description": "New metadata, replacing the old: a JSON object of at most 16 KB."
+          }
+        },
+        "description": "Changes to the signed in user. A field left out stays as it is."
+      },
       "UpdateInstallSettingsRequest": {
         "type": "object",
         "required": [
@@ -2533,6 +3043,30 @@
           }
         },
         "description": "Changes to an org."
+      },
+      "UpdatePasswordRequest": {
+        "type": "object",
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "The user's current password.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "The new password: 8 to 256 characters after Unicode NFKC normalization.",
+            "examples": [
+              "another horse battery staple"
+            ]
+          }
+        },
+        "description": "A password change."
       },
       "UpdatePlatformRequest": {
         "type": "object",

@@ -26,6 +26,36 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.delete': DispatchEntry(
+    status: 204,
+    client: (o, input) async {
+      await o.account.delete(
+        DeleteAccountRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return null;
+    },
+  ),
+  'account.deleteCurrentSession': DispatchEntry(
+    status: 204,
+    client: (o, input) async {
+      await o.account.deleteCurrentSession();
+      return null;
+    },
+  ),
+  'account.deleteOtherSessions': DispatchEntry(
+    status: 204,
+    client: (o, input) async {
+      await o.account.deleteOtherSessions();
+      return null;
+    },
+  ),
+  'account.deleteSession': DispatchEntry(
+    status: 204,
+    client: (o, input) async {
+      await o.account.deleteSession(input['sessionId'] as String);
+      return null;
+    },
+  ),
   'account.get': DispatchEntry(
     status: 200,
     client: (o, input) async {
@@ -35,6 +65,50 @@ final Map<String, DispatchEntry> dispatch = {
     server: (o, input) async {
       final r = await o.account.get();
       return r.toJson();
+    },
+  ),
+  'account.listSessions': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.listSessions(
+        cursor: input['cursor'] == null ? null : input['cursor'] as String,
+        limit: input['limit'] == null ? null : (input['limit'] as num).toInt(),
+      );
+      return r.toJson();
+    },
+    clientAll: (o, input) => o.account
+        .listSessionsAll(
+          limit: input['limit'] == null
+              ? null
+              : (input['limit'] as num).toInt(),
+        )
+        .map((e) => e.toJson()),
+  ),
+  'account.refreshSession': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.refreshSession(
+        RefreshSessionRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.update': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.update(
+        UpdateAccountRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.updatePassword': DispatchEntry(
+    status: 204,
+    client: (o, input) async {
+      await o.account.updatePassword(
+        UpdatePasswordRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return null;
     },
   ),
   'health.get': DispatchEntry(

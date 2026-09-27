@@ -104,6 +104,22 @@ final class CreatePasswordSessionRequest {
   Map<String, dynamic> toJson() => {'email': email, 'password': password};
 }
 
+/// A request to delete the signed in user.
+final class DeleteAccountRequest {
+  /// Creates a [DeleteAccountRequest].
+  const DeleteAccountRequest({required this.password});
+
+  /// Decodes a [DeleteAccountRequest] from JSON.
+  factory DeleteAccountRequest.fromJson(Map<String, dynamic> json) =>
+      DeleteAccountRequest(password: json['password'] as String);
+
+  /// The user's current password.
+  final String password;
+
+  /// Encodes this [DeleteAccountRequest] as JSON.
+  Map<String, dynamic> toJson() => {'password': password};
+}
+
 /// Whether the server is up, and which Orvano version it runs.
 final class Health {
   /// Creates a [Health].
@@ -258,6 +274,107 @@ final class OpenIdConfiguration {
   };
 }
 
+/// A trade of a refresh token for a new pair.
+final class RefreshSessionRequest {
+  /// Creates a [RefreshSessionRequest].
+  const RefreshSessionRequest({required this.refreshToken});
+
+  /// Decodes a [RefreshSessionRequest] from JSON.
+  factory RefreshSessionRequest.fromJson(Map<String, dynamic> json) =>
+      RefreshSessionRequest(refreshToken: json['refreshToken'] as String);
+
+  /// The session's current refresh token.
+  final String refreshToken;
+
+  /// Encodes this [RefreshSessionRequest] as JSON.
+  Map<String, dynamic> toJson() => {'refreshToken': refreshToken};
+}
+
+/// An active session of a user: one signed in device or browser.
+final class Session {
+  /// Creates a [Session].
+  const Session({
+    required this.id,
+    required this.createdAt,
+    required this.lastRefreshedAt,
+    this.userAgent,
+    this.sdk,
+    this.ipAddress,
+    required this.current,
+  });
+
+  /// Decodes a [Session] from JSON.
+  factory Session.fromJson(Map<String, dynamic> json) => Session(
+    id: json['id'] as String,
+    createdAt: DateTime.parse(json['createdAt'] as String),
+    lastRefreshedAt: DateTime.parse(json['lastRefreshedAt'] as String),
+    userAgent: json['userAgent'] == null ? null : json['userAgent'] as String,
+    sdk: json['sdk'] == null ? null : json['sdk'] as String,
+    ipAddress: json['ipAddress'] == null ? null : json['ipAddress'] as String,
+    current: json['current'] as bool,
+  );
+
+  /// The session ID.
+  final String id;
+
+  /// When the user signed in.
+  final DateTime createdAt;
+
+  /// When the session last traded its refresh token.
+  final DateTime lastRefreshedAt;
+
+  /// The user agent that signed in, at most 512 characters; null when none was sent.
+  final String? userAgent;
+
+  /// The SDK that signed in, from `X-Orvano-SDK`; null when none was sent.
+  final String? sdk;
+
+  /// The IP address last seen for the session; null when unknown.
+  final String? ipAddress;
+
+  /// Whether this is the session making the call.
+  final bool current;
+
+  /// Encodes this [Session] as JSON.
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'createdAt': createdAt.toUtc().toIso8601String(),
+    'lastRefreshedAt': lastRefreshedAt.toUtc().toIso8601String(),
+    'userAgent': userAgent,
+    'sdk': sdk,
+    'ipAddress': ipAddress,
+    'current': current,
+  };
+}
+
+/// One page of a user's active sessions, newest first.
+final class SessionPage {
+  /// Creates a [SessionPage].
+  const SessionPage({required this.items, this.nextCursor});
+
+  /// Decodes a [SessionPage] from JSON.
+  factory SessionPage.fromJson(Map<String, dynamic> json) => SessionPage(
+    items: (json['items'] as List<dynamic>)
+        .map((e) => Session.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    nextCursor: json['nextCursor'] == null
+        ? null
+        : json['nextCursor'] as String,
+  );
+
+  /// The sessions on this page.
+  final List<Session> items;
+
+  /// Pass it as `cursor` to get the next page; null on the last page.
+  final String? nextCursor;
+
+  /// Encodes this [SessionPage] as JSON.
+  Map<String, dynamic> toJson() => {
+    'items': items.map((e) => e.toJson()).toList(),
+    'nextCursor': nextCursor,
+  };
+}
+
 /// A session's tokens. Send the access token as `Authorization: Bearer`; trade the refresh token for a new pair
 /// before the access token expires. The SDKs do both for you.
 final class SessionTokens {
@@ -305,6 +422,60 @@ final class SessionTokens {
     'refreshToken': refreshToken,
     'refreshTokenExpiresAt': refreshTokenExpiresAt.toUtc().toIso8601String(),
     'sessionId': sessionId,
+  };
+}
+
+/// Changes to the signed in user. A field left out stays as it is.
+final class UpdateAccountRequest {
+  /// Creates a [UpdateAccountRequest].
+  const UpdateAccountRequest({this.name, this.metadata});
+
+  /// Decodes a [UpdateAccountRequest] from JSON.
+  factory UpdateAccountRequest.fromJson(Map<String, dynamic> json) =>
+      UpdateAccountRequest(
+        name: json['name'] == null ? null : json['name'] as String,
+        metadata: json['metadata'] == null
+            ? null
+            : Map<String, Object?>.from(
+                json['metadata'] as Map<String, dynamic>,
+              ),
+      );
+
+  /// A new display name of at most 256 characters, or null to remove it.
+  final String? name;
+
+  /// New metadata, replacing the old: a JSON object of at most 16 KB.
+  final Map<String, Object?>? metadata;
+
+  /// Encodes this [UpdateAccountRequest] as JSON.
+  Map<String, dynamic> toJson() => {'name': ?name, 'metadata': ?metadata};
+}
+
+/// A password change.
+final class UpdatePasswordRequest {
+  /// Creates a [UpdatePasswordRequest].
+  const UpdatePasswordRequest({
+    required this.currentPassword,
+    required this.newPassword,
+  });
+
+  /// Decodes a [UpdatePasswordRequest] from JSON.
+  factory UpdatePasswordRequest.fromJson(Map<String, dynamic> json) =>
+      UpdatePasswordRequest(
+        currentPassword: json['currentPassword'] as String,
+        newPassword: json['newPassword'] as String,
+      );
+
+  /// The user's current password.
+  final String currentPassword;
+
+  /// The new password: 8 to 256 characters after Unicode NFKC normalization.
+  final String newPassword;
+
+  /// Encodes this [UpdatePasswordRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'currentPassword': currentPassword,
+    'newPassword': newPassword,
   };
 }
 

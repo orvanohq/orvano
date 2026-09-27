@@ -6,6 +6,7 @@ using Orvano.Auth.Application;
 using Orvano.Auth.Contracts;
 using Orvano.Auth.Domain;
 using Orvano.Auth.Endpoints;
+using Orvano.Auth.Jobs;
 using Orvano.Core.Modules;
 
 namespace Orvano.Auth;
@@ -30,6 +31,7 @@ internal sealed class AuthModule : IOrvanoModule
         services.AddSingleton<SessionChecks>();
         services.AddSingleton<Sessions>();
         services.AddSingleton<AccountService>();
+        services.AddSingleton<SessionService>();
     }
 
     public void MapApi(RouteGroupBuilder v1)
@@ -38,7 +40,8 @@ internal sealed class AuthModule : IOrvanoModule
         KeysEndpoints.Map(v1);
     }
 
-    public void RegisterWork(IWorkRegistry work) { }
+    public void RegisterWork(IWorkRegistry work) =>
+        work.AddInternalSchedule(AuthRetention.Name, AuthRetention.Interval, AuthRetention.RunScheduledAsync);
 
     public void RegisterRealtime(IRealtimeRegistry realtime) { }
 }
