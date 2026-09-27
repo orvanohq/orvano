@@ -48,7 +48,7 @@ Every product feature ships in all of these layers in the same version, unless i
 | 2 | Coding standards & tooling | Foundation | done |
 | 3 | Platform data model | Foundation | in-progress |
 | 4 | API contract & SDK pipeline | Foundation | done |
-| 5 | Design system & console shell | Foundation | in-progress |
+| 5 | Design system & console shell | Foundation | done |
 | 6 | Self host installer | Foundation | planned |
 | 7 | Console accounts, orgs & projects | v0.1 | in-progress |
 | 8 | App user sign up & sign in | v0.1 | in-progress |
