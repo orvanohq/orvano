@@ -351,6 +351,8 @@ run_installer() {
   rm -f "$result_file"
 
   # Prompts read the terminal, because under `curl ... | sh` standard input is this script.
+  # "$@" is passed on as given, so a --version the caller passed arrives twice with the same value;
+  # the container's parser lets the later one win. A new flag must stay safe to repeat.
   if has_tty; then
     docker run --rm --pull never --user 0:0 --network host -v "$flag_dir:/install" -it \
       "$installer_image" install --existing-data="$existing_data" --version "$version" "$@" </dev/tty
