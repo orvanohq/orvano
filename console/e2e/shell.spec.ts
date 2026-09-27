@@ -135,7 +135,7 @@ test('the drawer closes on navigation and focus lands on the page title (AC-16, 
 }) => {
   await page.setViewportSize({ width: 360, height: 740 })
   await page.goto(`/projects/${scenariosProject}`)
-  const drawer = page.getByRole('dialog')
+  const drawer = page.getByRole('dialog').and(page.locator('[data-slot=sheet-content]'))
 
   // A link to the page you are already on still closes it.
   await page.getByRole('button', { name: 'Open navigation' }).click()
@@ -195,7 +195,7 @@ test('no shell page scrolls sideways at 360 px, and the drawer traps focus (AC-1
   // Project context: only the project switcher stays in the bar; the org switcher is in the drawer.
   await expect(page.getByRole('banner').getByRole('combobox', { name: /^Switch org/ })).toBeHidden()
   await page.getByRole('button', { name: 'Open navigation' }).click()
-  const drawer = page.getByRole('dialog')
+  const drawer = page.getByRole('dialog').and(page.locator('[data-slot=sheet-content]'))
   await expect(drawer.getByRole('combobox', { name: /^Switch org/ })).toBeVisible()
   await expect(drawer.getByRole('link', { name: 'Overview' })).toBeVisible()
   await page.keyboard.press('Escape')
