@@ -1357,6 +1357,84 @@
         "x-orvano-audience": "console"
       }
     },
+    "/v1/console/project/auth/keys": {
+      "get": {
+        "operationId": "consoleAuthKeys.list",
+        "description": "Lists the token signing keys of the project named by `X-Orvano-Project`. Every role.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SigningKeys"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAuthKeys",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/auth/keys/rotate": {
+      "post": {
+        "operationId": "consoleAuthKeys.rotate",
+        "description": "Rotates the project's signing key: a new key signs from now on, and the old one keeps verifying the tokens it\nsigned for 24 hours, then leaves. Owners only.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SigningKeys"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAuthKeys",
+        "x-orvano-audience": "console"
+      }
+    },
     "/v1/console/project/keys": {
       "get": {
         "operationId": "consoleApiKeys.list",
@@ -1828,6 +1906,506 @@
           }
         ],
         "x-orvano-service": "consoleProjects",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/users": {
+      "get": {
+        "operationId": "consoleUsers.list",
+        "description": "Lists the users of the project named by `X-Orvano-Project`, newest first. Every role.",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": false,
+            "description": "Only users whose email starts with this, ignoring case.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Only users with this status: `active` or `blocked`.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "createdAfter",
+            "in": "query",
+            "required": false,
+            "description": "Only users created after this time.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "explode": false
+          },
+          {
+            "name": "createdBefore",
+            "in": "query",
+            "required": false,
+            "description": "Only users created before this time.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "explode": false
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Users per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      },
+      "post": {
+        "operationId": "consoleUsers.create",
+        "description": "Creates a user with an email and password. It does not sign them in.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/users/{userId}": {
+      "get": {
+        "operationId": "consoleUsers.get",
+        "description": "Gets a user.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      },
+      "delete": {
+        "operationId": "consoleUsers.delete",
+        "description": "Deletes a user with their password and sessions. It can't be undone.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/users/{userId}/block": {
+      "post": {
+        "operationId": "consoleUsers.block",
+        "description": "Blocks a user: ends every session and refuses sign in. Blocking a blocked user changes nothing.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/users/{userId}/sessions": {
+      "get": {
+        "operationId": "consoleUsers.listSessions",
+        "description": "Lists a user's active sessions, newest first. `current` is always false.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Sessions per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      },
+      "delete": {
+        "operationId": "consoleUsers.deleteSessions",
+        "description": "Ends every session of a user.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/users/{userId}/sessions/{sessionId}": {
+      "delete": {
+        "operationId": "consoleUsers.deleteSession",
+        "description": "Ends one session of a user.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "description": "The session to end.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/users/{userId}/unblock": {
+      "post": {
+        "operationId": "consoleUsers.unblock",
+        "description": "Unblocks a user so they can sign in again. Their old sessions stay ended.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-service": "consoleUsers",
         "x-orvano-audience": "console"
       }
     },
@@ -3827,6 +4405,70 @@
           }
         },
         "description": "A session's tokens. Send the access token as `Authorization: Bearer`; trade the refresh token for a new pair\nbefore the access token expires. The SDKs do both for you."
+      },
+      "SigningKey": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "createdAt",
+          "retireAfter"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The key ID, the `kid` of the tokens it signs.",
+            "examples": [
+              "pXj2Yc0dQpu8Z2l4n1Ew0g"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/SigningKeyStatus",
+            "description": "`active` signs new tokens; `retiring` only verifies them until `retireAfter`."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the key was created."
+          },
+          "retireAfter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When a retiring key leaves the JWKS; null for the active key."
+          }
+        },
+        "description": "A project's token signing key as the console shows it; never the key itself."
+      },
+      "SigningKeyStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "retiring"
+        ],
+        "description": "What a signing key does."
+      },
+      "SigningKeys": {
+        "type": "object",
+        "required": [
+          "keys"
+        ],
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SigningKey"
+            },
+            "description": "The keys."
+          }
+        },
+        "description": "A project's signing keys, the active one first."
       },
       "TestConsolePing": {
         "type": "object",

@@ -23,6 +23,9 @@ public sealed record Reply(HttpStatusCode Status, HttpResponseHeaders Headers, J
 public sealed class AuthApi : IAsyncDisposable
 {
     public const string ConsoleUser = "auth-api-tests@x.com";
+
+    /// <summary>More console accounts, with personal orgs only; tests give them roles in the Fixtures org.</summary>
+    public static readonly string[] OtherConsoleUsers = ["developer@x.com", "viewer@x.com", "stranger@x.com"];
     public const string Project = "authproject0001";
     public const string OtherProject = "authproject0002";
     public const string ServerKey = "orv_sk_authAuthAuthAuthAuthAuthAuthAuthAuthAuthAut";
@@ -55,7 +58,7 @@ public sealed class AuthApi : IAsyncDisposable
         await database.MigrateAsync();
         var fixturesPath = Path.Combine(Path.GetTempPath(), $"orvano-auth-fixtures-{Guid.NewGuid():N}.yaml");
         await File.WriteAllTextAsync(fixturesPath, $"""
-            {ConsoleSignIn.Fixtures(ConsoleUser)}projects:
+            {ConsoleSignIn.Fixtures([ConsoleUser, .. OtherConsoleUsers])}projects:
               - id: {Project}
                 name: Auth project
               - id: {OtherProject}
@@ -132,16 +135,25 @@ public sealed class AuthApi : IAsyncDisposable
     public Task<Reply> AsServerAsync(HttpMethod method, string url, object? body = null, string key = ServerKey, string? project = Project) =>
         SendAsync(method, url, body, project, headers: new Dictionary<string, string> { ["X-Orvano-Key"] = key });
 
-    /// <summary>Calls a console operation as the fixture console account, signed in for real.</summary>
-    public async Task<Reply> AsConsoleAsync(HttpMethod method, string url, object? body = null, string? project = Project) =>
-        await SendAsync(method, url, body, project, headers: await ConsoleHeadersAsync());
+    /// <summary>Calls a console operation as a fixture console account (the owner by default), signed in for real.</summary>
+    public async Task<Reply> AsConsoleAsync(HttpMethod method, string url, object? body = null, string? project = Project, string account = ConsoleUser) =>
+        await SendAsync(method, url, body, project, headers: await ConsoleHeadersAsync(account));
 
-    /// <summary>The fixture console account's cookie and the same origin header a console call carries.</summary>
-    public async Task<Dictionary<string, string>> ConsoleHeadersAsync() => new()
+    /// <summary>A fixture console account's cookie and the same origin header a console call carries.</summary>
+    public async Task<Dictionary<string, string>> ConsoleHeadersAsync(string account = ConsoleUser) => new()
     {
-        ["Cookie"] = $"orvano_console={await ConsoleSignIn.CookieAsync(Http, ConsoleUser, Ct)}",
+        ["Cookie"] = $"orvano_console={await ConsoleSignIn.CookieAsync(Http, account, Ct)}",
         ["Sec-Fetch-Site"] = "same-origin",
     };
+
+    /// <summary>Gives a fixture console account a role in the org of the fixture projects.</summary>
+    public Task GrantAsync(string account, string role) =>
+        TestDatabase.ExecuteAsync(Database.Superuser, """
+            INSERT INTO orvano.platform_memberships (org_id, user_id, role)
+            SELECT p.org_id, u.id, @role
+            FROM orvano.platform_projects p, orvano.auth_users u
+            WHERE p.id = @project AND u.project_id = 'console' AND lower(u.email) = @email
+            """, ("role", role), ("project", Project), ("email", account));
 
     public static string AccessToken(Reply signedIn) => signedIn.Body.GetProperty("session").GetProperty("accessToken").GetString()!;
 

@@ -21,6 +21,9 @@ export type PlatformType = 'web' | 'android' | 'ios' | 'macos' | 'windows' | 'li
 /** A project's lifecycle state. */
 export type ProjectStatus = 'provisioning' | 'active' | 'failed' | 'deleting'
 
+/** What a signing key does. */
+export type SigningKeyStatus = 'active' | 'retiring'
+
 /** An API key for server code. Its secret is never shown again after creation. */
 export interface ApiKey {
   /** The key ID. */
@@ -209,6 +212,24 @@ export interface ProjectPage {
   items: Project[]
   /** Pass it as `cursor` to get the next page; null on the last page. */
   nextCursor: string | null
+}
+
+/** A project's token signing key as the console shows it; never the key itself. */
+export interface SigningKey {
+  /** The key ID, the `kid` of the tokens it signs. */
+  id: string
+  /** `active` signs new tokens; `retiring` only verifies them until `retireAfter`. */
+  status: SigningKeyStatus
+  /** When the key was created. */
+  createdAt: string
+  /** When a retiring key leaves the JWKS; null for the active key. */
+  retireAfter: string | null
+}
+
+/** A project's signing keys, the active one first. */
+export interface SigningKeys {
+  /** The keys. */
+  keys: SigningKey[]
 }
 
 /** Changes to the install settings. */

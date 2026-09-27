@@ -317,6 +317,42 @@ public static class ConsoleApiKeysOperations
     }
 }
 
+/// <summary>Route constants for the <c>consoleAuthKeys</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleAuthKeysOperations
+{
+    /// <summary>GET /v1/console/project/auth/keys: Lists the token signing keys of the project named by <c>X-Orvano-Project</c>. Every role.</summary>
+    public static class List
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAuthKeys.list";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/auth/keys";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/project/auth/keys/rotate: Rotates the project's signing key: a new key signs from now on, and the old one keeps verifying the tokens it</summary>
+    public static class Rotate
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAuthKeys.rotate";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/auth/keys/rotate";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
 /// <summary>Route constants for the <c>consoleInstall</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class ConsoleInstallOperations
 {
@@ -663,6 +699,154 @@ public static class ConsoleProjectsOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/console/project";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
+/// <summary>Route constants for the <c>consoleUsers</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleUsersOperations
+{
+    /// <summary>POST /v1/console/project/users/{userId}/block: Blocks a user: ends every session and refuses sign in. Blocking a blocked user changes nothing.</summary>
+    public static class Block
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.block";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/block";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/project/users: Creates a user with an email and password. It does not sign them in.</summary>
+    public static class Create
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.create";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>DELETE /v1/console/project/users/{userId}: Deletes a user with their password and sessions. It can't be undone.</summary>
+    public static class Delete
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.delete";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>DELETE /v1/console/project/users/{userId}/sessions/{sessionId}: Ends one session of a user.</summary>
+    public static class DeleteSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.deleteSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/sessions/{sessionId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>DELETE /v1/console/project/users/{userId}/sessions: Ends every session of a user.</summary>
+    public static class DeleteSessions
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.deleteSessions";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/sessions";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/console/project/users/{userId}: Gets a user.</summary>
+    public static class Get
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.get";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/console/project/users: Lists the users of the project named by <c>X-Orvano-Project</c>, newest first. Every role.</summary>
+    public static class List
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.list";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/console/project/users/{userId}/sessions: Lists a user's active sessions, newest first. <c>current</c> is always false.</summary>
+    public static class ListSessions
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.listSessions";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/sessions";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/project/users/{userId}/unblock: Unblocks a user so they can sign in again. Their old sessions stay ended.</summary>
+    public static class Unblock
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.unblock";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/unblock";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "console";

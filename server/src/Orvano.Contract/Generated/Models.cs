@@ -255,6 +255,42 @@ public sealed class ProjectStatusJsonConverter : JsonConverter<ProjectStatus>
         });
 }
 
+/// <summary>What a signing key does.</summary>
+[JsonConverter(typeof(SigningKeyStatusJsonConverter))]
+public enum SigningKeyStatus
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>active</c>.</summary>
+    Active,
+
+    /// <summary>The wire value <c>retiring</c>.</summary>
+    Retiring,
+}
+
+/// <summary>Reads and writes <see cref="SigningKeyStatus"/> by wire value; unknown values read as <see cref="SigningKeyStatus.Unknown"/>.</summary>
+public sealed class SigningKeyStatusJsonConverter : JsonConverter<SigningKeyStatus>
+{
+    /// <inheritdoc/>
+    public override SigningKeyStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "active" => SigningKeyStatus.Active,
+            "retiring" => SigningKeyStatus.Retiring,
+            _ => SigningKeyStatus.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, SigningKeyStatus value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            SigningKeyStatus.Active => "active",
+            SigningKeyStatus.Retiring => "retiring",
+            _ => throw new JsonException($"SigningKeyStatus.{value} has no wire value"),
+        });
+}
+
 /// <summary>Whether a user may sign in.</summary>
 [JsonConverter(typeof(UserStatusJsonConverter))]
 public enum UserStatus
@@ -595,6 +631,22 @@ public sealed record SessionTokens(
     [property: JsonPropertyName("refreshToken")] string RefreshToken,
     [property: JsonPropertyName("refreshTokenExpiresAt")] DateTimeOffset RefreshTokenExpiresAt,
     [property: JsonPropertyName("sessionId")] string SessionId);
+
+/// <summary>A project's token signing key as the console shows it; never the key itself.</summary>
+/// <param name="Id">The key ID, the <c>kid</c> of the tokens it signs.</param>
+/// <param name="Status"><c>active</c> signs new tokens; <c>retiring</c> only verifies them until <c>retireAfter</c>.</param>
+/// <param name="CreatedAt">When the key was created.</param>
+/// <param name="RetireAfter">When a retiring key leaves the JWKS; null for the active key.</param>
+public sealed record SigningKey(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("status")] SigningKeyStatus Status,
+    [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("retireAfter")] DateTimeOffset? RetireAfter);
+
+/// <summary>A project's signing keys, the active one first.</summary>
+/// <param name="Keys">The keys.</param>
+public sealed record SigningKeys(
+    [property: JsonPropertyName("keys")] IReadOnlyList<SigningKey> Keys);
 
 /// <summary>The answer to <c>test.consolePing</c>.</summary>
 /// <param name="Status">Always <c>ok</c>.</param>

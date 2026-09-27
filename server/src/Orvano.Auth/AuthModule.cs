@@ -42,6 +42,7 @@ internal sealed class AuthModule : IOrvanoModule
         KeysEndpoints.Map(v1);
         UsersEndpoints.Map(v1);
         ConsoleAccountEndpoints.Map(v1);
+        ConsoleUsersEndpoints.Map(v1);
     }
 
     public void RegisterWork(IWorkRegistry work)

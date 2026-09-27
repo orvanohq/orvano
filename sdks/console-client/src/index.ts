@@ -11,6 +11,15 @@ import type { ClientConfig, RequestOptions, RequestSpec } from '@orvano/js'
 
 export { OrvanoError } from '@orvano/js'
 export type { ClientConfig, RequestOptions } from '@orvano/js'
+// Models console operations share with the app SDK, so the console imports every model from here.
+export type {
+  CreateUserRequest,
+  Session,
+  SessionPage,
+  User,
+  UserPage,
+  UserStatus,
+} from '@orvano/js'
 export * from './generated/services.js'
 export type * from './generated/models.js'
 

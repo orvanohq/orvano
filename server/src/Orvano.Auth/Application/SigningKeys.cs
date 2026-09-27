@@ -112,19 +112,7 @@ internal sealed class SigningKeys(
 
     private async Task CreateAsync(string projectId, CancellationToken ct)
     {
-        var kid = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(16));
-        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var pkcs8 = key.ExportPkcs8PrivateKey();
-        byte[] ciphertext;
-        try
-        {
-            ciphertext = secrets.Encrypt(pkcs8, SecretBox.AssociatedData(Table, kid, PrivateKeyColumn));
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(pkcs8);
-        }
-
+        var (kid, jwk, ciphertext) = NewKey();
         await using var cmd = db.CreateCommand(
             """
             INSERT INTO orvano.auth_signing_keys (id, project_id, alg, public_jwk, private_key_ciphertext, status)
@@ -133,9 +121,82 @@ internal sealed class SigningKeys(
             """);
         cmd.Parameters.AddWithValue("id", kid);
         cmd.Parameters.AddWithValue("project", projectId);
-        cmd.Parameters.AddWithValue("jwk", PublicJwk(key, kid));
+        cmd.Parameters.AddWithValue("jwk", jwk);
         cmd.Parameters.AddWithValue("ciphertext", ciphertext);
         await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    /// <summary>
+    /// Rotates the project's key (AC-22) in one transaction: the active key turns <c>retiring</c> with
+    /// <c>retire_after = now() + 24 hours</c> (so the tokens it signed keep verifying until they expire, and the
+    /// hourly schedule then deletes it), a new key becomes <c>active</c>, and <c>auth.key.rotated</c> is written. This
+    /// process signs with the new key at once; others pick it up within their 10 minute cache, while the old key
+    /// still verifies.
+    /// </summary>
+    public async Task RotateAsync(string projectId, Actor actor, CancellationToken ct)
+    {
+        var (kid, jwk, ciphertext) = NewKey();
+        await using (var conn = await db.OpenConnectionAsync(ct))
+        await using (var tx = await conn.BeginTransactionAsync(ct))
+        {
+            string? previous;
+            await using (var retire = new NpgsqlCommand(
+                """
+                UPDATE orvano.auth_signing_keys SET status = 'retiring', retire_after = now() + @overlap
+                WHERE project_id = @project AND status = 'active'
+                RETURNING id
+                """, conn, tx))
+            {
+                retire.Parameters.AddWithValue("overlap", AuthTimings.KeyOverlap);
+                retire.Parameters.AddWithValue("project", projectId);
+                previous = await retire.ExecuteScalarAsync(ct) as string;
+            }
+
+            await using (var insert = new NpgsqlCommand(
+                """
+                INSERT INTO orvano.auth_signing_keys (id, project_id, alg, public_jwk, private_key_ciphertext, status)
+                VALUES (@id, @project, 'ES256', @jwk::jsonb, @ciphertext, 'active')
+                """, conn, tx))
+            {
+                insert.Parameters.AddWithValue("id", kid);
+                insert.Parameters.AddWithValue("project", projectId);
+                insert.Parameters.AddWithValue("jwk", jwk);
+                insert.Parameters.AddWithValue("ciphertext", ciphertext);
+                await insert.ExecuteNonQueryAsync(ct);
+            }
+
+            var ids = new Dictionary<string, string> { ["keyId"] = kid };
+            if (previous is not null) ids["previousKeyId"] = previous;
+            await AuthEvents.WriteAsync(tx, AuthEvents.KeyRotated, projectId, actor, projectId, ids, ct: ct);
+            await tx.CommitAsync(ct);
+        }
+
+        Evict(projectId);
+    }
+
+    /// <summary>The project's keys as the console lists them, the active one first, then newest first.</summary>
+    public Task<IReadOnlyList<SigningKeyRow>> ListAsync(string projectId, CancellationToken ct) =>
+        WithContextAsync<IReadOnlyList<SigningKeyRow>>(async context =>
+            await context.SigningKeys.AsNoTracking()
+                .Where(k => k.ProjectId == projectId)
+                .OrderBy(k => k.Status == SigningKeyStatuses.Active ? 0 : 1)
+                .ThenByDescending(k => k.CreatedAt)
+                .ToListAsync(ct), ct);
+
+    /// <summary>A new P-256 key: its <c>kid</c>, public JWK, and envelope encrypted PKCS#8 private key.</summary>
+    private (string Kid, string Jwk, byte[] Ciphertext) NewKey()
+    {
+        var kid = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(16));
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var pkcs8 = key.ExportPkcs8PrivateKey();
+        try
+        {
+            return (kid, PublicJwk(key, kid), secrets.Encrypt(pkcs8, SecretBox.AssociatedData(Table, kid, PrivateKeyColumn)));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(pkcs8);
+        }
     }
 
     /// <summary>The public half as a JWK: <c>{ kty, crv, x, y, kid, alg, use }</c>.</summary>

@@ -12,6 +12,7 @@ import type {
   UpdatePlatformRequest,
   UpdateProjectRequest,
 } from '@orvano/console-client'
+import type { CreateUserRequest } from '@orvano/js'
 import type { DispatchTable } from '../dispatch-table.js'
 
 /** Every console operation, called through `@orvano/console-client`. */
@@ -54,6 +55,14 @@ export const consoleDispatch: DispatchTable = {
       }),
     consoleAll: (o, input) =>
       o.consoleApiKeys.listAll({ limit: input.limit as number | undefined }),
+  },
+  'consoleAuthKeys.list': {
+    status: 200,
+    console: (o, _input) => o.consoleAuthKeys.list(),
+  },
+  'consoleAuthKeys.rotate': {
+    status: 200,
+    console: (o, _input) => o.consoleAuthKeys.rotate(),
   },
   'consoleInstall.getSettings': {
     status: 200,
@@ -161,6 +170,67 @@ export const consoleDispatch: DispatchTable = {
   'consoleProjects.update': {
     status: 200,
     console: (o, input) => o.consoleProjects.update(input.body as UpdateProjectRequest),
+  },
+  'consoleUsers.block': {
+    status: 200,
+    console: (o, input) => o.consoleUsers.block(input.userId as string),
+  },
+  'consoleUsers.create': {
+    status: 201,
+    console: (o, input) => o.consoleUsers.create(input.body as CreateUserRequest),
+  },
+  'consoleUsers.delete': {
+    status: 204,
+    console: (o, input) => o.consoleUsers.delete(input.userId as string),
+  },
+  'consoleUsers.deleteSession': {
+    status: 204,
+    console: (o, input) =>
+      o.consoleUsers.deleteSession(input.userId as string, input.sessionId as string),
+  },
+  'consoleUsers.deleteSessions': {
+    status: 204,
+    console: (o, input) => o.consoleUsers.deleteSessions(input.userId as string),
+  },
+  'consoleUsers.get': {
+    status: 200,
+    console: (o, input) => o.consoleUsers.get(input.userId as string),
+  },
+  'consoleUsers.list': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleUsers.list({
+        email: input.email as string | undefined,
+        status: input.status as string | undefined,
+        createdAfter: input.createdAfter as string | undefined,
+        createdBefore: input.createdBefore as string | undefined,
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    consoleAll: (o, input) =>
+      o.consoleUsers.listAll({
+        email: input.email as string | undefined,
+        status: input.status as string | undefined,
+        createdAfter: input.createdAfter as string | undefined,
+        createdBefore: input.createdBefore as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+  },
+  'consoleUsers.listSessions': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleUsers.listSessions(input.userId as string, {
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    consoleAll: (o, input) =>
+      o.consoleUsers.listSessionsAll(input.userId as string, {
+        limit: input.limit as number | undefined,
+      }),
+  },
+  'consoleUsers.unblock': {
+    status: 200,
+    console: (o, input) => o.consoleUsers.unblock(input.userId as string),
   },
   'test.consolePing': {
     status: 200,

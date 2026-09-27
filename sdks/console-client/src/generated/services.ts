@@ -17,12 +17,21 @@ import type {
   PlatformPage,
   Project,
   ProjectPage,
+  SigningKeys,
   UpdateInstallSettingsRequest,
   UpdateOrgRequest,
   UpdatePlatformRequest,
   UpdateProjectRequest,
 } from './models.js'
-import type { Client, RequestOptions, User } from '@orvano/js'
+import type {
+  Client,
+  CreateUserRequest,
+  RequestOptions,
+  Session,
+  SessionPage,
+  User,
+  UserPage,
+} from '@orvano/js'
 import { paginate } from '@orvano/js'
 
 /** Operations in the `consoleAccount` service. */
@@ -116,6 +125,34 @@ export class ConsoleApiKeysService {
     options?: RequestOptions,
   ): AsyncGenerator<ApiKey> {
     return paginate((cursor) => this.list({ ...query, cursor }, options))
+  }
+}
+
+/** Operations in the `consoleAuthKeys` service. */
+export class ConsoleAuthKeysService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /** Lists the token signing keys of the project named by `X-Orvano-Project`. Every role. */
+  list(options?: RequestOptions): Promise<SigningKeys> {
+    return this.#client.request<SigningKeys>(
+      { method: 'GET', path: '/v1/console/project/auth/keys' },
+      options,
+    )
+  }
+
+  /**
+   * Rotates the project's signing key: a new key signs from now on, and the old one keeps verifying the tokens it
+   * signed for 24 hours, then leaves. Owners only.
+   */
+  rotate(options?: RequestOptions): Promise<SigningKeys> {
+    return this.#client.request<SigningKeys>(
+      { method: 'POST', path: '/v1/console/project/auth/keys/rotate' },
+      options,
+    )
   }
 }
 
@@ -373,6 +410,142 @@ export class ConsoleProjectsService {
   }
 }
 
+/** Operations in the `consoleUsers` service. */
+export class ConsoleUsersService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /** Blocks a user: ends every session and refuses sign in. Blocking a blocked user changes nothing. */
+  block(userId: string, options?: RequestOptions): Promise<User> {
+    return this.#client.request<User>(
+      {
+        method: 'POST',
+        path: `/v1/console/project/users/${encodeURIComponent(userId)}/block`,
+        idempotent: true,
+      },
+      options,
+    )
+  }
+
+  /** Creates a user with an email and password. It does not sign them in. */
+  create(body: CreateUserRequest, options?: RequestOptions): Promise<User> {
+    return this.#client.request<User>(
+      { method: 'POST', path: '/v1/console/project/users', body },
+      options,
+    )
+  }
+
+  /** Deletes a user with their password and sessions. It can't be undone. */
+  delete(userId: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'DELETE', path: `/v1/console/project/users/${encodeURIComponent(userId)}` },
+      options,
+    )
+  }
+
+  /** Ends one session of a user. */
+  deleteSession(userId: string, sessionId: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      {
+        method: 'DELETE',
+        path: `/v1/console/project/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}`,
+      },
+      options,
+    )
+  }
+
+  /** Ends every session of a user. */
+  deleteSessions(userId: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      {
+        method: 'DELETE',
+        path: `/v1/console/project/users/${encodeURIComponent(userId)}/sessions`,
+      },
+      options,
+    )
+  }
+
+  /** Gets a user. */
+  get(userId: string, options?: RequestOptions): Promise<User> {
+    return this.#client.request<User>(
+      { method: 'GET', path: `/v1/console/project/users/${encodeURIComponent(userId)}` },
+      options,
+    )
+  }
+
+  /** Lists the users of the project named by `X-Orvano-Project`, newest first. Every role. */
+  list(
+    query?: {
+      email?: string | undefined
+      status?: string | undefined
+      createdAfter?: string | undefined
+      createdBefore?: string | undefined
+      cursor?: string | undefined
+      limit?: number | undefined
+    },
+    options?: RequestOptions,
+  ): Promise<UserPage> {
+    return this.#client.request<UserPage>(
+      { method: 'GET', path: '/v1/console/project/users', query },
+      options,
+    )
+  }
+
+  /** Every item of `list`, walking all pages: `for await (const item of ...)`. */
+  listAll(
+    query?: {
+      email?: string | undefined
+      status?: string | undefined
+      createdAfter?: string | undefined
+      createdBefore?: string | undefined
+      limit?: number | undefined
+    },
+    options?: RequestOptions,
+  ): AsyncGenerator<User> {
+    return paginate((cursor) => this.list({ ...query, cursor }, options))
+  }
+
+  /** Lists a user's active sessions, newest first. `current` is always false. */
+  listSessions(
+    userId: string,
+    query?: { cursor?: string | undefined; limit?: number | undefined },
+    options?: RequestOptions,
+  ): Promise<SessionPage> {
+    return this.#client.request<SessionPage>(
+      {
+        method: 'GET',
+        path: `/v1/console/project/users/${encodeURIComponent(userId)}/sessions`,
+        query,
+      },
+      options,
+    )
+  }
+
+  /** Every item of `listSessions`, walking all pages: `for await (const item of ...)`. */
+  listSessionsAll(
+    userId: string,
+    query?: { limit?: number | undefined },
+    options?: RequestOptions,
+  ): AsyncGenerator<Session> {
+    return paginate((cursor) => this.listSessions(userId, { ...query, cursor }, options))
+  }
+
+  /** Unblocks a user so they can sign in again. Their old sessions stay ended. */
+  unblock(userId: string, options?: RequestOptions): Promise<User> {
+    return this.#client.request<User>(
+      {
+        method: 'POST',
+        path: `/v1/console/project/users/${encodeURIComponent(userId)}/unblock`,
+        idempotent: true,
+      },
+      options,
+    )
+  }
+}
+
 /** Every console service on one object. Only the Orvano console uses it. */
 export class Orvano {
   /** The client every service sends through. */
@@ -381,6 +554,8 @@ export class Orvano {
   readonly consoleAccount: ConsoleAccountService
   /** Operations in the `consoleApiKeys` service. */
   readonly consoleApiKeys: ConsoleApiKeysService
+  /** Operations in the `consoleAuthKeys` service. */
+  readonly consoleAuthKeys: ConsoleAuthKeysService
   /** Operations in the `consoleInstall` service. */
   readonly consoleInstall: ConsoleInstallService
   /** Operations in the `consoleOrgs` service. */
@@ -389,14 +564,18 @@ export class Orvano {
   readonly consolePlatforms: ConsolePlatformsService
   /** Operations in the `consoleProjects` service. */
   readonly consoleProjects: ConsoleProjectsService
+  /** Operations in the `consoleUsers` service. */
+  readonly consoleUsers: ConsoleUsersService
 
   constructor(client: Client) {
     this.client = client
     this.consoleAccount = new ConsoleAccountService(client)
     this.consoleApiKeys = new ConsoleApiKeysService(client)
+    this.consoleAuthKeys = new ConsoleAuthKeysService(client)
     this.consoleInstall = new ConsoleInstallService(client)
     this.consoleOrgs = new ConsoleOrgsService(client)
     this.consolePlatforms = new ConsolePlatformsService(client)
     this.consoleProjects = new ConsoleProjectsService(client)
+    this.consoleUsers = new ConsoleUsersService(client)
   }
 }
