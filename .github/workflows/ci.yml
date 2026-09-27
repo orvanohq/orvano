@@ -152,6 +152,7 @@ jobs:
         run: |
           curl -fsS http://localhost/v1/health
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/internal/readyz)" = 404
+          test "$(cd /opt/orvano && sudo docker compose exec -T api /app/orvano setup-status)" = required
           # HSTS only on HTTPS installs (spec 0006, AC-26).
           if curl -sI http://localhost/ | grep -qi '^strict-transport-security'; then echo "HSTS sent on http://localhost"; exit 1; fi
       - name: Second install changes no secret

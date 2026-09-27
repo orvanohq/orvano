@@ -8,14 +8,18 @@ namespace Orvano.Server.Hosting;
 /// <c>console_session_required</c> unless it carries a valid console session and neither an API
 /// key nor an app session. A valid session sets the <see cref="ConsoleUser"/> the endpoints act as.
 /// Until scope row 8, the only valid sessions are the fixtures' <c>consoleSessions</c> in the
-/// <c>Test</c> environment, so elsewhere every console route is 401.
+/// <c>Test</c> environment, so elsewhere every console route is 401. <c>consoleInstall.getSetup</c> is the one
+/// console route that needs no session (spec 0006, AC-22).
 /// </summary>
 internal static class ConsoleSessions
 {
+    private static readonly PathString SetupStatus = "/v1" + ConsoleInstallOperations.GetSetup.Route;
+
     public static IApplicationBuilder UseConsoleSessions(this IApplicationBuilder app, TestFixtures fixtures) =>
         app.Use((context, next) =>
         {
             if (!context.Request.Path.StartsWithSegments("/v1/console")) return next(context);
+            if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path.Equals(SetupStatus, StringComparison.OrdinalIgnoreCase)) return next(context);
 
             var userId = Guid.Empty;
 

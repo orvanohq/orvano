@@ -11,17 +11,22 @@ namespace Orvano.Platform.Application;
 /// The console sign up rules Auth calls inside its sign up transaction (AC-6 to AC-8), and the check before a
 /// console account is deleted (AC-10).
 /// </summary>
-internal sealed class ConsoleAccounts(PlatformStore store, ILogger<ConsoleAccounts> logger)
+internal sealed class ConsoleAccounts(PlatformStore store, InstallSetupToken installToken, ILogger<ConsoleAccounts> logger)
     : IConsoleSignupPolicy, IConsoleAccountCreated, IConsoleAccountGuard
 {
-    public async Task<SignupAdmission> AdmitAsync(NpgsqlTransaction tx, string email, string? inviteToken, CancellationToken ct)
+    public async Task<SignupAdmission> AdmitAsync(NpgsqlTransaction tx, string email, string? inviteToken, string? setupToken, CancellationToken ct)
     {
         await using var context = await BindAsync(tx, ct);
         // Serializes racing sign ups, so exactly one of them sees no install admin.
         var settings = (await context.InstallSettings
             .FromSql($"SELECT * FROM orvano.platform_install_settings WHERE id = 1 FOR UPDATE").ToListAsync(ct)).Single();
 
-        if (!await context.InstallAdmins.AnyAsync(ct)) return new SignupAdmission.Admitted(IsFirstAccount: true);
+        if (!await context.InstallAdmins.AnyAsync(ct))
+        {
+            // The first account needs the installer's setup token when the install has one (spec 0006, AC-20).
+            if (installToken.IsConfigured && !installToken.Matches(setupToken)) return new SignupAdmission.SetupTokenInvalid();
+            return new SignupAdmission.Admitted(IsFirstAccount: true);
+        }
         if (settings.ConsoleSignup == InstallService.Open) return new SignupAdmission.Admitted(IsFirstAccount: false);
 
         // Invitations arrive with row 15; until then no token admits anyone on an invite only install.

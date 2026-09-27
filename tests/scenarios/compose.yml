@@ -46,6 +46,8 @@ services:
       ORVANO_PUBLIC_URL: http://localhost:8080
       ASPNETCORE_ENVIRONMENT: Test
       ORVANO_TEST_FIXTURES: /fixtures/fixtures.yaml
+      # A throwaway token, so the first console sign up behaves as on an installed server (spec 0006).
+      ORVANO_SETUP_TOKEN: ost_scenarios-setup-token-000000000000000000000
     volumes:
       - ./fixtures.yaml:/fixtures/fixtures.yaml:ro
     ports:

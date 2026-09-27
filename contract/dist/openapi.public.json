@@ -63,7 +63,8 @@
           "last_owner",
           "org_not_empty",
           "org_not_active",
-          "signup_closed"
+          "signup_closed",
+          "setup_token_invalid"
         ],
         "description": "Every stable error code the server sends in `Problem.code`."
       },

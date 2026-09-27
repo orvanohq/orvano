@@ -486,6 +486,16 @@ look_further() {
 
 # Summary ------------------------------------------------------------------------------------------
 
+# Prints the one time setup link while the install has no admin, read from the running api, so it
+# shows even when the public check failed (AC-19). Silent when the api does not answer.
+print_setup_link() {
+  setup=$(compose exec -T api /app/orvano setup-status 2>/dev/null | tr -d '\r') || return 0
+  if [ "$setup" = required ]; then
+    say "" "Create your admin account now (only this link can, and only once):" \
+      "  $(env_value ORVANO_PUBLIC_URL)/setup#$(env_value ORVANO_SETUP_TOKEN)"
+  fi
+}
+
 print_master_key() {
   if [ "$generated_master_key" = 1 ]; then
     say "" \
@@ -544,6 +554,7 @@ main() {
   wait_for_services || status=3
   [ "$status" != 0 ] || check_public_url || status=3
   [ "$status" != 0 ] || print_summary
+  print_setup_link
   # The master key block prints whether or not Orvano came up healthy (AC-15).
   print_master_key
   log "finished with exit code $status"

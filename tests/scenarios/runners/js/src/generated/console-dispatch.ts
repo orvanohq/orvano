@@ -36,6 +36,10 @@ export const consoleDispatch: DispatchTable = {
     status: 200,
     console: (o, _input) => o.consoleInstall.getSettings(),
   },
+  'consoleInstall.getSetup': {
+    status: 200,
+    console: (o, _input) => o.consoleInstall.getSetup(),
+  },
   'consoleInstall.updateSettings': {
     status: 200,
     console: (o, input) =>

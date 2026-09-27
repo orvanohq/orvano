@@ -20,7 +20,10 @@ internal sealed class PlatformModule : IOrvanoModule
 {
     public string Name => "platform";
 
-    /// <summary>Validates <c>ORVANO_DELETE_GRACE_DAYS</c> in every role: the API writes <c>purge_after</c>, the worker purges.</summary>
+    /// <summary>
+    /// Validates <c>ORVANO_DELETE_GRACE_DAYS</c> in every role (the API writes <c>purge_after</c>, the worker purges), and
+    /// <c>ORVANO_SETUP_TOKEN</c> wherever it is set (spec 0006, AC-21).
+    /// </summary>
     public void ConfigureServices(IServiceCollection services, IConfiguration config)
     {
         var grace = new DeleteGrace(OrvanoConfig.IntInRange(config, DeleteGrace.Setting, 0, DeleteGrace.Max, DeleteGrace.Default));
@@ -32,6 +35,8 @@ internal sealed class PlatformModule : IOrvanoModule
         services.AddSingleton<ApiKeyService>();
         services.AddSingleton<PlatformService>();
         services.AddSingleton<InstallService>();
+        services.AddSingleton<IInstallSetupState>(sp => sp.GetRequiredService<InstallService>());
+        services.AddSingleton(InstallSetupToken.FromConfig(config));
 
         services.AddSingleton<PlatformDirectory>();
         services.AddSingleton<IProjectDirectory>(sp => sp.GetRequiredService<PlatformDirectory>());

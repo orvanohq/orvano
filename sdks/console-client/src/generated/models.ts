@@ -97,6 +97,12 @@ export interface InstallSettings {
   updatedAt: string
 }
 
+/** Whether the install still waits for its first admin. */
+export interface InstallSetup {
+  /** True while no install admin exists: the first console account must come from the installer's setup link. */
+  setupRequired: boolean
+}
+
 /** An org: the owner of projects and the unit teammates join. */
 export interface Org {
   /** The org ID. */

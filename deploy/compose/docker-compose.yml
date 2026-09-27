@@ -100,6 +100,8 @@ services:
       ORVANO_ROLE: api
       ORVANO_PUBLIC_URL: ${ORVANO_PUBLIC_URL:?set in .env}
       ORVANO_MASTER_KEYS: ${ORVANO_MASTER_KEYS:-}
+      # Only the holder of the installer's setup link can create the first admin (spec 0006).
+      ORVANO_SETUP_TOKEN: ${ORVANO_SETUP_TOKEN:-}
       ORVANO_DELETE_GRACE_DAYS: ${ORVANO_DELETE_GRACE_DAYS:-7}
       OTEL_SERVICE_NAME: orvano-api
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}

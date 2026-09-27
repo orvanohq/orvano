@@ -50,6 +50,12 @@ public sealed class OrvanoProcess : IAsyncDisposable
         _process.Exited += (_, _) => _exited.TrySetResult();
     }
 
+    /// <summary>
+    /// A well formed <c>ORVANO_SETUP_TOKEN</c> for tests that start the api in <c>Production</c>, which refuses to
+    /// start without one while the install has no admin (spec 0006, AC-21).
+    /// </summary>
+    public const string SetupToken = "ost_test-setup-token-00000000000000000000000000";
+
     /// <summary>The HTTP port for a long running role, or null for one shot commands.</summary>
     public int? Port { get; }
 

@@ -30,13 +30,17 @@ public sealed class PlatformHarness : IAsyncDisposable
 
     public IServiceProvider Services => _services;
 
-    public static async Task<PlatformHarness> StartAsync(PostgresFixture postgres, int graceDays = 7)
+    public static async Task<PlatformHarness> StartAsync(PostgresFixture postgres, int graceDays = 7, string? setupToken = null)
     {
         var database = await postgres.NewDatabaseAsync();
         await database.MigrateAsync();
 
         var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["ORVANO_DELETE_GRACE_DAYS"] = graceDays.ToString(System.Globalization.CultureInfo.InvariantCulture) })
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ORVANO_DELETE_GRACE_DAYS"] = graceDays.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["ORVANO_SETUP_TOKEN"] = setupToken,
+            })
             .Build();
         var services = new ServiceCollection();
         services.AddLogging();
@@ -94,12 +98,12 @@ public sealed class PlatformHarness : IAsyncDisposable
     }
 
     /// <summary>Signs up a console account the way Auth will: admit, insert the user, then the Platform hooks, in one transaction.</summary>
-    public async Task<(Guid UserId, SignupAdmission Admission)> SignUpAsync(string email, string? name = null)
+    public async Task<(Guid UserId, SignupAdmission Admission)> SignUpAsync(string email, string? name = null, string? setupToken = null)
     {
         var userId = Guid.CreateVersion7();
         await using var conn = await Get<NpgsqlDataSource>(OrvanoDb.App).OpenConnectionAsync(Ct);
         await using var tx = await conn.BeginTransactionAsync(Ct);
-        var admission = await Get<IConsoleSignupPolicy>().AdmitAsync(tx, email, null, Ct);
+        var admission = await Get<IConsoleSignupPolicy>().AdmitAsync(tx, email, null, setupToken, Ct);
         if (admission is SignupAdmission.Admitted admitted)
         {
             await Get<IConsoleAccountCreated>().OnCreatedAsync(tx, userId, name, email, admitted, Ct);

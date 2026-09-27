@@ -9,6 +9,7 @@ using Orvano.Core.Modules;
 using Orvano.Core.Notifications;
 using Orvano.Core.Scheduling;
 using Orvano.Platform.Application;
+using Orvano.Platform.Contracts;
 using Orvano.Platform.Fixtures;
 using Orvano.Server.Modules;
 
@@ -62,6 +63,7 @@ internal static class ServerRole
         if (!StartupChecks.TestFixturesUsable(fixtures, logger)) return 1;
         var appDb = app.Services.GetRequiredKeyedService<NpgsqlDataSource>(OrvanoDb.App);
         if (!await StartupChecks.SchemaMatchesAsync(appDb, logger, app.Lifetime.ApplicationStopping)) return 1;
+        if (role == OrvanoRole.Api && !await StartupChecks.FirstAdminProtectedAsync(app.Environment, config, app.Services.GetRequiredService<IInstallSetupState>(), logger, app.Lifetime.ApplicationStopping)) return 1;
         if (role == OrvanoRole.Api && fixtures.Owner is { } owner)
         {
             await PlatformFixtures.SeedAsync(

@@ -15,6 +15,12 @@ public abstract record SignupAdmission
 
     /// <summary>Refused with 403 <c>signup_closed</c>: sign up is invite only and no valid invitation was given.</summary>
     public sealed record Refused : SignupAdmission;
+
+    /// <summary>
+    /// Refused with 403 <c>setup_token_invalid</c>: this would be the first account, the install has a setup token
+    /// (spec 0006, AC-20), and the sign up did not carry it.
+    /// </summary>
+    public sealed record SetupTokenInvalid : SignupAdmission;
 }
 
 /// <summary>The install's console sign up policy. Auth calls it first inside the sign up transaction.</summary>
@@ -22,14 +28,16 @@ public interface IConsoleSignupPolicy
 {
     /// <summary>
     /// Locks <c>platform_install_settings</c> (<c>SELECT ... FOR UPDATE</c>) so exactly one of two racing first sign
-    /// ups sees no install admin, then admits the first account, anyone while sign up is <c>open</c>, or a valid
-    /// invitation (row 15; until then an invite token admits no one).
+    /// ups sees no install admin, then admits the first account (with the install's setup token when one is
+    /// configured, spec 0006), anyone while sign up is <c>open</c>, or a valid invitation (row 15; until then an
+    /// invite token admits no one). Once an install admin exists the setup token is ignored.
     /// </summary>
     /// <param name="tx">The sign up transaction, owned by Auth.</param>
     /// <param name="email">The new account's email.</param>
     /// <param name="inviteToken">The invitation token, if the sign up came from one.</param>
+    /// <param name="setupToken">The setup token from the installer's setup link, if the sign up carried one.</param>
     /// <param name="ct">Cancels the check.</param>
-    Task<SignupAdmission> AdmitAsync(NpgsqlTransaction tx, string email, string? inviteToken, CancellationToken ct);
+    Task<SignupAdmission> AdmitAsync(NpgsqlTransaction tx, string email, string? inviteToken, string? setupToken, CancellationToken ct);
 }
 
 /// <summary>Auth calls it right after inserting a console user, in the same transaction.</summary>
@@ -67,4 +75,12 @@ public interface IConsoleAccountGuard
     /// <param name="userId">The console user.</param>
     /// <param name="ct">Cancels the check.</param>
     Task<ConsoleAccountDeleteCheck> CheckDeleteAsync(Guid userId, CancellationToken ct);
+}
+
+/// <summary>Whether the install still waits for its first admin (spec 0006).</summary>
+public interface IInstallSetupState
+{
+    /// <summary>True while no install admin exists.</summary>
+    /// <param name="ct">Cancels the check.</param>
+    Task<bool> IsSetupRequiredAsync(CancellationToken ct);
 }

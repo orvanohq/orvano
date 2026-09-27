@@ -93,6 +93,40 @@
         "x-orvano-audience": "console"
       }
     },
+    "/v1/console/install/setup": {
+      "get": {
+        "operationId": "consoleInstall.getSetup",
+        "description": "Tells whether the install still waits for its first admin. Needs no console session, so the console can\nsend you to the setup screen before anyone can sign in.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallSetup"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleInstall",
+        "x-orvano-audience": "console"
+      }
+    },
     "/v1/console/orgs": {
       "get": {
         "operationId": "consoleOrgs.list",
@@ -1437,7 +1471,8 @@
           "last_owner",
           "org_not_empty",
           "org_not_active",
-          "signup_closed"
+          "signup_closed",
+          "setup_token_invalid"
         ],
         "description": "Every stable error code the server sends in `Problem.code`."
       },
@@ -1483,6 +1518,22 @@
           }
         },
         "description": "Settings for the whole install."
+      },
+      "InstallSetup": {
+        "type": "object",
+        "required": [
+          "setupRequired"
+        ],
+        "properties": {
+          "setupRequired": {
+            "type": "boolean",
+            "description": "True while no install admin exists: the first console account must come from the installer's setup link.",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "description": "Whether the install still waits for its first admin."
       },
       "Org": {
         "type": "object",

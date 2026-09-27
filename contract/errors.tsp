@@ -78,6 +78,9 @@ enum ErrorCode {
 
   @doc("Console sign up is invite only and no valid invitation was given (403).")
   signup_closed,
+
+  @doc("The first console sign up on an install needs its setup token, and none or the wrong one was given (403).")
+  setup_token_invalid,
 }
 
 @doc("Error codes only the test operations send. Generated only into the scenario runners.")

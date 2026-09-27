@@ -1,4 +1,5 @@
-// Install settings (spec 0003): the console sign up policy, changed by install admins only.
+// Install settings (spec 0003): the console sign up policy, changed by install admins only. And the
+// setup status (spec 0006): whether the install still waits for its first admin.
 import "@typespec/http";
 import "@typespec/openapi";
 import "../errors.tsp";
@@ -32,6 +33,13 @@ model UpdateInstallSettingsRequest {
   consoleSignup: ConsoleSignupMode;
 }
 
+@doc("Whether the install still waits for its first admin.")
+model InstallSetup {
+  @doc("True while no install admin exists: the first console account must come from the installer's setup link.")
+  @example(true)
+  setupRequired: boolean;
+}
+
 @route("/v1/console/install/settings")
 @tag("console")
 interface ConsoleInstallApi {
@@ -48,4 +56,18 @@ interface ConsoleInstallApi {
   @extension("x-orvano-service", "consoleInstall")
   @patch(#{ implicitOptionality: false })
   updateSettings(@body request: UpdateInstallSettingsRequest): InstallSettings | Problem;
+}
+
+@route("/v1/console/install/setup")
+@tag("console")
+interface ConsoleInstallSetupApi {
+  @doc("""
+    Tells whether the install still waits for its first admin. Needs no console session, so the console can
+    send you to the setup screen before anyone can sign in.
+    """)
+  @operationId("consoleInstall.getSetup")
+  @extension("x-orvano-audience", "console")
+  @extension("x-orvano-service", "consoleInstall")
+  @get
+  getSetup(): InstallSetup | Problem;
 }
