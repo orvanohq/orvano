@@ -1,6 +1,7 @@
 # 0003. Platform data model: orgs, projects, keys, platforms, and app users
 
 **Date**: 2026-09-26
+**Updated**: 2026-09-27 (the first account also needs the installer's setup token when one is set, spec 0006)
 **Status**: In Progress
 
 ## Summary
@@ -25,7 +26,7 @@ This spec fixes the internal tables every Orvano product hangs off: console acco
 - **AC-4**: Public API calls to a project that is `provisioning` or `failed` get 409 `project_not_ready`. Calls to a project that is `deleting`, purged, unknown, or `console` get 404 `project_not_found`.
 - **AC-5**: Project data stays isolated. Every platform row owned by a project (keys, platforms, app users) carries its `project_id`, and every query filters by it. An API key used with an `X-Orvano-Project` that is not its own project is rejected with 401 `invalid_api_key`.
 - **AC-6**: Console accounts are app users of the system project `console`. The public API never serves the `console` project (AC-4), so console accounts can only be created and signed in through `/v1/console/*`, where the install sign up policy applies.
-- **AC-7**: The first console account on an install becomes an install admin, even when two sign ups race. After that, a sign up without a valid invitation is refused with 403 `signup_closed`, unless the install admin has set the sign up mode to `open`.
+- **AC-7**: The first console account on an install becomes an install admin, even when two sign ups race. After that, a sign up without a valid invitation is refused with 403 `signup_closed`, unless the install admin has set the sign up mode to `open`. When `ORVANO_SETUP_TOKEN` is set, the first account is admitted only with a `setupToken` equal to it, and a missing or wrong one gets 403 `setup_token_invalid` and creates nothing ([spec 0006](../0006-self-host-installer/index.md) AC-20, AC-21).
 - **AC-8**: Every new console account gets a personal org, named from the account, with that account as `owner`, in the same transaction. Any account can create more orgs.
 - **AC-9**: Org members hold exactly one role: `owner`, `developer`, or `viewer`. Each action is allowed or denied exactly as the permission matrix in *Security model* says, and a denied action gets 403 `forbidden`.
 - **AC-10**: An org always keeps at least one owner. Removing, demoting, or leaving as the last owner fails with 409 `last_owner`. Deleting a console account fails the same way while it is the last owner of an org that has other members or live projects. A live project is one in `provisioning`, `active`, or `failed`; a `deleting` project does not count. An org where the account is the only member and no live project remains moves to `deleting` along with the account, and its purge waits for its `deleting` projects as usual.
@@ -218,11 +219,11 @@ This spec designs no HTTP endpoint. Rows 7, 8, and 15 add the operations to the 
 | `IApiKeyVerifier` | Platform | `VerifyAsync(string projectId, string secret, CancellationToken)` | `ApiKeyVerification` (`Valid`, `KeyId`, `Scopes`) | request authentication (row 8) |
 | `IConsoleAccess` | Platform | `GetOrgRoleAsync(Guid userId, Guid orgId, CancellationToken)` and `GetProjectRoleAsync(Guid userId, string projectId, CancellationToken)` | `OrgRole?` | every console endpoint's permission check |
 | `IConsoleAccountGuard` | Platform | `CheckDeleteAsync(Guid userId, CancellationToken)` | `Allowed`, or the orgs that block it (AC-10) | Auth, before deleting a console user |
-| `IConsoleSignupPolicy` | Platform | `AdmitAsync(NpgsqlTransaction tx, string email, string? inviteToken, CancellationToken)` | `Admitted` (with `IsFirstAccount`, the invite's org and role) or `Refused` | console sign up (rows 7 and 8) |
+| `IConsoleSignupPolicy` | Platform | `AdmitAsync(NpgsqlTransaction tx, string email, string? inviteToken, string? setupToken, CancellationToken)` | `Admitted` (with `IsFirstAccount`, the invite's org and role), `Refused`, or `SetupTokenInvalid` (spec 0006) | console sign up (rows 7 and 8) |
 | `IConsoleAccountCreated` | Platform | `OnCreatedAsync(NpgsqlTransaction tx, Guid userId, string displayName, SignupAdmission admission, CancellationToken)` | nothing | Auth calls it inside the sign up transaction: it adds the install admin row (first account), the personal org and owner membership, and the invite's membership |
 | `IUserDirectory` | Auth | `GetManyAsync(string projectId, IReadOnlyCollection<Guid> ids, CancellationToken)` | `UserSummary` (`Id`, `Email`, `Name`, `Status`) | the console members list |
 
-The console sign up transaction is owned by Auth (it creates the user). It calls `AdmitAsync` first, which locks `platform_install_settings` with `SELECT ... FOR UPDATE` so that exactly one racing sign up sees an empty `platform_install_admins`. Then Auth inserts the user and calls `OnCreatedAsync`, all on the same transaction.
+The console sign up transaction is owned by Auth (it creates the user). It calls `AdmitAsync` first, which locks `platform_install_settings` with `SELECT ... FOR UPDATE` so that exactly one racing sign up sees an empty `platform_install_admins`. For that first account it also compares `setupToken` with the configured token in constant time, under the same lock, when one is set (spec 0006). Then Auth inserts the user and calls `OnCreatedAsync`, all on the same transaction.
 
 **Error codes** to add to `contract/errors.tsp`, each added by the row that first returns it:
 
@@ -235,6 +236,7 @@ The console sign up transaction is owned by Auth (it creates the user). It calls
 | `org_not_empty` | 409 | AC-15 | 7 |
 | `org_not_active` | 409 | create or restore a project in a `deleting` org | 7 |
 | `signup_closed` | 403 | AC-7 | 7 |
+| `setup_token_invalid` | 403 | AC-7, first account without the configured setup token | 6 (spec 0006) |
 | `invalid_api_key` | 401 | unknown, expired, or wrong project key | 8 |
 | `insufficient_scope` | 403 | the key lacks the operation's scope | 8 |
 | `origin_not_allowed` | 403 | the browser `Origin` matches no web platform | 8 |
@@ -286,6 +288,7 @@ Checked at create and update, with 400 `invalid_request` on a mismatch. Stored a
 | Check a browser origin | allowed hosts | `platform_platforms` rows of type `web` for the header project |
 | Console permission check | the caller's role | `platform_memberships.role` for (the project's `org_id`, the session user) |
 | Console sign up | first account or not | `platform_install_admins` is empty, read under the `platform_install_settings` row lock |
+| Console sign up | first account allowed or not | `setupToken` in the request equals `ORVANO_SETUP_TOKEN` (read once at `api` start), or no token is configured (spec 0006) |
 | Console sign up | allowed or not | `platform_install_settings.console_signup`, or a valid invite token (row 15) |
 | Personal org | `name` | the account's `name`, else the part of the email before `@`, followed by `'s org`, cut to 100 chars |
 | Invitation (row 15) | token | 32 random bytes, base64url; stored as SHA-256 in `token_hash` |

@@ -1,7 +1,7 @@
 # 0002. Orvano stack and architecture
 
 **Date**: 2026-09-24
-**Updated**: 2026-09-25 (poison events: a failing event consumer no longer stalls the outbox)
+**Updated**: 2026-09-27 (the installer follow up is settled by spec 0006); 2026-09-25 (poison events: a failing event consumer no longer stalls the outbox)
 **Status**: Accepted
 
 ## Summary
@@ -381,7 +381,7 @@ deploy/compose/                  docker-compose.yml and .env.example (the produc
 - [ ] Update spec 0001 to add the `console` audience (excluded from all public SDKs, generated into `sdks/console-client/`) and to note that this spec confirms .NET 10 and GitHub Actions.
 - [ ] Row 3 (platform data model): pick a project ID format limited to `[a-z0-9]`, at most 60 characters; model the project `provisioning` state; decide where app users live (platform schema or project schema).
 - [ ] Create the `orvanohq` GitHub org (the plain `orvano` name is unavailable on GitHub) and the `orvanohq/orvano` repo; GHCR images follow the org name. If the org ends up with another name, update the image and repo paths in this spec and in spec 0001.
-- [ ] Row 6 (installer): generate the database passwords and `ORVANO_MASTER_KEYS`, and warn that the master key must be backed up. Decide whether to keep a hand written compose file or generate it with Aspire's Docker Compose publisher.
+- [x] Row 6 (installer): generate the database passwords and `ORVANO_MASTER_KEYS`, and warn that the master key must be backed up. Decide whether to keep a hand written compose file or generate it with Aspire's Docker Compose publisher. Settled by [spec 0006](../0006-self-host-installer/index.md): `orvano install` generates every secret and prints the master key until you confirm you saved it (AC-8, AC-9, AC-15), and the compose file stays hand written, embedded in the server image so it always matches its version.
 - [ ] Row 22: design the realtime message protocol and decide whether to replay from `orvano.events` on reconnect.
 - [ ] Row 27: choose the sandbox behind the `executor` (gVisor, Firecracker, and Kata are all maintained today).
 - [ ] Row 37: choose storage for logs and metrics behind the OpenTelemetry export, and alert on `orvano.events.consumer_failures` and on dead `events.redispatch` jobs.
