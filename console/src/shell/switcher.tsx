@@ -1,6 +1,6 @@
 import { Combobox } from '@base-ui/react/combobox'
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -49,26 +49,25 @@ export function Switcher({
   footer,
   className,
 }: SwitcherProps) {
-  const scrollRef = useRef<HTMLDivElement | null>(null)
-  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  // State, not refs: the popup mounts after this component renders, and the effect must re-run then.
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null)
+  const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null)
   const canLoadMore = hasNextPage && !isFetchingNextPage
 
   // Watch the last row of the list; when it scrolls into view, load the next page.
   useEffect(() => {
-    const sentinel = sentinelRef.current
-    const root = scrollRef.current
-    if (sentinel === null || root === null || !canLoadMore) return
+    if (sentinel === null || scroller === null || !canLoadMore) return
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) fetchNextPage()
       },
-      { root },
+      { root: scroller, rootMargin: '0px 0px 96px 0px' },
     )
     observer.observe(sentinel)
     return () => {
       observer.disconnect()
     }
-  })
+  }, [sentinel, scroller, canLoadMore, fetchNextPage])
 
   return (
     <Combobox.Root<SwitcherItem>
@@ -103,7 +102,7 @@ export function Switcher({
                 className="h-(--control-h-sm) w-full rounded-md border border-input bg-background px-2 text-body placeholder:text-muted-foreground"
               />
             </div>
-            <div ref={scrollRef} className="max-h-72 overflow-y-auto overscroll-contain">
+            <div ref={setScroller} className="max-h-72 overflow-y-auto overscroll-contain">
               <Combobox.Empty className="px-3 py-2 text-body text-muted-foreground">
                 <span>No match.</span>
                 {hasNextPage ? (
@@ -129,7 +128,7 @@ export function Switcher({
                   Loading more
                 </div>
               ) : null}
-              <div ref={sentinelRef} aria-hidden className="h-px" />
+              <div ref={setSentinel} aria-hidden className="h-px" />
             </div>
             {footer === undefined ? null : (
               <div data-slot="switcher-footer" className="border-t border-border p-1">
