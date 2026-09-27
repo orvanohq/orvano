@@ -49,7 +49,7 @@ Every product feature ships in all of these layers in the same version, unless i
 | 3 | Platform data model | Foundation | in-progress |
 | 4 | API contract & SDK pipeline | Foundation | done |
 | 5 | Design system & console shell | Foundation | done |
-| 6 | Self host installer | Foundation | planned |
+| 6 | Self host installer | Foundation | in-progress |
 | 7 | Console accounts, orgs & projects | v0.1 | in-progress |
 | 8 | App user sign up & sign in | v0.1 | in-progress |
 | 9 | Transactional email | v0.2 | planned |
@@ -114,6 +114,9 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **GraphQL API**: an alternative to the data API · needs a decision
 - **Console command palette**: `Ctrl+K` to jump to any org, project, or page · from spec 0005
 - **Console preferences on the account**: theme and density follow you across devices · from spec 0005
+- **Signed images and installer**: cosign signatures on the images and `install.sh`, checked by the installer · from spec 0006
+- **Short install URL**: `get.orvano.dev` redirecting to the release's `install.sh` · from spec 0006
+- **RHEL family installs**: Rocky, Alma, and Fedora support once SELinux and firewalld are tested · from spec 0006
 
 ## Legend
 
