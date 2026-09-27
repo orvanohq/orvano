@@ -8,6 +8,15 @@ namespace Orvano;
     RespectNullableAnnotations = true,
     RespectRequiredConstructorParameters = true,
     DefaultIgnoreCondition = JsonIgnoreCondition.Never)]
+[JsonSerializable(typeof(CreateUserRequest))]
 [JsonSerializable(typeof(Health))]
+[JsonSerializable(typeof(Jwk))]
+[JsonSerializable(typeof(Jwks))]
+[JsonSerializable(typeof(OpenIdConfiguration))]
+[JsonSerializable(typeof(Session))]
+[JsonSerializable(typeof(SessionPage))]
+[JsonSerializable(typeof(User))]
+[JsonSerializable(typeof(UserPage))]
+[JsonSerializable(typeof(UserStatus))]
 [JsonSerializable(typeof(OrvanoProblem))]
 internal sealed partial class OrvanoJsonContext : JsonSerializerContext;

@@ -22,33 +22,33 @@ public class OrvanoClientTests
     }
 
     [Fact]
-    public async Task Sends_the_project_API_key_and_session_from_its_options() // covers: AC-4
+    public async Task Sends_the_project_and_API_key_from_its_options() // covers: AC-4
     {
         var server = new FakeServer().ThenHealth();
         using var client = server.Client(o =>
         {
             o.Project = "p1";
             o.ApiKey = "test-server-key";
-            o.Session = new MemorySessionStore { Token = "t" };
         });
 
         await client.Health.GetAsync(Ct);
 
         var request = Assert.Single(server.Requests);
-        Assert.Equal(("p1", "test-server-key", "t"), (FakeServer.Header(request, "X-Orvano-Project"), FakeServer.Header(request, "X-Orvano-Key"), FakeServer.Header(request, "X-Orvano-Session")));
+        Assert.Equal(("p1", "test-server-key"), (FakeServer.Header(request, "X-Orvano-Project"), FakeServer.Header(request, "X-Orvano-Key")));
+        Assert.Null(request.Headers.Authorization);
     }
 
     [Fact]
     public async Task Sends_no_credentials_it_was_not_given() // covers: AC-4
     {
         var server = new FakeServer().ThenHealth();
-        using var client = server.Client(o => o.Session = new MemorySessionStore());
+        using var client = server.Client();
 
         await client.Health.GetAsync(Ct);
 
         var request = Assert.Single(server.Requests);
         Assert.Null(FakeServer.Header(request, "X-Orvano-Key"));
-        Assert.Null(FakeServer.Header(request, "X-Orvano-Session"));
+        Assert.Null(request.Headers.Authorization);
         Assert.Null(FakeServer.Header(request, "X-Orvano-Project"));
     }
 

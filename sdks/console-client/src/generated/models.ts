@@ -21,6 +21,9 @@ export type PlatformType = 'web' | 'android' | 'ios' | 'macos' | 'windows' | 'li
 /** A project's lifecycle state. */
 export type ProjectStatus = 'provisioning' | 'active' | 'failed' | 'deleting'
 
+/** What a signing key does. */
+export type SigningKeyStatus = 'active' | 'retiring'
+
 /** An API key for server code. Its secret is never shown again after creation. */
 export interface ApiKey {
   /** The key ID. */
@@ -57,6 +60,28 @@ export interface CreateApiKeyRequest {
   scopes: ApiKeyScope[]
   /** When the key stops working, in the future; null or absent for never. */
   expiresAt?: string | null
+}
+
+/** A new console account. */
+export interface CreateConsoleAccountRequest {
+  /** The email, trimmed, at most 320 characters. Unique among console accounts, ignoring case. */
+  email: string
+  /** 8 to 256 characters after Unicode NFKC normalization. */
+  password: string
+  /** A display name, at most 256 characters. */
+  name?: string | null
+  /** The token of the invitation this sign up came from, if any. */
+  inviteToken?: string | null
+  /** The setup token from the installer's setup link; needed only for the install's first account. */
+  setupToken?: string | null
+}
+
+/** A console sign in with an email and password. */
+export interface CreateConsoleSessionRequest {
+  /** The console account's email; case does not matter. */
+  email: string
+  /** The console account's password. */
+  password: string
 }
 
 /** A new org. The caller becomes its owner. */
@@ -187,6 +212,24 @@ export interface ProjectPage {
   items: Project[]
   /** Pass it as `cursor` to get the next page; null on the last page. */
   nextCursor: string | null
+}
+
+/** A project's token signing key as the console shows it; never the key itself. */
+export interface SigningKey {
+  /** The key ID, the `kid` of the tokens it signs. */
+  id: string
+  /** `active` signs new tokens; `retiring` only verifies them until `retireAfter`. */
+  status: SigningKeyStatus
+  /** When the key was created. */
+  createdAt: string
+  /** When a retiring key leaves the JWKS; null for the active key. */
+  retireAfter: string | null
+}
+
+/** A project's signing keys, the active one first. */
+export interface SigningKeys {
+  /** The keys. */
+  keys: SigningKey[]
 }
 
 /** Changes to the install settings. */

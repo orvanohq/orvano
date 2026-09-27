@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.OpenApi;
+using Orvano.SdkGen.Rendering;
 
 namespace Orvano.SdkGen.Contract;
 
@@ -16,6 +17,14 @@ internal static partial class ContractReader
     private const string IdempotentExtension = "x-orvano-idempotent";
     private const string TestExtension = "x-orvano-test";
     private const string EventExtension = "x-orvano-event";
+    private const string SessionExtension = "x-orvano-session";
+    private const string StandardNamesExtension = "x-orvano-standard-names";
+    private const string ScopeExtension = "x-orvano-scope";
+    private const string ScopeCatalog = "ApiKeyScope";
+    private const string ApiKeyScheme = "apiKey";
+
+    /// <summary>The fields a client runtime reads from a session model, by wire name.</summary>
+    private static readonly string[] SessionFields = ["accessToken", "accessTokenExpiresAt", "refreshToken", "refreshTokenExpiresAt", "sessionId"];
 
     /// <summary>The error code catalogs (AC-6). They become constants, never enum types.</summary>
     private const string ErrorCatalog = "ErrorCode";
@@ -198,19 +207,25 @@ internal static partial class ContractReader
                 errors.Add($"model '{name}': composition (allOf, oneOf, anyOf) is not supported yet");
 
             var required = schema.Required ?? new HashSet<string>();
+            var standardNames = ReadBool(schema.Extensions, StandardNamesExtension, $"model '{name}'");
             var properties = new List<ContractProperty>();
             foreach (var (propName, propSchema) in schema.Properties!)
             {
                 var where = $"model '{name}', property '{propName}'";
-                if (!CamelCasePattern().IsMatch(propName))
+                if (!CamelCasePattern().IsMatch(propName) && !(standardNames && SnakeCasePattern().IsMatch(propName)))
                 {
-                    errors.Add($"{where}: property names must be camelCase");
+                    errors.Add(standardNames
+                        ? $"{where}: property names must be camelCase or snake_case"
+                        : $"{where}: property names must be camelCase (a standard document's snake_case names need {StandardNamesExtension})");
                     continue;
                 }
 
                 var (type, nullable) = ResolveType(propSchema, where);
                 if (type is null) continue;
-                properties.Add(new ContractProperty(propName, type, !required.Contains(propName), nullable, Describe(propSchema), ExampleOf(propSchema)));
+                properties.Add(new ContractProperty(Naming.MemberFromWire(propName), type, !required.Contains(propName), nullable, Describe(propSchema), ExampleOf(propSchema))
+                {
+                    Wire = propName,
+                });
             }
 
             return new ContractModel(
@@ -271,15 +286,105 @@ internal static partial class ContractReader
                     var (status, result) = ReadSuccess(op, where);
                     ReadDefault(op, where);
                     var pageItem = ReadPage(httpMethod, parameters, result, where);
+                    var session = ReadSession(op, audience, result, where);
+                    var scope = ReadScope(op, audience, where);
 
                     if (errors.Count > count || id is null || service is null || audience is null) continue;
                     operations.Add(new ContractOperation(
                         id, service, id[(service.Length + 1)..], httpMethod, path, audience.Value,
-                        op.Description ?? op.Summary, parameters, body, status, result, idempotent, test, pageItem));
+                        op.Description ?? op.Summary, parameters, body, status, result, idempotent, test, pageItem, session, scope));
                 }
             }
 
             return [.. operations.OrderBy(o => o.Id, StringComparer.Ordinal)];
+        }
+
+        /// <summary>
+        /// <c>x-orvano-scope</c> (spec 0004's amendment of spec 0003's rule): an operation secured by the <c>apiKey</c>
+        /// scheme must name the <c>ApiKeyScope</c> it needs, and any other operation (bearer only, or no security)
+        /// must not. Only server operations take an API key.
+        /// </summary>
+        private string? ReadScope(OpenApiOperation op, Audience? audience, string where)
+        {
+            var schemes = (op.Security ?? [])
+                .SelectMany(requirement => requirement.Keys)
+                .Select(scheme => scheme.Reference.Id)
+                .ToHashSet(StringComparer.Ordinal);
+            var usesKey = schemes.Contains(ApiKeyScheme);
+            var declared = op.Extensions?.ContainsKey(ScopeExtension) == true;
+            var value = ReadString(op.Extensions, ScopeExtension);
+
+            if (usesKey && audience is not (Audience.Server or Audience.Both))
+                errors.Add($"{where}: only server operations are secured by {ApiKeyScheme}");
+            if (!usesKey)
+            {
+                if (declared) errors.Add($"{where}: {ScopeExtension} is only for operations secured by {ApiKeyScheme}");
+                return null;
+            }
+
+            if (value is null)
+            {
+                errors.Add($"{where}: an operation secured by {ApiKeyScheme} must declare {ScopeExtension}");
+                return null;
+            }
+
+            var catalog = _schemas.TryGetValue(ScopeCatalog, out var scopes)
+                ? (scopes.Enum ?? []).Select(v => v.GetValue<string>()).ToHashSet(StringComparer.Ordinal)
+                : [];
+            if (!catalog.Contains(value)) errors.Add($"{where}: {ScopeExtension} '{value}' is not a value of the {ScopeCatalog} enum");
+            return value;
+        }
+
+        /// <summary>
+        /// <c>x-orvano-session</c>: <c>start</c> (the result has a <c>session</c> model), <c>refresh</c> (the result is
+        /// the session model), <c>end</c>, or <c>user</c> (the signed in user changed; the result is a model). Only
+        /// client operations change the client's session.
+        /// </summary>
+        private SessionEffect ReadSession(OpenApiOperation op, Audience? audience, TypeRef? result, string where)
+        {
+            var value = ReadString(op.Extensions, SessionExtension);
+            if (value is null)
+            {
+                if (op.Extensions?.ContainsKey(SessionExtension) == true) errors.Add($"{where}: {SessionExtension} must be start, refresh, end, or user");
+                return SessionEffect.None;
+            }
+
+            if (audience is not (Audience.Client or Audience.Both))
+                errors.Add($"{where}: {SessionExtension} is only for client operations");
+
+            switch (value)
+            {
+                case "start":
+                    if (result is not ModelType m || !_schemas.TryGetValue(m.Name, out var resultSchema)
+                        || resultSchema.Properties?.TryGetValue("session", out var session) != true || session is null
+                        || !IsSessionModel(session))
+                    {
+                        errors.Add($"{where}: a {SessionExtension} 'start' operation returns a model whose `session` is a session model ({string.Join(", ", SessionFields)})");
+                    }
+
+                    return SessionEffect.Start;
+                case "refresh":
+                    if (result is not ModelType r || !_schemas.TryGetValue(r.Name, out var refreshSchema) || !IsSessionModel(refreshSchema))
+                        errors.Add($"{where}: a {SessionExtension} 'refresh' operation returns a session model ({string.Join(", ", SessionFields)})");
+                    return SessionEffect.Refresh;
+                case "end":
+                    return SessionEffect.End;
+                case "user":
+                    if (result is not ModelType)
+                        errors.Add($"{where}: a {SessionExtension} 'user' operation returns the changed user as a model");
+                    return SessionEffect.User;
+                default:
+                    errors.Add($"{where}: {SessionExtension} is '{value}', expected start, refresh, end, or user");
+                    return SessionEffect.None;
+            }
+        }
+
+        /// <summary>A model that carries every field a client runtime stores, each required.</summary>
+        private bool IsSessionModel(IOpenApiSchema schema)
+        {
+            var target = schema is OpenApiSchemaReference reference && _schemas.TryGetValue(reference.Reference.Id ?? "", out var t) ? t : schema;
+            return target.Properties is { } properties && target.Required is { } required
+                && SessionFields.All(f => properties.ContainsKey(f) && required.Contains(f));
         }
 
         private Audience? ReadAudience(OpenApiOperation op, string where)
@@ -523,6 +628,13 @@ internal static partial class ContractReader
             var type = schema.Type ?? 0;
             var nullable = (type & JsonSchemaType.Null) != 0;
             type &= ~JsonSchemaType.Null;
+
+            // TypeSpec's `unknown` is a schema with no type and nothing else: any JSON value.
+            if (type == 0 && schema.Properties is not { Count: > 0 } && schema.Items is null && schema.Enum is not { Count: > 0 }
+                && MapValues(schema) is null)
+            {
+                return (JsonValueType.Instance, false);
+            }
 
             TypeRef? mapped = type switch
             {

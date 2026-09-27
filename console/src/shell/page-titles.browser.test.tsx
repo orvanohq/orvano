@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it } from 'vitest'
 
 import { Route as SignInRoute } from '@/routes/sign-in'
@@ -17,7 +18,13 @@ describe('page titles outside the shell (AC-23)', () => {
     document.title = 'Orgs · Orvano'
     const SignIn = SignInRoute.options.component
     if (SignIn === undefined) throw new Error('the sign in route has no component')
-    await renderInRouter(<SignIn />, { at: '/', paths })
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    await renderInRouter(
+      <QueryClientProvider client={queryClient}>
+        <SignIn />
+      </QueryClientProvider>,
+      { at: '/', paths },
+    )
     expect(document.title).toBe('Sign in · Orvano')
   })
 })

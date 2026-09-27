@@ -1,6 +1,8 @@
 // Runs every shared scenario through orvano_flutter on the device under test.
-// The endpoint comes from --dart-define=ORVANO_ENDPOINT=...; an Android
-// emulator reaches the host at http://10.0.2.2:8080.
+// The endpoint comes from --dart-define=ORVANO_ENDPOINT=...; on an Android
+// emulator, run `adb reverse tcp:8080 tcp:8080` first so localhost:8080 is
+// the host's (the endpoint must match the server's ORVANO_PUBLIC_URL for
+// access tokens to verify).
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -31,9 +33,15 @@ void main() {
     final scenarios = [
       for (final f in files) parseScenario(await rootBundle.loadString(f)),
     ];
+    final fixtures = await rootBundle.loadString(
+      'assets/scenarios/fixtures.yaml',
+    );
+    final project = fixtureProject(fixtures);
     final surface = Surface.connect(
       endpoint,
-      client: Client(endpoint: endpoint),
+      project: project,
+      apiKey: fixtureApiKey(fixtures),
+      client: Client(endpoint: endpoint, project: project),
     );
     final results = await runScenarios(scenarios, surface);
     surface.close();

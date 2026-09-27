@@ -80,7 +80,8 @@ internal static class Snippets
         EnumType e => Naming.QuotedString(EnumValue(e, example, contract)),
         ArrayType a => $"[{TsValue(a.Item, (example as JsonArray)?.FirstOrDefault(), name, contract)}]",
         MapType m => $"{{ key: {TsValue(m.Value, null, name, contract)} }}",
-        ModelType m => "{ " + string.Join(", ", Required(m, contract).Select(p => $"{p.Name}: {TsValue(p.Type, p.Example, p.Name, contract)}")) + " }",
+        ModelType m => "{ " + string.Join(", ", Required(m, contract).Select(p => $"{p.Wire}: {TsValue(p.Type, p.Example, p.Name, contract)}")) + " }",
+        JsonValueType => "'value'",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 
@@ -104,6 +105,7 @@ internal static class Snippets
         EnumType e => $"{e.Name}.{Naming.MemberFromWire(EnumValue(e, example, contract))}",
         ArrayType a => $"[{DartValue(a.Item, (example as JsonArray)?.FirstOrDefault(), name, contract)}]",
         MapType m => $"{{'key': {DartValue(m.Value, null, name, contract)}}}",
+        JsonValueType => "'value'",
         ModelType m => $"{m.Name}(" + string.Join(", ", Required(m, contract).Select(p => $"{p.Name}: {DartValue(p.Type, p.Example, p.Name, contract)}")) + ")",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
@@ -139,6 +141,7 @@ internal static class Snippets
         EnumType e => $"{e.Name}.{Naming.Pascal(Naming.MemberFromWire(EnumValue(e, example, contract)))}",
         ArrayType a => $"[{CsValue(a.Item, (example as JsonArray)?.FirstOrDefault(), name, contract)}]",
         MapType m => $"new Dictionary<string, {CSharp.Type(m.Value)}> {{ [\"key\"] = {CsValue(m.Value, null, name, contract)} }}",
+        JsonValueType => "JsonSerializer.SerializeToElement(\"value\")",
         ModelType m => $"new {m.Name}(" + string.Join(", ", Required(m, contract).Select(p => $"{Naming.Pascal(p.Name)}: {CsValue(p.Type, p.Example, p.Name, contract)}")) + ")",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };

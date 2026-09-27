@@ -19,6 +19,12 @@ import "./platform/projects.tsp";
 import "./platform/api-keys.tsp";
 import "./platform/platforms.tsp";
 import "./platform/install.tsp";
+import "./auth/security.tsp";
+import "./auth/account.tsp";
+import "./auth/keys.tsp";
+import "./auth/users.tsp";
+import "./auth/console-account.tsp";
+import "./auth/console-users.tsp";
 import "./test/test.tsp";
 
 using Http;

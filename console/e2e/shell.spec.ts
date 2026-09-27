@@ -1,4 +1,4 @@
-import { expect, fixturesOrgId, scenariosProject, sessionCookie, test } from './fixtures.ts'
+import { cookieHeader, expect, fixturesOrgId, scenariosProject, test } from './fixtures.ts'
 
 test('the happy path, keyboard only, on real data (AC-10, AC-11, AC-12, AC-13, AC-14, AC-26)', async ({
   signedIn: page,
@@ -17,9 +17,11 @@ test('the happy path, keyboard only, on real data (AC-10, AC-11, AC-12, AC-13, A
   await page.keyboard.press('Enter')
   await expect(page.getByRole('main')).toBeFocused()
 
-  // Org switcher: open with Enter, move with the arrows, pick with Enter.
+  // Org switcher: open with Enter, type to narrow (the fixture admin also has a personal org), move
+  // with the arrows, pick with Enter.
   await page.getByRole('combobox', { name: /^Switch org/ }).focus()
   await page.keyboard.press('Enter')
+  await page.keyboard.type('Fixtures')
   await page.keyboard.press('ArrowDown')
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/\/orgs\/[^/]+$/)
@@ -76,9 +78,10 @@ test('a new project shows Setting up, then its overview, without a reload (AC-18
   signedIn: page,
   request,
   baseURL,
+  session,
 }) => {
-  const headers = { cookie: `${sessionCookie.name}=${sessionCookie.value}` }
-  const orgId = await fixturesOrgId(request, baseURL ?? '')
+  const headers = { cookie: cookieHeader(session), 'sec-fetch-site': 'same-origin' }
+  const orgId = await fixturesOrgId(request, baseURL ?? '', session)
   const created = await request.post(`${baseURL ?? ''}/v1/console/orgs/${orgId}/projects`, {
     headers,
     data: { name: `Provisioning ${String(Date.now())}` },
@@ -116,7 +119,7 @@ test('titles and focus follow navigation (AC-23)', async ({ signedIn: page }) =>
   await page.goto('/orgs')
   await expect(page).toHaveTitle('Orgs · Orvano')
   await page.getByRole('combobox', { name: /^Switch org/ }).click()
-  await page.getByRole('option').first().click()
+  await page.getByRole('option', { name: /Fixtures/ }).click()
   await expect(page).toHaveTitle('Projects · Fixtures · Orvano')
   await expect(page.locator('#page-title')).toBeFocused()
 })
@@ -155,8 +158,9 @@ test('a failed load shows the error panel with a Retry (AC-21)', async ({
   signedIn: page,
   request,
   baseURL,
+  session,
 }) => {
-  const orgId = await fixturesOrgId(request, baseURL ?? '')
+  const orgId = await fixturesOrgId(request, baseURL ?? '', session)
   let fail = true
   await page.route('**/v1/console/orgs/*/projects*', async (route) => {
     if (!fail) return route.continue()
@@ -216,4 +220,35 @@ test('the sidebar collapses to a rail with [ and remembers it (AC-16)', async ({
   expect((await sidebar.boundingBox())?.width).toBe(56)
   await page.reload()
   await expect(page.locator('[data-slot=sidebar]')).toHaveAttribute('data-state', 'rail')
+})
+
+test('signing in lands where you were headed, and signing out ends the session (spec 0004 AC-27)', async ({
+  page,
+}) => {
+  await page.goto(`/projects/${scenariosProject}`)
+  await expect(page).toHaveURL(/\/sign-in\?redirect=/)
+  await page.getByLabel('Email').fill('fixture-admin@example.com')
+  await page.getByLabel('Password').fill('wrong console password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('alert')).toContainText('The email or password is wrong.')
+
+  await page.getByLabel('Password').fill('fixture console password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page).toHaveURL(new RegExp(`/projects/${scenariosProject}$`))
+  const cookies = await page.context().cookies()
+  const access = cookies.find((c) => c.name === 'orvano_console')
+  expect(access?.httpOnly).toBe(true)
+  expect(access?.sameSite).toBe('Strict')
+
+  await page.getByRole('button', { name: 'Account menu' }).click()
+  await expect(page.getByRole('menu')).toContainText('fixture-admin@example.com')
+  await page.getByRole('menuitem', { name: 'Sign out' }).click()
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  await page.goto('/orgs')
+  await expect(page).toHaveURL(/\/sign-in/)
+})
+
+test('/setup goes to sign in once the install has an admin (spec 0006 AC-23)', async ({ page }) => {
+  await page.goto('/setup#ost_not-the-token')
+  await expect(page).toHaveURL(/\/sign-in$/)
 })

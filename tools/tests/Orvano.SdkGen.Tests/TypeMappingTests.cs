@@ -17,6 +17,8 @@ public class TypeMappingTests
         "Part[]" => new ArrayType(new ModelType("Part")),
         "Record<string>" => new MapType(new PrimitiveType(PrimitiveKind.String)),
         "enum Kind" => new EnumType("Kind"),
+        "unknown" => JsonValueType.Instance,
+        "Record<unknown>" => new MapType(JsonValueType.Instance),
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, null),
     };
 
@@ -29,6 +31,8 @@ public class TypeMappingTests
     [InlineData("Part[]", "Part[]", "List<Part>", "IReadOnlyList<Part>")]
     [InlineData("Record<string>", "Record<string, string>", "Map<String, String>", "IReadOnlyDictionary<string, string>")]
     [InlineData("enum Kind", "Kind", "Kind", "Kind")]
+    [InlineData("unknown", "unknown", "Object?", "JsonElement")]
+    [InlineData("Record<unknown>", "Record<string, unknown>", "Map<String, Object?>", "IReadOnlyDictionary<string, JsonElement>")]
     public void Maps_each_contract_shape_to_every_language(string shape, string ts, string dart, string cs)
     {
         var type = Shape(shape);
@@ -83,5 +87,47 @@ public class TypeMappingTests
 
         Assert.Contains("[property: JsonPropertyName(\"note\"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Note = null", models, StringComparison.Ordinal);
         Assert.Contains("[property: JsonPropertyName(\"deletedAt\")] DateTimeOffset? DeletedAt", models, StringComparison.Ordinal);
+    }
+
+    private static readonly ContractModel Standard = new("Discovery", null,
+    [
+        new("jwksUri", new PrimitiveType(PrimitiveKind.String), false, false, null) { Wire = "jwks_uri" },
+        new("extra", new MapType(JsonValueType.Instance), true, false, null),
+    ], false, null);
+
+    private static readonly ApiContract StandardContract = new("0.0.0",
+        [new("things.discover", "things", "discover", "GET", "/v1/things/discovery", Audience.Both, null, [], null, 200, new ModelType("Discovery"), false, false, null)],
+        [Standard], [], []);
+
+    [Fact]
+    public void A_standard_document_keeps_its_wire_names_on_the_wire_and_camel_case_in_code() // spec 0004: OpenID discovery
+    {
+        var ts = File(TypeScript.Generate(StandardContract, Repo.Renderer), "sdks/js/src/generated/models.ts");
+        var dart = File(Dart.Generate(StandardContract, Repo.Renderer), "sdks/dart/core/lib/src/generated/models.dart");
+        var cs = File(CSharp.Generate(StandardContract, Repo.Renderer), "sdks/dotnet/src/Orvano/Generated/Models.cs");
+
+        Assert.Contains("jwks_uri: string", ts, StringComparison.Ordinal);
+        Assert.Contains("final String jwksUri;", dart, StringComparison.Ordinal);
+        Assert.Contains("json['jwks_uri'] as String", dart, StringComparison.Ordinal);
+        Assert.Contains("'jwks_uri': jwksUri", dart, StringComparison.Ordinal);
+        Assert.Contains("[property: JsonPropertyName(\"jwks_uri\")] string JwksUri", cs, StringComparison.Ordinal);
+        Assert.Contains("using System.Text.Json;", cs, StringComparison.Ordinal);
+        Assert.Contains("Map<String, Object?>.from(json['extra'] as Map<String, dynamic>)", dart, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Start", "session: 'start'", "session: SessionChange.start")]
+    [InlineData("Refresh", "session: 'refresh'", "session: SessionChange.refresh")]
+    [InlineData("End", "session: 'end'", "session: SessionChange.end")]
+    public void A_session_operation_tells_the_runtime_what_to_do_with_the_session(string change, string ts, string dart) // spec 0004
+    {
+        var effect = Enum.Parse<SessionEffect>(change);
+        var contract = Contract with
+        {
+            Operations = [new("things.signIn", "things", "signIn", "POST", "/v1/things/sign-in", Audience.Client, null, [], null, 201, new ModelType("Thing"), false, false, null, effect)],
+        };
+
+        Assert.Contains(ts, File(TypeScript.Generate(contract, Repo.Renderer), "sdks/js/src/generated/client.ts"), StringComparison.Ordinal);
+        Assert.Contains(dart, File(Dart.Generate(contract, Repo.Renderer), "sdks/dart/core/lib/src/generated/services.dart"), StringComparison.Ordinal);
     }
 }

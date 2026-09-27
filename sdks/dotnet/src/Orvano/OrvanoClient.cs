@@ -32,7 +32,6 @@ public sealed partial class OrvanoClient : IDisposable
     private readonly string _endpoint;
     private readonly string? _project;
     private readonly string? _apiKey;
-    private readonly IOrvanoSessionStore? _session;
     private readonly TimeSpan _timeout;
     private readonly int _maxRetries;
     private readonly ILogger _logger;
@@ -50,7 +49,6 @@ public sealed partial class OrvanoClient : IDisposable
         _endpoint = options.Endpoint.AbsoluteUri.TrimEnd('/');
         _project = options.Project;
         _apiKey = options.ApiKey;
-        _session = options.Session;
         _timeout = options.Timeout;
         _maxRetries = options.MaxRetries;
         _logger = options.Logger ?? NullLogger.Instance;
@@ -72,6 +70,14 @@ public sealed partial class OrvanoClient : IDisposable
 
     internal Task SendAsync(OrvanoRequest request, CancellationToken cancellationToken) =>
         SendAsync(request, (_, _) => Task.FromResult(true), cancellationToken);
+
+    /// <summary>Sends and returns the successful response's body as text.</summary>
+    internal Task<string> SendForTextAsync(OrvanoRequest request, CancellationToken cancellationToken) =>
+#if NET
+        SendAsync(request, (response, ct) => response.Content.ReadAsStringAsync(ct), cancellationToken);
+#else
+        SendAsync(request, (response, _) => response.Content.ReadAsStringAsync(), cancellationToken);
+#endif
 
     /// <summary>Sends with retries under one timeout, reading the successful response with <paramref name="read"/>.</summary>
     private async Task<T> SendAsync<T>(OrvanoRequest request, Func<HttpResponseMessage, CancellationToken, Task<T>> read, CancellationToken cancellationToken)
@@ -110,8 +116,9 @@ public sealed partial class OrvanoClient : IDisposable
         message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         message.Headers.TryAddWithoutValidation(OrvanoHeaders.Sdk, SdkHeaderValue);
         if (_project is not null) message.Headers.Add(OrvanoHeaders.Project, _project);
-        if (_session?.Token is { Length: > 0 } token) message.Headers.Add(OrvanoHeaders.Session, token);
-        if (_apiKey is not null) message.Headers.Add(OrvanoHeaders.ApiKey, _apiKey);
+        if (request.Bearer is { } bearer) message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
+        else if (_apiKey is not null) message.Headers.Add(OrvanoHeaders.ApiKey, _apiKey);
+        if (request.NoCache) message.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
         if (request.Body is not null)
         {
             message.Content = new ByteArrayContent(request.Body);
@@ -207,6 +214,7 @@ public sealed partial class OrvanoClient : IDisposable
     public void Dispose()
     {
         if (_ownsHttp) _http.Dispose();
+        _signingKeysLock.Dispose();
     }
 
     private static partial class Log

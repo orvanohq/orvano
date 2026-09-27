@@ -256,6 +256,70 @@ public class OrvanoBinaryTests(PostgresFixture postgres)
         Assert.Equal(1, check.ExitCode);
     }
 
+    [Theory]
+    [InlineData("api", "ORVANO_MASTER_KEYS", "ORVANO_MASTER_KEYS is not set.")]
+    [InlineData("worker", "ORVANO_MASTER_KEYS", "ORVANO_MASTER_KEYS is not set.")]
+    [InlineData("api", "ORVANO_PUBLIC_URL", "ORVANO_PUBLIC_URL is not set.")]
+    public async Task Exits_1_when_a_setting_auth_needs_is_missing(string role, string setting, string message)
+    {
+        await using var database = await postgres.NewDatabaseAsync();
+        await database.MigrateAsync();
+
+        await using var orvano = await OrvanoProcess.RunAsync([role], Env(
+            ("ORVANO_DB_URL", database.AppUrl), ("ORVANO_DB_ADMIN_URL", database.AdminUrl), (setting, "")));
+
+        Assert.Equal(1, orvano.ExitCode);
+        Assert.Contains(message, orvano.Output);
+    }
+
+    [Theory]
+    [InlineData("ORVANO_MASTER_KEYS", "k1:short", "ORVANO_MASTER_KEYS is invalid")]
+    [InlineData("ORVANO_PUBLIC_URL", "https://orvano.example.com/path", "ORVANO_PUBLIC_URL must be an absolute http or https URL")]
+    [InlineData("ORVANO_TRUSTED_PROXIES", "everyone", "ORVANO_TRUSTED_PROXIES must be")]
+    public async Task Exits_1_when_the_api_gets_a_malformed_auth_setting(string setting, string value, string message)
+    {
+        await using var database = await postgres.NewDatabaseAsync();
+        await database.MigrateAsync();
+
+        await using var orvano = await OrvanoProcess.RunAsync(["api"], Env(("ORVANO_DB_URL", database.AppUrl), (setting, value)));
+
+        Assert.Equal(1, orvano.ExitCode);
+        Assert.Contains(message, orvano.Output);
+        if (setting == "ORVANO_MASTER_KEYS") Assert.DoesNotContain(":short", orvano.Output, StringComparison.Ordinal); // never echoes key material
+    }
+
+    [Fact]
+    public async Task Limits_the_setup_status_per_connection_ip_behind_a_trusted_proxy()
+    {
+        await using var database = await postgres.NewDatabaseAsync();
+        await database.MigrateAsync();
+        await using var api = await StartRoleAsync("api", database);
+        using var http = api.Http();
+
+        // The test runner connects from 127.0.0.1, a trusted proxy by default, so X-Forwarded-For picks the client.
+        async Task<HttpResponseMessage> GetSetupAsync(string ip)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/v1/console/install/setup");
+            request.Headers.Add("X-Forwarded-For", ip);
+            return await http.SendAsync(request, TestContext.Current.CancellationToken);
+        }
+
+        for (var i = 0; i < 60; i++)
+        {
+            using var ok = await GetSetupAsync("203.0.113.7");
+            Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
+        }
+
+        using var limited = await GetSetupAsync("203.0.113.7");
+        using var other = await GetSetupAsync("203.0.113.8");
+
+        Assert.Equal((HttpStatusCode)429, limited.StatusCode);
+        Assert.InRange(int.Parse(limited.Headers.GetValues("Retry-After").Single()), 1, 60);
+        using var body = JsonDocument.Parse(await limited.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("rate_limited", body.RootElement.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.OK, other.StatusCode);
+    }
+
     [Fact]
     public async Task Rejects_a_retention_setting_that_is_not_a_positive_number()
     {

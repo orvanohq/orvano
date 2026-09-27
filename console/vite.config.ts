@@ -11,10 +11,6 @@ const apiUrl = process.env.API_HTTP ?? process.env.services__api__http__0 ?? 'ht
 const realtimeUrl =
   process.env.REALTIME_HTTP ?? process.env.services__realtime__http__0 ?? 'http://localhost:8081'
 
-// Local dev only, set by the AppHost's OrvanoDev:Fixtures switch: the console cookie the fixture
-// session uses, added to proxied /v1/console calls so the dev console opens signed in.
-const devSession = process.env.CONSOLE_DEV_SESSION
-
 export default defineConfig({
   plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
@@ -25,22 +21,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/v1/realtime': { target: realtimeUrl, ws: true, changeOrigin: true },
-      '/v1': {
-        target: apiUrl,
-        changeOrigin: true,
-        configure: (proxy) => {
-          if (devSession === undefined || devSession === '') return
-          proxy.on('proxyReq', (proxyReq, req) => {
-            if (!req.url?.startsWith('/v1/console')) return
-            const existing = proxyReq.getHeader('cookie')
-            const cookie = `orvano_console=${devSession}`
-            proxyReq.setHeader(
-              'cookie',
-              typeof existing === 'string' && existing !== '' ? `${existing}; ${cookie}` : cookie,
-            )
-          })
-        },
-      },
+      '/v1': { target: apiUrl, changeOrigin: true },
     },
   },
 })

@@ -3,6 +3,7 @@
 import "@typespec/http";
 import "@typespec/openapi";
 import "../errors.tsp";
+import "../auth/security.tsp";
 
 using Http;
 using OpenAPI;
@@ -42,6 +43,7 @@ model InstallSetup {
 
 @route("/v1/console/install/settings")
 @tag("console")
+@useAuth(consoleSession)
 interface ConsoleInstallApi {
   @doc("Gets the install settings. Install admins only.")
   @operationId("consoleInstall.getSettings")

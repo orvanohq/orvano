@@ -13,6 +13,8 @@ import { parse } from 'yaml'
 import { runScenarios } from './interpreter.js'
 import type { Scenario, ScenarioResult } from './interpreter.js'
 import { createSurface } from './surface.js'
+import type { ConsoleUser } from './surface.js'
+import type { BrowserContext } from 'playwright'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const packageDir = resolve(here, '..')
@@ -23,15 +25,43 @@ const marker = 'ORVANO_SCENARIO_RESULTS '
 type Target = 'node' | 'bun' | 'deno' | 'browser' | 'workerd' | 'nextjs'
 const targets: readonly Target[] = ['node', 'bun', 'deno', 'browser', 'workerd', 'nextjs']
 
-/** The first console session in `fixtures.yaml`, which the server accepts in the Test environment. */
-async function loadConsoleSession(): Promise<string | undefined> {
+/**
+ * The first console account, the first project, and its API key in `fixtures.yaml`, which the
+ * server seeds in the Test environment.
+ */
+async function loadFixtures(): Promise<{
+  consoleUser?: ConsoleUser
+  project?: string
+  apiKey?: string
+}> {
   const fixtures = parse(await readFile(join(scenariosDir, 'fixtures.yaml'), 'utf8')) as {
-    consoleSessions?: string[]
+    consoleUsers?: { email?: string; password?: string }[]
+    projects?: { id?: string }[]
+    apiKeys?: { project?: string; secret?: string }[]
   } | null
-  return fixtures?.consoleSessions?.[0]
+  const first = fixtures?.consoleUsers?.[0]
+  const consoleUser =
+    first?.email === undefined || first.password === undefined
+      ? undefined
+      : { email: first.email, password: first.password }
+  const project = fixtures?.projects?.[0]?.id
+  const apiKey = fixtures?.apiKeys?.find((k) => k.project === project)?.secret
+  return {
+    ...(consoleUser === undefined ? {} : { consoleUser }),
+    ...(project === undefined ? {} : { project }),
+    ...(apiKey === undefined ? {} : { apiKey }),
+  }
 }
 
-const consoleSession = await loadConsoleSession()
+const { consoleUser, project, apiKey } = await loadFixtures()
+/** The fixtures every runtime needs, as environment variables. */
+const fixtureEnv: Record<string, string> = {
+  ...(consoleUser === undefined
+    ? {}
+    : { ORVANO_CONSOLE_EMAIL: consoleUser.email, ORVANO_CONSOLE_PASSWORD: consoleUser.password }),
+  ...(project === undefined ? {} : { ORVANO_PROJECT: project }),
+  ...(apiKey === undefined ? {} : { ORVANO_API_KEY: apiKey }),
+}
 
 async function loadScenarios(): Promise<Scenario[]> {
   const files = (await readdir(scenariosDir))
@@ -72,7 +102,7 @@ async function inRuntime(
   const stdout = await exec(command, [...args, 'dist/entries/file-runner.js'], {
     ORVANO_SCENARIOS_FILE: file,
     ORVANO_ENDPOINT: endpoint,
-    ...(consoleSession === undefined ? {} : { ORVANO_CONSOLE_SESSION: consoleSession }),
+    ...fixtureEnv,
   })
   const line = stdout.split('\n').find((l) => l.startsWith(marker))
   if (line === undefined) throw new Error(`no results from ${command}:\n${stdout}`)
@@ -86,9 +116,11 @@ async function inRuntime(
 async function inBrowser(scenarios: Scenario[]): Promise<ScenarioResult[]> {
   const { chromium } = await import('playwright')
   const bundle = await readFile(join(packageDir, 'dist/bundles/browser.js'))
+  let refreshes = 0
   const server = createServer((req, res) => {
     void (async () => {
       const url = req.url ?? '/'
+      if (url.startsWith('/v1/account/sessions/refresh')) refreshes++
       if (url.startsWith('/v1/')) {
         const headers = new Headers()
         for (const [name, value] of Object.entries(req.headers)) {
@@ -103,7 +135,12 @@ async function inBrowser(scenarios: Scenario[]): Promise<ScenarioResult[]> {
           headers,
           ...(method === 'GET' || method === 'HEAD' ? {} : { body: Buffer.concat(chunks) }),
         })
-        res.writeHead(upstream.status, Object.fromEntries(upstream.headers))
+        // Every Set-Cookie separately: a plain object would keep only the last one.
+        const forwarded: [string, string][] = [...upstream.headers].filter(
+          ([name]) => name !== 'set-cookie',
+        )
+        for (const cookie of upstream.headers.getSetCookie()) forwarded.push(['set-cookie', cookie])
+        res.writeHead(upstream.status, forwarded.flat())
         res.end(Buffer.from(await upstream.arrayBuffer()))
       } else if (url === '/browser.js') {
         res.writeHead(200, { 'content-type': 'text/javascript' }).end(bundle)
@@ -122,17 +159,63 @@ async function inBrowser(scenarios: Scenario[]): Promise<ScenarioResult[]> {
   const browser = await chromium.launch()
   try {
     const context = await browser.newContext()
-    // The console signs in by cookie; the browser sends it on same origin calls by itself.
-    if (consoleSession !== undefined) {
-      await context.addCookies([{ name: 'orvano_console', value: consoleSession, url: origin }])
-    }
     const page = await context.newPage()
     await page.goto(origin)
     await page.waitForFunction(() => typeof window.orvanoRunScenarios === 'function')
-    return await page.evaluate((s) => window.orvanoRunScenarios(s), scenarios)
+    const results = await page.evaluate(([s, p, c]) => window.orvanoRunScenarios(s, p, c), [
+      scenarios,
+      project,
+      consoleUser,
+    ] as const)
+    return [...results, await twoTabs(context, origin, () => refreshes)]
   } finally {
     await browser.close()
     server.close()
+  }
+}
+
+/**
+ * Spec 0004 AC-24 in a real browser: two tabs share one stored session about to expire and call
+ * at once. Exactly one refresh reaches Orvano (the Web Lock), and the second tab hears
+ * `tokenRefreshed`.
+ */
+async function twoTabs(
+  context: BrowserContext,
+  origin: string,
+  refreshes: () => number,
+): Promise<ScenarioResult> {
+  const name = 'browser: two tabs refresh once, and the other tab hears it (spec 0004 AC-24)'
+  try {
+    const [first, second] = [await context.newPage(), await context.newPage()]
+    for (const tab of [first, second]) {
+      await tab.goto(origin)
+      await tab.waitForFunction(() => typeof window.orvanoTabs === 'object')
+    }
+    await first.evaluate((p) => window.orvanoTabs.signUp(p), project)
+    for (const tab of [first, second])
+      await tab.evaluate((p) => {
+        window.orvanoTabs.watch(p)
+      }, project)
+    const before = refreshes()
+    const ids = await Promise.all(
+      [first, second].map((tab) => tab.evaluate(() => window.orvanoTabs.call())),
+    )
+    await second.waitForTimeout(200)
+    const events = await second.evaluate(() => window.orvanoTabs.events())
+    const count = refreshes() - before
+    if (ids[0] !== ids[1])
+      return { name, outcome: 'failed', reason: 'the tabs saw different users' }
+    if (count !== 1)
+      return { name, outcome: 'failed', reason: `${String(count)} refreshes reached Orvano` }
+    if (!events.includes('tokenRefreshed'))
+      return { name, outcome: 'failed', reason: `the second tab heard ${JSON.stringify(events)}` }
+    return { name, outcome: 'passed' }
+  } catch (error) {
+    return {
+      name,
+      outcome: 'failed',
+      reason: error instanceof Error ? error.message : String(error),
+    }
   }
 }
 
@@ -145,7 +228,7 @@ async function inWorkerd(scenarios: Scenario[]): Promise<ScenarioResult[]> {
     compatibilityDate: '2026-07-30',
     bindings: {
       ORVANO_ENDPOINT: endpoint,
-      ...(consoleSession === undefined ? {} : { ORVANO_CONSOLE_SESSION: consoleSession }),
+      ...fixtureEnv,
     },
   })
   try {
@@ -170,7 +253,7 @@ async function inNextjs(scenarios: Scenario[]): Promise<ScenarioResult[]> {
     env: {
       ...process.env,
       ORVANO_ENDPOINT: endpoint,
-      ...(consoleSession === undefined ? {} : { ORVANO_CONSOLE_SESSION: consoleSession }),
+      ...fixtureEnv,
     },
     stdio: ['ignore', 'inherit', 'inherit'],
   })
@@ -203,7 +286,7 @@ async function inNextjs(scenarios: Scenario[]): Promise<ScenarioResult[]> {
 async function run(target: Target, scenarios: Scenario[]): Promise<ScenarioResult[]> {
   switch (target) {
     case 'node':
-      return runScenarios(scenarios, createSurface(endpoint, { consoleSession }))
+      return runScenarios(scenarios, createSurface(endpoint, { consoleUser, project, apiKey }))
     case 'bun':
       return inRuntime('bun', ['run'], scenarios)
     case 'deno':

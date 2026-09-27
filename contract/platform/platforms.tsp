@@ -2,6 +2,7 @@
 import "@typespec/http";
 import "@typespec/openapi";
 import "../errors.tsp";
+import "../auth/security.tsp";
 
 using Http;
 using OpenAPI;
@@ -93,6 +94,7 @@ model UpdatePlatformRequest {
 
 @route("/v1/console/project/platforms")
 @tag("console")
+@useAuth(consoleSession)
 interface ConsolePlatformsApi {
   @doc("Lists the platforms of the project named by `X-Orvano-Project`.")
   @operationId("consolePlatforms.list")

@@ -2,7 +2,7 @@
 
 **Date**: 2026-09-26
 **Updated**: 2026-09-27 (`setupToken` on console sign up, `consoleInstall.getSetup` works without a session and has its own limit, spec 0006)
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 

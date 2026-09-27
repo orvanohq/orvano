@@ -89,8 +89,10 @@ public class SetupTokenTests(PostgresFixture postgres)
         // Every other console route still needs a session.
         using var settings = await http.GetAsync("/v1/console/install/settings", Ct);
         Assert.Equal(HttpStatusCode.Unauthorized, settings.StatusCode);
-        using var post = await http.PostAsync("/v1/console/install/setup", null, Ct);
-        Assert.Equal(HttpStatusCode.Unauthorized, post.StatusCode);
+        using var post = new HttpRequestMessage(HttpMethod.Post, "/v1/console/install/setup");
+        post.Headers.Add("Sec-Fetch-Site", "same-origin");
+        using var posted = await http.SendAsync(post, Ct);
+        Assert.Equal(HttpStatusCode.Unauthorized, posted.StatusCode);
     }
 
     [Fact]

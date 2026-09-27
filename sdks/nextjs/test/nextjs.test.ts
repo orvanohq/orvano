@@ -2,22 +2,39 @@ import { describe, expect, it } from 'vitest'
 
 import {
   CookieSessionStore,
+  accessCookie,
   createBrowserClient,
   createMiddlewareClient,
   createServerClient,
-  sessionCookie,
+  refreshCookie,
 } from '../src/index.js'
-import type { CookieOptions, CookieStore } from '../src/index.js'
+import type { AuthSession, CookieOptions, CookieStore } from '../src/index.js'
 
 const endpoint = 'https://orvano.example.com'
 const quiet = { warn: () => undefined }
 
+/** An unsigned JWT with the claims the cookie store reads; the store never checks signatures. */
+function jwt(claims: Record<string, unknown>): string {
+  const part = (value: unknown): string =>
+    btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  return `${part({ alg: 'ES256', kid: 'k' })}.${part(claims)}.c2ln`
+}
+
+const access = jwt({ sub: 'u', sid: 's1', exp: 1893456000 })
+const session: AuthSession = {
+  accessToken: access,
+  accessTokenExpiresAt: '2030-01-01T00:00:00.000Z',
+  refreshToken: 'orv_rt_x.y',
+  refreshTokenExpiresAt: '2030-01-31T00:00:00.000Z',
+  sessionId: 's1',
+}
+
 /** A Next.js style cookie jar that records writes. */
 function jar(
   initial: Record<string, string> = {},
-): CookieStore & { values: Map<string, string>; options: CookieOptions[] } {
+): CookieStore & { values: Map<string, string>; options: Map<string, CookieOptions> } {
   const values = new Map(Object.entries(initial))
-  const options: CookieOptions[] = []
+  const options = new Map<string, CookieOptions>()
   return {
     values,
     options,
@@ -27,72 +44,90 @@ function jar(
     },
     set: (name, value, opts) => {
       values.set(name, value)
-      options.push(opts)
+      options.set(name, opts)
     },
     delete: (name) => values.delete(name),
   }
 }
 
-/** A fake fetch answering health and recording the session header each call carried. */
-function recordingFetch(): { fetch: typeof fetch; sessions: (string | null)[] } {
-  const sessions: (string | null)[] = []
+/** A fake fetch answering health and recording the Authorization header each call carried. */
+function recordingFetch(): { fetch: typeof fetch; bearers: (string | null)[] } {
+  const bearers: (string | null)[] = []
   const fetch = (_input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-    sessions.push(new Headers(init?.headers).get('X-Orvano-Session'))
+    bearers.push(new Headers(init?.headers).get('Authorization'))
     return Promise.resolve(Response.json({ status: 'ok', version: '0.0.0' }))
   }
-  return { fetch, sessions }
+  return { fetch, bearers }
 }
 
-describe('createServerClient (AC-5)', () => {
-  it('forwards the orvano_session cookie as the session header', async () => {
-    const { fetch, sessions } = recordingFetch()
+describe('createServerClient (spec 0004 AC-23)', () => {
+  it('sends the access token from the orvano_access cookie as a bearer', async () => {
+    const { fetch, bearers } = recordingFetch()
 
     await createServerClient({
       endpoint,
       fetch,
       logger: quiet,
-      cookies: jar({ [sessionCookie]: 't' }),
+      cookies: jar({ [accessCookie]: access }),
     }).health.get()
 
-    expect(sessions).toEqual(['t'])
+    expect(bearers).toEqual([`Bearer ${access}`])
   })
 
-  it('sends no session when the cookie is missing or empty', async () => {
-    const { fetch, sessions } = recordingFetch()
+  it('sends no session when the cookie is missing, empty, or not a token', async () => {
+    const { fetch, bearers } = recordingFetch()
 
-    await createServerClient({ endpoint, fetch, logger: quiet, cookies: jar() }).health.get()
-    await createServerClient({
-      endpoint,
-      fetch,
-      logger: quiet,
-      cookies: jar({ [sessionCookie]: '' }),
-    }).health.get()
+    for (const cookies of [jar(), jar({ [accessCookie]: '' }), jar({ [accessCookie]: 'x' })])
+      await createServerClient({ endpoint, fetch, logger: quiet, cookies }).health.get()
 
-    expect(sessions).toEqual([null, null])
+    expect(bearers).toEqual([null, null, null])
   })
 })
 
-describe('CookieSessionStore (AC-5)', () => {
-  it('writes the session as an HttpOnly, Secure, SameSite=Lax cookie on the whole site', () => {
+describe('CookieSessionStore (spec 0004 AC-23)', () => {
+  it('writes the access token to a readable cookie and the refresh token to an HttpOnly one', () => {
     const cookies = jar()
 
-    new CookieSessionStore(cookies).set('t')
+    new CookieSessionStore(cookies).set(session)
 
-    expect(cookies.values.get('orvano_session')).toBe('t')
-    expect(cookies.options).toEqual([{ httpOnly: true, secure: true, sameSite: 'lax', path: '/' }])
+    expect(cookies.values.get(accessCookie)).toBe(access)
+    expect(cookies.values.get(refreshCookie)).toBe('orv_rt_x.y')
+    expect(cookies.options.get(accessCookie)).toEqual({
+      httpOnly: false,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      expires: new Date('2030-01-01T00:00:00Z'),
+    })
+    expect(cookies.options.get(refreshCookie)).toEqual({
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      expires: new Date('2030-01-31T00:00:00Z'),
+    })
+    expect([...cookies.options.values()].every((o) => !('domain' in o))).toBe(true)
   })
 
-  it('deletes the cookie when the session is cleared', () => {
-    const cookies = jar({ [sessionCookie]: 't' })
+  it('reads the session back from both cookies', () => {
+    const store = new CookieSessionStore(
+      jar({ [accessCookie]: access, [refreshCookie]: 'orv_rt_x.y' }),
+    )
+
+    expect(store.get()).toEqual({ ...session, refreshTokenExpiresAt: null })
+  })
+
+  it('deletes both cookies when the session is cleared', () => {
+    const cookies = jar({ [accessCookie]: access, [refreshCookie]: 'orv_rt_x.y' })
 
     new CookieSessionStore(cookies).set(null)
 
-    expect(cookies.values.has(sessionCookie)).toBe(false)
+    expect(cookies.values.size).toBe(0)
   })
 
   it('reads only where it cannot write, as in a server component', () => {
     const readOnly: CookieStore = {
-      get: () => ({ value: 't' }),
+      get: (name) => (name === accessCookie ? { value: access } : undefined),
       set: () => {
         throw new Error('Cookies can only be modified in a Server Action or Route Handler')
       },
@@ -100,17 +135,17 @@ describe('CookieSessionStore (AC-5)', () => {
     const store = new CookieSessionStore(readOnly)
 
     expect(() => {
-      store.set('new')
+      store.set(session)
     }).not.toThrow()
-    expect(store.get()).toBe('t')
+    expect(store.get()?.accessToken).toBe(access)
   })
 })
 
-describe('createMiddlewareClient (AC-5)', () => {
+describe('createMiddlewareClient (spec 0004 AC-23)', () => {
   it('reads the request cookie and writes a new session to the request and the response', async () => {
-    const request = jar({ [sessionCookie]: 't' })
+    const request = jar({ [accessCookie]: access })
     const response = jar()
-    const { fetch, sessions } = recordingFetch()
+    const { fetch, bearers } = recordingFetch()
     const orvano = createMiddlewareClient({
       endpoint,
       fetch,
@@ -120,12 +155,13 @@ describe('createMiddlewareClient (AC-5)', () => {
     })
 
     await orvano.health.get()
-    await orvano.client.session.set('t2')
+    const next = jwt({ sub: 'u', sid: 's1', exp: 1893457000 })
+    await orvano.client.session.set({ ...session, accessToken: next })
 
-    expect(sessions).toEqual(['t'])
-    expect([request.values.get(sessionCookie), response.values.get(sessionCookie)]).toEqual([
-      't2',
-      't2',
+    expect(bearers).toEqual([`Bearer ${access}`])
+    expect([request.values.get(accessCookie), response.values.get(accessCookie)]).toEqual([
+      next,
+      next,
     ])
   })
 })

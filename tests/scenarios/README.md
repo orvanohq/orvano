@@ -18,6 +18,20 @@ steps:
       version: $.version     # later steps can use '${version}' (quote it, YAML reads { } as a map)
 ```
 
+`${unique}` is built in: twelve random lowercase letters and digits, fresh for each scenario run, so
+runs against one server never collide on unique values such as emails. Client and server steps
+send the first fixture project as `X-Orvano-Project`, and server steps send that project's first
+fixture API key. A browser can't hold an API key, so there a server step whose operation needs a
+scope skips the scenario.
+
+Two runner operations are not in the contract. Their names have no dot, so they never collide
+with an operationId:
+
+| `op` | `as` | Input | Body |
+|---|---|---|---|
+| `signIn` | `client` | `body: { email, password }` | the sign in answer; the SDK's stored session is left alone, so a runner without client operations (.NET) gets a token too |
+| `verifyAccessToken` | `server` | `token`, optional `online: true` | `{ userId, sessionId, expiresAt }` from the server SDK's own check, or its `token_expired` / `invalid_token` error |
+
 SdkGen writes a test only dispatch table per language (`operationId` to the generated method), so
 each SDK has one small interpreter instead of one test per scenario. A step whose operation has no
 call for that role in an SDK (a `client` operation in the .NET SDK, for example) skips the scenario
@@ -36,3 +50,8 @@ on that surface.
 Start a server for them with `docker compose -f tests/scenarios/compose.yml up -d --build`; it
 listens on `http://localhost:8080` in the `Test` environment, where every response is checked
 against the contract.
+
+The api keeps its rate limits in memory (spec 0004), and every runner on one machine shares one
+IP, for example 60 sign ups an hour. When you run many surfaces against one server in a row and
+start getting 429 `rate_limited`, restart it (`docker compose -f tests/scenarios/compose.yml
+restart api`). CI gives each surface its own server.

@@ -7,8 +7,30 @@ internal static class Dispatch
     /// <summary>Every non console operation; a null call means the .NET SDK has none.</summary>
     public static readonly IReadOnlyDictionary<string, DispatchEntry> Operations = new Dictionary<string, DispatchEntry>(StringComparer.Ordinal)
     {
+        ["account.create"] = new(201, null, null),
+        ["account.createPasswordSession"] = new(201, null, null),
+        ["account.delete"] = new(204, null, null),
+        ["account.deleteCurrentSession"] = new(204, null, null),
+        ["account.deleteOtherSessions"] = new(204, null, null),
+        ["account.deleteSession"] = new(204, null, null),
+        ["account.get"] = new(200, async (client, input, ct) => Args.ToJson(await client.Account.GetAsync(cancellationToken: ct)), null),
+        ["account.listSessions"] = new(200, null, null),
+        ["account.refreshSession"] = new(200, null, null),
+        ["account.update"] = new(200, null, null),
+        ["account.updatePassword"] = new(204, null, null),
         ["health.get"] = new(200, async (client, input, ct) => Args.ToJson(await client.Health.GetAsync(cancellationToken: ct)), null),
+        ["keys.getJwks"] = new(200, async (client, input, ct) => Args.ToJson(await client.Keys.GetJwksAsync(Args.Required<string>(input, "projectId"), cancellationToken: ct)), null),
+        ["keys.getOpenIdConfiguration"] = new(200, async (client, input, ct) => Args.ToJson(await client.Keys.GetOpenIdConfigurationAsync(Args.Required<string>(input, "projectId"), cancellationToken: ct)), null),
         ["test.conflict"] = new(204, async (client, input, ct) => { await new TestService(client).ConflictAsync(cancellationToken: ct); return null; }, null),
         ["test.list"] = new(200, async (client, input, ct) => Args.ToJson(await new TestService(client).ListAsync(cursor: Args.Optional<string?>(input, "cursor"), limit: Args.Optional<int?>(input, "limit"), cancellationToken: ct)), (client, input, ct) => Args.CollectAsync(new TestService(client).ListAllAsync(limit: Args.Optional<int?>(input, "limit"), cancellationToken: ct), ct)),
+        ["users.block"] = new(200, async (client, input, ct) => Args.ToJson(await client.Users.BlockAsync(Args.Required<string>(input, "userId"), cancellationToken: ct)), null),
+        ["users.create"] = new(201, async (client, input, ct) => Args.ToJson(await client.Users.CreateAsync(Args.Required<CreateUserRequest>(input, "body"), cancellationToken: ct)), null),
+        ["users.delete"] = new(204, async (client, input, ct) => { await client.Users.DeleteAsync(Args.Required<string>(input, "userId"), cancellationToken: ct); return null; }, null),
+        ["users.deleteSession"] = new(204, async (client, input, ct) => { await client.Users.DeleteSessionAsync(Args.Required<string>(input, "userId"), Args.Required<string>(input, "sessionId"), cancellationToken: ct); return null; }, null),
+        ["users.deleteSessions"] = new(204, async (client, input, ct) => { await client.Users.DeleteSessionsAsync(Args.Required<string>(input, "userId"), cancellationToken: ct); return null; }, null),
+        ["users.get"] = new(200, async (client, input, ct) => Args.ToJson(await client.Users.GetAsync(Args.Required<string>(input, "userId"), cancellationToken: ct)), null),
+        ["users.list"] = new(200, async (client, input, ct) => Args.ToJson(await client.Users.ListAsync(email: Args.Optional<string?>(input, "email"), status: Args.Optional<string?>(input, "status"), createdAfter: Args.Optional<DateTimeOffset?>(input, "createdAfter"), createdBefore: Args.Optional<DateTimeOffset?>(input, "createdBefore"), cursor: Args.Optional<string?>(input, "cursor"), limit: Args.Optional<int?>(input, "limit"), cancellationToken: ct)), (client, input, ct) => Args.CollectAsync(client.Users.ListAllAsync(email: Args.Optional<string?>(input, "email"), status: Args.Optional<string?>(input, "status"), createdAfter: Args.Optional<DateTimeOffset?>(input, "createdAfter"), createdBefore: Args.Optional<DateTimeOffset?>(input, "createdBefore"), limit: Args.Optional<int?>(input, "limit"), cancellationToken: ct), ct)),
+        ["users.listSessions"] = new(200, async (client, input, ct) => Args.ToJson(await client.Users.ListSessionsAsync(Args.Required<string>(input, "userId"), cursor: Args.Optional<string?>(input, "cursor"), limit: Args.Optional<int?>(input, "limit"), cancellationToken: ct)), (client, input, ct) => Args.CollectAsync(client.Users.ListSessionsAllAsync(Args.Required<string>(input, "userId"), limit: Args.Optional<int?>(input, "limit"), cancellationToken: ct), ct)),
+        ["users.unblock"] = new(200, async (client, input, ct) => Args.ToJson(await client.Users.UnblockAsync(Args.Required<string>(input, "userId"), cancellationToken: ct)), null),
     };
 }

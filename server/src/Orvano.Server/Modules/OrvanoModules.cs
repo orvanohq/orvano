@@ -1,3 +1,4 @@
+using Orvano.Auth;
 using Orvano.Core.Modules;
 using Orvano.Platform;
 using Orvano.Server.Hosting;
@@ -12,6 +13,7 @@ internal static class OrvanoModules
     [
         new SystemModule(),
         new PlatformModule(),
+        new AuthModule(),
     ];
 
     /// <summary>

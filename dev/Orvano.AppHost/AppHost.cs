@@ -4,19 +4,19 @@
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Optional: pass `-- --OrvanoDev:Fixtures=true` to run api and worker in Test with the shared
-// scenario fixtures, and to give the console dev server the fixture console session, so the dev
-// console opens straight into the Fixtures org (spec 0005). Row 8 removes this switch.
-var useFixtures = bool.TryParse(builder.Configuration["OrvanoDev:Fixtures"], out var fixtures) && fixtures;
-var fixturesPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "tests", "scenarios", "fixtures.yaml"));
-
-// The first `consoleSessions` entry in tests/scenarios/fixtures.yaml. The duplication is accepted:
-// a mismatch fails loudly (the dev console lands on /sign-in), and row 8 deletes both.
-const string ConsoleDevSession = "test-console-session";
+// The console starts with no account: open /setup on the console dev server to create the first
+// admin (no setup token is set here, so the first sign up needs none), then sign in as usual.
 
 var noSymbols = new GenerateParameterDefault { MinLength = 32, Special = false };
 var adminPassword = builder.AddParameter("orvano-admin-password", noSymbols, secret: true, persist: true);
 var appPassword = builder.AddParameter("orvano-app-password", noSymbols, secret: true, persist: true);
+
+// The dev install's master key (spec 0002): 42 random letters and digits plus `A`, read as base64url
+// of 32 bytes (the last character's 2 unused bits must be zero), kept across runs so the local
+// database's encrypted secrets stay readable.
+var masterKey = builder.AddParameter("orvano-master-key",
+    new GenerateParameterDefault { MinLength = 42, Special = false }, secret: true, persist: true);
+var masterKeys = ReferenceExpression.Create($"kdev:{masterKey}A");
 
 var postgres = builder.AddPostgres("postgres")
     .WithImageTag("18.6")
@@ -31,18 +31,12 @@ var appDb = ReferenceExpression.Create(
     $"Host={endpoint.Property(EndpointProperty.Host)};Port={endpoint.Property(EndpointProperty.Port)};Username=orvano_app;Password={appPassword};Database=orvano");
 
 // One project, started once per role. No launch profile, so each role gets its own port.
-IResourceBuilder<ProjectResource> Role(string role)
-{
-    var fixtureRole = useFixtures && role is "api" or "worker";
-    var project = builder.AddProject<Projects.Orvano_Server>(role, launchProfileName: null)
+IResourceBuilder<ProjectResource> Role(string role) =>
+    builder.AddProject<Projects.Orvano_Server>(role, launchProfileName: null)
         .WithArgs(role)
-        .WithEnvironment("ASPNETCORE_ENVIRONMENT", fixtureRole ? "Test" : "Development")
+        .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
         .WithEnvironment("OTEL_SERVICE_NAME", $"orvano-{role}")
         .WaitFor(postgres);
-    return fixtureRole
-        ? project.WithEnvironment("ORVANO_TEST_FIXTURES", fixturesPath)
-        : project;
-}
 
 var migrate = Role("migrate")
     .WithEnvironment("ORVANO_DB_ADMIN_URL", adminDb);
@@ -54,9 +48,11 @@ IResourceBuilder<ProjectResource> LongRunning(string role) =>
         .WithHttpHealthCheck("/internal/readyz")
         .WaitForCompletion(migrate);
 
-var api = LongRunning("api");
+var api = LongRunning("api").WithEnvironment("ORVANO_MASTER_KEYS", masterKeys);
 var realtime = LongRunning("realtime");
-LongRunning("worker").WithEnvironment("ORVANO_DB_ADMIN_URL", adminDb);
+LongRunning("worker")
+    .WithEnvironment("ORVANO_DB_ADMIN_URL", adminDb)
+    .WithEnvironment("ORVANO_MASTER_KEYS", masterKeys);
 
 var console = builder.AddViteApp("console", "../../console")
     .WithPnpm()
@@ -64,9 +60,8 @@ var console = builder.AddViteApp("console", "../../console")
     .WithReference(realtime)
     .WaitFor(api);
 
-if (useFixtures)
-{
-    console.WithEnvironment("CONSOLE_DEV_SESSION", ConsoleDevSession);
-}
+// The console dev server is the install's public address here: it proxies /v1 to the api, so the
+// console stays same origin and access tokens name it as their issuer.
+api.WithEnvironment("ORVANO_PUBLIC_URL", console.GetEndpoint("http"));
 
 builder.Build().Run();

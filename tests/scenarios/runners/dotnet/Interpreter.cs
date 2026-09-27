@@ -18,7 +18,7 @@ internal sealed record ScenarioResult(string Name, string Outcome, string? Reaso
 
 /// <summary>The SDK clients a run uses, one per role. The .NET SDK is server side only, so both are <see cref="OrvanoClient"/>.</summary>
 /// <param name="Client">For <c>as: client</c> steps: no API key.</param>
-/// <param name="Server">For <c>as: server</c> steps: the scenario API key.</param>
+/// <param name="Server">For <c>as: server</c> steps: the fixture API key.</param>
 internal sealed record Surface(OrvanoClient Client, OrvanoClient Server);
 
 /// <summary>
@@ -58,7 +58,8 @@ internal static partial class Interpreter
 
     private static async Task RunScenarioAsync(JsonObject scenario, Surface surface, CancellationToken ct)
     {
-        var vars = new Dictionary<string, JsonNode?>(StringComparer.Ordinal);
+        // `${unique}` is fresh per scenario run, so runs never collide on unique values such as emails.
+        var vars = new Dictionary<string, JsonNode?>(StringComparer.Ordinal) { ["unique"] = JsonValue.Create(UniqueValue()) };
         var steps = scenario["steps"]!.AsArray();
         for (var i = 0; i < steps.Count; i++)
         {
@@ -89,7 +90,7 @@ internal static partial class Interpreter
                     "console" => throw new ScenarioSkipped("console steps run only in the JS interpreter"),
                     _ => throw new ScenarioFailure($"{where}: an operation step needs `as`"),
                 };
-                if (op is null || !Dispatch.Operations.TryGetValue(op, out var entry))
+                if (op is null || !RunnerDispatch.Operations.TryGetValue(op, out var entry) && !Dispatch.Operations.TryGetValue(op, out entry))
                     throw new ScenarioFailure($"{where}: the contract has no operation {op ?? "?"}");
                 var paginate = step["paginate"]?.GetValue<bool>() == true;
                 var call = (paginate ? entry.All : entry.Call)
@@ -128,6 +129,10 @@ internal static partial class Interpreter
     private static partial Regex Embedded();
 
     /// <summary>Replaces <c>${name}</c> with saved values; a string that is exactly one keeps the value's type.</summary>
+    /// <summary>Twelve lowercase letters and digits, random per call.</summary>
+    private static string UniqueValue() =>
+        System.Security.Cryptography.RandomNumberGenerator.GetString("0123456789abcdefghijklmnopqrstuvwxyz", 12);
+
     private static JsonNode? Substitute(JsonNode? node, Dictionary<string, JsonNode?> vars)
     {
         JsonNode? Lookup(string name) => vars.TryGetValue(name, out var value)

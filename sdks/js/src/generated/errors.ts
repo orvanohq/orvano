@@ -6,14 +6,28 @@ export const ErrorCode = {
   consoleSessionRequired: 'console_session_required',
   /** `contract_violation` */
   contractViolation: 'contract_violation',
+  /** `csrf_rejected` */
+  csrfRejected: 'csrf_rejected',
   /** `forbidden` */
   forbidden: 'forbidden',
+  /** `insufficient_scope` */
+  insufficientScope: 'insufficient_scope',
   /** `internal_error` */
   internalError: 'internal_error',
+  /** `invalid_api_key` */
+  invalidApiKey: 'invalid_api_key',
+  /** `invalid_credentials` */
+  invalidCredentials: 'invalid_credentials',
   /** `invalid_cursor` */
   invalidCursor: 'invalid_cursor',
+  /** `invalid_password` */
+  invalidPassword: 'invalid_password',
+  /** `invalid_refresh_token` */
+  invalidRefreshToken: 'invalid_refresh_token',
   /** `invalid_request` */
   invalidRequest: 'invalid_request',
+  /** `invalid_token` */
+  invalidToken: 'invalid_token',
   /** `last_owner` */
   lastOwner: 'last_owner',
   /** `not_found` */
@@ -22,14 +36,32 @@ export const ErrorCode = {
   orgNotActive: 'org_not_active',
   /** `org_not_empty` */
   orgNotEmpty: 'org_not_empty',
+  /** `origin_not_allowed` */
+  originNotAllowed: 'origin_not_allowed',
   /** `project_not_found` */
   projectNotFound: 'project_not_found',
   /** `project_not_ready` */
   projectNotReady: 'project_not_ready',
+  /** `rate_limited` */
+  rateLimited: 'rate_limited',
+  /** `server_busy` */
+  serverBusy: 'server_busy',
+  /** `session_not_found` */
+  sessionNotFound: 'session_not_found',
+  /** `session_required` */
+  sessionRequired: 'session_required',
   /** `setup_token_invalid` */
   setupTokenInvalid: 'setup_token_invalid',
   /** `signup_closed` */
   signupClosed: 'signup_closed',
+  /** `token_expired` */
+  tokenExpired: 'token_expired',
+  /** `user_already_exists` */
+  userAlreadyExists: 'user_already_exists',
+  /** `user_blocked` */
+  userBlocked: 'user_blocked',
+  /** `user_not_found` */
+  userNotFound: 'user_not_found',
 } as const
 
 /** One of the codes in {@link ErrorCode}. */

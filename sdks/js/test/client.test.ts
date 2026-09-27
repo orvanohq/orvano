@@ -1,12 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { Client, MemorySessionStore, Orvano, OrvanoError, sdkVersion } from '../src/index.js'
-import type { ClientConfig } from '../src/index.js'
+import type { AuthSession, ClientConfig } from '../src/index.js'
 import { Client as ServerClient, Orvano as ServerOrvano } from '../src/server.js'
 import { fakeFetch, health, problem, status } from './fake-fetch.js'
 
 const endpoint = 'https://orvano.example.com'
 const quiet = { warn: vi.fn() }
+
+const signedIn: AuthSession = {
+  accessToken: 't',
+  accessTokenExpiresAt: '2030-01-01T00:00:00Z',
+  refreshToken: 'r',
+  refreshTokenExpiresAt: '2030-01-31T00:00:00Z',
+  sessionId: 's',
+}
 
 function app(fetch: typeof globalThis.fetch, config: Partial<ClientConfig> = {}): Orvano {
   return new Orvano(new Client({ endpoint, fetch, logger: quiet, ...config }))
@@ -21,13 +29,14 @@ describe('headers', () => {
     expect(sent[0]?.headers.get('X-Orvano-SDK')).toBe(`@orvano/js/${sdkVersion}`)
   })
 
-  it('sends the project and the session token from the session store', async () => {
+  it('sends the project and the access token as a bearer (spec 0004 AC-7)', async () => {
     const { fetch, sent } = fakeFetch(health())
 
-    await app(fetch, { project: 'p1', session: new MemorySessionStore('t') }).health.get()
+    await app(fetch, { project: 'p1', session: new MemorySessionStore(signedIn) }).health.get()
 
     expect(sent[0]?.headers.get('X-Orvano-Project')).toBe('p1')
-    expect(sent[0]?.headers.get('X-Orvano-Session')).toBe('t')
+    expect(sent[0]?.headers.get('Authorization')).toBe('Bearer t')
+    expect(sent[0]?.headers.has('X-Orvano-Session')).toBe(false)
   })
 
   it('never sends an API key from the app entry (AC-4)', async () => {
@@ -36,7 +45,7 @@ describe('headers', () => {
     await app(fetch, { headers: {} }).health.get()
 
     expect(sent[0]?.headers.has('X-Orvano-Key')).toBe(false)
-    expect(sent[0]?.headers.has('X-Orvano-Session')).toBe(false)
+    expect(sent[0]?.headers.has('Authorization')).toBe(false)
   })
 
   it('sends the API key from the server entry (AC-4)', async () => {
@@ -230,5 +239,69 @@ describe('errors (AC-6)', () => {
       code: 'unknown',
       requestId: 'header-id',
     })
+  })
+})
+
+describe('session changes (spec 0004, x-orvano-session)', () => {
+  const tokens = {
+    accessToken: 'a2',
+    accessTokenExpiresAt: '2030-02-01T00:00:00Z',
+    refreshToken: 'orv_rt_x.y',
+    refreshTokenExpiresAt: '2030-03-01T00:00:00Z',
+    sessionId: 's2',
+  }
+
+  it('stores the session a sign in returns, and sends it on the next call', async () => {
+    const { fetch, sent } = fakeFetch(
+      () => Response.json({ user: { id: 'u' }, session: tokens }),
+      health(),
+    )
+    const orvano = app(fetch)
+
+    await orvano.client.request({ method: 'POST', path: '/v1/account', session: 'start' })
+    await orvano.health.get()
+
+    expect(await orvano.client.session.get()).toEqual(tokens)
+    expect(sent[1]?.headers.get('Authorization')).toBe('Bearer a2')
+  })
+
+  it('stores the tokens a refresh returns', async () => {
+    const { fetch } = fakeFetch(() => Response.json(tokens))
+    const orvano = app(fetch, { session: new MemorySessionStore(signedIn) })
+
+    await orvano.client.request({
+      method: 'POST',
+      path: '/v1/account/sessions/refresh',
+      session: 'refresh',
+    })
+
+    expect(await orvano.client.session.get()).toEqual(tokens)
+  })
+
+  it('clears the session after a sign out', async () => {
+    const { fetch } = fakeFetch(() => new Response(null, { status: 204 }))
+    const orvano = app(fetch, { session: new MemorySessionStore(signedIn) })
+
+    await orvano.client.request({
+      method: 'DELETE',
+      path: '/v1/account/sessions/current',
+      session: 'end',
+    })
+
+    expect(await orvano.client.session.get()).toBeNull()
+  })
+
+  it('keeps the session when the call fails', async () => {
+    const { fetch } = fakeFetch(problem(401, { code: 'invalid_credentials' }))
+    const orvano = app(fetch, { session: new MemorySessionStore(signedIn) })
+
+    await expect(
+      orvano.client.request({
+        method: 'POST',
+        path: '/v1/account/sessions/password',
+        session: 'start',
+      }),
+    ).rejects.toBeInstanceOf(OrvanoError)
+    expect(await orvano.client.session.get()).toEqual(signedIn)
   })
 })

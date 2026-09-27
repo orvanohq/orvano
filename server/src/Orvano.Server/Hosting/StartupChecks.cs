@@ -1,4 +1,5 @@
 using Npgsql;
+using Orvano.Auth.Domain;
 using Orvano.Core.Migrations;
 using Orvano.Platform.Contracts;
 
@@ -20,6 +21,25 @@ internal static class StartupChecks
         catch (Exception ex)
         {
             logger.LogCritical(ex, "Time zone data is missing; Orvano needs an image with tzdata and ICU");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Loads libsodium (NSec's native library) and computes the dummy password hash once, before the api serves anything
+    /// (spec 0004). This is also the image smoke test: an image whose native library fails to load on its architecture
+    /// refuses to start instead of failing on the first sign in.
+    /// </summary>
+    public static bool PasswordHashingAvailable(IServiceProvider services, ILogger logger)
+    {
+        try
+        {
+            services.GetRequiredService<PasswordHasher>();
+            return true;
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or TypeInitializationException or EntryPointNotFoundException or InvalidOperationException)
+        {
+            logger.LogCritical(ex, "Password hashing is unavailable: libsodium could not be loaded");
             return false;
         }
     }

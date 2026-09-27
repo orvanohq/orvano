@@ -21,9 +21,9 @@ describe('meetsRole (AC-22)', () => {
 })
 
 describe('nav registry (AC-15)', () => {
-  it('registers Projects for orgs and Overview for projects, with unique ids', () => {
+  it('registers Projects for orgs and Overview, Users, and Settings for projects, with unique ids', () => {
     expect(orgNav.map((entry) => entry.label)).toEqual(['Projects'])
-    expect(projectNav[0]?.label).toBe('Overview')
+    expect(projectNav.map((entry) => entry.label)).toEqual(['Overview', 'Users', 'Settings'])
     const ids = [...orgNav, ...projectNav].map((entry) => entry.id)
     expect(new Set(ids).size).toBe(ids.length)
   })

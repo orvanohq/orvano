@@ -4,6 +4,7 @@ import type { ClientSurface } from './generated/client.js'
 import type { ConsoleSurface } from './generated/console.js'
 import { consoleDispatch } from './generated/console-dispatch.js'
 import { dispatch } from './generated/dispatch.js'
+import { runnerDispatch } from './runner-dispatch.js'
 import type { ServerSurface } from './generated/server.js'
 import { testEventRegistry } from './generated/test-events.js'
 
@@ -36,11 +37,17 @@ export interface ScenarioResult {
   reason?: string
 }
 
-/** The SDK objects a surface offers, one per role. Without `console`, console steps skip. */
+/**
+ * The SDK objects a surface offers, one per role. Without `console`, console steps skip; without
+ * `serverKey` (a browser can't hold an API key), server steps that need a scope skip.
+ */
 export interface Surface {
   client: ClientSurface
   server: ServerSurface
   console?: ConsoleSurface | undefined
+  /** Signs the fixture console account in; console steps await it first. */
+  consoleReady?: (() => Promise<void>) | undefined
+  serverKey?: boolean
 }
 
 /** The package's events plus the test events, as the spec has runners decode them. */
@@ -73,7 +80,8 @@ export async function runScenarios(
 }
 
 async function runScenario(scenario: Scenario, surface: Surface): Promise<void> {
-  const vars = new Map<string, unknown>()
+  // `${unique}` is fresh per scenario run, so runs never collide on unique values such as emails.
+  const vars = new Map<string, unknown>([['unique', uniqueValue()]])
   for (const [index, step] of scenario.steps.entries()) {
     const where = `step ${String(index + 1)} (${step.op ?? `event ${step.event ?? '?'}`}${step.as === undefined ? '' : ` as ${step.as}`})`
     const expect = substitute(step.expect, vars) as ScenarioStep['expect']
@@ -87,7 +95,7 @@ async function runScenario(scenario: Scenario, surface: Surface): Promise<void> 
         throw new StepFailure(`${where}: the contract has no event ${step.event}`)
       body = JSON.parse(JSON.stringify(decoded)) as unknown
     } else {
-      const table = step.as === 'console' ? consoleDispatch : dispatch
+      const table = step.as === 'console' ? consoleDispatch : { ...dispatch, ...runnerDispatch }
       const entry = step.op === undefined ? undefined : table[step.op]
       if (entry === undefined)
         throw new StepFailure(
@@ -139,6 +147,8 @@ async function call(
       if (entry.client === undefined) throw missing('@orvano/js')
       return entry.client(surface.client, input)
     case 'server':
+      if (entry.scope !== undefined && surface.serverKey !== true)
+        throw new ScenarioSkipped(`${op} needs an API key, which this surface does not hold`)
       if (all) {
         if (entry.serverAll === undefined) throw missing('@orvano/js/server')
         return collect(entry.serverAll(surface.server, input))
@@ -147,7 +157,8 @@ async function call(
       return entry.server(surface.server, input)
     case 'console':
       if (surface.console === undefined)
-        throw new ScenarioSkipped('no console session on this surface (fixtures.yaml)')
+        throw new ScenarioSkipped('no console account on this surface (fixtures.yaml)')
+      await surface.consoleReady?.()
       if (all) {
         if (entry.consoleAll === undefined) throw missing('@orvano/console-client')
         return collect(entry.consoleAll(surface.console, input))
@@ -163,6 +174,12 @@ async function collect(items: AsyncIterable<unknown>): Promise<{ items: unknown[
   const all: unknown[] = []
   for await (const item of items) all.push(item)
   return { items: all }
+}
+
+/** Twelve lowercase letters and digits, random per call. */
+function uniqueValue(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(12))
+  return Array.from(bytes, (b) => '0123456789abcdefghijklmnopqrstuvwxyz'[b % 36]).join('')
 }
 
 /** Replaces `${name}` with saved values. A string that is exactly `${name}` keeps the value's type. */

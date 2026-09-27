@@ -1,0 +1,57 @@
+name: a user changes their name and password, then deletes themselves
+requires: []
+steps:
+  - op: account.create
+    as: client
+    input:
+      body:
+        { email: 'fay-${unique}@example.com', password: correct horse battery staple, name: Fay }
+    expect: { status: 201 }
+  - op: account.update
+    as: client
+    input:
+      body: { name: Fay Smith, metadata: { plan: pro } }
+    expect:
+      status: 200
+      body: { name: Fay Smith, metadata: { plan: pro } }
+  - op: account.updatePassword
+    as: client
+    input:
+      body: { currentPassword: wrong horse battery staple, newPassword: another horse battery }
+    expect: { status: 401, code: invalid_credentials }
+  - op: account.updatePassword
+    as: client
+    input:
+      body: { currentPassword: correct horse battery staple, newPassword: another horse battery }
+    expect: { status: 204 }
+  - op: account.get
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body: { name: Fay Smith }
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'fay-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 401, code: invalid_credentials }
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'fay-${unique}@example.com', password: another horse battery }
+    expect: { status: 201 }
+  - op: account.delete
+    as: client
+    input:
+      body: { password: another horse battery }
+    expect: { status: 204 }
+  # Deleting the account clears the SDK's stored session.
+  - op: account.get
+    as: client
+    input: {}
+    expect: { status: 401, code: session_required }
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'fay-${unique}@example.com', password: another horse battery }
+    expect: { status: 401, code: invalid_credentials }

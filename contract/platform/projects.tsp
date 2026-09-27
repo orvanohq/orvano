@@ -3,6 +3,7 @@
 import "@typespec/http";
 import "@typespec/openapi";
 import "../errors.tsp";
+import "../auth/security.tsp";
 import "./orgs.tsp";
 
 using Http;
@@ -83,6 +84,7 @@ model UpdateProjectRequest {
 
 @route("/v1/console/orgs/{orgId}/projects")
 @tag("console")
+@useAuth(consoleSession)
 interface ConsoleOrgProjectsApi {
   @doc("Lists an org's projects, deleting ones included.")
   @operationId("consoleProjects.list")
@@ -125,6 +127,7 @@ interface ConsoleOrgProjectsApi {
 
 @route("/v1/console/project")
 @tag("console")
+@useAuth(consoleSession)
 interface ConsoleProjectApi {
   @doc("Gets the project named by `X-Orvano-Project`, in any state.")
   @operationId("consoleProjects.get")

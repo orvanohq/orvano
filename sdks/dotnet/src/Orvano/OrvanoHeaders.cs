@@ -3,11 +3,11 @@ namespace Orvano;
 /// <summary>The headers the SDK sends and reads, named once.</summary>
 internal static class OrvanoHeaders
 {
-    /// <summary>Temporary until the auth spec (scope row 8): the API key.</summary>
+    /// <summary>The API key (spec 0004, the <c>apiKey</c> scheme).</summary>
     public const string ApiKey = "X-Orvano-Key";
 
-    /// <summary>Temporary until the auth spec (scope row 8): an app session token.</summary>
-    public const string Session = "X-Orvano-Session";
+    /// <summary>A user's access token as <c>Bearer &lt;token&gt;</c>, sent only by the online token check.</summary>
+    public const string Authorization = "Authorization";
 
     public const string Project = "X-Orvano-Project";
 

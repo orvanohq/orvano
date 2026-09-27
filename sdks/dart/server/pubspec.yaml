@@ -13,6 +13,8 @@ environment:
   sdk: ^3.8.0
 
 dependencies:
+  clock: ^1.1.2
+  dart_jsonwebtoken: ^3.4.1
   orvano_core: ^0.0.0
 
 dev_dependencies:

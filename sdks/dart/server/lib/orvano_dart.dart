@@ -9,6 +9,7 @@
 /// ```
 library;
 
+export 'src/access_tokens.dart' show VerifiedAccessToken;
 export 'src/client.dart' show Client;
 export 'src/generated/core_exports.dart';
 export 'src/generated/services.dart';

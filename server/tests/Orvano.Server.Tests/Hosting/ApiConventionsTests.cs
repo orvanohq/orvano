@@ -11,7 +11,7 @@ namespace Orvano.Server.Tests.Hosting;
 // below has passed that check too.
 public class ApiConventionsTests(PostgresFixture postgres)
 {
-    private const string ConsoleSession = "console-session-for-tests";
+    private const string ConsoleUser = "console-conventions@x.com";
 
     [Fact]
     public async Task A_console_route_answers_a_valid_console_session()
@@ -19,7 +19,7 @@ public class ApiConventionsTests(PostgresFixture postgres)
         await using var api = await StartApiAsync("Test");
         using var http = api.Http();
 
-        using var response = await http.SendAsync(Console(ConsoleSession), Ct);
+        using var response = await http.SendAsync(Console(await ConsoleSignIn.CookieAsync(http, ConsoleUser, Ct)), Ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var body = await JsonAsync(response);
@@ -28,12 +28,12 @@ public class ApiConventionsTests(PostgresFixture postgres)
 
     [Theory]
     [InlineData("X-Orvano-Key", "test-server-key")]
-    [InlineData("X-Orvano-Session", "an-app-session")]
+    [InlineData("Authorization", "Bearer an-app-access-token")]
     public async Task A_console_route_rejects_an_API_key_or_an_app_session_even_with_a_console_session(string header, string value)
     {
         await using var api = await StartApiAsync("Test");
         using var http = api.Http();
-        using var request = Console(ConsoleSession);
+        using var request = Console(await ConsoleSignIn.CookieAsync(http, ConsoleUser, Ct));
         request.Headers.Add(header, value);
 
         using var response = await http.SendAsync(request, Ct);
@@ -160,12 +160,12 @@ public class ApiConventionsTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task No_console_session_is_valid_outside_the_Test_environment()
+    public async Task A_made_up_console_cookie_is_refused_in_Production()
     {
         await using var api = await StartApiAsync("Production");
         using var http = api.Http();
 
-        using var response = await http.SendAsync(Console(ConsoleSession), Ct);
+        using var response = await http.SendAsync(Console("eyJhbGciOiJFUzI1NiJ9.e30.c2ln"), Ct);
 
         await AssertProblemAsync(response, HttpStatusCode.Unauthorized, ErrorCode.ConsoleSessionRequired);
     }
@@ -213,7 +213,7 @@ public class ApiConventionsTests(PostgresFixture postgres)
     private static async Task<string> WriteFixturesAsync()
     {
         var path = Path.Combine(Path.GetTempPath(), $"orvano-fixtures-{Guid.NewGuid():N}.yaml");
-        await File.WriteAllTextAsync(path, $"consoleSessions:\n  - {ConsoleSession}\n", Ct);
+        await File.WriteAllTextAsync(path, ConsoleSignIn.Fixtures(ConsoleUser), Ct);
         return path;
     }
 

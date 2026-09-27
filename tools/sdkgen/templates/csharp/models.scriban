@@ -1,5 +1,5 @@
 // {{ header }}
-{{~ if enums.size > 0 ~}}
+{{~ if uses_json ~}}
 using System.Text.Json;
 {{~ end ~}}
 using System.Text.Json.Serialization;

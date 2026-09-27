@@ -2,6 +2,7 @@
 import "@typespec/http";
 import "@typespec/openapi";
 import "../errors.tsp";
+import "../auth/security.tsp";
 
 using Http;
 using OpenAPI;
@@ -83,6 +84,7 @@ model UpdateOrgRequest {
 
 @route("/v1/console/orgs")
 @tag("console")
+@useAuth(consoleSession)
 interface ConsoleOrgsApi {
   @doc("Lists the orgs the caller is a member of, deleting ones included.")
   @operationId("consoleOrgs.list")

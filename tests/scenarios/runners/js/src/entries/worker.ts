@@ -6,14 +6,22 @@ import { createSurface } from '../surface.js'
 
 interface Env {
   ORVANO_ENDPOINT: string
-  ORVANO_CONSOLE_SESSION?: string
+  ORVANO_CONSOLE_EMAIL?: string
+  ORVANO_CONSOLE_PASSWORD?: string
+  ORVANO_PROJECT?: string
+  ORVANO_API_KEY?: string
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const scenarios = (await request.json()) as Scenario[]
     const surface = createSurface(env.ORVANO_ENDPOINT, {
-      consoleSession: env.ORVANO_CONSOLE_SESSION,
+      consoleUser:
+        env.ORVANO_CONSOLE_EMAIL === undefined || env.ORVANO_CONSOLE_PASSWORD === undefined
+          ? undefined
+          : { email: env.ORVANO_CONSOLE_EMAIL, password: env.ORVANO_CONSOLE_PASSWORD },
+      project: env.ORVANO_PROJECT,
+      apiKey: env.ORVANO_API_KEY,
     })
     return Response.json(await runScenarios(scenarios, surface))
   },

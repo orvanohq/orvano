@@ -7,6 +7,7 @@ ARG TARGETARCH
 WORKDIR /src
 
 COPY global.json Directory.Build.props Directory.Packages.props VERSION ./
+COPY server/src/Orvano.Auth/Orvano.Auth.csproj server/src/Orvano.Auth/
 COPY server/src/Orvano.Contract/Orvano.Contract.csproj server/src/Orvano.Contract/
 COPY server/src/Orvano.Core/Orvano.Core.csproj server/src/Orvano.Core/
 COPY server/src/Orvano.Platform/Orvano.Platform.csproj server/src/Orvano.Platform/

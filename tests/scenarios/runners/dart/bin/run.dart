@@ -22,7 +22,14 @@ Future<void> main() async {
     for (final f in files) parseScenario(f.readAsStringSync()),
   ];
 
-  final surface = Surface.connect(endpoint);
+  final fixtures = File.fromUri(
+    dir.uri.resolve('fixtures.yaml'),
+  ).readAsStringSync();
+  final surface = Surface.connect(
+    endpoint,
+    project: fixtureProject(fixtures),
+    apiKey: fixtureApiKey(fixtures),
+  );
   final results = await runScenarios(scenarios, surface);
   surface.close();
 

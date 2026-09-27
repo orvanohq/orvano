@@ -40,10 +40,39 @@ internal sealed record ModelType(string Name) : TypeRef;
 
 internal sealed record EnumType(string Name) : TypeRef;
 
+/// <summary>Any JSON value (TypeSpec <c>unknown</c>), for data the API stores without a schema, such as user metadata.</summary>
+internal sealed record JsonValueType : TypeRef
+{
+    public static JsonValueType Instance { get; } = new();
+}
+
+/// <summary>What a successful call does to the client's stored session, from <c>x-orvano-session</c>.</summary>
+internal enum SessionEffect
+{
+    None,
+
+    /// <summary>A sign in: the response's <c>session</c> becomes the stored session.</summary>
+    Start,
+
+    /// <summary>A refresh: the response itself is the new session.</summary>
+    Refresh,
+
+    /// <summary>A sign out: the stored session is cleared.</summary>
+    End,
+
+    /// <summary>The signed in user changed: the session stays, and the client tells its listeners.</summary>
+    User,
+}
+
 // Optional: not in the schema's `required` list, omitted from JSON when null.
 // Nullable: the value may be JSON null.
 // Example: the first `@example` value, which docs snippets use (AC-15); null when there is none.
-internal sealed record ContractProperty(string Name, TypeRef Type, bool Optional, bool Nullable, string? Doc, JsonNode? Example = null);
+// Wire: the JSON name. It equals Name except in a model marked `x-orvano-standard-names`, whose snake_case wire
+// names (a standard document's, such as OpenID discovery) get camelCase names in code.
+internal sealed record ContractProperty(string Name, TypeRef Type, bool Optional, bool Nullable, string? Doc, JsonNode? Example = null)
+{
+    public string Wire { get; init; } = Name;
+}
 
 // Test: marked `x-orvano-test`, so it reaches only the scenario runners and the server (AC-18).
 // Event: the `x-orvano-event` name when this model is an event payload (AC-8).
@@ -73,7 +102,9 @@ internal sealed record ContractOperation(
     TypeRef? Result,
     bool Idempotent,
     bool Test,
-    TypeRef? PageItem)
+    TypeRef? PageItem,
+    SessionEffect Session = SessionEffect.None,
+    string? Scope = null)
 {
     public bool IsClient => Audience is Audience.Client or Audience.Both;
 

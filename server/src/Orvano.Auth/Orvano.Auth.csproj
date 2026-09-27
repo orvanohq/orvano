@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Auth module (spec 0004): app users and console accounts, passwords, sessions, and token signing keys.
+       Public types live only in the Contracts namespace; the host reaches the module entry point through
+       InternalsVisibleTo. It reaches the Platform module only through Orvano.Platform.Contracts. -->
+  <PropertyGroup>
+    <RootNamespace>Orvano.Auth</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orvano.Contract\Orvano.Contract.csproj" />
+    <ProjectReference Include="..\Orvano.Core\Orvano.Core.csproj" />
+    <ProjectReference Include="..\Orvano.Platform\Orvano.Platform.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="NSec.Cryptography" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="orvano" />
+    <InternalsVisibleTo Include="Orvano.Server.Tests" />
+    <InternalsVisibleTo Include="Orvano.ModelDriftCheck" />
+  </ItemGroup>
+
+</Project>

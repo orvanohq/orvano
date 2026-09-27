@@ -10,6 +10,48 @@ import 'generated/version.dart';
 import 'orvano_exception.dart';
 import 'version.dart';
 
+/// What a successful call does to the client's stored session, from the
+/// contract's `x-orvano-session`.
+enum SessionChange {
+  /// A sign in: the response's `session` becomes the stored session.
+  start,
+
+  /// A refresh: the response itself is the new session.
+  refresh,
+
+  /// A sign out: the stored session is cleared.
+  end,
+
+  /// The signed in user changed: the session stays, and listeners hear
+  /// [AuthEvent.userUpdated].
+  user,
+}
+
+/// How a client trades a session for a fresh one. Throws an
+/// [OrvanoException] with status 401 when the session is over; any other
+/// error (a network error, a timeout) keeps the session.
+typedef SessionRefresher =
+    Future<AuthSession> Function(AuthSession session, Client client);
+
+/// A client refreshes before a call when less than this is left of the
+/// access token (spec 0004, AC-26).
+const refreshMargin = Duration(seconds: 60);
+
+/// The default [SessionRefresher]: `account.refreshSession` with the stored
+/// refresh token.
+Future<AuthSession> refreshWithToken(
+  AuthSession session,
+  Client client,
+) async => AuthSession.fromJson(
+  await client.send(
+    'POST',
+    '/v1/account/sessions/refresh',
+    body: {'refreshToken': session.refreshToken},
+    idempotent: true,
+    anonymous: true,
+  ),
+);
+
 /// Per call settings, the last argument of every generated method.
 final class RequestOptions {
   /// Creates options for one call.
@@ -23,7 +65,10 @@ final class RequestOptions {
 /// Sends requests to one Orvano server. Generated services (`orvano.health`,
 /// ...) all send through a [Client]. It retries safe calls (GET, HEAD, and
 /// operations marked idempotent) on 429 and 503, honoring `Retry-After`, and
-/// gives every call a timeout.
+/// gives every call a timeout. When someone is signed in it sends their
+/// access token, refreshes it before a call when under a minute is left, and
+/// after a 401 for an expired or refused token refreshes once and repeats the
+/// call once (spec 0004, AC-26). Nothing refreshes on a timer.
 base class Client {
   /// Creates a client for the server at [endpoint], for example
   /// `https://orvano.example.com`. [session] holds the signed in user's
@@ -41,8 +86,10 @@ base class Client {
     this.maxRetries = 3,
     http.Client? httpClient,
     void Function(String message)? onWarning,
+    SessionRefresher? refresh,
   }) : endpoint = _parseEndpoint(endpoint),
        session = session ?? MemorySessionStore(),
+       _refresher = refresh ?? refreshWithToken,
        _headers = Map.unmodifiable(headers),
        _http = httpClient ?? http.Client(),
        _onWarning = onWarning ?? print;
@@ -67,7 +114,20 @@ base class Client {
   final http.Client _http;
   final void Function(String message) _onWarning;
   final Random _random = Random();
+  final SessionRefresher _refresher;
+  final _changes = StreamController<AuthStateChange>.broadcast();
+  Future<AuthSession?>? _refreshing;
   bool _versionChecked = false;
+
+  /// Every change to the signed in user: [AuthEvent.signedIn],
+  /// [AuthEvent.signedOut], [AuthEvent.tokenRefreshed], and
+  /// [AuthEvent.userUpdated].
+  Stream<AuthStateChange> get authStateChanges => _changes.stream;
+
+  /// The signed in user's session, refreshed first when under a minute of
+  /// its access token is left; null when nobody is signed in. Call it when
+  /// the app wakes up (`orvano_flutter` does, on resume).
+  Future<AuthSession?> getSession() => _sessionForCall();
 
   /// The SDK's name, sent with its version in `X-Orvano-SDK`. Packages that
   /// build on this client name themselves here.
@@ -87,24 +147,127 @@ base class Client {
     return endpoint.replaceFirst(RegExp(r'/+$'), '');
   }
 
-  /// Adds this client's credentials to an outgoing request: the session
-  /// token, when there is one. Clients for other audiences add theirs here
-  /// too.
-  Future<void> authorize(Map<String, String> headers) async {
-    final token = await session.read();
-    if (token != null && token.isNotEmpty) headers[sessionHeader] = token;
+  /// Adds this client's credentials to an outgoing request: the signed in
+  /// user's access token as `Authorization: Bearer`, when there is one
+  /// ([current]). Clients for other audiences add theirs here too.
+  Future<void> authorize(
+    Map<String, String> headers,
+    AuthSession? current,
+  ) async {
+    if (current != null) {
+      headers[authorizationHeader] = 'Bearer ${current.accessToken}';
+    }
   }
 
   /// Sends one request and returns the decoded JSON body, or null when the
   /// response has none. Throws [OrvanoException] on a failure status and
   /// [TimeoutException] when the call takes longer than its timeout.
+  ///
+  /// [bearer] sends that access token as `Authorization: Bearer` instead of
+  /// this client's own credentials, so a call made as a user never carries an
+  /// API key. [noCache] sends `Cache-Control: no-cache`. [anonymous] sends no
+  /// user credentials and never refreshes first (the refresh call itself).
   Future<Object?> send(
     String method,
     String path, {
     Map<String, String?> query = const {},
     Object? body,
     bool idempotent = false,
+    SessionChange? session,
     RequestOptions? options,
+    String? bearer,
+    bool noCache = false,
+    bool anonymous = false,
+  }) async {
+    final asUser =
+        !anonymous &&
+        bearer == null &&
+        session != SessionChange.start &&
+        session != SessionChange.refresh;
+    final current = asUser ? await _sessionForCall() : null;
+    Future<Object?> attempt(AuthSession? user) => _send(
+      method,
+      path,
+      query: query,
+      body: body,
+      idempotent: idempotent,
+      change: session,
+      options: options,
+      bearer: bearer,
+      noCache: noCache,
+      user: user,
+    );
+    try {
+      return await attempt(current);
+    } on OrvanoException catch (e) {
+      // Refused before it did anything, so repeating any method once is safe.
+      if (current == null || !_isStaleToken(e)) rethrow;
+      final fresh = await _refresh(current);
+      if (fresh == null) rethrow;
+      return attempt(fresh);
+    }
+  }
+
+  static bool _isStaleToken(OrvanoException e) =>
+      e.status == 401 &&
+      (e.code == 'token_expired' || e.code == 'invalid_token');
+
+  /// The stored session, refreshed first when under [refreshMargin] is left.
+  Future<AuthSession?> _sessionForCall() async {
+    final current = await session.read();
+    if (current == null ||
+        current.accessTokenExpiresAt.difference(DateTime.now()) >=
+            refreshMargin) {
+      return current;
+    }
+    try {
+      return await _refresh(current);
+    } on Object {
+      // A network error or timeout keeps the session; the call goes ahead
+      // with the current token.
+      return current;
+    }
+  }
+
+  /// Trades [stale] for a fresh session, once per client at a time. Returns
+  /// null when the session is over (a 401: the store is cleared and
+  /// listeners hear [AuthEvent.signedOut]); rethrows anything else, keeping
+  /// the session.
+  Future<AuthSession?> _refresh(AuthSession stale) =>
+      _refreshing ??= _refreshNow(stale).whenComplete(() => _refreshing = null);
+
+  Future<AuthSession?> _refreshNow(AuthSession stale) async {
+    // A call racing this one may have refreshed already.
+    final current = await session.read();
+    if (current == null) return null;
+    if (current.accessToken != stale.accessToken) return current;
+    try {
+      final fresh = await _refresher(current, this);
+      await _save(fresh, AuthEvent.tokenRefreshed);
+      return fresh;
+    } on OrvanoException catch (e) {
+      if (e.status != 401) rethrow;
+      await _save(null, AuthEvent.signedOut);
+      return null;
+    }
+  }
+
+  Future<void> _save(AuthSession? next, AuthEvent event) async {
+    await session.write(next);
+    if (!_changes.isClosed) _changes.add(AuthStateChange(event, next));
+  }
+
+  Future<Object?> _send(
+    String method,
+    String path, {
+    required Map<String, String?> query,
+    required Object? body,
+    required bool idempotent,
+    required SessionChange? change,
+    required RequestOptions? options,
+    required String? bearer,
+    required bool noCache,
+    required AuthSession? user,
   }) async {
     final params = {for (final e in query.entries) e.key: ?e.value};
     var uri = Uri.parse('$endpoint$path');
@@ -123,10 +286,17 @@ base class Client {
           sdkHeader: '$sdkName/$sdkVersion',
           'X-Orvano-Project': ?project,
         };
-        await authorize(headers);
-        final request =
-            http.AbortableRequest(method, uri, abortTrigger: deadline?.future)
-              ..headers.addAll(headers);
+        if (bearer != null) {
+          headers[authorizationHeader] = 'Bearer $bearer';
+        } else {
+          await authorize(headers, user);
+        }
+        if (noCache) headers['Cache-Control'] = 'no-cache';
+        final request = http.AbortableRequest(
+          method,
+          uri,
+          abortTrigger: deadline?.future,
+        )..headers.addAll(headers);
         if (encoded != null) {
           request.headers['Content-Type'] = 'application/json';
           request.body = encoded;
@@ -142,10 +312,12 @@ base class Client {
         _checkVersion(response.headers[serverVersionHeader.toLowerCase()]);
         final status = response.statusCode;
         if (status >= 200 && status < 300) {
-          if (status == 204 || method == 'HEAD' || response.body.isEmpty) {
-            return null;
-          }
-          return jsonDecode(response.body);
+          final Object? result =
+              status == 204 || method == 'HEAD' || response.body.isEmpty
+              ? null
+              : jsonDecode(response.body);
+          await _applySession(change, result);
+          return result;
         }
 
         if (retryable &&
@@ -165,6 +337,28 @@ base class Client {
       }
     } finally {
       timer?.cancel();
+    }
+  }
+
+  /// Stores or clears the session after a successful sign in, refresh, or
+  /// sign out.
+  Future<void> _applySession(SessionChange? change, Object? result) async {
+    switch (change) {
+      case null:
+        return;
+      case SessionChange.start:
+        final body = result is Map<String, dynamic> ? result : null;
+        await _save(AuthSession.fromJson(body?['session']), AuthEvent.signedIn);
+      case SessionChange.refresh:
+        await _save(AuthSession.fromJson(result), AuthEvent.tokenRefreshed);
+      case SessionChange.end:
+        await _save(null, AuthEvent.signedOut);
+      case SessionChange.user:
+        if (!_changes.isClosed) {
+          _changes.add(
+            AuthStateChange(AuthEvent.userUpdated, await session.read()),
+          );
+        }
     }
   }
 
@@ -208,6 +402,10 @@ base class Client {
     return Duration(microseconds: (_random.nextDouble() * ceiling).round());
   }
 
-  /// Closes the underlying HTTP client. The client can't be used afterwards.
-  void close() => _http.close();
+  /// Closes the underlying HTTP client and [authStateChanges]. The client
+  /// can't be used afterwards.
+  void close() {
+    _http.close();
+    unawaited(_changes.close());
+  }
 }

@@ -10,8 +10,8 @@ namespace Orvano.Server.Tests.Platform;
 // checked against the contract: the console path from an org to a scoped key and a web and a Flutter platform.
 public class ConsoleApiTests(PostgresFixture postgres)
 {
-    private const string Session = "console-api-tests";
-    private const string OtherSession = "console-api-tests-other";
+    private const string Session = "console-api-tests@x.com";
+    private const string OtherSession = "console-api-tests-other@x.com";
     private const string FixtureProject = "fixtureproject0001";
     private const string FixtureSecret = "orv_sk_fixtureFixtureFixtureFixtureFixtureFixture0";
 
@@ -124,7 +124,7 @@ public class ConsoleApiTests(PostgresFixture postgres)
     private static async Task<Reply> SendAsync(HttpClient http, HttpMethod method, string url, object? body, string? project = null, string session = Session)
     {
         using var request = new HttpRequestMessage(method, url);
-        request.Headers.Add("Cookie", $"orvano_console={session}");
+        await ConsoleSignIn.AuthorizeAsync(http, request, session, Ct);
         if (project is not null) request.Headers.Add("X-Orvano-Project", project);
         if (body is not null) request.Content = JsonContent.Create(body);
         using var response = await http.SendAsync(request, Ct);
@@ -136,7 +136,7 @@ public class ConsoleApiTests(PostgresFixture postgres)
         HttpClient http, HttpMethod method, string url, object? body, string? project, HttpStatusCode status, string code, string session = Session)
     {
         using var reply = await SendAsync(http, method, url, body, project, session);
-        Assert.Equal(status, reply.Status);
+        Assert.True(status == reply.Status, $"{method} {url}: expected {status}, got {reply.Status}: {reply.Document?.RootElement}");
         Assert.Equal(code, reply.Body.GetProperty("code").GetString());
     }
 
@@ -144,10 +144,7 @@ public class ConsoleApiTests(PostgresFixture postgres)
     {
         var path = Path.Combine(Path.GetTempPath(), $"orvano-fixtures-{Guid.NewGuid():N}.yaml");
         await File.WriteAllTextAsync(path, $"""
-            consoleSessions:
-              - {Session}
-              - {OtherSession}
-            projects:
+            {ConsoleSignIn.Fixtures(Session, OtherSession)}projects:
               - id: {FixtureProject}
                 name: Fixture project
             apiKeys:

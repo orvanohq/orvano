@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Orvano.Auth\Orvano.Auth.csproj" />
     <ProjectReference Include="..\Orvano.Contract\Orvano.Contract.csproj" />
     <ProjectReference Include="..\Orvano.Core\Orvano.Core.csproj" />
     <ProjectReference Include="..\Orvano.Platform\Orvano.Platform.csproj" />
@@ -29,6 +30,7 @@
 
   <ItemGroup>
     <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
     <PackageReference Include="Npgsql.OpenTelemetry" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />

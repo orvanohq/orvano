@@ -21,7 +21,7 @@ public class MigrationRunnerTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Creates_schema_orvano_owned_by_orvano_admin_with_the_kernel_and_platform_tables()
+    public async Task Creates_schema_orvano_owned_by_orvano_admin_with_the_kernel_platform_and_auth_tables()
     {
         await using var database = await postgres.NewDatabaseAsync();
 
@@ -34,6 +34,7 @@ public class MigrationRunnerTests(PostgresFixture postgres)
         Assert.Equal("orvano_admin", owner);
         Assert.Equal(
         [
+            "auth_passwords", "auth_sessions", "auth_signing_keys", "auth_users",
             "events", "jobs", "platform_api_keys", "platform_install_admins", "platform_install_settings",
             "platform_memberships", "platform_orgs", "platform_platforms", "platform_projects", "schema_migrations",
         ], tables);

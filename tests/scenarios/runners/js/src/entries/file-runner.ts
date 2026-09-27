@@ -13,6 +13,14 @@ if (file === undefined || endpoint === undefined) {
 }
 
 const scenarios = JSON.parse(await readFile(file, 'utf8')) as Scenario[]
-const surface = createSurface(endpoint, { consoleSession: process.env.ORVANO_CONSOLE_SESSION })
+const surface = createSurface(endpoint, {
+  consoleUser:
+    process.env.ORVANO_CONSOLE_EMAIL === undefined ||
+    process.env.ORVANO_CONSOLE_PASSWORD === undefined
+      ? undefined
+      : { email: process.env.ORVANO_CONSOLE_EMAIL, password: process.env.ORVANO_CONSOLE_PASSWORD },
+  project: process.env.ORVANO_PROJECT,
+  apiKey: process.env.ORVANO_API_KEY,
+})
 const results = await runScenarios(scenarios, surface)
 console.log('ORVANO_SCENARIO_RESULTS ' + JSON.stringify(results))

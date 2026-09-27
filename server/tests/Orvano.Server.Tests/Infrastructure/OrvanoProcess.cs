@@ -42,6 +42,7 @@ public sealed class OrvanoProcess : IAsyncDisposable
         }
 
         if (port is not null) start.Environment["ASPNETCORE_URLS"] = $"http://127.0.0.1:{port}";
+        foreach (var (key, value) in Defaults) start.Environment[key] = value;
         foreach (var (key, value) in env) start.Environment[key] = value;
 
         _process = new Process { StartInfo = start, EnableRaisingEvents = true };
@@ -55,6 +56,22 @@ public sealed class OrvanoProcess : IAsyncDisposable
     /// start without one while the install has no admin (spec 0006, AC-21).
     /// </summary>
     public const string SetupToken = "ost_test-setup-token-00000000000000000000000000";
+
+    /// <summary>A throwaway <c>ORVANO_MASTER_KEYS</c> value (32 bytes), for every test that starts api or worker.</summary>
+    public const string MasterKeys = "ktest:b3J2YW5vLXNlcnZlci10ZXN0cy1tYXN0ZXIta2V5ISE=";
+
+    /// <summary>The <c>ORVANO_PUBLIC_URL</c> every test process gets unless it sets its own.</summary>
+    public const string PublicUrl = "http://localhost:8080";
+
+    /// <summary>
+    /// Settings every process gets unless the test sets its own (a test that proves a setting is required sets it to
+    /// an empty string, which the server treats as unset).
+    /// </summary>
+    private static readonly Dictionary<string, string> Defaults = new(StringComparer.Ordinal)
+    {
+        ["ORVANO_MASTER_KEYS"] = MasterKeys,
+        ["ORVANO_PUBLIC_URL"] = PublicUrl,
+    };
 
     /// <summary>The HTTP port for a long running role, or null for one shot commands.</summary>
     public int? Port { get; }
@@ -90,7 +107,8 @@ public sealed class OrvanoProcess : IAsyncDisposable
         await _process.WaitForExitAsync(TestContext.Current.CancellationToken); // drains redirected output
     }
 
-    public HttpClient Http() => new()
+    /// <summary>A client for this process. It keeps no cookies of its own: tests send the ones they mean to.</summary>
+    public HttpClient Http() => new(new SocketsHttpHandler { UseCookies = false })
     {
         BaseAddress = new Uri($"http://127.0.0.1:{Port ?? throw new InvalidOperationException("This process does not listen.")}"),
         Timeout = TimeSpan.FromSeconds(5),

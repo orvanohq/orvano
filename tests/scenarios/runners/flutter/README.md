@@ -12,7 +12,9 @@ dart run tool/copy_scenarios.dart
 flutter test integration_test -d <ios simulator id> --dart-define=ORVANO_ENDPOINT=http://localhost:8080
 ```
 
-On an Android emulator use `--dart-define=ORVANO_ENDPOINT=http://10.0.2.2:8080`. On Chrome, run
+On an Android emulator, run `adb reverse tcp:8080 tcp:8080` first and keep
+`http://localhost:8080`: the endpoint must match the server's `ORVANO_PUBLIC_URL`, or access
+tokens don't verify against their issuer. On Chrome, run
 it through `flutter drive` with `chromedriver --port=4444` running:
 
 ```bash

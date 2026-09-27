@@ -1,0 +1,351 @@
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using NpgsqlTypes;
+using Orvano.Auth.Data;
+using Orvano.Auth.Domain;
+using Orvano.Platform.Contracts;
+
+namespace Orvano.Auth.Application;
+
+/// <summary>A session's tokens as the API returns them (the contract's <c>SessionTokens</c>).</summary>
+internal sealed record SessionTokensView(string AccessToken, DateTimeOffset AccessTokenExpiresAt, string RefreshToken, DateTimeOffset RefreshTokenExpiresAt, Guid SessionId);
+
+/// <summary>A signed in user and their new session (the contract's <c>AuthResult</c>).</summary>
+internal sealed record SignedIn(UserRow User, SessionTokensView Session);
+
+/// <summary>
+/// Changes to the signed in user (AC-13). A null <see cref="Metadata"/> leaves the metadata alone; <see cref="SetName"/>
+/// false leaves the name alone, and true with a null <see cref="Name"/> removes it.
+/// </summary>
+internal sealed record AccountChanges(bool SetName, string? Name, string? Metadata);
+
+/// <summary>
+/// What a console sign up carried for the install's sign up gate (spec 0003 AC-7, spec 0006). <paramref name="Seeded"/>
+/// is only for the <c>Test</c> fixtures' later accounts: admitted as if sign up were open, never as the first account.
+/// </summary>
+internal sealed record ConsoleGate(string? InviteToken, string? SetupToken, bool Seeded = false);
+
+/// <summary>
+/// The signed in user's own account (spec 0004, <c>account</c> service): sign up, sign in, the current user, and self
+/// service. Use cases know no HTTP; they return an <see cref="Outcome{T}"/>.
+/// </summary>
+internal sealed class AccountService(
+    AuthStore store,
+    PasswordHasher hasher,
+    Sessions sessions,
+    SessionChecks checks,
+    AccessTokens tokens,
+    SigningKeys keys,
+    IConsoleSignupPolicy signupPolicy,
+    IConsoleAccountCreated accountCreated)
+{
+    public const string EmailIndex = "auth_users_email_key";
+
+    /// <summary>
+    /// Sign up (AC-1 to AC-3): creates the user, their password row, and a session in one transaction. The password is
+    /// hashed before the transaction opens, so no connection waits on Argon2id.
+    /// </summary>
+    public async Task<Outcome<SignedIn>> SignUpAsync(
+        string projectId, string? email, string? password, string? name, ClientInfo client, CancellationToken ct, ConsoleGate? gate = null)
+    {
+        await keys.GetActiveAsync(projectId, ct); // the first token of a project creates its key, before any commit
+        var outcome = await CreateAsync(projectId, email, password, name, userId => Actor.User(userId), client, ct, gate);
+        return outcome.Succeeded ? await SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant!, ct) : outcome.Failure!;
+    }
+
+    /// <summary>A console account created without signing it in: the <c>Test</c> fixtures' seeding.</summary>
+    public async Task<Outcome<UserRow>> CreateConsoleAccountAsync(string? email, string? password, string? name, ConsoleGate gate, CancellationToken ct)
+    {
+        var outcome = await CreateAsync(ConsoleProject.Id, email, password, name, userId => Actor.User(userId), client: null, ct, gate);
+        return outcome.Succeeded ? outcome.Value.User : outcome.Failure!;
+    }
+
+    /// <summary>A server or console creates a user (AC-17): the same rules as sign up, and no session.</summary>
+    public async Task<Outcome<UserRow>> CreateUserAsync(string projectId, string? email, string? password, string? name, Actor actor, CancellationToken ct)
+    {
+        var outcome = await CreateAsync(projectId, email, password, name, _ => actor, client: null, ct);
+        return outcome.Succeeded ? outcome.Value.User : outcome.Failure!;
+    }
+
+    /// <summary>
+    /// Creates the user and their password row, and a session when <paramref name="client"/> is given. A console sign
+    /// up passes <paramref name="gate"/>: Platform's <c>AdmitAsync</c> decides first and <c>OnCreatedAsync</c> runs
+    /// after the insert, both in this transaction (spec 0003 AC-7, AC-8).
+    /// </summary>
+    private async Task<Outcome<(UserRow User, SessionGrant? Grant)>> CreateAsync(
+        string projectId, string? email, string? password, string? name, Func<Guid, Actor> actorOf, ClientInfo? client, CancellationToken ct,
+        ConsoleGate? gate = null)
+    {
+        if (!EmailRule.TryNormalize(email, out var trimmed)) return Failure.Invalid("The email must be an address of at most 320 characters.");
+        if (!UserName.IsValid(name)) return Failure.Invalid($"The name must be at most {UserName.MaxLength} characters.");
+        if (!PasswordPolicy.TryNormalize(password, out var normalized)) return Failure.InvalidPassword;
+
+        var hash = await hasher.TryHashAsync(normalized, ct);
+        if (hash is null) return Failure.Busy;
+
+        return await store.WriteAsync<(UserRow User, SessionGrant? Grant)>(async (uow, token) =>
+        {
+            SignupAdmission.Admitted? admitted = null;
+            if (gate is { Seeded: true })
+            {
+                admitted = new SignupAdmission.Admitted(IsFirstAccount: false);
+            }
+            else if (gate is not null)
+            {
+                switch (await signupPolicy.AdmitAsync(uow.Tx, trimmed, gate.InviteToken, gate.SetupToken, token))
+                {
+                    case SignupAdmission.Admitted admission:
+                        admitted = admission;
+                        break;
+                    case SignupAdmission.SetupTokenInvalid:
+                        return Failure.SetupTokenInvalid;
+                    default:
+                        return Failure.SignupClosed;
+                }
+            }
+
+            if (await InsertUserAsync(uow, projectId, trimmed, name, token) is not { } userId) return Failure.UserAlreadyExists;
+
+            await InsertPasswordAsync(uow, userId, projectId, hash, token);
+            if (admitted is not null) await accountCreated.OnCreatedAsync(uow.Tx, userId, name, trimmed, admitted, token);
+            var actor = actorOf(userId);
+            await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserCreated, projectId, actor, userId.ToString(),
+                new Dictionary<string, string> { ["userId"] = userId.ToString() }, ct: token);
+            var grant = client is null ? null : await sessions.CreateAsync(uow, projectId, userId, client, actor, token);
+            return (await ReloadAsync(uow.Db, userId, token), grant);
+        }, ct);
+    }
+
+    /// <summary>
+    /// Password sign in (AC-4, AC-5). An unknown email is checked against the dummy hash, so a wrong password and an
+    /// unknown email cost one Argon2id run each and answer the same. Block status shows only with the right password.
+    /// A hash made with older parameters is replaced (rehash on sign in).
+    /// </summary>
+    public async Task<Outcome<SignedIn>> SignInAsync(string projectId, string? email, string? password, ClientInfo client, CancellationToken ct)
+    {
+        var known = EmailRule.TryNormalize(email, out var trimmed);
+        var wellFormed = PasswordPolicy.TryNormalize(password, out var normalized);
+        var account = known ? await FindByEmailAsync(projectId, trimmed, ct) : null;
+
+        // A password that can't meet the policy can't match either; it is still checked, against the dummy hash.
+        var check = await hasher.TryVerifyAsync(wellFormed ? normalized : password ?? "", wellFormed ? account?.Hash : null, ct);
+        if (check is null) return Failure.Busy;
+        if (!check.Value.Matches || account is null) return Failure.InvalidCredentials;
+        if (account.Status == UserStatuses.Blocked) return Failure.UserBlocked;
+
+        var rehash = check.Value.NeedsRehash ? await hasher.TryHashAsync(normalized, ct) : null;
+        await keys.GetActiveAsync(projectId, ct);
+
+        var outcome = await store.WriteAsync<(UserRow User, SessionGrant Grant)>(async (uow, token) =>
+        {
+            if (rehash is not null)
+            {
+                await using var update = new NpgsqlCommand(
+                    "UPDATE orvano.auth_passwords SET hash = @hash, updated_at = now() WHERE user_id = @user", uow.Tx.Connection, uow.Tx);
+                update.Parameters.AddWithValue("hash", rehash);
+                update.Parameters.AddWithValue("user", account.Id);
+                await update.ExecuteNonQueryAsync(token);
+            }
+
+            var grant = await sessions.CreateAsync(uow, projectId, account.Id, client, Actor.User(account.Id), token);
+            return (await ReloadAsync(uow.Db, account.Id, token), grant);
+        }, ct);
+
+        return outcome.Succeeded ? await SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant, ct) : outcome.Failure!;
+    }
+
+    /// <summary>The signed in user (AC-12).</summary>
+    public async Task<Outcome<UserRow>> GetAsync(string projectId, Guid userId, CancellationToken ct)
+    {
+        var user = await store.ReadAsync((db, token) =>
+            db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId && u.ProjectId == projectId, token), ct);
+        return user is null ? Failure.UserNotFound : user;
+    }
+
+    /// <summary>
+    /// Changes the name or metadata (AC-13) and writes <c>auth.user.updated</c> with the fields whose value changed.
+    /// Nothing changed: no write and no event.
+    /// </summary>
+    public async Task<Outcome<UserRow>> UpdateAsync(string projectId, Guid userId, AccountChanges changes, CancellationToken ct)
+    {
+        if (changes.SetName && !UserName.IsValid(changes.Name)) return Failure.Invalid($"The name must be at most {UserName.MaxLength} characters.");
+        if (changes.Metadata is { } metadata && !UserMetadata.IsValidSize(metadata))
+            return Failure.Invalid($"The metadata must be at most {UserMetadata.MaxBytes / 1024} KB as JSON.");
+
+        return await store.WriteAsync<UserRow>(async (uow, token) =>
+        {
+            string? name;
+            bool sameMetadata;
+            await using (var read = new NpgsqlCommand(
+                "SELECT name, metadata = @metadata::jsonb FROM orvano.auth_users WHERE id = @id AND project_id = @project FOR UPDATE",
+                uow.Tx.Connection, uow.Tx))
+            {
+                read.Parameters.AddWithValue("metadata", NpgsqlDbType.Jsonb, (object?)changes.Metadata ?? DBNull.Value);
+                read.Parameters.AddWithValue("id", userId);
+                read.Parameters.AddWithValue("project", projectId);
+                await using var reader = await read.ExecuteReaderAsync(token);
+                if (!await reader.ReadAsync(token)) return Failure.UserNotFound;
+                name = reader.IsDBNull(0) ? null : reader.GetString(0);
+                sameMetadata = reader.IsDBNull(1) || reader.GetBoolean(1);
+            }
+
+            var changed = new List<string>();
+            if (changes.SetName && !string.Equals(name, changes.Name, StringComparison.Ordinal)) changed.Add("name");
+            if (!sameMetadata) changed.Add("metadata");
+            if (changed.Count > 0)
+            {
+                await using var update = new NpgsqlCommand(
+                    """
+                    UPDATE orvano.auth_users
+                    SET name = CASE WHEN @setName THEN @name ELSE name END, metadata = coalesce(@metadata::jsonb, metadata), updated_at = now()
+                    WHERE id = @id
+                    """, uow.Tx.Connection, uow.Tx);
+                update.Parameters.AddWithValue("setName", changed.Contains("name"));
+                update.Parameters.AddWithValue("name", NpgsqlDbType.Text, (object?)changes.Name ?? DBNull.Value);
+                update.Parameters.AddWithValue("metadata", NpgsqlDbType.Jsonb, sameMetadata ? DBNull.Value : changes.Metadata!);
+                update.Parameters.AddWithValue("id", userId);
+                await update.ExecuteNonQueryAsync(token);
+                await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserUpdated, projectId, Actor.User(userId), userId.ToString(),
+                    new Dictionary<string, string> { ["userId"] = userId.ToString() }, changed, ct: token);
+            }
+
+            return await ReloadAsync(uow.Db, userId, token);
+        }, ct);
+    }
+
+    /// <summary>
+    /// Changes the password (AC-14): the current one must match, the new one must meet the policy. Every other session
+    /// of the user ends (<c>password_changed</c>) in the same transaction; the caller's stays.
+    /// </summary>
+    public async Task<Outcome<Done>> UpdatePasswordAsync(string projectId, Guid userId, Guid sessionId, string? currentPassword, string? newPassword, CancellationToken ct)
+    {
+        if (!PasswordPolicy.TryNormalize(newPassword, out var normalized)) return Failure.InvalidPassword;
+        var check = await CheckPasswordAsync(projectId, userId, currentPassword, ct);
+        if (check.Failure is not null) return check.Failure;
+
+        var hash = await hasher.TryHashAsync(normalized, ct);
+        if (hash is null) return Failure.Busy;
+
+        var outcome = await store.WriteAsync<Guid[]>(async (uow, token) =>
+        {
+            // Only over the hash just verified: a racing change in between makes this one fail as a wrong password.
+            await using (var update = new NpgsqlCommand(
+                "UPDATE orvano.auth_passwords SET hash = @hash, updated_at = now() WHERE user_id = @user AND hash = @verified",
+                uow.Tx.Connection, uow.Tx))
+            {
+                update.Parameters.AddWithValue("hash", hash);
+                update.Parameters.AddWithValue("user", userId);
+                update.Parameters.AddWithValue("verified", check.Value!);
+                if (await update.ExecuteNonQueryAsync(token) == 0) return Failure.InvalidCredentials;
+            }
+
+            var actor = Actor.User(userId);
+            var ended = await sessions.EndAllAsync(uow, projectId, userId, SessionEndReason.PasswordChanged, actor, sessionId, token);
+            await AuthEvents.WriteAsync(uow.Tx, AuthEvents.PasswordChanged, projectId, actor, userId.ToString(),
+                new Dictionary<string, string> { ["userId"] = userId.ToString() }, ct: token);
+            return ended.ToArray();
+        }, ct);
+
+        if (!outcome.Succeeded) return outcome.Failure!;
+        foreach (var id in outcome.Value!) await checks.EvictAsync(id, ct);
+        return default(Done);
+    }
+
+    /// <summary>
+    /// Deletes the user (AC-15) after checking their password: the user, their password, and all their sessions in one
+    /// transaction, with <c>auth.user.deleted</c>. Every token of the user then fails at the api.
+    /// </summary>
+    public async Task<Outcome<Done>> DeleteAsync(string projectId, Guid userId, string? password, CancellationToken ct)
+    {
+        var check = await CheckPasswordAsync(projectId, userId, password, ct);
+        if (check.Failure is not null) return check.Failure;
+
+        var outcome = await store.WriteAsync<Guid[]>(async (uow, token) =>
+            await UserRecords.DeleteAsync(uow, projectId, userId, Actor.User(userId), token) is { } ended ? ended : Failure.UserNotFound, ct);
+
+        if (!outcome.Succeeded) return outcome.Failure!;
+        foreach (var id in outcome.Value!) await checks.EvictAsync(id, ct);
+        return default(Done);
+    }
+
+    /// <summary>
+    /// Checks the signed in user's password with one Argon2id run, and returns the verified hash. A user without a
+    /// password, or a password that can't meet the policy, is still checked against the dummy hash.
+    /// </summary>
+    private async Task<Outcome<string>> CheckPasswordAsync(string projectId, Guid userId, string? password, CancellationToken ct)
+    {
+        var hash = await store.ReadAsync((db, token) =>
+            db.Passwords.AsNoTracking().Where(p => p.UserId == userId && p.ProjectId == projectId).Select(p => p.Hash).SingleOrDefaultAsync(token), ct);
+        var wellFormed = PasswordPolicy.TryNormalize(password, out var normalized);
+        var check = await hasher.TryVerifyAsync(wellFormed ? normalized : password ?? "", wellFormed ? hash : null, ct);
+        if (check is null) return Failure.Busy;
+        if (!check.Value.Matches || hash is null) return Failure.InvalidCredentials;
+        return hash;
+    }
+
+    private async Task<SignedIn> SignedInAsync(string projectId, UserRow user, SessionGrant grant, CancellationToken ct)
+    {
+        var access = await tokens.IssueAsync(projectId, user.Id, grant.SessionId, ct);
+        return new SignedIn(user, new SessionTokensView(access.Token, access.ExpiresAt, grant.RefreshToken.Value, grant.RefreshTokenExpiresAt, grant.SessionId));
+    }
+
+    private sealed record Account(Guid Id, string Status, string? Hash);
+
+    private Task<Account?> FindByEmailAsync(string projectId, string email, CancellationToken ct) =>
+        store.ReadAsync(async (db, token) =>
+        {
+            var conn = (NpgsqlConnection)db.Database.GetDbConnection();
+            await using var cmd = new NpgsqlCommand(
+                """
+                SELECT u.id, u.status, p.hash
+                FROM orvano.auth_users u
+                LEFT JOIN orvano.auth_passwords p ON p.user_id = u.id
+                WHERE u.project_id = @project AND lower(u.email) = lower(@email)
+                """, conn);
+            cmd.Parameters.AddWithValue("project", projectId);
+            cmd.Parameters.AddWithValue("email", email);
+            await using var reader = await cmd.ExecuteReaderAsync(token);
+            return await reader.ReadAsync(token)
+                ? new Account(reader.GetGuid(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2))
+                : null;
+        }, ct);
+
+    /// <summary>
+    /// Inserts the user and returns their ID, or null when the email is taken in the project: the unique index on
+    /// (<c>project_id</c>, <c>lower(email)</c>) decides between racing sign ups (AC-3). The savepoint keeps the
+    /// transaction usable after the violation.
+    /// </summary>
+    private static async Task<Guid?> InsertUserAsync(AuthUnitOfWork uow, string projectId, string email, string? name, CancellationToken ct)
+    {
+        await uow.Tx.SaveAsync("insert_user", ct);
+        try
+        {
+            await using var cmd = new NpgsqlCommand(
+                "INSERT INTO orvano.auth_users (project_id, email, name) VALUES (@project, @email, @name) RETURNING id", uow.Tx.Connection, uow.Tx);
+            cmd.Parameters.AddWithValue("project", projectId);
+            cmd.Parameters.AddWithValue("email", email);
+            cmd.Parameters.AddWithValue("name", NpgsqlDbType.Text, (object?)name ?? DBNull.Value);
+            var id = (Guid)(await cmd.ExecuteScalarAsync(ct))!;
+            await uow.Tx.ReleaseAsync("insert_user", ct);
+            return id;
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.ConstraintName == EmailIndex)
+        {
+            await uow.Tx.RollbackAsync("insert_user", ct);
+            return null;
+        }
+    }
+
+    private static async Task InsertPasswordAsync(AuthUnitOfWork uow, Guid userId, string projectId, string hash, CancellationToken ct)
+    {
+        await using var cmd = new NpgsqlCommand(
+            "INSERT INTO orvano.auth_passwords (user_id, project_id, hash) VALUES (@user, @project, @hash)", uow.Tx.Connection, uow.Tx);
+        cmd.Parameters.AddWithValue("user", userId);
+        cmd.Parameters.AddWithValue("project", projectId);
+        cmd.Parameters.AddWithValue("hash", hash);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    private static Task<UserRow> ReloadAsync(AuthDbContext db, Guid userId, CancellationToken ct) =>
+        db.Users.AsNoTracking().SingleAsync(u => u.Id == userId, ct);
+}

@@ -4,6 +4,7 @@
 import "@typespec/http";
 import "@typespec/openapi";
 import "../errors.tsp";
+import "../auth/security.tsp";
 
 using Http;
 using OpenAPI;
@@ -80,6 +81,7 @@ interface TestApi {
 
 @route("/v1/console/test")
 @tag("test")
+@useAuth(consoleSession)
 interface ConsoleTestApi {
   @doc("Answers `{ status: ok }` to a valid console session.")
   @operationId("test.consolePing")

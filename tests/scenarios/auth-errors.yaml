@@ -1,0 +1,28 @@
+name: sign up and sign in refusals carry stable codes
+requires: []
+steps:
+  - op: account.create
+    as: client
+    input:
+      body: { email: 'bo-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }
+  - op: account.create
+    as: client
+    input:
+      body: { email: 'BO-${unique}@example.com', password: another horse battery }
+    expect: { status: 409, code: user_already_exists }
+  - op: account.create
+    as: client
+    input:
+      body: { email: 'cy-${unique}@example.com', password: short }
+    expect: { status: 400, code: invalid_password }
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'bo-${unique}@example.com', password: wrong horse battery staple }
+    expect: { status: 401, code: invalid_credentials }
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'nobody-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 401, code: invalid_credentials }

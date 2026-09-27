@@ -13,6 +13,7 @@ final class DispatchEntry {
     this.server,
     this.clientAll,
     this.serverAll,
+    this.scope,
   });
 
   /// The success status the contract declares; the SDK returns the body.
@@ -33,4 +34,8 @@ final class DispatchEntry {
   /// For a list operation: every item through `orvano_dart`'s stream.
   final Stream<Object?> Function(ServerSurface orvano, ScenarioInput input)?
   serverAll;
+
+  /// The API key scope a server call needs; a surface without a key (a
+  /// browser) skips it.
+  final String? scope;
 }
