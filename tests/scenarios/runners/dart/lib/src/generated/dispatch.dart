@@ -190,4 +190,119 @@ final Map<String, DispatchEntry> dispatch = {
         )
         .map((e) => e.toJson()),
   ),
+  'users.block': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.users.block(input['userId'] as String);
+      return r.toJson();
+    },
+    scope: 'users.write',
+  ),
+  'users.create': DispatchEntry(
+    status: 201,
+    server: (o, input) async {
+      final r = await o.users.create(
+        CreateUserRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+    scope: 'users.write',
+  ),
+  'users.delete': DispatchEntry(
+    status: 204,
+    server: (o, input) async {
+      await o.users.delete(input['userId'] as String);
+      return null;
+    },
+    scope: 'users.write',
+  ),
+  'users.deleteSession': DispatchEntry(
+    status: 204,
+    server: (o, input) async {
+      await o.users.deleteSession(
+        input['userId'] as String,
+        input['sessionId'] as String,
+      );
+      return null;
+    },
+    scope: 'users.write',
+  ),
+  'users.deleteSessions': DispatchEntry(
+    status: 204,
+    server: (o, input) async {
+      await o.users.deleteSessions(input['userId'] as String);
+      return null;
+    },
+    scope: 'users.write',
+  ),
+  'users.get': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.users.get(input['userId'] as String);
+      return r.toJson();
+    },
+    scope: 'users.read',
+  ),
+  'users.list': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.users.list(
+        email: input['email'] == null ? null : input['email'] as String,
+        status: input['status'] == null ? null : input['status'] as String,
+        createdAfter: input['createdAfter'] == null
+            ? null
+            : DateTime.parse(input['createdAfter'] as String),
+        createdBefore: input['createdBefore'] == null
+            ? null
+            : DateTime.parse(input['createdBefore'] as String),
+        cursor: input['cursor'] == null ? null : input['cursor'] as String,
+        limit: input['limit'] == null ? null : (input['limit'] as num).toInt(),
+      );
+      return r.toJson();
+    },
+    serverAll: (o, input) => o.users
+        .listAll(
+          email: input['email'] == null ? null : input['email'] as String,
+          status: input['status'] == null ? null : input['status'] as String,
+          createdAfter: input['createdAfter'] == null
+              ? null
+              : DateTime.parse(input['createdAfter'] as String),
+          createdBefore: input['createdBefore'] == null
+              ? null
+              : DateTime.parse(input['createdBefore'] as String),
+          limit: input['limit'] == null
+              ? null
+              : (input['limit'] as num).toInt(),
+        )
+        .map((e) => e.toJson()),
+    scope: 'users.read',
+  ),
+  'users.listSessions': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.users.listSessions(
+        input['userId'] as String,
+        cursor: input['cursor'] == null ? null : input['cursor'] as String,
+        limit: input['limit'] == null ? null : (input['limit'] as num).toInt(),
+      );
+      return r.toJson();
+    },
+    serverAll: (o, input) => o.users
+        .listSessionsAll(
+          input['userId'] as String,
+          limit: input['limit'] == null
+              ? null
+              : (input['limit'] as num).toInt(),
+        )
+        .map((e) => e.toJson()),
+    scope: 'users.read',
+  ),
+  'users.unblock': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.users.unblock(input['userId'] as String);
+      return r.toJson();
+    },
+    scope: 'users.write',
+  ),
 };

@@ -1,6 +1,6 @@
 /**
- * The header an API key travels in. Temporary: the auth spec (scope row 8) replaces it, and this
- * is the only place the TS runtime names it. Only the `./server` entry imports this file.
+ * The header an API key travels in (spec 0004, the `apiKey` scheme). This is the only place the TS
+ * runtime names it. Only the `./server` entry imports this file.
  */
 export const apiKeyHeader = 'X-Orvano-Key'
 
@@ -13,7 +13,7 @@ function inBrowser(): boolean {
 export function assertNotInBrowser(): void {
   if (inBrowser()) {
     throw new Error(
-      'Orvano API keys are for trusted server code only. Never set one in a browser; use a session instead.',
+      'Orvano API keys are for trusted server code only. Never set one in a browser; sign users in with @orvano/js instead.',
     )
   }
 }

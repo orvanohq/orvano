@@ -315,14 +315,17 @@ jobs:
       - run: flutter pub get
       - run: dart run tool/copy_scenarios.dart
         working-directory: tests/scenarios/runners/flutter
-      # The emulator reaches the host's port 8080 at 10.0.2.2.
+      # adb reverse maps the emulator's localhost:8080 to the host's, so the endpoint matches the server's
+      # ORVANO_PUBLIC_URL and access tokens verify against their issuer.
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
           arch: x86_64
           target: google_apis
           working-directory: tests/scenarios/runners/flutter
-          script: flutter test integration_test -d emulator-5554 --dart-define=ORVANO_ENDPOINT=http://10.0.2.2:8080
+          script: |
+            adb reverse tcp:8080 tcp:8080
+            flutter test integration_test -d emulator-5554 --dart-define=ORVANO_ENDPOINT=http://localhost:8080
       - if: failure()
         run: docker compose -f tests/scenarios/compose.yml logs
 

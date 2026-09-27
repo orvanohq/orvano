@@ -100,6 +100,7 @@ internal static class Dart
             .. o.IsServer ? [new DispatchCall("server", Call(o))] : Array.Empty<DispatchCall>(),
             .. o.IsClient && o.PageItem is not null ? [new DispatchCall("clientAll", CallAll(o))] : Array.Empty<DispatchCall>(),
             .. o.IsServer && o.PageItem is not null ? [new DispatchCall("serverAll", CallAll(o))] : Array.Empty<DispatchCall>(),
+            .. o.Scope is not null ? [new DispatchCall("scope", $"'{o.Scope}'")] : Array.Empty<DispatchCall>(),
         ])).ToList();
         var dispatchTypes = contract.Operations.Where(o => o.Audience != Audience.Console)
             .SelectMany(o => o.Params.Select(p => (TypeRef?)p.Type).Append(o.Body)).ToList();

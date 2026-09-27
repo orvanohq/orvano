@@ -14,6 +14,9 @@
     },
     {
       "name": "keys"
+    },
+    {
+      "name": "users"
     }
   ],
   "paths": {
@@ -609,6 +612,515 @@
         "x-orvano-service": "keys",
         "x-orvano-audience": "both"
       }
+    },
+    "/v1/users": {
+      "get": {
+        "operationId": "users.list",
+        "description": "Lists the project's users, newest first.",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": false,
+            "description": "Only users whose email starts with this, ignoring case.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Only users with this status: `active` or `blocked`.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "createdAfter",
+            "in": "query",
+            "required": false,
+            "description": "Only users created after this time.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "explode": false
+          },
+          {
+            "name": "createdBefore",
+            "in": "query",
+            "required": false,
+            "description": "Only users created before this time.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "explode": false
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Users per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.read",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      },
+      "post": {
+        "operationId": "users.create",
+        "description": "Creates a user with an email and password. It does not sign them in.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}": {
+      "get": {
+        "operationId": "users.get",
+        "description": "Gets a user.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.read",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      },
+      "delete": {
+        "operationId": "users.delete",
+        "description": "Deletes a user with their password and sessions. It can't be undone.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/block": {
+      "post": {
+        "operationId": "users.block",
+        "description": "Blocks a user: ends every session and refuses sign in. Blocking a blocked user changes nothing.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/sessions": {
+      "get": {
+        "operationId": "users.listSessions",
+        "description": "Lists a user's active sessions, newest first. `current` is always false.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Sessions per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.read",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      },
+      "delete": {
+        "operationId": "users.deleteSessions",
+        "description": "Ends every session of a user.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/sessions/{sessionId}": {
+      "delete": {
+        "operationId": "users.deleteSession",
+        "description": "Ends one session of a user.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "description": "The session to end.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/unblock": {
+      "post": {
+        "operationId": "users.unblock",
+        "description": "Unblocks a user so they can sign in again. Their old sessions stay ended.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
     }
   },
   "components": {
@@ -692,6 +1204,44 @@
           }
         },
         "description": "A sign in with an email and password."
+      },
+      "CreateUserRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email, trimmed, at most 320 characters. Unique in the project, ignoring case.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "description": "8 to 256 characters after Unicode NFKC normalization.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A display name, at most 256 characters.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          }
+        },
+        "description": "A new user with an email and password, created by a server. No session is created."
       },
       "DeleteAccountRequest": {
         "type": "object",
@@ -1253,6 +1803,34 @@
         },
         "description": "A user of a project."
       },
+      "UserPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/User"
+            },
+            "description": "The users on this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass it as `cursor` to get the next page; null on the last page."
+          }
+        },
+        "description": "One page of a project's users, newest first."
+      },
       "UserStatus": {
         "type": "string",
         "enum": [
@@ -1267,6 +1845,12 @@
         "type": "http",
         "scheme": "Bearer",
         "description": "A signed in user's access token: `Authorization: Bearer <access token>`, an ES256 JWT."
+      },
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Orvano-Key",
+        "description": "A server's API key: `X-Orvano-Key: orv_sk_...`, holding the scopes the operation needs."
       }
     }
   }

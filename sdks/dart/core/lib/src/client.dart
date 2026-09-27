@@ -113,6 +113,10 @@ base class Client {
   /// Sends one request and returns the decoded JSON body, or null when the
   /// response has none. Throws [OrvanoException] on a failure status and
   /// [TimeoutException] when the call takes longer than its timeout.
+  ///
+  /// [bearer] sends that access token as `Authorization: Bearer` instead of
+  /// this client's own credentials, so a call made as a user never carries an
+  /// API key. [noCache] sends `Cache-Control: no-cache`.
   Future<Object?> send(
     String method,
     String path, {
@@ -121,6 +125,8 @@ base class Client {
     bool idempotent = false,
     SessionChange? session,
     RequestOptions? options,
+    String? bearer,
+    bool noCache = false,
   }) async {
     final params = {for (final e in query.entries) e.key: ?e.value};
     var uri = Uri.parse('$endpoint$path');
@@ -139,7 +145,12 @@ base class Client {
           sdkHeader: '$sdkName/$sdkVersion',
           'X-Orvano-Project': ?project,
         };
-        await authorize(headers);
+        if (bearer != null) {
+          headers[authorizationHeader] = 'Bearer $bearer';
+        } else {
+          await authorize(headers);
+        }
+        if (noCache) headers['Cache-Control'] = 'no-cache';
         final request = http.AbortableRequest(
           method,
           uri,

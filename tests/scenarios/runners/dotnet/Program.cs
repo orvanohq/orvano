@@ -20,11 +20,14 @@ var scenarios = Directory.GetFiles(scenariosDir, "*.yaml")
     .Select(f => JsonSerializer.SerializeToNode(yaml.Deserialize<object>(File.ReadAllText(f)))!.AsObject())
     .ToList();
 
-// The API key scenario runners send; the server ignores keys until the auth spec (row 8).
-const string TestServerKey = "test-server-key";
+// Both clients send the first fixture project; the server one also sends that project's first fixture API key.
+var fixtures = JsonSerializer.SerializeToNode(yaml.Deserialize<object>(File.ReadAllText(Path.Combine(scenariosDir, "fixtures.yaml"))))?.AsObject();
+var project = fixtures?["projects"]?.AsArray().FirstOrDefault()?["id"]?.GetValue<string>();
+var apiKey = fixtures?["apiKeys"]?.AsArray()
+    .FirstOrDefault(k => k?["project"]?.GetValue<string>() == project)?["secret"]?.GetValue<string>();
 
-using var client = new OrvanoClient(new OrvanoClientOptions(new Uri(endpoint)));
-using var server = new OrvanoClient(new OrvanoClientOptions(new Uri(endpoint)) { ApiKey = TestServerKey });
+using var client = new OrvanoClient(new OrvanoClientOptions(new Uri(endpoint)) { Project = project });
+using var server = new OrvanoClient(new OrvanoClientOptions(new Uri(endpoint)) { Project = project, ApiKey = apiKey });
 var results = await Interpreter.RunAsync(scenarios, new Surface(client, server), CancellationToken.None);
 
 var sdkTarget = typeof(OrvanoClient).Assembly.GetCustomAttribute<TargetFrameworkAttribute>()?.FrameworkName;

@@ -1,10 +1,14 @@
 # Seed data for the shared scenarios, loaded by a server started with
-# ORVANO_TEST_FIXTURES=<path to this file> in the Test environment (spec 0001, spec 0003).
+# ORVANO_TEST_FIXTURES=<path to this file> in the Test environment (spec 0001, spec 0003, spec 0004).
 # consoleSessions: the console session tokens the server accepts, each acting as its own console
-#   user until row 8's real sessions; the JS runner sends the first for `as: console` steps.
-# projects: seeded in the first session's `Fixtures` org, then provisioned by the worker.
-# apiKeys: known secrets (orv_sk_ plus 43 base64url characters) for the fixture projects.
-# Row 8 adds users.
+#   user until row 8's real console sessions; the JS runner sends the first for `as: console` steps.
+# projects: seeded in the first session's `Fixtures` org, then provisioned by the worker. Runners
+#   send the first as X-Orvano-Project.
+# apiKeys: known secrets (orv_sk_ plus 43 base64url characters) for the fixture projects. Server
+#   steps send the first.
+# platforms: a web platform lets browsers of that host call the project (the browser runners serve
+#   their pages from localhost or 127.0.0.1).
+# users: app users with known passwords, hashed at load like any sign up.
 consoleSessions:
   - test-console-session
 projects:
@@ -14,3 +18,15 @@ apiKeys:
   - project: scenarios0000000000a
     secret: orv_sk_scenarioScenarioScenarioScenarioScenario000
     scopes: [users.read, users.write]
+platforms:
+  - project: scenarios0000000000a
+    type: web
+    identifier: localhost
+  - project: scenarios0000000000a
+    type: web
+    identifier: 127.0.0.1
+users:
+  - project: scenarios0000000000a
+    email: fixture-user@example.com
+    password: fixture horse battery staple
+    name: Fixture User

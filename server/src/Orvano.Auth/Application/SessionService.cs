@@ -174,16 +174,16 @@ internal sealed class SessionService(AuthStore store, Sessions sessions, Session
     }
 
     /// <summary>
-    /// Ends one of the user's own sessions (AC-16, <c>revoked</c>). A session of another user, or none at all, is
+    /// Ends one session of the user (AC-16, AC-17, <c>revoked</c>). A session of another user, or none at all, is
     /// 404 <c>session_not_found</c>; one of the user's that has already ended answers as done.
     /// </summary>
-    public async Task<Outcome<Done>> EndAsync(string projectId, Guid userId, string sessionId, CancellationToken ct)
+    public async Task<Outcome<Done>> EndAsync(string projectId, Guid userId, string sessionId, Actor actor, CancellationToken ct)
     {
         if (!Guid.TryParse(sessionId, out var id)) return Failure.SessionNotFound;
 
         var outcome = await store.WriteAsync<Done>(async (uow, token) =>
         {
-            if (await sessions.EndAsync(uow, projectId, userId, id, SessionEndReason.Revoked, Actor.User(userId), token)) return default(Done);
+            if (await sessions.EndAsync(uow, projectId, userId, id, SessionEndReason.Revoked, actor, token)) return default(Done);
             if (!await uow.Db.Sessions.AnyAsync(s => s.Id == id && s.UserId == userId && s.ProjectId == projectId, token)) return Failure.SessionNotFound;
             return default(Done);
         }, ct);
@@ -192,11 +192,14 @@ internal sealed class SessionService(AuthStore store, Sessions sessions, Session
         return outcome;
     }
 
-    /// <summary>Ends every session of the user but the caller's (AC-16, <c>revoked</c>).</summary>
-    public async Task<Outcome<Done>> EndOthersAsync(string projectId, Guid userId, Guid current, CancellationToken ct)
+    /// <summary>
+    /// Ends every session of the user (AC-17), or all but <paramref name="keep"/>, the caller's (AC-16), as
+    /// <c>revoked</c>.
+    /// </summary>
+    public async Task<Outcome<Done>> EndAllAsync(string projectId, Guid userId, Guid? keep, Actor actor, CancellationToken ct)
     {
         var outcome = await store.WriteAsync<Guid[]>(async (uow, token) =>
-            (await sessions.EndAllAsync(uow, projectId, userId, SessionEndReason.Revoked, Actor.User(userId), current, token)).ToArray(), ct);
+            (await sessions.EndAllAsync(uow, projectId, userId, SessionEndReason.Revoked, actor, keep, token)).ToArray(), ct);
         foreach (var id in outcome.Value!) await checks.EvictAsync(id, ct);
         return default(Done);
     }

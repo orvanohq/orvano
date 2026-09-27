@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Npgsql;
+using Orvano.Auth.Application;
+using Orvano.Auth.Fixtures;
 using Orvano.Core;
 using Orvano.Core.Data;
 using Orvano.Core.Events;
@@ -73,12 +75,15 @@ internal static class ServerRole
         if (role == OrvanoRole.Api && fixtures.Owner is { } owner)
         {
             await PlatformFixtures.SeedAsync(
-                app.Services.GetRequiredService<PlatformStore>(), owner, fixtures.Projects, fixtures.ApiKeys, logger, app.Lifetime.ApplicationStopping);
+                app.Services.GetRequiredService<PlatformStore>(), owner, fixtures.Projects, fixtures.ApiKeys, fixtures.Platforms, logger, app.Lifetime.ApplicationStopping);
+            await AuthFixtures.SeedAsync(
+                app.Services.GetRequiredService<AuthStore>(), app.Services.GetRequiredService<AccountService>(), fixtures.Users, logger, app.Lifetime.ApplicationStopping);
         }
 
         if (role == OrvanoRole.Api) app.UseForwardedHeaders();
         app.UseRequestIds();
         app.UseVersionHeader();
+        if (role == OrvanoRole.Api) app.UsePublicCors();
         // Outside the error handlers, so it checks the problem bodies they write too.
         if (app.Environment.IsEnvironment(OrvanoEnvironments.Test)) app.UseContractValidation();
         app.UseExceptionHandler();

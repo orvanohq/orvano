@@ -67,7 +67,11 @@ internal static partial class PlatformIdentifiers
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
     };
 
-    public static PlatformType Parse(string wire) => wire switch
+    public static PlatformType Parse(string wire) =>
+        ParseType(wire) ?? throw new ArgumentOutOfRangeException(nameof(wire), wire, "Unknown platform type.");
+
+    /// <summary>The type of a wire value, or null for anything unknown.</summary>
+    public static PlatformType? ParseType(string? wire) => wire switch
     {
         "web" => PlatformType.Web,
         "android" => PlatformType.Android,
@@ -75,7 +79,7 @@ internal static partial class PlatformIdentifiers
         "macos" => PlatformType.Macos,
         "windows" => PlatformType.Windows,
         "linux" => PlatformType.Linux,
-        _ => throw new ArgumentOutOfRangeException(nameof(wire), wire, "Unknown platform type."),
+        _ => null,
     };
 
     [GeneratedRegex(@"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+\z")]

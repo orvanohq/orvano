@@ -41,6 +41,7 @@ internal sealed class PlatformModule : IOrvanoModule
         services.AddSingleton<PlatformDirectory>();
         services.AddSingleton<IProjectDirectory>(sp => sp.GetRequiredService<PlatformDirectory>());
         services.AddSingleton<IApiKeyVerifier>(sp => sp.GetRequiredService<PlatformDirectory>());
+        services.AddSingleton<IWebOriginPolicy>(sp => sp.GetRequiredService<PlatformDirectory>());
         services.AddSingleton<IConsoleAccess>(sp => sp.GetRequiredService<PlatformDirectory>());
 
         services.AddSingleton<ConsoleAccounts>();

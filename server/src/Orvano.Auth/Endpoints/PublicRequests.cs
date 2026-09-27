@@ -12,6 +12,9 @@ namespace Orvano.Auth.Endpoints;
 /// <summary>The signed in user a bearer request acts as, set by <see cref="PublicRequests.RequireUser"/>.</summary>
 internal sealed record CurrentUser(Guid UserId, Guid SessionId);
 
+/// <summary>The API key a server request acts as, set by <see cref="PublicRequests.RequireApiKey"/>.</summary>
+internal sealed record CurrentKey(Guid KeyId);
+
 /// <summary>
 /// Request rules for the public, project scoped routes (spec 0003 AC-4, spec 0004 AC-7): the project from
 /// <c>X-Orvano-Project</c> (or the path, for the JWKS) must be servable, and <c>account</c> operations need a valid
@@ -21,6 +24,7 @@ internal static class PublicRequests
 {
     private static readonly object ProjectKey = new();
     private static readonly object UserKey = new();
+    private static readonly object ApiKeyKey = new();
 
     /// <summary>The servable project this request is for; set by <see cref="RequireProject"/>.</summary>
     public static string Project(HttpContext http) =>
@@ -30,7 +34,15 @@ internal static class PublicRequests
     public static CurrentUser User(HttpContext http) =>
         http.Items[UserKey] as CurrentUser ?? throw new InvalidOperationException("The route has no bearer filter.");
 
-    /// <summary>Resolves <c>X-Orvano-Project</c>: 400 when missing, 404 or 409 when not servable (spec 0003 AC-4).</summary>
+    /// <summary>The API key; set by <see cref="RequireApiKey"/>.</summary>
+    public static CurrentKey Key(HttpContext http) =>
+        http.Items[ApiKeyKey] as CurrentKey ?? throw new InvalidOperationException("The route has no API key filter.");
+
+    /// <summary>
+    /// Resolves <c>X-Orvano-Project</c>: 400 when missing, 404 or 409 when not servable (spec 0003 AC-4), and 403
+    /// <c>origin_not_allowed</c> when a browser's <c>Origin</c> matches none of the project's web platforms (AC-13). A
+    /// request without <c>Origin</c> (servers, mobile and desktop apps) is not checked.
+    /// </summary>
     public static TBuilder RequireProject<TBuilder>(this TBuilder builder) where TBuilder : IEndpointConventionBuilder =>
         builder.AddEndpointFilter(async (context, next) =>
         {
@@ -38,7 +50,7 @@ internal static class PublicRequests
             if (http.Request.Headers[OrvanoHeaders.Project] is not [{ Length: > 0 } projectId])
                 return ApiProblem.Result(StatusCodes.Status400BadRequest, Api.ErrorCode.InvalidRequest, "Send the project ID in the X-Orvano-Project header.");
 
-            var refusal = await ServableAsync(http, projectId);
+            var refusal = await ServableAsync(http, projectId) ?? await OriginRefusalAsync(http, projectId);
             if (refusal is not null) return refusal;
             http.Items[ProjectKey] = projectId;
             return await next(context);
@@ -87,6 +99,28 @@ internal static class PublicRequests
         });
 
     /// <summary>
+    /// Needs <c>X-Orvano-Key</c> of the request's project holding <paramref name="scope"/> (spec 0003 AC-5, AC-12):
+    /// 401 <c>invalid_api_key</c> for a missing, unknown, expired, or other project's key, 403
+    /// <c>insufficient_scope</c> without the scope. Pass the operation's generated <c>Scope</c>. Add it after
+    /// <see cref="RequireProject"/>.
+    /// </summary>
+    public static TBuilder RequireApiKey<TBuilder>(this TBuilder builder, string scope) where TBuilder : IEndpointConventionBuilder =>
+        builder.AddEndpointFilter(async (context, next) =>
+        {
+            var http = context.HttpContext;
+            if (http.Request.Headers[OrvanoHeaders.ApiKey] is not [{ Length: > 0 } secret])
+                return InvalidApiKey();
+
+            var key = await http.RequestServices.GetRequiredService<IApiKeyVerifier>().VerifyAsync(Project(http), secret, http.RequestAborted);
+            if (!key.Valid || key.KeyId is not { } keyId) return InvalidApiKey();
+            if (!key.Scopes.Contains(scope))
+                return ApiProblem.Result(StatusCodes.Status403Forbidden, Api.ErrorCode.InsufficientScope, $"The API key lacks the {scope} scope.");
+
+            http.Items[ApiKeyKey] = new CurrentKey(keyId);
+            return await next(context);
+        });
+
+    /// <summary>
     /// Where the request came from, for the session record (AC-31): <c>X-Orvano-Client-UA</c> and
     /// <c>X-Orvano-Client-IP</c> when present (sent by <c>@orvano/nextjs</c> on the server), else the request's own
     /// user agent and connection IP.
@@ -107,8 +141,17 @@ internal static class PublicRequests
             ? token
             : null;
 
+    private static IResult InvalidApiKey() =>
+        ApiProblem.Result(StatusCodes.Status401Unauthorized, Api.ErrorCode.InvalidApiKey, "Send a valid API key of this project as X-Orvano-Key.");
+
     private static IResult InvalidToken() =>
         ApiProblem.Result(StatusCodes.Status401Unauthorized, Api.ErrorCode.InvalidToken, "The access token is not valid for this project, or its session has ended.");
+
+    private static async Task<IResult?> OriginRefusalAsync(HttpContext http, string projectId) =>
+        http.Request.Headers.Origin is not [{ } origin]
+            || await http.RequestServices.GetRequiredService<IWebOriginPolicy>().AllowsAsync(projectId, origin, http.RequestAborted)
+            ? null
+            : ApiProblem.Result(StatusCodes.Status403Forbidden, Api.ErrorCode.OriginNotAllowed, "This origin is not a web platform of the project.");
 
     private static async Task<IResult?> ServableAsync(HttpContext http, string projectId) =>
         await http.RequestServices.GetRequiredService<IProjectDirectory>().GetServableAsync(projectId, http.RequestAborted) switch

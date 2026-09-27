@@ -104,6 +104,40 @@ final class CreatePasswordSessionRequest {
   Map<String, dynamic> toJson() => {'email': email, 'password': password};
 }
 
+/// A new user with an email and password, created by a server. No session is created.
+final class CreateUserRequest {
+  /// Creates a [CreateUserRequest].
+  const CreateUserRequest({
+    required this.email,
+    required this.password,
+    this.name,
+  });
+
+  /// Decodes a [CreateUserRequest] from JSON.
+  factory CreateUserRequest.fromJson(Map<String, dynamic> json) =>
+      CreateUserRequest(
+        email: json['email'] as String,
+        password: json['password'] as String,
+        name: json['name'] == null ? null : json['name'] as String,
+      );
+
+  /// The email, trimmed, at most 320 characters. Unique in the project, ignoring case.
+  final String email;
+
+  /// 8 to 256 characters after Unicode NFKC normalization.
+  final String password;
+
+  /// A display name, at most 256 characters.
+  final String? name;
+
+  /// Encodes this [CreateUserRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'email': email,
+    'password': password,
+    'name': ?name,
+  };
+}
+
 /// A request to delete the signed in user.
 final class DeleteAccountRequest {
   /// Creates a [DeleteAccountRequest].
@@ -546,5 +580,33 @@ final class User {
       final v? => v.toUtc().toIso8601String(),
       null => null,
     },
+  };
+}
+
+/// One page of a project's users, newest first.
+final class UserPage {
+  /// Creates a [UserPage].
+  const UserPage({required this.items, this.nextCursor});
+
+  /// Decodes a [UserPage] from JSON.
+  factory UserPage.fromJson(Map<String, dynamic> json) => UserPage(
+    items: (json['items'] as List<dynamic>)
+        .map((e) => User.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    nextCursor: json['nextCursor'] == null
+        ? null
+        : json['nextCursor'] as String,
+  );
+
+  /// The users on this page.
+  final List<User> items;
+
+  /// Pass it as `cursor` to get the next page; null on the last page.
+  final String? nextCursor;
+
+  /// Encodes this [UserPage] as JSON.
+  Map<String, dynamic> toJson() => {
+    'items': items.map((e) => e.toJson()).toList(),
+    'nextCursor': nextCursor,
   };
 }

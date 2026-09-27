@@ -6,9 +6,9 @@ namespace Orvano.Platform.Application;
 
 /// <summary>
 /// The module contracts other modules read through (spec 0003): project lookup (AC-4), API key checks (AC-5,
-/// AC-12), and console roles (AC-9).
+/// AC-12), browser origins (AC-13), and console roles (AC-9).
 /// </summary>
-internal sealed class PlatformDirectory(PlatformStore store, TimeProvider clock) : IProjectDirectory, IApiKeyVerifier, IConsoleAccess
+internal sealed class PlatformDirectory(PlatformStore store, TimeProvider clock) : IProjectDirectory, IApiKeyVerifier, IWebOriginPolicy, IConsoleAccess
 {
     public async Task<ProjectLookup> GetServableAsync(string projectId, CancellationToken ct)
     {
@@ -58,6 +58,16 @@ internal sealed class PlatformDirectory(PlatformStore store, TimeProvider clock)
 
             return new ApiKeyVerification(true, key.Id, ApiKeyScopes.Parse(key.Scopes).Select(ApiKeyScopes.Wire).ToHashSet(StringComparer.Ordinal));
         }, ct);
+    }
+
+    public async Task<bool> AllowsAsync(string projectId, string origin, CancellationToken ct)
+    {
+        if (!WebOriginPattern.TryHostOf(origin, out _)) return false;
+
+        var web = PlatformIdentifiers.Wire(PlatformType.Web);
+        var identifiers = await store.ReadAsync((db, ct) =>
+            db.Platforms.AsNoTracking().Where(p => p.ProjectId == projectId && p.Type == web).Select(p => p.Identifier).ToListAsync(ct), ct);
+        return identifiers.Any(identifier => WebOriginPattern.TryParse(identifier, out var pattern, out _) && pattern.Matches(origin));
     }
 
     public Task<OrgRole?> GetOrgRoleAsync(Guid userId, Guid orgId, CancellationToken ct) =>

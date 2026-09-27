@@ -368,6 +368,15 @@ public sealed record CreatePlatformRequest(
 public sealed record CreateProjectRequest(
     [property: JsonPropertyName("name")] string Name);
 
+/// <summary>A new user with an email and password, created by a server. No session is created.</summary>
+/// <param name="Email">The email, trimmed, at most 320 characters. Unique in the project, ignoring case.</param>
+/// <param name="Password">8 to 256 characters after Unicode NFKC normalization.</param>
+/// <param name="Name">A display name, at most 256 characters.</param>
+public sealed record CreateUserRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null);
+
 /// <summary>A new API key with its secret. The secret is shown only here, once.</summary>
 /// <param name="ApiKey">The key.</param>
 /// <param name="Secret">The secret to send as the API key: <c>orv_sk_</c> plus 43 characters. Store it now; it can't be shown again.</param>
@@ -645,3 +654,10 @@ public sealed record User(
     [property: JsonPropertyName("metadata")] IReadOnlyDictionary<string, JsonElement> Metadata,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
     [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt);
+
+/// <summary>One page of a project's users, newest first.</summary>
+/// <param name="Items">The users on this page.</param>
+/// <param name="NextCursor">Pass it as <c>cursor</c> to get the next page; null on the last page.</param>
+public sealed record UserPage(
+    [property: JsonPropertyName("items")] IReadOnlyList<User> Items,
+    [property: JsonPropertyName("nextCursor")] string? NextCursor);

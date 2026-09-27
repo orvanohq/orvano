@@ -1,0 +1,81 @@
+name: a server verifies a user's token and manages users with an API key
+requires: []
+steps:
+  # The fixture user exists on every scenario server; the rest of the run uses a fresh user.
+  - op: users.list
+    as: server
+    input: { email: fixture-user@example.com }
+    expect:
+      status: 200
+      body:
+        items: [{ email: fixture-user@example.com, name: Fixture User, status: active }]
+  - op: users.create
+    as: server
+    input:
+      body:
+        { email: 'gus-${unique}@example.com', password: correct horse battery staple, name: Gus }
+    expect: { status: 201 }
+    save:
+      userId: $.id
+  # signIn is a runner operation: a plain sign in call, so runners without client operations (.NET) get a token too.
+  - op: signIn
+    as: client
+    input:
+      body: { email: 'gus-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }
+    save:
+      token: $.session.accessToken
+      sessionId: $.session.sessionId
+  # verifyAccessToken is the server SDK's own check, not a contract operation.
+  - op: verifyAccessToken
+    as: server
+    input: { token: '${token}' }
+    expect:
+      status: 200
+      body: { userId: '${userId}', sessionId: '${sessionId}' }
+  - op: verifyAccessToken
+    as: server
+    input: { token: '${token}', online: true }
+    expect:
+      status: 200
+      body: { userId: '${userId}' }
+  - op: verifyAccessToken
+    as: server
+    input: { token: not a token }
+    expect: { status: 401, code: invalid_token }
+  - op: users.get
+    as: server
+    input: { userId: '${userId}' }
+    expect:
+      status: 200
+      body: { id: '${userId}', name: Gus }
+  - op: users.listSessions
+    as: server
+    input: { userId: '${userId}' }
+    expect:
+      status: 200
+      body:
+        items: [{ id: '${sessionId}', current: false }]
+  - op: users.block
+    as: server
+    input: { userId: '${userId}' }
+    expect:
+      status: 200
+      body: { status: blocked }
+  # Blocking ended the session: the online check fails at once, the local one passes until expiry.
+  - op: verifyAccessToken
+    as: server
+    input: { token: '${token}', online: true }
+    expect: { status: 401, code: invalid_token }
+  - op: verifyAccessToken
+    as: server
+    input: { token: '${token}' }
+    expect: { status: 200 }
+  - op: users.delete
+    as: server
+    input: { userId: '${userId}' }
+    expect: { status: 204 }
+  - op: users.get
+    as: server
+    input: { userId: '${userId}' }
+    expect: { status: 404, code: user_not_found }

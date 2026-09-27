@@ -40,6 +40,15 @@ public sealed class UserStatusJsonConverter : JsonConverter<UserStatus>
         });
 }
 
+/// <summary>A new user with an email and password, created by a server. No session is created.</summary>
+/// <param name="Email">The email, trimmed, at most 320 characters. Unique in the project, ignoring case.</param>
+/// <param name="Password">8 to 256 characters after Unicode NFKC normalization.</param>
+/// <param name="Name">A display name, at most 256 characters.</param>
+public sealed record CreateUserRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null);
+
 /// <summary>Whether the server is up, and which Orvano version it runs.</summary>
 /// <param name="Status">Always <c>ok</c> when the server answers.</param>
 /// <param name="Version">The Orvano server version, major.minor.patch.</param>
@@ -82,6 +91,30 @@ public sealed record OpenIdConfiguration(
     [property: JsonPropertyName("subject_types_supported")] IReadOnlyList<string> SubjectTypesSupported,
     [property: JsonPropertyName("response_types_supported")] IReadOnlyList<string> ResponseTypesSupported);
 
+/// <summary>An active session of a user: one signed in device or browser.</summary>
+/// <param name="Id">The session ID.</param>
+/// <param name="CreatedAt">When the user signed in.</param>
+/// <param name="LastRefreshedAt">When the session last traded its refresh token.</param>
+/// <param name="UserAgent">The user agent that signed in, at most 512 characters; null when none was sent.</param>
+/// <param name="Sdk">The SDK that signed in, from <c>X-Orvano-SDK</c>; null when none was sent.</param>
+/// <param name="IpAddress">The IP address last seen for the session; null when unknown.</param>
+/// <param name="Current">Whether this is the session making the call.</param>
+public sealed record Session(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("lastRefreshedAt")] DateTimeOffset LastRefreshedAt,
+    [property: JsonPropertyName("userAgent")] string? UserAgent,
+    [property: JsonPropertyName("sdk")] string? Sdk,
+    [property: JsonPropertyName("ipAddress")] string? IpAddress,
+    [property: JsonPropertyName("current")] bool Current);
+
+/// <summary>One page of a user's active sessions, newest first.</summary>
+/// <param name="Items">The sessions on this page.</param>
+/// <param name="NextCursor">Pass it as <c>cursor</c> to get the next page; null on the last page.</param>
+public sealed record SessionPage(
+    [property: JsonPropertyName("items")] IReadOnlyList<Session> Items,
+    [property: JsonPropertyName("nextCursor")] string? NextCursor);
+
 /// <summary>A user of a project.</summary>
 /// <param name="Id">The user ID.</param>
 /// <param name="Email">The email, as typed at sign up; null for a user without one.</param>
@@ -100,3 +133,10 @@ public sealed record User(
     [property: JsonPropertyName("metadata")] IReadOnlyDictionary<string, JsonElement> Metadata,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
     [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt);
+
+/// <summary>One page of a project's users, newest first.</summary>
+/// <param name="Items">The users on this page.</param>
+/// <param name="NextCursor">Pass it as <c>cursor</c> to get the next page; null on the last page.</param>
+public sealed record UserPage(
+    [property: JsonPropertyName("items")] IReadOnlyList<User> Items,
+    [property: JsonPropertyName("nextCursor")] string? NextCursor);

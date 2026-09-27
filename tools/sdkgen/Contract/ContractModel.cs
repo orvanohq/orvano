@@ -100,7 +100,8 @@ internal sealed record ContractOperation(
     bool Idempotent,
     bool Test,
     TypeRef? PageItem,
-    SessionEffect Session = SessionEffect.None)
+    SessionEffect Session = SessionEffect.None,
+    string? Scope = null)
 {
     public bool IsClient => Audience is Audience.Client or Audience.Both;
 

@@ -32,12 +32,14 @@ internal sealed class AuthModule : IOrvanoModule
         services.AddSingleton<Sessions>();
         services.AddSingleton<AccountService>();
         services.AddSingleton<SessionService>();
+        services.AddSingleton<UsersService>();
     }
 
     public void MapApi(RouteGroupBuilder v1)
     {
         AccountEndpoints.Map(v1);
         KeysEndpoints.Map(v1);
+        UsersEndpoints.Map(v1);
     }
 
     public void RegisterWork(IWorkRegistry work) =>

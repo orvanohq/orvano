@@ -19,6 +19,9 @@ internal static partial class ContractReader
     private const string EventExtension = "x-orvano-event";
     private const string SessionExtension = "x-orvano-session";
     private const string StandardNamesExtension = "x-orvano-standard-names";
+    private const string ScopeExtension = "x-orvano-scope";
+    private const string ScopeCatalog = "ApiKeyScope";
+    private const string ApiKeyScheme = "apiKey";
 
     /// <summary>The fields a client runtime reads from a session model, by wire name.</summary>
     private static readonly string[] SessionFields = ["accessToken", "accessTokenExpiresAt", "refreshToken", "refreshTokenExpiresAt", "sessionId"];
@@ -284,15 +287,52 @@ internal static partial class ContractReader
                     ReadDefault(op, where);
                     var pageItem = ReadPage(httpMethod, parameters, result, where);
                     var session = ReadSession(op, audience, result, where);
+                    var scope = ReadScope(op, audience, where);
 
                     if (errors.Count > count || id is null || service is null || audience is null) continue;
                     operations.Add(new ContractOperation(
                         id, service, id[(service.Length + 1)..], httpMethod, path, audience.Value,
-                        op.Description ?? op.Summary, parameters, body, status, result, idempotent, test, pageItem, session));
+                        op.Description ?? op.Summary, parameters, body, status, result, idempotent, test, pageItem, session, scope));
                 }
             }
 
             return [.. operations.OrderBy(o => o.Id, StringComparer.Ordinal)];
+        }
+
+        /// <summary>
+        /// <c>x-orvano-scope</c> (spec 0004's amendment of spec 0003's rule): an operation secured by the <c>apiKey</c>
+        /// scheme must name the <c>ApiKeyScope</c> it needs, and any other operation (bearer only, or no security)
+        /// must not. Only server operations take an API key.
+        /// </summary>
+        private string? ReadScope(OpenApiOperation op, Audience? audience, string where)
+        {
+            var schemes = (op.Security ?? [])
+                .SelectMany(requirement => requirement.Keys)
+                .Select(scheme => scheme.Reference.Id)
+                .ToHashSet(StringComparer.Ordinal);
+            var usesKey = schemes.Contains(ApiKeyScheme);
+            var declared = op.Extensions?.ContainsKey(ScopeExtension) == true;
+            var value = ReadString(op.Extensions, ScopeExtension);
+
+            if (usesKey && audience is not (Audience.Server or Audience.Both))
+                errors.Add($"{where}: only server operations are secured by {ApiKeyScheme}");
+            if (!usesKey)
+            {
+                if (declared) errors.Add($"{where}: {ScopeExtension} is only for operations secured by {ApiKeyScheme}");
+                return null;
+            }
+
+            if (value is null)
+            {
+                errors.Add($"{where}: an operation secured by {ApiKeyScheme} must declare {ScopeExtension}");
+                return null;
+            }
+
+            var catalog = _schemas.TryGetValue(ScopeCatalog, out var scopes)
+                ? (scopes.Enum ?? []).Select(v => v.GetValue<string>()).ToHashSet(StringComparer.Ordinal)
+                : [];
+            if (!catalog.Contains(value)) errors.Add($"{where}: {ScopeExtension} '{value}' is not a value of the {ScopeCatalog} enum");
+            return value;
         }
 
         /// <summary>

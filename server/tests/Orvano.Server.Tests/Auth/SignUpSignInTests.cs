@@ -238,7 +238,7 @@ public class SignUpSignInTests(PostgresFixture postgres)
             "INSERT INTO orvano.auth_users (project_id, email) SELECT @p, 'u' || g || '@x.com' FROM generate_series(1, 20) g", ("p", AuthApi.Project));
         var hash = await CurrentHashAsync(api);
         await TestDatabase.ExecuteAsync(api.Database.Superuser,
-            "INSERT INTO orvano.auth_passwords (user_id, project_id, hash) SELECT id, project_id, @h FROM orvano.auth_users", ("h", hash));
+            "INSERT INTO orvano.auth_passwords (user_id, project_id, hash) SELECT id, project_id, @h FROM orvano.auth_users WHERE project_id = @p", ("h", hash), ("p", AuthApi.Project));
 
         var replies = await Task.WhenAll(Enumerable.Range(1, 20).Select(i => api.SignInAsync($"u{i}@x.com")));
 

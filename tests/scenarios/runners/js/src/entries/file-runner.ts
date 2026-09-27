@@ -16,6 +16,7 @@ const scenarios = JSON.parse(await readFile(file, 'utf8')) as Scenario[]
 const surface = createSurface(endpoint, {
   consoleSession: process.env.ORVANO_CONSOLE_SESSION,
   project: process.env.ORVANO_PROJECT,
+  apiKey: process.env.ORVANO_API_KEY,
 })
 const results = await runScenarios(scenarios, surface)
 console.log('ORVANO_SCENARIO_RESULTS ' + JSON.stringify(results))

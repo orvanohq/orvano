@@ -56,6 +56,13 @@ export interface RequestSpec {
    * `session`, `refresh` stores the response itself, and `end` clears the stored session.
    */
   session?: 'start' | 'refresh' | 'end'
+  /**
+   * An access token to send as `Authorization: Bearer` instead of this client's own credentials,
+   * so a call made as that user never carries an API key.
+   */
+  bearer?: string
+  /** Sends `Cache-Control: no-cache`, so no cache in between answers from before a change. */
+  noCache?: boolean
 }
 
 const defaultTimeoutMs = 30_000
@@ -78,6 +85,16 @@ export class Client {
   readonly #fetch: typeof fetch
   readonly #logger: Logger
   #versionChecked = false
+
+  /** The server's base URL, without a trailing slash. */
+  get endpoint(): string {
+    return this.#endpoint
+  }
+
+  /** The project sent as `X-Orvano-Project`, if any. */
+  get project(): string | undefined {
+    return this.#project
+  }
 
   constructor(config: ClientConfig) {
     let url: URL
@@ -125,7 +142,9 @@ export class Client {
       headers.set('Accept', 'application/json')
       headers.set(sdkHeader, `${sdkName}/${sdkVersion}`)
       if (this.#project !== undefined) headers.set('X-Orvano-Project', this.#project)
-      await this.authorize(headers)
+      if (spec.bearer === undefined) await this.authorize(headers)
+      else headers.set(authorizationHeader, `Bearer ${spec.bearer}`)
+      if (spec.noCache === true) headers.set('Cache-Control', 'no-cache')
 
       const init: RequestInit = { method: spec.method, headers }
       if (body !== undefined) {

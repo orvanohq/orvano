@@ -1,3 +1,5 @@
+import { AccessTokenVerifier } from './access-tokens.js'
+import type { VerifiedAccessToken, VerifyAccessTokenOptions } from './access-tokens.js'
 import { apiKeyHeader, assertNotInBrowser } from './api-key.js'
 import { Client as BaseClient } from './client.js'
 import type { ClientConfig } from './client.js'
@@ -13,10 +15,11 @@ export interface ServerClientConfig extends ClientConfig {
 
 /**
  * Sends requests to one Orvano server from trusted server code. Like the app client, plus an API
- * key; it can also act as a user by carrying a session.
+ * key and a local check of users' access tokens.
  */
 export class Client extends BaseClient {
   #apiKey: string | undefined
+  readonly #verifier = new AccessTokenVerifier(this)
 
   constructor(config: ServerClientConfig) {
     super(config)
@@ -27,6 +30,23 @@ export class Client extends BaseClient {
   setKey(apiKey: string | null): void {
     assertNotInBrowser()
     this.#apiKey = apiKey ?? undefined
+  }
+
+  /**
+   * Checks a user's access token without calling Orvano: an ES256 signature by one of the
+   * project's keys (fetched from its JWKS and kept for 10 minutes), issued by this endpoint for
+   * this project, and not expired (30 seconds leeway). A token whose session ended still passes
+   * until it expires (at most 15 minutes); pass `online: true` to also ask Orvano, as the user and
+   * never with the API key, whether the session is still active.
+   *
+   * @throws {@link OrvanoError} with status 401 and code `token_expired` or `invalid_token` when the
+   * token does not check out, and `Error` when the client has no project.
+   */
+  verifyAccessToken(
+    token: string,
+    options?: VerifyAccessTokenOptions,
+  ): Promise<VerifiedAccessToken> {
+    return this.#verifier.verify(token, options)
   }
 
   protected override async authorize(headers: Headers): Promise<void> {

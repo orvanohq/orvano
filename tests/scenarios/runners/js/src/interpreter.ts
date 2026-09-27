@@ -4,6 +4,7 @@ import type { ClientSurface } from './generated/client.js'
 import type { ConsoleSurface } from './generated/console.js'
 import { consoleDispatch } from './generated/console-dispatch.js'
 import { dispatch } from './generated/dispatch.js'
+import { runnerDispatch } from './runner-dispatch.js'
 import type { ServerSurface } from './generated/server.js'
 import { testEventRegistry } from './generated/test-events.js'
 
@@ -36,11 +37,15 @@ export interface ScenarioResult {
   reason?: string
 }
 
-/** The SDK objects a surface offers, one per role. Without `console`, console steps skip. */
+/**
+ * The SDK objects a surface offers, one per role. Without `console`, console steps skip; without
+ * `serverKey` (a browser can't hold an API key), server steps that need a scope skip.
+ */
 export interface Surface {
   client: ClientSurface
   server: ServerSurface
   console?: ConsoleSurface | undefined
+  serverKey?: boolean
 }
 
 /** The package's events plus the test events, as the spec has runners decode them. */
@@ -88,7 +93,7 @@ async function runScenario(scenario: Scenario, surface: Surface): Promise<void> 
         throw new StepFailure(`${where}: the contract has no event ${step.event}`)
       body = JSON.parse(JSON.stringify(decoded)) as unknown
     } else {
-      const table = step.as === 'console' ? consoleDispatch : dispatch
+      const table = step.as === 'console' ? consoleDispatch : { ...dispatch, ...runnerDispatch }
       const entry = step.op === undefined ? undefined : table[step.op]
       if (entry === undefined)
         throw new StepFailure(
@@ -140,6 +145,8 @@ async function call(
       if (entry.client === undefined) throw missing('@orvano/js')
       return entry.client(surface.client, input)
     case 'server':
+      if (entry.scope !== undefined && surface.serverKey !== true)
+        throw new ScenarioSkipped(`${op} needs an API key, which this surface does not hold`)
       if (all) {
         if (entry.serverAll === undefined) throw missing('@orvano/js/server')
         return collect(entry.serverAll(surface.server, input))

@@ -28,7 +28,7 @@ internal static partial class CSharp
 
     public sealed record Service(string ClassName, string Property, string Field, string Name, IReadOnlyList<Operation> Operations);
 
-    public sealed record OperationConstants(string ClassName, string Summary, string Id, string Method, string Route, string Audience);
+    public sealed record OperationConstants(string ClassName, string Summary, string Id, string Method, string Route, string Audience, string? Scope);
 
     public sealed record ServiceConstants(string ClassName, string Name, IReadOnlyList<OperationConstants> Operations);
 
@@ -84,7 +84,8 @@ internal static partial class CSharp
                 Naming.CsString(o.Id),
                 Naming.CsString(o.HttpMethod),
                 Naming.CsString(o.Path["/v1".Length..]),
-                Naming.CsString(o.Audience.ToString().ToLowerInvariant())))])).ToList();
+                Naming.CsString(o.Audience.ToString().ToLowerInvariant()),
+                o.Scope is null ? null : Naming.CsString(o.Scope)))])).ToList();
 
         yield return new GeneratedOutput("Server contract types", "server/src/Orvano.Contract/Generated", Formatter.CSharp,
         [

@@ -16,6 +16,15 @@ internal sealed record OrvanoRequest(
     byte[]? Body,
     bool Idempotent)
 {
+    /// <summary>
+    /// A user's access token to send as <c>Authorization: Bearer</c> instead of the client's API key, so a call made as
+    /// that user never carries the key.
+    /// </summary>
+    public string? Bearer { get; init; }
+
+    /// <summary>Sends <c>Cache-Control: no-cache</c>, so no cache in between answers from before a change.</summary>
+    public bool NoCache { get; init; }
+
     /// <summary>Serializes <paramref name="value"/> as UTF-8 JSON with source generated metadata.</summary>
     public static byte[] Json<T>(T value, JsonTypeInfo<T> typeInfo) => JsonSerializer.SerializeToUtf8Bytes(value, typeInfo);
 

@@ -3,6 +3,7 @@
 import type {
   CreateAccountRequest,
   CreatePasswordSessionRequest,
+  CreateUserRequest,
   DeleteAccountRequest,
   RefreshSessionRequest,
   UpdateAccountRequest,
@@ -98,5 +99,72 @@ export const dispatch: DispatchTable = {
       }),
     clientAll: (o, input) => o.test.listAll({ limit: input.limit as number | undefined }),
     serverAll: (o, input) => o.test.listAll({ limit: input.limit as number | undefined }),
+  },
+  'users.block': {
+    status: 200,
+    server: (o, input) => o.users.block(input.userId as string),
+    scope: 'users.write',
+  },
+  'users.create': {
+    status: 201,
+    server: (o, input) => o.users.create(input.body as CreateUserRequest),
+    scope: 'users.write',
+  },
+  'users.delete': {
+    status: 204,
+    server: (o, input) => o.users.delete(input.userId as string),
+    scope: 'users.write',
+  },
+  'users.deleteSession': {
+    status: 204,
+    server: (o, input) => o.users.deleteSession(input.userId as string, input.sessionId as string),
+    scope: 'users.write',
+  },
+  'users.deleteSessions': {
+    status: 204,
+    server: (o, input) => o.users.deleteSessions(input.userId as string),
+    scope: 'users.write',
+  },
+  'users.get': {
+    status: 200,
+    server: (o, input) => o.users.get(input.userId as string),
+    scope: 'users.read',
+  },
+  'users.list': {
+    status: 200,
+    server: (o, input) =>
+      o.users.list({
+        email: input.email as string | undefined,
+        status: input.status as string | undefined,
+        createdAfter: input.createdAfter as string | undefined,
+        createdBefore: input.createdBefore as string | undefined,
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    serverAll: (o, input) =>
+      o.users.listAll({
+        email: input.email as string | undefined,
+        status: input.status as string | undefined,
+        createdAfter: input.createdAfter as string | undefined,
+        createdBefore: input.createdBefore as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    scope: 'users.read',
+  },
+  'users.listSessions': {
+    status: 200,
+    server: (o, input) =>
+      o.users.listSessions(input.userId as string, {
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    serverAll: (o, input) =>
+      o.users.listSessionsAll(input.userId as string, { limit: input.limit as number | undefined }),
+    scope: 'users.read',
+  },
+  'users.unblock': {
+    status: 200,
+    server: (o, input) => o.users.unblock(input.userId as string),
+    scope: 'users.write',
   },
 }

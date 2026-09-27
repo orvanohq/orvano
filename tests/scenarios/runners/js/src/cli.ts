@@ -27,24 +27,32 @@ const targets: readonly Target[] = ['node', 'bun', 'deno', 'browser', 'workerd',
  * The first console session and the first project in `fixtures.yaml`, which the server seeds in
  * the Test environment.
  */
-async function loadFixtures(): Promise<{ consoleSession?: string; project?: string }> {
+async function loadFixtures(): Promise<{
+  consoleSession?: string
+  project?: string
+  apiKey?: string
+}> {
   const fixtures = parse(await readFile(join(scenariosDir, 'fixtures.yaml'), 'utf8')) as {
     consoleSessions?: string[]
     projects?: { id?: string }[]
+    apiKeys?: { project?: string; secret?: string }[]
   } | null
   const consoleSession = fixtures?.consoleSessions?.[0]
   const project = fixtures?.projects?.[0]?.id
+  const apiKey = fixtures?.apiKeys?.find((k) => k.project === project)?.secret
   return {
     ...(consoleSession === undefined ? {} : { consoleSession }),
     ...(project === undefined ? {} : { project }),
+    ...(apiKey === undefined ? {} : { apiKey }),
   }
 }
 
-const { consoleSession, project } = await loadFixtures()
+const { consoleSession, project, apiKey } = await loadFixtures()
 /** The fixtures every runtime needs, as environment variables. */
 const fixtureEnv: Record<string, string> = {
   ...(consoleSession === undefined ? {} : { ORVANO_CONSOLE_SESSION: consoleSession }),
   ...(project === undefined ? {} : { ORVANO_PROJECT: project }),
+  ...(apiKey === undefined ? {} : { ORVANO_API_KEY: apiKey }),
 }
 
 async function loadScenarios(): Promise<Scenario[]> {
@@ -220,7 +228,7 @@ async function inNextjs(scenarios: Scenario[]): Promise<ScenarioResult[]> {
 async function run(target: Target, scenarios: Scenario[]): Promise<ScenarioResult[]> {
   switch (target) {
     case 'node':
-      return runScenarios(scenarios, createSurface(endpoint, { consoleSession, project }))
+      return runScenarios(scenarios, createSurface(endpoint, { consoleSession, project, apiKey }))
     case 'bun':
       return inRuntime('bun', ['run'], scenarios)
     case 'deno':

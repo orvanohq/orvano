@@ -32,13 +32,10 @@ public sealed class OrvanoClientOptions
         set
         {
             if (value is not null && InBrowser)
-                throw new PlatformNotSupportedException("Orvano API keys are for trusted server code only. Never set one in a browser; use a session instead.");
+                throw new PlatformNotSupportedException("Orvano API keys are for trusted server code only. Never set one in a browser; sign users in with a client SDK instead.");
             _apiKey = value;
         }
     }
-
-    /// <summary>A signed in user's session, to act as that user. None by default.</summary>
-    public IOrvanoSessionStore? Session { get; set; }
 
     /// <summary>How long one call may take, retries included. Defaults to 30 seconds; <see cref="TimeSpan.Zero"/> turns it off.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);

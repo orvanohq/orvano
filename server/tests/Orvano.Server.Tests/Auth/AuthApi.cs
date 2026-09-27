@@ -26,6 +26,9 @@ public sealed class AuthApi : IAsyncDisposable
     public const string Project = "authproject0001";
     public const string OtherProject = "authproject0002";
     public const string ServerKey = "orv_sk_authAuthAuthAuthAuthAuthAuthAuthAuthAuthAut";
+    public const string ReadKey = "orv_sk_readReadReadReadReadReadReadReadReadReadRea";
+    public const string FixtureUser = "fixture@x.com";
+    public const string OtherProjectKey = "orv_sk_otherOtherOtherOtherOtherOtherOtherOtherOth";
 
     private AuthApi(OrvanoProcess process, TestDatabase database)
     {
@@ -60,6 +63,21 @@ public sealed class AuthApi : IAsyncDisposable
               - project: {Project}
                 secret: {ServerKey}
                 scopes: [users.read, users.write]
+              - project: {Project}
+                secret: {ReadKey}
+                scopes: [users.read]
+              - project: {OtherProject}
+                secret: {OtherProjectKey}
+                scopes: [users.read, users.write]
+            platforms:
+              - project: {OtherProject}
+                type: web
+                identifier: localhost
+            users:
+              - project: {OtherProject}
+                email: {FixtureUser}
+                password: fixture horse battery
+                name: Fixture User
 
             """, Ct);
 
@@ -108,6 +126,14 @@ public sealed class AuthApi : IAsyncDisposable
 
     public Task<Reply> SignInAsync(string email, string password = "correct horse battery", string? project = Project) =>
         SendAsync(HttpMethod.Post, "/v1/account/sessions/password", new { email, password }, project);
+
+    /// <summary>Calls a <c>users</c> operation with an API key (the full scope server key by default).</summary>
+    public Task<Reply> AsServerAsync(HttpMethod method, string url, object? body = null, string key = ServerKey, string? project = Project) =>
+        SendAsync(method, url, body, project, headers: new Dictionary<string, string> { ["X-Orvano-Key"] = key });
+
+    /// <summary>Calls a console operation as the fixture console session.</summary>
+    public Task<Reply> AsConsoleAsync(HttpMethod method, string url, object? body = null, string? project = Project) =>
+        SendAsync(method, url, body, project, headers: new Dictionary<string, string> { ["Cookie"] = $"orvano_console={ConsoleSession}" });
 
     public static string AccessToken(Reply signedIn) => signedIn.Body.GetProperty("session").GetProperty("accessToken").GetString()!;
 

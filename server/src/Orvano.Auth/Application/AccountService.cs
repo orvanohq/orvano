@@ -33,27 +33,39 @@ internal sealed class AccountService(
     /// </summary>
     public async Task<Outcome<SignedIn>> SignUpAsync(string projectId, string? email, string? password, string? name, ClientInfo client, CancellationToken ct)
     {
+        await keys.GetActiveAsync(projectId, ct); // the first token of a project creates its key, before any commit
+        var outcome = await CreateAsync(projectId, email, password, name, userId => Actor.User(userId), client, ct);
+        return outcome.Succeeded ? await SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant!, ct) : outcome.Failure!;
+    }
+
+    /// <summary>A server or console creates a user (AC-17): the same rules as sign up, and no session.</summary>
+    public async Task<Outcome<UserRow>> CreateUserAsync(string projectId, string? email, string? password, string? name, Actor actor, CancellationToken ct)
+    {
+        var outcome = await CreateAsync(projectId, email, password, name, _ => actor, client: null, ct);
+        return outcome.Succeeded ? outcome.Value.User : outcome.Failure!;
+    }
+
+    private async Task<Outcome<(UserRow User, SessionGrant? Grant)>> CreateAsync(
+        string projectId, string? email, string? password, string? name, Func<Guid, Actor> actorOf, ClientInfo? client, CancellationToken ct)
+    {
         if (!EmailRule.TryNormalize(email, out var trimmed)) return Failure.Invalid("The email must be an address of at most 320 characters.");
         if (!UserName.IsValid(name)) return Failure.Invalid($"The name must be at most {UserName.MaxLength} characters.");
         if (!PasswordPolicy.TryNormalize(password, out var normalized)) return Failure.InvalidPassword;
 
         var hash = await hasher.TryHashAsync(normalized, ct);
         if (hash is null) return Failure.Busy;
-        await keys.GetActiveAsync(projectId, ct); // the first token of a project creates its key, before any commit
 
-        var outcome = await store.WriteAsync<(UserRow User, SessionGrant Grant)>(async (uow, token) =>
+        return await store.WriteAsync<(UserRow User, SessionGrant? Grant)>(async (uow, token) =>
         {
             if (await InsertUserAsync(uow, projectId, trimmed, name, token) is not { } userId) return Failure.UserAlreadyExists;
 
             await InsertPasswordAsync(uow, userId, projectId, hash, token);
-            var actor = Actor.User(userId);
+            var actor = actorOf(userId);
             await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserCreated, projectId, actor, userId.ToString(),
                 new Dictionary<string, string> { ["userId"] = userId.ToString() }, ct: token);
-            var grant = await sessions.CreateAsync(uow, projectId, userId, client, actor, token);
+            var grant = client is null ? null : await sessions.CreateAsync(uow, projectId, userId, client, actor, token);
             return (await ReloadAsync(uow.Db, userId, token), grant);
         }, ct);
-
-        return outcome.Succeeded ? await SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant, ct) : outcome.Failure!;
     }
 
     /// <summary>
@@ -201,28 +213,7 @@ internal sealed class AccountService(
         if (check.Failure is not null) return check.Failure;
 
         var outcome = await store.WriteAsync<Guid[]>(async (uow, token) =>
-        {
-            var ended = new List<Guid>();
-            await using (var sessionsGone = new NpgsqlCommand(
-                "DELETE FROM orvano.auth_sessions WHERE user_id = @user RETURNING id", uow.Tx.Connection, uow.Tx))
-            {
-                sessionsGone.Parameters.AddWithValue("user", userId);
-                await using var reader = await sessionsGone.ExecuteReaderAsync(token);
-                while (await reader.ReadAsync(token)) ended.Add(reader.GetGuid(0));
-            }
-
-            await using (var userGone = new NpgsqlCommand(
-                "DELETE FROM orvano.auth_users WHERE id = @user AND project_id = @project", uow.Tx.Connection, uow.Tx))
-            {
-                userGone.Parameters.AddWithValue("user", userId);
-                userGone.Parameters.AddWithValue("project", projectId);
-                if (await userGone.ExecuteNonQueryAsync(token) == 0) return Failure.UserNotFound;
-            }
-
-            await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserDeleted, projectId, Actor.User(userId), userId.ToString(),
-                new Dictionary<string, string> { ["userId"] = userId.ToString() }, ct: token);
-            return ended.ToArray();
-        }, ct);
+            await UserRecords.DeleteAsync(uow, projectId, userId, Actor.User(userId), token) is { } ended ? ended : Failure.UserNotFound, ct);
 
         if (!outcome.Succeeded) return outcome.Failure!;
         foreach (var id in outcome.Value!) await checks.EvictAsync(id, ct);

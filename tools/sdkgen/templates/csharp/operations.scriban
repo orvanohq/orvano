@@ -20,6 +20,11 @@ public static class {{ s.class_name }}
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = {{ o.audience }};
+{{~ if o.scope ~}}
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = {{ o.scope }};
+{{~ end ~}}
     }
 {{~ if !for.last ~}}
 

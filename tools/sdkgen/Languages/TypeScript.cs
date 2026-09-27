@@ -97,6 +97,7 @@ internal static class TypeScript
             .. o.IsServer ? [new DispatchCall("server", Call(o, "o"))] : Array.Empty<DispatchCall>(),
             .. o.IsClient && o.PageItem is not null ? [new DispatchCall("clientAll", CallAll(o))] : Array.Empty<DispatchCall>(),
             .. o.IsServer && o.PageItem is not null ? [new DispatchCall("serverAll", CallAll(o))] : Array.Empty<DispatchCall>(),
+            .. o.Scope is not null ? [new DispatchCall("scope", $"'{o.Scope}'")] : Array.Empty<DispatchCall>(),
         ])).ToList();
         var consoleDispatch = contract.Operations.Where(o => o.Audience == Audience.Console).Select(o => new DispatchEntry(o.Id, o.SuccessStatus,
         [

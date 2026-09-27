@@ -11,10 +11,6 @@ import 'generated/test_client.dart';
 import 'generated/test_events.dart';
 import 'generated/test_server.dart';
 
-/// The API key scenario runners send; the server ignores keys until the auth
-/// spec (row 8).
-const testServerKey = 'test-server-key';
-
 const _inBrowser = bool.fromEnvironment('dart.library.js_interop');
 
 /// The package's events plus the test events, as the spec has runners decode
@@ -40,36 +36,45 @@ final class ScenarioResult {
 
 /// The SDK objects a surface offers, one per role.
 final class Surface {
-  /// Wraps SDK objects the caller built.
-  const Surface({required this.client, required this.server});
+  /// Wraps SDK objects the caller built. Without [serverKey] (a browser
+  /// can't hold an API key), server steps that need a scope skip.
+  const Surface({
+    required this.client,
+    required this.server,
+    this.serverKey = false,
+  });
 
   /// The client and server SDK objects for [endpoint], as every Dart runner
   /// builds them: both send [project] (the fixture project), and the server
-  /// one sends [testServerKey], except in a browser, where setting a key
-  /// throws. Pass [client] to run the client steps through a client built
-  /// elsewhere (the Flutter runner's, from `orvano_flutter`).
+  /// one sends [apiKey] (the fixture key), except in a browser, where setting
+  /// a key throws. Pass [client] to run the client steps through a client
+  /// built elsewhere (the Flutter runner's, from `orvano_flutter`).
   factory Surface.connect(
     String endpoint, {
     core.Client? client,
     String? project,
-  }) => Surface(
-    client: ClientSurface(
-      client ?? core.Client(endpoint: endpoint, project: project),
-    ),
-    server: ServerSurface(
-      srv.Client(
-        endpoint: endpoint,
-        project: project,
-        apiKey: _inBrowser ? null : testServerKey,
+    String? apiKey,
+  }) {
+    final key = _inBrowser ? null : apiKey;
+    return Surface(
+      client: ClientSurface(
+        client ?? core.Client(endpoint: endpoint, project: project),
       ),
-    ),
-  );
+      server: ServerSurface(
+        srv.Client(endpoint: endpoint, project: project, apiKey: key),
+      ),
+      serverKey: key != null,
+    );
+  }
 
   /// `orvano_core` plus the test services.
   final ClientSurface client;
 
   /// `orvano_dart` plus the test services.
   final ServerSurface server;
+
+  /// Whether the server SDK sends an API key.
+  final bool serverKey;
 
   /// Closes both clients' connections.
   void close() {
@@ -78,15 +83,64 @@ final class Surface {
   }
 }
 
+Object? _fixtures(String fixturesYaml) =>
+    jsonDecode(jsonEncode(loadYaml(fixturesYaml)));
+
 /// The first project in `fixtures.yaml`, which the server seeds in the Test
 /// environment; null when there is none.
-String? fixtureProject(String fixturesYaml) {
-  final fixtures = jsonDecode(jsonEncode(loadYaml(fixturesYaml)));
-  return switch (fixtures) {
-    {'projects': [{'id': final String id}, ...]} => id,
-    _ => null,
-  };
+String? fixtureProject(String fixturesYaml) =>
+    switch (_fixtures(fixturesYaml)) {
+      {'projects': [{'id': final String id}, ...]} => id,
+      _ => null,
+    };
+
+/// The first API key of the first project in `fixtures.yaml`; null when
+/// there is none.
+String? fixtureApiKey(String fixturesYaml) {
+  final fixtures = _fixtures(fixturesYaml);
+  final project = fixtureProject(fixturesYaml);
+  if (fixtures case {'apiKeys': final List<Object?> keys}) {
+    for (final key in keys) {
+      if (key case {
+        'project': final String p,
+        'secret': final String secret,
+      } when p == project) {
+        return secret;
+      }
+    }
+  }
+  return null;
 }
+
+/// Runner operations: calls the scenarios make that are not contract
+/// operations. `signIn` is a plain sign in call that leaves the SDK's stored
+/// session alone, so a runner without client operations (.NET) can get a
+/// token too; `verifyAccessToken` is the server SDK's own check. Their names
+/// have no dot, so they never collide with an operationId.
+final Map<String, DispatchEntry> _runnerDispatch = {
+  'signIn': DispatchEntry(
+    status: 201,
+    client: (o, input) => o.client.send(
+      'POST',
+      '/v1/account/sessions/password',
+      body: input['body'],
+    ),
+  ),
+  'verifyAccessToken': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final verified = await (o.client as srv.Client).verifyAccessToken(
+        '${input['token']}',
+        online: input['online'] == true,
+      );
+      return {
+        'userId': verified.userId,
+        'sessionId': verified.sessionId,
+        'expiresAt': verified.expiresAt.toIso8601String(),
+      };
+    },
+  ),
+};
 
 /// Parses one scenario file into plain JSON values.
 Map<String, Object?> parseScenario(String yamlText) =>
@@ -161,7 +215,7 @@ Future<void> _runScenario(
       if (role == 'console') {
         throw _Skipped('console steps run only in the JS interpreter');
       }
-      final entry = op == null ? null : dispatch[op];
+      final entry = op == null ? null : _runnerDispatch[op] ?? dispatch[op];
       if (entry == null) {
         throw _StepFailure('$where: the contract has no operation $op');
       }
@@ -223,6 +277,11 @@ Future<Object?> _call(
       final call = entry.client ?? (throw missing('orvano_core'));
       return call(surface.client, input);
     case 'server':
+      if (entry.scope != null && !surface.serverKey) {
+        throw _Skipped(
+          '$op needs an API key, which this surface does not hold',
+        );
+      }
       if (all) {
         final call = entry.serverAll ?? (throw missing('orvano_dart'));
         return {'items': await call(surface.server, input).toList()};

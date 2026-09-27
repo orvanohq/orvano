@@ -131,7 +131,10 @@ internal static class AccountEndpoints
             .RequireUser();
 
         v1.MapDelete(Api.AccountOperations.DeleteSession.Route, async (HttpContext http, string sessionId, SessionService sessions, CancellationToken ct) =>
-            NoContent(http, await sessions.EndAsync(PublicRequests.Project(http), PublicRequests.User(http).UserId, sessionId, ct)))
+        {
+            var user = PublicRequests.User(http);
+            return NoContent(http, await sessions.EndAsync(PublicRequests.Project(http), user.UserId, sessionId, Actor.User(user.UserId), ct));
+        })
             .WithName(Api.AccountOperations.DeleteSession.Id)
             .RequireProject()
             .RequireUser();
@@ -139,7 +142,7 @@ internal static class AccountEndpoints
         v1.MapDelete(Api.AccountOperations.DeleteOtherSessions.Route, async (HttpContext http, SessionService sessions, CancellationToken ct) =>
         {
             var user = PublicRequests.User(http);
-            return NoContent(http, await sessions.EndOthersAsync(PublicRequests.Project(http), user.UserId, user.SessionId, ct));
+            return NoContent(http, await sessions.EndAllAsync(PublicRequests.Project(http), user.UserId, user.SessionId, Actor.User(user.UserId), ct));
         })
             .WithName(Api.AccountOperations.DeleteOtherSessions.Id)
             .RequireProject()

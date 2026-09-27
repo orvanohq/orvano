@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
+using Orvano.Auth.Domain;
+using Orvano.Auth.Fixtures;
 using Orvano.Platform.Domain;
 using Orvano.Platform.Fixtures;
 using YamlDotNet.Core;
@@ -10,22 +12,26 @@ namespace Orvano.Server.Hosting;
 /// <summary>
 /// Test only seed data for the shared scenarios (<c>tests/scenarios/fixtures.yaml</c>), loaded from
 /// <c>ORVANO_TEST_FIXTURES</c> in the <c>Test</c> environment only (spec 0001). It holds the console session tokens the
-/// server accepts (each acting as its own console user until row 8's real sessions), and the projects and API keys
-/// to seed (spec 0003). Row 8 adds <c>users</c>.
+/// server accepts (each acting as its own console user until row 8's real sessions), the projects, API keys, and
+/// platforms to seed (spec 0003), and the app users with their passwords (spec 0004).
 /// </summary>
 /// <param name="ConsoleSessions">Console session tokens valid on <c>/v1/console</c>, each with the console user it acts as.</param>
 /// <param name="Projects">Projects to seed, owned by the first session's user.</param>
 /// <param name="ApiKeys">API keys to seed with known secrets.</param>
+/// <param name="Platforms">Platforms to seed; a web one lets browsers of that host call the project.</param>
+/// <param name="Users">App users to seed with known passwords.</param>
 /// <param name="Problem">Why the fixtures can't be used; the role refuses to start when set.</param>
 internal sealed record TestFixtures(
     IReadOnlyDictionary<string, Guid> ConsoleSessions,
     IReadOnlyList<FixtureProject> Projects,
     IReadOnlyList<FixtureApiKey> ApiKeys,
+    IReadOnlyList<FixturePlatform> Platforms,
+    IReadOnlyList<FixtureUser> Users,
     string? Problem = null)
 {
     public const string Setting = "ORVANO_TEST_FIXTURES";
 
-    public static TestFixtures None { get; } = new(new Dictionary<string, Guid>(StringComparer.Ordinal), [], []);
+    public static TestFixtures None { get; } = new(new Dictionary<string, Guid>(StringComparer.Ordinal), [], [], [], []);
 
     /// <summary>The console user the first session acts as, who owns the seeded projects.</summary>
     public Guid? Owner { get; private init; }
@@ -76,9 +82,27 @@ internal sealed record TestFixtures(
             keys.Add(new FixtureApiKey(k.Project!, k.Secret!, scopes));
         }
 
+        var platforms = new List<FixturePlatform>();
+        foreach (var p in file?.Platforms ?? [])
+        {
+            if (!projects.Any(project => project.Id == p.Project)) return Fail($"{Setting}: platforms project '{p.Project}' is not one of the fixture projects");
+            if (PlatformIdentifiers.ParseType(p.Type) is not { } type) return Fail($"{Setting}: platform type '{p.Type}' is not a known platform type");
+            if (!PlatformIdentifiers.TryNormalize(type, p.Identifier, out _, out var problem)) return Fail($"{Setting}: platform '{p.Identifier}': {problem}");
+            platforms.Add(new FixturePlatform(p.Project!, type, p.Identifier!));
+        }
+
+        var users = new List<FixtureUser>();
+        foreach (var u in file?.Users ?? [])
+        {
+            if (!projects.Any(project => project.Id == u.Project)) return Fail($"{Setting}: users project '{u.Project}' is not one of the fixture projects");
+            if (!EmailRule.TryNormalize(u.Email, out var email)) return Fail($"{Setting}: user email '{u.Email}' is not an email address");
+            if (!PasswordPolicy.TryNormalize(u.Password, out _)) return Fail($"{Setting}: user '{email}' needs a password of 8 to 256 characters");
+            users.Add(new FixtureUser(u.Project!, email, u.Password!, u.Name));
+        }
+
         if (projects.Count > 0 && sessions.Count == 0) return Fail($"{Setting}: projects need a console session to own them");
 
-        return new TestFixtures(sessions.Distinct(StringComparer.Ordinal).ToDictionary(t => t, UserIdFor, StringComparer.Ordinal), projects, keys)
+        return new TestFixtures(sessions.Distinct(StringComparer.Ordinal).ToDictionary(t => t, UserIdFor, StringComparer.Ordinal), projects, keys, platforms, users)
         {
             Owner = sessions.Count > 0 ? UserIdFor(sessions[0]) : null,
         };
@@ -97,6 +121,39 @@ internal sealed record TestFixtures(
 
         [YamlMember(Alias = "apiKeys")]
         public List<ApiKeyEntry>? ApiKeys { get; set; }
+
+        [YamlMember(Alias = "platforms")]
+        public List<PlatformEntry>? Platforms { get; set; }
+
+        [YamlMember(Alias = "users")]
+        public List<UserEntry>? Users { get; set; }
+    }
+
+    private sealed class PlatformEntry
+    {
+        [YamlMember(Alias = "project")]
+        public string? Project { get; set; }
+
+        [YamlMember(Alias = "type")]
+        public string? Type { get; set; }
+
+        [YamlMember(Alias = "identifier")]
+        public string? Identifier { get; set; }
+    }
+
+    private sealed class UserEntry
+    {
+        [YamlMember(Alias = "project")]
+        public string? Project { get; set; }
+
+        [YamlMember(Alias = "email")]
+        public string? Email { get; set; }
+
+        [YamlMember(Alias = "password")]
+        public string? Password { get; set; }
+
+        [YamlMember(Alias = "name")]
+        public string? Name { get; set; }
     }
 
     private sealed class ProjectEntry

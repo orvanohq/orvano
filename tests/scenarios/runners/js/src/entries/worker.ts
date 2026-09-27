@@ -8,6 +8,7 @@ interface Env {
   ORVANO_ENDPOINT: string
   ORVANO_CONSOLE_SESSION?: string
   ORVANO_PROJECT?: string
+  ORVANO_API_KEY?: string
 }
 
 export default {
@@ -16,6 +17,7 @@ export default {
     const surface = createSurface(env.ORVANO_ENDPOINT, {
       consoleSession: env.ORVANO_CONSOLE_SESSION,
       project: env.ORVANO_PROJECT,
+      apiKey: env.ORVANO_API_KEY,
     })
     return Response.json(await runScenarios(scenarios, surface))
   },

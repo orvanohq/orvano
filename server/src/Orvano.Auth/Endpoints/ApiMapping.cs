@@ -67,6 +67,8 @@ internal static class ApiMapping
 
     public static Api.SessionPage SessionPage(Page<SessionView> page) => new([.. page.Items.Select(Session)], page.NextCursor);
 
+    public static Api.UserPage UserPage(Page<UserRow> page) => new([.. page.Items.Select(User)], page.NextCursor);
+
     public static Api.AuthResult AuthResult(SignedIn signedIn) => new(User(signedIn.User), SessionTokens(signedIn.Session));
 
     public static Api.Jwk Jwk(PublicSigningKey key) =>

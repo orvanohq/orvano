@@ -2,4 +2,3 @@
 export { ClientSurface } from './generated/client.js'
 export { ConsoleSurface } from './generated/console.js'
 export { ServerSurface } from './generated/server.js'
-export { testServerKey } from './surface.js'

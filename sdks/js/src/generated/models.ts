@@ -29,6 +29,16 @@ export interface CreatePasswordSessionRequest {
   password: string
 }
 
+/** A new user with an email and password, created by a server. No session is created. */
+export interface CreateUserRequest {
+  /** The email, trimmed, at most 320 characters. Unique in the project, ignoring case. */
+  email: string
+  /** 8 to 256 characters after Unicode NFKC normalization. */
+  password: string
+  /** A display name, at most 256 characters. */
+  name?: string | null
+}
+
 /** A request to delete the signed in user. */
 export interface DeleteAccountRequest {
   /** The user's current password. */
@@ -167,4 +177,12 @@ export interface User {
   createdAt: string
   /** When the user last signed in; null if never. */
   lastSignInAt: string | null
+}
+
+/** One page of a project's users, newest first. */
+export interface UserPage {
+  /** The users on this page. */
+  items: User[]
+  /** Pass it as `cursor` to get the next page; null on the last page. */
+  nextCursor: string | null
 }

@@ -692,3 +692,178 @@ public static class TestOperations
         public const string Audience = "both";
     }
 }
+
+/// <summary>Route constants for the <c>users</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class UsersOperations
+{
+    /// <summary>POST /v1/users/{userId}/block: Blocks a user: ends every session and refuses sign in. Blocking a blocked user changes nothing.</summary>
+    public static class Block
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.block";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/block";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
+    /// <summary>POST /v1/users: Creates a user with an email and password. It does not sign them in.</summary>
+    public static class Create
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.create";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
+    /// <summary>DELETE /v1/users/{userId}: Deletes a user with their password and sessions. It can't be undone.</summary>
+    public static class Delete
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.delete";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
+    /// <summary>DELETE /v1/users/{userId}/sessions/{sessionId}: Ends one session of a user.</summary>
+    public static class DeleteSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.deleteSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/sessions/{sessionId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
+    /// <summary>DELETE /v1/users/{userId}/sessions: Ends every session of a user.</summary>
+    public static class DeleteSessions
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.deleteSessions";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/sessions";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
+    /// <summary>GET /v1/users/{userId}: Gets a user.</summary>
+    public static class Get
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.get";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.read";
+    }
+
+    /// <summary>GET /v1/users: Lists the project's users, newest first.</summary>
+    public static class List
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.list";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.read";
+    }
+
+    /// <summary>GET /v1/users/{userId}/sessions: Lists a user's active sessions, newest first. <c>current</c> is always false.</summary>
+    public static class ListSessions
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.listSessions";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/sessions";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.read";
+    }
+
+    /// <summary>POST /v1/users/{userId}/unblock: Unblocks a user so they can sign in again. Their old sessions stay ended.</summary>
+    public static class Unblock
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.unblock";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/unblock";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+}

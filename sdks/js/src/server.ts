@@ -16,6 +16,7 @@
  */
 export { Client } from './runtime/server-client.js'
 export type { ServerClientConfig } from './runtime/server-client.js'
+export type { VerifiedAccessToken, VerifyAccessTokenOptions } from './runtime/access-tokens.js'
 export type { ClientConfig, HttpMethod, RequestOptions, RequestSpec } from './runtime/client.js'
 export { MemorySessionStore } from './runtime/auth.js'
 export type { AuthSession, SessionStore } from './runtime/auth.js'

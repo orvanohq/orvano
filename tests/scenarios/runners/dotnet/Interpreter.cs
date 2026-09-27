@@ -18,7 +18,7 @@ internal sealed record ScenarioResult(string Name, string Outcome, string? Reaso
 
 /// <summary>The SDK clients a run uses, one per role. The .NET SDK is server side only, so both are <see cref="OrvanoClient"/>.</summary>
 /// <param name="Client">For <c>as: client</c> steps: no API key.</param>
-/// <param name="Server">For <c>as: server</c> steps: the scenario API key.</param>
+/// <param name="Server">For <c>as: server</c> steps: the fixture API key.</param>
 internal sealed record Surface(OrvanoClient Client, OrvanoClient Server);
 
 /// <summary>
@@ -90,7 +90,7 @@ internal static partial class Interpreter
                     "console" => throw new ScenarioSkipped("console steps run only in the JS interpreter"),
                     _ => throw new ScenarioFailure($"{where}: an operation step needs `as`"),
                 };
-                if (op is null || !Dispatch.Operations.TryGetValue(op, out var entry))
+                if (op is null || !RunnerDispatch.Operations.TryGetValue(op, out var entry) && !Dispatch.Operations.TryGetValue(op, out entry))
                     throw new ScenarioFailure($"{where}: the contract has no operation {op ?? "?"}");
                 var paginate = step["paginate"]?.GetValue<bool>() == true;
                 var call = (paginate ? entry.All : entry.Call)

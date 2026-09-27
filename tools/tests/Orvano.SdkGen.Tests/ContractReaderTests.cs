@@ -304,3 +304,60 @@ public class ContractReaderTests
         Assert.Contains(errors, e => e.Contains(message, StringComparison.Ordinal));
     }
 }
+
+public class ScopeRuleTests
+{
+    [Fact]
+    public async Task Reads_the_scope_of_an_api_key_operation_and_none_for_bearer_or_open_ones() // spec 0004, scope rule amendment
+    {
+        var (contract, errors) = await Repo.ReadAsync(Repo.OpenApi());
+
+        Assert.Empty(errors);
+        Assert.Equal("users.read", contract!.Operations.Single(o => o.Id == "users.list").Scope);
+        Assert.Equal("users.write", contract.Operations.Single(o => o.Id == "users.block").Scope);
+        Assert.Null(contract.Operations.Single(o => o.Id == "account.get").Scope);
+        Assert.Null(contract.Operations.Single(o => o.Id == "keys.getJwks").Scope);
+        Assert.Null(contract.Operations.Single(o => o.Id == "health.get").Scope);
+    }
+
+    [Fact]
+    public async Task Refuses_an_api_key_operation_without_a_scope()
+    {
+        var doc = Repo.OpenApi();
+        Repo.Operation(doc, "/v1/users", "get").Remove("x-orvano-scope");
+
+        var (contract, errors) = await Repo.ReadAsync(doc);
+
+        Assert.Null(contract);
+        Assert.Contains(errors, e => e.Contains("users.list", StringComparison.Ordinal) && e.Contains("must declare x-orvano-scope", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("/v1/account", "get")] // bearer only
+    [InlineData("/v1/health", "get")] // no security
+    public async Task Refuses_a_scope_on_an_operation_without_an_api_key(string path, string method)
+    {
+        var doc = Repo.OpenApi();
+        Repo.Operation(doc, path, method)["x-orvano-scope"] = "users.read";
+
+        var (contract, errors) = await Repo.ReadAsync(doc);
+
+        Assert.Null(contract);
+        Assert.Contains(errors, e => e.Contains("x-orvano-scope is only for operations secured by apiKey", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Refuses_a_scope_outside_the_catalog_and_an_api_key_on_a_client_operation()
+    {
+        var doc = Repo.OpenApi();
+        Repo.Operation(doc, "/v1/users", "get")["x-orvano-scope"] = "users.admin";
+        var client = Repo.Operation(doc, "/v1/users/{userId}", "get");
+        client["x-orvano-audience"] = "client";
+
+        var (contract, errors) = await Repo.ReadAsync(doc);
+
+        Assert.Null(contract);
+        Assert.Contains(errors, e => e.Contains("'users.admin' is not a value of the ApiKeyScope enum", StringComparison.Ordinal));
+        Assert.Contains(errors, e => e.Contains("users.get", StringComparison.Ordinal) && e.Contains("only server operations are secured by apiKey", StringComparison.Ordinal));
+    }
+}
