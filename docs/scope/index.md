@@ -84,11 +84,12 @@ Every product feature ships in all of these layers in the same version, unless i
 | 38 | Upgrades, audit logs & hardening | v0.15 | planned |
 | 39 | Stable release gate | v1.0 | planned |
 | 40 | Console account self service | v0.3 | planned |
+| 41 | Install admin console | v0.3 | planned |
 
 ## Epics
 
 - [Foundations](foundations.md): rows 1 to 6 · 3 of 6 done
-- [Platform & developer experience](platform.md): rows 7, 11, 15, 19, 37 to 40 · 0 of 8 done
+- [Platform & developer experience](platform.md): rows 7, 11, 15, 19, 37 to 41 · 0 of 9 done
 - [Authentication](auth.md): rows 8 to 10, 12 to 14 · 0 of 6 done
 - [Databases](databases.md): rows 16 to 18 · 0 of 3 done
 - [Storage](storage.md): rows 20 to 21 · 0 of 2 done

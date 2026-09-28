@@ -5,10 +5,14 @@ Console accounts, teams, the CLI, docs, operations, and the road to 1.0. See [in
 ### 7. Console accounts, orgs & projects · in-progress
 The first console screens: an admin signs up, creates an org and a project, creates an API key, and registers a platform (web origin or app bundle ID). Part of the v0.1 thread.
 **Done when:** on a fresh install you can sign up, create an org and a project, create a scoped API key, and add a web and a Flutter platform.
+- [x] Design the console screens (spec): `/architect console accounts, orgs & projects`
 - [ ] Build it: `/develop console accounts, orgs & projects`
    - [x] Backend: the Platform module, console operations in the contract, provision and purge jobs, API keys, platforms, events, and fixture projects and keys (spec 0003 row 7 tasks 1 to 6)
-   - [ ] Console screens: sign up, orgs, projects, API keys, and platforms (waits on row 5's design system decision and row 8's console session)
-Spec [0003](../specs/0003-platform-data-model/index.md) · code in `server/src/Orvano.Platform/`, `contract/platform/`
+   - [ ] Console thin thread: create org and project, the API keys page with the one time secret, the Platforms page, and the end to end journey (spec 0007 AC-1, 6, 11 to 15, 17 to 19, 23)
+   - [ ] Console complete: key delete, platform edit and delete, project and org settings, status panel actions, the Connect your app card, catalog and accessibility tests (spec 0007 AC-2 to 5, 7 to 10, 16, 20 to 22)
+- [ ] Verify it: `/check verify console accounts, orgs & projects`
+- [ ] Test it: `/test console accounts, orgs & projects`
+Spec [0003](../specs/0003-platform-data-model/index.md) (model and API) · Spec [0007](../specs/0007-console-platform-screens/index.md) (console screens) · code in `server/src/Orvano.Platform/`, `contract/platform/`, `console/`
 
 ### 11. Docs site & quickstarts · needs a decision
 Public docs with a quickstart per SDK and the generated API reference. From here on, every feature adds its own docs page.
@@ -46,3 +50,8 @@ Freeze the v1 API, publish every SDK to its registry (npm, pub.dev, NuGet), fini
 Console accounts can change their password, see and end their own sessions, and delete their account (blocked while they are the last owner of an org with members or projects, through `IConsoleAccountGuard`). Spec 0004 builds the engine; this row adds the console screens and `/v1/console/account` operations.
 **Done when:** a console user changes their password and other sessions end, ends a session from the list, and deleting an account that is the last owner of a busy org is refused with a clear message.
 - [ ] Build it: `/develop console account self service`
+
+### 41. Install admin console · needs a decision · from spec 0007
+Screens for install admins: switch console sign up between invite and open, add a `/sign-up` page for open installs, and retry a failed project purge on any org (spec 0003's install admin rights). Needs an install admin flag on the console account API, which does not exist yet.
+**Done when:** an install admin sets sign up to open and a stranger can sign up at `/sign-up`, a non admin sees neither screen, and an install admin retries a failed purge on an org they are not a member of.
+- [ ] Design it (spec): `/architect install admin console`
