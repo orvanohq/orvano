@@ -8,7 +8,7 @@ The first console screens: an admin signs up, creates an org and a project, crea
 - [x] Design the console screens (spec): `/architect console accounts, orgs & projects`
 - [ ] Build it: `/develop console accounts, orgs & projects`
    - [x] Backend: the Platform module, console operations in the contract, provision and purge jobs, API keys, platforms, events, and fixture projects and keys (spec 0003 row 7 tasks 1 to 6)
-   - [ ] Console thin thread: create org and project, the API keys page with the one time secret, the Platforms page, and the end to end journey (spec 0007 AC-1, 6, 11 to 15, 17 to 19, 23)
+   - [x] Console thin thread: create org and project, the API keys page with the one time secret, the Platforms page, and the end to end journey (spec 0007 AC-1, 6, 11 to 15, 17 to 19, 23)
    - [ ] Console complete: key delete, platform edit and delete, project and org settings, status panel actions, the Connect your app card, catalog and accessibility tests (spec 0007 AC-2 to 5, 7 to 10, 16, 20 to 22)
 - [ ] Verify it: `/check verify console accounts, orgs & projects`
 - [ ] Test it: `/test console accounts, orgs & projects`
