@@ -1,5 +1,5 @@
 import { Check, Copy } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type Ref } from 'react'
 
 import { Button } from '@/components/ui/button'
 
@@ -7,9 +7,18 @@ type CopyState = 'idle' | 'copied' | 'failed'
 
 /**
  * Copies `value` to the clipboard. After a copy it shows a check for 2 seconds and announces
- * "Copied" through a polite live region; a blocked clipboard announces "Copy failed".
+ * "Copied" through a polite live region; a blocked clipboard announces "Copy failed". `ref` reaches
+ * the button, so a step that opens can move focus to it (spec 0007, AC-14).
  */
-export function CopyButton({ value, label = 'Copy' }: { value: string; label?: string }) {
+export function CopyButton({
+  value,
+  label = 'Copy',
+  ref,
+}: {
+  value: string
+  label?: string
+  ref?: Ref<HTMLButtonElement> | undefined
+}) {
   const [state, setState] = useState<CopyState>('idle')
   const timer = useRef<number | undefined>(undefined)
 
@@ -40,6 +49,7 @@ export function CopyButton({ value, label = 'Copy' }: { value: string; label?: s
   return (
     <>
       <Button
+        ref={ref}
         variant="ghost"
         size="icon"
         aria-label={label}

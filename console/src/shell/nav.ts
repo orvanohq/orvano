@@ -1,5 +1,13 @@
 import type { LinkProps } from '@tanstack/react-router'
-import { FolderKanban, LayoutDashboard, Settings, UsersRound, type LucideIcon } from 'lucide-react'
+import {
+  FolderKanban,
+  KeyRound,
+  LayoutDashboard,
+  MonitorSmartphone,
+  Settings,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react'
 
 import type { OrgRole } from '@orvano/console-client'
 
@@ -34,6 +42,13 @@ export const projectNav: readonly NavEntry[] = [
     exact: true,
   },
   { id: 'users', label: 'Users', icon: UsersRound, to: '/projects/$projectId/users' },
+  { id: 'keys', label: 'API keys', icon: KeyRound, to: '/projects/$projectId/keys' },
+  {
+    id: 'platforms',
+    label: 'Platforms',
+    icon: MonitorSmartphone,
+    to: '/projects/$projectId/platforms',
+  },
   { id: 'settings', label: 'Settings', icon: Settings, to: '/projects/$projectId/settings' },
 ]
 

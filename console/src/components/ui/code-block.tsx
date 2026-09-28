@@ -1,3 +1,5 @@
+import type { Ref } from 'react'
+
 import { CopyButton } from '@/components/ui/copy-button'
 import { cn } from '@/lib/utils'
 
@@ -7,14 +9,23 @@ export function InlineCode({ className, ...props }: React.ComponentProps<'code'>
 }
 
 /** A block of code with a copy button. No syntax colors yet; the scroll container is focusable. */
-export function CodeBlock({ code, label }: { code: string; label: string }) {
+export function CodeBlock({
+  code,
+  label,
+  copyRef,
+}: {
+  code: string
+  label: string
+  /** Reaches the copy button, to focus it when the block appears. */
+  copyRef?: Ref<HTMLButtonElement> | undefined
+}) {
   return (
     <div className="relative rounded-lg border border-border bg-card">
       <pre tabIndex={0} aria-label={label} className="overflow-auto p-3 pr-12 font-mono text-mono">
         <code>{code}</code>
       </pre>
       <div className="absolute top-1 right-1">
-        <CopyButton value={code} label={`Copy ${label}`} />
+        <CopyButton ref={copyRef} value={code} label={`Copy ${label}`} />
       </div>
     </div>
   )

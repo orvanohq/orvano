@@ -18,6 +18,8 @@ export const keys = {
   userSessions: (projectId: string, userId: string) =>
     ['console', 'projects', projectId, 'users', userId, 'sessions'] as const,
   signingKeys: (projectId: string) => ['console', 'projects', projectId, 'signing-keys'] as const,
+  apiKeys: (projectId: string) => ['console', 'projects', projectId, 'keys'] as const,
+  platforms: (projectId: string) => ['console', 'projects', projectId, 'platforms'] as const,
 }
 
 /** The signed in console account; the session guard's probe (spec 0005, AC-20). */
@@ -119,5 +121,30 @@ export function signingKeysQuery(projectId: string) {
   return queryOptions({
     queryKey: keys.signingKeys(projectId),
     queryFn: ({ signal }) => projectClient(projectId).consoleAuthKeys.list({ signal }),
+  })
+}
+
+/**
+ * A project's API keys, oldest first, 25 per page (spec 0007, AC-12). Holds `ApiKey` only: a new key's
+ * secret is never written to any query (AC-15).
+ */
+export function apiKeysQuery(projectId: string) {
+  return infiniteQueryOptions({
+    queryKey: keys.apiKeys(projectId),
+    queryFn: ({ pageParam, signal }) =>
+      projectClient(projectId).consoleApiKeys.list({ cursor: pageParam, limit: 25 }, { signal }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+}
+
+/** A project's platforms, oldest first, 25 per page (spec 0007, AC-17). */
+export function platformsQuery(projectId: string) {
+  return infiniteQueryOptions({
+    queryKey: keys.platforms(projectId),
+    queryFn: ({ pageParam, signal }) =>
+      projectClient(projectId).consolePlatforms.list({ cursor: pageParam, limit: 25 }, { signal }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
   })
 }

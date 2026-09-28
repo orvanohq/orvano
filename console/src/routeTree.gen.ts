@@ -19,6 +19,8 @@ import { Route as AppOrgsOrgIdRouteRouteImport } from './routes/_app/orgs/$orgId
 import { Route as AppProjectsProjectIdRouteRouteImport } from './routes/_app/projects/$projectId/route'
 import { Route as AppOrgsOrgIdIndexRouteImport } from './routes/_app/orgs/$orgId/index'
 import { Route as AppProjectsProjectIdIndexRouteImport } from './routes/_app/projects/$projectId/index'
+import { Route as AppProjectsProjectIdKeysRouteImport } from './routes/_app/projects/$projectId/keys'
+import { Route as AppProjectsProjectIdPlatformsRouteImport } from './routes/_app/projects/$projectId/platforms'
 import { Route as AppProjectsProjectIdSettingsRouteImport } from './routes/_app/projects/$projectId/settings'
 import { Route as AppProjectsProjectIdUsersIndexRouteImport } from './routes/_app/projects/$projectId/users/index'
 import { Route as AppProjectsProjectIdUsersUserIdRouteImport } from './routes/_app/projects/$projectId/users/$userId'
@@ -72,6 +74,16 @@ const AppProjectsProjectIdIndexRoute = AppProjectsProjectIdIndexRouteImport.upda
   path: '/',
   getParentRoute: () => AppProjectsProjectIdRouteRoute,
 } as any)
+const AppProjectsProjectIdKeysRoute = AppProjectsProjectIdKeysRouteImport.update({
+  id: '/keys',
+  path: '/keys',
+  getParentRoute: () => AppProjectsProjectIdRouteRoute,
+} as any)
+const AppProjectsProjectIdPlatformsRoute = AppProjectsProjectIdPlatformsRouteImport.update({
+  id: '/platforms',
+  path: '/platforms',
+  getParentRoute: () => AppProjectsProjectIdRouteRoute,
+} as any)
 const AppProjectsProjectIdSettingsRoute = AppProjectsProjectIdSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -96,6 +108,8 @@ export interface FileRoutesByFullPath {
   '/orgs/$orgId': typeof AppOrgsOrgIdRouteRouteWithChildren
   '/projects/$projectId': typeof AppProjectsProjectIdRouteRouteWithChildren
   '/orgs/': typeof AppOrgsIndexRoute
+  '/projects/$projectId/keys': typeof AppProjectsProjectIdKeysRoute
+  '/projects/$projectId/platforms': typeof AppProjectsProjectIdPlatformsRoute
   '/projects/$projectId/settings': typeof AppProjectsProjectIdSettingsRoute
   '/orgs/$orgId/': typeof AppOrgsOrgIdIndexRoute
   '/projects/$projectId/': typeof AppProjectsProjectIdIndexRoute
@@ -108,6 +122,8 @@ export interface FileRoutesByTo {
   '/dev/components': typeof DevComponentsRoute
   '/': typeof AppIndexRoute
   '/orgs': typeof AppOrgsIndexRoute
+  '/projects/$projectId/keys': typeof AppProjectsProjectIdKeysRoute
+  '/projects/$projectId/platforms': typeof AppProjectsProjectIdPlatformsRoute
   '/projects/$projectId/settings': typeof AppProjectsProjectIdSettingsRoute
   '/orgs/$orgId': typeof AppOrgsOrgIdIndexRoute
   '/projects/$projectId': typeof AppProjectsProjectIdIndexRoute
@@ -124,6 +140,8 @@ export interface FileRoutesById {
   '/_app/orgs/$orgId': typeof AppOrgsOrgIdRouteRouteWithChildren
   '/_app/projects/$projectId': typeof AppProjectsProjectIdRouteRouteWithChildren
   '/_app/orgs/': typeof AppOrgsIndexRoute
+  '/_app/projects/$projectId/keys': typeof AppProjectsProjectIdKeysRoute
+  '/_app/projects/$projectId/platforms': typeof AppProjectsProjectIdPlatformsRoute
   '/_app/projects/$projectId/settings': typeof AppProjectsProjectIdSettingsRoute
   '/_app/orgs/$orgId/': typeof AppOrgsOrgIdIndexRoute
   '/_app/projects/$projectId/': typeof AppProjectsProjectIdIndexRoute
@@ -140,6 +158,8 @@ export interface FileRouteTypes {
     | '/orgs/$orgId'
     | '/projects/$projectId'
     | '/orgs/'
+    | '/projects/$projectId/keys'
+    | '/projects/$projectId/platforms'
     | '/projects/$projectId/settings'
     | '/orgs/$orgId/'
     | '/projects/$projectId/'
@@ -152,6 +172,8 @@ export interface FileRouteTypes {
     | '/dev/components'
     | '/'
     | '/orgs'
+    | '/projects/$projectId/keys'
+    | '/projects/$projectId/platforms'
     | '/projects/$projectId/settings'
     | '/orgs/$orgId'
     | '/projects/$projectId'
@@ -167,6 +189,8 @@ export interface FileRouteTypes {
     | '/_app/orgs/$orgId'
     | '/_app/projects/$projectId'
     | '/_app/orgs/'
+    | '/_app/projects/$projectId/keys'
+    | '/_app/projects/$projectId/platforms'
     | '/_app/projects/$projectId/settings'
     | '/_app/orgs/$orgId/'
     | '/_app/projects/$projectId/'
@@ -253,6 +277,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectsProjectIdIndexRouteImport
       parentRoute: typeof AppProjectsProjectIdRouteRoute
     }
+    '/_app/projects/$projectId/keys': {
+      id: '/_app/projects/$projectId/keys'
+      path: '/keys'
+      fullPath: '/projects/$projectId/keys'
+      preLoaderRoute: typeof AppProjectsProjectIdKeysRouteImport
+      parentRoute: typeof AppProjectsProjectIdRouteRoute
+    }
+    '/_app/projects/$projectId/platforms': {
+      id: '/_app/projects/$projectId/platforms'
+      path: '/platforms'
+      fullPath: '/projects/$projectId/platforms'
+      preLoaderRoute: typeof AppProjectsProjectIdPlatformsRouteImport
+      parentRoute: typeof AppProjectsProjectIdRouteRoute
+    }
     '/_app/projects/$projectId/settings': {
       id: '/_app/projects/$projectId/settings'
       path: '/settings'
@@ -290,6 +328,8 @@ const AppOrgsOrgIdRouteRouteWithChildren = AppOrgsOrgIdRouteRoute._addFileChildr
 )
 
 interface AppProjectsProjectIdRouteRouteChildren {
+  AppProjectsProjectIdKeysRoute: typeof AppProjectsProjectIdKeysRoute
+  AppProjectsProjectIdPlatformsRoute: typeof AppProjectsProjectIdPlatformsRoute
   AppProjectsProjectIdSettingsRoute: typeof AppProjectsProjectIdSettingsRoute
   AppProjectsProjectIdIndexRoute: typeof AppProjectsProjectIdIndexRoute
   AppProjectsProjectIdUsersUserIdRoute: typeof AppProjectsProjectIdUsersUserIdRoute
@@ -297,6 +337,8 @@ interface AppProjectsProjectIdRouteRouteChildren {
 }
 
 const AppProjectsProjectIdRouteRouteChildren: AppProjectsProjectIdRouteRouteChildren = {
+  AppProjectsProjectIdKeysRoute: AppProjectsProjectIdKeysRoute,
+  AppProjectsProjectIdPlatformsRoute: AppProjectsProjectIdPlatformsRoute,
   AppProjectsProjectIdSettingsRoute: AppProjectsProjectIdSettingsRoute,
   AppProjectsProjectIdIndexRoute: AppProjectsProjectIdIndexRoute,
   AppProjectsProjectIdUsersUserIdRoute: AppProjectsProjectIdUsersUserIdRoute,
