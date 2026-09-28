@@ -11,7 +11,7 @@ The thinnest real auth thread: email and password sign up, sign in, sign out, an
    - [x] Thin thread and sessions: sign up, sign in, current user, signing keys and JWKS, refresh with reuse detection, sign out, session lists, self service, events, retention (AC-1, 3 to 16, 20, 21, 30 to 33)
    - [x] Servers and client SDKs: API key authentication and scopes, `users.*`, token verification in .NET, Dart, and JS servers; session handling in JS, Next.js, and Flutter (AC-17 to 19, 23 to 26, 35)
    - [x] Console: console account sessions with the CSRF rule, the Users page, and signing key rotation (AC-22, 27 to 29, 35)
-- [ ] Verify it: `/check verify app user sign up & sign in`
+- [x] Verify it: `/check verify app user sign up & sign in`
 - [ ] Test it: `/test app user sign up & sign in`
 - [ ] Review it (fresh model): `/check review app user sign up & sign in`
 - [ ] Document it: `/document app user sign up & sign in`
