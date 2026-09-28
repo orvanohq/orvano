@@ -2,7 +2,7 @@
 
 App user identity for projects built on Orvano. See [index.md](index.md) for the full plan.
 
-### 8. App user sign up & sign in · in-progress · GA
+### 8. App user sign up & sign in · done · GA
 The thinnest real auth thread: email and password sign up, sign in, sign out, and "get current user". Decides the session model (tokens, refresh, and cookie sessions for Next.js server rendering). Together with row 7 this is v0.1.
 **Done when:** a Next.js app and a Flutter app sign a user up and in; a .NET and a Dart server verify that user's session and list users; the user shows in the console Users page.
 - [x] Design it (spec): `/architect app user sign up & sign in`
