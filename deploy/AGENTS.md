@@ -40,6 +40,7 @@ The production shape command (`docker-compose.yml` plus `docker-compose.build.ym
 - Shared settings live in `x-` anchors (`x-server`, `x-app-db`, `x-logging`, `x-healthcheck`). Users override services in `docker-compose.override.yml`, never the anchors, because anchors are resolved before files merge.
 - Every service uses the `x-logging` anchor (json file, 10 MB, 3 files) and sets a memory limit.
 - Only `migrate` and `worker` get `ORVANO_DB_ADMIN_URL`; the other roles connect as `orvano_app`.
+- Only `api` and `worker` get `ORVANO_MASTER_KEYS` (required), and only `api` gets `ORVANO_TRUSTED_PROXIES`. Never give the master keys to `realtime`: it holds no master key on purpose (spec 0002).
 - In the Caddyfile, `/internal/*` is always a 404 (internal calls go straight to `api:8080`), and `/v1/realtime` is matched before `/v1/*`. HSTS is sent only over HTTPS, without `includeSubDomains`.
 
 ## Gotchas

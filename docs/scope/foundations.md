@@ -25,7 +25,7 @@ The internal model that every product hangs off: console accounts, organizations
 - [x] Design it (spec): `/architect platform data model`
 - [ ] Build it: lands with the rows that first use each part (Tracer Bullet), no separate `/develop` run
    - [x] Row 7 slice: platform tables, domain rules, console sign up rules, project and org lifecycle jobs, API keys and platforms, events and fixtures: `/develop console accounts, orgs & projects` (AC-1 to 5, 7 to 15, 17 to 19)
-   - [ ] Row 8 slice: `auth_users`, request authentication (project lookup, key verification, scopes, origins), console accounts as users of `console`: `/develop app user sign up & sign in` (AC-4 to 8, 12 to 14, 16, 17)
+   - [x] Row 8 slice: `auth_users`, request authentication (project lookup, key verification, scopes, origins), console accounts as users of `console`: `/develop app user sign up & sign in` (AC-4 to 8, 12 to 14, 16, 17)
    - [ ] Row 15 slice: invitations and member management: `/develop console team members & roles` (AC-7, 9, 10)
 - [ ] Verify it: `/check verify platform data model`
 - [ ] Test it: `/test platform data model`
@@ -63,10 +63,10 @@ Spec [0005](../specs/0005-console-design-system-shell/index.md) · code in `cons
 A one command install on a single server that sets secrets, pulls containers, and starts Orvano. Designed so later versions upgrade in place.
 **Done when:** on a clean Linux server, one command brings up a working Orvano reachable at your domain, and running it again is safe.
 - [x] Design it (spec): `/architect self host installer`
-- [ ] Build it: `/develop self host installer`
+- [x] Build it: `/develop self host installer`
    - [x] Thin thread: image only compose file with log rotation and Postgres tuning keys, `orvano install` writing secrets and files, `install.sh` running Compose, CI installing twice on amd64 and arm64 (AC-2, 8 to 14, 16, 17, 25, 27, 30)
    - [x] Interactive and preflight depth: prompts, domain and email checks, DNS check, Docker install offer, warnings, master key confirmation, the gateway's ACME email and HSTS (AC-1 to 7, 15, 18, 26, 28)
-   - [ ] First admin gate: setup token on the server, `consoleInstall.getSetup`, `setup-status`, then the console `/setup` route and sign in notice once console sign up exists (AC-19 to 24)
+   - [x] First admin gate: setup token on the server, `consoleInstall.getSetup`, `setup-status`, then the console `/setup` route and sign in notice once console sign up exists (AC-19 to 24)
    - [x] Publishing: images to GHCR, the GitHub Release with `install.sh` and its checksum, the README install section (AC-1, 29)
 - [ ] Verify it: `/check verify self host installer`
 - [ ] Test it: `/test self host installer`

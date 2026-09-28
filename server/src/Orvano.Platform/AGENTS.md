@@ -8,7 +8,7 @@ The Platform module (spec 0003): install settings and admins, orgs, memberships,
 
 | Folder | Owns |
 |---|---|
-| `Contracts/` | The only public types: `IProjectDirectory`, `IApiKeyVerifier`, `IConsoleAccess`, `IConsoleSignupPolicy`, `IConsoleAccountCreated`, `IConsoleAccountGuard` and their records |
+| `Contracts/` | The only public types: `IProjectDirectory`, `IApiKeyVerifier`, `IConsoleAccess`, `IConsoleSignupPolicy`, `IConsoleAccountCreated`, `IConsoleAccountGuard`, `IWebOriginPolicy` (the host's public CORS check) and their records |
 | `Domain/` | Business rules as plain types: project IDs, lifecycles, the permission matrix, the owner rule, key secrets, web origin patterns, platform identifiers, names |
 | `Application/` | Use cases (`OrgService`, `ProjectService`, `ApiKeyService`, `PlatformService`, `InstallService`, `ConsoleAccounts`, `PlatformDirectory`), `PlatformStore`, `Outcome`/`Failure`, `PlatformEvents` |
 | `Data/PlatformDbContext.cs` | EF Core mapping of the `platform_` tables; internal, checked by the drift check |
@@ -25,7 +25,7 @@ The Platform module (spec 0003): install settings and admins, orgs, memberships,
 - Every change writes its `platform.*` event through `PlatformEvents.WriteAsync`: affected IDs, the `Actor` (a console user, or `system` in jobs), and changed field names. Never a secret, hash, or token.
 - Console access: a caller who is not a member of the org gets 404 (`project_not_found` or `not_found`), so existence never leaks; a member whose role lacks the action gets 403 `forbidden`. Project scoped endpoints read `X-Orvano-Project`; a missing header is 400.
 - Lists are keyset paged on `(created_at, id)` with `PageCursor` from `Orvano.Core.Paging`.
-- While no install admin exists, `ConsoleAccounts.AdmitAsync` admits the first account only with the installer's setup token when `ORVANO_SETUP_TOKEN` is set (`Domain/InstallSetupToken.cs`, compared in constant time; spec 0006). `consoleInstall.getSetup` is the one console route that answers without a session, so it returns only `setupRequired`.
+- While no install admin exists, `ConsoleAccounts.AdmitAsync` admits the first account only with the installer's setup token when `ORVANO_SETUP_TOKEN` is set (`Domain/InstallSetupToken.cs`, compared in constant time; spec 0006). `consoleInstall.getSetup` answers without a session (the only Platform route that does, rate limited per IP), so it returns only `setupRequired`.
 - `ORVANO_DELETE_GRACE_DAYS` (0 to 90, default 7) is read in `PlatformModule.ConfigureServices`, so every role refuses to start on a bad value.
 
 ## Gotchas

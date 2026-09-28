@@ -6,11 +6,11 @@ The five public SDK surfaces (spec 0001). Each is a thin handwritten runtime plu
 
 | Path | Package | Operations | Notes |
 |---|---|---|---|
-| `js/` | `@orvano/js` | root: `client` + `both`; `./server`: `server` + `both` | ESM, zero runtime dependencies, plain `fetch`, built with `tsc` |
-| `nextjs/` | `@orvano/nextjs` | none of its own | Wraps `@orvano/js`; `createServerClient` per request, `createBrowserClient` shared |
+| `js/` | `@orvano/js` | root: `client` + `both`; `./server`: `server` + `both` | ESM, plain `fetch`, built with `tsc`; its one runtime dependency, `jose`, is used only by `./server`'s access token verifier |
+| `nextjs/` | `@orvano/nextjs` | none of its own | Wraps `@orvano/js`; root: `createServerClient` per request, `createMiddlewareClient`, `createBrowserClient` shared, the `orvano_access` and `orvano_refresh` cookies; `./server`: `updateSession` for middleware and `createOrvanoRouteHandler` (refresh and sign out, default `/api/orvano`) |
 | `dart/core/` | `orvano_core` | `client` + `both` | `package:http`, hand style JSON mapping, no `build_runner` |
-| `dart/flutter/` | `orvano_flutter` | exports core again | Only exports core for now; secure session storage and deep links arrive with auth |
-| `dart/server/` | `orvano_dart` | `server` only, plus core's `both` | Hides core's `Orvano` and client only services |
+| `dart/flutter/` | `orvano_flutter` | exports core again | Exports core again, plus `createClient` with the session in secure storage (`flutter_secure_storage`, key `orvano.session.<projectId>`), checked when the app resumes |
+| `dart/server/` | `orvano_dart` | `server` only, plus core's `both` | Hides core's `Orvano` and client only services; verifies access tokens against the project's JWKS (`dart_jsonwebtoken`) |
 | `dotnet/src/Orvano/` | `Orvano` (NuGet) | `server` + `both` | `net10.0` and `netstandard2.0` |
 | `console-client/` | `@orvano/console-client` (`private`, never published) | `console` only | Built on the `@orvano/js` runtime, used by the console; sends the `orvano_console` cookie |
 
@@ -23,7 +23,9 @@ The five public SDK surfaces (spec 0001). Each is a thin handwritten runtime plu
 | `js/src/runtime/client.ts`, `js/src/runtime/error.ts` | The TS `Client` and `OrvanoError` |
 | `dart/core/lib/src/client.dart`, `orvano_exception.dart` | The Dart `Client` and `OrvanoException` |
 | `dotnet/src/Orvano/OrvanoClient.cs`, `OrvanoRequest.cs`, `OrvanoException.cs` | The .NET client, request shape, and exception |
-| `js/src/runtime/auth.ts`, `api-key.ts`, `server-client.ts`; `dart/core/lib/src/auth.dart`, `dart/server/lib/src/client.dart`; `dotnet/src/Orvano/OrvanoHeaders.cs` | Auth providers and the temporary auth names (`X-Orvano-Session`, `X-Orvano-Key`) |
+| `js/src/runtime/auth.ts`, `api-key.ts`, `server-client.ts`; `dart/core/lib/src/auth.dart`, `dart/server/lib/src/client.dart`; `dotnet/src/Orvano/OrvanoHeaders.cs` | Auth providers, session stores, refresh, and the auth names (`Authorization: Bearer`, `X-Orvano-Key`) |
+| `js/src/runtime/access-tokens.ts`, `dart/server/lib/src/access_tokens.dart`, `dotnet/src/Orvano/OrvanoAccessTokens.cs` | Server side access token verification against the project's JWKS, keys kept 10 minutes (spec 0004, AC-19) |
+| `nextjs/src/index.ts`, `nextjs/src/server.ts`; `dart/flutter/lib/src/secure_session_store.dart` | Cookie session stores and the Next.js middleware and route handler; the Flutter secure session store |
 | `js/src/runtime/version.ts`, `dart/core/lib/src/version.dart`, `dotnet/src/Orvano/OrvanoClient.cs` (`CheckVersion`) | `X-Orvano-SDK` on every request and the once per client major.minor mismatch warning |
 | `js/src/runtime/pagination.ts`, `events.ts`; `dart/core/lib/src/pagination.dart`, `events.dart`; `dotnet/src/Orvano/OrvanoPagination.cs`, `OrvanoEvents.cs` | The page iterator helper and the event decoder |
 | `*/generated/`, `*/Generated/` | SdkGen output; never edit by hand |
@@ -49,7 +51,7 @@ dotnet test --project sdks/dotnet/tests/Orvano.Tests     # net10.0 and net8.0 (t
 - Every failure is one error type with status, stable `code` (`unknown` when absent), message, and request ID (problem body first, then `X-Request-Id`).
 - TS: `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `erasableSyntaxOnly`; bind `fetch` to `globalThis` (Workers reject it otherwise).
 - Dart: one pub workspace from the root `pubspec.yaml`. Members use `resolution: workspace` and depend on each other by version (`^0.0.0`), never by path, so they stay publishable. Shared lints in `dart/analysis_options.yaml`.
-- Auth is a pluggable provider on the `Client`: none, session, or API key. Each temporary auth name (`X-Orvano-Key`, `X-Orvano-Session`, the `orvano_session` cookie in `nextjs/`, the `orvano_console` cookie in `console-client/`) is defined once per runtime, never inline, so the auth spec (row 8) swaps it in one place.
+- Auth is a pluggable provider on the `Client`: none, session, or API key. Each auth name (`Authorization`, `X-Orvano-Key`, the `orvano_access` and `orvano_refresh` cookies in `nextjs/`, the `orvano_console` cookie in `console-client/`) is defined once per runtime, never inline.
 - An API key setter exists only in server packages, and it throws in a browser.
 - Retries: GET, HEAD, and `idempotent` calls retry on 429 and 503, honoring `Retry-After`, else backoff with jitter from 250 ms, 3 retries by default. The timeout covers the whole call, retry waits included, and every call accepts cancellation.
 - The pagination helper and the event decoder are public API in TS and Dart, because the scenario runners build their test services on them; the decoder takes a registry. In .NET the runner reaches the internal `SendAsync` through `InternalsVisibleTo("Orvano.Scenarios")`, so keep that signature stable.
@@ -62,7 +64,7 @@ dotnet test --project sdks/dotnet/tests/Orvano.Tests     # net10.0 and net8.0 (t
 - Type aware ESLint reads workspace packages' types from `dist/`, so build them before linting (CI does).
 - TS tests live in `test/`, outside `src/`, with their own `test/tsconfig.json`, so `tsc` never builds them into `dist/` and ESLint's project service still sees them. `@orvano/nextjs` tests import `@orvano/js` from its `dist/`, so build it first.
 - Dart runtime tests run against a real local `HttpServer` (`dart/core/test/fake_orvano.dart`), so timeouts go through the real abort path. The API key browser guard is a compile time constant, so it's only testable with `dart test -p chrome`.
-- The .NET tests reach the internal `SendAsync` by reflection to send a POST (public packages carry only GET operations so far); keep its shape stable.
+- The .NET tests reach the internal `SendAsync` by reflection (`dotnet/tests/Orvano.Tests/FakeServer.cs`); keep its shape stable.
 - Each Dart package needs its own `README.md`, `CHANGELOG.md`, and `LICENSE`, or `pub publish` refuses it. SdkGen adds a `## <version>` section to each CHANGELOG when `VERSION` changes; write the real notes there by hand.
 
 ## Agent skills
