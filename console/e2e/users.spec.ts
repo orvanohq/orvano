@@ -40,6 +40,8 @@ test('an owner manages users from the Users page', async ({ signedIn: page }) =>
 test('an owner rotates the signing key in Settings', async ({ signedIn: page }) => {
   await page.goto(`/projects/${scenariosProject}/settings`)
   await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible()
+  // Count only once the keys have loaded.
+  await expect(page.getByText('Active', { exact: true })).toHaveCount(1)
   const retiringBefore = await page.getByText('Retiring', { exact: true }).count()
 
   await page.getByRole('button', { name: 'Rotate key' }).click()
