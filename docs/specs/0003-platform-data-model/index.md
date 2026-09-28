@@ -1,7 +1,7 @@
 # 0003. Platform data model: orgs, projects, keys, platforms, and app users
 
 **Date**: 2026-09-26
-**Updated**: 2026-09-27 (the first account also needs the installer's setup token when one is set, spec 0006)
+**Updated**: 2026-09-27 (the first account also needs the installer's setup token when one is set, spec 0006; the `x-orvano-scope` rule, `last_sign_in_at`, and the purge job's extra tables from spec 0004)
 **Status**: In Progress
 
 ## Summary
@@ -122,7 +122,7 @@ All tables live in schema `orvano`. Conventions for every table below:
 
 Seed rows (in the migration that creates the tables): `platform_install_settings (1, 'invite')`, and `platform_projects ('console', NULL, 'system', 'Console', 'active', ...)`. The `console` project is never provisioned and has no schema.
 
-**Auth module** (`Orvano.Auth`, table prefix `auth_`), identity core only; row 8 adds credentials and sessions as their own tables:
+**Auth module** (`Orvano.Auth`, table prefix `auth_`), identity core only; row 8 adds credentials and sessions as their own tables (`auth_passwords`, `auth_sessions`, `auth_signing_keys`, see [spec 0004](../0004-app-user-auth/index.md)):
 
 | Table | Column | Type | Null | Notes |
 |---|---|---|---|---|
@@ -136,7 +136,9 @@ Seed rows (in the migration that creates the tables): `platform_install_settings
 | | `status` | text | no | `active` \| `blocked`, default `active` |
 | | `metadata` | jsonb | no | default `'{}'`, `CHECK (jsonb_typeof(metadata) = 'object')`; at most 16 KB serialized (checked in code) |
 | | `created_at`, `updated_at` | timestamptz | no | |
+| | `last_sign_in_at` | timestamptz | yes | added by spec 0004: set when a session is created |
 | | | | | UNIQUE (`project_id`, `lower(email)`) WHERE `email IS NOT NULL` |
+| | | | | index (`project_id`, `lower(email) text_pattern_ops`) for prefix search, added by spec 0004 |
 | | | | | UNIQUE (`project_id`, `phone`) WHERE `phone IS NOT NULL` |
 
 **Per project** (spec 0002, unchanged): role `p_<projectId>` (`NOLOGIN`) owning schema `p_<projectId>`, granted to `orvano_app` `WITH INHERIT FALSE, SET TRUE`.
@@ -199,7 +201,7 @@ platform_projects 1 ── 1 Postgres schema and role p_<id>
 | `platform.project.provision` | `platform` | create, retry, restore | In one `orvano_admin` transaction: create role `p_<id>` if missing (a `DO` block checking `pg_roles`), `CREATE SCHEMA IF NOT EXISTS p_<id> AUTHORIZATION p_<id>`, `GRANT p_<id> TO orvano_app WITH INHERIT FALSE, SET TRUE`, set `active` where still `provisioning`, write event `platform.project.provisioned`. When `job.Attempts >= job.MaxAttempts` and the work throws, set `failed` in a separate transaction, then rethrow. | 5 |
 | `platform.project.purge` | `platform` | delete | In one `orvano_admin` transaction, after locking the project row and checking the purge condition: `DROP SCHEMA IF EXISTS p_<id> CASCADE`, `DROP ROLE IF EXISTS p_<id>`, delete its keys and platforms and the project row, write event `platform.project.purged`. When `job.Attempts >= job.MaxAttempts` and the work throws, set `purge_failed_at = now()` in a separate transaction, write `platform.project.purge_failed`, then rethrow. | 10 (default) |
 | `platform.org.purge` | `platform` | org delete | Locks the org row `FOR UPDATE` and checks it is still `deleting` with `purge_after <= now()`, else succeeds as a no op. If project rows of the org still exist, re-enqueue itself at the latest `purge_after` of those projects plus 1 minute. Otherwise delete invitations, memberships, and the org, and write `platform.org.purged`. | 10 |
-| `auth.project.purge_users` | `auth` | Auth consumer `auth.purge_users` of `platform.project.purged` | Delete `auth_users` (and row 8's credential and session rows) where `project_id` matches, in batches of 1000 until none are left. | 10 |
+| `auth.project.purge_users` | `auth` | Auth consumer `auth.purge_users` of `platform.project.purged` | Delete the project's `auth_users`, `auth_passwords`, `auth_sessions`, and `auth_signing_keys` rows (the last three from spec 0004) where `project_id` matches, in batches of 1000 until none are left. Idempotent. | 10 |
 | (consumer) `platform.remove_memberships` | | Platform consumer of `auth.user.deleted` where `projectId = 'console'` | Enqueues a job that deletes that user's memberships and install admin row. | |
 
 The `platform` and `auth` queues are registered by their modules (spec 0002's `IWorkRegistry`). Only the worker holds `ORVANO_DB_ADMIN_URL`, so only jobs issue DDL. The API role never does.
@@ -241,7 +243,7 @@ The console sign up transaction is owned by Auth (it creates the user). It calls
 | `insufficient_scope` | 403 | the key lacks the operation's scope | 8 |
 | `origin_not_allowed` | 403 | the browser `Origin` matches no web platform | 8 |
 
-**Scopes**: a TypeSpec `enum ApiKeyScope` in the contract, generated into every SDK and `Orvano.Contract` by SdkGen. Values are `<resource>.<read|write>`. Row 8 adds the first two, `users.read` and `users.write`, and each product row adds its own. Each server audience operation declares its required scope with a new extension `x-orvano-scope` (SdkGen refuses a `server` or `both` operation without one, except `health`). A `write` scope does not imply `read`. Scopes that later leave the catalog are ignored on existing keys.
+**Scopes**: a TypeSpec `enum ApiKeyScope` in the contract, generated into every SDK and `Orvano.Contract` by SdkGen. Values are `<resource>.<read|write>`. Row 8 adds the first two, `users.read` and `users.write`, and each product row adds its own. Each operation secured by the `apiKey` scheme declares its required scope with a new extension `x-orvano-scope`, and every other operation (secured only by `bearer`, or with no security, such as `account.get`, `keys.*`, and `health`) must not declare one. SdkGen enforces both directions in `ContractReader.ReadScope` and names the operation that breaks the rule. (This is spec 0004's *Scope rule amendment*. The first wording, "SdkGen refuses a `server` or `both` operation without one, except `health`", said more than it meant.) A `write` scope does not imply `read`. Scopes that later leave the catalog are ignored on existing keys.
 
 ### Web origin matching
 
@@ -406,7 +408,7 @@ Row 3 is design only. The build lands with the rows that first use each part, so
 
 ## Follow-up
 
-- [ ] Row 8's spec must decide the console session format and CSRF rule as well as app sessions, since console accounts are app users of `console` (spec 0001 left the console cookie format to rows 7 and 8).
+- [x] Row 8's spec must decide the console session format and CSRF rule as well as app sessions, since console accounts are app users of `console` (spec 0001 left the console cookie format to rows 7 and 8). Done in [spec 0004](../0004-app-user-auth/index.md) (AC-27, AC-28): the `orvano_console` and `orvano_console_refresh` cookies and the Fetch Metadata CSRF rule. It also added `auth_users.last_sign_in_at` and the credential, session, and signing key tables that `auth.project.purge_users` now clears.
 - [ ] Spec 0002: its Follow-up item for row 3 (ID format, `provisioning` state, where app users live) is answered here; mark it done and point to this spec. Also update its Postgres layout table, which says the worker uses `orvano_admin` "for provisioning jobs only": the purge jobs here need it too (`DROP SCHEMA`, `DROP ROLE`).
 - [ ] Row 35 (backups): per project backup and restore must include the project's rows in `auth_users`, `platform_api_keys`, and `platform_platforms`, not only its schema.
 - [ ] Row 36 (environments): confirm the child project shape; the console shows a project family with an environment switcher.

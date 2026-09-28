@@ -1,11 +1,12 @@
 # 0001. One API contract that generates every Orvano SDK
 
 **Date**: 2026-09-24
+**Updated**: 2026-09-27 (the temporary auth wire formats are replaced by spec 0004's; fixtures and console scenarios follow)
 **Status**: Accepted
 
 ## Summary
 
-Orvano's whole public API is written once, in TypeSpec (a short language for describing APIs), which compiles to a standard OpenAPI 3.1 file. A small generator written in C# reads that file and produces the repetitive part of every SDK (models, service methods, error codes) for TypeScript, Dart, and .NET, plus the request and response types the .NET 10 server compiles against. A thin handwritten layer in each language does the hard parts (sessions, realtime sockets, uploads), and the Next.js and Flutter packages wrap those cores. Operations only the Orvano console may call go into a private package that is never published. Change one endpoint, run one command, and all five SDKs, the server types, and the docs snippets update together. Operations that exist only to prove the SDKs work are marked in the contract and generated only into the test runners, and until the auth spec lands, API keys, app sessions, and console sessions travel in temporary, clearly named headers and a cookie.
+Orvano's whole public API is written once, in TypeSpec (a short language for describing APIs), which compiles to a standard OpenAPI 3.1 file. A small generator written in C# reads that file and produces the repetitive part of every SDK (models, service methods, error codes) for TypeScript, Dart, and .NET, plus the request and response types the .NET 10 server compiles against. A thin handwritten layer in each language does the hard parts (sessions, realtime sockets, uploads), and the Next.js and Flutter packages wrap those cores. Operations only the Orvano console may call go into a private package that is never published. Change one endpoint, run one command, and all five SDKs, the server types, and the docs snippets update together. Operations that exist only to prove the SDKs work are marked in the contract and generated only into the test runners. API keys, app sessions, and console sessions use the formats [spec 0004](../0004-app-user-auth/index.md) set, declared in the contract as security schemes; the temporary headers and cookie this spec first used are gone.
 
 ## Requirements
 
@@ -147,7 +148,7 @@ A failing step can instead expect `{ status: 409, code: user_already_exists }`. 
 ```
 SdkGen also emits a **test only dispatch table** per language (`operationId` → the generated method), so each SDK needs only one small scenario interpreter rather than one handwritten test per scenario. The dispatch table is excluded from published packages. `@orvano/console-client` gets its own dispatch table, which the JS interpreter loads next to the `@orvano/js` one to run `as: console` steps.
 
-**Test fixtures**: the server supports a test only startup flag (`ORVANO_TEST_FIXTURES=<path>`, refused unless the environment is `Test`) that loads `tests/scenarios/fixtures.yaml` to seed known projects, users, and API keys. Its exact shape waits for the platform data model (row 3); the health scenario needs no fixtures. Until then it holds one key, `consoleSessions` (a list of test console session tokens, `[test-console-session]`), which the server keeps in memory and the JS scenario interpreter reads to send `as: console` steps.
+**Test fixtures**: the server supports a test only startup flag (`ORVANO_TEST_FIXTURES=<path>`, refused unless the environment is `Test`) that loads `tests/scenarios/fixtures.yaml` to seed known projects, users, and API keys. Its shape comes from specs 0003 and 0004: `consoleUsers`, `projects`, `apiKeys`, `platforms`, and `users`, each with known passwords or secrets. Server steps send the first `apiKeys` secret, and the JS interpreter signs the first `consoleUsers` account in for real to run `as: console` steps. (Until row 8 it held one key, `consoleSessions`, a list of test console session tokens the server kept in memory; spec 0004 removed it.)
 
 **Errors** (AC-6):
 - **Body**: one TypeSpec `@error` model, `Problem`, in `contract/errors.tsp`, sent as `application/problem+json`. Required members: `type`, `title`, `status`, `code`, `requestId`; optional: `detail`. It is closed like every model, so no other member may appear. Every operation declares it as its `default` response.
@@ -171,7 +172,17 @@ SdkGen also emits a **test only dispatch table** per language (`operationId` →
 | `test.consolePing` | `console` | `GET /v1/console/test/ping` | 200 `{ status: ok }` with a valid console session | AC-17 |
 | event `test.pinged` | (event) | none | payload `TestPinged { message, at }`, decoded by `event:` steps | AC-8 |
 
-**Temporary auth wire formats** (until the auth spec, row 8, replaces them): each credential has its own name, so the server can tell which kind arrived without parsing a token. Each runtime defines these names as constants in one place (its auth providers), and the server in one `OrvanoHeaders` class, so row 8 swaps them in one file per runtime. They are not in the contract yet; row 8 moves the real formats into the contract as security schemes.
+**Auth wire formats** (set by [spec 0004](../0004-app-user-auth/index.md), AC-35): the contract declares each credential as a security scheme in `contract/auth/security.tsp`, and each operation names the one it needs. Every runtime still defines the names once (its auth providers), and the server once (`OrvanoHeaders`).
+
+| Credential | Sent as | Sent by | Server |
+|---|---|---|---|
+| API key (scheme `apiKey`) | header `X-Orvano-Key: orv_sk_...` | the API key auth provider in `@orvano/js/server`, `orvano_dart`, and the .NET SDK | checks the key and the scope the operation names in `x-orvano-scope` (spec 0003); 401 `invalid_api_key`, 403 `insufficient_scope` |
+| App session (scheme `bearer`) | header `Authorization: Bearer <access token>`, an ES256 JWT | the session auth provider in client SDKs, token from the session store. `@orvano/nextjs` keeps the pair in the cookies `orvano_access` and `orvano_refresh` (spec 0004, AC-23) | checks the signature, claims, and session (spec 0004, AC-7) |
+| Console session (scheme `consoleSession`) | cookie `orvano_console=<access token>`, plus `orvano_console_refresh` on the session path | the browser, after `consoleAccount.create` or `consoleAccount.createSession` set both cookies (`HttpOnly`, `Secure`, `SameSite=Strict`) | checks it like a bearer token for project `console`; unsafe methods also need the CSRF rule (spec 0004, AC-28: `Sec-Fetch-Site: same-origin`, else an `Origin` equal to `ORVANO_PUBLIC_URL`'s, else 403 `csrf_rejected`) |
+
+The console route rule now reads: a `/v1/console/*` request gets a 401 problem with `code: console_session_required` (or `token_expired`) unless it carries a valid console session and carries neither `X-Orvano-Key` nor a bearer token. The four console account session operations and spec 0006's `consoleInstall.getSetup` are the only console routes open without a session. Scenario runners build their server clients with the first API key in `tests/scenarios/fixtures.yaml`.
+
+**Temporary auth wire formats** (history: replaced by spec 0004, kept to show where the names came from): each credential has its own name, so the server can tell which kind arrived without parsing a token. Each runtime defines these names as constants in one place (its auth providers), and the server in one `OrvanoHeaders` class, so row 8 swaps them in one file per runtime. They are not in the contract yet; row 8 moves the real formats into the contract as security schemes.
 
 | Credential | Sent as | Sent by | Server until row 8 |
 |---|---|---|---|
@@ -197,8 +208,8 @@ The console route rule: a `/v1/console/*` request gets a 401 problem with `code:
 |---|---|
 | Base path | `/v1/...`; the contract `info.version` equals `VERSION` |
 | Project routing | `X-Orvano-Project` header on every project scoped call |
-| Auth | session token or API key; final format decided in the auth spec (row 8); until then `X-Orvano-Session` and `X-Orvano-Key` (see *Temporary auth wire formats*); API key only accepted from server audiences |
-| Console routes | `console` operations live under `/v1/console/*`; only a console session is accepted there (until rows 7 and 8: the `orvano_console` cookie); project scoped ones still send `X-Orvano-Project` |
+| Auth | `Authorization: Bearer <access token>` or `X-Orvano-Key` with scopes, declared as the `bearer` and `apiKey` security schemes (see *Auth wire formats*, spec 0004); API key only accepted from server audiences |
+| Console routes | `console` operations live under `/v1/console/*`; only a console session is accepted there (the `orvano_console` cookie, scheme `consoleSession`, with spec 0004's CSRF rule); project scoped ones still send `X-Orvano-Project` |
 | Test routes | `x-orvano-test` operations live under `/v1/test/*` and `/v1/console/test/*`, mapped only in the `Test` environment |
 | Lists | query `cursor`, `limit`; response `{ items, nextCursor }`; `nextCursor` null on the last page |
 | Errors | `application/problem+json` with `type`, `title`, `status`, `detail` (optional), `code`, `requestId`; every operation's `default` response (see *Errors*) |
@@ -211,9 +222,9 @@ The console route rule: a `/v1/console/*` request gets a 401 problem with `code:
 |---|---|---|
 | Any SDK call | endpoint URL, project ID | `Client` config set by the developer |
 | Any SDK call | `X-Orvano-SDK` version | `VERSION` file, stamped into each package manifest and a generated constant by SdkGen |
-| Server call | API key | server `Client` config (server audience only), sent as `X-Orvano-Key` until row 8; scenario runners use `test-server-key` |
-| Client call | session token | session store (memory by default; `orvano_session` cookie in Next.js), sent as `X-Orvano-Session` until row 8; token format decided in spec for row 8 |
-| Console scenario step | console session token | `consoleSessions` in `tests/scenarios/fixtures.yaml`, sent as the `orvano_console` cookie |
+| Server call | API key | server `Client` config (server audience only), sent as `X-Orvano-Key`; scenario runners read the first `apiKeys` secret in `tests/scenarios/fixtures.yaml` (it replaced `test-server-key`, spec 0004) |
+| Client call | access token | session store (memory by default; `localStorage` in browsers, `flutter_secure_storage` in Flutter, the `orvano_access` and `orvano_refresh` cookies in Next.js), sent as `Authorization: Bearer`; token format in spec 0004 (it replaced `X-Orvano-Session` and `orvano_session`) |
+| Console scenario step | console session | the JS interpreter signs in the first `consoleUsers` account in `tests/scenarios/fixtures.yaml` and sends the `orvano_console` cookie it got (it replaced the fixtures' `consoleSessions`, spec 0004) |
 | Test operation placement | runner only, never a package | `x-orvano-test` on the operation, model, event, or error code |
 | Test operation answers | 409 code, list items, ping body | fixed values in `TestingModule` (see the Milestone 2 set) |
 | Error thrown | status, code, message, requestId | Problem Details body (`code` and `requestId` are extension members; message is `detail`, else `title`) and `X-Request-Id` header |
@@ -225,7 +236,7 @@ The console route rule: a `/v1/console/*` request gets a 401 problem with `code:
 | Typed event | payload type | `x-orvano-event` name in the contract → generated registry |
 | Retry delay | wait time | `Retry-After` header, else exponential backoff with jitter from runtime defaults (base 250 ms, max 3 retries) |
 | Operation placement | which package/entry | `x-orvano-audience` |
-| Console call | console session | console session store in `@orvano/console-client` (provisionally a same origin cookie; the format and CSRF rule come from rows 7 and 8) |
+| Console call | console session | the `orvano_console` and `orvano_console_refresh` cookies the browser keeps for `@orvano/console-client` (format and CSRF rule in spec 0004, AC-27, AC-28) |
 | Docs reference | which operations | `contract/dist/openapi.public.json` |
 | Docs snippet | example values | the operation's schema examples in TypeSpec (`@example`); generator falls back to placeholder values by type |
 
@@ -237,13 +248,13 @@ The console route rule: a `/v1/console/*` request gets a 401 problem with `code:
 - No published package depends on `@orvano/console-client`; a CI check over the pnpm workspace dependency graph fails the build if one does.
 - `Orvano.Contract` is `IsPackable=false` and only referenced inside the repo, so console route constants and records never ship in a NuGet package.
 - The public docs reference renders only from `openapi.public.json`, never from the full contract.
-- `@orvano/console-client` does not reach a production release until rows 7 and 8 have set the console session format and its CSRF rule (the protection against another site riding on the console cookie).
+- `@orvano/console-client` does not reach a production release until rows 7 and 8 have set the console session format and its CSRF rule (the protection against another site riding on the console cookie). Met: spec 0004 set both (AC-27, AC-28).
 - An operation's `operationId`, audience, and service never change after 1.0 without a major version. `console` operations are exempt, because the console and the server always ship together in one release.
 - Nothing marked `x-orvano-test` reaches a published package, `@orvano/console-client`, `openapi.public.json`, or a docs snippet. SdkGen enforces this by construction, and CI fails if any package's generated output contains `/v1/test/` or `/v1/console/test/`.
 - Test routes exist only in the `Test` environment; a server integration test asserts `/v1/test/conflict` is 404 outside it.
-- The temporary auth names (`X-Orvano-Key`, `X-Orvano-Session`, `orvano_session`, `orvano_console`) are each defined once per runtime and once on the server, never repeated inline.
+- The auth names (`X-Orvano-Key`, `Authorization`, `orvano_access`, `orvano_refresh`, `orvano_console`, `orvano_console_refresh`) are each defined once per runtime and once on the server (`OrvanoHeaders`), never repeated inline.
 
-**Security model**: API keys grant admin power, so they are unreachable from client packages by construction: client packages have no key setter at all, and the server entry's setter throws in a browser. That construction is the real protection. A server side origin check cannot cover Flutter mobile, which sends no `Origin` header, so none is relied on here; key scopes are decided in the auth spec (row 8). Platform administration (`console` operations) is kept out of public SDKs by construction, and the server enforces it too: `/v1/console/*` accepts only a console session, so neither an API key nor an app user session can reach it. Until row 8, API keys and app sessions are sent but not validated, which is safe only because no product data exists yet; row 8 must land before any product operation that needs authorization ships. Test operations are unreachable in production because their routes are never mapped outside `Test`. Publishing uses short lived OIDC credentials where available; mirror push tokens are scoped to the mirror repos only.
+**Security model**: API keys grant admin power, so they are unreachable from client packages by construction: client packages have no key setter at all, and the server entry's setter throws in a browser. That construction is the real protection. A server side origin check cannot cover Flutter mobile, which sends no `Origin` header, so none is relied on here; key scopes are checked per operation (`x-orvano-scope`, specs 0003 and 0004). Platform administration (`console` operations) is kept out of public SDKs by construction, and the server enforces it too: `/v1/console/*` accepts only a console session, so neither an API key nor an app user session can reach it. Before row 8, API keys and app sessions were sent but not validated, which was safe only because no product data existed yet; spec 0004 now validates keys, sessions, and console sessions. Test operations are unreachable in production because their routes are never mapped outside `Test`. Publishing uses short lived OIDC credentials where available; mirror push tokens are scoped to the mirror repos only.
 
 **Configuration required**:
 - `NPM_TOKEN`, `PUB_DEV` automated publishing, `NUGET_API_KEY`: only if trusted publishing is unavailable on that registry.
@@ -253,7 +264,7 @@ The console route rule: a `/v1/console/*` request gets a 401 problem with `code:
 - Happy path: add a field to the health response in TypeSpec, run the generator, and all five surfaces read the new field in the `health` scenario. Verifies **AC-1**, **AC-3**, **AC-16**.
 - Failure case: remove the audience from one operation; the generator exits with an error naming it. Verifies **AC-2**.
 - Auth/permission: importing `@orvano/js` in a browser exposes no server service; calling the `./server` key setter in a browser throws. Verifies **AC-4**.
-- Console audience: `test.consolePing` is generated into the JS runner on top of `@orvano/console-client` and appears in no public package; server integration tests show it returns 401 with an API key header, 401 with an app session header, and 401 with no or an unknown console cookie; an `as: console` scenario with the fixtures' console session gets 200. Verifies **AC-17**.
+- Console audience: `test.consolePing` is generated into the JS runner on top of `@orvano/console-client` and appears in no public package; server integration tests show it returns 401 with an API key header, 401 with a bearer token, and 401 with no or an unknown console cookie; an `as: console` scenario signed in as the fixtures' console account gets 200. Verifies **AC-17**.
 - Test isolation: after SdkGen, no package's generated output and no docs snippet contains `test.` operations or `/v1/test/`, `openapi.public.json` has no `x-orvano-test` entry, and a server started as `Production` answers 404 on `/v1/test/conflict`. Verifies **AC-18**.
 - Pagination: a `paginate: true` step on `test.list` with `limit: 2` collects `item-1` to `item-5` in order in every SDK, and a single page call returns two items and a `nextCursor`. Verifies **AC-7**.
 - Events: an `event: test.pinged` step decodes to the typed model in every SDK. Verifies **AC-8**.
@@ -300,7 +311,7 @@ Tracer Bullet: first push one real operation through every layer (contract → g
 - The generator is useful only once the thin thread (Milestone 1) works across all five surfaces, which is a lot of setup before any product feature.
 - Test only operations give SdkGen a second output target per runner and the server a `Test` only module, both of which must be kept in step with the templates.
 - Runner side test services need SDK internals: the TS and Dart pagination helper and event decoder become public API, and the published .NET assembly names `Orvano.Scenarios` in an `InternalsVisibleTo` attribute.
-- The temporary auth formats will be replaced by row 8, which then touches every runtime's auth provider and the server once. Until then keys and app sessions are sent but not checked.
+- The temporary auth formats were replaced by row 8 (spec 0004), which touched every runtime's auth provider and the server once, as planned.
 
 **Neutral**:
 - Scriban templates are a new skill to learn; they are close to Liquid.
@@ -309,12 +320,12 @@ Tracer Bullet: first push one real operation through every layer (contract → g
 ## Follow-up
 
 - [x] The stack spec (row 1) should confirm .NET 10 as the server runtime and GitHub Actions for CI, both assumed here. Done in spec 0002.
-- [ ] Rows 7 and 8 decide the console session format and its CSRF rule; until then, `console` scenarios use a test session seeded through `ORVANO_TEST_FIXTURES`, and `@orvano/console-client` stays out of production releases.
-- [ ] The auth spec (row 8) decides the session token and API key header formats referenced in the API conventions, replaces the temporary `X-Orvano-Key`, `X-Orvano-Session`, `orvano_session`, and `orvano_console` names (one constant per runtime and `OrvanoHeaders` on the server), moves them into the contract as security schemes, and starts validating keys and sessions.
+- [x] Rows 7 and 8 decide the console session format and its CSRF rule; until then, `console` scenarios use a test session seeded through `ORVANO_TEST_FIXTURES`, and `@orvano/console-client` stays out of production releases. Done in [spec 0004](../0004-app-user-auth/index.md) (AC-27, AC-28): the `orvano_console` cookie pair and the Fetch Metadata CSRF rule; `console` scenarios now sign in a fixture console account for real.
+- [x] The auth spec (row 8) decides the session token and API key header formats referenced in the API conventions, replaces the temporary `X-Orvano-Key`, `X-Orvano-Session`, `orvano_session`, and `orvano_console` names (one constant per runtime and `OrvanoHeaders` on the server), moves them into the contract as security schemes, and starts validating keys and sessions. Done in [spec 0004](../0004-app-user-auth/index.md) (AC-35): `Authorization: Bearer`, `X-Orvano-Key` with scopes, and the `orvano_console` cookie, as the `bearer`, `apiKey`, and `consoleSession` schemes in `contract/auth/security.tsp` (see *Auth wire formats*).
 - [ ] Claim the package names before the first publish. Checked 2026-09-24: nothing is published under the `@orvano` npm scope, and `orvano_core` (pub.dev) and `Orvano` (NuGet) are unused. Done: the pub.dev verified publisher `orvano.dev` and the `orvano` npm org (2026-09-24). Still to do: a NuGet organization with the `Orvano` prefix reserved. pub.dev names are claimed at first publish, not reserved ahead.
 - [x] Agent Skills: the .NET, Aspire, and pnpm skills were installed with spec 0002 (`.claude/skills/`). Searched again after Milestone 1 (2026-09-25): nothing credible exists for TypeSpec or Scriban. Installed `flutter-add-integration-test`, `dart-write-documentation`, `dart-run-static-analysis`, `nextjs-app-router-patterns`, `workers-best-practices`, and `playwright-cli` (`.agents/skills/`, listed in root `AGENTS.md`).
 - [x] Before Milestone 1, confirm the `Microsoft.OpenApi` 2.x release you pin reads OpenAPI 3.1 in a stable (not preview) version; if not, parse `openapi.json` with `System.Text.Json` into the internal model directly. Confirmed: SdkGen pins the stable 2.12.2, which reads the compiled 3.1 contract (2026-09-25).
-- [ ] Finalize `tests/scenarios/fixtures.yaml` once the platform data model (row 3) is decided.
+- [x] Finalize `tests/scenarios/fixtures.yaml` once the platform data model (row 3) is decided. Done by specs 0003 and 0004 (see *Test fixtures*).
 - [ ] Design the `x-orvano-upload` templates (multipart and chunked) with Buckets & files (row 20).
 - [ ] Realtime socket, chunked uploads, and OAuth runtime pieces are handwritten per language when their rows (22, 21, 12) are built.
 
