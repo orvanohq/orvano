@@ -322,6 +322,28 @@ public class SessionTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task A_forwarded_client_ip_is_only_recorded_and_never_moves_a_limit()
+    {
+        // AC-31: X-Orvano-Client-IP is shown only. Changing it on every call must not dodge the connection IP's limit.
+        await using var api = await AuthApi.StartAsync(postgres);
+        using var signUp = await api.SignUpAsync("ada@x.com");
+        var token = AuthApi.RefreshToken(signUp);
+
+        for (var i = 0; i < 60; i++)
+        {
+            using var bad = await RefreshAsync(api, $"orv_rt_{RandomId()}.{new string('A', 43)}",
+                headers: new Dictionary<string, string> { ["X-Forwarded-For"] = "203.0.113.62", ["X-Orvano-Client-IP"] = $"198.51.100.{i}" });
+            Assert.Equal("invalid_refresh_token", bad.Code);
+        }
+
+        using var limited = await RefreshAsync(api, token,
+            headers: new Dictionary<string, string> { ["X-Forwarded-For"] = "203.0.113.62", ["X-Orvano-Client-IP"] = "198.51.100.200" });
+
+        Assert.Equal((HttpStatusCode)429, limited.Status);
+        Assert.Equal("rate_limited", limited.Code);
+    }
+
+    [Fact]
     public async Task The_61st_refresh_of_one_session_within_15_minutes_is_limited()
     {
         await using var api = await AuthApi.StartAsync(postgres);

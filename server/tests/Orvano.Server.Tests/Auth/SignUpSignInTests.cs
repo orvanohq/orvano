@@ -294,6 +294,31 @@ public class SignUpSignInTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task App_sign_ups_and_server_created_users_share_one_limit_per_ip()
+    {
+        // AC-30: account.create and users.create count against the same 60 per hour of one connection IP.
+        await using var api = await AuthApi.StartAsync(postgres);
+        var ip = new Dictionary<string, string> { ["X-Forwarded-For"] = "203.0.113.52" };
+        var serverIp = new Dictionary<string, string>(ip) { ["X-Orvano-Key"] = AuthApi.ServerKey };
+
+        for (var i = 0; i < 30; i++)
+        {
+            // Invalid passwords: no hash is spent, but each attempt still counts.
+            using var app = await api.SendAsync(HttpMethod.Post, "/v1/account", new { email = $"a{i}@x.com", password = "short" }, headers: ip);
+            using var server = await api.SendAsync(HttpMethod.Post, "/v1/users", new { email = $"s{i}@x.com", password = "short" }, headers: serverIp);
+            Assert.Equal(HttpStatusCode.BadRequest, app.Status);
+            Assert.Equal(HttpStatusCode.BadRequest, server.Status);
+        }
+
+        using var limitedServer = await api.SendAsync(HttpMethod.Post, "/v1/users", new { email = "last@x.com", password = "correct horse battery" }, headers: serverIp);
+        using var limitedApp = await api.SendAsync(HttpMethod.Post, "/v1/account", new { email = "last@x.com", password = "correct horse battery" }, headers: ip);
+
+        Assert.Equal((HttpStatusCode)429, limitedServer.Status);
+        Assert.Equal("rate_limited", limitedServer.Code);
+        Assert.Equal((HttpStatusCode)429, limitedApp.Status);
+    }
+
+    [Fact]
     public async Task The_database_holds_no_plain_refresh_token_or_private_key()
     {
         await using var api = await AuthApi.StartAsync(postgres);
