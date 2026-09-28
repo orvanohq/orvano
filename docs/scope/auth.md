@@ -12,7 +12,7 @@ The thinnest real auth thread: email and password sign up, sign in, sign out, an
    - [x] Servers and client SDKs: API key authentication and scopes, `users.*`, token verification in .NET, Dart, and JS servers; session handling in JS, Next.js, and Flutter (AC-17 to 19, 23 to 26, 35)
    - [x] Console: console account sessions with the CSRF rule, the Users page, and signing key rotation (AC-22, 27 to 29, 35)
 - [x] Verify it: `/check verify app user sign up & sign in`
-- [ ] Test it: `/test app user sign up & sign in`
+- [x] Test it: `/test app user sign up & sign in`
 - [ ] Review it (fresh model): `/check review app user sign up & sign in`
 - [ ] Document it: `/document app user sign up & sign in`
 Spec [0004](../specs/0004-app-user-auth/index.md) · code in `server/src/Orvano.Auth/`, `contract/auth/`, `sdks/`, `console/`
