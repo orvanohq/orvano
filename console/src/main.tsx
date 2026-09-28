@@ -1,3 +1,5 @@
+// First: configures Zod before any imported module builds a schema.
+import '@/lib/zod-config'
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { StrictMode } from 'react'

@@ -1,5 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
+import { useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,7 @@ import { usePageTitle } from '@/lib/page-title'
 import { orgProjectsQuery, orgsQuery } from '@/lib/queries'
 import { ErrorPanel } from '@/shell/error-panel'
 import { PageHeading } from '@/shell/page-heading'
+import { CreateOrgDialog } from '@/shell/create-org-dialog'
 import { statusLabel } from '@/shell/status'
 import type { Org } from '@orvano/console-client'
 
@@ -19,10 +21,23 @@ function OrgsPage() {
   usePageTitle('Orgs')
   const orgs = useInfiniteQuery(orgsQuery(25))
   const items = orgs.data?.pages.flatMap((page) => page.items) ?? []
+  const [creating, setCreating] = useState(false)
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
-      <PageHeading>Orgs</PageHeading>
+      <div className="flex items-center gap-3">
+        <PageHeading>Orgs</PageHeading>
+        <div data-slot="page-actions" className="ml-auto">
+          <Button
+            onClick={() => {
+              setCreating(true)
+            }}
+          >
+            Create org
+          </Button>
+        </div>
+      </div>
+      <CreateOrgDialog open={creating} onOpenChange={setCreating} />
       {orgs.isError ? (
         <ErrorPanel
           error={orgs.error}

@@ -1,11 +1,20 @@
 import { Combobox } from '@base-ui/react/combobox'
-import { Check, ChevronsUpDown, Loader2 } from 'lucide-react'
-import { useEffect, useState, type ReactNode, type Ref } from 'react'
+import { Check, ChevronsUpDown, Loader2, Plus } from 'lucide-react'
+import { useEffect, useState, type Ref } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { statusLabel } from '@/shell/status'
 import type { OrgStatus, ProjectStatus } from '@orvano/console-client'
+
+/** The action in a switcher's footer, for example "Create org" (spec 0007, AC-1 and AC-6). */
+export interface SwitcherAction {
+  label: string
+  /** Why the action is not yours to take; the button stays visible and explains it. */
+  disabledReason?: string | undefined
+  /** Runs after the switcher closes, for example to open a dialog. */
+  onSelect: () => void
+}
 
 /** One row of a switcher: an org or a project. */
 export interface SwitcherItem {
@@ -27,8 +36,10 @@ interface SwitcherProps {
   isFetchingNextPage: boolean
   fetchNextPage: () => void
   onPick: (item: SwitcherItem) => void
-  /** The empty footer slot where later rows add "Create" links. */
-  footer?: ReactNode
+  /** The footer's action; none means no footer. */
+  footerAction?: SwitcherAction | undefined
+  /** Reaches the trigger, so a dialog opened from the footer can return focus to it. */
+  triggerRef?: Ref<HTMLButtonElement> | undefined
   /** Hide the trigger's text below 640 px (used to keep only the deepest switcher). */
   className?: string
 }
@@ -46,9 +57,11 @@ export function Switcher({
   isFetchingNextPage,
   fetchNextPage,
   onPick,
-  footer,
+  footerAction,
+  triggerRef,
   className,
 }: SwitcherProps) {
+  const [open, setOpen] = useState(false)
   // State, not refs: the popup mounts after this component renders, and the effect must re-run then.
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null)
   const [lastOption, setLastOption] = useState<HTMLDivElement | null>(null)
@@ -72,6 +85,8 @@ export function Switcher({
 
   return (
     <Combobox.Root<SwitcherItem>
+      open={open}
+      onOpenChange={setOpen}
       items={items}
       value={current ?? null}
       onValueChange={(item) => {
@@ -81,6 +96,7 @@ export function Switcher({
       isItemEqualToValue={(a, b) => a.id === b.id}
     >
       <Combobox.Trigger
+        ref={triggerRef}
         render={
           <Button
             variant="ghost"
@@ -128,9 +144,21 @@ export function Switcher({
                 </div>
               ) : null}
             </div>
-            {footer === undefined ? null : (
+            {footerAction === undefined ? null : (
               <div data-slot="switcher-footer" className="border-t border-border p-1">
-                {footer}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start"
+                  disabledReason={footerAction.disabledReason}
+                  onClick={() => {
+                    setOpen(false)
+                    footerAction.onSelect()
+                  }}
+                >
+                  <Plus aria-hidden />
+                  {footerAction.label}
+                </Button>
               </div>
             )}
           </Combobox.Popup>

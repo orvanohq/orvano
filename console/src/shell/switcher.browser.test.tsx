@@ -254,12 +254,17 @@ describe('Switcher rows (AC-13, AC-14)', () => {
     ])
   })
 
-  it('shows the footer slot for later rows, and nothing when there is none', async () => {
-    await renderSwitcher({ footer: <a href="#create">Create org</a> })
+  it('runs the footer action after closing the list (spec 0007, AC-1)', async () => {
+    const onSelect = vi.fn()
+    await renderSwitcher({ footerAction: { label: 'Create org', onSelect } })
     await userEvent.click(trigger())
     await expect
       .poll(() => document.querySelector('[data-slot=switcher-footer]')?.textContent)
       .toBe('Create org')
+    const button = document.querySelector<HTMLElement>('[data-slot=switcher-footer] button')
+    await userEvent.click(button ?? document.body)
+    expect(onSelect).toHaveBeenCalledTimes(1)
+    await expect.poll(() => options().length).toBe(0)
   })
 
   it('has no footer slot when none is given', async () => {

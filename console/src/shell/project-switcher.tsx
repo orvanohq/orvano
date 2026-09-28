@@ -1,8 +1,9 @@
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import { useMemo } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
-import { orgProjectsQuery } from '@/lib/queries'
+import { orgProjectsQuery, orgQuery } from '@/lib/queries'
+import { CreateProjectDialog, createProjectReason } from '@/shell/create-project-dialog'
 import { sortActiveFirst } from '@/shell/sort'
 import { Switcher, type SwitcherItem } from '@/shell/switcher'
 
@@ -14,7 +15,8 @@ function productSegment(pathname: string): string {
 
 /**
  * The project switcher for the current org (AC-14). Picking a project opens the same product in
- * it when it is active, and its overview otherwise.
+ * it when it is active, and its overview otherwise. Its footer holds "Create project" for this org
+ * (spec 0007, AC-6).
  */
 export function ProjectSwitcher({
   orgId,
@@ -26,25 +28,44 @@ export function ProjectSwitcher({
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const query = useInfiniteQuery(orgProjectsQuery(orgId))
+  const org = useQuery(orgQuery(orgId)).data
+  const [creating, setCreating] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const items = useMemo(
     () => sortActiveFirst(query.data?.pages.flatMap((page) => page.items) ?? []),
     [query.data],
   )
   return (
-    <Switcher
-      label="Switch project"
-      placeholder="Select project"
-      current={current}
-      items={items}
-      hasNextPage={query.hasNextPage}
-      isFetchingNextPage={query.isFetchingNextPage}
-      fetchNextPage={() => {
-        void query.fetchNextPage()
-      }}
-      onPick={(project) => {
-        const keep = project.status === 'active' ? productSegment(pathname) : ''
-        void navigate({ href: `/projects/${project.id}${keep}` })
-      }}
-    />
+    <>
+      <Switcher
+        label="Switch project"
+        placeholder="Select project"
+        current={current}
+        items={items}
+        hasNextPage={query.hasNextPage}
+        isFetchingNextPage={query.isFetchingNextPage}
+        fetchNextPage={() => {
+          void query.fetchNextPage()
+        }}
+        onPick={(project) => {
+          const keep = project.status === 'active' ? productSegment(pathname) : ''
+          void navigate({ href: `/projects/${project.id}${keep}` })
+        }}
+        triggerRef={triggerRef}
+        footerAction={{
+          label: 'Create project',
+          disabledReason: createProjectReason(org),
+          onSelect: () => {
+            setCreating(true)
+          },
+        }}
+      />
+      <CreateProjectDialog
+        orgId={orgId}
+        open={creating}
+        onOpenChange={setCreating}
+        finalFocus={triggerRef}
+      />
+    </>
   )
 }
