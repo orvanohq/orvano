@@ -1,10 +1,11 @@
 using System.Security.Cryptography;
+using Orvano.Auth.Application;
 using Orvano.Auth.Domain;
 
 namespace Orvano.Server.Tests.Auth;
 
 // Spec 0004 domain rules: AC-1 (email), AC-2 (password), AC-6 (claims), AC-8 (refresh decision), AC-9 (expiry),
-// AC-34 (Argon2id, refresh token hashing).
+// AC-31 (client info), AC-34 (Argon2id, refresh token hashing).
 public class AuthDomainTests
 {
     // Made with argon2-cffi (the reference C implementation), salt 00..0f, so our encoded hashes are standard.
@@ -258,5 +259,17 @@ public class AuthDomainTests
         Assert.Equal(session, claims.SessionId);
         Assert.Equal(now.AddMilliseconds(-750), claims.IssuedAt);
         Assert.Equal(TimeSpan.FromSeconds(900), claims.ExpiresAt - claims.IssuedAt);
+    }
+
+    [Fact]
+    public void Client_info_cuts_to_its_limits_without_splitting_a_surrogate_pair()
+    {
+        var emojiAtTheEdge = new string('a', ClientInfo.MaxUserAgent - 1) + "\U0001F600";
+
+        var info = ClientInfo.Of(emojiAtTheEdge, new string('s', ClientInfo.MaxSdk + 5), null);
+
+        Assert.Equal(new string('a', ClientInfo.MaxUserAgent - 1), info.UserAgent);
+        Assert.Equal(new string('s', ClientInfo.MaxSdk), info.Sdk);
+        Assert.Null(ClientInfo.Of(" ", null, null).UserAgent);
     }
 }

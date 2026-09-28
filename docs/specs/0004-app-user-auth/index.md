@@ -247,7 +247,7 @@ Plus spec 0003's errors on every key call: 401 `invalid_api_key`, 403 `insuffici
 
 The discovery document exists only so standard JWT libraries (ASP.NET JwtBearer with `Authority`, `jose`) configure themselves from the issuer. Orvano is not an OpenID provider. These two JSON bodies keep their standard snake case names, the one exception to camelCase on the wire.
 
-**Console operations** (audience `console`, under `/v1/console`):
+**Console operations** (audience `console`, under `/v1/console`; project scoped ones take the project from the `X-Orvano-Project` header, never a path parameter):
 
 | Operation | Method and path | Notes |
 |---|---|---|
@@ -256,9 +256,9 @@ The discovery document exists only so standard JWT libraries (ASP.NET JwtBearer 
 | `consoleAccount.refreshSession` | POST `/console/account/session/refresh` | reads `orvano_console_refresh`, sets both cookies |
 | `consoleAccount.deleteSession` | DELETE `/console/account/session` | ends the session, clears both cookies |
 | `consoleAccount.get` | GET `/console/account` | the console user |
-| `consoleUsers.list`, `.get`, `.create`, `.block`, `.unblock`, `.delete`, `.listSessions`, `.deleteSessions`, `.deleteSession` | `/console/projects/{projectId}/users/...` | same shapes as `users.*`; the role check through `IConsoleAccess` |
-| `consoleAuthKeys.list` | GET `/console/projects/{projectId}/auth/keys` | `id`, `status`, `createdAt`, `retireAfter` |
-| `consoleAuthKeys.rotate` | POST `/console/projects/{projectId}/auth/keys/rotate` | owner only |
+| `consoleUsers.list`, `.get`, `.create`, `.block`, `.unblock`, `.delete`, `.listSessions`, `.deleteSessions`, `.deleteSession` | `/console/project/users/...` | same shapes as `users.*`; the role check through `IConsoleAccess` |
+| `consoleAuthKeys.list` | GET `/console/project/auth/keys` | `id`, `status`, `createdAt`, `retireAfter` |
+| `consoleAuthKeys.rotate` | POST `/console/project/auth/keys/rotate` | owner only |
 
 The first four console account operations, plus spec 0006's `consoleInstall.getSetup` (GET `/console/install/setup`, answers only `setupRequired`), are the only console routes that work without a console session. Console account self service (password change, sessions, deletion through `IConsoleAccountGuard`) is left for a later row.
 

@@ -18,8 +18,11 @@ internal sealed record ClientInfo(string? UserAgent, string? Sdk, IPAddress? Ip)
     public static ClientInfo Of(string? userAgent, string? sdk, IPAddress? ip) =>
         new(Cut(userAgent, MaxUserAgent), Cut(sdk, MaxSdk), ip);
 
+    // Never ends on the first half of a surrogate pair: a lone surrogate is not text, and Postgres refuses it.
     private static string? Cut(string? value, int max) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Length <= max ? value : value[..max];
+        string.IsNullOrWhiteSpace(value) ? null
+        : value.Length <= max ? value
+        : char.IsHighSurrogate(value[max - 1]) ? value[..(max - 1)] : value[..max];
 }
 
 /// <summary>A new or rotated session and its refresh token, before the access token is issued.</summary>

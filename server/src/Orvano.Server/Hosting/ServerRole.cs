@@ -25,9 +25,16 @@ namespace Orvano.Server.Hosting;
 /// <summary>The long running roles: api, worker, and realtime. Each serves /internal health on HTTP.</summary>
 internal static class ServerRole
 {
+    /// <summary>
+    /// The largest request body any role accepts. Every route takes small JSON, so 1 MiB is plenty; a bigger body is
+    /// refused with 413 before a handler reads it. A route that needs more, such as an upload, raises it for itself.
+    /// </summary>
+    public const long MaxRequestBodyBytes = 1024 * 1024;
+
     public static async Task<int> RunAsync(OrvanoRole role, string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+        builder.WebHost.ConfigureKestrel(kestrel => kestrel.Limits.MaxRequestBodySize = MaxRequestBodyBytes);
         var config = builder.Configuration;
         var serviceName = config["OTEL_SERVICE_NAME"] ?? $"orvano-{role.Name()}";
         builder.AddOrvanoTelemetry(serviceName);
