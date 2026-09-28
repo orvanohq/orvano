@@ -13,8 +13,47 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Which areas this pull request touches (.github/scripts/changed-areas.sh), so each job below runs
+  # only when its inputs changed. Pushes to main and manual runs run every job. "CI passed" at the
+  # end is the one check to require on main: it passes when every job either passed or was skipped.
+  changes:
+    name: Changed areas
+    runs-on: ubuntu-latest
+    outputs:
+      lint: ${{ steps.areas.outputs.lint }}
+      dotnet: ${{ steps.areas.outputs.dotnet }}
+      js: ${{ steps.areas.outputs.js }}
+      console: ${{ steps.areas.outputs.console }}
+      e2e: ${{ steps.areas.outputs.e2e }}
+      install: ${{ steps.areas.outputs.install }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The pull request's merge commit and its first parent, the base branch.
+          fetch-depth: 2
+      - id: areas
+        run: |
+          .github/scripts/changed-areas.sh HEAD^1 HEAD <<'RULES'
+          all       .github/workflows/ci.yml .github/scripts/changed-areas.sh
+          # Prose, including the AGENTS.md and CLAUDE.md files inside code folders.
+          ignore    *.md
+          # What ESLint and Prettier check: every file outside their ignore lists (Prettier also
+          # checks YAML and JSON, so this is wider than the JS workspaces).
+          lint      !docs/* !.claude/* !server/* !dev/* !deploy/*
+          # Everything Orvano.slnx builds and tests (SdkGen's tests read the SDK manifests).
+          dotnet    server/* tools/* dev/* sdks/dotnet/* tests/scenarios/runners/dotnet/* sdks/*/package.json sdks/*/pubspec.yaml tests/scenarios/runners/*/pubspec.yaml contract/dist/openapi.json deploy/compose/initdb/* Orvano.slnx global.json Directory.Build.props Directory.Packages.props .editorconfig VERSION
+          js        contract/* console/* sdks/js/* sdks/nextjs/* sdks/console-client/* tests/scenarios/runners/js/* tests/scenarios/runners/nextjs/* package.json pnpm-lock.yaml pnpm-workspace.yaml eslint.config.js .prettierrc.json .tool-versions
+          console   console/* sdks/js/* sdks/console-client/* package.json pnpm-lock.yaml pnpm-workspace.yaml .tool-versions
+          # The console against the real API: the console, the gateway, and the server image.
+          e2e       console/* sdks/js/* sdks/console-client/* deploy/gateway/* deploy/server.Dockerfile deploy/compose/* server/* contract/dist/openapi.json tests/scenarios/compose.yml tests/scenarios/fixtures.yaml package.json pnpm-lock.yaml pnpm-workspace.yaml global.json Directory.Build.props Directory.Packages.props .dockerignore .tool-versions VERSION
+          # The self host install path: the installer, both images, and the Compose file.
+          install   deploy/* server/* contract/dist/openapi.json global.json Directory.Build.props Directory.Packages.props .dockerignore VERSION
+          RULES
+
   lint:
     name: Lint and format
+    needs: changes
+    if: needs.changes.outputs.lint == 'true' || needs.changes.outputs.dotnet == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -27,16 +66,23 @@ jobs:
       - run: corepack enable pnpm
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
-      - run: pnpm install --frozen-lockfile
       # Style and analyzer rules from .editorconfig; analyzer errors also fail the server build.
-      - run: dotnet format Orvano.slnx --verify-no-changes
+      - if: needs.changes.outputs.dotnet == 'true'
+        run: dotnet format Orvano.slnx --verify-no-changes
+      - if: needs.changes.outputs.lint == 'true'
+        run: pnpm install --frozen-lockfile
       # Type aware lint rules need the types of workspace packages, which live in their dist/.
-      - run: pnpm --filter "@orvano/scenarios-nextjs^..." build
-      - run: pnpm lint
-      - run: pnpm format:check
+      - if: needs.changes.outputs.lint == 'true'
+        run: pnpm --filter "@orvano/scenarios-nextjs^..." build
+      - if: needs.changes.outputs.lint == 'true'
+        run: pnpm lint
+      - if: needs.changes.outputs.lint == 'true'
+        run: pnpm format:check
 
   server:
     name: Server build, tests, and EF drift check
+    needs: changes
+    if: needs.changes.outputs.dotnet == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -64,6 +110,8 @@ jobs:
 
   console:
     name: JS workspace build
+    needs: changes
+    if: needs.changes.outputs.js == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -78,6 +126,8 @@ jobs:
 
   console-tests:
     name: Console tests (unit and browser)
+    needs: changes
+    if: needs.changes.outputs.console == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -96,6 +146,8 @@ jobs:
 
   console-e2e:
     name: Console end to end (gateway, real API)
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -119,6 +171,8 @@ jobs:
     # The real install path, twice, on both architectures (spec 0006, AC-30): images built from this
     # commit and tagged from VERSION, then install.sh with --no-pull, as on an air gapped server.
     name: Install with install.sh (${{ matrix.runner }})
+    needs: changes
+    if: needs.changes.outputs.install == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -180,3 +234,15 @@ jobs:
           cd /opt/orvano && sudo docker compose ps --all && sudo docker compose logs
       - if: always()
         run: cd /opt/orvano && sudo docker compose down -v || true
+
+  passed:
+    name: CI passed
+    if: always()
+    needs: [changes, lint, server, console, console-tests, console-e2e, install]
+    runs-on: ubuntu-latest
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "::error::A CI job failed or was cancelled."
+          exit 1
+      - run: echo "Every CI job passed or was skipped because its area did not change."
