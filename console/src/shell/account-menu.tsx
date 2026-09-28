@@ -32,8 +32,10 @@ export function AccountMenu() {
       notifyError("Couldn't sign out", error)
       return
     }
-    queryClient.clear()
+    // Leave the shell before clearing: a query still on screen would fetch again, get a 401, and
+    // send you to /sign-in?redirect=/sign-in.
     await navigate({ to: '/sign-in', replace: true })
+    queryClient.clear()
   }
   return (
     <DropdownMenu>

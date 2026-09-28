@@ -30,7 +30,8 @@ interface ConfirmDialogProps {
 
 /**
  * A confirmation before a risky action. Focus starts on Cancel and Escape cancels. With
- * `requireName` the confirm button stays disabled until the exact name is typed.
+ * `requireName` the confirm button stays disabled until the exact name is typed. The dialog closes
+ * once `onConfirm` finishes, and stays open if it throws.
  */
 export function ConfirmDialog({
   trigger,
@@ -42,13 +43,16 @@ export function ConfirmDialog({
   onConfirm,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement | null>(null)
+  const [open, setOpen] = useState(false)
   const [typed, setTyped] = useState('')
   const [busy, setBusy] = useState(false)
   const nameOk = requireName === undefined || typed === requireName
 
   return (
     <AlertDialog
-      onOpenChange={() => {
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
         setTyped('')
       }}
     >
@@ -80,9 +84,14 @@ export function ConfirmDialog({
             disabled={!nameOk}
             onClick={() => {
               setBusy(true)
-              void Promise.resolve(onConfirm()).finally(() => {
-                setBusy(false)
-              })
+              void Promise.resolve(onConfirm())
+                .then(() => {
+                  setOpen(false)
+                  setTyped('')
+                })
+                .finally(() => {
+                  setBusy(false)
+                })
             }}
           >
             {confirmLabel}

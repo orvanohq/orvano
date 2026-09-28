@@ -150,6 +150,8 @@ describe('SigningKeysPanel', () => {
     await screen.getByRole('alertdialog').getByRole('button', { name: 'Rotate key' }).click()
 
     await expect.poll(() => onRotate.mock.calls.length).toBe(1)
+    // The Rotate key button stays on the page, so only the dialog itself can close the dialog.
+    await expect.element(screen.getByRole('alertdialog')).not.toBeInTheDocument()
   })
 
   it('tells developers and viewers that only owners rotate', async () => {
