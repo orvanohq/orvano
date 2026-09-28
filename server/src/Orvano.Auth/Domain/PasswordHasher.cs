@@ -70,15 +70,22 @@ internal sealed class PasswordHasher : IDisposable
 
     /// <summary>
     /// Checks a normalized password against <paramref name="encodedHash"/>, or against the dummy hash when there is none
-    /// (an unknown email), so both paths cost exactly one Argon2id run. <see langword="null"/> when every slot stayed busy.
+    /// (an unknown email, or a password that can't meet the policy), so both paths cost exactly one Argon2id run. The
+    /// dummy check never hashes the offered password: its answer is thrown away, so only its cost matters, and an
+    /// oversized input can't make it dearer. <see langword="null"/> when every slot stayed busy.
     /// </summary>
     public async Task<PasswordCheck?> TryVerifyAsync(string normalizedPassword, string? encodedHash, CancellationToken ct)
     {
         if (!await _gate.WaitAsync(MaxWait, ct)) return null;
         try
         {
-            var check = Verify(normalizedPassword, encodedHash ?? _dummyHash);
-            return encodedHash is null ? new PasswordCheck(false, false) : check;
+            if (encodedHash is null)
+            {
+                Verify("", _dummyHash);
+                return new PasswordCheck(false, false);
+            }
+
+            return Verify(normalizedPassword, encodedHash);
         }
         finally
         {
@@ -109,6 +116,8 @@ internal sealed class PasswordHasher : IDisposable
 
     private byte[] Derive(string password, byte[] salt, Argon2Cost cost, int length)
     {
+        // Only a password that met the policy reaches here; anything longer would let a caller buy Argon2id work by size.
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(password.Length, PasswordPolicy.MaxLength * 4);
         Interlocked.Increment(ref _runs);
         var parameters = new Argon2Parameters
         {
