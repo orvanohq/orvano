@@ -116,7 +116,22 @@ test('an admin creates an org, a project, a key, and platforms', async ({
   await expect(page).toHaveURL(new RegExp(`/orgs/${orgId}$`))
   const row = page.getByRole('row').filter({ hasText: `E2E project ${stamp}` })
   await expect(row).toContainText('Deleting')
+  // The worker often sets a restored project up before the list is read again, which would hide a
+  // list that stops checking. Hold the first read at Setting up, as a slower worker would.
+  await page.route(
+    (url) =>
+      url.pathname === `/v1/console/orgs/${orgId}/projects` &&
+      url.searchParams.get('limit') === '25',
+    async (route) => {
+      const response = await route.fetch()
+      const body = (await response.text()).replace('"status":"active"', '"status":"provisioning"')
+      await route.fulfill({ response, body })
+    },
+    { times: 1 },
+  )
   await page.getByRole('button', { name: 'Restore', exact: true }).click()
   await expect(page.getByText('Project restored')).toBeVisible()
-  await expect(row).toContainText(/Setting up|Active/)
+  await expect(row).toContainText('Setting up')
+  // The list keeps checking while the project is set up again, so the row turns Active in place.
+  await expect(row).toContainText('Active', { timeout: 15_000 })
 })

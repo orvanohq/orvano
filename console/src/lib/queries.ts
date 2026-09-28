@@ -84,6 +84,11 @@ export function orgProjectsQuery(orgId: string, limit: number = switcherPageSize
       consoleApi().consoleProjects.list(orgId, { cursor: pageParam, limit }, { signal }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
+    // Check again every 2 seconds while any listed project is being set up, as the project page does.
+    refetchInterval: (query) =>
+      query.state.data?.pages.some((page) => page.items.some((p) => p.status === 'provisioning'))
+        ? 2000
+        : false,
   })
 }
 

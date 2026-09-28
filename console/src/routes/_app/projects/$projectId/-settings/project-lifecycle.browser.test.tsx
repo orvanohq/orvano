@@ -63,6 +63,8 @@ describe('project Settings, General (AC-7)', () => {
   it('renames the project and updates the title and switcher without a reload', async () => {
     await openSettings('developer')
     const field = document.querySelector<HTMLInputElement>('#project-name')
+    // The role comes from the org, which can load after the project's name shows.
+    await expect.poll(() => field?.readOnly).toBe(false)
     await userEvent.fill(field ?? document.body, '  Storefront  ')
     await click('Save')
     await expect.poll(() => document.title).toBe('Settings · Storefront · Orvano')
@@ -80,7 +82,9 @@ describe('project Settings, General (AC-7)', () => {
 
   it('lets a developer rename but not delete', async () => {
     await openSettings('developer')
-    expect(document.querySelector<HTMLInputElement>('#project-name')?.readOnly).toBe(false)
+    await expect
+      .poll(() => document.querySelector<HTMLInputElement>('#project-name')?.readOnly)
+      .toBe(false)
     expect(button('Delete project')?.getAttribute('aria-disabled')).toBe('true')
     expect(reason(button('Delete project'))).toBe('Owners only')
   })
