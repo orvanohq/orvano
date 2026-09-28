@@ -1,6 +1,6 @@
 # Verify: Console screens for orgs, projects, API keys, and platforms · spec 0007 · updated 2026-09-27
 
-_Steps derived from spec 0007 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones. This first batch covers build plan task 1 (the thin thread); later tasks append theirs._
+_Steps derived from spec 0007 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones. The first batch covers build plan task 1 (the thin thread); the second covers tasks 2 to 6._
 
 ## UI / manual
 
@@ -42,4 +42,57 @@ Start the gateway (`docker compose -f tests/scenarios/compose.yml --profile cons
 ## Acceptance criteria coverage (task 1)
 
 - AC-1 · Create org steps 1 to 3 · AC-6 · Create project steps 4 to 6 · AC-11 · sidebar step · AC-12 · keys table step, Expired check · AC-13 · validation, custom date, viewer steps · AC-14 · reveal step · AC-15 · after Done step · AC-17 · platforms table step · AC-18 · Add platform, wildcard, duplicate, viewer steps · AC-19 · web paste step · AC-23 · the e2e command
-- Not yet covered (later build plan tasks): AC-2 to AC-5, AC-7 to AC-10, AC-16, AC-20 to AC-22
+- AC-2 to AC-5, AC-7 to AC-10, AC-16, AC-20 to AC-22: see the tasks 2 to 6 batch below
+
+---
+
+# Tasks 2 to 6 · added 2026-09-27
+
+Same setup: the gateway on `http://localhost:8081`, signed in as the fixture console account. For the role steps, use an org where you are a developer or a viewer (row 15 adds invites; until then set `org_members.role` in the dev database).
+
+## UI / manual
+
+- [ ] API keys: the table has a Created by column, "You" on your keys and "Teammate" on others; while your account loads it shows a skeleton, never "Teammate" first → AC-12
+- [ ] As an owner, Delete on any key opens a confirm naming the key and its prefix, focus on Cancel, saying it stops working at once and can't be undone; Delete key removes the row and shows a toast → AC-16
+- [ ] As a developer, Delete is enabled on your own key and disabled on a teammate's with "You can delete only keys you created"; as a viewer every Delete says "Developers and owners only" → AC-16
+- [ ] Platforms: Edit opens the form filled in, Type shown as text (no select); change only the name and save → the PATCH body holds only `name`; save with no change → no request → AC-20
+- [ ] Delete a platform → a confirm naming it, saying apps using it lose access at once; the row leaves the list → AC-20
+- [ ] As a viewer, Add platform, Edit, and Delete are all disabled with "Developers and owners only" → AC-18, AC-20
+- [ ] Project Settings shows General (name form, project ID with copy), Token signing keys, then Danger zone, each under an `h2` → AC-7
+- [ ] Rename the project → the document title and the project switcher show the new name with no reload → AC-7
+- [ ] As a viewer the name is read only with "Developers and owners only"; as a developer Delete project is disabled with "Owners only" → AC-7
+- [ ] Delete project: the Delete button stays disabled until the exact name is typed (case matters); then you land on the org page, the row shows Deleting, and the "Project deleted" toast has Restore → AC-8
+- [ ] Press Restore in that toast → "Project restored", the row shows Setting up, then Active → AC-8, AC-9
+- [ ] A `failed` project shows Retry setup (owners and developers) → press it → the panel turns into "Setting up" with a spinner on the button while pending → AC-9
+- [ ] A `deleting` project under a `deleting` org shows Restore project disabled with "Restore the org first"; after a failed purge, Retry purge (owners) clears the failure note → AC-9
+- [ ] Restore a project that a teammate already purged → an error toast with the server's message, then the in shell not found view → AC-10
+- [ ] Double click any submit or action button → one request in the network tab → AC-10
+- [ ] Org sidebar: owners see Settings under Projects; developers and viewers don't, and opening `/orgs/<id>/settings` shows it read only with "Owners only" → AC-2
+- [ ] Org Settings shows General (name, org ID with copy, created date) and Danger zone → AC-2
+- [ ] Rename the org → the title and org switcher update with no reload → AC-3
+- [ ] With a live project, Delete org says "Delete its projects first"; while the projects load it says "Checking projects…" → AC-4
+- [ ] With only deleting projects, Delete org opens a confirm (focus on Cancel); confirm → the Deleting banner with the purge date and a Restore org button appears, and the org moves to the end of the switcher, dimmed; the name form says "Restore the org to rename it" → AC-3, AC-4
+- [ ] Restore org (banner or Danger zone) → no confirm, a spinner while pending, a toast, the banner leaves; its projects stay deleted → AC-5
+- [ ] Overview: a new project shows Connect your app with both steps not done; after adding a platform, step 1 shows a check and the word "Done" → AC-21
+- [ ] Titles: `Settings · <org> · Orvano` on org Settings, `API keys · <project> · Orvano`, `Platforms · <project> · Orvano` → AC-22
+- [ ] Every new dialog: Tab stays inside, Escape closes (except the reveal step), focus returns to the button that opened it → AC-22
+
+## Value sourcing checks
+
+- [ ] Created by compares `createdByUserId` with your account's `id`: sign in as another account in the same org and the same key flips to "Teammate" → Value sourcing: Keys table, Created by
+- [ ] Delete org pre check reads the first page of projects: with only deleting projects on it the button is enabled, and a server `org_not_empty` still shows in the dialog → Value sourcing: Delete org pre check
+- [ ] After Delete project you land on the deleted project's own org (`Project.orgId`), even if you came from another org → Value sourcing: After delete project
+- [ ] Restore project is disabled from `Org.status` of the project's org, not the last org you visited → Value sourcing: Restore project enabled
+- [ ] Retry purge shows only when `purgeFailedAt` is set → Value sourcing: Retry purge shown
+- [ ] Edit platform sends only fields that differ from the loaded platform → Value sourcing: Edit platform
+- [ ] Connect your app steps come from `limit=1` list calls (network tab shows `?limit=1` for keys and platforms) → Value sourcing: Connect your app
+
+## Commands
+
+- [ ] `pnpm --filter @orvano/console test` → all unit and browser tests pass, including `keys-page`, `platforms-page`, `project-lifecycle`, `org-settings`, and `connect-your-app` browser tests (axe in both themes and both densities) and the new keyboard scripts (`key-reveal`, `scope-grid`, `platform-form`) → AC-2 to AC-5, AC-7 to AC-10, AC-12, AC-16, AC-20 to AC-22
+- [ ] `pnpm --filter @orvano/console test:e2e` against the gateway → `platform.spec.ts` passes through the org delete refusal and the project delete and toast restore → AC-4, AC-8, AC-23
+
+## Acceptance criteria coverage (tasks 2 to 6)
+
+- AC-2 · sidebar and read only steps · AC-3 · org rename, deleting org name form · AC-4 · live project, loading, org delete steps, e2e · AC-5 · Restore org step · AC-7 · Settings sections, rename, role steps · AC-8 · typed name delete, toast Restore · AC-9 · Retry setup, Restore disabled, Retry purge · AC-10 · purged project, double click · AC-12 · Created by · AC-16 · key delete steps · AC-20 · platform edit, delete, viewer · AC-21 · overview step · AC-22 · titles, dialog focus, the browser test command
+
