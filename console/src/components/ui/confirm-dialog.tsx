@@ -12,8 +12,10 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { FormAlert } from '@/components/ui/form-alert'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { describeError } from '@/lib/errors'
 
 interface ConfirmDialogProps {
   /** The element that opens the dialog, usually a `Button`. */
@@ -25,13 +27,14 @@ interface ConfirmDialogProps {
   destructive?: boolean
   /** Makes the person type this name before the confirm button works (for deleting things). */
   requireName?: string
+  /** Runs the action. Throw to keep the dialog open: the error's message shows in its alert. */
   onConfirm: () => void | Promise<void>
 }
 
 /**
  * A confirmation before a risky action. Focus starts on Cancel and Escape cancels. With
  * `requireName` the confirm button stays disabled until the exact name is typed. The dialog closes
- * once `onConfirm` finishes, and stays open if it throws.
+ * once `onConfirm` finishes; if it throws, the dialog stays open and shows the error in its alert.
  */
 export function ConfirmDialog({
   trigger,
@@ -46,6 +49,7 @@ export function ConfirmDialog({
   const [open, setOpen] = useState(false)
   const [typed, setTyped] = useState('')
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const nameOk = requireName === undefined || typed === requireName
 
   return (
@@ -54,6 +58,7 @@ export function ConfirmDialog({
       onOpenChange={(next) => {
         setOpen(next)
         setTyped('')
+        setError(null)
       }}
     >
       <AlertDialogTrigger render={trigger} />
@@ -62,6 +67,9 @@ export function ConfirmDialog({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+        {error === null ? null : (
+          <FormAlert title={`Couldn't ${confirmLabel.toLowerCase()}`}>{error}</FormAlert>
+        )}
         {requireName === undefined ? null : (
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="confirm-name">
@@ -84,11 +92,18 @@ export function ConfirmDialog({
             disabled={!nameOk}
             onClick={() => {
               setBusy(true)
-              void Promise.resolve(onConfirm())
-                .then(() => {
-                  setOpen(false)
-                  setTyped('')
-                })
+              setError(null)
+              void Promise.resolve()
+                .then(onConfirm)
+                .then(
+                  () => {
+                    setOpen(false)
+                    setTyped('')
+                  },
+                  (failure: unknown) => {
+                    setError(describeError(failure).message)
+                  },
+                )
                 .finally(() => {
                   setBusy(false)
                 })

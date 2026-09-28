@@ -8,6 +8,8 @@ import { formatFull } from '@/lib/format'
 import { orgQuery } from '@/lib/queries'
 import { InShellNotFound } from '@/shell/in-shell-not-found'
 
+import { RestoreOrgButton } from './-org-settings/org-actions'
+
 export const Route = createFileRoute('/_app/orgs/$orgId')({
   loader: async ({ context, params }) => {
     try {
@@ -35,8 +37,11 @@ function OrgLayout() {
             {org.purgeAfter === null
               ? ''
               : ` and is purged for good on ${formatFull(org.purgeAfter)}`}
-            .
+            . Restoring it restores none of its projects.
           </AlertDescription>
+          <div className="col-start-2 mt-2">
+            <RestoreOrgButton org={org} variant="outline" />
+          </div>
         </Alert>
       ) : null}
       <Outlet />

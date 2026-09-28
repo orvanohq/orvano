@@ -40,11 +40,17 @@ test('an owner manages users from the Users page', async ({ signedIn: page }) =>
 test('an owner rotates the signing key in Settings', async ({ signedIn: page }) => {
   await page.goto(`/projects/${scenariosProject}/settings`)
   await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible()
+  // Count only once the keys have loaded (a fresh install has none yet, so wait on loading).
+  await expect(page.locator('[aria-busy=true]')).toHaveCount(0)
   const retiringBefore = await page.getByText('Retiring', { exact: true }).count()
+  // A fresh install has no key yet: rotating then makes the first one, and nothing retires.
+  const activeBefore = await page.getByText('Active', { exact: true }).count()
 
   await page.getByRole('button', { name: 'Rotate key' }).click()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Rotate key' }).click()
 
-  await expect(page.getByText('Retiring', { exact: true })).toHaveCount(retiringBefore + 1)
+  await expect(page.getByText('Retiring', { exact: true })).toHaveCount(
+    retiringBefore + activeBefore,
+  )
   await expect(page.getByText('Active', { exact: true })).toHaveCount(1)
 })

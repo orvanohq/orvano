@@ -2,6 +2,8 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { MonitorSmartphone } from 'lucide-react'
 import type { ReactNode } from 'react'
 
+import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { platformTypes } from '@/lib/platform-types'
 import { RelativeTime } from '@/shell/relative-time'
@@ -18,31 +20,84 @@ export function PlatformTypeLabel({ type }: { type: PlatformType }) {
   )
 }
 
-/** The Platforms table (AC-17). */
-export const platformColumns: ColumnDef<Platform>[] = [
-  {
-    accessorKey: 'type',
-    header: 'Type',
-    cell: ({ row }) => <PlatformTypeLabel type={row.original.type} />,
-  },
-  {
-    accessorKey: 'name',
-    header: 'Name',
-    cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
-  },
-  {
-    accessorKey: 'identifier',
-    header: 'Identifier',
-    cell: ({ row }) => (
-      <code className="font-mono text-mono break-all">{row.original.identifier}</code>
-    ),
-  },
-  {
-    accessorKey: 'createdAt',
-    header: 'Added',
-    cell: ({ row }) => <RelativeTime iso={row.original.createdAt} />,
-  },
-]
+/**
+ * The Platforms table (AC-17 and AC-20). `changeReason` is set when you may not change platforms
+ * (a viewer); Edit and Delete then explain why.
+ */
+export function platformColumns({
+  changeReason,
+  onEdit,
+  onDelete,
+}: {
+  changeReason: string | undefined
+  onEdit: (platform: Platform) => void
+  onDelete: (platform: Platform) => Promise<void>
+}): ColumnDef<Platform>[] {
+  return [
+    {
+      accessorKey: 'type',
+      header: 'Type',
+      cell: ({ row }) => <PlatformTypeLabel type={row.original.type} />,
+    },
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+    },
+    {
+      accessorKey: 'identifier',
+      header: 'Identifier',
+      cell: ({ row }) => (
+        <code className="font-mono text-mono break-all">{row.original.identifier}</code>
+      ),
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Added',
+      cell: ({ row }) => <RelativeTime iso={row.original.createdAt} />,
+    },
+    {
+      id: 'actions',
+      header: () => <span className="sr-only">Actions</span>,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const platform = row.original
+        return (
+          <span className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label={`Edit ${platform.name}`}
+              disabledReason={changeReason}
+              onClick={() => {
+                onEdit(platform)
+              }}
+            >
+              Edit
+            </Button>
+            <ConfirmDialog
+              trigger={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label={`Delete ${platform.name}`}
+                  disabledReason={changeReason}
+                >
+                  Delete
+                </Button>
+              }
+              title={`Delete the platform ${platform.name}?`}
+              description={`Apps using ${platform.identifier} lose access to this project at once.`}
+              confirmLabel="Delete platform"
+              destructive
+              onConfirm={() => onDelete(platform)}
+            />
+          </span>
+        )
+      },
+    },
+  ]
+}
 
 /** The empty Platforms table, with "Add platform" (AC-17). */
 export function NoPlatforms({ action }: { action: ReactNode }) {

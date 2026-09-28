@@ -1,4 +1,4 @@
-import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
+import { infiniteQueryOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 import { consoleApi, projectClient } from '@/lib/console-client'
 
 /** Page size for the switchers; `/orgs` and the org page use smaller pages. */
@@ -20,6 +20,22 @@ export const keys = {
   signingKeys: (projectId: string) => ['console', 'projects', projectId, 'signing-keys'] as const,
   apiKeys: (projectId: string) => ['console', 'projects', projectId, 'keys'] as const,
   platforms: (projectId: string) => ['console', 'projects', projectId, 'platforms'] as const,
+  /** Whether the project has any key: the overview's first page of one (spec 0007, AC-21). */
+  anyApiKey: (projectId: string) => ['console', 'projects', projectId, 'keys', 'any'] as const,
+  /** Whether the project has any platform (spec 0007, AC-21). */
+  anyPlatform: (projectId: string) =>
+    ['console', 'projects', projectId, 'platforms', 'any'] as const,
+}
+
+/**
+ * Marks every list of your orgs stale (the switcher's and the `/orgs` page's), but not each org or
+ * its projects, after an org is created, renamed, deleted, or restored.
+ */
+export function invalidateOrgLists(queryClient: QueryClient): Promise<void> {
+  return queryClient.invalidateQueries({
+    queryKey: keys.orgs,
+    predicate: (query) => query.queryKey.length === 2 || typeof query.queryKey[2] === 'object',
+  })
 }
 
 /** The signed in console account; the session guard's probe (spec 0005, AC-20). */
@@ -135,6 +151,28 @@ export function apiKeysQuery(projectId: string) {
       projectClient(projectId).consoleApiKeys.list({ cursor: pageParam, limit: 25 }, { signal }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+}
+
+/** Whether the project has at least one API key, for the overview (spec 0007, AC-21). */
+export function anyApiKeyQuery(projectId: string) {
+  return queryOptions({
+    queryKey: keys.anyApiKey(projectId),
+    queryFn: async ({ signal }) => {
+      const page = await projectClient(projectId).consoleApiKeys.list({ limit: 1 }, { signal })
+      return page.items.length > 0
+    },
+  })
+}
+
+/** Whether the project has at least one platform, for the overview (spec 0007, AC-21). */
+export function anyPlatformQuery(projectId: string) {
+  return queryOptions({
+    queryKey: keys.anyPlatform(projectId),
+    queryFn: async ({ signal }) => {
+      const page = await projectClient(projectId).consolePlatforms.list({ limit: 1 }, { signal })
+      return page.items.length > 0
+    },
   })
 }
 

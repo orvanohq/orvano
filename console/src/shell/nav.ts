@@ -30,6 +30,13 @@ export interface NavEntry {
  */
 export const orgNav: readonly NavEntry[] = [
   { id: 'projects', label: 'Projects', icon: FolderKanban, to: '/orgs/$orgId', exact: true },
+  {
+    id: 'org-settings',
+    label: 'Settings',
+    icon: Settings,
+    to: '/orgs/$orgId/settings',
+    minRole: 'owner',
+  },
 ]
 
 /** Overview first, then every product entry; products show only while the project is active. */

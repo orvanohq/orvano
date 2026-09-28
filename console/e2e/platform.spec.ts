@@ -1,7 +1,8 @@
 import { expect, test } from './fixtures.ts'
 
 // Spec 0007 AC-23 against the real API, through the UI only: create an org and a project, create a
-// scoped API key and prove its secret works, and register a web and an Android platform.
+// scoped API key and prove its secret works, register a web and an Android platform, see the org
+// delete refused while the project is live, then delete the project and restore it from the toast.
 
 test('an admin creates an org, a project, a key, and platforms', async ({
   signedIn: page,
@@ -18,6 +19,7 @@ test('an admin creates an org, a project, a key, and platforms', async ({
   await orgDialog.getByRole('button', { name: 'Create org' }).click()
   await expect(orgDialog).toBeHidden()
   await expect(page).toHaveURL(/\/orgs\/[^/]+$/)
+  const orgId = /\/orgs\/([^/]+)$/.exec(page.url())?.[1] ?? ''
   await expect(page.getByRole('heading', { level: 1, name: 'Projects' })).toBeVisible()
   await expect(page.getByRole('combobox', { name: `Switch org: E2E org ${stamp}` })).toBeVisible()
 
@@ -53,7 +55,7 @@ test('an admin creates an org, a project, a key, and platforms', async ({
   await reveal.getByRole('checkbox', { name: "I've copied this key and stored it safely" }).click()
   await reveal.getByRole('button', { name: 'Done' }).click()
   await expect(reveal).toBeHidden()
-  await expect(page.getByRole('cell', { name: 'E2E server' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'E2E server', exact: true })).toBeVisible()
   await expect(page.getByText(secret)).toHaveCount(0)
 
   // The secret authenticates a real server call to the new project (AC-23).
@@ -83,6 +85,38 @@ test('an admin creates an org, a project, a key, and platforms', async ({
   await androidDialog.getByRole('button', { name: 'Add platform' }).click()
   await expect(androidDialog).toBeHidden()
 
-  await expect(page.getByRole('cell', { name: 'localhost' })).toBeVisible()
-  await expect(page.getByRole('cell', { name: 'com.example.e2e' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'localhost', exact: true })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'com.example.e2e', exact: true })).toBeVisible()
+
+  // The overview's Connect your app steps are both done now (AC-21).
+  await nav.getByRole('link', { name: 'Overview' }).click()
+  const steps = page.getByRole('list').filter({ hasText: 'Add a platform' }).getByRole('listitem')
+  await expect(steps.filter({ hasText: 'Done' })).toHaveCount(2)
+
+  // The org can't be deleted while its project is live (AC-4).
+  await page.getByRole('link', { name: `E2E org ${stamp}` }).click()
+  await expect(page).toHaveURL(new RegExp(`/orgs/${orgId}$`))
+  const orgNav = page.getByRole('navigation', { name: 'Org navigation' })
+  await orgNav.getByRole('link', { name: 'Settings' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible()
+  const deleteOrg = page.getByRole('button', { name: 'Delete org' })
+  await expect(deleteOrg).toHaveAccessibleDescription('Delete its projects first')
+  await expect(deleteOrg).toHaveAttribute('aria-disabled', 'true')
+
+  // Delete the project by typing its name, then restore it from the toast (AC-8, AC-9).
+  await orgNav.getByRole('link', { name: 'Projects' }).click()
+  await page.getByRole('link', { name: `E2E project ${stamp}` }).click()
+  await nav.getByRole('link', { name: 'Settings' }).click()
+  await page.getByRole('button', { name: 'Delete project' }).click()
+  const confirm = page.getByRole('alertdialog', { name: `Delete E2E project ${stamp}?` })
+  const confirmButton = confirm.getByRole('button', { name: 'Delete project' })
+  await expect(confirmButton).toBeDisabled()
+  await confirm.getByLabel(/to confirm/).fill(`E2E project ${stamp}`)
+  await confirmButton.click()
+  await expect(page).toHaveURL(new RegExp(`/orgs/${orgId}$`))
+  const row = page.getByRole('row').filter({ hasText: `E2E project ${stamp}` })
+  await expect(row).toContainText('Deleting')
+  await page.getByRole('button', { name: 'Restore', exact: true }).click()
+  await expect(page.getByText('Project restored')).toBeVisible()
+  await expect(row).toContainText(/Setting up|Active/)
 })
