@@ -6,7 +6,8 @@ import { isNotFound } from '@/lib/errors'
 import { clearLastProject, setLastProject } from '@/lib/last-project'
 import { keys, projectQuery } from '@/lib/queries'
 import { InShellNotFound } from '@/shell/in-shell-not-found'
-import { ProjectStatusPanel } from '@/shell/project-status'
+import { ProjectStatusPanel, useStatusActions } from '@/shell/project-status'
+import type { Project } from '@orvano/console-client'
 
 export const Route = createFileRoute('/_app/projects/$projectId')({
   loader: async ({ context, params }) => {
@@ -47,6 +48,11 @@ function ProjectLayout() {
   }, [data, queryClient])
 
   if (data === undefined) return null
-  if (data.status !== 'active') return <ProjectStatusPanel project={data} />
+  if (data.status !== 'active') return <StatusPanel project={data} />
   return <Outlet />
+}
+
+function StatusPanel({ project }: { project: Project }) {
+  const actions = useStatusActions(project)
+  return <ProjectStatusPanel project={project} actions={actions} />
 }

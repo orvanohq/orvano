@@ -358,7 +358,9 @@ export function SigningKeysPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Token signing keys</CardTitle>
+        <CardTitle>
+          <h2>Token signing keys</h2>
+        </CardTitle>
         <CardDescription>
           Access tokens of this project are signed with the active key. Rotating makes a new key
           sign from now on; the old one keeps verifying the tokens it signed for 24 hours, then
