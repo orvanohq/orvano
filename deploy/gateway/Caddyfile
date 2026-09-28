@@ -30,9 +30,10 @@
 		root * /srv/console
 
 		# Every console file (spec 0005, Security headers): scripts and styles only from the
-		# console's own origin, no framing, no MIME sniffing.
+		# console's own origin, no framing, no MIME sniffing. The one style hash is Base UI's scrollbar
+		# style for select popups (console/design.md, Security exception log).
 		header {
-			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'sha256-kLmvWqfziFavKtqHqRsb90f006UAK2Dmd0It5Iz2KFA='; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 			X-Content-Type-Options nosniff
 			X-Frame-Options DENY
 			Referrer-Policy strict-origin-when-cross-origin

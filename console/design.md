@@ -147,4 +147,10 @@ All live in `src/components/ui/`. Every component and variant has a live example
 
 ## Security exception log
 
-The Content Security Policy allows scripts and styles only from the console's own files. Fonts are not inlined as `data:` URIs (`assetsInlineLimit` in `vite.config.ts`), because `font-src` is `'self'`. No exception has been needed yet. Record one here if a library ever needs a style hash.
+The Content Security Policy allows scripts and styles only from the console's own files. Fonts are not inlined as `data:` URIs (`assetsInlineLimit` in `vite.config.ts`), because `font-src` is `'self'`. Record every exception here, with the exact text it allows.
+
+| Allowed by hash | Why | Where it lives |
+|---|---|---|
+| `'sha256-kLmvWqfziFavKtqHqRsb90f006UAK2Dmd0It5Iz2KFA='` in `style-src` | Base UI's Select popup (and ScrollArea) injects one `<style>` that hides the popup's scrollbar: `.base-ui-disable-scrollbar{scrollbar-width:none}.base-ui-disable-scrollbar::-webkit-scrollbar{display:none}`. Found by spec 0007's Expiry and Type selects. | `deploy/gateway/Caddyfile`; `e2e/headers.spec.ts` opens both selects and fails on any violation |
+
+A Base UI upgrade that changes that text changes the hash: the end to end test then fails, and the browser's console error names the new hash to put in both places.

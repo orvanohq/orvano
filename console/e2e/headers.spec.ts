@@ -37,7 +37,9 @@ test('a missing hashed asset is a 404 that is not cached for a year (AC-24)', as
   expect(response.headers()['x-content-type-options']).toBe('nosniff')
 })
 
-test('every shell page runs without a CSP violation (AC-24)', async ({ signedIn: page }) => {
+test('every shell page and select popup runs without a CSP violation (AC-24)', async ({
+  signedIn: page,
+}) => {
   await page.addInitScript(() => {
     const seen: string[] = []
     ;(window as unknown as { __csp: string[] }).__csp = seen
@@ -51,6 +53,18 @@ test('every shell page runs without a CSP violation (AC-24)', async ({ signedIn:
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     await page.getByRole('button', { name: 'Account menu' }).click()
     await page.keyboard.press('Escape')
+    visited.push(...(await page.evaluate(() => (window as unknown as { __csp: string[] }).__csp)))
+  }
+  // A select popup is where Base UI injects its one `<style>` (see design.md's exception log).
+  const selects = [
+    { path: 'keys', open: 'Create key', select: 'Expiry', option: '30 days' },
+    { path: 'platforms', open: 'Add platform', select: 'Type', option: 'Android' },
+  ]
+  for (const { path, open, select, option } of selects) {
+    await page.goto(`/projects/${scenariosProject}/${path}`)
+    await page.getByRole('button', { name: open }).first().click()
+    await page.getByRole('dialog').getByRole('combobox', { name: select }).click()
+    await expect(page.getByRole('option', { name: option })).toBeVisible()
     visited.push(...(await page.evaluate(() => (window as unknown as { __csp: string[] }).__csp)))
   }
   expect(visited).toEqual([])
