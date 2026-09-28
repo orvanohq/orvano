@@ -123,6 +123,28 @@ public class AuthDomainTests
         Assert.Equal(before + 1, hasher.Runs);
     }
 
+    [Fact]
+    public async Task The_dummy_check_never_hashes_the_offered_password_however_long()
+    {
+        using var hasher = new PasswordHasher();
+        var before = hasher.Runs;
+
+        var check = await hasher.TryVerifyAsync(new string('a', 1_000_000), null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(new PasswordCheck(false, false), check);
+        Assert.Equal(before + 1, hasher.Runs);
+    }
+
+    [Fact]
+    public async Task Refuses_to_hash_a_password_longer_than_the_policy_allows()
+    {
+        using var hasher = new PasswordHasher();
+        var tooLong = new string('a', (PasswordPolicy.MaxLength * 4) + 1);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => hasher.TryHashAsync(tooLong, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => hasher.TryVerifyAsync(tooLong, ReferenceCurrent, TestContext.Current.CancellationToken));
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("$argon2i$v=19$m=19456,t=2,p=1$AAECAwQFBgcICQoLDA0ODw$quyusfeeuAGbpiw09i+j4VKJ+I/5h3mugd4HghmS/x8")]

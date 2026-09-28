@@ -127,8 +127,9 @@ internal sealed class AccountService(
         var wellFormed = PasswordPolicy.TryNormalize(password, out var normalized);
         var account = known ? await FindByEmailAsync(projectId, trimmed, ct) : null;
 
-        // A password that can't meet the policy can't match either; it is still checked, against the dummy hash.
-        var check = await hasher.TryVerifyAsync(wellFormed ? normalized : password ?? "", wellFormed ? account?.Hash : null, ct);
+        // A password that can't meet the policy can't match either; it still costs one run, against the dummy hash, but
+        // is never hashed itself, so an oversized one buys no extra work.
+        var check = await hasher.TryVerifyAsync(normalized, wellFormed ? account?.Hash : null, ct);
         if (check is null) return Failure.Busy;
         if (!check.Value.Matches || account is null) return Failure.InvalidCredentials;
         if (account.Status == UserStatuses.Blocked) return Failure.UserBlocked;
@@ -277,7 +278,7 @@ internal sealed class AccountService(
         var hash = await store.ReadAsync((db, token) =>
             db.Passwords.AsNoTracking().Where(p => p.UserId == userId && p.ProjectId == projectId).Select(p => p.Hash).SingleOrDefaultAsync(token), ct);
         var wellFormed = PasswordPolicy.TryNormalize(password, out var normalized);
-        var check = await hasher.TryVerifyAsync(wellFormed ? normalized : password ?? "", wellFormed ? hash : null, ct);
+        var check = await hasher.TryVerifyAsync(normalized, wellFormed ? hash : null, ct);
         if (check is null) return Failure.Busy;
         if (!check.Value.Matches || hash is null) return Failure.InvalidCredentials;
         return hash;

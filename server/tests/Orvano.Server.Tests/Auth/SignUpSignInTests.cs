@@ -94,11 +94,12 @@ public class SignUpSignInTests(PostgresFixture postgres)
         using var wrong = await api.SignInAsync("ada@x.com", "wrong horse battery");
         using var unknown = await api.SignInAsync("nobody@x.com");
         using var malformed = await api.SignInAsync("nobody", "x");
+        using var overlong = await api.SignInAsync("ada@x.com", new string('a', 1_000_000));
 
         Assert.Equal(HttpStatusCode.Created, signIn.Status);
         Assert.NotEqual(AuthApi.RefreshToken(signUp), AuthApi.RefreshToken(signIn));
         Assert.Equal(2L, await Count(api, "SELECT count(*) FROM orvano.auth_sessions WHERE user_id = @id", Guid.Parse(AuthApi.UserId(signUp))));
-        foreach (var refused in new[] { wrong, unknown, malformed })
+        foreach (var refused in new[] { wrong, unknown, malformed, overlong })
         {
             Assert.Equal(HttpStatusCode.Unauthorized, refused.Status);
             Assert.Equal("invalid_credentials", refused.Code);

@@ -13,7 +13,7 @@ The thinnest real auth thread: email and password sign up, sign in, sign out, an
    - [x] Console: console account sessions with the CSRF rule, the Users page, and signing key rotation (AC-22, 27 to 29, 35)
 - [x] Verify it: `/check verify app user sign up & sign in`
 - [x] Test it: `/test app user sign up & sign in`
-- [ ] Review it (fresh model): `/check review app user sign up & sign in`
+- [x] Review it (fresh model): `/check review app user sign up & sign in`
 - [ ] Document it: `/document app user sign up & sign in`
 Spec [0004](../specs/0004-app-user-auth/index.md) · code in `server/src/Orvano.Auth/`, `contract/auth/`, `sdks/`, `console/`
 
