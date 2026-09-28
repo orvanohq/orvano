@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using Orvano.Server.Hosting;
 using Orvano.Server.Tests.Infrastructure;
 
 namespace Orvano.Server.Tests.Auth;
@@ -105,6 +106,19 @@ public class SignUpSignInTests(PostgresFixture postgres)
             Assert.Equal("invalid_credentials", refused.Code);
             Assert.Equal(Without(wrong.Body, "requestId"), Without(refused.Body, "requestId"));
         }
+    }
+
+    [Fact]
+    public async Task A_body_over_1_MiB_is_refused_with_413_before_any_work()
+    {
+        await using var api = await AuthApi.StartAsync(postgres);
+
+        using var tooBig = await api.SignUpAsync("ada@x.com", new string('a', (int)ServerRole.MaxRequestBodyBytes));
+
+        using var signUp = await api.SignUpAsync("ada@x.com");
+
+        Assert.Equal((HttpStatusCode.RequestEntityTooLarge, "invalid_request"), (tooBig.Status, tooBig.Code));
+        Assert.Equal(HttpStatusCode.Created, signUp.Status);
     }
 
     [Fact]
