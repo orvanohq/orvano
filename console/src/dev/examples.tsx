@@ -78,7 +78,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { notifyError, notifySuccess } from '@/lib/toast'
+import { CreateKeyDialog } from '@/routes/_app/projects/$projectId/-keys/create-key-dialog'
+import { ScopeGrid } from '@/routes/_app/projects/$projectId/-keys/scope-grid'
+import { PlatformDialog } from '@/routes/_app/projects/$projectId/-platforms/platform-dialog'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
+import type { ApiKeyScope, Platform } from '@orvano/console-client'
 
 /*
  * One example per inventory component (spec 0005, Component inventory). The catalog renders them
@@ -626,6 +631,105 @@ function CodeExample() {
   )
 }
 
+/** A stand in secret for the catalog; it authenticates nothing (spec 0007, key invariants). */
+const exampleSecret = 'orv_example_not_a_real_key_000000000000000000'
+
+// The reveal step (spec 0007, AC-14): the real dialog, with a stand in for the create call.
+function KeyRevealExample() {
+  const [queryClient] = useState(() => new QueryClient())
+  const [open, setOpen] = useState(false)
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Button
+        data-testid="key-create"
+        onClick={() => {
+          setOpen(true)
+        }}
+      >
+        Create key
+      </Button>
+      <CreateKeyDialog
+        projectId="scenarios0000000000a"
+        open={open}
+        onOpenChange={setOpen}
+        createKey={(body) =>
+          Promise.resolve({
+            secret: exampleSecret,
+            apiKey: {
+              id: 'key00000000000000000a',
+              name: body.name,
+              prefix: exampleSecret.slice(0, 12),
+              scopes: body.scopes,
+              expiresAt: body.expiresAt ?? null,
+              lastUsedAt: null,
+              createdByUserId: 'user0000000000000000a',
+              createdAt: '2026-06-01T10:00:00.000Z',
+            },
+          })
+        }
+      />
+    </QueryClientProvider>
+  )
+}
+
+function ScopeGridExample() {
+  const [value, setValue] = useState<ApiKeyScope[]>([])
+  return (
+    <div className="max-w-lg" data-testid="scope-grid">
+      <ScopeGrid
+        id="example-scope"
+        value={value}
+        onChange={setValue}
+        invalid={false}
+        describedBy={undefined}
+      />
+    </div>
+  )
+}
+
+const examplePlatform: Platform = {
+  id: 'platform000000000000a',
+  type: 'android',
+  name: 'Android app',
+  identifier: 'com.example.app',
+  createdAt: '2026-06-01T10:00:00.000Z',
+  updatedAt: '2026-06-01T10:00:00.000Z',
+}
+
+// The platform form (spec 0007, AC-18 to AC-20), adding and editing, with nothing sent anywhere.
+function PlatformFormExample() {
+  const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState(false)
+  return (
+    <div className="flex gap-2">
+      <Button
+        data-testid="platform-add"
+        onClick={() => {
+          setAdding(true)
+        }}
+      >
+        Add platform
+      </Button>
+      <Button
+        data-testid="platform-edit"
+        variant="outline"
+        onClick={() => {
+          setEditing(true)
+        }}
+      >
+        Edit platform
+      </Button>
+      <PlatformDialog open={adding} onOpenChange={setAdding} onSubmit={() => Promise.resolve()} />
+      <PlatformDialog
+        platform={examplePlatform}
+        open={editing}
+        onOpenChange={setEditing}
+        onSubmit={() => Promise.resolve()}
+      />
+    </div>
+  )
+}
+
 /** The catalog: id to a titled, rendered example. */
 export const examples: Record<string, { title: string; render: () => ReactNode }> = {
   button: { title: 'Button', render: () => <ButtonExample /> },
@@ -653,4 +757,7 @@ export const examples: Record<string, { title: string; render: () => ReactNode }
   'separator-kbd': { title: 'Separator and Kbd', render: () => <SeparatorKbdExample /> },
   'copy-button': { title: 'Copy button', render: () => <CopyExample /> },
   'code-block': { title: 'Code block', render: () => <CodeExample /> },
+  'key-reveal': { title: 'API key reveal step', render: () => <KeyRevealExample /> },
+  'scope-grid': { title: 'Scope grid', render: () => <ScopeGridExample /> },
+  'platform-form': { title: 'Platform form', render: () => <PlatformFormExample /> },
 }

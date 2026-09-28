@@ -389,4 +389,143 @@ export const keyboardScripts: readonly KeyboardScript[] = [
     start: '[aria-label="install command"]',
     steps: [{ keys: '{Tab}', then: [{ focused: '[aria-label="Copy install command"]' }] }],
   },
+  {
+    // Spec 0007, AC-14: the reveal step can't be dismissed; only Done closes it, once confirmed.
+    example: 'key-reveal',
+    component: 'API key reveal step',
+    start: '[data-testid=key-create]',
+    steps: [
+      { keys: '{Enter}', then: [{ focused: '#create-key-name' }] },
+      { keys: 'Deploy', then: [{ value: { selector: '#create-key-name', is: 'Deploy' } }] },
+      { keys: '{Tab}', then: [{ focused: '[aria-label="Users read"]' }] },
+      {
+        keys: ' ',
+        then: [
+          {
+            attribute: {
+              selector: '[aria-label="Users read"]',
+              name: 'aria-checked',
+              value: 'true',
+            },
+          },
+        ],
+      },
+      { keys: '{Shift>}{Tab}{/Shift}', then: [{ focused: '#create-key-name' }] },
+      {
+        keys: '{Enter}',
+        then: [
+          { text: { selector: '[role=dialog]', contains: 'Copy your API key' } },
+          { focused: '[aria-label="Copy API key"]' },
+        ],
+      },
+      {
+        keys: '{Escape}',
+        then: [{ text: { selector: '[role=dialog]', contains: 'Copy your API key' } }],
+      },
+      { keys: '{Tab}', then: [{ focused: '[aria-label="Copy project ID"]' }] },
+      { keys: '{Tab}', then: [{ focused: '[role=dialog] [role=checkbox]' }] },
+      { keys: '{Tab}', then: [{ text: { selector: ':focus', contains: 'Done' } }] },
+      {
+        // Done does nothing until the box is checked.
+        keys: '{Enter}',
+        then: [{ text: { selector: '[role=dialog]', contains: 'Copy your API key' } }],
+      },
+      { keys: '{Shift>}{Tab}{/Shift}', then: [{ focused: '[role=dialog] [role=checkbox]' }] },
+      {
+        keys: ' ',
+        then: [
+          {
+            attribute: {
+              selector: '[role=dialog] [role=checkbox]',
+              name: 'aria-checked',
+              value: 'true',
+            },
+          },
+        ],
+      },
+      { keys: '{Tab}', then: [{ text: { selector: ':focus', contains: 'Done' } }] },
+      {
+        keys: '{Enter}',
+        then: [{ absent: '[role=dialog]' }, { focused: '[data-testid=key-create]' }],
+      },
+    ],
+  },
+  {
+    example: 'scope-grid',
+    component: 'Scope grid',
+    start: '[aria-label="Users read"]',
+    steps: [
+      {
+        keys: ' ',
+        then: [
+          {
+            attribute: {
+              selector: '[aria-label="Users read"]',
+              name: 'aria-checked',
+              value: 'true',
+            },
+          },
+        ],
+      },
+      { keys: '{Tab}', then: [{ focused: '[aria-label="Users write"]' }] },
+      {
+        keys: ' ',
+        then: [
+          {
+            attribute: {
+              selector: '[aria-label="Users write"]',
+              name: 'aria-checked',
+              value: 'true',
+            },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    // Spec 0007, AC-19: a pasted web URL keeps only its hostname when the field loses focus.
+    example: 'platform-form',
+    component: 'Platform form',
+    start: '[data-testid=platform-add]',
+    steps: [
+      { keys: '{Enter}', then: [{ focused: '#platform-type' }] },
+      { keys: '{Tab}', then: [{ focused: '#platform-name' }] },
+      { keys: 'Web app', then: [{ value: { selector: '#platform-name', is: 'Web app' } }] },
+      { keys: '{Tab}', then: [{ focused: '#platform-identifier' }] },
+      {
+        keys: 'https://App.example.com:3000/login',
+        then: [
+          { value: { selector: '#platform-identifier', is: 'https://App.example.com:3000/login' } },
+        ],
+      },
+      {
+        keys: '{Tab}',
+        then: [{ value: { selector: '#platform-identifier', is: 'app.example.com' } }],
+      },
+      {
+        keys: '{Escape}',
+        then: [{ absent: '[role=dialog]' }, { focused: '[data-testid=platform-add]' }],
+      },
+    ],
+  },
+  {
+    // Spec 0007, AC-20: editing shows the type as text; the form starts on Name.
+    example: 'platform-form',
+    component: 'Platform form (edit)',
+    start: '[data-testid=platform-edit]',
+    steps: [
+      {
+        keys: '{Enter}',
+        then: [
+          { focused: '#platform-name' },
+          { value: { selector: '#platform-identifier', is: 'com.example.app' } },
+          { absent: '#platform-type' },
+        ],
+      },
+      {
+        keys: '{Escape}',
+        then: [{ absent: '[role=dialog]' }, { focused: '[data-testid=platform-edit]' }],
+      },
+    ],
+  },
 ]

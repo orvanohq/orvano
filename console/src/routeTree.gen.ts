@@ -60,12 +60,11 @@ const AppOrgsOrgIdRouteRoute = AppOrgsOrgIdRouteRouteImport.update({
   path: '/orgs/$orgId',
   getParentRoute: () => AppRoute,
 } as any)
-const AppProjectsProjectIdRouteRoute =
-  AppProjectsProjectIdRouteRouteImport.update({
-    id: '/projects/$projectId',
-    path: '/projects/$projectId',
-    getParentRoute: () => AppRoute,
-  } as any)
+const AppProjectsProjectIdRouteRoute = AppProjectsProjectIdRouteRouteImport.update({
+  id: '/projects/$projectId',
+  path: '/projects/$projectId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppOrgsOrgIdIndexRoute = AppOrgsOrgIdIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -76,42 +75,36 @@ const AppOrgsOrgIdSettingsRoute = AppOrgsOrgIdSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppOrgsOrgIdRouteRoute,
 } as any)
-const AppProjectsProjectIdIndexRoute =
-  AppProjectsProjectIdIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AppProjectsProjectIdRouteRoute,
-  } as any)
-const AppProjectsProjectIdKeysRoute =
-  AppProjectsProjectIdKeysRouteImport.update({
-    id: '/keys',
-    path: '/keys',
-    getParentRoute: () => AppProjectsProjectIdRouteRoute,
-  } as any)
-const AppProjectsProjectIdPlatformsRoute =
-  AppProjectsProjectIdPlatformsRouteImport.update({
-    id: '/platforms',
-    path: '/platforms',
-    getParentRoute: () => AppProjectsProjectIdRouteRoute,
-  } as any)
-const AppProjectsProjectIdSettingsRoute =
-  AppProjectsProjectIdSettingsRouteImport.update({
-    id: '/settings',
-    path: '/settings',
-    getParentRoute: () => AppProjectsProjectIdRouteRoute,
-  } as any)
-const AppProjectsProjectIdUsersIndexRoute =
-  AppProjectsProjectIdUsersIndexRouteImport.update({
-    id: '/users/',
-    path: '/users/',
-    getParentRoute: () => AppProjectsProjectIdRouteRoute,
-  } as any)
-const AppProjectsProjectIdUsersUserIdRoute =
-  AppProjectsProjectIdUsersUserIdRouteImport.update({
-    id: '/users/$userId',
-    path: '/users/$userId',
-    getParentRoute: () => AppProjectsProjectIdRouteRoute,
-  } as any)
+const AppProjectsProjectIdIndexRoute = AppProjectsProjectIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppProjectsProjectIdRouteRoute,
+} as any)
+const AppProjectsProjectIdKeysRoute = AppProjectsProjectIdKeysRouteImport.update({
+  id: '/keys',
+  path: '/keys',
+  getParentRoute: () => AppProjectsProjectIdRouteRoute,
+} as any)
+const AppProjectsProjectIdPlatformsRoute = AppProjectsProjectIdPlatformsRouteImport.update({
+  id: '/platforms',
+  path: '/platforms',
+  getParentRoute: () => AppProjectsProjectIdRouteRoute,
+} as any)
+const AppProjectsProjectIdSettingsRoute = AppProjectsProjectIdSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppProjectsProjectIdRouteRoute,
+} as any)
+const AppProjectsProjectIdUsersIndexRoute = AppProjectsProjectIdUsersIndexRouteImport.update({
+  id: '/users/',
+  path: '/users/',
+  getParentRoute: () => AppProjectsProjectIdRouteRoute,
+} as any)
+const AppProjectsProjectIdUsersUserIdRoute = AppProjectsProjectIdUsersUserIdRouteImport.update({
+  id: '/users/$userId',
+  path: '/users/$userId',
+  getParentRoute: () => AppProjectsProjectIdRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -351,8 +344,9 @@ const AppOrgsOrgIdRouteRouteChildren: AppOrgsOrgIdRouteRouteChildren = {
   AppOrgsOrgIdIndexRoute: AppOrgsOrgIdIndexRoute,
 }
 
-const AppOrgsOrgIdRouteRouteWithChildren =
-  AppOrgsOrgIdRouteRoute._addFileChildren(AppOrgsOrgIdRouteRouteChildren)
+const AppOrgsOrgIdRouteRouteWithChildren = AppOrgsOrgIdRouteRoute._addFileChildren(
+  AppOrgsOrgIdRouteRouteChildren,
+)
 
 interface AppProjectsProjectIdRouteRouteChildren {
   AppProjectsProjectIdKeysRoute: typeof AppProjectsProjectIdKeysRoute
@@ -363,20 +357,18 @@ interface AppProjectsProjectIdRouteRouteChildren {
   AppProjectsProjectIdUsersIndexRoute: typeof AppProjectsProjectIdUsersIndexRoute
 }
 
-const AppProjectsProjectIdRouteRouteChildren: AppProjectsProjectIdRouteRouteChildren =
-  {
-    AppProjectsProjectIdKeysRoute: AppProjectsProjectIdKeysRoute,
-    AppProjectsProjectIdPlatformsRoute: AppProjectsProjectIdPlatformsRoute,
-    AppProjectsProjectIdSettingsRoute: AppProjectsProjectIdSettingsRoute,
-    AppProjectsProjectIdIndexRoute: AppProjectsProjectIdIndexRoute,
-    AppProjectsProjectIdUsersUserIdRoute: AppProjectsProjectIdUsersUserIdRoute,
-    AppProjectsProjectIdUsersIndexRoute: AppProjectsProjectIdUsersIndexRoute,
-  }
+const AppProjectsProjectIdRouteRouteChildren: AppProjectsProjectIdRouteRouteChildren = {
+  AppProjectsProjectIdKeysRoute: AppProjectsProjectIdKeysRoute,
+  AppProjectsProjectIdPlatformsRoute: AppProjectsProjectIdPlatformsRoute,
+  AppProjectsProjectIdSettingsRoute: AppProjectsProjectIdSettingsRoute,
+  AppProjectsProjectIdIndexRoute: AppProjectsProjectIdIndexRoute,
+  AppProjectsProjectIdUsersUserIdRoute: AppProjectsProjectIdUsersUserIdRoute,
+  AppProjectsProjectIdUsersIndexRoute: AppProjectsProjectIdUsersIndexRoute,
+}
 
-const AppProjectsProjectIdRouteRouteWithChildren =
-  AppProjectsProjectIdRouteRoute._addFileChildren(
-    AppProjectsProjectIdRouteRouteChildren,
-  )
+const AppProjectsProjectIdRouteRouteWithChildren = AppProjectsProjectIdRouteRoute._addFileChildren(
+  AppProjectsProjectIdRouteRouteChildren,
+)
 
 interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
