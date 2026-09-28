@@ -25,11 +25,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { projectClient } from '@/lib/console-client'
 import { describeError } from '@/lib/errors'
 import { keys } from '@/lib/queries'
 import { nameSchema } from '@/shell/name-dialog'
-import type { ApiKey, ApiKeyScope, CreateApiKeyRequest } from '@orvano/console-client'
+import type {
+  ApiKey,
+  ApiKeyScope,
+  CreateApiKeyRequest,
+  CreatedApiKey,
+} from '@orvano/console-client'
 
 import { expiresAtFor, expiryOptions, todayLocal, type Expiry } from './expiry'
 import { ScopeGrid } from './scope-grid'
@@ -76,10 +80,13 @@ export function CreateKeyDialog({
   projectId,
   open,
   onOpenChange,
+  createKey,
 }: {
   projectId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Creates the key: `consoleApiKeys.create` on the page, a stand in in the catalog. */
+  createKey: (body: CreateApiKeyRequest) => Promise<CreatedApiKey>
 }) {
   const queryClient = useQueryClient()
   const [step, setStep] = useState<Step>({ step: 'form' })
@@ -87,7 +94,7 @@ export function CreateKeyDialog({
   const [serverError, setServerError] = useState<string | null>(null)
   const copyRef = useRef<HTMLButtonElement>(null)
   const create = useMutation({
-    mutationFn: (body: CreateApiKeyRequest) => projectClient(projectId).consoleApiKeys.create(body),
+    mutationFn: createKey,
     // With no observer after `reset()`, the mutation leaves the cache at once (AC-15).
     gcTime: 0,
   })
