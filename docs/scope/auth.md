@@ -14,7 +14,7 @@ The thinnest real auth thread: email and password sign up, sign in, sign out, an
 - [x] Verify it: `/check verify app user sign up & sign in`
 - [x] Test it: `/test app user sign up & sign in`
 - [x] Review it (fresh model): `/check review app user sign up & sign in`
-- [ ] Document it: `/document app user sign up & sign in`
+- [x] Document it: `/document app user sign up & sign in`
 Spec [0004](../specs/0004-app-user-auth/index.md) · code in `server/src/Orvano.Auth/`, `contract/auth/`, `sdks/`, `console/`
 
 ### 9. Transactional email · needs a decision
