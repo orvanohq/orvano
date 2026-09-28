@@ -1,6 +1,7 @@
 # 0005. Console design system and shell
 
 **Date**: 2026-09-26
+**Updated**: 2026-09-27 (row 8, spec 0004, removed the dev fixtures switch of AC-25 and the fixture cookie, as planned)
 **Status**: Accepted
 
 ## Summary
@@ -47,7 +48,8 @@ Shell
 Security and development
 - **AC-24**: Every console file Caddy serves carries the headers in *Security headers*. In the production shape, visiting every shell page with a session produces no Content Security Policy violation. Hashed files under `/assets/` are cached for a year as immutable; `index.html` and `theme-init.js` are sent with `Cache-Control: no-cache`.
 - **AC-25**: `dotnet run --project dev/Orvano.AppHost -- --OrvanoDev:Fixtures=true` runs `api` and `worker` in the `Test` environment with `tests/scenarios/fixtures.yaml`, and the Vite dev proxy adds the fixture console cookie to `/v1/console` calls, so the dev console opens straight into the Fixtures org. Without the switch, the AppHost behaves as it does today. None of this reaches the production build or images.
-- **AC-26**: Against the scenario server with the gateway in front (compose profile `console`), an end to end browser test starts with the fixture cookie set, lands on `/orgs`, and reaches the Scenarios project overview through the org and project switchers using only the keyboard, with data from the real API.
+  - **Removed by row 8** ([spec 0004](../0004-app-user-auth/index.md)), as this spec planned. The switch only stood in for a real console session: it ran the API in `Test` and injected the fixtures' `consoleSessions` token, both of which spec 0004 deleted (AC-35) once real console sign in, sign up, and the `orvano_console` cookie pair existed. Keeping it would have meant a dev only way around the session and CSRF checks. Now a fresh dev database starts with no account: open `/setup` on the console dev server to create the first admin (the AppHost sets no setup token, so none is needed), then sign in as usual. `OrvanoDev:Fixtures` and `CONSOLE_DEV_SESSION` are gone. AC-25 stays here as history.
+- **AC-26**: Against the scenario server with the gateway in front (compose profile `console`), an end to end browser test starts signed in (since row 8, its global setup signs in the first `consoleUsers` account of `tests/scenarios/fixtures.yaml`; before, it set the fixture cookie), lands on `/orgs`, and reaches the Scenarios project overview through the org and project switchers using only the keyboard, with data from the real API.
 
 ## Decision
 
@@ -283,7 +285,7 @@ No new operations. The shell calls existing `console` operations through `@orvan
 | Form field errors | per field messages | the form's Zod schema on the client; server problems carry no per field list (spec 0001), so a server 400 shows its `message` in the form alert |
 | Page title | `<Page> · <name> · Orvano` | each route's static page label, plus the org or project name from the queries above |
 | Sidebar entries | labels, icons, links, `minRole` | `console/src/shell/nav.ts` |
-| Dev console cookie (AC-25) | `orvano_console` value | `CONSOLE_DEV_SESSION`, set by the AppHost from one named constant, `"test-console-session"`, whose comment points at the first `consoleSessions` entry in `tests/scenarios/fixtures.yaml`. The duplication is accepted: a mismatch fails loudly (the dev console lands on `/sign-in`), and row 8 deletes both |
+| Dev console cookie (AC-25) | `orvano_console` value | `CONSOLE_DEV_SESSION`, set by the AppHost from one named constant, `"test-console-session"`, whose comment points at the first `consoleSessions` entry in `tests/scenarios/fixtures.yaml`. The duplication is accepted: a mismatch fails loudly (the dev console lands on `/sign-in`), and row 8 deletes both. **Removed by row 8** (spec 0004): the dev console now holds a real session from `/setup` or `/sign-in` |
 | `/orgs` project cards | which 6 projects | the first page of `consoleProjects.list` with `limit` 6, oldest first (the API's order) |
 
 ### Key invariants
@@ -298,16 +300,16 @@ No new operations. The shell calls existing `console` operations through `@orvan
 
 ### Security model
 
-The console is same origin with the API (spec 0002), and its session is the `HttpOnly` cookie that spec 0004 defines, so no token is ever readable by console code. The role helpers are presentation only: every permission is enforced by the API through `IConsoleAccess` (spec 0003), and the UI reflects `Org.role` so people are not offered actions they will be refused. The `redirect` parameter is checked as a same origin path, closing the open redirect. The CSP forbids scripts and styles from anywhere but the console's own files, forbids framing (clickjacking), and limits connections to the origin. The dev session exists only in the Vite dev server's proxy, reads an environment variable the AppHost sets only when you pass the fixtures switch, and relies on the API's rule that fixtures are refused outside `Test`. No personal data beyond what the API already returns is shown or stored.
+The console is same origin with the API (spec 0002), and its session is the `HttpOnly` cookie that spec 0004 defines, so no token is ever readable by console code. The role helpers are presentation only: every permission is enforced by the API through `IConsoleAccess` (spec 0003), and the UI reflects `Org.role` so people are not offered actions they will be refused. The `redirect` parameter is checked as a same origin path, closing the open redirect. The CSP forbids scripts and styles from anywhere but the console's own files, forbids framing (clickjacking), and limits connections to the origin. The dev session existed only in the Vite dev server's proxy, read an environment variable the AppHost set only when you passed the fixtures switch, and relied on the API's rule that fixtures are refused outside `Test`; row 8 removed it, so dev now uses a real console session. No personal data beyond what the API already returns is shown or stored.
 
 ### Configuration required
 
-- `OrvanoDev:Fixtures` (AppHost configuration, default `false`): pass `-- --OrvanoDev:Fixtures=true` to run `api` and `worker` in `Test` with `ORVANO_TEST_FIXTURES` pointing at `tests/scenarios/fixtures.yaml`, and to give the console `CONSOLE_DEV_SESSION`. Row 8 removes it.
-- `CONSOLE_DEV_SESSION` (Vite dev server only, never `ORVANO_*` so it stays outside the server's startup validation): when set, `vite.config.ts` appends `orvano_console=<value>` to the `Cookie` header of proxied `/v1/console` requests. Unset in every other setting.
+- `OrvanoDev:Fixtures` (AppHost configuration, default `false`): pass `-- --OrvanoDev:Fixtures=true` to run `api` and `worker` in `Test` with `ORVANO_TEST_FIXTURES` pointing at `tests/scenarios/fixtures.yaml`, and to give the console `CONSOLE_DEV_SESSION`. Row 8 removes it. **Removed by row 8** (spec 0004, see AC-25): the AppHost has no fixtures mode, and a fresh dev database starts with no account until you create the first admin at `/setup`.
+- `CONSOLE_DEV_SESSION` (Vite dev server only, never `ORVANO_*` so it stays outside the server's startup validation): when set, `vite.config.ts` appends `orvano_console=<value>` to the `Cookie` header of proxied `/v1/console` requests. Unset in every other setting. **Removed by row 8** with the switch above.
 
 ### Critical test scenarios
 
-- Happy path, end to end: compose profile `console`, fixture cookie, `/` → `/orgs` → org switcher to Fixtures → project switcher to Scenarios → overview, keyboard only, real API data; verifies **AC-10**, **AC-11**, **AC-12**, **AC-13**, **AC-14**, **AC-26**.
+- Happy path, end to end: compose profile `console`, signed in as the fixture console account (the fixture cookie before row 8), `/` → `/orgs` → org switcher to Fixtures → project switcher to Scenarios → overview, keyboard only, real API data; verifies **AC-10**, **AC-11**, **AC-12**, **AC-13**, **AC-14**, **AC-26**.
 - Session: with no cookie, `/projects/scenarios0000000000a` lands on `/sign-in?redirect=%2Fprojects%2Fscenarios0000000000a` after exactly one navigation, even though several calls fail with 401 together; `/sign-in?redirect=//evil.example` and `?redirect=https://evil.example` are ignored; verifies **AC-20**.
 - Provisioning: create a project through the API, open its URL at once, see "Setting up", then the overview without a reload; verifies **AC-18**.
 - Not found: open `/projects/zzzzzzzzzzzzzzzzzzzz` after storing it as the last project; see the in shell message, `orvano.lastProject` removed, `/` then goes to `/orgs`; verifies **AC-12**, **AC-19**.
@@ -323,7 +325,7 @@ The console is same origin with the API (spec 0002), and its session is the `Htt
 - Roles: in the catalog and unit tests, a viewer sees an owner only nav entry hidden and a developer action disabled with its reason announced; verifies **AC-22**.
 - Titles and focus: navigating by the switcher sets the title and moves focus to the `h1`; verifies **AC-23**.
 - Headers: `curl -I` in the production shape shows every header and cache rule; the end to end run records no `securitypolicyviolation` event; verifies **AC-24**.
-- Dev fixtures: with the switch, the dev console shows the Fixtures org; without it, the AppHost's resources and environments are unchanged; verifies **AC-25**.
+- Dev fixtures: with the switch, the dev console shows the Fixtures org; without it, the AppHost's resources and environments are unchanged; verifies **AC-25** (retired with the switch by row 8).
 - Tokens only: the color literal scan over `console/src` passes; verifies **AC-1**.
 
 ## Build plan
@@ -353,7 +355,7 @@ Tracer Bullet: task 1 is the thin thread (real tokens, one real component, the f
 - The density toggle doubles the visual matrix every component must be checked in.
 - Browser mode tests need Chromium in CI and run slower than jsdom tests.
 - The strict CSP may block a future library that injects styles or scripts; each exception costs a hash and a note.
-- Local dev fixtures mean dev runs the API in `Test` (contract checking on), which differs from a real Development run until row 8.
+- Local dev fixtures mean dev runs the API in `Test` (contract checking on), which differs from a real Development run until row 8. (Row 8 removed the fixtures mode, so dev now runs as a real Development install.)
 - Preferences stay in one browser and do not follow you to another device.
 - The switcher filters only the orgs and projects already loaded; on a very large install you may scroll before you find one.
 - `/orgs` makes one project request per org shown (up to 25), acceptable for typical installs, wasteful for very large ones.
@@ -367,7 +369,7 @@ Tracer Bullet: task 1 is the thin thread (real tokens, one real component, the f
 ## Follow-up
 
 - [ ] Row 7: fill the switcher footers ("Create org", "Create project"), the status panels' action slots (Retry provisioning, Restore, Retry purge), and add org Settings to `orgNav`, using the form and confirm dialog patterns from this spec.
-- [ ] Row 8: replace the session guard's probe with `consoleAccount.get` and add its session codes to the 401 handling; build the real `/sign-in` that honours `redirect`; add name, email, and Sign out to the account menu; remove the AppHost `OrvanoDev:Fixtures` switch and `CONSOLE_DEV_SESSION`.
+- [x] Row 8: replace the session guard's probe with `consoleAccount.get` and add its session codes to the 401 handling; build the real `/sign-in` that honours `redirect`; add name, email, and Sign out to the account menu; remove the AppHost `OrvanoDev:Fixtures` switch and `CONSOLE_DEV_SESSION`. Done in [spec 0004](../0004-app-user-auth/index.md) (see the note under AC-25).
 - [ ] Row 15: add Members to `orgNav`.
 - [ ] A command palette (`Ctrl+K`/`⌘K`) to jump to any org, project, or page, once there are enough pages to jump to.
 - [ ] A `q` search parameter on `consoleOrgs.list` and `consoleProjects.list`, when installs grow past a few hundred orgs or projects; the switcher then searches the server.

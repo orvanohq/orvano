@@ -454,15 +454,15 @@ Tracer Bullet: task 3 is the thin thread (sign up, sign in, get the current user
 - [ ] Row 14 (auth policies): make the token lifetimes, password rules, and limits per project settings; add failed attempt lockouts that resist lockout abuse, and a breached password check.
 - [ ] Row 10: add the per project "require verified email" switch (off by default) and email change with verification.
 - [ ] Row 10 (password reset): v0.1 has no password recovery, because it sends no email. Until row 10 ships, the only remedy for a forgotten password is for the developer to delete and recreate the user (server or console), which loses that user's ID. The v0.1 docs and release notes must say so.
-- [ ] Spec 0003: amend its `x-orvano-scope` sentence to the rule in *Scope rule amendment* (scope required exactly on `apiKey` operations).
+- [x] Spec 0003: amend its `x-orvano-scope` sentence to the rule in *Scope rule amendment* (scope required exactly on `apiKey` operations). Done in [spec 0003](../0003-platform-data-model/index.md) (*Scopes*).
 - [ ] Row 12: `account.delete` for users without a password needs a recent sign in check.
 - [ ] Row 38: build the durable audit log from the `auth.*` events (required for this GA feature before 1.0).
 - [ ] A later console row: console account self service (password change, sessions, deletion through `IConsoleAccountGuard`).
 - [x] Row 6 (installer): generate `ORVANO_MASTER_KEYS`, set `ORVANO_PUBLIC_URL`, and document key backup; the API now refuses to start without them. Done in [spec 0006](../0006-self-host-installer/index.md) (AC-5, AC-8, AC-15).
 - [ ] Row 11 (docs): a page on verifying Orvano tokens in your own server, including the 15 minute revocation window and `online: true`.
 - [ ] Before 1.0: an outside security review of `Orvano.Auth` and the SDK session code.
-- [ ] Spec 0001: mark its row 8 follow up item (auth wire formats) and its console session item done, pointing here.
-- [ ] Spec 0003: mark its follow up item on the console session format and CSRF rule done, pointing here; note the new `last_sign_in_at` column and the purge job's extra tables.
+- [x] Spec 0001: mark its row 8 follow up item (auth wire formats) and its console session item done, pointing here. Done in [spec 0001](../0001-api-contract-sdk-pipeline/index.md): both items ticked, and its *Auth wire formats* section now describes these formats (the temporary ones stay as history).
+- [x] Spec 0003: mark its follow up item on the console session format and CSRF rule done, pointing here; note the new `last_sign_in_at` column and the purge job's extra tables. Done in [spec 0003](../0003-platform-data-model/index.md) (data model, jobs, Follow-up).
 - [ ] Twelve Agent Skills installed for this row are not yet in any `AGENTS.md`: the .NET ones (`dotnet-cryptography`, `dotnet-api-security`, `dotnet-jwt-authentication`, `libsodium`) belong in `server/AGENTS.md`; the SDK ones (`jwt-validate`, `nextjs-authentication`, `flutter-security`, `managing-secure-storage`) in `sdks/AGENTS.md`; the general ones (`security-and-hardening`, `session-management`, `email-and-password-best-practices`, `owasp-top-10-testing`) in root `AGENTS.md`. The security scan rated `libsodium` medium risk and flagged one alert each on `owasp-top-10-testing` and `nextjs-authentication`; read them before relying on them.
 - [ ] Verify the current versions of NSec, `Microsoft.IdentityModel.JsonWebTokens`, `jose`, `dart_jsonwebtoken`, and `flutter_secure_storage` before the first build; these were not checked on the web.
 
