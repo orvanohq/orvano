@@ -14,19 +14,24 @@ import { SetupForm } from './-auth/auth-form'
 /**
  * The installer's setup link, `/setup#<token>` (spec 0006, AC-23). The token is read from the
  * fragment and the fragment removed from the address bar and history before anything renders, so
- * it never lingers there or reaches a server; it lives only in this route's context.
+ * it never lingers there or reaches a server; it lives only in memory and this route's context.
+ * Removing the fragment changes the location under the router, which then loads this route again;
+ * that second `beforeLoad` finds no fragment, so the token read first is kept, not replaced.
  */
+let capturedToken: string | undefined
+
 export const Route = createFileRoute('/setup')({
   beforeLoad: () => {
     const token = window.location.hash.slice(1)
     if (token !== '') {
+      capturedToken = token
       window.history.replaceState(
         window.history.state,
         '',
         window.location.pathname + window.location.search,
       )
     }
-    return { setupToken: token === '' ? undefined : token }
+    return { setupToken: capturedToken }
   },
   component: Setup,
 })
