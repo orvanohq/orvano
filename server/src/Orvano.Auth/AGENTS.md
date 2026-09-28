@@ -25,6 +25,7 @@ The Auth module (spec 0004): app users and console accounts, Argon2id password h
 - Secrets at rest go through `SecretBox` with associated data `<table>:<rowId>:<column>`: signing private keys and the current refresh token (`refresh_ciphertext`). Refresh lookups use only the SHA-256 of the token's secret (`refresh_hash`, and `previous_refresh_hash` for reuse detection).
 - Events (`AuthEvents`) carry IDs, changed field names, the end reason, and the actor. Never an email, name, password, token, hash, IP, or user agent.
 - Passwords are NFKC normalized by `Credentials` before hashing and checking; hashing and checking always use that form.
+- Pass `PasswordHasher` only a password that met the policy (the normalized form from `PasswordPolicy.TryNormalize`, empty when it failed). A failed one is checked against the dummy hash, which never hashes its input, and the hasher throws on anything longer than the policy allows.
 
 ## Gotchas
 

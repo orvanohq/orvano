@@ -55,6 +55,7 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 
 ## Gotchas
 
+- Every role refuses a request body over 1 MiB (`ServerRole.MaxRequestBodyBytes`) with 413 `invalid_request`. A route that needs more, such as an upload, raises the limit for itself (`IHttpMaxRequestBodySizeFeature`); never raise the server wide default.
 - Every event and job is written in the same transaction as the change it describes. Never write one outside that transaction.
 - Test only routes (`/v1/test/*`, `/v1/console/test/*`) exist only in `Test`, because `OrvanoModules` adds `TestingModule` only there.
 - In the `Test` environment a response that breaks the contract (extra, missing, or mistyped field, undeclared 2xx status, unnamed endpoint) becomes a 500 `contract_violation`. `ORVANO_TEST_FIXTURES` is refused outside `Test`.
