@@ -96,6 +96,29 @@ public class SetupTokenTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task GetSetup_allows_60_calls_a_minute_from_one_address_then_answers_429()
+    {
+        await using var database = await postgres.NewDatabaseAsync();
+        await database.MigrateAsync();
+        await using var api = await StartApiAsync(database, ("ORVANO_SETUP_TOKEN", Token));
+        using var http = api.Http();
+
+        for (var i = 0; i < 60; i++)
+        {
+            using var allowed = await http.GetAsync("/v1/console/install/setup", Ct);
+            Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        }
+
+        using var limited = await http.GetAsync("/v1/console/install/setup", Ct);
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
+        Assert.Equal("application/problem+json", limited.Content.Headers.ContentType?.MediaType);
+        var problem = await limited.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(Ct);
+        Assert.Equal("rate_limited", problem.GetProperty("code").GetString());
+        var retryAfter = int.Parse(Assert.Single(limited.Headers.GetValues("Retry-After")), System.Globalization.CultureInfo.InvariantCulture);
+        Assert.InRange(retryAfter, 1, 60);
+    }
+
+    [Fact]
     public async Task Setup_status_exits_1_when_the_api_does_not_answer()
     {
         await using var status = await OrvanoProcess.RunAsync(["setup-status"],

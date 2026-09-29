@@ -50,7 +50,7 @@ Run the host steps on a throwaway Linux server or VM (Ubuntu 24.04), or in a `do
 - [x] Start `api` in Production with no `ORVANO_SETUP_TOKEN` on an empty install → refuses to start with the "no admin yet" message; `ORVANO_SETUP_TOKEN=bad` → refuses in any environment → AC-21
 - [x] Sign up the first console account without the token, with a wrong one → 403 `setup_token_invalid`, nothing created; with the right one → install admin; a second sign up with the same token → `signup_closed` → AC-20 (server tests call `AdmitAsync` until console sign up exists)
 
-## Not built yet (owed)
+## First admin (console) and rate limit
 - [x] `/setup` removes the fragment before render, creates the first admin, redirects when setup is done, shows the invalid link message, passes axe; `/sign-in` shows the finish setup notice while `setupRequired` → AC-23 (task 7, needs spec 0004 task 8)
 - [x] 61st `getSetup` from one client IP within a minute → 429 `rate_limited` → AC-22 rate limit (deferred to spec 0004 task 1)
 

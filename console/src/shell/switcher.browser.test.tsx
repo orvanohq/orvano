@@ -112,6 +112,8 @@ async function renderSwitcher(overrides: Partial<ComponentProps<typeof Switcher>
 const search = () =>
   document.querySelector<HTMLInputElement>('input[aria-label="Search: Switch org"]')
 const options = () => [...document.querySelectorAll('[role=option]')]
+const highlighted = () =>
+  document.querySelector('[role=option][data-highlighted]')?.textContent ?? ''
 const optionNames = () => options().map((option) => option.textContent)
 const popupText = () => document.querySelector('[role=listbox]')?.parentElement?.textContent ?? ''
 const loadMoreButton = () =>
@@ -292,7 +294,12 @@ describe('Switcher keyboard and picking (AC-13)', () => {
     await userEvent.keyboard('{Enter}')
     await expect.poll(() => options().length).toBe(3)
 
-    await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}')
+    // Each key waits for the highlight to move: in CI a key sent while the popup settles was lost.
+    await userEvent.keyboard('{ArrowDown}')
+    await expect.poll(highlighted).toContain(orgs[0]?.name)
+    await userEvent.keyboard('{ArrowDown}')
+    await expect.poll(highlighted).toContain(orgs[1]?.name)
+    await userEvent.keyboard('{Enter}')
 
     await expect.poll(() => vi.mocked(props.onPick).mock.calls.length).toBe(1)
     expect(props.onPick).toHaveBeenCalledWith(orgs[1])
