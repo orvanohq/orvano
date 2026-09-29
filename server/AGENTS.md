@@ -64,6 +64,7 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 - In `Production`, `api` refuses to start while no install admin exists and `ORVANO_SETUP_TOKEN` is unset; a malformed token is refused in every environment (spec 0006, AC-21).
 - Every job handler must be idempotent, and no consumer may rely on event order. A consumer that throws is retried later through the `events.redispatch` job.
 - Consumers stay small and do no IO: a hanging consumer still stalls the dispatcher.
+- A console operation that must work without a session (sign up, sign in, `getSetup`, invitation preview) has to be listed in `ConsoleSessions.Open`, or it answers 401. The CSRF check still applies to it.
 - `orvano_app` never holds DDL rights. Only `migrate` and `worker` receive `ORVANO_DB_ADMIN_URL`.
 - Kernel services differ by role: `PublicUrl` and forwarded headers exist only in `api`, `SecretBox` only in `api` and `worker` (realtime never holds the master key). A module registers anything that needs them in `ConfigureApiServices`, never in `ConfigureServices`, or the other roles crash at startup in Development (the AppHost) while CI stays green. `Starts_every_long_running_role_in_Development_with_only_its_own_settings` in `tests/Orvano.Server.Tests/Hosting/OrvanoBinaryTests.cs` guards it.
 - Changing a platform table means a new SQL migration AND the matching EF model change, or the drift check fails in CI. A new module's `DbContext` must be added to the drift check's context list in `tests/Orvano.ModelDriftCheck/Program.cs`.

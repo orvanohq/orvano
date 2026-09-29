@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Auth module (spec 0004): app users and console accounts, Argon2id password hashes, sessions with rotating refresh tokens, and each project's ES256 signing keys. Console accounts are users of the reserved project `console`. Other modules reach it only through `Contracts/`; it reaches Platform only through `Orvano.Platform.Contracts` (`IApiKeyVerifier`, `IProjectDirectory`, `IConsoleSignupPolicy`, `IConsoleAccountCreated`).
+The Auth module (spec 0004): app users and console accounts, Argon2id password hashes, sessions with rotating refresh tokens, and each project's ES256 signing keys. Console accounts are users of the reserved project `console`. Other modules reach it only through `Contracts/`; it reaches Platform only through `Orvano.Platform.Contracts` (`IApiKeyVerifier`, `IProjectDirectory`, `IConsoleSignupPolicy`, `IConsoleAccountCreated`, `IInstallAdmins`). It also implements Platform's `IConsoleUserDirectory` (`Application/ConsoleUserDirectory.cs`), which names members, inviters, and key creators.
 
 ## Layout
 
@@ -40,6 +40,7 @@ The Auth module (spec 0004): app users and console accounts, Argon2id password h
 ## Related specs
 
 - [0004 App user sign up, sign in, and sessions](../../../docs/specs/0004-app-user-auth/index.md)
+- [0008 Console team members, invitations, and roles](../../../docs/specs/0008-console-team-members/index.md) (invited sign up, `ConsoleAccount.isInstallAdmin`)
 - [0002 Stack and architecture](../../../docs/specs/0002-stack-architecture/index.md) (module hooks, envelope encryption)
 
 _Drafted by /sync from the introducing change, worth a quick human pass._

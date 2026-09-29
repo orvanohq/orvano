@@ -8,9 +8,9 @@ The Platform module (spec 0003): install settings and admins, orgs, memberships,
 
 | Folder | Owns |
 |---|---|
-| `Contracts/` | The only public types: `IProjectDirectory`, `IApiKeyVerifier`, `IConsoleAccess`, `IConsoleSignupPolicy`, `IConsoleAccountCreated`, `IConsoleAccountGuard`, `IWebOriginPolicy` (the host's public CORS check) and their records |
-| `Domain/` | Business rules as plain types: project IDs, lifecycles, the permission matrix, the owner rule, key secrets, web origin patterns, platform identifiers, names |
-| `Application/` | Use cases (`OrgService`, `ProjectService`, `ApiKeyService`, `PlatformService`, `InstallService`, `ConsoleAccounts`, `PlatformDirectory`), `PlatformStore`, `Outcome`/`Failure`, `PlatformEvents` |
+| `Contracts/` | The only public types: `IProjectDirectory`, `IApiKeyVerifier`, `IConsoleAccess`, `IConsoleSignupPolicy`, `IConsoleAccountCreated`, `IConsoleAccountGuard`, `IWebOriginPolicy` (the host's public CORS check), `IConsoleUserDirectory` (console account names and emails, which Auth implements), `IInstallAdmins` (the install admin flag Auth reads) and their records |
+| `Domain/` | Business rules as plain types: project IDs, lifecycles, the permission matrix, the owner rule, key secrets, web origin patterns, platform identifiers, names, invite tokens and invitation lifetimes (`Invitations.cs`) |
+| `Application/` | Use cases (`OrgService`, `ProjectService`, `ApiKeyService`, `PlatformService`, `InstallService`, `ConsoleAccounts`, `PlatformDirectory`, `InvitationService`, `MemberService`), `PlatformStore`, `Outcome`/`Failure`, `PlatformEvents` |
 | `Data/PlatformDbContext.cs` | EF Core mapping of the `platform_` tables; internal, checked by the drift check |
 | `Endpoints/` | Thin console endpoints and the row to contract model mapping (`ApiMapping`) |
 | `Jobs/` | `platform.project.provision`, `platform.project.purge`, `platform.org.purge`, `platform.remove_memberships`, all on queue `platform` |
@@ -42,5 +42,6 @@ The Platform module (spec 0003): install settings and admins, orgs, memberships,
 ## Related specs
 
 - [0003 Platform data model](../../../docs/specs/0003-platform-data-model/index.md) (with `verify.md`)
+- [0008 Console team members, invitations, and roles](../../../docs/specs/0008-console-team-members/index.md) (invitations, members, the install admin flag)
 
 _Drafted by /sync from the introducing change, worth a quick human pass._
