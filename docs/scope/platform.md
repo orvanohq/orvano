@@ -29,7 +29,7 @@ Invite teammates into an org by email and give them roles (owner, developer, vie
    - [x] Member management: change role, remove, leave, list and revoke invitations, events, and the Pending invitations section (AC-4, 9 to 11, 18, 19)
    - [x] Names on keys, install admin flag, `/install`, and `/sign-up` (AC-12 to 14, 23 to 25)
    - [x] Quality and end to end: titles, catalog, keyboard scripts, axe, integration tests, the Playwright flow (AC-26, 27)
-- [ ] Verify it: `/check verify console team members & roles`
+- [x] Verify it: `/check verify console team members & roles`
 - [ ] Test it: `/test console team members & roles`
 Spec [0008](../specs/0008-console-team-members/index.md) (members, invitations, screens) · Spec [0003](../specs/0003-platform-data-model/index.md) (model) · code in `server/src/Orvano.Platform/`, `server/src/Orvano.Auth/`, `contract/platform/`, `console/`
 
