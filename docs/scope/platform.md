@@ -2,7 +2,7 @@
 
 Console accounts, teams, the CLI, docs, operations, and the road to 1.0. See [index.md](index.md) for the full plan.
 
-### 7. Console accounts, orgs & projects · in-progress
+### 7. Console accounts, orgs & projects · done
 The first console screens: an admin signs up, creates an org and a project, creates an API key, and registers a platform (web origin or app bundle ID). Part of the v0.1 thread.
 **Done when:** on a fresh install you can sign up, create an org and a project, create a scoped API key, and add a web and a Flutter platform.
 - [x] Design the console screens (spec): `/architect console accounts, orgs & projects`
@@ -10,8 +10,8 @@ The first console screens: an admin signs up, creates an org and a project, crea
    - [x] Backend: the Platform module, console operations in the contract, provision and purge jobs, API keys, platforms, events, and fixture projects and keys (spec 0003 row 7 tasks 1 to 6)
    - [x] Console thin thread: create org and project, the API keys page with the one time secret, the Platforms page, and the end to end journey (spec 0007 AC-1, 6, 11 to 15, 17 to 19, 23)
    - [x] Console complete: key delete, platform edit and delete, project and org settings, status panel actions, the Connect your app card, catalog and accessibility tests (spec 0007 AC-2 to 5, 7 to 10, 16, 20 to 22)
-- [ ] Verify it: `/check verify console accounts, orgs & projects`
-- [ ] Test it: `/test console accounts, orgs & projects`
+- [x] Verify it: `/check verify console accounts, orgs & projects`
+- [x] Test it: `/test console accounts, orgs & projects`
 Spec [0003](../specs/0003-platform-data-model/index.md) (model and API) · Spec [0007](../specs/0007-console-platform-screens/index.md) (console screens) · code in `server/src/Orvano.Platform/`, `contract/platform/`, `console/`
 
 ### 11. Docs site & quickstarts · needs a decision

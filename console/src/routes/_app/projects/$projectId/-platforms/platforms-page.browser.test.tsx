@@ -49,6 +49,148 @@ afterEach(() => {
   setMode('dark', 'compact')
 })
 
+describe('the Platforms table (AC-17)', () => {
+  it('has the Type, Name, Identifier, and Added columns, the type as a label', async () => {
+    await openPlatforms('owner')
+    const headers = [...document.querySelectorAll('thead th')].map((th) => th.textContent.trim())
+    expect(headers.slice(0, 4)).toEqual(['Type', 'Name', 'Identifier', 'Added'])
+    const android = [...document.querySelectorAll('tbody tr')].find((tr) =>
+      tr.textContent.includes('Android app'),
+    )
+    expect(android?.querySelector('td')?.textContent).toBe('Android')
+    expect(android?.querySelector('td svg')).not.toBeNull()
+  })
+
+  it('shows "No platforms yet" with Add platform on a new project', async () => {
+    seed('owner')
+    api.platforms = []
+    await renderApp(`/projects/${projectId}/platforms`)
+    await expect.poll(text).toContain('No platforms yet')
+    expect(document.querySelector('[data-slot=empty-action]')?.textContent).toBe('Add platform')
+  })
+})
+
+describe('adding a platform (AC-18, AC-19)', () => {
+  const posts = () =>
+    api.requests.filter(
+      (request) => request.method === 'POST' && request.path === '/v1/console/project/platforms',
+    )
+  const dialogText = () => document.querySelector('[role=dialog]')?.textContent ?? ''
+  const hint = () => document.getElementById('platform-identifier-hint')?.textContent
+  const label = () => document.querySelector('label[for=platform-identifier]')?.textContent
+  const submit = () =>
+    userEvent.click(document.querySelector('[role=dialog] button[type=submit]') ?? document.body)
+
+  async function openAdd() {
+    await openPlatforms('developer')
+    await userEvent.click(button('Add platform') ?? document.body)
+    await expect.poll(() => input('platform-name')).not.toBeNull()
+  }
+
+  async function chooseType(name: string) {
+    const option = () =>
+      [...document.querySelectorAll('[role=option]')].find((item) => item.textContent === name)
+    await userEvent.click(document.querySelector('#platform-type') ?? document.body)
+    await expect.poll(option).toBeDefined()
+    await userEvent.click(option() ?? document.body)
+    await expect.poll(() => document.querySelector('#platform-type')?.textContent).toContain(name)
+  }
+
+  it('starts on Web, asks for a hostname, and carries the Flutter note', async () => {
+    await openAdd()
+    expect(document.querySelector('#platform-type')?.textContent).toContain('Web')
+    expect(label()).toBe('Hostname')
+    expect(input('platform-identifier')?.placeholder).toBe('app.example.com')
+    expect(hint()).toContain('Scheme and port are ignored')
+    expect(dialogText()).toContain(
+      'Flutter apps: add one platform for each target you ship (Web, Android, iOS, and so on).',
+    )
+  })
+
+  it.each([
+    ['Android', 'Package name', 'com.example.app', 'applicationId'],
+    ['iOS', 'Bundle ID', 'com.example.app', 'Xcode'],
+    ['Windows', 'Label', 'My desktop app', "can't verify desktop apps"],
+  ])(
+    'changes the identifier label, placeholder, and hint for %s',
+    async (type, fieldLabel, placeholder, hintText) => {
+      await openAdd()
+      await chooseType(type)
+      expect(label()).toBe(fieldLabel)
+      expect(input('platform-identifier')?.placeholder).toBe(placeholder)
+      expect(hint()).toContain(hintText)
+    },
+  )
+
+  it('reduces a pasted URL to its lowercase hostname when the field loses focus', async () => {
+    await openAdd()
+    await userEvent.fill(
+      input('platform-identifier') ?? document.body,
+      'https://App.example.com:3000/login',
+    )
+    await userEvent.tab()
+    await expect.poll(() => input('platform-identifier')?.value).toBe('app.example.com')
+  })
+
+  it.each(['*', '*.com'])('refuses the web wildcard %s and sends nothing', async (identifier) => {
+    await openAdd()
+    await userEvent.fill(input('platform-name') ?? document.body, 'Everything')
+    await userEvent.fill(input('platform-identifier') ?? document.body, identifier)
+    await submit()
+    await expect
+      .poll(() => document.getElementById('platform-identifier-error')?.textContent)
+      .toBeTruthy()
+    expect(input('platform-identifier')?.getAttribute('aria-invalid')).toBe('true')
+    expect(posts()).toEqual([])
+  })
+
+  it('refuses an Android identifier that is not a package name', async () => {
+    await openAdd()
+    await chooseType('Android')
+    await userEvent.fill(input('platform-name') ?? document.body, 'Android app')
+    await userEvent.fill(input('platform-identifier') ?? document.body, 'not a package')
+    await submit()
+    await expect
+      .poll(() => document.getElementById('platform-identifier-error')?.textContent)
+      .toBe('Use a package name like com.example.app.')
+    expect(posts()).toEqual([])
+  })
+
+  it('adds an Android platform with the trimmed values and lists it', async () => {
+    await openAdd()
+    api.platforms = []
+    await chooseType('Android')
+    await userEvent.fill(input('platform-name') ?? document.body, '  Release  ')
+    await userEvent.fill(input('platform-identifier') ?? document.body, 'com.example.release')
+    await submit()
+    await expect.poll(text).toContain('Platform added')
+    expect(posts().map((request) => request.body)).toEqual([
+      { type: 'android', name: 'Release', identifier: 'com.example.release' },
+    ])
+    await expect.poll(() => document.querySelector('[data-slot=dialog-content]')).toBeNull()
+    await expect.poll(text).toContain('com.example.release')
+  })
+
+  it('shows a server refusal in the form alert and keeps the dialog open', async () => {
+    await openAdd()
+    api.failNext(
+      'POST',
+      /\/platforms$/,
+      400,
+      'validation_failed',
+      'This project already has that platform.',
+    )
+    await userEvent.fill(input('platform-name') ?? document.body, 'Web again')
+    await userEvent.fill(input('platform-identifier') ?? document.body, 'app.example.com')
+    await submit()
+    await expect
+      .poll(() => document.querySelector('[role=dialog] [role=alert]')?.textContent)
+      .toContain('This project already has that platform.')
+    expect(dialogText()).toContain("Couldn't add the platform")
+    expect(input('platform-name')?.value).toBe('Web again')
+  })
+})
+
 describe('editing a platform (AC-20)', () => {
   it('opens the form filled in, with the type as read only text', async () => {
     await openPlatforms('developer')
