@@ -4,6 +4,11 @@
 {
 	# The Let's Encrypt account email, written at start by entrypoint.sh (spec 0006, AC-7).
 	import /etc/caddy/global.caddy
+
+	# Let's Encrypt only (spec 0006, AC-1). Caddy's default adds ZeroSSL as a fallback CA.
+	cert_issuer acme {
+		dir https://acme-v02.api.letsencrypt.org/directory
+	}
 }
 
 {$ORVANO_PUBLIC_URL} {
