@@ -50,7 +50,7 @@ Every product feature ships in all of these layers in the same version, unless i
 | 4 | API contract & SDK pipeline | Foundation | done |
 | 5 | Design system & console shell | Foundation | done |
 | 6 | Self host installer | Foundation | in-progress |
-| 7 | Console accounts, orgs & projects | v0.1 | in-progress |
+| 7 | Console accounts, orgs & projects | v0.1 | done |
 | 8 | App user sign up & sign in | v0.1 | done |
 | 9 | Transactional email | v0.2 | planned |
 | 10 | Email verification, recovery & passwordless | v0.2 | planned |

@@ -13,6 +13,18 @@ import type { OrgRole, ProjectStatus } from '@orvano/console-client'
 const api: FakeApi = installFakeApi()
 const orgId = 'org00000000000000001'
 
+// Holds the org's project list while `projectsHeld` is set, to see Delete org before its check ran.
+// Installed before the app loads, so the console client picks it up.
+let projectsHeld: Promise<void> | null = null
+const fakeFetch = globalThis.fetch
+globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  const url = new URL(input instanceof Request ? input.url : String(input), window.location.href)
+  if (projectsHeld !== null && /^\/v1\/console\/orgs\/[^/]+\/projects$/.test(url.pathname)) {
+    await projectsHeld
+  }
+  return fakeFetch(input, init)
+}
+
 function seed(role: OrgRole, projects: ProjectStatus[] = []) {
   api.orgs = [makeOrg({ id: orgId, role })]
   api.projects = projects.map((status, i) =>
@@ -82,6 +94,22 @@ describe('renaming the org (AC-3)', () => {
 })
 
 describe('deleting the org (AC-4)', () => {
+  it('says "Checking projects…" until the first page of projects has loaded', async () => {
+    let release: (() => void) | undefined
+    projectsHeld = new Promise((resolve) => {
+      release = resolve
+    })
+    try {
+      await openSettings('owner', ['active'])
+      await expect.poll(() => reason(button('Delete org')[0])).toBe('Checking projects…')
+      expect(button('Delete org')[0]?.getAttribute('aria-disabled')).toBe('true')
+    } finally {
+      release?.()
+      projectsHeld = null
+    }
+    await expect.poll(() => reason(button('Delete org')[0])).toBe('Delete its projects first')
+  })
+
   it('is blocked while a project is live', async () => {
     await openSettings('owner', ['active', 'deleting'])
     await expect.poll(() => reason(button('Delete org')[0])).toBe('Delete its projects first')

@@ -13,6 +13,16 @@ const api: FakeApi = installFakeApi()
 const orgId = 'org00000000000000001'
 const projectId = 'proj0000000000000001'
 
+// Holds Retry setup's request while `retryHeld` is set, to see the button while it is pending.
+// Installed before the app loads, so the console client picks it up.
+let retryHeld: Promise<void> | null = null
+const fakeFetch = globalThis.fetch
+globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  const url = input instanceof Request ? input.url : String(input)
+  if (retryHeld !== null && url.endsWith('/retry-provisioning')) await retryHeld
+  return fakeFetch(input, init)
+}
+
 function seed(role: OrgRole, project: Partial<Project> = {}, orgStatus: OrgStatus = 'active') {
   api.orgs = [makeOrg({ id: orgId, role, status: orgStatus })]
   api.projects = [makeProject({ id: projectId, orgId, ...project })]
@@ -146,6 +156,27 @@ describe('status panel actions (AC-9)', () => {
     expect(sent('POST')).toEqual(['/v1/console/project/retry-provisioning'])
   })
 
+  it('shows a spinner and aria-busy on Retry setup while it is pending, and sends once', async () => {
+    let release: (() => void) | undefined
+    retryHeld = new Promise((resolve) => {
+      release = resolve
+    })
+    try {
+      seed('owner', { status: 'failed' })
+      await renderApp(`/projects/${projectId}`)
+      await expect.poll(heading).toBe('Setup failed')
+      await expect.poll(() => button('Retry setup')).toBeDefined()
+      await userEvent.dblClick(button('Retry setup') ?? document.body)
+      await expect.poll(() => button('Retry setup')?.getAttribute('aria-busy')).toBe('true')
+      expect(button('Retry setup')?.querySelector('.animate-spin')).not.toBeNull()
+    } finally {
+      release?.()
+      retryHeld = null
+    }
+    await expect.poll(heading).toBe('Setting up')
+    expect(sent('POST')).toEqual(['/v1/console/project/retry-provisioning'])
+  })
+
   it('disables Retry setup for a viewer', async () => {
     seed('viewer', { status: 'failed' })
     await renderApp(`/projects/${projectId}`)
@@ -159,6 +190,32 @@ describe('status panel actions (AC-9)', () => {
     await expect.poll(heading).toBe('Being deleted')
     await expect.poll(() => reason(button('Restore project'))).toBe('Restore the org first')
   })
+
+  it.each([
+    ['enables Restore when its org is active, after visiting a deleting org', 'active', 'deleting'],
+    [
+      'disables Restore when its org is deleting, after visiting an active org',
+      'deleting',
+      'active',
+    ],
+  ] as const)(
+    "%s: it reads the project's own org (Value sourcing: Restore project enabled)",
+    async (_, ownStatus, visitedStatus) => {
+      const otherOrg = 'orgother000000000002'
+      seed('owner', { status: 'deleting', purgeAfter: '2026-07-01T10:00:00.000Z' }, ownStatus)
+      api.orgs.push(makeOrg({ id: otherOrg, name: 'Other', status: visitedStatus }))
+      const { router } = await renderApp(`/orgs/${otherOrg}`)
+      await expect.poll(heading).toBe('Projects')
+      await router.navigate({ to: '/projects/$projectId', params: { projectId } })
+      await expect.poll(heading).toBe('Being deleted')
+      await expect.poll(() => button('Restore project')).toBeDefined()
+      if (ownStatus === 'active') {
+        await expect.poll(() => button('Restore project')?.getAttribute('aria-disabled')).toBeNull()
+      } else {
+        await expect.poll(() => reason(button('Restore project'))).toBe('Restore the org first')
+      }
+    },
+  )
 
   it('retries a failed purge and clears the failure note', async () => {
     seed('owner', {
