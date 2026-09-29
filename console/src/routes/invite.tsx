@@ -18,14 +18,18 @@ import { InviteView, type InviteState } from './-invite/invite-view'
  * fragment and the fragment removed from the address bar and history before anything renders, so it
  * never lingers there or reaches a server. It lives only in this module and the route context; no
  * query key, cache entry, or URL carries it. The router loads the route again after the fragment is
- * removed, and that second `beforeLoad` keeps the token read first.
+ * removed, and that second `beforeLoad` keeps the token read first. A new link pasted into an open
+ * tab (a fragment only change) bumps `tokenGeneration`, which the preview key carries instead of the
+ * token, so the page previews the new link.
  */
 let capturedToken: string | undefined
+let tokenGeneration = 0
 
 export const Route = createFileRoute('/invite')({
   beforeLoad: () => {
     const token = window.location.hash.slice(1)
     if (token !== '') {
+      if (token !== capturedToken) tokenGeneration += 1
       capturedToken = token
       window.history.replaceState(
         window.history.state,
@@ -33,7 +37,7 @@ export const Route = createFileRoute('/invite')({
         window.location.pathname + window.location.search,
       )
     }
-    return { inviteToken: capturedToken }
+    return { inviteToken: capturedToken, inviteGeneration: tokenGeneration }
   },
   component: InvitePage,
 })
@@ -44,14 +48,14 @@ export const Route = createFileRoute('/invite')({
  * "signed out" here and never redirects to sign in.
  */
 function InvitePage() {
-  const { inviteToken } = Route.useRouteContext()
+  const { inviteToken, inviteGeneration } = Route.useRouteContext()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   // Bumped after the cache is cleared in place (sign in, sign out), so the queries load again.
   const [, setEpoch] = useState(0)
 
   const preview = useQuery({
-    queryKey: keys.invitationPreview,
+    queryKey: [...keys.invitationPreview, inviteGeneration],
     queryFn: ({ signal }) =>
       consoleApi().consoleInvitations.preview({ token: inviteToken ?? '' }, { signal }),
     enabled: inviteToken !== undefined,

@@ -48,7 +48,8 @@ test('Comfortable density grows controls and rows, and survives a reload (AC-3)'
   await page.goto(`/orgs`)
   await page.getByRole('combobox', { name: /^Switch org/ }).click()
   await page.getByRole('option', { name: /Fixtures/ }).click()
-  const row = page.locator('tbody tr').first()
+  // A loaded row, not a skeleton: the table keys rows by id, so the skeleton rows are replaced.
+  const row = page.locator('tbody tr').filter({ hasText: 'Scenarios' }).first()
   await expect(row).toBeVisible()
   expect((await row.boundingBox())?.height).toBe(36)
   await page.getByRole('button', { name: 'Account menu' }).click()

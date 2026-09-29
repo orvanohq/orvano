@@ -59,8 +59,9 @@ export function ChangeRoleDialog({
         <DialogHeader>
           <DialogTitle>Change role</DialogTitle>
           <DialogDescription>
-            {isSelf ? 'Your role' : `The role of ${memberName(member)}`} in this org. It takes
-            effect on the next thing they do.
+            {isSelf
+              ? 'Your role in this org. It takes effect on the next thing you do.'
+              : `The role of ${memberName(member)} in this org. It takes effect on the next thing they do.`}
           </DialogDescription>
         </DialogHeader>
         <form

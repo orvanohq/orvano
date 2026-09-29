@@ -96,6 +96,19 @@ describe('the token (AC-20)', () => {
     await userEvent.click(button('Retry') ?? document.body)
     await expect.poll(text).toContain('invited you to join')
   })
+
+  it('previews a second link pasted into the open tab', async () => {
+    const { router } = await openInvite()
+    await expect.poll(text).toContain('invited you to join Acme')
+    api.preview = { ...preview, orgId: 'orgi0000000000000002', orgName: 'Globex' }
+    const second = 'secondSecondSecondSecondSecondSecondSecon0'
+    // The test router's history is in memory; the browser's would load the route again on popstate.
+    window.history.replaceState(null, '', `/invite#${second}`)
+    await router.invalidate()
+    await expect.poll(text).toContain('invited you to join Globex')
+    expect(window.location.hash).toBe('')
+    expect(sent('POST', '/v1/console/invitations/preview').at(-1)?.body).toEqual({ token: second })
+  })
 })
 
 describe('signed out (AC-22)', () => {

@@ -71,6 +71,9 @@ test('an owner invites a teammate, changes their role, and removes them', async 
   const confirm = owner.getByRole('alertdialog')
   await expect(confirm).toContainText(`Remove ${local} from Fixtures?`)
   await confirm.getByRole('button', { name: 'Remove member' }).click()
+  // The confirm closes once the DELETE has finished; while it is open the table is aria-hidden, so
+  // the row count would reach 0 early and the teammate could visit before the removal commits.
+  await expect(confirm).toBeHidden()
   await expect(owner.getByRole('row', { name: new RegExp(local) })).toHaveCount(0)
 
   await teammate.goto(`/orgs/${orgId}`)
