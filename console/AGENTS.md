@@ -26,6 +26,8 @@ The Orvano console: a React SPA built with Vite and served as static files by Ca
 | `src/components/ui/` | shadcn components (Base UI flavor) restyled to the tokens; `keyboard-scripts.ts` is each component's keyboard test as data |
 | `src/shell/` | Top bar, org and project switchers, sidebar, status and error panels; `nav.ts` is the only place sidebar entries are declared; `page-heading.tsx` renders every page's `h1` |
 | `src/lib/` | `console-client.ts` (the one client, plus `projectClient(id)`), `session.ts` (`redirectToSignIn` and the error codes that mean no usable session), preferences, roles, toast helpers |
+| `src/lib/state-moved.ts` | `useStateMoved`: an org or project action answered 409 `project_not_ready`/`org_not_active` or 404 shows an error toast and refetches (spec 0007, AC-10); route every org and project mutation's failure through it |
+| `src/test/app.tsx`, `src/test/fake-api.ts` | Page tests: `renderApp(url)` renders the whole console against an in memory API that records every request |
 | `src/dev/` | The `/dev/components` catalog; dev only, never in the production build |
 | `public/theme-init.js` | Sets `data-theme` and `data-density` before first paint; a classic script so the CSP needs no hash |
 | `e2e/` | Playwright tests against the gateway on `:8081` |
@@ -63,6 +65,8 @@ pnpm --filter @orvano/console test:e2e
 
 - The console is always same origin as the API (Vite proxy in dev, Caddy in production), so there is no CORS. Routing bugs that differ between the two only show up in the compose check.
 - The production CSP allows scripts and styles only from the console's own files: no inline script, and no library that injects a `<style>` element (why the toast is Base UI's, not sonner). An exception is a hash plus a note in `design.md`.
+- `main.tsx` imports `@/lib/zod-config` first: it sets Zod's `jitless`, so building a schema never probes `new Function`, which the CSP reports as a violation. Keep it the first import.
+- In a page test, call `installFakeApi()` at the top of the file and load app modules only dynamically after it (as `renderApp` does): the console client keeps the `fetch` it finds when it loads. Seed IDs the fake never generates (not `org000…1` or `proj000…1`), and find dialogs by `[data-slot=dialog-content]`, since Base UI toasts are `role=dialog` too.
 - `/dev/components` exists only in dev, and the production build must not contain the string `orvano-dev-catalog` (an e2e test checks it), so never import `src/dev/` statically.
 - A fresh dev database has no console account: open `/setup` on the console dev server to create the first admin (the AppHost sets no setup token, so none is asked), then sign in as usual.
 
@@ -88,5 +92,6 @@ Declined: Base UI MCP, a11y MCP `ronantakizawa/a11ymcp`
 - [0002 Stack and architecture](../docs/specs/0002-stack-architecture/index.md) (console, request routing)
 - [0005 Console design system and shell](../docs/specs/0005-console-design-system-shell/index.md) (tokens, components, shell, security headers, tests)
 - [0004 App user sign up, sign in, and sessions](../docs/specs/0004-app-user-auth/index.md) (console sessions, the CSRF rule, the Users page)
+- [0007 Console screens for orgs, projects, API keys, and platforms](../docs/specs/0007-console-platform-screens/index.md) (create, rename, delete, and restore flows, the one time key secret, platform identifiers)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
