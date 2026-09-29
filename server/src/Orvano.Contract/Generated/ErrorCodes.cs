@@ -4,6 +4,9 @@ namespace Orvano.Contract;
 /// <summary>Every stable error code the server sends in <c>Problem.code</c>.</summary>
 public static class ErrorCode
 {
+    /// <summary>The <c>already_member</c> error code.</summary>
+    public const string AlreadyMember = "already_member";
+
     /// <summary>The <c>console_session_required</c> error code.</summary>
     public const string ConsoleSessionRequired = "console_session_required";
 
@@ -42,6 +45,18 @@ public static class ErrorCode
 
     /// <summary>The <c>invalid_token</c> error code.</summary>
     public const string InvalidToken = "invalid_token";
+
+    /// <summary>The <c>invitation_email_mismatch</c> error code.</summary>
+    public const string InvitationEmailMismatch = "invitation_email_mismatch";
+
+    /// <summary>The <c>invitation_expired</c> error code.</summary>
+    public const string InvitationExpired = "invitation_expired";
+
+    /// <summary>The <c>invitation_limit</c> error code.</summary>
+    public const string InvitationLimit = "invitation_limit";
+
+    /// <summary>The <c>invitation_not_found</c> error code.</summary>
+    public const string InvitationNotFound = "invitation_not_found";
 
     /// <summary>The <c>last_owner</c> error code.</summary>
     public const string LastOwner = "last_owner";

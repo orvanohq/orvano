@@ -509,7 +509,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/User"
+                  "$ref": "#/components/schemas/ConsoleAccount"
                 }
               }
             }
@@ -551,7 +551,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/User"
+                  "$ref": "#/components/schemas/ConsoleAccount"
                 }
               }
             }
@@ -590,7 +590,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/User"
+                  "$ref": "#/components/schemas/ConsoleAccount"
                 }
               }
             }
@@ -793,6 +793,99 @@
           "console"
         ],
         "x-orvano-service": "consoleInstall",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/invitations/accept": {
+      "post": {
+        "operationId": "consoleInvitations.accept",
+        "description": "Joins the org with the signed in console account, whose email must be the invitation's (ignoring case), and\nuses the invitation up. A member already in the org keeps their role.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedInvitation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationTokenRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleInvitations",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/invitations/preview": {
+      "post": {
+        "operationId": "consoleInvitations.preview",
+        "description": "Shows what an invite link is for. Needs no console session, only the token. Fails with\n`invitation_not_found` for a used, replaced, or revoked link, and `invitation_expired` after it expired.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationPreview"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationTokenRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "consoleInvitations",
         "x-orvano-audience": "console"
       }
     },
@@ -1054,6 +1147,371 @@
           }
         ],
         "x-orvano-service": "consoleOrgs",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/orgs/{orgId}/invitations": {
+      "get": {
+        "operationId": "consoleInvitations.list",
+        "description": "Lists the org's invitations, pending and expired, oldest first. Owners only.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "description": "The org ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Invitations per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleInvitations",
+        "x-orvano-audience": "console"
+      },
+      "post": {
+        "operationId": "consoleInvitations.create",
+        "description": "Invites an email to the org with a role and returns the link to share, once. Owners only. Inviting an email\nagain replaces its old invitation, whose link stops working. Fails with `already_member` when that email's\nconsole account is already a member, and `invitation_limit` past 100 invitations.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "description": "The org ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedInvitation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvitationRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleInvitations",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/orgs/{orgId}/invitations/{invitationId}": {
+      "delete": {
+        "operationId": "consoleInvitations.revoke",
+        "description": "Revokes an invitation, so its link stops working at once. Owners only.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "description": "The org ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invitationId",
+            "in": "path",
+            "required": true,
+            "description": "The invitation ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleInvitations",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/orgs/{orgId}/members": {
+      "get": {
+        "operationId": "consoleMembers.list",
+        "description": "Lists the org's members, oldest first. Any member.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "description": "The org ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Members per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleMembers",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/orgs/{orgId}/members/{userId}": {
+      "patch": {
+        "operationId": "consoleMembers.update",
+        "description": "Changes a member's role. Owners only. Fails with `last_owner` when it would demote the org's last owner.\nTakes effect on the member's next request.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "description": "The org ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The member's console user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Member"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemberRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleMembers",
+        "x-orvano-audience": "console"
+      },
+      "delete": {
+        "operationId": "consoleMembers.remove",
+        "description": "Removes a member from the org, or lets a member leave when `userId` is their own. Owners remove anyone; every\nmember may leave. Fails with `last_owner` when it would leave the org without an owner. The member's access\nends on their next request; API keys they created keep working.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "description": "The org ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The member's console user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleMembers",
         "x-orvano-audience": "console"
       }
     },
@@ -3168,6 +3626,24 @@
   },
   "components": {
     "schemas": {
+      "AcceptedInvitation": {
+        "type": "object",
+        "required": [
+          "org",
+          "alreadyMember"
+        ],
+        "properties": {
+          "org": {
+            "$ref": "#/components/schemas/Org",
+            "description": "The org, with the caller's role in it."
+          },
+          "alreadyMember": {
+            "type": "boolean",
+            "description": "True when the caller was already a member; their role did not change."
+          }
+        },
+        "description": "The org an accepted invitation joined."
+      },
       "ApiKey": {
         "type": "object",
         "required": [
@@ -3178,6 +3654,7 @@
           "expiresAt",
           "lastUsedAt",
           "createdByUserId",
+          "createdBy",
           "createdAt"
         ],
         "properties": {
@@ -3239,6 +3716,17 @@
             "examples": [
               "01924f5e-6b0a-7f2e-8c01-1b2c3d4e5f60"
             ]
+          },
+          "createdBy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsoleUserRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The console user who created the key, with their name and email; null when that account no longer exists."
           },
           "createdAt": {
             "type": "string",
@@ -3302,6 +3790,98 @@
         },
         "description": "A signed in user and their new session."
       },
+      "ConsoleAccount": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "emailVerified",
+          "name",
+          "status",
+          "metadata",
+          "createdAt",
+          "lastSignInAt",
+          "isInstallAdmin"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The user ID.",
+            "examples": [
+              "01924f5e-8d2b-7c4d-8e21-3d5e6f7a8b9c"
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The email, as typed at sign up; null for a user without one.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Whether the email has been verified.",
+            "examples": [
+              false
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The display name; null when none was given.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/UserStatus",
+            "description": "Whether the user may sign in."
+          },
+          "metadata": {
+            "type": "object",
+            "unevaluatedProperties": {},
+            "description": "Your own data about the user: a JSON object of at most 16 KB."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the user signed up."
+          },
+          "lastSignInAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the user last signed in; null if never."
+          },
+          "isInstallAdmin": {
+            "type": "boolean",
+            "description": "True when the account is an install admin, who may change the install settings.",
+            "examples": [
+              false
+            ]
+          }
+        },
+        "description": "A console account: a user of the console, and whether it is an install admin."
+      },
       "ConsoleSignupMode": {
         "type": "string",
         "enum": [
@@ -3309,6 +3889,45 @@
           "open"
         ],
         "description": "Who may create a console account."
+      },
+      "ConsoleUserRef": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The console user ID.",
+            "examples": [
+              "01924f5e-6b0a-7f2e-8c01-1b2c3d4e5f60"
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The display name; null when none was given.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "description": "The email.",
+            "examples": [
+              "ada@example.com"
+            ]
+          }
+        },
+        "description": "A console account and the name and email it goes by, for showing who did something."
       },
       "CreateAccountRequest": {
         "type": "object",
@@ -3428,7 +4047,7 @@
                 "type": "null"
               }
             ],
-            "description": "The token of the invitation this sign up came from, if any."
+            "description": "The token of the invitation this sign up came from, if any. The account then joins the invitation's org with\nits role, whatever the sign up mode; the email must be the invitation's."
           },
           "setupToken": {
             "anyOf": [
@@ -3467,6 +4086,27 @@
           }
         },
         "description": "A console sign in with an email and password."
+      },
+      "CreateInvitationRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "role"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email to invite; trimmed, at most 320 characters. Inviting an email again replaces its old invitation.",
+            "examples": [
+              "grace@example.com"
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/OrgRole",
+            "description": "The role the invitation grants."
+          }
+        },
+        "description": "A new invitation."
       },
       "CreateOrgRequest": {
         "type": "object",
@@ -3612,6 +4252,27 @@
         },
         "description": "A new API key with its secret. The secret is shown only here, once."
       },
+      "CreatedInvitation": {
+        "type": "object",
+        "required": [
+          "invitation",
+          "url"
+        ],
+        "properties": {
+          "invitation": {
+            "$ref": "#/components/schemas/Invitation",
+            "description": "The invitation."
+          },
+          "url": {
+            "type": "string",
+            "description": "The link to share with the invited person. Anyone holding it can see the invitation until it is used or expires.",
+            "examples": [
+              "https://orvano.example.com/invite#Xy3aBcD4eF5gH6iJ7kL8mN9oP0qR1sT2uV3wX4yZ5a"
+            ]
+          }
+        },
+        "description": "A new invitation and its link. The link is shown only here, once."
+      },
       "DeleteAccountRequest": {
         "type": "object",
         "required": [
@@ -3659,6 +4320,11 @@
           "user_not_found",
           "session_not_found",
           "user_already_exists",
+          "invitation_not_found",
+          "invitation_expired",
+          "invitation_email_mismatch",
+          "already_member",
+          "invitation_limit",
           "rate_limited",
           "server_busy"
         ],
@@ -3710,7 +4376,8 @@
       "InstallSetup": {
         "type": "object",
         "required": [
-          "setupRequired"
+          "setupRequired",
+          "signupOpen"
         ],
         "properties": {
           "setupRequired": {
@@ -3719,9 +4386,184 @@
             "examples": [
               true
             ]
+          },
+          "signupOpen": {
+            "type": "boolean",
+            "description": "True when anyone who can reach the console may create an account (`consoleSignup` is `open`).",
+            "examples": [
+              false
+            ]
           }
         },
         "description": "Whether the install still waits for its first admin."
+      },
+      "Invitation": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "role",
+          "invitedBy",
+          "status",
+          "expiresAt",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The invitation ID.",
+            "examples": [
+              "01924f5e-9e3c-7d5e-9f32-4e6f7a8b9c0d"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "description": "The email the invitation is for, as typed. Only a console account with this email, ignoring case, can use it.",
+            "examples": [
+              "grace@example.com"
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/OrgRole",
+            "description": "The role the invitation grants."
+          },
+          "invitedBy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsoleUserRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The owner who created it; null when that console account no longer exists."
+          },
+          "status": {
+            "$ref": "#/components/schemas/InvitationStatus",
+            "description": "Whether it can still be accepted."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the invitation stops working, 7 days after it was created."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the invitation was created."
+          }
+        },
+        "description": "An invitation to join an org. Its link is shown only once, when it is created."
+      },
+      "InvitationPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Invitation"
+            },
+            "description": "The invitations on this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass it as `cursor` to get the next page; null on the last page."
+          }
+        },
+        "description": "One page of an org's invitations, oldest first."
+      },
+      "InvitationPreview": {
+        "type": "object",
+        "required": [
+          "orgId",
+          "orgName",
+          "role",
+          "email",
+          "invitedByName",
+          "expiresAt"
+        ],
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "description": "The org's ID.",
+            "examples": [
+              "01924f5e-7c1a-7a3b-9f10-2c4d5e6f7a8b"
+            ]
+          },
+          "orgName": {
+            "type": "string",
+            "description": "The org's name.",
+            "examples": [
+              "Acme"
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/OrgRole",
+            "description": "The role the invitation grants."
+          },
+          "email": {
+            "type": "string",
+            "description": "The email the invitation is for.",
+            "examples": [
+              "grace@example.com"
+            ]
+          },
+          "invitedByName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The inviter's name, else their email; null when that console account no longer exists.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the invitation stops working."
+          }
+        },
+        "description": "What an invite link is for, shown before joining."
+      },
+      "InvitationStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "expired"
+        ],
+        "description": "Whether an invitation can still be accepted."
+      },
+      "InvitationTokenRequest": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The token: 43 base64url characters.",
+            "examples": [
+              "Xy3aBcD4eF5gH6iJ7kL8mN9oP0qR1sT2uV3wX4yZ5a"
+            ]
+          }
+        },
+        "description": "An invitation token, from the fragment of an invite link."
       },
       "Jwk": {
         "type": "object",
@@ -3802,6 +4644,97 @@
           }
         },
         "description": "A project's public signing keys: the active key and any key retired within the last 24 hours."
+      },
+      "Member": {
+        "type": "object",
+        "required": [
+          "userId",
+          "name",
+          "email",
+          "status",
+          "role",
+          "joinedAt"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "The member's console user ID.",
+            "examples": [
+              "01924f5e-6b0a-7f2e-8c01-1b2c3d4e5f60"
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The display name; null when none was given.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "description": "The email.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemberStatus",
+            "description": "Whether the member's account may sign in."
+          },
+          "role": {
+            "$ref": "#/components/schemas/OrgRole",
+            "description": "The member's role in this org."
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the member joined the org."
+          }
+        },
+        "description": "A member of an org."
+      },
+      "MemberPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            },
+            "description": "The members on this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass it as `cursor` to get the next page; null on the last page."
+          }
+        },
+        "description": "One page of an org's members, oldest first. A member whose console account no longer exists is left out, so a\npage can hold fewer items than the limit, even none, while `nextCursor` is still set."
+      },
+      "MemberStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "blocked"
+        ],
+        "description": "Whether a member's console account may sign in."
       },
       "OpenIdConfiguration": {
         "type": "object",
@@ -4602,6 +5535,19 @@
           }
         },
         "description": "Changes to the install settings."
+      },
+      "UpdateMemberRequest": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/OrgRole",
+            "description": "The member's new role."
+          }
+        },
+        "description": "Changes to a member."
       },
       "UpdateOrgRequest": {
         "type": "object",

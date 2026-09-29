@@ -17,8 +17,8 @@ internal static class OrgJobs
 
     /// <summary>
     /// Locks the org, and does nothing unless it is still <c>deleting</c> and due. While project rows of the org remain,
-    /// it enqueues itself again at their latest <c>purge_after</c> plus a minute; otherwise it deletes the memberships and
-    /// the org.
+    /// it enqueues itself again at their latest <c>purge_after</c> plus a minute; otherwise it deletes the invitations,
+    /// the memberships, and the org.
     /// </summary>
     public static async Task PurgeOrgAsync(JobContext job, CancellationToken ct)
     {
@@ -45,6 +45,8 @@ internal static class OrgJobs
                 return new Done();
             }
 
+            // Invitations reference the org, so they go first (spec 0008, retention); no revoked events, the org purge says it.
+            await uow.Db.Invitations.Where(i => i.OrgId == orgId).ExecuteDeleteAsync(ct);
             await uow.Db.Memberships.Where(m => m.OrgId == orgId).ExecuteDeleteAsync(ct);
             await uow.Db.Orgs.Where(o => o.Id == orgId).ExecuteDeleteAsync(ct);
             await PlatformEvents.WriteAsync(uow.Tx, PlatformEvents.OrgPurged, Actor.System, orgId.ToString(), OrgService.Ids(orgId), ct: ct);

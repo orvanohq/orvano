@@ -14,8 +14,8 @@ import {
 } from '@/test/fake-api'
 import type { OrgRole } from '@orvano/console-client'
 
-// Spec 0007, AC-12, AC-16, AC-22: the keys table and its Created by column, who may delete which
-// key, and the page's accessibility.
+// Spec 0007, AC-12, AC-16, AC-22: the keys table and its Created by column (named since spec 0008,
+// AC-25), who may delete which key, and the page's accessibility.
 
 const api: FakeApi = installFakeApi()
 const projectId = 'proj0000000000000001'
@@ -31,6 +31,21 @@ function seed(role: OrgRole) {
       name: 'Theirs',
       prefix: 'orv_their000',
       createdByUserId: teammate,
+      createdBy: { id: teammate, name: 'Grace Hopper', email: 'grace@example.com' },
+    }),
+    makeKey({
+      id: 'key00000000000000003',
+      name: 'Unnamed',
+      prefix: 'orv_unnamed0',
+      createdByUserId: 'user00000000000000003',
+      createdBy: { id: 'user00000000000000003', name: null, email: 'linus@example.com' },
+    }),
+    makeKey({
+      id: 'key00000000000000004',
+      name: 'Orphan',
+      prefix: 'orv_orphan00',
+      createdByUserId: 'user00000000000000004',
+      createdBy: null,
     }),
   ]
   api.requests = []
@@ -61,16 +76,19 @@ afterEach(() => {
   setMode('dark', 'compact')
 })
 
-describe('Created by (AC-12)', () => {
-  it('says "You" for your keys and "Teammate" for the others', async () => {
+describe('Created by (spec 0008, AC-25)', () => {
+  it('says "You" for your keys, else the name, else the email, and "Deleted account" when gone', async () => {
     await openKeys('owner')
     const rows = [...document.querySelectorAll('tbody tr')].map((row) => row.textContent)
     expect(rows.find((row) => row.includes('Mine'))).toContain('You')
-    expect(rows.find((row) => row.includes('Theirs'))).toContain('Teammate')
+    expect(rows.find((row) => row.includes('Theirs'))).toContain('Grace Hopper')
+    expect(rows.find((row) => row.includes('Unnamed'))).toContain('linus@example.com')
+    expect(rows.find((row) => row.includes('Orphan'))).toContain('Deleted account')
+    expect(text()).not.toContain('Teammate')
     expect(api.account.id).toBe(accountId)
   })
 
-  it('shows a skeleton, never "Teammate", while your account is still loading', async () => {
+  it('shows a skeleton, never a name, while your account is still loading', async () => {
     // Loaded here, not at the top: it reaches the console client, which must see the fake `fetch`.
     const { CreatedBy } = await import('./columns')
     const screen = await render(
@@ -78,7 +96,13 @@ describe('Created by (AC-12)', () => {
         <tbody>
           <tr>
             <td>
-              <CreatedBy userId={teammate} accountId={undefined} />
+              <CreatedBy
+                apiKey={{
+                  createdByUserId: teammate,
+                  createdBy: { id: teammate, name: 'Grace Hopper', email: 'grace@example.com' },
+                }}
+                accountId={undefined}
+              />
             </td>
           </tr>
         </tbody>

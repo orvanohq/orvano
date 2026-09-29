@@ -19,6 +19,8 @@ import "./platform/projects.tsp";
 import "./platform/api-keys.tsp";
 import "./platform/platforms.tsp";
 import "./platform/install.tsp";
+import "./platform/members.tsp";
+import "./platform/invitations.tsp";
 import "./auth/security.tsp";
 import "./auth/account.tsp";
 import "./auth/keys.tsp";

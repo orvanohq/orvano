@@ -1,4 +1,4 @@
-import { expect, scenariosProject, test } from './fixtures.ts'
+import { expect, fixturesOrgId, scenariosProject, test } from './fixtures.ts'
 
 test('every console file carries the security headers (AC-24)', async ({ request }) => {
   for (const path of ['/', '/orgs', '/theme-init.js', '/favicon.svg']) {
@@ -39,7 +39,12 @@ test('a missing hashed asset is a 404 that is not cached for a year (AC-24)', as
 
 test('every shell page and select popup runs without a CSP violation (AC-24)', async ({
   signedIn: page,
+  request,
+  baseURL,
+  session,
 }) => {
+  if (baseURL === undefined) throw new Error('baseURL is not set')
+  const orgId = await fixturesOrgId(request, baseURL, session)
   await page.addInitScript(() => {
     const seen: string[] = []
     ;(window as unknown as { __csp: string[] }).__csp = seen
@@ -48,7 +53,13 @@ test('every shell page and select popup runs without a CSP violation (AC-24)', a
     })
   })
   const visited: string[] = []
-  for (const path of ['/orgs', `/projects/${scenariosProject}`]) {
+  // Members and Install settings arrived with spec 0008; the radio group injects no style.
+  for (const path of [
+    '/orgs',
+    `/projects/${scenariosProject}`,
+    `/orgs/${orgId}/members`,
+    '/install',
+  ]) {
     await page.goto(path)
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     await page.getByRole('button', { name: 'Account menu' }).click()

@@ -10,7 +10,7 @@ using Api = Orvano.Contract;
 namespace Orvano.Platform.Endpoints;
 
 /// <summary>
-/// The console operations of row 7 (spec 0003), each a thin adapter: read the console user and the request, call a
+/// The console operations of rows 7 and 15 (specs 0003 and 0008), each a thin adapter: read the console user and the request, call a
 /// use case, map the result. The host's console session check has already run for every <c>/v1/console</c> route.
 /// Project scoped operations take the project from <c>X-Orvano-Project</c> (spec 0001).
 /// </summary>
@@ -23,6 +23,8 @@ internal static class ConsoleEndpoints
         MapApiKeys(v1);
         MapPlatforms(v1);
         MapInstall(v1);
+        MapMembers(v1);
+        MapInvitations(v1);
     }
 
     private static void MapOrgs(RouteGroupBuilder v1)
@@ -91,12 +93,26 @@ internal static class ConsoleEndpoints
 
     private static void MapApiKeys(RouteGroupBuilder v1)
     {
-        v1.MapGet(Api.ConsoleApiKeysOperations.List.Route, async (HttpContext http, ApiKeyService keys, string? cursor, int? limit, CancellationToken ct) =>
-            Ok(await keys.ListAsync(User(http), ProjectOf(http), cursor, limit, ct), page => new Api.ApiKeyPage([.. page.Items.Select(ApiKey)], page.NextCursor)))
+        // Every creator on a page is resolved in one batch (spec 0008, AC-14).
+        v1.MapGet(Api.ConsoleApiKeysOperations.List.Route, async (
+            HttpContext http, ApiKeyService keys, ConsoleUserNames users, string? cursor, int? limit, CancellationToken ct) =>
+        {
+            var outcome = await keys.ListAsync(User(http), ProjectOf(http), cursor, limit, ct);
+            if (!outcome.Succeeded) return Problem(outcome.Failure!);
+            var page = outcome.Value!;
+            var creators = await users.ByIdAsync(page.Items.Select(k => k.CreatedByUserId), ct);
+            return TypedResults.Ok(new Api.ApiKeyPage([.. page.Items.Select(k => ApiKey(k, creators.GetValueOrDefault(k.CreatedByUserId)))], page.NextCursor));
+        })
             .WithName(Api.ConsoleApiKeysOperations.List.Id);
 
-        v1.MapPost(Api.ConsoleApiKeysOperations.Create.Route, async (HttpContext http, ApiKeyService keys, Api.CreateApiKeyRequest request, CancellationToken ct) =>
-            Created(await keys.CreateAsync(User(http), ProjectOf(http), request.Name, request.Scopes, request.ExpiresAt, ct), CreatedApiKey))
+        v1.MapPost(Api.ConsoleApiKeysOperations.Create.Route, async (
+            HttpContext http, ApiKeyService keys, ConsoleUserNames users, Api.CreateApiKeyRequest request, CancellationToken ct) =>
+        {
+            var outcome = await keys.CreateAsync(User(http), ProjectOf(http), request.Name, request.Scopes, request.ExpiresAt, ct);
+            if (!outcome.Succeeded) return Problem(outcome.Failure!);
+            var creator = (await users.ByIdAsync([User(http)], ct)).GetValueOrDefault(User(http));
+            return TypedResults.Created((string?)null, new Api.CreatedApiKey(ApiKey(outcome.Value!.Key, creator), outcome.Value.Secret.Value));
+        })
             .WithName(Api.ConsoleApiKeysOperations.Create.Id);
 
         v1.MapDelete(Api.ConsoleApiKeysOperations.Delete.Route, async (HttpContext http, ApiKeyService keys, string keyId, CancellationToken ct) =>
@@ -131,7 +147,8 @@ internal static class ConsoleEndpoints
         {
             var limit = limits.Acquire(RateLimitPolicies.ConsoleSetupPerIp, ConnectionIp.Key(http));
             if (!limit.Allowed) return (IResult)ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
-            return Results.Ok(new Api.InstallSetup(await install.IsSetupRequiredAsync(ct)));
+            var (setupRequired, signupOpen) = await install.GetSetupAsync(ct);
+            return Results.Ok(new Api.InstallSetup(setupRequired, signupOpen));
         })
             .WithName(Api.ConsoleInstallOperations.GetSetup.Id);
 
@@ -149,7 +166,78 @@ internal static class ConsoleEndpoints
             .WithName(Api.ConsoleInstallOperations.UpdateSettings.Id);
     }
 
+    private static void MapMembers(RouteGroupBuilder v1)
+    {
+        v1.MapGet(Api.ConsoleMembersOperations.List.Route, async (HttpContext http, MemberService members, string orgId, string? cursor, int? limit, CancellationToken ct) =>
+            Guid.TryParse(orgId, out var id)
+                ? Ok(await members.ListAsync(User(http), id, cursor, limit, ct), page => new Api.MemberPage([.. page.Items.Select(Member)], page.NextCursor))
+                : Problem(Failure.OrgNotFound))
+            .WithName(Api.ConsoleMembersOperations.List.Id);
+
+        v1.MapPatch(Api.ConsoleMembersOperations.Update.Route, async (
+            HttpContext http, MemberService members, string orgId, string userId, Api.UpdateMemberRequest request, CancellationToken ct) =>
+        {
+            if (ToRole(request.Role) is not { } role) return Problem(Failure.Invalid("role is owner, developer, or viewer."));
+            if (!Guid.TryParse(orgId, out var id)) return Problem(Failure.OrgNotFound);
+            return Ok(await members.ChangeRoleAsync(User(http), id, ParseId(userId), role, ct), Member);
+        })
+            .WithName(Api.ConsoleMembersOperations.Update.Id);
+
+        v1.MapDelete(Api.ConsoleMembersOperations.Remove.Route, async (HttpContext http, MemberService members, string orgId, string userId, CancellationToken ct) =>
+            Guid.TryParse(orgId, out var id) ? NoContent(await members.RemoveAsync(User(http), id, ParseId(userId), ct)) : Problem(Failure.OrgNotFound))
+            .WithName(Api.ConsoleMembersOperations.Remove.Id);
+    }
+
+    private static void MapInvitations(RouteGroupBuilder v1)
+    {
+        v1.MapGet(Api.ConsoleInvitationsOperations.List.Route, async (
+            HttpContext http, InvitationService invitations, string orgId, string? cursor, int? limit, CancellationToken ct) =>
+            Guid.TryParse(orgId, out var id)
+                ? Ok(await invitations.ListAsync(User(http), id, cursor, limit, ct), page => new Api.InvitationPage([.. page.Items.Select(Invitation)], page.NextCursor))
+                : Problem(Failure.OrgNotFound))
+            .WithName(Api.ConsoleInvitationsOperations.List.Id);
+
+        // Every attempt counts, per account (AC-1).
+        v1.MapPost(Api.ConsoleInvitationsOperations.Create.Route, async (
+            HttpContext http, InvitationService invitations, RateLimits limits, string orgId, Api.CreateInvitationRequest request, CancellationToken ct) =>
+        {
+            var limit = limits.Acquire(RateLimitPolicies.ConsoleInviteCreatePerUser, User(http).ToString());
+            if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
+            // An org ID that is not a UUID names no org: the body is still checked first (AC-3), then it answers 404.
+            var id = Guid.TryParse(orgId, out var parsed) ? parsed : Guid.Empty;
+            return Created(await invitations.CreateAsync(User(http), id, request.Email, ToRole(request.Role), ct), CreatedInvitation);
+        })
+            .WithName(Api.ConsoleInvitationsOperations.Create.Id);
+
+        v1.MapDelete(Api.ConsoleInvitationsOperations.Revoke.Route, async (
+            HttpContext http, InvitationService invitations, string orgId, string invitationId, CancellationToken ct) =>
+            Guid.TryParse(orgId, out var id) ? NoContent(await invitations.RevokeAsync(User(http), id, invitationId, ct)) : Problem(Failure.OrgNotFound))
+            .WithName(Api.ConsoleInvitationsOperations.Revoke.Id);
+
+        // Needs no console session (the host lets this one route through), only the token, rate limited per IP (AC-5).
+        v1.MapPost(Api.ConsoleInvitationsOperations.Preview.Route, async (
+            HttpContext http, InvitationService invitations, RateLimits limits, Api.InvitationTokenRequest request, CancellationToken ct) =>
+        {
+            var limit = limits.Acquire(RateLimitPolicies.ConsoleInvitePreviewPerIp, ConnectionIp.Key(http));
+            if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
+            return Ok(await invitations.PreviewAsync(request.Token, ct), InvitationPreview);
+        })
+            .WithName(Api.ConsoleInvitationsOperations.Preview.Id);
+
+        v1.MapPost(Api.ConsoleInvitationsOperations.Accept.Route, async (
+            HttpContext http, InvitationService invitations, RateLimits limits, Api.InvitationTokenRequest request, CancellationToken ct) =>
+        {
+            var limit = limits.Acquire(RateLimitPolicies.ConsoleInviteAcceptPerUser, User(http).ToString());
+            if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
+            return Ok(await invitations.AcceptAsync(User(http), request.Token, ct), AcceptedInvitation);
+        })
+            .WithName(Api.ConsoleInvitationsOperations.Accept.Id);
+    }
+
     private static Guid User(HttpContext http) => ConsoleUser.Get(http);
+
+    /// <summary>A path ID, or <see langword="null"/> when it is not a UUID (then it names no one, after the permission checks).</summary>
+    private static Guid? ParseId(string value) => Guid.TryParse(value, out var id) ? id : null;
 
     private static string? ProjectOf(HttpContext http) =>
         http.Request.Headers[OrvanoHeaders.Project] is [{ Length: > 0 } project] ? project : null;

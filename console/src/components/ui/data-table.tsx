@@ -39,6 +39,17 @@ interface DataTableProps<T> {
   onLoadMore?: () => void
   /** Client side sorting over the loaded rows, from the header buttons. */
   sortable?: boolean
+  /**
+   * A stable key per row, so a row's state (an open confirm) stays with its item when a row above
+   * it goes. Defaults to the item's string `id` when it has one, else its position.
+   */
+  getRowId?: (row: T, index: number) => string
+}
+
+/** The item's own string `id`, else its position. */
+function defaultRowId(row: unknown, index: number): string {
+  const id = typeof row === 'object' && row !== null ? (row as { id?: unknown }).id : undefined
+  return typeof id === 'string' ? id : String(index)
 }
 
 const skeletonRows = 5
@@ -60,6 +71,7 @@ export function DataTable<T>({
   loadingMore = false,
   onLoadMore,
   sortable = false,
+  getRowId = defaultRowId,
 }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([])
   // TanStack Table's functions are not memoizable; nothing here is passed to a memoized child.
@@ -72,6 +84,7 @@ export function DataTable<T>({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: sortable ? getSortedRowModel() : undefined,
     enableSorting: sortable,
+    getRowId,
   })
 
   if (error !== undefined && error !== null) {

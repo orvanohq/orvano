@@ -1,7 +1,7 @@
 # 0008. Console team members, invitations, and roles
 
 **Date**: 2026-09-28
-**Status**: Proposed
+**Status**: Accepted
 
 ## Summary
 

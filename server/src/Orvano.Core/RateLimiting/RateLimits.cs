@@ -32,6 +32,15 @@ public static class RateLimitPolicies
 
     /// <summary><c>consoleInstall.getSetup</c>, keyed by connection IP (spec 0006, AC-22).</summary>
     public static RateLimitPolicy ConsoleSetupPerIp { get; } = new("console.setup.ip", 60, TimeSpan.FromMinutes(1));
+
+    /// <summary><c>consoleInvitations.create</c>, keyed by console user ID; every attempt counts (spec 0008, AC-1).</summary>
+    public static RateLimitPolicy ConsoleInviteCreatePerUser { get; } = new("console.invite_create.user", 60, TimeSpan.FromHours(1));
+
+    /// <summary><c>consoleInvitations.preview</c>, keyed by connection IP; every attempt counts (spec 0008, AC-5).</summary>
+    public static RateLimitPolicy ConsoleInvitePreviewPerIp { get; } = new("console.invite_preview.ip", 60, TimeSpan.FromMinutes(1));
+
+    /// <summary><c>consoleInvitations.accept</c>, keyed by console user ID; every attempt counts (spec 0008, AC-6).</summary>
+    public static RateLimitPolicy ConsoleInviteAcceptPerUser { get; } = new("console.invite_accept.user", 30, TimeSpan.FromMinutes(15));
 }
 
 /// <summary>The answer of a limit check.</summary>

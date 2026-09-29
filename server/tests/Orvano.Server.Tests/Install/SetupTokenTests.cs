@@ -79,11 +79,11 @@ public class SetupTokenTests(PostgresFixture postgres)
 
         using var response = await http.GetAsync("/v1/console/install/setup", Ct);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(new InstallSetup(SetupRequired: true), await response.Content.ReadFromJsonAsync<InstallSetup>(Ct));
+        Assert.Equal(new InstallSetup(SetupRequired: true, SignupOpen: false), await response.Content.ReadFromJsonAsync<InstallSetup>(Ct));
         Assert.Equal("required", (await SetupStatusAsync(api)).Trim());
 
         await AddInstallAdminAsync(database);
-        Assert.Equal(new InstallSetup(SetupRequired: false), await http.GetFromJsonAsync<InstallSetup>("/v1/console/install/setup", Ct));
+        Assert.Equal(new InstallSetup(SetupRequired: false, SignupOpen: false), await http.GetFromJsonAsync<InstallSetup>("/v1/console/install/setup", Ct));
         Assert.Equal("done", (await SetupStatusAsync(api)).Trim());
 
         // Every other console route still needs a session.

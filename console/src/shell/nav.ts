@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   MonitorSmartphone,
   Settings,
+  Users,
   UsersRound,
   type LucideIcon,
 } from 'lucide-react'
@@ -30,6 +31,8 @@ export interface NavEntry {
  */
 export const orgNav: readonly NavEntry[] = [
   { id: 'projects', label: 'Projects', icon: FolderKanban, to: '/orgs/$orgId', exact: true },
+  // `Users`, not the project Users entry's `UsersRound`, so the two never look alike (spec 0008, AC-15).
+  { id: 'members', label: 'Members', icon: Users, to: '/orgs/$orgId/members' },
   {
     id: 'org-settings',
     label: 'Settings',

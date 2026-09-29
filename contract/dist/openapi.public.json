@@ -1291,6 +1291,11 @@
           "user_not_found",
           "session_not_found",
           "user_already_exists",
+          "invitation_not_found",
+          "invitation_expired",
+          "invitation_email_mismatch",
+          "already_member",
+          "invitation_limit",
           "rate_limited",
           "server_busy"
         ],

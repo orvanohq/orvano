@@ -12,6 +12,9 @@ internal enum FailureKind
     Conflict,
     RateLimited,
     Busy,
+
+    /// <summary>The thing existed but is gone for good (410), such as an expired invitation.</summary>
+    Gone,
 }
 
 /// <summary>A refusal with a stable error code from the contract's catalog and a short safe sentence.</summary>
@@ -38,6 +41,18 @@ internal sealed record Failure(FailureKind Kind, string Code, string Detail)
 
     public static Failure SetupTokenInvalid { get; } =
         new(FailureKind.Forbidden, ErrorCode.SetupTokenInvalid, "This setup link is not valid. Run the installer again on your server to see the right link.");
+
+    public static Failure InvitationNotFound { get; } =
+        new(FailureKind.NotFound, ErrorCode.InvitationNotFound, "This invite link isn't valid anymore. It may have been used, replaced, or revoked.");
+
+    public static Failure InvitationExpired { get; } =
+        new(FailureKind.Gone, ErrorCode.InvitationExpired, "This invite expired. Ask an owner of the org for a new link.");
+
+    public static Failure InvitationEmailMismatch { get; } =
+        new(FailureKind.Forbidden, ErrorCode.InvitationEmailMismatch, "This invite is for another email address.");
+
+    public static Failure OrgNotActive { get; } =
+        new(FailureKind.Conflict, ErrorCode.OrgNotActive, "The org of this invite is being deleted.");
 
     public static Failure UserNotFound { get; } = new(FailureKind.NotFound, ErrorCode.UserNotFound, "No such user.");
 

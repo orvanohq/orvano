@@ -314,3 +314,77 @@ public class PageCursorTests
         Assert.Equal(expected, PageCursor.Limit(limit));
     }
 }
+
+// Spec 0008: invite tokens, the invitation rules, and Platform's copy of the email rule.
+public class InvitationRulesTests
+{
+    [Fact]
+    public void An_invite_token_is_43_base64url_characters_and_its_url_carries_it_in_the_fragment()
+    {
+        var token = InviteToken.New();
+
+        Assert.Matches("^[A-Za-z0-9_-]{43}$", token.Value); // AC-1
+        Assert.Equal(32, token.Hash.Length);
+        Assert.Equal($"https://orvano.example.com/invite#{token.Value}", token.Url("https://orvano.example.com"));
+        Assert.Equal($"https://orvano.example.com/invite#{token.Value}", token.Url("https://orvano.example.com/"));
+        Assert.DoesNotContain(token.Value, token.ToString());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")] // 42
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")] // 44
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=")] // padding
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa+")] // base64, not base64url
+    public void A_token_that_is_not_exactly_43_base64url_characters_never_parses(string? presented) =>
+        Assert.False(InviteToken.TryParse(presented, out _)); // AC-5
+
+    [Fact]
+    public void A_parsed_token_hashes_like_the_one_that_was_issued()
+    {
+        var issued = InviteToken.New();
+
+        Assert.True(InviteToken.TryParse(issued.Value, out var parsed));
+        Assert.Equal(issued.Hash, parsed.Hash);
+    }
+
+    [Fact]
+    public void An_invitation_lasts_7_days_is_expired_at_its_expiry_and_is_cleaned_up_30_days_later()
+    {
+        var now = new DateTimeOffset(2026, 9, 28, 12, 0, 0, TimeSpan.Zero);
+        var expires = InvitationRules.ExpiresAt(now);
+
+        Assert.Equal(now.AddDays(7), expires);
+        Assert.Equal(InvitationState.Pending, InvitationRules.StateAt(expires, expires.AddTicks(-1)));
+        Assert.Equal(InvitationState.Expired, InvitationRules.StateAt(expires, expires)); // AC-4: at or before now
+        Assert.Equal(now.AddDays(-30), InvitationRules.CleanupBefore(now));
+    }
+
+    [Fact]
+    public void An_org_holds_at_most_100_invitations()
+    {
+        Assert.True(InvitationRules.FitsCap(99));
+        Assert.False(InvitationRules.FitsCap(100));
+    }
+
+    [Theory]
+    [InlineData(" ada@example.com ", true, "ada@example.com")]
+    [InlineData("ada@example", true, "ada@example")]
+    [InlineData("ada", false, "ada")]
+    [InlineData("a b@example.com", false, "a b@example.com")]
+    [InlineData("", false, "")]
+    [InlineData(null, false, "")]
+    public void Invite_emails_follow_the_sign_up_email_rule(string? email, bool valid, string trimmed)
+    {
+        Assert.Equal(valid, InviteEmail.TryNormalize(email, out var result));
+        Assert.Equal(trimmed, result);
+    }
+
+    [Fact]
+    public void An_invite_email_is_at_most_320_characters()
+    {
+        Assert.True(InviteEmail.TryNormalize(new string('a', 310) + "@x.example", out _));
+        Assert.False(InviteEmail.TryNormalize(new string('a', 311) + "@x.example", out _));
+    }
+}

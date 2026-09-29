@@ -405,6 +405,142 @@ public static class ConsoleInstallOperations
     }
 }
 
+/// <summary>Route constants for the <c>consoleInvitations</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleInvitationsOperations
+{
+    /// <summary>POST /v1/console/invitations/accept: Joins the org with the signed in console account, whose email must be the invitation's (ignoring case), and</summary>
+    public static class Accept
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleInvitations.accept";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/invitations/accept";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/orgs/{orgId}/invitations: Invites an email to the org with a role and returns the link to share, once. Owners only. Inviting an email</summary>
+    public static class Create
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleInvitations.create";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/orgs/{orgId}/invitations";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/console/orgs/{orgId}/invitations: Lists the org's invitations, pending and expired, oldest first. Owners only.</summary>
+    public static class List
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleInvitations.list";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/orgs/{orgId}/invitations";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/invitations/preview: Shows what an invite link is for. Needs no console session, only the token. Fails with</summary>
+    public static class Preview
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleInvitations.preview";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/invitations/preview";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>DELETE /v1/console/orgs/{orgId}/invitations/{invitationId}: Revokes an invitation, so its link stops working at once. Owners only.</summary>
+    public static class Revoke
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleInvitations.revoke";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/orgs/{orgId}/invitations/{invitationId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
+/// <summary>Route constants for the <c>consoleMembers</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleMembersOperations
+{
+    /// <summary>GET /v1/console/orgs/{orgId}/members: Lists the org's members, oldest first. Any member.</summary>
+    public static class List
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleMembers.list";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/orgs/{orgId}/members";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>DELETE /v1/console/orgs/{orgId}/members/{userId}: Removes a member from the org, or lets a member leave when <c>userId</c> is their own. Owners remove anyone; every</summary>
+    public static class Remove
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleMembers.remove";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/orgs/{orgId}/members/{userId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>PATCH /v1/console/orgs/{orgId}/members/{userId}: Changes a member's role. Owners only. Fails with <c>last_owner</c> when it would demote the org's last owner.</summary>
+    public static class Update
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleMembers.update";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PATCH";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/orgs/{orgId}/members/{userId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
 /// <summary>Route constants for the <c>consoleOrgs</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class ConsoleOrgsOperations
 {

@@ -22,7 +22,9 @@ describe('meetsRole (AC-22)', () => {
 
 describe('nav registry (AC-15)', () => {
   it('registers Projects for orgs and the project entries in order, with unique ids', () => {
-    expect(orgNav.map((entry) => entry.label)).toEqual(['Projects', 'Settings'])
+    // Members sits between Projects and Settings, for every role (spec 0008, AC-15).
+    expect(orgNav.map((entry) => entry.label)).toEqual(['Projects', 'Members', 'Settings'])
+    expect(orgNav.find((entry) => entry.id === 'members')?.minRole).toBeUndefined()
     // API keys and Platforms sit between Users and Settings (spec 0007, AC-11).
     expect(projectNav.map((entry) => entry.label)).toEqual([
       'Overview',

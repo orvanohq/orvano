@@ -18,8 +18,11 @@ import { Label } from '@/components/ui/label'
 import { describeError } from '@/lib/errors'
 
 interface ConfirmDialogProps {
-  /** The element that opens the dialog, usually a `Button`. */
-  trigger: ReactElement
+  /** The element that opens the dialog, usually a `Button`. Omit it to control the dialog with `open`. */
+  trigger?: ReactElement
+  /** Controls the dialog from outside, for example from a menu item that has already closed. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   title: string
   description: string
   /** A verb phrase, never "OK": "Delete project". */
@@ -35,9 +38,13 @@ interface ConfirmDialogProps {
  * A confirmation before a risky action. Focus starts on Cancel and Escape cancels. With
  * `requireName` the confirm button stays disabled until the exact name is typed. The dialog closes
  * once `onConfirm` finishes; if it throws, the dialog stays open and shows the error in its alert.
+ * Without a `trigger`, `open` and `onOpenChange` control it, and focus returns to what had it before
+ * it opened (a row menu's button).
  */
 export function ConfirmDialog({
   trigger,
+  open: controlledOpen,
+  onOpenChange,
   title,
   description,
   confirmLabel,
@@ -46,7 +53,12 @@ export function ConfirmDialog({
   onConfirm,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement | null>(null)
-  const [open, setOpen] = useState(false)
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const open = controlledOpen ?? uncontrolledOpen
+  const setOpen = (next: boolean) => {
+    setUncontrolledOpen(next)
+    onOpenChange?.(next)
+  }
   const [typed, setTyped] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -61,7 +73,7 @@ export function ConfirmDialog({
         setError(null)
       }}
     >
-      <AlertDialogTrigger render={trigger} />
+      {trigger === undefined ? null : <AlertDialogTrigger render={trigger} />}
       <AlertDialogContent initialFocus={cancelRef}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

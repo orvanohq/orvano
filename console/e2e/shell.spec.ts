@@ -131,6 +131,10 @@ test('pages outside the shell set their own title (AC-23)', async ({ signedIn: p
   await page.goto('/sign-in')
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
   await expect(page).toHaveTitle('Sign in · Orvano')
+  // Spec 0008, AC-26: a link without its token still names the page.
+  await page.goto('/invite')
+  await expect(page.getByText('This invite link is incomplete')).toBeVisible()
+  await expect(page).toHaveTitle('Invite · Orvano')
 })
 
 test('the drawer closes on navigation and focus lands on the page title (AC-16, AC-23)', async ({

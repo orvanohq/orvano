@@ -10,7 +10,8 @@ namespace Orvano.Server.Hosting;
 /// <item>CSRF: a request with an unsafe method needs <c>Sec-Fetch-Site: same-origin</c>, or, when the browser sent no
 /// <c>Sec-Fetch-Site</c>, an <c>Origin</c> equal to <c>ORVANO_PUBLIC_URL</c>'s; else 403 <c>csrf_rejected</c>. This
 /// covers sign up and sign in too.</item>
-/// <item>Session: every console route but the four account session operations and <c>consoleInstall.getSetup</c>
+/// <item>Session: every console route but the four account session operations, <c>consoleInstall.getSetup</c>, and
+/// <c>consoleInvitations.preview</c>
 /// needs a valid <c>orvano_console</c> cookie and neither an API key nor a bearer token; else 401
 /// <c>console_session_required</c>, or <c>token_expired</c> for an expired one (the console client refreshes). A
 /// valid session sets the <see cref="ConsoleUser"/> the endpoints act as.</item>
@@ -22,6 +23,7 @@ internal static class ConsoleSessions
     private static readonly (string Method, PathString Path)[] Open =
     [
         (ConsoleInstallOperations.GetSetup.Method, "/v1" + ConsoleInstallOperations.GetSetup.Route),
+        (ConsoleInvitationsOperations.Preview.Method, "/v1" + ConsoleInvitationsOperations.Preview.Route),
         (ConsoleAccountOperations.Create.Method, "/v1" + ConsoleAccountOperations.Create.Route),
         (ConsoleAccountOperations.CreateSession.Method, "/v1" + ConsoleAccountOperations.CreateSession.Route),
         (ConsoleAccountOperations.RefreshSession.Method, "/v1" + ConsoleAccountOperations.RefreshSession.Route),

@@ -81,9 +81,20 @@ import { notifyError, notifySuccess } from '@/lib/toast'
 import { CreateKeyDialog } from '@/routes/_app/projects/$projectId/-keys/create-key-dialog'
 import { ScopeGrid } from '@/routes/_app/projects/$projectId/-keys/scope-grid'
 import { PlatformDialog } from '@/routes/_app/projects/$projectId/-platforms/platform-dialog'
+import { ChangeRoleDialog } from '@/routes/_app/orgs/$orgId/-members/change-role-dialog'
+import { InviteDialog } from '@/routes/_app/orgs/$orgId/-members/invite-dialog'
+import { SignUpForm } from '@/routes/-auth/auth-form'
+import { InviteView, type InviteState } from '@/routes/-invite/invite-view'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
-import type { ApiKeyScope, Platform } from '@orvano/console-client'
+import type {
+  ApiKeyScope,
+  CreateInvitationRequest,
+  InvitationPreview,
+  Member,
+  Platform,
+} from '@orvano/console-client'
 
 /*
  * One example per inventory component (spec 0005, Component inventory). The catalog renders them
@@ -663,6 +674,7 @@ function KeyRevealExample() {
               expiresAt: body.expiresAt ?? null,
               lastUsedAt: null,
               createdByUserId: 'user0000000000000000a',
+              createdBy: { id: 'user0000000000000000a', name: 'Ada', email: 'ada@example.com' },
               createdAt: '2026-06-01T10:00:00.000Z',
             },
           })
@@ -730,6 +742,179 @@ function PlatformFormExample() {
   )
 }
 
+function RadioGroupExample() {
+  return (
+    <RadioGroup aria-label="Plan" defaultValue="free" className="max-w-xs">
+      {[
+        { value: 'free', label: 'Free' },
+        { value: 'team', label: 'Team' },
+        { value: 'scale', label: 'Scale', disabled: true },
+      ].map((plan) => (
+        <label key={plan.value} className="flex items-center gap-2">
+          <RadioGroupItem
+            data-testid={`radio-${plan.value}`}
+            value={plan.value}
+            disabled={plan.disabled}
+          />
+          {plan.label}
+        </label>
+      ))}
+    </RadioGroup>
+  )
+}
+
+/** A stand in invite link for the catalog; it opens nothing (spec 0008, key invariants). */
+const exampleInviteUrl = 'https://orvano.example.com/invite#example_not_a_real_invite_token_000000'
+
+const exampleCreateInvitation = (body: CreateInvitationRequest) =>
+  Promise.resolve({
+    url: exampleInviteUrl,
+    invitation: {
+      id: 'invitation00000000000a',
+      email: body.email,
+      role: body.role,
+      invitedBy: { id: 'user0000000000000000a', name: 'Ada', email: 'ada@example.com' },
+      status: 'pending' as const,
+      expiresAt: '2026-06-08T10:00:00.000Z',
+      createdAt: '2026-06-01T10:00:00.000Z',
+    },
+  })
+
+// The invite dialog and its link step (spec 0008, AC-16 to AC-18), with nothing sent anywhere.
+function InviteDialogExample() {
+  const [queryClient] = useState(() => new QueryClient())
+  const [open, setOpen] = useState(false)
+  const [resending, setResending] = useState(false)
+  return (
+    <QueryClientProvider client={queryClient}>
+      <div className="flex gap-2">
+        <Button
+          data-testid="invite-open"
+          onClick={() => {
+            setOpen(true)
+          }}
+        >
+          Invite
+        </Button>
+        <Button
+          data-testid="invite-resend"
+          variant="outline"
+          onClick={() => {
+            setResending(true)
+          }}
+        >
+          Resend
+        </Button>
+      </div>
+      <InviteDialog open={open} onOpenChange={setOpen} createInvitation={exampleCreateInvitation} />
+      <InviteDialog
+        open={resending}
+        onOpenChange={setResending}
+        resend={{ email: 'grace@example.com', role: 'viewer' }}
+        createInvitation={exampleCreateInvitation}
+      />
+    </QueryClientProvider>
+  )
+}
+
+const exampleMember: Member = {
+  userId: 'user0000000000000000a',
+  name: 'Ada Lovelace',
+  email: 'ada@example.com',
+  status: 'active',
+  role: 'owner',
+  joinedAt: '2026-06-01T10:00:00.000Z',
+}
+
+// Change role (spec 0008, AC-19), on your own owner row, so demoting yourself shows its warning.
+function ChangeRoleExample() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button
+        data-testid="change-role-open"
+        variant="outline"
+        onClick={() => {
+          setOpen(true)
+        }}
+      >
+        Change role
+      </Button>
+      {open ? (
+        <ChangeRoleDialog
+          member={exampleMember}
+          isSelf
+          open
+          onOpenChange={setOpen}
+          onSave={() => Promise.resolve()}
+        />
+      ) : null}
+    </>
+  )
+}
+
+// The auth form's sign up mode (spec 0008, AC-23), as `/sign-up` shows it.
+function SignUpFormExample() {
+  return (
+    <div className="max-w-md">
+      <SignUpForm id="catalog-sign-up" onSubmit={() => Promise.resolve()} />
+    </div>
+  )
+}
+
+const examplePreview: InvitationPreview = {
+  orgId: 'org00000000000000000a',
+  orgName: 'Acme',
+  role: 'developer',
+  email: 'grace@example.com',
+  invitedByName: 'Ada Lovelace',
+  expiresAt: '2026-06-08T10:00:00.000Z',
+}
+
+const inviteStates: readonly { title: string; state: InviteState }[] = [
+  { title: 'Incomplete link', state: { kind: 'incomplete' } },
+  { title: 'Loading', state: { kind: 'loading' } },
+  { title: 'Used, replaced, or revoked', state: { kind: 'gone' } },
+  { title: 'Expired', state: { kind: 'expired' } },
+  { title: 'Org being deleted', state: { kind: 'deleting' } },
+  {
+    title: 'Signed in with the invited email',
+    state: { kind: 'join', preview: examplePreview, onJoin: () => Promise.resolve() },
+  },
+  {
+    title: 'Signed in as someone else',
+    state: {
+      kind: 'mismatch',
+      preview: { ...examplePreview, invitedByName: null },
+      accountEmail: 'linus@example.com',
+      onSignOut: () => Promise.resolve(),
+    },
+  },
+  {
+    title: 'Signed out',
+    state: {
+      kind: 'signed-out',
+      preview: examplePreview,
+      onCreateAccount: () => Promise.resolve(),
+      onSignIn: () => Promise.resolve(),
+    },
+  },
+]
+
+// Every state of the invite page (spec 0008, AC-20 to AC-22), with nothing sent anywhere.
+function InvitePageExample() {
+  return (
+    <div className="grid max-w-md gap-6">
+      {inviteStates.map(({ title, state }) => (
+        <section key={title} aria-label={title} className="flex flex-col gap-2">
+          <h3 className="text-h3">{title}</h3>
+          <InviteView state={state} />
+        </section>
+      ))}
+    </div>
+  )
+}
+
 /** The catalog: id to a titled, rendered example. */
 export const examples: Record<string, { title: string; render: () => ReactNode }> = {
   button: { title: 'Button', render: () => <ButtonExample /> },
@@ -760,4 +945,9 @@ export const examples: Record<string, { title: string; render: () => ReactNode }
   'key-reveal': { title: 'API key reveal step', render: () => <KeyRevealExample /> },
   'scope-grid': { title: 'Scope grid', render: () => <ScopeGridExample /> },
   'platform-form': { title: 'Platform form', render: () => <PlatformFormExample /> },
+  'radio-group': { title: 'Radio group', render: () => <RadioGroupExample /> },
+  'invite-dialog': { title: 'Invite dialog and link step', render: () => <InviteDialogExample /> },
+  'change-role': { title: 'Change role dialog', render: () => <ChangeRoleExample /> },
+  'sign-up-form': { title: 'Sign up form', render: () => <SignUpFormExample /> },
+  'invite-page': { title: 'Invite page states', render: () => <InvitePageExample /> },
 }

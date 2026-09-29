@@ -8,9 +8,9 @@ The Platform module (spec 0003): install settings and admins, orgs, memberships,
 
 | Folder | Owns |
 |---|---|
-| `Contracts/` | The only public types: `IProjectDirectory`, `IApiKeyVerifier`, `IConsoleAccess`, `IConsoleSignupPolicy`, `IConsoleAccountCreated`, `IConsoleAccountGuard`, `IWebOriginPolicy` (the host's public CORS check) and their records |
-| `Domain/` | Business rules as plain types: project IDs, lifecycles, the permission matrix, the owner rule, key secrets, web origin patterns, platform identifiers, names |
-| `Application/` | Use cases (`OrgService`, `ProjectService`, `ApiKeyService`, `PlatformService`, `InstallService`, `ConsoleAccounts`, `PlatformDirectory`), `PlatformStore`, `Outcome`/`Failure`, `PlatformEvents` |
+| `Contracts/` | The only public types: `IProjectDirectory`, `IApiKeyVerifier`, `IConsoleAccess`, `IConsoleSignupPolicy`, `IConsoleAccountCreated`, `IConsoleAccountGuard`, `IWebOriginPolicy` (the host's public CORS check), `IConsoleUserDirectory` (console account names and emails, which Auth implements), `IInstallAdmins` (the install admin flag Auth reads) and their records |
+| `Domain/` | Business rules as plain types: project IDs, lifecycles, the permission matrix, the owner rule, key secrets, web origin patterns, platform identifiers, names, invite tokens and invitation lifetimes (`Invitations.cs`) |
+| `Application/` | Use cases (`OrgService`, `ProjectService`, `ApiKeyService`, `PlatformService`, `InstallService`, `ConsoleAccounts`, `PlatformDirectory`, `InvitationService`, `MemberService`), `PlatformStore`, `Outcome`/`Failure`, `PlatformEvents` |
 | `Data/PlatformDbContext.cs` | EF Core mapping of the `platform_` tables; internal, checked by the drift check |
 | `Endpoints/` | Thin console endpoints and the row to contract model mapping (`ApiMapping`) |
 | `Jobs/` | `platform.project.provision`, `platform.project.purge`, `platform.org.purge`, `platform.remove_memberships`, all on queue `platform` |
@@ -25,14 +25,14 @@ The Platform module (spec 0003): install settings and admins, orgs, memberships,
 - Every change writes its `platform.*` event through `PlatformEvents.WriteAsync`: affected IDs, the `Actor` (a console user, or `system` in jobs), and changed field names. Never a secret, hash, or token.
 - Console access: a caller who is not a member of the org gets 404 (`project_not_found` or `not_found`), so existence never leaks; a member whose role lacks the action gets 403 `forbidden`. Project scoped endpoints read `X-Orvano-Project`; a missing header is 400.
 - Lists are keyset paged on `(created_at, id)` with `PageCursor` from `Orvano.Core.Paging`.
-- While no install admin exists, `ConsoleAccounts.AdmitAsync` admits the first account only with the installer's setup token when `ORVANO_SETUP_TOKEN` is set (`Domain/InstallSetupToken.cs`, compared in constant time; spec 0006). `consoleInstall.getSetup` answers without a session (the only Platform route that does, rate limited per IP), so it returns only `setupRequired`.
+- While no install admin exists, `ConsoleAccounts.AdmitAsync` admits the first account only with the installer's setup token when `ORVANO_SETUP_TOKEN` is set (`Domain/InstallSetupToken.cs`, compared in constant time; spec 0006). `consoleInstall.getSetup` and `consoleInvitations.preview` answer without a session (the only Platform routes that do, each rate limited per IP), so `getSetup` returns only `setupRequired` and `signupOpen`, and `preview` needs the invite token.
 - `ORVANO_DELETE_GRACE_DAYS` (0 to 90, default 7) is read in `PlatformModule.ConfigureServices`, so every role refuses to start on a bad value.
 
 ## Gotchas
 
 - Jobs that issue DDL use the `OrvanoDb.Admin` data source, only in the worker. Each locks the project row first and is idempotent; on its last failing attempt it records `failed` or `purge_failed_at` in a separate transaction, then rethrows.
 - The Contract's generated `OrgRole`, `ProjectStatus`, and `PlatformType` share names with this module's own types, and the contract model `Platform` clashes with this namespace: alias them (`using Api = Orvano.Contract;`).
-- Invitations are row 15's: until then an invite token admits no one, and member management endpoints don't exist.
+- An invitation is used up only by the one conditional `DELETE ... RETURNING` in `InvitationService.ConsumeAsync`, after the org lock, for both accept and invited sign up (spec 0008); only the token's SHA-256 is stored, and no log, event, or problem body carries the token or the invited email.
 - The `auth.user.deleted` consumer reads the console user ID from the event's `subject` and only acts when `project_id` is `console`.
 
 ## Tests
@@ -42,5 +42,6 @@ The Platform module (spec 0003): install settings and admins, orgs, memberships,
 ## Related specs
 
 - [0003 Platform data model](../../../docs/specs/0003-platform-data-model/index.md) (with `verify.md`)
+- [0008 Console team members, invitations, and roles](../../../docs/specs/0008-console-team-members/index.md) (invitations, members, the install admin flag)
 
 _Drafted by /sync from the introducing change, worth a quick human pass._

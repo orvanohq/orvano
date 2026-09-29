@@ -1,12 +1,16 @@
 import type {
   ApiKey,
   ApiKeyScope,
+  ConsoleAccount,
+  ConsoleSignupMode,
+  Invitation,
+  InvitationPreview,
+  Member,
   Org,
   OrgRole,
   Platform,
   PlatformType,
   Project,
-  User,
 } from '@orvano/console-client'
 
 /*
@@ -27,6 +31,13 @@ export interface SentRequest {
 }
 
 /** A one time answer that replaces the fake's own for the next matching request. */
+interface Answer {
+  method: string
+  path: RegExp
+  body: unknown
+}
+
+/** A one time problem that replaces the fake's own answer for the next matching request. */
 interface Failure {
   method: string
   path: RegExp
@@ -36,8 +47,18 @@ interface Failure {
 }
 
 export interface FakeApi {
-  account: User
+  account: ConsoleAccount
+  /** False makes `consoleAccount.get` answer 401, as for someone signed out (spec 0008, AC-21). */
+  signedIn: boolean
   orgs: Org[]
+  /** Members by org ID. */
+  members: Record<string, Member[]>
+  /** Invitations by org ID. */
+  invitations: Record<string, Invitation[]>
+  /** What `consoleInvitations.preview` answers for any token; null answers 404. */
+  preview: InvitationPreview | null
+  /** Who may create a console account, as the install settings say. */
+  consoleSignup: ConsoleSignupMode
   projects: Project[]
   apiKeys: ApiKey[]
   platforms: Platform[]
@@ -46,6 +67,8 @@ export interface FakeApi {
   setupRequired: boolean
   /** Makes the next `method` request whose path matches answer with this problem, once. */
   failNext: (method: string, path: RegExp, status: number, code: string, detail: string) => void
+  /** Makes the next `method` request whose path matches answer 200 with this JSON body, once. */
+  answerNext: (method: string, path: RegExp, body: unknown) => void
 }
 
 export const accountId = 'user00000000000000001'
@@ -85,10 +108,39 @@ export function makeKey(overrides: Partial<ApiKey> & { id: string }): ApiKey {
     expiresAt: null,
     lastUsedAt: null,
     createdByUserId: accountId,
+    createdBy: { id: accountId, name: 'Ada', email: 'ada@example.com' },
     createdAt: now,
     ...overrides,
   }
 }
+
+/** A member of an org. */
+export function makeMember(overrides: Partial<Member> & { userId: string }): Member {
+  return {
+    name: null,
+    email: `${overrides.userId}@example.com`,
+    status: 'active',
+    role: 'developer',
+    joinedAt: now,
+    ...overrides,
+  }
+}
+
+/** An invitation to an org. */
+export function makeInvitation(overrides: Partial<Invitation> & { id: string }): Invitation {
+  return {
+    email: 'grace@example.com',
+    role: 'developer',
+    invitedBy: { id: accountId, name: 'Ada', email: 'ada@example.com' },
+    status: 'pending',
+    expiresAt: '2026-06-08T10:00:00.000Z',
+    createdAt: now,
+    ...overrides,
+  }
+}
+
+/** The invite link the fake hands out; it opens nothing real. */
+export const fakeInviteUrl = 'http://localhost/invite#fakeInviteTokenForTestsOnly00000000000000'
 
 export function makePlatform(
   overrides: Partial<Platform> & { id: string; type?: PlatformType },
@@ -118,6 +170,7 @@ const nextId = (prefix: string) => `${prefix}${String(++counter).padStart(20 - p
 /** Replaces `fetch` with the fake and returns its state, which tests read and change freely. */
 export function installFakeApi(): FakeApi {
   const failures: Failure[] = []
+  const answers: Answer[] = []
   const api: FakeApi = {
     account: {
       id: accountId,
@@ -128,8 +181,14 @@ export function installFakeApi(): FakeApi {
       metadata: {},
       createdAt: now,
       lastSignInAt: now,
+      isInstallAdmin: false,
     },
+    signedIn: true,
     orgs: [],
+    members: {},
+    invitations: {},
+    preview: null,
+    consoleSignup: 'invite',
     projects: [],
     apiKeys: [],
     platforms: [],
@@ -137,6 +196,9 @@ export function installFakeApi(): FakeApi {
     setupRequired: false,
     failNext: (method, path, status, code, detail) => {
       failures.push({ method, path, status, code, detail })
+    },
+    answerNext: (method, path, body) => {
+      answers.push({ method, path, body })
     },
   }
 
@@ -166,21 +228,73 @@ export function installFakeApi(): FakeApi {
       const [f] = failures.splice(failure, 1) as [Failure]
       return problem(f.status, f.code, f.detail)
     }
-
-    if (path === '/v1/console/account' && method === 'GET') return Response.json(api.account)
-    if (path === '/v1/console/install/setup' && method === 'GET') {
-      return Response.json({ setupRequired: api.setupRequired })
+    const answer = answers.findIndex((a) => a.method === method && a.path.test(path))
+    if (answer !== -1) {
+      const [a] = answers.splice(answer, 1) as [Answer]
+      return Response.json(a.body)
     }
-    // The first admin's sign up. The real server checks the setup token; refuse it with failNext.
+
+    if (path === '/v1/console/account' && method === 'GET') {
+      return api.signedIn
+        ? Response.json(api.account)
+        : problem(401, 'console_session_required', 'Sign in first.')
+    }
+    if (path === '/v1/console/install/setup' && method === 'GET') {
+      return Response.json({
+        setupRequired: api.setupRequired,
+        signupOpen: api.consoleSignup === 'open',
+      })
+    }
+    if (path === '/v1/console/install/settings') {
+      if (!api.account.isInstallAdmin) {
+        return problem(403, 'forbidden', 'Only install admins can do this.')
+      }
+      if (method === 'PATCH') api.consoleSignup = input.consoleSignup as ConsoleSignupMode
+      return Response.json({ consoleSignup: api.consoleSignup, updatedAt: now })
+    }
+    if (path === '/v1/console/account/session' && method === 'POST') {
+      api.signedIn = true
+      api.account = { ...api.account, email: String(input.email) }
+      return Response.json(api.account, { status: 201 })
+    }
+    if (path === '/v1/console/account/session' && method === 'DELETE') {
+      api.signedIn = false
+      return new Response(null, { status: 204 })
+    }
+    // A sign up: the first admin's, an open one, or an invited one (which joins the preview's org).
+    // The real server checks the setup token and the invitation; refuse them with failNext.
     if (path === '/v1/console/account' && method === 'POST') {
       api.account = {
         ...api.account,
         email: String(input.email),
         name: typeof input.name === 'string' ? input.name : null,
       }
+      api.signedIn = true
       api.setupRequired = false
       api.orgs.push(makeOrg({ id: nextId('org'), name: `${api.account.name ?? 'Your'}'s org` }))
+      if (typeof input.inviteToken === 'string' && api.preview !== null) {
+        api.orgs.push(
+          makeOrg({ id: api.preview.orgId, name: api.preview.orgName, role: api.preview.role }),
+        )
+      }
       return Response.json(api.account, { status: 201 })
+    }
+    if (path === '/v1/console/invitations/preview' && method === 'POST') {
+      return api.preview === null
+        ? problem(404, 'invitation_not_found', 'This invite link isn’t valid anymore.')
+        : Response.json(api.preview)
+    }
+    if (path === '/v1/console/invitations/accept' && method === 'POST') {
+      const preview = api.preview
+      if (preview === null) {
+        return problem(404, 'invitation_not_found', 'This invite link isn’t valid anymore.')
+      }
+      const existing = orgById(preview.orgId)
+      const org =
+        existing ?? makeOrg({ id: preview.orgId, name: preview.orgName, role: preview.role })
+      if (existing === undefined) api.orgs.push(org)
+      api.preview = null
+      return Response.json({ org, alreadyMember: existing !== undefined })
     }
     if (path === '/v1/console/orgs' && method === 'GET') return page(api.orgs)
     if (path === '/v1/console/orgs' && method === 'POST') {
@@ -189,7 +303,49 @@ export function installFakeApi(): FakeApi {
       return Response.json(org, { status: 201 })
     }
 
-    let match = /^\/v1\/console\/orgs\/([^/]+)(\/restore|\/projects)?$/.exec(path)
+    let match = /^\/v1\/console\/orgs\/([^/]+)\/(members|invitations)(?:\/([^/]+))?$/.exec(path)
+    if (match !== null) {
+      const [, id = '', kind] = match
+      const itemId = match.at(3)
+      if (orgById(id) === undefined) return problem(404, 'not_found', 'No such org.')
+      if (kind === 'members') {
+        const members = (api.members[id] ??= [])
+        if (itemId === undefined) return page(members)
+        const member = members.find((item) => item.userId === itemId)
+        if (member === undefined) return problem(404, 'not_found', 'No such member.')
+        if (method === 'DELETE') {
+          members.splice(members.indexOf(member), 1)
+          if (itemId === accountId) api.orgs = api.orgs.filter((org) => org.id !== id)
+          return new Response(null, { status: 204 })
+        }
+        const updated = { ...member, role: input.role as OrgRole }
+        members.splice(members.indexOf(member), 1, updated)
+        if (itemId === accountId) {
+          const org = orgById(id)
+          if (org !== undefined) replace(api.orgs, { ...org, role: updated.role })
+        }
+        return Response.json(updated)
+      }
+      const invitations = (api.invitations[id] ??= [])
+      if (itemId === undefined && method === 'GET') return page(invitations)
+      if (itemId === undefined && method === 'POST') {
+        const email = String(input.email)
+        const kept = invitations.filter((item) => item.email.toLowerCase() !== email.toLowerCase())
+        const invitation = makeInvitation({
+          id: nextId('inv'),
+          email,
+          role: input.role as OrgRole,
+        })
+        api.invitations[id] = [...kept, invitation]
+        return Response.json({ invitation, url: fakeInviteUrl }, { status: 201 })
+      }
+      const found = invitations.find((item) => item.id === itemId)
+      if (found === undefined) return problem(404, 'not_found', 'No such invitation.')
+      invitations.splice(invitations.indexOf(found), 1)
+      return new Response(null, { status: 204 })
+    }
+
+    match = /^\/v1\/console\/orgs\/([^/]+)(\/restore|\/projects)?$/.exec(path)
     if (match !== null) {
       const [, id = '', rest] = match
       const org = orgById(id)

@@ -13,14 +13,25 @@ import { RouteError } from '@/shell/route-error'
 import { routeTree } from './routeTree.gen'
 
 // One place turns a "no console session" answer into the sign in redirect (spec 0005, AC-20).
-const onError = (error: unknown) => {
+// Queries and mutations marked `meta: { sessionOptional: true }` belong to public pages that work
+// signed out, where a 401 means "signed out", so they never redirect (spec 0008, AC-21).
+const onError = (error: unknown, meta: Record<string, unknown> | undefined) => {
+  if (meta?.sessionOptional === true) return
   if (isSessionError(error)) redirectToSignIn()
 }
 
 // The client already retries safe calls (spec 0001), so queries do not retry again.
 const queryClient = new QueryClient({
-  queryCache: new QueryCache({ onError }),
-  mutationCache: new MutationCache({ onError }),
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      onError(error, query.meta)
+    },
+  }),
+  mutationCache: new MutationCache({
+    onError: (error, _variables, _context, mutation) => {
+      onError(error, mutation.meta)
+    },
+  }),
   defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
 })
 const router = createRouter({

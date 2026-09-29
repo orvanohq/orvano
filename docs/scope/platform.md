@@ -20,17 +20,17 @@ Public docs with a quickstart per SDK and the generated API reference. From here
 **Also:** move the README install section into the docs site · from spec 0006
 - [ ] Design it (spec): `/architect docs site & quickstarts`
 
-### 15. Console team members & roles · in-progress
+### 15. Console team members & roles · done
 Invite teammates into an org by email and give them roles (owner, developer, viewer) that control what they can do in the console.
 **Done when:** an invited teammate joins with the right role; a viewer cannot change settings or keys; removing a member ends their access.
 - [x] Design it (spec): `/architect console team members & roles`
-- [ ] Build it: `/develop console team members & roles`
-   - [ ] Thin thread: invitations table, create with replace and cap, preview, accept, invited sign up, the members list, the Members page with the Invite dialog and link step, and the `/invite` page (AC-1 to 3, 5 to 8, 15 to 17, 20 to 22)
-   - [ ] Member management: change role, remove, leave, list and revoke invitations, events, and the Pending invitations section (AC-4, 9 to 11, 18, 19)
-   - [ ] Names on keys, install admin flag, `/install`, and `/sign-up` (AC-12 to 14, 23 to 25)
-   - [ ] Quality and end to end: titles, catalog, keyboard scripts, axe, integration tests, the Playwright flow (AC-26, 27)
-- [ ] Verify it: `/check verify console team members & roles`
-- [ ] Test it: `/test console team members & roles`
+- [x] Build it: `/develop console team members & roles`
+   - [x] Thin thread: invitations table, create with replace and cap, preview, accept, invited sign up, the members list, the Members page with the Invite dialog and link step, and the `/invite` page (AC-1 to 3, 5 to 8, 15 to 17, 20 to 22)
+   - [x] Member management: change role, remove, leave, list and revoke invitations, events, and the Pending invitations section (AC-4, 9 to 11, 18, 19)
+   - [x] Names on keys, install admin flag, `/install`, and `/sign-up` (AC-12 to 14, 23 to 25)
+   - [x] Quality and end to end: titles, catalog, keyboard scripts, axe, integration tests, the Playwright flow (AC-26, 27)
+- [x] Verify it: `/check verify console team members & roles`
+- [x] Test it: `/test console team members & roles`
 Spec [0008](../specs/0008-console-team-members/index.md) (members, invitations, screens) · Spec [0003](../specs/0003-platform-data-model/index.md) (model) · code in `server/src/Orvano.Platform/`, `server/src/Orvano.Auth/`, `contract/platform/`, `console/`
 
 ### 19. CLI, migrations & type generation · needs a decision

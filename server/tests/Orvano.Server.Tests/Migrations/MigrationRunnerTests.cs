@@ -35,7 +35,7 @@ public class MigrationRunnerTests(PostgresFixture postgres)
         Assert.Equal(
         [
             "auth_passwords", "auth_sessions", "auth_signing_keys", "auth_users",
-            "events", "jobs", "platform_api_keys", "platform_install_admins", "platform_install_settings",
+            "events", "jobs", "platform_api_keys", "platform_install_admins", "platform_install_settings", "platform_invitations",
             "platform_memberships", "platform_orgs", "platform_platforms", "platform_projects", "schema_migrations",
         ], tables);
     }

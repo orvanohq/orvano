@@ -36,6 +36,20 @@ describe('/sign-in', () => {
     expect(document.body.textContent).not.toContain('Finish setting up Orvano')
   })
 
+  it('links to /sign-up only when sign up is open (spec 0008, AC-23)', async () => {
+    api.setupRequired = false
+    api.consoleSignup = 'invite'
+    const { screen } = await renderApp('/sign-in')
+    await expect.element(screen.getByLabelText('Password')).toBeVisible()
+    expect(document.querySelector('a[href="/sign-up"]')).toBeNull()
+
+    api.consoleSignup = 'open'
+    await renderApp('/sign-in')
+    await expect
+      .poll(() => document.querySelector('a[href="/sign-up"]')?.textContent)
+      .toBe('Create account')
+  })
+
   for (const theme of ['light', 'dark'] as const) {
     it(`has no axe violations in ${theme} mode with the setup notice showing`, async () => {
       setMode(theme, 'comfortable')

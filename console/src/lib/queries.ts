@@ -1,5 +1,6 @@
 import { infiniteQueryOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 import { consoleApi, projectClient } from '@/lib/console-client'
+import { isSessionError } from '@/lib/session'
 
 /** Page size for the switchers; `/orgs` and the org page use smaller pages. */
 export const switcherPageSize = 100
@@ -7,10 +8,20 @@ export const switcherPageSize = 100
 /** Query keys, one place (spec 0005, Query setup). */
 export const keys = {
   account: ['console', 'account'] as const,
+  /**
+   * The same account for public pages that work signed in or out (`/invite`, `/sign-up`): its query
+   * is `sessionOptional`, so a 401 means "signed out" and never redirects (spec 0008, AC-21).
+   */
+  accountOptional: ['console', 'account', 'optional'] as const,
   setup: ['console', 'install', 'setup'] as const,
+  installSettings: ['console', 'install', 'settings'] as const,
+  /** Holds no token: the invite page's token never enters a query key or cache (AC-20). */
+  invitationPreview: ['console', 'invitations', 'preview'] as const,
   orgs: ['console', 'orgs'] as const,
   org: (orgId: string) => ['console', 'orgs', orgId] as const,
   orgProjects: (orgId: string) => ['console', 'orgs', orgId, 'projects'] as const,
+  members: (orgId: string) => ['console', 'orgs', orgId, 'members'] as const,
+  invitations: (orgId: string) => ['console', 'orgs', orgId, 'invitations'] as const,
   project: (projectId: string) => ['console', 'projects', projectId] as const,
   users: (projectId: string) => ['console', 'projects', projectId, 'users'] as const,
   user: (projectId: string, userId: string) =>
@@ -46,6 +57,25 @@ export function accountQuery() {
   })
 }
 
+/**
+ * The signed in console account, or null when signed out, for public pages (spec 0008, AC-21). The
+ * global session handler skips it (`meta.sessionOptional`), so a 401 here never redirects.
+ */
+export function optionalAccountQuery() {
+  return queryOptions({
+    queryKey: keys.accountOptional,
+    queryFn: async ({ signal }) => {
+      try {
+        return await consoleApi().consoleAccount.get({ signal })
+      } catch (error) {
+        if (isSessionError(error)) return null
+        throw error
+      }
+    },
+    meta: { sessionOptional: true },
+  })
+}
+
 /** Whether the install still waits for its first admin (spec 0006, AC-22); needs no session. */
 export function setupQuery() {
   return queryOptions({
@@ -60,6 +90,42 @@ export function orgsQuery(limit: number = switcherPageSize) {
     queryKey: limit === switcherPageSize ? keys.orgs : ([...keys.orgs, { limit }] as const),
     queryFn: ({ pageParam, signal }) =>
       consoleApi().consoleOrgs.list({ cursor: pageParam, limit }, { signal }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+}
+
+/** The install settings; install admins only (spec 0008, AC-24). */
+export function installSettingsQuery() {
+  return queryOptions({
+    queryKey: keys.installSettings,
+    queryFn: ({ signal }) => consoleApi().consoleInstall.getSettings({ signal }),
+  })
+}
+
+/**
+ * An org's members, oldest first, 25 per page (spec 0008, AC-15). A page can hold fewer items than
+ * the limit, even none, while it still has a next cursor (AC-8).
+ */
+export function membersQuery(orgId: string) {
+  return infiniteQueryOptions({
+    queryKey: keys.members(orgId),
+    queryFn: ({ pageParam, signal }) =>
+      consoleApi().consoleMembers.list(orgId, { cursor: pageParam, limit: 25 }, { signal }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+}
+
+/**
+ * An org's invitations, oldest first, 25 per page; owners only (spec 0008, AC-18). Holds
+ * `Invitation` only: an invite link is never written to any query (AC-17).
+ */
+export function invitationsQuery(orgId: string) {
+  return infiniteQueryOptions({
+    queryKey: keys.invitations(orgId),
+    queryFn: ({ pageParam, signal }) =>
+      consoleApi().consoleInvitations.list(orgId, { cursor: pageParam, limit: 25 }, { signal }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   })

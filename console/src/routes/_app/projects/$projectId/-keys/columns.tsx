@@ -45,12 +45,15 @@ export function deleteKeyReason(
   return key.createdByUserId === accountId ? undefined : 'You can delete only keys you created'
 }
 
-/** Who created a key: "You" or "Teammate", and a skeleton until your account has loaded (AC-12). */
+/**
+ * Who created a key (spec 0008, AC-25): "You", else their name, else their email, and "Deleted
+ * account" once that account is gone; a skeleton until your account has loaded (spec 0007, AC-12).
+ */
 export function CreatedBy({
-  userId,
+  apiKey,
   accountId,
 }: {
-  userId: string
+  apiKey: Pick<ApiKey, 'createdByUserId' | 'createdBy'>
   accountId: string | undefined
 }) {
   if (accountId === undefined) {
@@ -61,7 +64,9 @@ export function CreatedBy({
       </>
     )
   }
-  return userId === accountId ? 'You' : 'Teammate'
+  if (apiKey.createdByUserId === accountId) return 'You'
+  if (apiKey.createdBy === null) return 'Deleted account'
+  return apiKey.createdBy.name ?? apiKey.createdBy.email
 }
 
 /**
@@ -120,7 +125,7 @@ export function keyColumns({
     {
       accessorKey: 'createdByUserId',
       header: 'Created by',
-      cell: ({ row }) => <CreatedBy userId={row.original.createdByUserId} accountId={accountId} />,
+      cell: ({ row }) => <CreatedBy apiKey={row.original} accountId={accountId} />,
     },
     {
       id: 'delete',

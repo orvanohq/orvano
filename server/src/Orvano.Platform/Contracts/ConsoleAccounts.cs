@@ -9,12 +9,26 @@ public abstract record SignupAdmission
 
     /// <summary>The sign up may go ahead.</summary>
     /// <param name="IsFirstAccount">The first console account on the install, which becomes an install admin.</param>
-    /// <param name="InviteOrgId">The org of the invitation it was admitted by, if any (row 15).</param>
-    /// <param name="InviteRole">The role that invitation grants, if any (row 15).</param>
-    public sealed record Admitted(bool IsFirstAccount, Guid? InviteOrgId = null, OrgRole? InviteRole = null) : SignupAdmission;
+    /// <param name="InviteOrgId">The org of the invitation it was admitted by, if any (spec 0008).</param>
+    /// <param name="InviteRole">The role that invitation grants, if any.</param>
+    /// <param name="InvitationId">The invitation, already used up in this transaction, if any.</param>
+    public sealed record Admitted(bool IsFirstAccount, Guid? InviteOrgId = null, OrgRole? InviteRole = null, Guid? InvitationId = null)
+        : SignupAdmission;
 
-    /// <summary>Refused with 403 <c>signup_closed</c>: sign up is invite only and no valid invitation was given.</summary>
+    /// <summary>Refused with 403 <c>signup_closed</c>: sign up is invite only and no invitation was given.</summary>
     public sealed record Refused : SignupAdmission;
+
+    /// <summary>Refused with 404 <c>invitation_not_found</c>: the invite token is malformed, unknown, used, replaced, or revoked.</summary>
+    public sealed record InvitationNotFound : SignupAdmission;
+
+    /// <summary>Refused with 410 <c>invitation_expired</c>.</summary>
+    public sealed record InvitationExpired : SignupAdmission;
+
+    /// <summary>Refused with 403 <c>invitation_email_mismatch</c>: the invitation is for another email; it is kept.</summary>
+    public sealed record InvitationEmailMismatch : SignupAdmission;
+
+    /// <summary>Refused with 409 <c>org_not_active</c>: the invitation's org is being deleted.</summary>
+    public sealed record OrgNotActive : SignupAdmission;
 
     /// <summary>
     /// Refused with 403 <c>setup_token_invalid</c>: this would be the first account, the install has a setup token
@@ -29,8 +43,9 @@ public interface IConsoleSignupPolicy
     /// <summary>
     /// Locks <c>platform_install_settings</c> (<c>SELECT ... FOR UPDATE</c>) so exactly one of two racing first sign
     /// ups sees no install admin, then admits the first account (with the install's setup token when one is
-    /// configured, spec 0006), anyone while sign up is <c>open</c>, or a valid invitation (row 15; until then an
-    /// invite token admits no one). Once an install admin exists the setup token is ignored.
+    /// configured, spec 0006; any invite token is then ignored). Once an install admin exists, an invite token is
+    /// checked whatever the sign up mode and used up in this transaction (spec 0008, AC-7); without one, anyone is
+    /// admitted while sign up is <c>open</c>. The setup token is then ignored.
     /// </summary>
     /// <param name="tx">The sign up transaction, owned by Auth.</param>
     /// <param name="email">The new account's email.</param>
