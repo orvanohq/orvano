@@ -58,7 +58,7 @@ Every product feature ships in all of these layers in the same version, unless i
 | 12 | OAuth & ID token sign in | v0.3 | planned |
 | 13 | MFA, passkeys & sessions | v0.3 | planned |
 | 14 | Auth policies & abuse protection | v0.3 | planned |
-| 15 | Console team members & roles | v0.3 | planned |
+| 15 | Console team members & roles | v0.3 | in-progress |
 | 16 | Tables, rows & data API | v0.4 | planned |
 | 17 | Row level permissions & app teams | v0.4 | planned |
 | 18 | SQL & table editor | v0.5 | planned |
