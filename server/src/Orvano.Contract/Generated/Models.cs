@@ -76,6 +76,78 @@ public sealed class ConsoleSignupModeJsonConverter : JsonConverter<ConsoleSignup
         });
 }
 
+/// <summary>Whether an invitation can still be accepted.</summary>
+[JsonConverter(typeof(InvitationStatusJsonConverter))]
+public enum InvitationStatus
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>pending</c>.</summary>
+    Pending,
+
+    /// <summary>The wire value <c>expired</c>.</summary>
+    Expired,
+}
+
+/// <summary>Reads and writes <see cref="InvitationStatus"/> by wire value; unknown values read as <see cref="InvitationStatus.Unknown"/>.</summary>
+public sealed class InvitationStatusJsonConverter : JsonConverter<InvitationStatus>
+{
+    /// <inheritdoc/>
+    public override InvitationStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "pending" => InvitationStatus.Pending,
+            "expired" => InvitationStatus.Expired,
+            _ => InvitationStatus.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, InvitationStatus value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            InvitationStatus.Pending => "pending",
+            InvitationStatus.Expired => "expired",
+            _ => throw new JsonException($"InvitationStatus.{value} has no wire value"),
+        });
+}
+
+/// <summary>Whether a member's console account may sign in.</summary>
+[JsonConverter(typeof(MemberStatusJsonConverter))]
+public enum MemberStatus
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>active</c>.</summary>
+    Active,
+
+    /// <summary>The wire value <c>blocked</c>.</summary>
+    Blocked,
+}
+
+/// <summary>Reads and writes <see cref="MemberStatus"/> by wire value; unknown values read as <see cref="MemberStatus.Unknown"/>.</summary>
+public sealed class MemberStatusJsonConverter : JsonConverter<MemberStatus>
+{
+    /// <inheritdoc/>
+    public override MemberStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "active" => MemberStatus.Active,
+            "blocked" => MemberStatus.Blocked,
+            _ => MemberStatus.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, MemberStatus value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            MemberStatus.Active => "active",
+            MemberStatus.Blocked => "blocked",
+            _ => throw new JsonException($"MemberStatus.{value} has no wire value"),
+        });
+}
+
 /// <summary>A console member's one role in an org.</summary>
 [JsonConverter(typeof(OrgRoleJsonConverter))]
 public enum OrgRole
@@ -327,6 +399,13 @@ public sealed class UserStatusJsonConverter : JsonConverter<UserStatus>
         });
 }
 
+/// <summary>The org an accepted invitation joined.</summary>
+/// <param name="Org">The org, with the caller's role in it.</param>
+/// <param name="AlreadyMember">True when the caller was already a member; their role did not change.</param>
+public sealed record AcceptedInvitation(
+    [property: JsonPropertyName("org")] Org Org,
+    [property: JsonPropertyName("alreadyMember")] bool AlreadyMember);
+
 /// <summary>An API key for server code. Its secret is never shown again after creation.</summary>
 /// <param name="Id">The key ID.</param>
 /// <param name="Name">A name to recognize the key by, 1 to 100 characters.</param>
@@ -335,6 +414,7 @@ public sealed class UserStatusJsonConverter : JsonConverter<UserStatus>
 /// <param name="ExpiresAt">When the key stops working; null for never.</param>
 /// <param name="LastUsedAt">When the key was last used, to the minute; null if never.</param>
 /// <param name="CreatedByUserId">The console user who created the key.</param>
+/// <param name="CreatedBy">The console user who created the key, with their name and email; null when that account no longer exists.</param>
 /// <param name="CreatedAt">When the key was created.</param>
 public sealed record ApiKey(
     [property: JsonPropertyName("id")] string Id,
@@ -344,6 +424,7 @@ public sealed record ApiKey(
     [property: JsonPropertyName("expiresAt")] DateTimeOffset? ExpiresAt,
     [property: JsonPropertyName("lastUsedAt")] DateTimeOffset? LastUsedAt,
     [property: JsonPropertyName("createdByUserId")] string CreatedByUserId,
+    [property: JsonPropertyName("createdBy")] ConsoleUserRef? CreatedBy,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt);
 
 /// <summary>One page of a project's API keys, oldest first.</summary>
@@ -359,6 +440,36 @@ public sealed record ApiKeyPage(
 public sealed record AuthResult(
     [property: JsonPropertyName("user")] User User,
     [property: JsonPropertyName("session")] SessionTokens Session);
+
+/// <summary>A console account: a user of the console, and whether it is an install admin.</summary>
+/// <param name="Id">The user ID.</param>
+/// <param name="Email">The email, as typed at sign up; null for a user without one.</param>
+/// <param name="EmailVerified">Whether the email has been verified.</param>
+/// <param name="Name">The display name; null when none was given.</param>
+/// <param name="Status">Whether the user may sign in.</param>
+/// <param name="Metadata">Your own data about the user: a JSON object of at most 16 KB.</param>
+/// <param name="CreatedAt">When the user signed up.</param>
+/// <param name="LastSignInAt">When the user last signed in; null if never.</param>
+/// <param name="IsInstallAdmin">True when the account is an install admin, who may change the install settings.</param>
+public sealed record ConsoleAccount(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("email")] string? Email,
+    [property: JsonPropertyName("emailVerified")] bool EmailVerified,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("status")] UserStatus Status,
+    [property: JsonPropertyName("metadata")] IReadOnlyDictionary<string, JsonElement> Metadata,
+    [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt,
+    [property: JsonPropertyName("isInstallAdmin")] bool IsInstallAdmin);
+
+/// <summary>A console account and the name and email it goes by, for showing who did something.</summary>
+/// <param name="Id">The console user ID.</param>
+/// <param name="Name">The display name; null when none was given.</param>
+/// <param name="Email">The email.</param>
+public sealed record ConsoleUserRef(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("email")] string Email);
 
 /// <summary>A new user with an email and password.</summary>
 /// <param name="Email">The email, trimmed, at most 320 characters. Unique in the project, ignoring case.</param>
@@ -382,7 +493,7 @@ public sealed record CreateApiKeyRequest(
 /// <param name="Email">The email, trimmed, at most 320 characters. Unique among console accounts, ignoring case.</param>
 /// <param name="Password">8 to 256 characters after Unicode NFKC normalization.</param>
 /// <param name="Name">A display name, at most 256 characters.</param>
-/// <param name="InviteToken">The token of the invitation this sign up came from, if any.</param>
+/// <param name="InviteToken">The token of the invitation this sign up came from, if any. The account then joins the invitation's org with its role, whatever the sign up mode; the email must be the invitation's.</param>
 /// <param name="SetupToken">The setup token from the installer's setup link; needed only for the install's first account.</param>
 public sealed record CreateConsoleAccountRequest(
     [property: JsonPropertyName("email")] string Email,
@@ -397,6 +508,13 @@ public sealed record CreateConsoleAccountRequest(
 public sealed record CreateConsoleSessionRequest(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("password")] string Password);
+
+/// <summary>A new invitation.</summary>
+/// <param name="Email">The email to invite; trimmed, at most 320 characters. Inviting an email again replaces its old invitation.</param>
+/// <param name="Role">The role the invitation grants.</param>
+public sealed record CreateInvitationRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("role")] OrgRole Role);
 
 /// <summary>A new org. The caller becomes its owner.</summary>
 /// <param name="Name">The org name; trimmed, 1 to 100 characters.</param>
@@ -440,6 +558,13 @@ public sealed record CreatedApiKey(
     [property: JsonPropertyName("apiKey")] ApiKey ApiKey,
     [property: JsonPropertyName("secret")] string Secret);
 
+/// <summary>A new invitation and its link. The link is shown only here, once.</summary>
+/// <param name="Invitation">The invitation.</param>
+/// <param name="Url">The link to share with the invited person. Anyone holding it can see the invitation until it is used or expires.</param>
+public sealed record CreatedInvitation(
+    [property: JsonPropertyName("invitation")] Invitation Invitation,
+    [property: JsonPropertyName("url")] string Url);
+
 /// <summary>A request to delete the signed in user.</summary>
 /// <param name="Password">The user's current password.</param>
 public sealed record DeleteAccountRequest(
@@ -461,8 +586,54 @@ public sealed record InstallSettings(
 
 /// <summary>Whether the install still waits for its first admin.</summary>
 /// <param name="SetupRequired">True while no install admin exists: the first console account must come from the installer's setup link.</param>
+/// <param name="SignupOpen">True when anyone who can reach the console may create an account (<c>consoleSignup</c> is <c>open</c>).</param>
 public sealed record InstallSetup(
-    [property: JsonPropertyName("setupRequired")] bool SetupRequired);
+    [property: JsonPropertyName("setupRequired")] bool SetupRequired,
+    [property: JsonPropertyName("signupOpen")] bool SignupOpen);
+
+/// <summary>An invitation to join an org. Its link is shown only once, when it is created.</summary>
+/// <param name="Id">The invitation ID.</param>
+/// <param name="Email">The email the invitation is for, as typed. Only a console account with this email, ignoring case, can use it.</param>
+/// <param name="Role">The role the invitation grants.</param>
+/// <param name="InvitedBy">The owner who created it; null when that console account no longer exists.</param>
+/// <param name="Status">Whether it can still be accepted.</param>
+/// <param name="ExpiresAt">When the invitation stops working, 7 days after it was created.</param>
+/// <param name="CreatedAt">When the invitation was created.</param>
+public sealed record Invitation(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("role")] OrgRole Role,
+    [property: JsonPropertyName("invitedBy")] ConsoleUserRef? InvitedBy,
+    [property: JsonPropertyName("status")] InvitationStatus Status,
+    [property: JsonPropertyName("expiresAt")] DateTimeOffset ExpiresAt,
+    [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt);
+
+/// <summary>One page of an org's invitations, oldest first.</summary>
+/// <param name="Items">The invitations on this page.</param>
+/// <param name="NextCursor">Pass it as <c>cursor</c> to get the next page; null on the last page.</param>
+public sealed record InvitationPage(
+    [property: JsonPropertyName("items")] IReadOnlyList<Invitation> Items,
+    [property: JsonPropertyName("nextCursor")] string? NextCursor);
+
+/// <summary>What an invite link is for, shown before joining.</summary>
+/// <param name="OrgId">The org's ID.</param>
+/// <param name="OrgName">The org's name.</param>
+/// <param name="Role">The role the invitation grants.</param>
+/// <param name="Email">The email the invitation is for.</param>
+/// <param name="InvitedByName">The inviter's name, else their email; null when that console account no longer exists.</param>
+/// <param name="ExpiresAt">When the invitation stops working.</param>
+public sealed record InvitationPreview(
+    [property: JsonPropertyName("orgId")] string OrgId,
+    [property: JsonPropertyName("orgName")] string OrgName,
+    [property: JsonPropertyName("role")] OrgRole Role,
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("invitedByName")] string? InvitedByName,
+    [property: JsonPropertyName("expiresAt")] DateTimeOffset ExpiresAt);
+
+/// <summary>An invitation token, from the fragment of an invite link.</summary>
+/// <param name="Token">The token: 43 base64url characters.</param>
+public sealed record InvitationTokenRequest(
+    [property: JsonPropertyName("token")] string Token);
 
 /// <summary>One public signing key, as a JSON Web Key (RFC 7517).</summary>
 /// <param name="Kty">The key type, <c>EC</c>.</param>
@@ -485,6 +656,28 @@ public sealed record Jwk(
 /// <param name="Keys">The keys.</param>
 public sealed record Jwks(
     [property: JsonPropertyName("keys")] IReadOnlyList<Jwk> Keys);
+
+/// <summary>A member of an org.</summary>
+/// <param name="UserId">The member's console user ID.</param>
+/// <param name="Name">The display name; null when none was given.</param>
+/// <param name="Email">The email.</param>
+/// <param name="Status">Whether the member's account may sign in.</param>
+/// <param name="Role">The member's role in this org.</param>
+/// <param name="JoinedAt">When the member joined the org.</param>
+public sealed record Member(
+    [property: JsonPropertyName("userId")] string UserId,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("status")] MemberStatus Status,
+    [property: JsonPropertyName("role")] OrgRole Role,
+    [property: JsonPropertyName("joinedAt")] DateTimeOffset JoinedAt);
+
+/// <summary>One page of an org's members, oldest first. A member whose console account no longer exists is left out, so a page can hold fewer items than the limit, even none, while <c>nextCursor</c> is still set.</summary>
+/// <param name="Items">The members on this page.</param>
+/// <param name="NextCursor">Pass it as <c>cursor</c> to get the next page; null on the last page.</param>
+public sealed record MemberPage(
+    [property: JsonPropertyName("items")] IReadOnlyList<Member> Items,
+    [property: JsonPropertyName("nextCursor")] string? NextCursor);
 
 /// <summary>The discovery document standard JWT libraries configure themselves from. Orvano is not an OpenID provider; this exists so tools that take an issuer URL find the keys. Its names are the standard snake case ones.</summary>
 /// <param name="Issuer">The issuer, the <c>iss</c> of every access token of the project.</param>
@@ -683,6 +876,11 @@ public sealed record UpdateAccountRequest(
 /// <param name="ConsoleSignup">Who may create a console account.</param>
 public sealed record UpdateInstallSettingsRequest(
     [property: JsonPropertyName("consoleSignup")] ConsoleSignupMode ConsoleSignup);
+
+/// <summary>Changes to a member.</summary>
+/// <param name="Role">The member's new role.</param>
+public sealed record UpdateMemberRequest(
+    [property: JsonPropertyName("role")] OrgRole Role);
 
 /// <summary>Changes to an org.</summary>
 /// <param name="Name">The new org name; trimmed, 1 to 100 characters.</param>

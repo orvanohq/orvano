@@ -9,6 +9,9 @@ internal enum FailureKind
     Forbidden,
     NotFound,
     Conflict,
+
+    /// <summary>The thing existed but is gone for good (410), such as an expired invitation.</summary>
+    Gone,
 }
 
 /// <summary>A refusal with a stable error code from the contract's catalog and a short safe sentence.</summary>
@@ -37,6 +40,26 @@ internal sealed record Failure(FailureKind Kind, string Code, string Detail)
 
     public static Failure OrgNotEmpty { get; } =
         new(FailureKind.Conflict, ErrorCode.OrgNotEmpty, "Delete every project of the org first.");
+
+    public static Failure LastOwner { get; } =
+        new(FailureKind.Conflict, ErrorCode.LastOwner, "An org needs at least one owner. Make someone else an owner first.");
+
+    public static Failure MemberNotFound { get; } = NotFound("member");
+
+    public static Failure InvitationNotFound { get; } =
+        new(FailureKind.NotFound, ErrorCode.InvitationNotFound, "This invite link isn't valid anymore. It may have been used, replaced, or revoked.");
+
+    public static Failure InvitationExpired { get; } =
+        new(FailureKind.Gone, ErrorCode.InvitationExpired, "This invite expired. Ask an owner of the org for a new link.");
+
+    public static Failure InvitationEmailMismatch { get; } =
+        new(FailureKind.Forbidden, ErrorCode.InvitationEmailMismatch, "This invite is for another email address.");
+
+    public static Failure AlreadyMember { get; } =
+        new(FailureKind.Conflict, ErrorCode.AlreadyMember, "This email's account is already a member of the org.");
+
+    public static Failure InvitationLimit { get; } =
+        new(FailureKind.Conflict, ErrorCode.InvitationLimit, "The org already holds 100 invitations. Revoke some first.");
 }
 
 /// <summary>A use case's result: a value, or a <see cref="Failure"/>.</summary>

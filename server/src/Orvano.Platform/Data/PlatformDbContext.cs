@@ -25,6 +25,8 @@ internal sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> opti
 
     public DbSet<PlatformRow> Platforms => Set<PlatformRow>();
 
+    public DbSet<InvitationRow> Invitations => Set<InvitationRow>();
+
     /// <summary>A context on an open connection the caller owns; it never opens or closes it.</summary>
     public static PlatformDbContext On(NpgsqlConnection connection) =>
         new(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(connection).Options);
@@ -124,6 +126,21 @@ internal sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> opti
             e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
             e.HasOne<ProjectRow>().WithMany().HasForeignKey(x => x.ProjectId);
+        });
+
+        model.Entity<InvitationRow>(e =>
+        {
+            e.ToTable("platform_invitations");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasDefaultValueSql("uuidv7()");
+            e.Property(x => x.OrgId).HasColumnName("org_id");
+            e.Property(x => x.Email).HasColumnName("email");
+            e.Property(x => x.Role).HasColumnName("role");
+            e.Property(x => x.TokenHash).HasColumnName("token_hash");
+            e.Property(x => x.InvitedByUserId).HasColumnName("invited_by_user_id");
+            e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            e.HasOne<OrgRow>().WithMany().HasForeignKey(x => x.OrgId);
         });
     }
 }
@@ -254,4 +271,26 @@ internal sealed class PlatformRow
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }
+}
+
+/// <summary><c>platform_invitations</c> (spec 0008): the hash of an invite token, never the token.</summary>
+internal sealed class InvitationRow
+{
+    public Guid Id { get; set; }
+
+    public Guid OrgId { get; set; }
+
+    /// <summary>Trimmed, as typed. Personal data: never log it.</summary>
+    public required string Email { get; set; }
+
+    /// <summary><c>owner</c>, <c>developer</c>, or <c>viewer</c>.</summary>
+    public required string Role { get; set; }
+
+    public required byte[] TokenHash { get; set; }
+
+    public Guid InvitedByUserId { get; set; }
+
+    public DateTimeOffset ExpiresAt { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
 }

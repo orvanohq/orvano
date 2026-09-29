@@ -14,7 +14,8 @@ internal sealed record Actor(string Type, Guid? Id)
 
 /// <summary>
 /// The Platform module's outbox events (AC-19). Each carries the affected IDs, the actor, and for updates the names
-/// of the changed fields. Never a key secret, hash, or invite token.
+/// of the changed fields; member and invitation events also carry role values and reasons (spec 0008, AC-11).
+/// Never a key secret, hash, invite token, invite url, or email.
 /// </summary>
 internal static class PlatformEvents
 {
@@ -25,6 +26,10 @@ internal static class PlatformEvents
     public const string OrgPurged = "platform.org.purged";
     public const string MemberAdded = "platform.member.added";
     public const string MemberRemoved = "platform.member.removed";
+    public const string MemberRoleChanged = "platform.member.role_changed";
+    public const string InvitationCreated = "platform.invitation.created";
+    public const string InvitationRevoked = "platform.invitation.revoked";
+    public const string InvitationAccepted = "platform.invitation.accepted";
     public const string ProjectCreated = "platform.project.created";
     public const string ProjectUpdated = "platform.project.updated";
     public const string ProjectProvisioned = "platform.project.provisioned";
@@ -43,7 +48,8 @@ internal static class PlatformEvents
 
     /// <summary>
     /// Writes one event in <paramref name="tx"/>. <paramref name="ids"/> are the affected IDs by name
-    /// (<c>orgId</c>, <c>projectId</c>, ...); <paramref name="projectId"/> also goes on the event row for
+    /// (<c>orgId</c>, <c>projectId</c>, ...), plus any role values and reasons (<c>role</c>, <c>from</c>, <c>to</c>,
+    /// <c>reason</c>); <paramref name="projectId"/> also goes on the event row for
     /// project scoped events. <paramref name="subject"/> is the ID the event is about.
     /// </summary>
     public static Task<long> WriteAsync(

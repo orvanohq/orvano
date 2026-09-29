@@ -26,6 +26,7 @@ internal static class ApiMapping
             FailureKind.Conflict => StatusCodes.Status409Conflict,
             FailureKind.RateLimited => StatusCodes.Status429TooManyRequests,
             FailureKind.Busy => StatusCodes.Status503ServiceUnavailable,
+            FailureKind.Gone => StatusCodes.Status410Gone,
             _ => throw new ArgumentOutOfRangeException(nameof(failure), failure.Kind, null),
         }, failure.Code, failure.Detail);
     }
@@ -48,6 +49,12 @@ internal static class ApiMapping
         JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(row.Metadata) ?? [],
         row.CreatedAt,
         row.LastSignInAt);
+
+    public static Api.ConsoleAccount ConsoleAccount(UserRow row, bool isInstallAdmin)
+    {
+        var user = User(row);
+        return new(user.Id, user.Email, user.EmailVerified, user.Name, user.Status, user.Metadata, user.CreatedAt, user.LastSignInAt, isInstallAdmin);
+    }
 
     public static Api.SessionTokens SessionTokens(SessionTokensView view) => new(
         view.AccessToken,

@@ -8,6 +8,7 @@ using Orvano.Auth.Domain;
 using Orvano.Auth.Endpoints;
 using Orvano.Auth.Jobs;
 using Orvano.Core.Modules;
+using Orvano.Platform.Contracts;
 
 namespace Orvano.Auth;
 
@@ -26,6 +27,7 @@ internal sealed class AuthModule : IOrvanoModule
         services.AddSingleton<AuthStore>();
         services.AddSingleton<UserDirectory>();
         services.AddSingleton<IUserDirectory>(sp => sp.GetRequiredService<UserDirectory>());
+        services.AddSingleton<IConsoleUserDirectory, ConsoleUserDirectory>();
         services.AddSingleton<SessionChecks>();
     }
 

@@ -4,10 +4,13 @@ import type {
   CreateApiKeyRequest,
   CreateConsoleAccountRequest,
   CreateConsoleSessionRequest,
+  CreateInvitationRequest,
   CreateOrgRequest,
   CreatePlatformRequest,
   CreateProjectRequest,
+  InvitationTokenRequest,
   UpdateInstallSettingsRequest,
+  UpdateMemberRequest,
   UpdateOrgRequest,
   UpdatePlatformRequest,
   UpdateProjectRequest,
@@ -76,6 +79,59 @@ export const consoleDispatch: DispatchTable = {
     status: 200,
     console: (o, input) =>
       o.consoleInstall.updateSettings(input.body as UpdateInstallSettingsRequest),
+  },
+  'consoleInvitations.accept': {
+    status: 200,
+    console: (o, input) => o.consoleInvitations.accept(input.body as InvitationTokenRequest),
+  },
+  'consoleInvitations.create': {
+    status: 201,
+    console: (o, input) =>
+      o.consoleInvitations.create(input.orgId as string, input.body as CreateInvitationRequest),
+  },
+  'consoleInvitations.list': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleInvitations.list(input.orgId as string, {
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    consoleAll: (o, input) =>
+      o.consoleInvitations.listAll(input.orgId as string, {
+        limit: input.limit as number | undefined,
+      }),
+  },
+  'consoleInvitations.preview': {
+    status: 200,
+    console: (o, input) => o.consoleInvitations.preview(input.body as InvitationTokenRequest),
+  },
+  'consoleInvitations.revoke': {
+    status: 204,
+    console: (o, input) =>
+      o.consoleInvitations.revoke(input.orgId as string, input.invitationId as string),
+  },
+  'consoleMembers.list': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleMembers.list(input.orgId as string, {
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    consoleAll: (o, input) =>
+      o.consoleMembers.listAll(input.orgId as string, { limit: input.limit as number | undefined }),
+  },
+  'consoleMembers.remove': {
+    status: 204,
+    console: (o, input) => o.consoleMembers.remove(input.orgId as string, input.userId as string),
+  },
+  'consoleMembers.update': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleMembers.update(
+        input.orgId as string,
+        input.userId as string,
+        input.body as UpdateMemberRequest,
+      ),
   },
   'consoleOrgs.create': {
     status: 201,

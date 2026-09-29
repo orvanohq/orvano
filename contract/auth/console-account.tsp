@@ -1,7 +1,7 @@
 // The console account's own session (spec 0004, AC-27): console accounts are users of project `console`. Sign up,
 // sign in, refresh, and sign out set or clear two HttpOnly, SameSite=Strict cookies: orvano_console (the access
-// token) and orvano_console_refresh (the refresh token, sent only to /v1/console/account/session). These four and
-// consoleInstall.getSetup are the only console operations that need no console session.
+// token) and orvano_console_refresh (the refresh token, sent only to /v1/console/account/session). These four,
+// consoleInstall.getSetup, and consoleInvitations.preview are the only console operations that need no console session.
 import "@typespec/http";
 import "@typespec/openapi";
 import "../errors.tsp";
@@ -12,6 +12,15 @@ using Http;
 using OpenAPI;
 
 namespace Orvano;
+
+@doc("A console account: a user of the console, and whether it is an install admin.")
+model ConsoleAccount {
+  ...User;
+
+  @doc("True when the account is an install admin, who may change the install settings.")
+  @example(false)
+  isInstallAdmin: boolean;
+}
 
 @doc("A new console account.")
 model CreateConsoleAccountRequest {
@@ -27,7 +36,10 @@ model CreateConsoleAccountRequest {
   @example("Ada Lovelace")
   name?: string | null;
 
-  @doc("The token of the invitation this sign up came from, if any.")
+  @doc("""
+    The token of the invitation this sign up came from, if any. The account then joins the invitation's org with
+    its role, whatever the sign up mode; the email must be the invitation's.
+    """)
   inviteToken?: string | null;
 
   @doc("The setup token from the installer's setup link; needed only for the install's first account.")
@@ -59,7 +71,7 @@ interface ConsoleAccountApi {
   @post
   create(@body request: CreateConsoleAccountRequest): {
     @statusCode statusCode: 201;
-    @body body: User;
+    @body body: ConsoleAccount;
   } | Problem;
 
   @doc("Signs a console account in with its email and password, setting the session cookies.")
@@ -70,7 +82,7 @@ interface ConsoleAccountApi {
   @post
   createSession(@body request: CreateConsoleSessionRequest): {
     @statusCode statusCode: 201;
-    @body body: User;
+    @body body: ConsoleAccount;
   } | Problem;
 
   @doc("Trades the refresh cookie for a new pair of session cookies. The console client calls it after `token_expired`.")
@@ -96,5 +108,5 @@ interface ConsoleAccountApi {
   @extension("x-orvano-service", "consoleAccount")
   @useAuth(consoleSession)
   @get
-  get(): User | Problem;
+  get(): ConsoleAccount | Problem;
 }

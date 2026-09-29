@@ -7,8 +7,11 @@ namespace Orvano.Platform.Application;
 internal static class UnitOfWorkExtensions
 {
     /// <summary>The transaction's start time from Postgres, so every timestamp agrees with the jobs' <c>now()</c>.</summary>
-    public static Task<DateTimeOffset> NowAsync(this UnitOfWork uow, CancellationToken ct) =>
-        uow.Db.Database.SqlQuery<DateTimeOffset>($"SELECT now() AS \"Value\"").SingleAsync(ct);
+    public static Task<DateTimeOffset> NowAsync(this UnitOfWork uow, CancellationToken ct) => uow.Db.NowAsync(ct);
+
+    /// <summary>The database clock, for reads that compare against it (an invitation's expiry).</summary>
+    public static Task<DateTimeOffset> NowAsync(this PlatformDbContext db, CancellationToken ct) =>
+        db.Database.SqlQuery<DateTimeOffset>($"SELECT now() AS \"Value\"").SingleAsync(ct);
 
     /// <summary>The org, locked <c>FOR UPDATE</c> (org changes, deletes, and membership changes).</summary>
     public static async Task<OrgRow?> LockOrgForUpdateAsync(this UnitOfWork uow, Guid orgId, CancellationToken ct) =>

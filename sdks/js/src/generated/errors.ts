@@ -2,6 +2,8 @@
 
 /** Every stable error code the server sends as `OrvanoError.code`. */
 export const ErrorCode = {
+  /** `already_member` */
+  alreadyMember: 'already_member',
   /** `console_session_required` */
   consoleSessionRequired: 'console_session_required',
   /** `contract_violation` */
@@ -28,6 +30,14 @@ export const ErrorCode = {
   invalidRequest: 'invalid_request',
   /** `invalid_token` */
   invalidToken: 'invalid_token',
+  /** `invitation_email_mismatch` */
+  invitationEmailMismatch: 'invitation_email_mismatch',
+  /** `invitation_expired` */
+  invitationExpired: 'invitation_expired',
+  /** `invitation_limit` */
+  invitationLimit: 'invitation_limit',
+  /** `invitation_not_found` */
+  invitationNotFound: 'invitation_not_found',
   /** `last_owner` */
   lastOwner: 'last_owner',
   /** `not_found` */

@@ -92,15 +92,26 @@ internal sealed class AccountService(
             }
             else if (gate is not null)
             {
-                switch (await signupPolicy.AdmitAsync(uow.Tx, trimmed, gate.InviteToken, gate.SetupToken, token))
+                var decision = await signupPolicy.AdmitAsync(uow.Tx, trimmed, gate.InviteToken, gate.SetupToken, token);
+                switch (decision)
                 {
                     case SignupAdmission.Admitted admission:
                         admitted = admission;
                         break;
                     case SignupAdmission.SetupTokenInvalid:
                         return Failure.SetupTokenInvalid;
-                    default:
+                    case SignupAdmission.InvitationNotFound:
+                        return Failure.InvitationNotFound;
+                    case SignupAdmission.InvitationExpired:
+                        return Failure.InvitationExpired;
+                    case SignupAdmission.InvitationEmailMismatch:
+                        return Failure.InvitationEmailMismatch;
+                    case SignupAdmission.OrgNotActive:
+                        return Failure.OrgNotActive;
+                    case SignupAdmission.Refused:
                         return Failure.SignupClosed;
+                    default:
+                        throw new InvalidOperationException($"Unknown sign up admission {decision.GetType().Name}.");
                 }
             }
 

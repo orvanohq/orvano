@@ -124,6 +124,21 @@ enum ErrorCode {
   @doc("A user with this email already exists in the project (409).")
   user_already_exists,
 
+  @doc("The invite link is unknown, already used, replaced, or revoked (404).")
+  invitation_not_found,
+
+  @doc("The invite link has expired; ask an org owner for a new one (410).")
+  invitation_expired,
+
+  @doc("The invitation is for another email than the console account using it (403).")
+  invitation_email_mismatch,
+
+  @doc("That email's console account is already a member of the org (409).")
+  already_member,
+
+  @doc("The org already holds 100 invitations; revoke some first (409).")
+  invitation_limit,
+
   @doc("Too many requests; wait for the number of seconds in `Retry-After` (429).")
   rate_limited,
 

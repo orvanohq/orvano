@@ -16,6 +16,7 @@ internal static class ApiMapping
         FailureKind.Forbidden => StatusCodes.Status403Forbidden,
         FailureKind.NotFound => StatusCodes.Status404NotFound,
         FailureKind.Conflict => StatusCodes.Status409Conflict,
+        FailureKind.Gone => StatusCodes.Status410Gone,
         _ => throw new ArgumentOutOfRangeException(nameof(failure), failure.Kind, null),
     }, failure.Code, failure.Detail);
 
@@ -37,13 +38,7 @@ internal static class ApiMapping
             OrgStatus.Deleting => Api.OrgStatus.Deleting,
             _ => throw new ArgumentOutOfRangeException(nameof(view), view.Org.Status, null),
         },
-        view.Role switch
-        {
-            Contracts.OrgRole.Owner => Api.OrgRole.Owner,
-            Contracts.OrgRole.Developer => Api.OrgRole.Developer,
-            Contracts.OrgRole.Viewer => Api.OrgRole.Viewer,
-            _ => throw new ArgumentOutOfRangeException(nameof(view), view.Role, null),
-        },
+        Role(view.Role),
         view.Org.DeletedAt,
         view.Org.PurgeAfter,
         view.Org.CreatedAt,
@@ -67,7 +62,56 @@ internal static class ApiMapping
         row.CreatedAt,
         row.UpdatedAt);
 
-    public static Api.ApiKey ApiKey(ApiKeyRow row) => new(
+    public static Api.OrgRole Role(Contracts.OrgRole role) => role switch
+    {
+        Contracts.OrgRole.Owner => Api.OrgRole.Owner,
+        Contracts.OrgRole.Developer => Api.OrgRole.Developer,
+        Contracts.OrgRole.Viewer => Api.OrgRole.Viewer,
+        _ => throw new ArgumentOutOfRangeException(nameof(role), role, null),
+    };
+
+    /// <summary>A role from a request; <see langword="null"/> for a value this server does not know.</summary>
+    public static Contracts.OrgRole? ToRole(Api.OrgRole role) => role switch
+    {
+        Api.OrgRole.Owner => Contracts.OrgRole.Owner,
+        Api.OrgRole.Developer => Contracts.OrgRole.Developer,
+        Api.OrgRole.Viewer => Contracts.OrgRole.Viewer,
+        _ => null,
+    };
+
+    public static Api.ConsoleUserRef? UserRef(Contracts.ConsoleUserSummary? user) =>
+        user is null ? null : new(user.Id.ToString(), user.Name, user.Email);
+
+    public static Api.Member Member(MemberView view) => new(
+        view.User.Id.ToString(),
+        view.User.Name,
+        view.User.Email,
+        view.User.Status == Contracts.ConsoleUserStatus.Blocked ? Api.MemberStatus.Blocked : Api.MemberStatus.Active,
+        Role(Roles.Parse(view.Membership.Role)),
+        view.Membership.CreatedAt);
+
+    public static Api.Invitation Invitation(InvitationView view) => new(
+        view.Row.Id.ToString(),
+        view.Row.Email,
+        Role(Roles.Parse(view.Row.Role)),
+        UserRef(view.InvitedBy),
+        view.State == InvitationState.Expired ? Api.InvitationStatus.Expired : Api.InvitationStatus.Pending,
+        view.Row.ExpiresAt,
+        view.Row.CreatedAt);
+
+    public static Api.CreatedInvitation CreatedInvitation(CreatedInvite created) => new(Invitation(created.Invitation), created.Url);
+
+    public static Api.InvitationPreview InvitationPreview(InvitePreview preview) => new(
+        preview.Org.Id.ToString(),
+        preview.Org.Name,
+        Role(Roles.Parse(preview.Invitation.Role)),
+        preview.Invitation.Email,
+        preview.InvitedByName,
+        preview.Invitation.ExpiresAt);
+
+    public static Api.AcceptedInvitation AcceptedInvitation(AcceptedInvite accepted) => new(Org(accepted.Org), accepted.AlreadyMember);
+
+    public static Api.ApiKey ApiKey(ApiKeyRow row, Contracts.ConsoleUserSummary? createdBy) => new(
         row.Id.ToString(),
         row.Name,
         row.Prefix,
@@ -75,9 +119,8 @@ internal static class ApiMapping
         row.ExpiresAt,
         row.LastUsedAt,
         row.CreatedByUserId.ToString(),
+        UserRef(createdBy),
         row.CreatedAt);
-
-    public static Api.CreatedApiKey CreatedApiKey(CreatedKey created) => new(ApiKey(created.Key), created.Secret.Value);
 
     public static Api.Platform ApiPlatform(PlatformRow row) => new(
         row.Id.ToString(),

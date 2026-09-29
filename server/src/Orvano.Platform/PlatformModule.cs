@@ -36,6 +36,7 @@ internal sealed class PlatformModule : IOrvanoModule
         services.AddSingleton<PlatformService>();
         services.AddSingleton<InstallService>();
         services.AddSingleton<IInstallSetupState>(sp => sp.GetRequiredService<InstallService>());
+        services.AddSingleton<IInstallAdmins>(sp => sp.GetRequiredService<InstallService>());
         services.AddSingleton(InstallSetupToken.FromConfig(config));
 
         services.AddSingleton<PlatformDirectory>();
@@ -48,6 +49,18 @@ internal sealed class PlatformModule : IOrvanoModule
         services.AddSingleton<IConsoleSignupPolicy>(sp => sp.GetRequiredService<ConsoleAccounts>());
         services.AddSingleton<IConsoleAccountCreated>(sp => sp.GetRequiredService<ConsoleAccounts>());
         services.AddSingleton<IConsoleAccountGuard>(sp => sp.GetRequiredService<ConsoleAccounts>());
+    }
+
+    /// <summary>
+    /// Members and invitations read console accounts through Auth's <see cref="IConsoleUserDirectory"/> (resolved from
+    /// DI, so the module order stays as it is), and invitations build their link from <c>PublicUrl</c>, which only the
+    /// api role has (spec 0008).
+    /// </summary>
+    public void ConfigureApiServices(IServiceCollection services, IConfiguration config)
+    {
+        services.AddSingleton<ConsoleUserNames>();
+        services.AddSingleton<MemberService>();
+        services.AddSingleton<InvitationService>();
     }
 
     public void MapApi(RouteGroupBuilder v1) => ConsoleEndpoints.Map(v1);

@@ -248,6 +248,10 @@ public class PlatformLifecycleTests(PostgresFixture postgres)
         var orgId = (await p.Get<ProjectService>().GetAsync(user, project, Ct)).Value!.OrgId!.Value;
         await p.Get<ProjectService>().DeleteAsync(user, project, Ct);
         await p.Get<OrgService>().DeleteAsync(user, orgId, Ct);
+        // A pending invitation references the org, so the purge must delete it first (spec 0008, retention).
+        await TestDatabase.ExecuteAsync(p.Database.Superuser,
+            "INSERT INTO orvano.platform_invitations (org_id, email, role, token_hash, invited_by_user_id, expires_at) " +
+            "VALUES (@o, 'grace@x.com', 'viewer', sha256('t'::bytea), @u, now() + interval '7 days')", ("o", orgId), ("u", user));
 
         await p.RunJobsAsync(PlatformJobs.PurgeOrg);
         Assert.Equal(1L, await p.ScalarAsync<long>("SELECT count(*) FROM orvano.platform_orgs WHERE id = @o", ("o", orgId))); // AC-15
@@ -259,6 +263,7 @@ public class PlatformLifecycleTests(PostgresFixture postgres)
 
         Assert.Equal(0L, await p.ScalarAsync<long>("SELECT count(*) FROM orvano.platform_orgs WHERE id = @o", ("o", orgId)));
         Assert.Equal(0L, await p.ScalarAsync<long>("SELECT count(*) FROM orvano.platform_memberships WHERE org_id = @o", ("o", orgId)));
+        Assert.Equal(0L, await p.ScalarAsync<long>("SELECT count(*) FROM orvano.platform_invitations WHERE org_id = @o", ("o", orgId)));
     }
 
     [Fact]

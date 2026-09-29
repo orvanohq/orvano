@@ -2,6 +2,9 @@
 
 /// Every stable error code the server sends as `OrvanoException.code`.
 abstract final class ErrorCode {
+  /// `already_member`
+  static const alreadyMember = 'already_member';
+
   /// `console_session_required`
   static const consoleSessionRequired = 'console_session_required';
 
@@ -40,6 +43,18 @@ abstract final class ErrorCode {
 
   /// `invalid_token`
   static const invalidToken = 'invalid_token';
+
+  /// `invitation_email_mismatch`
+  static const invitationEmailMismatch = 'invitation_email_mismatch';
+
+  /// `invitation_expired`
+  static const invitationExpired = 'invitation_expired';
+
+  /// `invitation_limit`
+  static const invitationLimit = 'invitation_limit';
+
+  /// `invitation_not_found`
+  static const invitationNotFound = 'invitation_not_found';
 
   /// `last_owner`
   static const lastOwner = 'last_owner';

@@ -39,6 +39,10 @@ model InstallSetup {
   @doc("True while no install admin exists: the first console account must come from the installer's setup link.")
   @example(true)
   setupRequired: boolean;
+
+  @doc("True when anyone who can reach the console may create an account (`consoleSignup` is `open`).")
+  @example(false)
+  signupOpen: boolean;
 }
 
 @route("/v1/console/install/settings")

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Routing;
 using Orvano.Auth.Application;
 using Orvano.Core.Http;
 using Orvano.Core.RateLimiting;
+using Orvano.Platform.Contracts;
 using static Orvano.Auth.Endpoints.ApiMapping;
 using Api = Orvano.Contract;
 using Ops = Orvano.Contract.ConsoleAccountOperations;
@@ -20,7 +21,8 @@ internal static class ConsoleAccountEndpoints
     public static void Map(RouteGroupBuilder v1)
     {
         v1.MapPost(Ops.Create.Route, async (
-            HttpContext http, Api.CreateConsoleAccountRequest request, AccountService accounts, RateLimits limits, PublicUrl publicUrl, CancellationToken ct) =>
+            HttpContext http, Api.CreateConsoleAccountRequest request, AccountService accounts, IInstallAdmins admins, RateLimits limits, PublicUrl publicUrl,
+            CancellationToken ct) =>
         {
             var limit = limits.Acquire(RateLimitPolicies.SignUpPerIp, ConnectionIp.Key(http));
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
@@ -29,12 +31,13 @@ internal static class ConsoleAccountEndpoints
                 new ConsoleGate(request.InviteToken, request.SetupToken));
             if (!outcome.Succeeded) return Problem(http, outcome.Failure!);
             ConsoleCookies.Set(http, outcome.Value!.Session, publicUrl);
-            return TypedResults.Created((string?)null, User(outcome.Value.User));
+            return TypedResults.Created((string?)null, await AccountAsync(outcome.Value.User, admins, ct));
         })
             .WithName(Ops.Create.Id);
 
         v1.MapPost(Ops.CreateSession.Route, async (
-            HttpContext http, Api.CreateConsoleSessionRequest request, AccountService accounts, RateLimits limits, PublicUrl publicUrl, CancellationToken ct) =>
+            HttpContext http, Api.CreateConsoleSessionRequest request, AccountService accounts, IInstallAdmins admins, RateLimits limits, PublicUrl publicUrl,
+            CancellationToken ct) =>
         {
             // Both limits count every attempt, right or wrong (spec 0004, rate limits).
             var perEmail = limits.Acquire(RateLimitPolicies.SignInPerEmail, $"{ConsoleProject.Id}\n{(request.Email ?? "").Trim().ToLowerInvariant()}");
@@ -45,7 +48,7 @@ internal static class ConsoleAccountEndpoints
             var outcome = await accounts.SignInAsync(ConsoleProject.Id, request.Email, request.Password, PublicRequests.Client(http), ct);
             if (!outcome.Succeeded) return Problem(http, outcome.Failure!);
             ConsoleCookies.Set(http, outcome.Value!.Session, publicUrl);
-            return TypedResults.Created((string?)null, User(outcome.Value.User));
+            return TypedResults.Created((string?)null, await AccountAsync(outcome.Value.User, admins, ct));
         })
             .WithName(Ops.CreateSession.Id);
 
@@ -92,10 +95,17 @@ internal static class ConsoleAccountEndpoints
         })
             .WithName(Ops.DeleteSession.Id);
 
-        v1.MapGet(Ops.Get.Route, async (HttpContext http, AccountService accounts, CancellationToken ct) =>
-            Ok(http, await accounts.GetAsync(ConsoleProject.Id, ConsoleUser.Get(http), ct), User))
+        v1.MapGet(Ops.Get.Route, async (HttpContext http, AccountService accounts, IInstallAdmins admins, CancellationToken ct) =>
+        {
+            var outcome = await accounts.GetAsync(ConsoleProject.Id, ConsoleUser.Get(http), ct);
+            return outcome.Succeeded ? TypedResults.Ok(await AccountAsync(outcome.Value!, admins, ct)) : Problem(http, outcome.Failure!);
+        })
             .WithName(Ops.Get.Id);
     }
+
+    /// <summary>The console account with its install admin flag (spec 0008, AC-12).</summary>
+    private static async Task<Api.ConsoleAccount> AccountAsync(Data.UserRow user, IInstallAdmins admins, CancellationToken ct) =>
+        ConsoleAccount(user, await admins.IsInstallAdminAsync(user.Id, ct));
 }
 
 /// <summary>

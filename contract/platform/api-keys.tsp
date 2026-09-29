@@ -3,6 +3,7 @@ import "@typespec/http";
 import "@typespec/openapi";
 import "../errors.tsp";
 import "../auth/security.tsp";
+import "./members.tsp";
 
 using Http;
 using OpenAPI;
@@ -47,6 +48,9 @@ model ApiKey {
   @doc("The console user who created the key.")
   @example("01924f5e-6b0a-7f2e-8c01-1b2c3d4e5f60")
   createdByUserId: string;
+
+  @doc("The console user who created the key, with their name and email; null when that account no longer exists.")
+  createdBy: ConsoleUserRef | null;
 
   @doc("When the key was created.")
   createdAt: utcDateTime;

@@ -146,7 +146,9 @@ internal sealed class OrgService(PlatformStore store, DeleteGrace grace, ILogger
         return org;
     }
 
-    internal static async Task AddMemberAsync(UnitOfWork uow, Guid orgId, Guid userId, OrgRole role, Actor actor, DateTimeOffset now, CancellationToken ct)
+    /// <summary>Inserts a membership and writes <c>platform.member.added</c> with its role, and the invitation it came from, if any.</summary>
+    internal static async Task AddMemberAsync(
+        UnitOfWork uow, Guid orgId, Guid userId, OrgRole role, Actor actor, DateTimeOffset now, CancellationToken ct, Guid? invitationId = null)
     {
         var membership = new MembershipRow
         {
@@ -159,15 +161,21 @@ internal sealed class OrgService(PlatformStore store, DeleteGrace grace, ILogger
         };
         uow.Db.Memberships.Add(membership);
         await uow.Db.SaveChangesAsync(ct);
-        await PlatformEvents.WriteAsync(uow.Tx, PlatformEvents.MemberAdded, actor, membership.Id.ToString(),
-            new Dictionary<string, string> { ["orgId"] = orgId.ToString(), ["membershipId"] = membership.Id.ToString(), ["userId"] = userId.ToString() },
-            ct: ct);
+        var fields = new Dictionary<string, string>
+        {
+            ["orgId"] = orgId.ToString(),
+            ["membershipId"] = membership.Id.ToString(),
+            ["userId"] = userId.ToString(),
+            ["role"] = Roles.Wire(role),
+        };
+        if (invitationId is { } fromInvitation) fields["invitationId"] = fromInvitation.ToString();
+        await PlatformEvents.WriteAsync(uow.Tx, PlatformEvents.MemberAdded, actor, membership.Id.ToString(), fields, ct: ct);
     }
 
     internal static Dictionary<string, string> Ids(Guid orgId) => new() { ["orgId"] = orgId.ToString() };
 
     /// <summary>Locks the org and checks the caller may manage it: 404 to non members, 403 to non owners.</summary>
-    private static async Task<(OrgRow? Org, Failure? Failure)> LockAsOwnerAsync(UnitOfWork uow, Guid userId, Guid orgId, CancellationToken ct)
+    internal static async Task<(OrgRow? Org, Failure? Failure)> LockAsOwnerAsync(UnitOfWork uow, Guid userId, Guid orgId, CancellationToken ct)
     {
         var org = await uow.LockOrgForUpdateAsync(orgId, ct);
         if (org is null) return (null, Failure.OrgNotFound);
