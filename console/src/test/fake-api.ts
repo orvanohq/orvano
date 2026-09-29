@@ -31,6 +31,13 @@ export interface SentRequest {
 }
 
 /** A one time answer that replaces the fake's own for the next matching request. */
+interface Answer {
+  method: string
+  path: RegExp
+  body: unknown
+}
+
+/** A one time problem that replaces the fake's own answer for the next matching request. */
 interface Failure {
   method: string
   path: RegExp
@@ -60,6 +67,8 @@ export interface FakeApi {
   setupRequired: boolean
   /** Makes the next `method` request whose path matches answer with this problem, once. */
   failNext: (method: string, path: RegExp, status: number, code: string, detail: string) => void
+  /** Makes the next `method` request whose path matches answer 200 with this JSON body, once. */
+  answerNext: (method: string, path: RegExp, body: unknown) => void
 }
 
 export const accountId = 'user00000000000000001'
@@ -161,6 +170,7 @@ const nextId = (prefix: string) => `${prefix}${String(++counter).padStart(20 - p
 /** Replaces `fetch` with the fake and returns its state, which tests read and change freely. */
 export function installFakeApi(): FakeApi {
   const failures: Failure[] = []
+  const answers: Answer[] = []
   const api: FakeApi = {
     account: {
       id: accountId,
@@ -186,6 +196,9 @@ export function installFakeApi(): FakeApi {
     setupRequired: false,
     failNext: (method, path, status, code, detail) => {
       failures.push({ method, path, status, code, detail })
+    },
+    answerNext: (method, path, body) => {
+      answers.push({ method, path, body })
     },
   }
 
@@ -214,6 +227,11 @@ export function installFakeApi(): FakeApi {
     if (failure !== -1) {
       const [f] = failures.splice(failure, 1) as [Failure]
       return problem(f.status, f.code, f.detail)
+    }
+    const answer = answers.findIndex((a) => a.method === method && a.path.test(path))
+    if (answer !== -1) {
+      const [a] = answers.splice(answer, 1) as [Answer]
+      return Response.json(a.body)
     }
 
     if (path === '/v1/console/account' && method === 'GET') {

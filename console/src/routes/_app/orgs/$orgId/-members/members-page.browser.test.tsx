@@ -115,6 +115,30 @@ describe('the members table (AC-15)', () => {
     await expect.poll(() => document.title).toBe('Members · Acme · Orvano')
     expect(document.querySelector('h1#page-title')?.textContent).toBe('Members')
   })
+
+  it('offers Load more instead of the empty state when a page comes back empty but more remain', async () => {
+    seed('owner')
+    // The server drops members whose account is gone after paging, so a page can be empty (AC-8).
+    api.answerNext('GET', new RegExp(`/orgs/${orgId}/members$`), {
+      items: [],
+      nextCursor: 'more',
+    })
+    await renderApp(`/orgs/${orgId}/members`)
+    await expect.poll(() => button('Load more')).toBeDefined()
+    expect(text()).not.toContain('No members to show')
+
+    await userEvent.click(button('Load more') ?? document.body)
+    await expect.poll(text).toContain('Grace Hopper')
+    expect(button('Load more')).toBeUndefined()
+  })
+
+  it('shows the empty state once no member is left to show and no page remains', async () => {
+    seed('owner')
+    api.answerNext('GET', new RegExp(`/orgs/${orgId}/members$`), { items: [], nextCursor: null })
+    await renderApp(`/orgs/${orgId}/members`)
+    await expect.poll(text).toContain('No members to show')
+    expect(button('Load more')).toBeUndefined()
+  })
 })
 
 describe('invite (AC-16, AC-17)', () => {

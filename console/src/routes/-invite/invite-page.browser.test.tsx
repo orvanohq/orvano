@@ -123,6 +123,13 @@ describe('signed out (AC-22)', () => {
     expect(email?.readOnly).toBe(true)
   })
 
+  it('leaves the inviter out once their account is gone (AC-21)', async () => {
+    api.preview = { ...preview, invitedByName: null }
+    await openInvite()
+    await expect.poll(text).toContain("You're invited to join Acme as developer.")
+    expect(text()).not.toContain('invited you')
+  })
+
   it('creates the account with the token and lands on the inviting org', async () => {
     const { router } = await openInvite()
     await expect.poll(text).toContain('invited you to join')

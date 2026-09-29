@@ -382,6 +382,189 @@ public class MembersAndInvitationsTests(PostgresFixture postgres)
         Assert.Equal((HttpStatusCode.TooManyRequests, ErrorCode.RateLimited), (limited.Status, limited.Code));
     }
 
+    [Fact]
+    public async Task Invitations_list_oldest_first_in_pages_and_a_gone_inviter_reads_as_null()
+    {
+        // covers: AC-4, AC-5
+        await using var t = await StartAsync();
+        var orgId = await t.CreateOrgAsync();
+        await t.InviteAsync(orgId, "a@x.com", "viewer");
+        await t.InviteAsync(orgId, "b@x.com", "developer");
+        var third = await t.InviteAsync(orgId, "c@x.com", "owner");
+        var url = $"/v1/console/orgs/{orgId}/invitations";
+
+        using var first = await t.SendAsync(HttpMethod.Get, $"{url}?limit=2");
+        Assert.Equal(["a@x.com", "b@x.com"], first.Body.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("email").GetString()));
+        var cursor = first.Body.GetProperty("nextCursor").GetString()!;
+
+        await t.ExecuteAsync("UPDATE orvano.platform_invitations SET invited_by_user_id = @gone WHERE email = 'c@x.com'", ("gone", Guid.NewGuid()));
+        using var second = await t.SendAsync(HttpMethod.Get, $"{url}?limit=2&cursor={Uri.EscapeDataString(cursor)}");
+        var last = Assert.Single(second.Body.GetProperty("items").EnumerateArray());
+        Assert.Equal("c@x.com", last.GetProperty("email").GetString());
+        Assert.Equal(JsonValueKind.Null, last.GetProperty("invitedBy").ValueKind);
+        Assert.Equal(JsonValueKind.Null, second.Body.GetProperty("nextCursor").ValueKind);
+
+        using var preview = await t.PreviewAsync(third);
+        Assert.Equal(HttpStatusCode.OK, preview.Status);
+        Assert.Equal(JsonValueKind.Null, preview.Body.GetProperty("invitedByName").ValueKind);
+    }
+
+    [Fact]
+    public async Task Members_list_pages_oldest_first_and_skips_a_membership_whose_account_is_gone()
+    {
+        // covers: AC-8
+        await using var t = await StartAsync();
+        var orgId = await t.CreateOrgAsync();
+        await t.ExecuteAsync("INSERT INTO orvano.platform_memberships (org_id, user_id, role) VALUES (@o, @u, 'viewer')",
+            ("o", Guid.Parse(orgId)), ("u", Guid.NewGuid()));
+        var devId = await t.AddMemberAsync(orgId, Dev, "developer");
+        var url = $"/v1/console/orgs/{orgId}/members?limit=1";
+
+        using var first = await t.SendAsync(HttpMethod.Get, url);
+        Assert.Equal(Owner, Assert.Single(first.Body.GetProperty("items").EnumerateArray()).GetProperty("email").GetString());
+
+        // The second membership's account is gone: its page comes back empty, but paging goes on.
+        using var second = await t.SendAsync(HttpMethod.Get, $"{url}&cursor={Uri.EscapeDataString(first.Body.GetProperty("nextCursor").GetString()!)}");
+        Assert.Equal(0, second.Body.GetProperty("items").GetArrayLength());
+        var cursor = second.Body.GetProperty("nextCursor").GetString();
+        Assert.NotNull(cursor);
+
+        using var third = await t.SendAsync(HttpMethod.Get, $"{url}&cursor={Uri.EscapeDataString(cursor)}");
+        var dev = Assert.Single(third.Body.GetProperty("items").EnumerateArray());
+        Assert.Equal(devId.ToString(), dev.GetProperty("userId").GetString());
+        Assert.Equal(
+            await t.ScalarAsync<DateTime>("SELECT created_at FROM orvano.platform_memberships WHERE org_id = @o AND user_id = @u",
+                ("o", Guid.Parse(orgId)), ("u", devId)),
+            dev.GetProperty("joinedAt").GetDateTimeOffset().UtcDateTime,
+            TimeSpan.FromMilliseconds(1));
+        Assert.Equal(JsonValueKind.Null, third.Body.GetProperty("nextCursor").ValueKind);
+    }
+
+    [Fact]
+    public async Task Every_membership_or_invitation_change_in_a_deleting_org_answers_409()
+    {
+        // covers: AC-5, AC-6, AC-7, AC-9, AC-10
+        await using var t = await StartAsync();
+        var orgId = await t.CreateOrgAsync();
+        var devId = await t.AddMemberAsync(orgId, Dev, "developer");
+        var forOutsider = await t.InviteAsync(orgId, Outsider, "viewer");
+        var forNewcomer = await t.InviteAsync(orgId, "newcomer@x.com", "developer");
+        await t.ExecuteAsync("UPDATE orvano.platform_orgs SET status = 'deleting', deleted_at = now(), purge_after = now() + interval '7 days' WHERE id = @o",
+            ("o", Guid.Parse(orgId)));
+        var members = $"/v1/console/orgs/{orgId}/members";
+
+        await t.AssertProblemAsync(HttpMethod.Patch, $"{members}/{devId}", new { role = "viewer" }, HttpStatusCode.Conflict, ErrorCode.OrgNotActive);
+        await t.AssertProblemAsync(HttpMethod.Delete, $"{members}/{devId}", null, HttpStatusCode.Conflict, ErrorCode.OrgNotActive);
+        await t.AssertProblemAsync(HttpMethod.Delete, $"{members}/{devId}", null, HttpStatusCode.Conflict, ErrorCode.OrgNotActive, Dev);
+        await t.AssertProblemAsync(HttpMethod.Post, "/v1/console/invitations/accept", new { token = forOutsider }, HttpStatusCode.Conflict, ErrorCode.OrgNotActive, Outsider);
+        using var preview = await t.PreviewAsync(forOutsider);
+        using var signUp = await t.SignUpAsync("newcomer@x.com", forNewcomer);
+        Assert.Equal((HttpStatusCode.Conflict, ErrorCode.OrgNotActive), (preview.Status, preview.Code));
+        Assert.Equal((HttpStatusCode.Conflict, ErrorCode.OrgNotActive), (signUp.Status, signUp.Code));
+
+        Assert.Equal("developer", await t.ScalarAsync<string>("SELECT role FROM orvano.platform_memberships WHERE user_id = @u AND org_id = @o",
+            ("u", devId), ("o", Guid.Parse(orgId))));
+        Assert.Equal(0L, await t.ScalarAsync<long>("SELECT count(*) FROM orvano.auth_users WHERE email = 'newcomer@x.com'"));
+        Assert.Equal(2L, await t.ScalarAsync<long>("SELECT count(*) FROM orvano.platform_memberships WHERE org_id = @o", ("o", Guid.Parse(orgId))));
+    }
+
+    [Fact]
+    public async Task Bad_bodies_answer_400_before_anything_else()
+    {
+        // covers: AC-1, AC-3, AC-9
+        await using var t = await StartAsync();
+        var orgId = await t.CreateOrgAsync();
+        var devId = await t.AddMemberAsync(orgId, Dev, "developer");
+        var invitations = $"/v1/console/orgs/{orgId}/invitations";
+
+        // An outsider would get 404, so a 400 here proves the body is checked first.
+        await t.AssertProblemAsync(HttpMethod.Post, invitations, new { email = "a@x.com", role = "admin" }, HttpStatusCode.BadRequest, ErrorCode.InvalidRequest, Outsider);
+        await t.AssertProblemAsync(HttpMethod.Post, invitations, new { email = "a@x.com" }, HttpStatusCode.BadRequest, ErrorCode.InvalidRequest, Outsider);
+        await t.AssertProblemAsync(HttpMethod.Post, invitations, new { email = new string('a', 309) + "@example.com", role = "viewer" },
+            HttpStatusCode.BadRequest, ErrorCode.InvalidRequest);
+        await t.AssertProblemAsync(HttpMethod.Patch, $"/v1/console/orgs/{orgId}/members/{devId}", new { role = "admin" }, HttpStatusCode.BadRequest, ErrorCode.InvalidRequest, Outsider);
+        await t.AssertProblemAsync(HttpMethod.Patch, $"/v1/console/orgs/{orgId}/members/{devId}", new { role = "viewer" }, HttpStatusCode.NotFound, ErrorCode.NotFound, Outsider);
+        Assert.Equal(0L, await t.ScalarAsync<long>("SELECT count(*) FROM orvano.platform_invitations"));
+    }
+
+    [Fact]
+    public async Task A_removed_member_loses_the_orgs_projects_at_once_and_the_keys_they_made_stay()
+    {
+        // covers: AC-10, AC-14
+        await using var t = await StartAsync();
+        var orgId = await t.CreateOrgAsync();
+        const string projectId = "removedproject01";
+        await t.ExecuteAsync("INSERT INTO orvano.platform_projects (id, org_id, kind, name, status, created_by_user_id) VALUES (@p, @o, 'app', 'Shop', 'active', @u)",
+            ("p", projectId), ("o", Guid.Parse(orgId)), ("u", await t.UserIdAsync(Owner)));
+        var devId = await t.AddMemberAsync(orgId, Dev, "developer");
+        using var key = await t.SendAsync(HttpMethod.Post, "/v1/console/project/keys", new { name = "Dev key", scopes = new[] { "users.read" } }, Dev, projectId);
+        Assert.Equal(HttpStatusCode.Created, key.Status);
+
+        using var removed = await t.SendAsync(HttpMethod.Delete, $"/v1/console/orgs/{orgId}/members/{devId}");
+        Assert.Equal(HttpStatusCode.NoContent, removed.Status);
+
+        using var asRemoved = await t.SendAsync(HttpMethod.Get, "/v1/console/project/keys", session: Dev, project: projectId);
+        Assert.Equal((HttpStatusCode.NotFound, ErrorCode.ProjectNotFound), (asRemoved.Status, asRemoved.Code));
+        using var asOwner = await t.SendAsync(HttpMethod.Get, "/v1/console/project/keys", project: projectId);
+        var kept = Assert.Single(asOwner.Body.GetProperty("items").EnumerateArray());
+        Assert.Equal(devId.ToString(), kept.GetProperty("createdByUserId").GetString());
+        Assert.Equal(Dev, kept.GetProperty("createdBy").GetProperty("email").GetString());
+    }
+
+    [Fact]
+    public async Task Invitation_and_member_events_carry_ids_the_actor_and_role_values_only()
+    {
+        // covers: AC-11
+        await using var t = await StartAsync();
+        var orgId = await t.CreateOrgAsync();
+        var ownerId = await t.UserIdAsync(Owner);
+        var devId = await t.UserIdAsync(Dev);
+        var token = await t.InviteAsync(orgId, Dev, "developer");
+        var invitationId = await t.ScalarAsync<Guid>("SELECT id FROM orvano.platform_invitations");
+        using var accepted = await t.SendAsync(HttpMethod.Post, "/v1/console/invitations/accept", new { token }, Dev);
+        Assert.Equal(HttpStatusCode.OK, accepted.Status);
+        using var changed = await t.SendAsync(HttpMethod.Patch, $"/v1/console/orgs/{orgId}/members/{devId}", new { role = "viewer" });
+        Assert.Equal(HttpStatusCode.OK, changed.Status);
+
+        Assert.Equal($"developer|{invitationId}|{ownerId}", await t.ScalarAsync<string>(
+            "SELECT concat_ws('|', payload->>'role', payload->>'invitationId', payload->'actor'->>'id') FROM orvano.events WHERE type = 'platform.invitation.created'"));
+        Assert.Equal($"{devId}|developer|{devId}", await t.ScalarAsync<string>(
+            "SELECT concat_ws('|', payload->>'userId', payload->>'role', payload->'actor'->>'id') FROM orvano.events WHERE type = 'platform.invitation.accepted'"));
+        Assert.Equal("developer", await t.ScalarAsync<string>(
+            "SELECT payload->>'role' FROM orvano.events WHERE type = 'platform.member.added' AND payload->>'invitationId' = @i", ("i", invitationId.ToString())));
+        Assert.Equal("role", await t.ScalarAsync<string>(
+            "SELECT payload->'changed'->>0 FROM orvano.events WHERE type = 'platform.member.role_changed'"));
+
+        var fields = await t.ScalarAsync<string[]>(
+            "SELECT array_agg(DISTINCT k ORDER BY k) FROM orvano.events, json_object_keys(payload::json) k " +
+            "WHERE type LIKE 'platform.invitation.%' OR type LIKE 'platform.member.%'");
+        Assert.Subset(new HashSet<string>(["actor", "changed", "from", "invitationId", "membershipId", "orgId", "reason", "role", "to", "userId"]), fields.ToHashSet());
+        await t.AssertNoLeakAsync(token, Dev);
+    }
+
+    [Fact]
+    public async Task Invitation_creates_and_accepts_are_rate_limited_per_account()
+    {
+        // covers: AC-1, AC-6
+        await using var t = await StartAsync();
+        var orgId = await t.CreateOrgAsync();
+        for (var i = 0; i < 60; i++) await t.InviteAsync(orgId, $"limit{i}@x.com", "viewer");
+        await t.AssertProblemAsync(HttpMethod.Post, $"/v1/console/orgs/{orgId}/invitations", new { email = "limit60@x.com", role = "viewer" },
+            HttpStatusCode.TooManyRequests, ErrorCode.RateLimited);
+
+        for (var i = 0; i < 30; i++)
+        {
+            using var reply = await t.SendAsync(HttpMethod.Post, "/v1/console/invitations/accept", new { token = new string('a', 43) }, Dev);
+            Assert.Equal(HttpStatusCode.NotFound, reply.Status);
+        }
+
+        await t.AssertProblemAsync(HttpMethod.Post, "/v1/console/invitations/accept", new { token = new string('a', 43) },
+            HttpStatusCode.TooManyRequests, ErrorCode.RateLimited, Dev);
+        // The limit is the account's own: another account still gets its answer.
+        await t.AssertProblemAsync(HttpMethod.Post, "/v1/console/invitations/accept", new { token = new string('a', 43) },
+            HttpStatusCode.NotFound, ErrorCode.InvitationNotFound, Outsider);
+    }
+
     private async Task<Harness> StartAsync()
     {
         var database = await postgres.NewDatabaseAsync();
