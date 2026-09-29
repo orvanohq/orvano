@@ -206,9 +206,11 @@ describe('Create org and Create project accessibility (AC-22)', () => {
 
   it('keeps Tab inside the dialog', async () => {
     await openCreateOrg()
+    // Start once the dialog has moved focus inside; a Tab before that starts from the page.
+    await expect.poll(() => document.activeElement?.id).toBe('create-org-name')
     for (let i = 0; i < 6; i++) {
       await userEvent.tab()
-      expect(dialog()?.contains(document.activeElement)).toBe(true)
+      await expect.poll(() => dialog()?.contains(document.activeElement)).toBe(true)
     }
   })
 })
