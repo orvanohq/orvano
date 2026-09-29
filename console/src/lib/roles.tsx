@@ -18,6 +18,26 @@ export function useOrgRole(): OrgRole | undefined {
   return org.data?.role
 }
 
+/**
+ * Each role's name and one line description, from the contract's `OrgRole` docs (spec 0008). Typed
+ * as a `Record`, so a new role fails the build until it is described here.
+ */
+export const roleInfo: Record<OrgRole, { label: string; description: string }> = {
+  owner: {
+    label: 'Owner',
+    description: 'Everything, including deleting projects, managing members, and the org itself.',
+  },
+  developer: {
+    label: 'Developer',
+    description:
+      'Creates and edits projects, API keys, and platforms; deletes only the keys they created.',
+  },
+  viewer: { label: 'Viewer', description: 'Reads only.' },
+}
+
+/** Roles in the order the pickers list them, highest first. */
+export const orgRoles: readonly OrgRole[] = ['owner', 'developer', 'viewer']
+
 /** The reason text for a role rule, for example "Owners only" or "Developers and owners only". */
 export function roleReason(minRole: OrgRole): string {
   return minRole === 'owner' ? 'Owners only' : 'Developers and owners only'

@@ -1,6 +1,6 @@
 import { useForm } from '@tanstack/react-form'
 import { OrvanoError } from '@orvano/console-client'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { z } from 'zod'
 
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,15 @@ export function authErrorMessage(error: unknown): string {
     case 'setup_token_invalid':
       return 'This setup link is not valid. Run the installer again on your server to see the right link.'
     case 'signup_closed':
-      return 'Sign up is by invitation only on this install.'
+      return 'Sign up on this server is by invitation. Ask an org owner for an invite link.'
+    case 'invitation_not_found':
+      return "This invite link isn't valid anymore. It may have been used, replaced, or revoked."
+    case 'invitation_expired':
+      return 'This invite expired. Ask an owner of the org for a new link.'
+    case 'invitation_email_mismatch':
+      return 'This invite is for another email address.'
+    case 'org_not_active':
+      return 'This org is being deleted.'
     case 'user_already_exists':
       return 'An account with this email already exists. Sign in instead.'
     case 'invalid_password':
@@ -54,6 +62,7 @@ const setupSchema = z.object({
   email,
   password: newPassword,
 })
+const signUpSchema = setupSchema
 
 /** What each form field needs: its name, label, type, and autocomplete hint. */
 interface FieldSpec {
@@ -61,38 +70,54 @@ interface FieldSpec {
   label: string
   type: 'text' | 'email' | 'password'
   autoComplete: string
+  /** Shown but not editable, for an email an invite fixes (spec 0008, AC-22). */
+  readOnly?: boolean
+}
+
+/** A value to start a field with, and whether it can be changed. */
+export interface Prefill {
+  value: string
+  readOnly: boolean
 }
 
 /**
- * The shared email and password form of `/sign-in` and `/setup` (spec 0004 AC-27, spec 0006 AC-23):
+ * The shared email and password form of `/sign-in`, `/setup`, `/sign-up`, and `/invite` (spec 0004
+ * AC-27, spec 0006 AC-23, spec 0008 AC-22 and AC-23):
  * TanStack Form with a Zod schema, errors under each field, and a refusal from Orvano in the alert
  * above. `onSubmit` throws to refuse; the page moves on when it resolves.
  */
 function AuthForm({
   id,
   fields,
+  defaults = {},
   schema,
   submit,
   failedTitle,
+  errorAction,
   onSubmit,
 }: {
   id: string
   fields: readonly FieldSpec[]
+  defaults?: Record<string, string>
   schema: z.ZodType<Record<string, string>, Record<string, string>>
   submit: string
   failedTitle: string
+  /** A button to show in the alert for some refusals, such as "Sign in instead". */
+  errorAction?: ((error: unknown) => ReactNode) | undefined
   onSubmit: (values: Record<string, string>) => Promise<void>
 }) {
-  const [serverError, setServerError] = useState<string | null>(null)
+  const [serverError, setServerError] = useState<{ message: string; action: ReactNode } | null>(
+    null,
+  )
   const form = useForm({
-    defaultValues: Object.fromEntries(fields.map((f) => [f.name, ''])),
+    defaultValues: Object.fromEntries(fields.map((f) => [f.name, defaults[f.name] ?? ''])),
     validators: { onSubmit: schema },
     onSubmit: async ({ value }) => {
       setServerError(null)
       try {
         await onSubmit(value)
       } catch (error) {
-        setServerError(authErrorMessage(error))
+        setServerError({ message: authErrorMessage(error), action: errorAction?.(error) ?? null })
       }
     },
   })
@@ -106,7 +131,12 @@ function AuthForm({
         void form.handleSubmit()
       }}
     >
-      {serverError === null ? null : <FormAlert title={failedTitle}>{serverError}</FormAlert>}
+      {serverError === null ? null : (
+        <FormAlert title={failedTitle}>
+          {serverError.message}
+          {serverError.action === null ? null : <div className="mt-2">{serverError.action}</div>}
+        </FormAlert>
+      )}
       {fields.map((spec) => (
         <form.Field key={spec.name} name={spec.name}>
           {(field) => {
@@ -120,6 +150,7 @@ function AuthForm({
                   name={spec.name}
                   type={spec.type}
                   autoComplete={spec.autoComplete}
+                  readOnly={spec.readOnly}
                   value={field.state.value}
                   aria-invalid={invalid || undefined}
                   aria-describedby={invalid ? `${inputId}-error` : undefined}
@@ -148,15 +179,20 @@ function AuthForm({
   )
 }
 
-/** The sign in form: email and password. */
+/** The sign in form: email and password, the email optionally filled in (spec 0008, AC-22). */
 export function SignInForm({
+  id = 'sign-in',
+  email: emailPrefill,
   onSubmit,
 }: {
+  id?: string
+  email?: string | undefined
   onSubmit: (values: { email: string; password: string }) => Promise<void>
 }) {
   return (
     <AuthForm
-      id="sign-in"
+      id={id}
+      defaults={emailPrefill === undefined ? {} : { email: emailPrefill }}
       fields={[
         { name: 'email', label: 'Email', type: 'email', autoComplete: 'username' },
         { name: 'password', label: 'Password', type: 'password', autoComplete: 'current-password' },
@@ -192,6 +228,47 @@ export function SetupForm({
           email: values.email,
           password: values.password,
         })
+      }
+    />
+  )
+}
+
+/**
+ * The sign up form of `/sign-up` and the invite page (spec 0008, AC-22 and AC-23): Name (optional),
+ * Email, and a new password. An invite fills the email in and makes it read only.
+ */
+export function SignUpForm({
+  id = 'sign-up',
+  email: emailPrefill,
+  errorAction,
+  onSubmit,
+}: {
+  id?: string
+  email?: Prefill | undefined
+  errorAction?: ((error: unknown) => ReactNode) | undefined
+  onSubmit: (values: { name: string; email: string; password: string }) => Promise<void>
+}) {
+  return (
+    <AuthForm
+      id={id}
+      defaults={emailPrefill === undefined ? {} : { email: emailPrefill.value }}
+      fields={[
+        { name: 'name', label: 'Name (optional)', type: 'text', autoComplete: 'name' },
+        {
+          name: 'email',
+          label: 'Email',
+          type: 'email',
+          autoComplete: 'username',
+          readOnly: emailPrefill?.readOnly ?? false,
+        },
+        { name: 'password', label: 'Password', type: 'password', autoComplete: 'new-password' },
+      ]}
+      schema={signUpSchema}
+      submit="Create account"
+      failedTitle="Couldn't create the account"
+      errorAction={errorAction}
+      onSubmit={(values) =>
+        onSubmit({ name: values.name, email: values.email, password: values.password })
       }
     />
   )

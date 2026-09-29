@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { LogOut, UserRound } from 'lucide-react'
+import { LogOut, Server, UserRound } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -19,7 +19,10 @@ import { usePreferences, type Density, type ThemeChoice } from '@/lib/preference
 import { accountQuery } from '@/lib/queries'
 import { notifyError } from '@/lib/toast'
 
-/** The account menu: who is signed in, theme and density, and Sign out (spec 0004, AC-27). */
+/**
+ * The account menu: who is signed in, theme and density, Install settings for install admins
+ * (spec 0008, AC-24), and Sign out (spec 0004, AC-27).
+ */
 export function AccountMenu() {
   const { theme, density, setTheme, setDensity } = usePreferences()
   const account = useQuery(accountQuery())
@@ -87,6 +90,17 @@ export function AccountMenu() {
           </DropdownMenuRadioGroup>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        {/* Install admins only (spec 0008, AC-24). */}
+        {account.data?.isInstallAdmin === true ? (
+          <DropdownMenuItem
+            onClick={() => {
+              void navigate({ to: '/install' })
+            }}
+          >
+            <Server aria-hidden />
+            Install settings
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem
           onClick={() => {
             void signOut()

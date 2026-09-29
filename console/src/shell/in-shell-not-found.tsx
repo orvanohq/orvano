@@ -5,8 +5,8 @@ import { usePageTitle } from '@/lib/page-title'
 import { PageHeading } from '@/shell/page-heading'
 
 /** "Doesn't exist or you don't have access", shown inside the shell so the top bar keeps working (AC-19). */
-export function InShellNotFound({ what }: { what: 'project' | 'org' | 'user' }) {
-  const noun = { org: 'Org', project: 'Project', user: 'User' }[what]
+export function InShellNotFound({ what }: { what: 'project' | 'org' | 'user' | 'page' }) {
+  const noun = { org: 'Org', project: 'Project', user: 'User', page: 'Page' }[what]
   usePageTitle(`${noun} not found`)
   return (
     <div className="mx-auto max-w-xl py-10">

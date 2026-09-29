@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 
 import { FormAlert } from '@/components/ui/form-alert'
 import { consoleApi } from '@/lib/console-client'
@@ -41,13 +41,24 @@ function SignIn() {
           Open the setup link the installer printed on your server.
         </FormAlert>
       ) : (
-        <SignInForm
-          onSubmit={async (values) => {
-            await consoleApi().consoleAccount.createSession(values)
-            queryClient.clear()
-            await navigate({ href: redirect ?? '/', replace: true })
-          }}
-        />
+        <>
+          <SignInForm
+            onSubmit={async (values) => {
+              await consoleApi().consoleAccount.createSession(values)
+              queryClient.clear()
+              await navigate({ href: redirect ?? '/', replace: true })
+            }}
+          />
+          {/* Only on an install with open sign up (spec 0008, AC-23). */}
+          {setup.data?.signupOpen === true ? (
+            <p className="text-muted-foreground">
+              New here?{' '}
+              <Link to="/sign-up" className="text-link underline">
+                Create account
+              </Link>
+            </p>
+          ) : null}
+        </>
       )}
     </main>
   )

@@ -115,6 +115,7 @@ All live in `src/components/ui/`. Every component and variant has a live example
 | Input, Textarea | default, invalid (`aria-invalid`), disabled, read only | native |
 | Select | default, invalid, disabled | arrows, typeahead, Enter, Escape |
 | Checkbox, Switch | checked, unchecked, indeterminate (checkbox), disabled | Space toggles |
+| Radio group | checked, unchecked, disabled; an item with a description (the role picker) | arrows move and select, Tab leaves the group |
 | Field | label, hint, error linked with `aria-describedby`, required marker | label click focuses the control |
 | Form alert | error, warning, info, success; `role="alert"` for errors | none |
 | Dialog | default, with form | focus trap, Escape closes, focus returns |

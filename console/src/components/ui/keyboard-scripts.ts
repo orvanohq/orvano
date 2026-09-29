@@ -528,4 +528,187 @@ export const keyboardScripts: readonly KeyboardScript[] = [
       },
     ],
   },
+  {
+    // Arrow keys move and select; a disabled radio is skipped.
+    example: 'radio-group',
+    component: 'Radio group',
+    start: '[data-testid=radio-free]',
+    steps: [
+      {
+        keys: '{ArrowDown}',
+        then: [
+          { focused: '[data-testid=radio-team]' },
+          {
+            attribute: {
+              selector: '[data-testid=radio-team]',
+              name: 'aria-checked',
+              value: 'true',
+            },
+          },
+        ],
+      },
+      {
+        keys: '{ArrowUp}',
+        then: [
+          { focused: '[data-testid=radio-free]' },
+          {
+            attribute: {
+              selector: '[data-testid=radio-free]',
+              name: 'aria-checked',
+              value: 'true',
+            },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    // Spec 0008, AC-16 and AC-17: the form, then the link step with focus on its copy button; Escape
+    // closes it and focus returns to Invite.
+    example: 'invite-dialog',
+    component: 'Invite dialog',
+    start: '[data-testid=invite-open]',
+    steps: [
+      { keys: '{Enter}', then: [{ focused: '#invite-email' }] },
+      {
+        keys: 'grace@example.com',
+        then: [{ value: { selector: '#invite-email', is: 'grace@example.com' } }],
+      },
+      {
+        keys: '{Tab}',
+        then: [
+          { focused: '[aria-labelledby=invite-role-developer-label]' },
+          {
+            attribute: {
+              selector: '[aria-labelledby=invite-role-developer-label]',
+              name: 'aria-checked',
+              value: 'true',
+            },
+          },
+        ],
+      },
+      {
+        keys: '{ArrowDown}',
+        then: [
+          {
+            attribute: {
+              selector: '[aria-labelledby=invite-role-viewer-label]',
+              name: 'aria-checked',
+              value: 'true',
+            },
+          },
+        ],
+      },
+      { keys: '{Shift>}{Tab}{/Shift}', then: [{ focused: '#invite-email' }] },
+      {
+        keys: '{Enter}',
+        then: [
+          { text: { selector: '[data-slot=dialog-content]', contains: 'Share this invite link' } },
+          { text: { selector: '[data-slot=dialog-content]', contains: 'as viewer' } },
+          { focused: '[aria-label="Copy invite link"]' },
+        ],
+      },
+      {
+        keys: '{Escape}',
+        then: [{ absent: '[data-slot=dialog-content]' }, { focused: '[data-testid=invite-open]' }],
+      },
+    ],
+  },
+  {
+    // Spec 0008, AC-18: Resend skips the form and opens the link step at once.
+    example: 'invite-dialog',
+    component: 'Invite dialog (resend)',
+    start: '[data-testid=invite-resend]',
+    steps: [
+      {
+        keys: '{Enter}',
+        then: [
+          { text: { selector: '[data-slot=dialog-content]', contains: 'Share this invite link' } },
+          { text: { selector: '[data-slot=dialog-content]', contains: 'grace@example.com' } },
+        ],
+      },
+      {
+        keys: '{Escape}',
+        then: [
+          { absent: '[data-slot=dialog-content]' },
+          { focused: '[data-testid=invite-resend]' },
+        ],
+      },
+    ],
+  },
+  {
+    // Spec 0008, AC-19: Save waits for a different role; demoting yourself warns first.
+    example: 'change-role',
+    component: 'Change role dialog',
+    start: '[data-testid=change-role-open]',
+    steps: [
+      {
+        keys: '{Enter}',
+        then: [
+          { focused: '[aria-labelledby=change-role-owner-label]' },
+          { absent: '[data-slot=dialog-content] [role=alert]' },
+        ],
+      },
+      {
+        keys: '{ArrowDown}',
+        then: [
+          {
+            attribute: {
+              selector: '[aria-labelledby=change-role-developer-label]',
+              name: 'aria-checked',
+              value: 'true',
+            },
+          },
+          {
+            text: {
+              selector: '[data-slot=dialog-content]',
+              contains: "You'll lose owner rights in this org",
+            },
+          },
+        ],
+      },
+      {
+        keys: '{Escape}',
+        then: [
+          { absent: '[data-slot=dialog-content]' },
+          { focused: '[data-testid=change-role-open]' },
+        ],
+      },
+    ],
+  },
+  {
+    // Spec 0008, AC-23: Name (optional), Email, and Password, in that order.
+    example: 'sign-up-form',
+    component: 'Sign up form',
+    start: '#catalog-sign-up-name',
+    steps: [
+      { keys: '{Tab}', then: [{ focused: '#catalog-sign-up-email' }] },
+      { keys: '{Tab}', then: [{ focused: '#catalog-sign-up-password' }] },
+      { keys: '{Tab}', then: [{ text: { selector: ':focus', contains: 'Create account' } }] },
+    ],
+  },
+  {
+    // Spec 0008, AC-22: Create account first with the email read only; Sign in fills it in.
+    example: 'invite-page',
+    component: 'Invite page',
+    start: '[role=tab][aria-selected=true]',
+    steps: [
+      {
+        keys: '{ArrowRight}',
+        then: [
+          { text: { selector: '[role=tab][aria-selected=true]', contains: 'Sign in' } },
+          { value: { selector: '#invite-sign-in-email', is: 'grace@example.com' } },
+        ],
+      },
+      {
+        keys: '{ArrowLeft}',
+        then: [
+          { text: { selector: '[role=tab][aria-selected=true]', contains: 'Create account' } },
+          {
+            attribute: { selector: '#invite-sign-up-email', name: 'readonly', value: '' },
+          },
+        ],
+      },
+    ],
+  },
 ]

@@ -10,14 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as InviteRouteImport } from './routes/invite'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppInstallRouteImport } from './routes/_app/install'
 import { Route as DevComponentsRouteImport } from './routes/dev.components'
 import { Route as AppOrgsIndexRouteImport } from './routes/_app/orgs/index'
 import { Route as AppOrgsOrgIdRouteRouteImport } from './routes/_app/orgs/$orgId/route'
 import { Route as AppProjectsProjectIdRouteRouteImport } from './routes/_app/projects/$projectId/route'
 import { Route as AppOrgsOrgIdIndexRouteImport } from './routes/_app/orgs/$orgId/index'
+import { Route as AppOrgsOrgIdMembersRouteImport } from './routes/_app/orgs/$orgId/members'
 import { Route as AppOrgsOrgIdSettingsRouteImport } from './routes/_app/orgs/$orgId/settings'
 import { Route as AppProjectsProjectIdIndexRouteImport } from './routes/_app/projects/$projectId/index'
 import { Route as AppProjectsProjectIdKeysRouteImport } from './routes/_app/projects/$projectId/keys'
@@ -30,6 +34,11 @@ const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InviteRoute = InviteRouteImport.update({
+  id: '/invite',
+  path: '/invite',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
@@ -40,9 +49,19 @@ const SignInRoute = SignInRouteImport.update({
   path: '/sign-in',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SignUpRoute = SignUpRouteImport.update({
+  id: '/sign-up',
+  path: '/sign-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInstallRoute = AppInstallRouteImport.update({
+  id: '/install',
+  path: '/install',
   getParentRoute: () => AppRoute,
 } as any)
 const DevComponentsRoute = DevComponentsRouteImport.update({
@@ -60,14 +79,20 @@ const AppOrgsOrgIdRouteRoute = AppOrgsOrgIdRouteRouteImport.update({
   path: '/orgs/$orgId',
   getParentRoute: () => AppRoute,
 } as any)
-const AppProjectsProjectIdRouteRoute = AppProjectsProjectIdRouteRouteImport.update({
-  id: '/projects/$projectId',
-  path: '/projects/$projectId',
-  getParentRoute: () => AppRoute,
-} as any)
+const AppProjectsProjectIdRouteRoute =
+  AppProjectsProjectIdRouteRouteImport.update({
+    id: '/projects/$projectId',
+    path: '/projects/$projectId',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppOrgsOrgIdIndexRoute = AppOrgsOrgIdIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppOrgsOrgIdRouteRoute,
+} as any)
+const AppOrgsOrgIdMembersRoute = AppOrgsOrgIdMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
   getParentRoute: () => AppOrgsOrgIdRouteRoute,
 } as any)
 const AppOrgsOrgIdSettingsRoute = AppOrgsOrgIdSettingsRouteImport.update({
@@ -75,45 +100,55 @@ const AppOrgsOrgIdSettingsRoute = AppOrgsOrgIdSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppOrgsOrgIdRouteRoute,
 } as any)
-const AppProjectsProjectIdIndexRoute = AppProjectsProjectIdIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AppProjectsProjectIdRouteRoute,
-} as any)
-const AppProjectsProjectIdKeysRoute = AppProjectsProjectIdKeysRouteImport.update({
-  id: '/keys',
-  path: '/keys',
-  getParentRoute: () => AppProjectsProjectIdRouteRoute,
-} as any)
-const AppProjectsProjectIdPlatformsRoute = AppProjectsProjectIdPlatformsRouteImport.update({
-  id: '/platforms',
-  path: '/platforms',
-  getParentRoute: () => AppProjectsProjectIdRouteRoute,
-} as any)
-const AppProjectsProjectIdSettingsRoute = AppProjectsProjectIdSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AppProjectsProjectIdRouteRoute,
-} as any)
-const AppProjectsProjectIdUsersIndexRoute = AppProjectsProjectIdUsersIndexRouteImport.update({
-  id: '/users/',
-  path: '/users/',
-  getParentRoute: () => AppProjectsProjectIdRouteRoute,
-} as any)
-const AppProjectsProjectIdUsersUserIdRoute = AppProjectsProjectIdUsersUserIdRouteImport.update({
-  id: '/users/$userId',
-  path: '/users/$userId',
-  getParentRoute: () => AppProjectsProjectIdRouteRoute,
-} as any)
+const AppProjectsProjectIdIndexRoute =
+  AppProjectsProjectIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppProjectsProjectIdRouteRoute,
+  } as any)
+const AppProjectsProjectIdKeysRoute =
+  AppProjectsProjectIdKeysRouteImport.update({
+    id: '/keys',
+    path: '/keys',
+    getParentRoute: () => AppProjectsProjectIdRouteRoute,
+  } as any)
+const AppProjectsProjectIdPlatformsRoute =
+  AppProjectsProjectIdPlatformsRouteImport.update({
+    id: '/platforms',
+    path: '/platforms',
+    getParentRoute: () => AppProjectsProjectIdRouteRoute,
+  } as any)
+const AppProjectsProjectIdSettingsRoute =
+  AppProjectsProjectIdSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => AppProjectsProjectIdRouteRoute,
+  } as any)
+const AppProjectsProjectIdUsersIndexRoute =
+  AppProjectsProjectIdUsersIndexRouteImport.update({
+    id: '/users/',
+    path: '/users/',
+    getParentRoute: () => AppProjectsProjectIdRouteRoute,
+  } as any)
+const AppProjectsProjectIdUsersUserIdRoute =
+  AppProjectsProjectIdUsersUserIdRouteImport.update({
+    id: '/users/$userId',
+    path: '/users/$userId',
+    getParentRoute: () => AppProjectsProjectIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/invite': typeof InviteRoute
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
+  '/install': typeof AppInstallRoute
   '/dev/components': typeof DevComponentsRoute
   '/orgs/$orgId': typeof AppOrgsOrgIdRouteRouteWithChildren
   '/projects/$projectId': typeof AppProjectsProjectIdRouteRouteWithChildren
   '/orgs/': typeof AppOrgsIndexRoute
+  '/orgs/$orgId/members': typeof AppOrgsOrgIdMembersRoute
   '/orgs/$orgId/settings': typeof AppOrgsOrgIdSettingsRoute
   '/projects/$projectId/keys': typeof AppProjectsProjectIdKeysRoute
   '/projects/$projectId/platforms': typeof AppProjectsProjectIdPlatformsRoute
@@ -124,11 +159,15 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/users/': typeof AppProjectsProjectIdUsersIndexRoute
 }
 export interface FileRoutesByTo {
+  '/invite': typeof InviteRoute
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
+  '/install': typeof AppInstallRoute
   '/dev/components': typeof DevComponentsRoute
   '/': typeof AppIndexRoute
   '/orgs': typeof AppOrgsIndexRoute
+  '/orgs/$orgId/members': typeof AppOrgsOrgIdMembersRoute
   '/orgs/$orgId/settings': typeof AppOrgsOrgIdSettingsRoute
   '/projects/$projectId/keys': typeof AppProjectsProjectIdKeysRoute
   '/projects/$projectId/platforms': typeof AppProjectsProjectIdPlatformsRoute
@@ -141,13 +180,17 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/invite': typeof InviteRoute
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
+  '/_app/install': typeof AppInstallRoute
   '/dev/components': typeof DevComponentsRoute
   '/_app/': typeof AppIndexRoute
   '/_app/orgs/$orgId': typeof AppOrgsOrgIdRouteRouteWithChildren
   '/_app/projects/$projectId': typeof AppProjectsProjectIdRouteRouteWithChildren
   '/_app/orgs/': typeof AppOrgsIndexRoute
+  '/_app/orgs/$orgId/members': typeof AppOrgsOrgIdMembersRoute
   '/_app/orgs/$orgId/settings': typeof AppOrgsOrgIdSettingsRoute
   '/_app/projects/$projectId/keys': typeof AppProjectsProjectIdKeysRoute
   '/_app/projects/$projectId/platforms': typeof AppProjectsProjectIdPlatformsRoute
@@ -161,12 +204,16 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/invite'
     | '/setup'
     | '/sign-in'
+    | '/sign-up'
+    | '/install'
     | '/dev/components'
     | '/orgs/$orgId'
     | '/projects/$projectId'
     | '/orgs/'
+    | '/orgs/$orgId/members'
     | '/orgs/$orgId/settings'
     | '/projects/$projectId/keys'
     | '/projects/$projectId/platforms'
@@ -177,11 +224,15 @@ export interface FileRouteTypes {
     | '/projects/$projectId/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/invite'
     | '/setup'
     | '/sign-in'
+    | '/sign-up'
+    | '/install'
     | '/dev/components'
     | '/'
     | '/orgs'
+    | '/orgs/$orgId/members'
     | '/orgs/$orgId/settings'
     | '/projects/$projectId/keys'
     | '/projects/$projectId/platforms'
@@ -193,13 +244,17 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/invite'
     | '/setup'
     | '/sign-in'
+    | '/sign-up'
+    | '/_app/install'
     | '/dev/components'
     | '/_app/'
     | '/_app/orgs/$orgId'
     | '/_app/projects/$projectId'
     | '/_app/orgs/'
+    | '/_app/orgs/$orgId/members'
     | '/_app/orgs/$orgId/settings'
     | '/_app/projects/$projectId/keys'
     | '/_app/projects/$projectId/platforms'
@@ -212,8 +267,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
+  InviteRoute: typeof InviteRoute
   SetupRoute: typeof SetupRoute
   SignInRoute: typeof SignInRoute
+  SignUpRoute: typeof SignUpRoute
   DevComponentsRoute: typeof DevComponentsRoute
 }
 
@@ -224,6 +281,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite': {
+      id: '/invite'
+      path: '/invite'
+      fullPath: '/invite'
+      preLoaderRoute: typeof InviteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/setup': {
@@ -240,11 +304,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignInRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sign-up': {
+      id: '/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof SignUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/': {
       id: '/_app/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/install': {
+      id: '/_app/install'
+      path: '/install'
+      fullPath: '/install'
+      preLoaderRoute: typeof AppInstallRouteImport
       parentRoute: typeof AppRoute
     }
     '/dev/components': {
@@ -280,6 +358,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/orgs/$orgId/'
       preLoaderRoute: typeof AppOrgsOrgIdIndexRouteImport
+      parentRoute: typeof AppOrgsOrgIdRouteRoute
+    }
+    '/_app/orgs/$orgId/members': {
+      id: '/_app/orgs/$orgId/members'
+      path: '/members'
+      fullPath: '/orgs/$orgId/members'
+      preLoaderRoute: typeof AppOrgsOrgIdMembersRouteImport
       parentRoute: typeof AppOrgsOrgIdRouteRoute
     }
     '/_app/orgs/$orgId/settings': {
@@ -335,18 +420,19 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppOrgsOrgIdRouteRouteChildren {
+  AppOrgsOrgIdMembersRoute: typeof AppOrgsOrgIdMembersRoute
   AppOrgsOrgIdSettingsRoute: typeof AppOrgsOrgIdSettingsRoute
   AppOrgsOrgIdIndexRoute: typeof AppOrgsOrgIdIndexRoute
 }
 
 const AppOrgsOrgIdRouteRouteChildren: AppOrgsOrgIdRouteRouteChildren = {
+  AppOrgsOrgIdMembersRoute: AppOrgsOrgIdMembersRoute,
   AppOrgsOrgIdSettingsRoute: AppOrgsOrgIdSettingsRoute,
   AppOrgsOrgIdIndexRoute: AppOrgsOrgIdIndexRoute,
 }
 
-const AppOrgsOrgIdRouteRouteWithChildren = AppOrgsOrgIdRouteRoute._addFileChildren(
-  AppOrgsOrgIdRouteRouteChildren,
-)
+const AppOrgsOrgIdRouteRouteWithChildren =
+  AppOrgsOrgIdRouteRoute._addFileChildren(AppOrgsOrgIdRouteRouteChildren)
 
 interface AppProjectsProjectIdRouteRouteChildren {
   AppProjectsProjectIdKeysRoute: typeof AppProjectsProjectIdKeysRoute
@@ -357,20 +443,23 @@ interface AppProjectsProjectIdRouteRouteChildren {
   AppProjectsProjectIdUsersIndexRoute: typeof AppProjectsProjectIdUsersIndexRoute
 }
 
-const AppProjectsProjectIdRouteRouteChildren: AppProjectsProjectIdRouteRouteChildren = {
-  AppProjectsProjectIdKeysRoute: AppProjectsProjectIdKeysRoute,
-  AppProjectsProjectIdPlatformsRoute: AppProjectsProjectIdPlatformsRoute,
-  AppProjectsProjectIdSettingsRoute: AppProjectsProjectIdSettingsRoute,
-  AppProjectsProjectIdIndexRoute: AppProjectsProjectIdIndexRoute,
-  AppProjectsProjectIdUsersUserIdRoute: AppProjectsProjectIdUsersUserIdRoute,
-  AppProjectsProjectIdUsersIndexRoute: AppProjectsProjectIdUsersIndexRoute,
-}
+const AppProjectsProjectIdRouteRouteChildren: AppProjectsProjectIdRouteRouteChildren =
+  {
+    AppProjectsProjectIdKeysRoute: AppProjectsProjectIdKeysRoute,
+    AppProjectsProjectIdPlatformsRoute: AppProjectsProjectIdPlatformsRoute,
+    AppProjectsProjectIdSettingsRoute: AppProjectsProjectIdSettingsRoute,
+    AppProjectsProjectIdIndexRoute: AppProjectsProjectIdIndexRoute,
+    AppProjectsProjectIdUsersUserIdRoute: AppProjectsProjectIdUsersUserIdRoute,
+    AppProjectsProjectIdUsersIndexRoute: AppProjectsProjectIdUsersIndexRoute,
+  }
 
-const AppProjectsProjectIdRouteRouteWithChildren = AppProjectsProjectIdRouteRoute._addFileChildren(
-  AppProjectsProjectIdRouteRouteChildren,
-)
+const AppProjectsProjectIdRouteRouteWithChildren =
+  AppProjectsProjectIdRouteRoute._addFileChildren(
+    AppProjectsProjectIdRouteRouteChildren,
+  )
 
 interface AppRouteChildren {
+  AppInstallRoute: typeof AppInstallRoute
   AppIndexRoute: typeof AppIndexRoute
   AppOrgsOrgIdRouteRoute: typeof AppOrgsOrgIdRouteRouteWithChildren
   AppProjectsProjectIdRouteRoute: typeof AppProjectsProjectIdRouteRouteWithChildren
@@ -378,6 +467,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppInstallRoute: AppInstallRoute,
   AppIndexRoute: AppIndexRoute,
   AppOrgsOrgIdRouteRoute: AppOrgsOrgIdRouteRouteWithChildren,
   AppProjectsProjectIdRouteRoute: AppProjectsProjectIdRouteRouteWithChildren,
@@ -388,8 +478,10 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
+  InviteRoute: InviteRoute,
   SetupRoute: SetupRoute,
   SignInRoute: SignInRoute,
+  SignUpRoute: SignUpRoute,
   DevComponentsRoute: DevComponentsRoute,
 }
 export const routeTree = rootRouteImport
