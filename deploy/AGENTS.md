@@ -42,6 +42,7 @@ The production shape command (`docker-compose.yml` plus `docker-compose.build.ym
 - Only `migrate` and `worker` get `ORVANO_DB_ADMIN_URL`; the other roles connect as `orvano_app`.
 - Only `api` and `worker` get `ORVANO_MASTER_KEYS` (required), and only `api` gets `ORVANO_TRUSTED_PROXIES`. Never give the master keys to `realtime`: it holds no master key on purpose (spec 0002).
 - In the Caddyfile, `/internal/*` is always a 404 (internal calls go straight to `api:8080`), and `/v1/realtime` is matched before `/v1/*`. HSTS is sent only over HTTPS, without `includeSubDomains`.
+- Certificates come from Let's Encrypt only: the Caddyfile's global `cert_issuer acme` pins its directory, which drops Caddy's default ZeroSSL fallback (spec 0006, AC-1). Keep it when you touch the global block.
 
 ## Gotchas
 
