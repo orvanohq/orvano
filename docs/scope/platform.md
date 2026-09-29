@@ -20,7 +20,7 @@ Public docs with a quickstart per SDK and the generated API reference. From here
 **Also:** move the README install section into the docs site · from spec 0006
 - [ ] Design it (spec): `/architect docs site & quickstarts`
 
-### 15. Console team members & roles · in-progress
+### 15. Console team members & roles · done
 Invite teammates into an org by email and give them roles (owner, developer, viewer) that control what they can do in the console.
 **Done when:** an invited teammate joins with the right role; a viewer cannot change settings or keys; removing a member ends their access.
 - [x] Design it (spec): `/architect console team members & roles`
@@ -30,7 +30,7 @@ Invite teammates into an org by email and give them roles (owner, developer, vie
    - [x] Names on keys, install admin flag, `/install`, and `/sign-up` (AC-12 to 14, 23 to 25)
    - [x] Quality and end to end: titles, catalog, keyboard scripts, axe, integration tests, the Playwright flow (AC-26, 27)
 - [x] Verify it: `/check verify console team members & roles`
-- [ ] Test it: `/test console team members & roles`
+- [x] Test it: `/test console team members & roles`
 Spec [0008](../specs/0008-console-team-members/index.md) (members, invitations, screens) · Spec [0003](../specs/0003-platform-data-model/index.md) (model) · code in `server/src/Orvano.Platform/`, `server/src/Orvano.Auth/`, `contract/platform/`, `console/`
 
 ### 19. CLI, migrations & type generation · needs a decision
