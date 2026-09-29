@@ -42,6 +42,8 @@ export interface FakeApi {
   apiKeys: ApiKey[]
   platforms: Platform[]
   requests: SentRequest[]
+  /** Whether the install still waits for its first admin, as `consoleInstall.getSetup` answers. */
+  setupRequired: boolean
   /** Makes the next `method` request whose path matches answer with this problem, once. */
   failNext: (method: string, path: RegExp, status: number, code: string, detail: string) => void
 }
@@ -132,6 +134,7 @@ export function installFakeApi(): FakeApi {
     apiKeys: [],
     platforms: [],
     requests: [],
+    setupRequired: false,
     failNext: (method, path, status, code, detail) => {
       failures.push({ method, path, status, code, detail })
     },
@@ -165,6 +168,20 @@ export function installFakeApi(): FakeApi {
     }
 
     if (path === '/v1/console/account' && method === 'GET') return Response.json(api.account)
+    if (path === '/v1/console/install/setup' && method === 'GET') {
+      return Response.json({ setupRequired: api.setupRequired })
+    }
+    // The first admin's sign up. The real server checks the setup token; refuse it with failNext.
+    if (path === '/v1/console/account' && method === 'POST') {
+      api.account = {
+        ...api.account,
+        email: String(input.email),
+        name: typeof input.name === 'string' ? input.name : null,
+      }
+      api.setupRequired = false
+      api.orgs.push(makeOrg({ id: nextId('org'), name: `${api.account.name ?? 'Your'}'s org` }))
+      return Response.json(api.account, { status: 201 })
+    }
     if (path === '/v1/console/orgs' && method === 'GET') return page(api.orgs)
     if (path === '/v1/console/orgs' && method === 'POST') {
       const org = makeOrg({ id: nextId('org'), name: String(input.name) })

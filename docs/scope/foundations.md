@@ -69,5 +69,5 @@ A one command install on a single server that sets secrets, pulls containers, an
    - [x] First admin gate: setup token on the server, `consoleInstall.getSetup`, `setup-status`, then the console `/setup` route and sign in notice once console sign up exists (AC-19 to 24)
    - [x] Publishing: images to GHCR, the GitHub Release with `install.sh` and its checksum, the README install section (AC-1, 29)
 - [ ] Verify it: `/check verify self host installer`
-- [ ] Test it: `/test self host installer`
+- [x] Test it: `/test self host installer`
 Spec [0006](../specs/0006-self-host-installer/index.md) · code in `deploy/`, `server/src/Orvano.Server/`, `server/src/Orvano.Platform/`, `contract/platform/install.tsp`, `console/`, `.github/workflows/`
