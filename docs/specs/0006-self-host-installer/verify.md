@@ -48,11 +48,11 @@ Run the host steps on a throwaway Linux server or VM (Ubuntu 24.04), or in a `do
 - [x] `docker compose exec -T api /app/orvano setup-status` → `required` on a fresh install, `done` once an install admin exists; exits 1 when the api is down → AC-24
 - [x] `curl http://localhost/v1/console/install/setup` with no cookie → 200 `{"setupRequired":true}`; any other console route without a session → 401 → AC-22
 - [x] Start `api` in Production with no `ORVANO_SETUP_TOKEN` on an empty install → refuses to start with the "no admin yet" message; `ORVANO_SETUP_TOKEN=bad` → refuses in any environment → AC-21
-- [ ] Sign up the first console account without the token, with a wrong one → 403 `setup_token_invalid`, nothing created; with the right one → install admin; a second sign up with the same token → `signup_closed` → AC-20 (server tests call `AdmitAsync` until console sign up exists)
+- [x] Sign up the first console account without the token, with a wrong one → 403 `setup_token_invalid`, nothing created; with the right one → install admin; a second sign up with the same token → `signup_closed` → AC-20 (server tests call `AdmitAsync` until console sign up exists)
 
 ## Not built yet (owed)
-- [ ] `/setup` removes the fragment before render, creates the first admin, redirects when setup is done, shows the invalid link message, passes axe; `/sign-in` shows the finish setup notice while `setupRequired` → AC-23 (task 7, needs spec 0004 task 8)
-- [ ] 61st `getSetup` from one client IP within a minute → 429 `rate_limited` → AC-22 rate limit (deferred to spec 0004 task 1)
+- [x] `/setup` removes the fragment before render, creates the first admin, redirects when setup is done, shows the invalid link message, passes axe; `/sign-in` shows the finish setup notice while `setupRequired` → AC-23 (task 7, needs spec 0004 task 8)
+- [x] 61st `getSetup` from one client IP within a minute → 429 `rate_limited` → AC-22 rate limit (deferred to spec 0004 task 1)
 
 ## Release
 - [x] Run `release.yml` by hand (always a dry run) → both images build for amd64 and arm64, `install.sh` stamped with `<V>` and its `.sha256` uploaded as an artifact, nothing pushed → AC-29
