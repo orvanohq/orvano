@@ -29,6 +29,7 @@ import { Route as AppProjectsProjectIdKeysRouteImport } from './routes/_app/proj
 import { Route as AppProjectsProjectIdPlatformsRouteImport } from './routes/_app/projects/$projectId/platforms'
 import { Route as AppProjectsProjectIdSettingsRouteImport } from './routes/_app/projects/$projectId/settings'
 import { Route as AppProjectsProjectIdEmailIndexRouteImport } from './routes/_app/projects/$projectId/email/index'
+import { Route as AppProjectsProjectIdEmailLogRouteImport } from './routes/_app/projects/$projectId/email/log'
 import { Route as AppProjectsProjectIdEmailSettingsRouteImport } from './routes/_app/projects/$projectId/email/settings'
 import { Route as AppProjectsProjectIdUsersIndexRouteImport } from './routes/_app/projects/$projectId/users/index'
 import { Route as AppProjectsProjectIdUsersUserIdRouteImport } from './routes/_app/projects/$projectId/users/$userId'
@@ -139,6 +140,12 @@ const AppProjectsProjectIdEmailIndexRoute =
     path: '/',
     getParentRoute: () => AppProjectsProjectIdEmailRouteRoute,
   } as any)
+const AppProjectsProjectIdEmailLogRoute =
+  AppProjectsProjectIdEmailLogRouteImport.update({
+    id: '/log',
+    path: '/log',
+    getParentRoute: () => AppProjectsProjectIdEmailRouteRoute,
+  } as any)
 const AppProjectsProjectIdEmailSettingsRoute =
   AppProjectsProjectIdEmailSettingsRouteImport.update({
     id: '/settings',
@@ -177,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/settings': typeof AppProjectsProjectIdSettingsRoute
   '/orgs/$orgId/': typeof AppOrgsOrgIdIndexRoute
   '/projects/$projectId/': typeof AppProjectsProjectIdIndexRoute
+  '/projects/$projectId/email/log': typeof AppProjectsProjectIdEmailLogRoute
   '/projects/$projectId/email/settings': typeof AppProjectsProjectIdEmailSettingsRoute
   '/projects/$projectId/users/$userId': typeof AppProjectsProjectIdUsersUserIdRoute
   '/projects/$projectId/email/': typeof AppProjectsProjectIdEmailIndexRoute
@@ -198,6 +206,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId/settings': typeof AppProjectsProjectIdSettingsRoute
   '/orgs/$orgId': typeof AppOrgsOrgIdIndexRoute
   '/projects/$projectId': typeof AppProjectsProjectIdIndexRoute
+  '/projects/$projectId/email/log': typeof AppProjectsProjectIdEmailLogRoute
   '/projects/$projectId/email/settings': typeof AppProjectsProjectIdEmailSettingsRoute
   '/projects/$projectId/users/$userId': typeof AppProjectsProjectIdUsersUserIdRoute
   '/projects/$projectId/email': typeof AppProjectsProjectIdEmailIndexRoute
@@ -224,6 +233,7 @@ export interface FileRoutesById {
   '/_app/projects/$projectId/settings': typeof AppProjectsProjectIdSettingsRoute
   '/_app/orgs/$orgId/': typeof AppOrgsOrgIdIndexRoute
   '/_app/projects/$projectId/': typeof AppProjectsProjectIdIndexRoute
+  '/_app/projects/$projectId/email/log': typeof AppProjectsProjectIdEmailLogRoute
   '/_app/projects/$projectId/email/settings': typeof AppProjectsProjectIdEmailSettingsRoute
   '/_app/projects/$projectId/users/$userId': typeof AppProjectsProjectIdUsersUserIdRoute
   '/_app/projects/$projectId/email/': typeof AppProjectsProjectIdEmailIndexRoute
@@ -250,6 +260,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/settings'
     | '/orgs/$orgId/'
     | '/projects/$projectId/'
+    | '/projects/$projectId/email/log'
     | '/projects/$projectId/email/settings'
     | '/projects/$projectId/users/$userId'
     | '/projects/$projectId/email/'
@@ -271,6 +282,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/settings'
     | '/orgs/$orgId'
     | '/projects/$projectId'
+    | '/projects/$projectId/email/log'
     | '/projects/$projectId/email/settings'
     | '/projects/$projectId/users/$userId'
     | '/projects/$projectId/email'
@@ -296,6 +308,7 @@ export interface FileRouteTypes {
     | '/_app/projects/$projectId/settings'
     | '/_app/orgs/$orgId/'
     | '/_app/projects/$projectId/'
+    | '/_app/projects/$projectId/email/log'
     | '/_app/projects/$projectId/email/settings'
     | '/_app/projects/$projectId/users/$userId'
     | '/_app/projects/$projectId/email/'
@@ -453,6 +466,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectsProjectIdEmailIndexRouteImport
       parentRoute: typeof AppProjectsProjectIdEmailRouteRoute
     }
+    '/_app/projects/$projectId/email/log': {
+      id: '/_app/projects/$projectId/email/log'
+      path: '/log'
+      fullPath: '/projects/$projectId/email/log'
+      preLoaderRoute: typeof AppProjectsProjectIdEmailLogRouteImport
+      parentRoute: typeof AppProjectsProjectIdEmailRouteRoute
+    }
     '/_app/projects/$projectId/email/settings': {
       id: '/_app/projects/$projectId/email/settings'
       path: '/settings'
@@ -493,12 +513,14 @@ const AppOrgsOrgIdRouteRouteWithChildren =
   AppOrgsOrgIdRouteRoute._addFileChildren(AppOrgsOrgIdRouteRouteChildren)
 
 interface AppProjectsProjectIdEmailRouteRouteChildren {
+  AppProjectsProjectIdEmailLogRoute: typeof AppProjectsProjectIdEmailLogRoute
   AppProjectsProjectIdEmailSettingsRoute: typeof AppProjectsProjectIdEmailSettingsRoute
   AppProjectsProjectIdEmailIndexRoute: typeof AppProjectsProjectIdEmailIndexRoute
 }
 
 const AppProjectsProjectIdEmailRouteRouteChildren: AppProjectsProjectIdEmailRouteRouteChildren =
   {
+    AppProjectsProjectIdEmailLogRoute: AppProjectsProjectIdEmailLogRoute,
     AppProjectsProjectIdEmailSettingsRoute:
       AppProjectsProjectIdEmailSettingsRoute,
     AppProjectsProjectIdEmailIndexRoute: AppProjectsProjectIdEmailIndexRoute,

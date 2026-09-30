@@ -4,6 +4,7 @@ using Orvano.Messaging.Application;
 using Orvano.Messaging.Data;
 using Orvano.Messaging.Domain;
 using Api = Orvano.Contract;
+using ErrorCode = Orvano.Contract.ErrorCode;
 
 namespace Orvano.Messaging.Endpoints;
 
@@ -52,6 +53,54 @@ internal static class ApiMapping
         row.FromName,
         row.ReplyTo,
         row.UpdatedAt);
+
+    public static Api.EmailPage EmailPage(Page<EmailRow> page) => new([.. page.Items.Select(EmailLogEntry)], page.NextCursor);
+
+    /// <summary>A log row: the masked recipient only, never the content.</summary>
+    public static Api.EmailLogEntry EmailLogEntry(EmailRow row) => new(
+        row.Id.ToString(),
+        row.Template switch
+        {
+            "verification" => Api.EmailTemplateName.Verification,
+            "recovery" => Api.EmailTemplateName.Recovery,
+            "magic_link" => Api.EmailTemplateName.MagicLink,
+            "email_code" => Api.EmailTemplateName.EmailCode,
+            EmailTemplateNames.ConsoleInvitation => Api.EmailTemplateName.ConsoleInvitation,
+            _ => throw new ArgumentOutOfRangeException(nameof(row), row.Template, null),
+        },
+        row.RecipientMasked,
+        row.Status switch
+        {
+            EmailStatuses.Queued => Api.EmailStatus.Queued,
+            EmailStatuses.Sent => Api.EmailStatus.Sent,
+            EmailStatuses.Failed => Api.EmailStatus.Failed,
+            _ => throw new ArgumentOutOfRangeException(nameof(row), row.Status, null),
+        },
+        row.SmtpSource switch
+        {
+            null => null,
+            SmtpSources.Project => Api.SmtpSource.Project,
+            SmtpSources.Install => Api.SmtpSource.Install,
+            _ => throw new ArgumentOutOfRangeException(nameof(row), row.SmtpSource, null),
+        },
+        row.Attempts,
+        row.ErrorCode switch
+        {
+            null => null,
+            ErrorCode.SmtpUnreachable => Api.EmailFailureCode.SmtpUnreachable,
+            ErrorCode.SmtpTlsFailed => Api.EmailFailureCode.SmtpTlsFailed,
+            ErrorCode.SmtpAuthFailed => Api.EmailFailureCode.SmtpAuthFailed,
+            ErrorCode.SmtpRejected => Api.EmailFailureCode.SmtpRejected,
+            ErrorCode.SmtpTimeout => Api.EmailFailureCode.SmtpTimeout,
+            ErrorCode.SmtpHostNotAllowed => Api.EmailFailureCode.SmtpHostNotAllowed,
+            EmailFailures.NotConfigured => Api.EmailFailureCode.EmailNotConfigured,
+            EmailFailures.ProjectNotActive => Api.EmailFailureCode.ProjectNotActive,
+            EmailFailures.Expired => Api.EmailFailureCode.EmailExpired,
+            EmailFailures.Unreadable => Api.EmailFailureCode.EmailUnreadable,
+            _ => throw new ArgumentOutOfRangeException(nameof(row), row.ErrorCode, null),
+        },
+        row.CreatedAt,
+        row.CompletedAt);
 
     /// <summary>AC-4: the project's own settings only when it has them, and of the install only who it sends as.</summary>
     public static Api.ProjectSmtp ProjectSmtp(ProjectSmtpView view) => new(

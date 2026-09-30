@@ -47,6 +47,7 @@ function seed(role: OrgRole, status: 'active' | 'deleting' = 'active') {
       }),
     ],
   }
+  api.installSmtp = null
   api.requests = []
 }
 
@@ -155,6 +156,28 @@ describe('invite (AC-16, AC-17)', () => {
     expect(reason(button('Invite'))).toBe('Restore the org first')
   })
 
+  // Spec 0009, AC-23: with an email server the invite is also emailed, and the link step says so.
+  it('says the invite is being emailed only when the install has an email server', async () => {
+    const { screen } = await openMembers('owner')
+    api.installSmtp = {
+      host: 'smtp.example.com',
+      port: 587,
+      security: 'starttls',
+      username: null,
+      hasPassword: false,
+      fromEmail: 'orvano@example.com',
+      fromName: null,
+      replyTo: null,
+      updatedAt: '2026-06-01T10:00:00.000Z',
+    }
+    await userEvent.click(button('Invite') ?? document.body)
+    await screen.getByLabelText('Email').fill('new@example.com')
+    await userEvent.click(dialogButton('Invite') ?? document.body)
+    await expect.poll(() => dialog()?.textContent).toContain('Share this invite link')
+    expect(dialog()?.textContent).toContain('We’re sending the invite to new@example.com.')
+    expect(dialog()?.textContent).toContain(fakeInviteUrl)
+  })
+
   it('shows the link once, focused on its copy button, and keeps it nowhere after it closes', async () => {
     const { screen, queryClient } = await openMembers('owner')
     await userEvent.click(button('Invite') ?? document.body)
@@ -167,6 +190,7 @@ describe('invite (AC-16, AC-17)', () => {
     expect(dialog()?.textContent).toContain('new@example.com')
     expect(dialog()?.textContent).toContain('as viewer')
     expect(dialog()?.textContent).toContain("This link won't be shown again")
+    expect(dialog()?.textContent).not.toContain('We’re sending the invite')
     await expect
       .poll(() => document.activeElement?.getAttribute('aria-label'))
       .toBe('Copy invite link')

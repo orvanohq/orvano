@@ -22,9 +22,21 @@ internal enum SmtpSourceKind
 internal sealed record ProjectSmtpView(SmtpSourceKind Source, SmtpSettingsRow? Settings, SmtpSettingsRow? Install);
 
 /// <summary>
-/// A project's SMTP settings (spec 0009, AC-1 to AC-6): read, save, stop using, and send a test email. The caller
-/// already passed <see cref="ProjectAccess"/>. The password is sealed with <see cref="SecretBox"/> bound to its row,
-/// and no response, log line, or event ever carries it, the host, or the username.
+/// Whose SMTP settings an operation is about, and who acts: a project's own row, or the install's (the row of
+/// project <c>console</c>). The install's skips the private host rule (AC-3) and the project state check (AC-7).
+/// </summary>
+internal sealed record SmtpScope(string ProjectId, Guid UserId, bool Install)
+{
+    public static SmtpScope Of(ProjectCaller caller) => new(caller.ProjectId, caller.UserId, Install: false);
+
+    public static SmtpScope OfInstall(Guid adminUserId) => new(SmtpSettingsService.InstallProjectId, adminUserId, Install: true);
+}
+
+/// <summary>
+/// SMTP settings (spec 0009, AC-1 to AC-7): read, save, stop using, and send a test email, for a project or for
+/// the install. The caller already passed <see cref="ProjectAccess"/> or the install admin check. The password is
+/// sealed with <see cref="SecretBox"/> bound to its row, and no response, log line, or event ever carries it, the
+/// host, or the username.
 /// </summary>
 internal sealed class SmtpSettingsService(
     MessagingStore store,
@@ -58,12 +70,18 @@ internal sealed class SmtpSettingsService(
             return new ProjectSmtpView(source, own, install);
         }, ct);
 
-    public async Task<Outcome<SmtpSettingsRow>> UpdateAsync(ProjectCaller caller, SmtpSettingsDraft draft, CancellationToken ct)
+    /// <summary>The install's own settings, or null when none are set (AC-7).</summary>
+    public Task<SmtpSettingsRow?> GetInstallAsync(CancellationToken ct) => FindAsync(InstallProjectId, ct);
+
+    public async Task<Outcome<SmtpSettingsRow>> UpdateAsync(SmtpScope caller, SmtpSettingsDraft draft, CancellationToken ct)
     {
         var stored = await FindAsync(caller.ProjectId, ct);
         if (!SmtpSettingsRule.TryValidate(draft, Identity(stored), out var valid, out var error)) return Failure.Invalid(error);
-        if (!await HostAllowedAsync(valid.Host, ct)) return Failure.SmtpHostNotAllowed;
-        if (await NotActiveAsync(caller.ProjectId, ct) is { } notActive) return notActive;
+        if (!caller.Install)
+        {
+            if (!await HostAllowedAsync(valid.Host, ct)) return Failure.SmtpHostNotAllowed;
+            if (await NotActiveAsync(caller.ProjectId, ct) is { } notActive) return notActive;
+        }
 
         return await store.WriteAsync<SmtpSettingsRow>(async (uow, ct) =>
         {
@@ -121,9 +139,9 @@ internal sealed class SmtpSettingsService(
     }
 
     /// <summary>Succeeds also when nothing is stored (AC-5).</summary>
-    public async Task<Outcome<Done>> DeleteAsync(ProjectCaller caller, CancellationToken ct)
+    public async Task<Outcome<Done>> DeleteAsync(SmtpScope caller, CancellationToken ct)
     {
-        if (await NotActiveAsync(caller.ProjectId, ct) is { } notActive) return notActive;
+        if (!caller.Install && await NotActiveAsync(caller.ProjectId, ct) is { } notActive) return notActive;
 
         return await store.WriteAsync<Done>(async (uow, ct) =>
         {
@@ -141,17 +159,23 @@ internal sealed class SmtpSettingsService(
     /// Sends the fixed test email through <paramref name="draft"/>, saved or not, to the caller's own console email,
     /// and stores nothing (AC-6). One attempt, at most <see cref="TestBudget"/>. Returns the address it went to.
     /// </summary>
-    public async Task<Outcome<string>> TestAsync(ProjectCaller caller, SmtpSettingsDraft draft, CancellationToken ct)
+    public async Task<Outcome<string>> TestAsync(SmtpScope caller, SmtpSettingsDraft draft, CancellationToken ct)
     {
         var stored = await FindAsync(caller.ProjectId, ct);
         if (!SmtpSettingsRule.TryValidate(draft, Identity(stored), out var valid, out var error)) return Failure.Invalid(error);
+        var publicOnly = !caller.Install && !settings.AllowPrivateHosts;
         // A name is checked when the connection is made, against the very addresses that are dialed.
-        if (!settings.AllowPrivateHosts && SmtpHost.TryGetLiteral(valid.Host, out var literal) && !GlobalUnicast.Contains(literal))
+        if (publicOnly && SmtpHost.TryGetLiteral(valid.Host, out var literal) && !GlobalUnicast.Contains(literal))
             return Failure.SmtpHostNotAllowed;
 
-        var project = await projects.GetAsync(caller.ProjectId, ct);
-        if (project is null) return Failure.ProjectNotFound;
-        if (project.Status != ProjectStatus.Active) return Failure.ProjectNotReady;
+        var content = TestEmail.ForInstall();
+        if (!caller.Install)
+        {
+            var project = await projects.GetAsync(caller.ProjectId, ct);
+            if (project is null) return Failure.ProjectNotFound;
+            if (project.Status != ProjectStatus.Active) return Failure.ProjectNotReady;
+            content = TestEmail.ForProject(project.Name);
+        }
 
         if ((await users.GetManyAsync([caller.UserId], ct)).SingleOrDefault() is not { } user)
             return Failure.Invalid("Your console account has no email address to send the test to.");
@@ -162,10 +186,10 @@ internal sealed class SmtpSettingsService(
             SmtpPasswordSource.Stored => Encoding.UTF8.GetString(secrets.Decrypt(stored!.PasswordCiphertext, PasswordBinding(caller.ProjectId))),
             _ => null,
         };
-        var server = new SmtpServer(valid.Host, valid.Port, valid.Security, valid.Username, password, PublicOnly: !settings.AllowPrivateHosts);
+        var server = new SmtpServer(valid.Host, valid.Port, valid.Security, valid.Username, password, publicOnly);
         var email = new OutgoingEmail(
             valid.FromEmail, valid.FromName, valid.ReplyTo, user.Email,
-            $"{Guid.CreateVersion7()}@{new Uri(publicUrl.Origin).Host}", TestEmail.ForProject(project.Name));
+            $"{Guid.CreateVersion7()}@{new Uri(publicUrl.Origin).Host}", content);
 
         if (await sender.SendAsync(server, email, TestBudget, ct) is { } failure)
         {

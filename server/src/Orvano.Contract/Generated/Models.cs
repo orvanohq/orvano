@@ -76,6 +76,174 @@ public sealed class ConsoleSignupModeJsonConverter : JsonConverter<ConsoleSignup
         });
 }
 
+/// <summary>Why an email was not sent.</summary>
+[JsonConverter(typeof(EmailFailureCodeJsonConverter))]
+public enum EmailFailureCode
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>smtp_unreachable</c>.</summary>
+    SmtpUnreachable,
+
+    /// <summary>The wire value <c>smtp_tls_failed</c>.</summary>
+    SmtpTlsFailed,
+
+    /// <summary>The wire value <c>smtp_auth_failed</c>.</summary>
+    SmtpAuthFailed,
+
+    /// <summary>The wire value <c>smtp_rejected</c>.</summary>
+    SmtpRejected,
+
+    /// <summary>The wire value <c>smtp_timeout</c>.</summary>
+    SmtpTimeout,
+
+    /// <summary>The wire value <c>smtp_host_not_allowed</c>.</summary>
+    SmtpHostNotAllowed,
+
+    /// <summary>The wire value <c>email_not_configured</c>.</summary>
+    EmailNotConfigured,
+
+    /// <summary>The wire value <c>project_not_active</c>.</summary>
+    ProjectNotActive,
+
+    /// <summary>The wire value <c>email_expired</c>.</summary>
+    EmailExpired,
+
+    /// <summary>The wire value <c>email_unreadable</c>.</summary>
+    EmailUnreadable,
+}
+
+/// <summary>Reads and writes <see cref="EmailFailureCode"/> by wire value; unknown values read as <see cref="EmailFailureCode.Unknown"/>.</summary>
+public sealed class EmailFailureCodeJsonConverter : JsonConverter<EmailFailureCode>
+{
+    /// <inheritdoc/>
+    public override EmailFailureCode Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "smtp_unreachable" => EmailFailureCode.SmtpUnreachable,
+            "smtp_tls_failed" => EmailFailureCode.SmtpTlsFailed,
+            "smtp_auth_failed" => EmailFailureCode.SmtpAuthFailed,
+            "smtp_rejected" => EmailFailureCode.SmtpRejected,
+            "smtp_timeout" => EmailFailureCode.SmtpTimeout,
+            "smtp_host_not_allowed" => EmailFailureCode.SmtpHostNotAllowed,
+            "email_not_configured" => EmailFailureCode.EmailNotConfigured,
+            "project_not_active" => EmailFailureCode.ProjectNotActive,
+            "email_expired" => EmailFailureCode.EmailExpired,
+            "email_unreadable" => EmailFailureCode.EmailUnreadable,
+            _ => EmailFailureCode.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, EmailFailureCode value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            EmailFailureCode.SmtpUnreachable => "smtp_unreachable",
+            EmailFailureCode.SmtpTlsFailed => "smtp_tls_failed",
+            EmailFailureCode.SmtpAuthFailed => "smtp_auth_failed",
+            EmailFailureCode.SmtpRejected => "smtp_rejected",
+            EmailFailureCode.SmtpTimeout => "smtp_timeout",
+            EmailFailureCode.SmtpHostNotAllowed => "smtp_host_not_allowed",
+            EmailFailureCode.EmailNotConfigured => "email_not_configured",
+            EmailFailureCode.ProjectNotActive => "project_not_active",
+            EmailFailureCode.EmailExpired => "email_expired",
+            EmailFailureCode.EmailUnreadable => "email_unreadable",
+            _ => throw new JsonException($"EmailFailureCode.{value} has no wire value"),
+        });
+}
+
+/// <summary>Where an email is in its delivery.</summary>
+[JsonConverter(typeof(EmailStatusJsonConverter))]
+public enum EmailStatus
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>queued</c>.</summary>
+    Queued,
+
+    /// <summary>The wire value <c>sent</c>.</summary>
+    Sent,
+
+    /// <summary>The wire value <c>failed</c>.</summary>
+    Failed,
+}
+
+/// <summary>Reads and writes <see cref="EmailStatus"/> by wire value; unknown values read as <see cref="EmailStatus.Unknown"/>.</summary>
+public sealed class EmailStatusJsonConverter : JsonConverter<EmailStatus>
+{
+    /// <inheritdoc/>
+    public override EmailStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "queued" => EmailStatus.Queued,
+            "sent" => EmailStatus.Sent,
+            "failed" => EmailStatus.Failed,
+            _ => EmailStatus.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, EmailStatus value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            EmailStatus.Queued => "queued",
+            EmailStatus.Sent => "sent",
+            EmailStatus.Failed => "failed",
+            _ => throw new JsonException($"EmailStatus.{value} has no wire value"),
+        });
+}
+
+/// <summary>Which email was sent: one of the four auth templates, or the console's own invite.</summary>
+[JsonConverter(typeof(EmailTemplateNameJsonConverter))]
+public enum EmailTemplateName
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>verification</c>.</summary>
+    Verification,
+
+    /// <summary>The wire value <c>recovery</c>.</summary>
+    Recovery,
+
+    /// <summary>The wire value <c>magic_link</c>.</summary>
+    MagicLink,
+
+    /// <summary>The wire value <c>email_code</c>.</summary>
+    EmailCode,
+
+    /// <summary>The wire value <c>console_invitation</c>.</summary>
+    ConsoleInvitation,
+}
+
+/// <summary>Reads and writes <see cref="EmailTemplateName"/> by wire value; unknown values read as <see cref="EmailTemplateName.Unknown"/>.</summary>
+public sealed class EmailTemplateNameJsonConverter : JsonConverter<EmailTemplateName>
+{
+    /// <inheritdoc/>
+    public override EmailTemplateName Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "verification" => EmailTemplateName.Verification,
+            "recovery" => EmailTemplateName.Recovery,
+            "magic_link" => EmailTemplateName.MagicLink,
+            "email_code" => EmailTemplateName.EmailCode,
+            "console_invitation" => EmailTemplateName.ConsoleInvitation,
+            _ => EmailTemplateName.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, EmailTemplateName value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            EmailTemplateName.Verification => "verification",
+            EmailTemplateName.Recovery => "recovery",
+            EmailTemplateName.MagicLink => "magic_link",
+            EmailTemplateName.EmailCode => "email_code",
+            EmailTemplateName.ConsoleInvitation => "console_invitation",
+            _ => throw new JsonException($"EmailTemplateName.{value} has no wire value"),
+        });
+}
+
 /// <summary>Whether an invitation can still be accepted.</summary>
 [JsonConverter(typeof(InvitationStatusJsonConverter))]
 public enum InvitationStatus
@@ -643,14 +811,44 @@ public sealed record CreatedApiKey(
 /// <summary>A new invitation and its link. The link is shown only here, once.</summary>
 /// <param name="Invitation">The invitation.</param>
 /// <param name="Url">The link to share with the invited person. Anyone holding it can see the invitation until it is used or expires.</param>
+/// <param name="Emailed">True when the server is also sending the link to the invited address by email (the install has an SMTP server).</param>
 public sealed record CreatedInvitation(
     [property: JsonPropertyName("invitation")] Invitation Invitation,
-    [property: JsonPropertyName("url")] string Url);
+    [property: JsonPropertyName("url")] string Url,
+    [property: JsonPropertyName("emailed")] bool Emailed);
 
 /// <summary>A request to delete the signed in user.</summary>
 /// <param name="Password">The user's current password.</param>
 public sealed record DeleteAccountRequest(
     [property: JsonPropertyName("password")] string Password);
+
+/// <summary>One email in the log. The recipient is masked, and the content is never kept.</summary>
+/// <param name="Id">The email's ID.</param>
+/// <param name="Template">Which email it was.</param>
+/// <param name="Recipient">The recipient, masked: the first character, then <c>***</c>, then the domain.</param>
+/// <param name="Status">Where it is in its delivery.</param>
+/// <param name="SmtpSource">Whose SMTP settings sent it; null until it is sent.</param>
+/// <param name="Attempts">How many times the server tried to send it.</param>
+/// <param name="ErrorCode">Why it was not sent; null unless <c>status</c> is <c>failed</c>.</param>
+/// <param name="CreatedAt">When it was queued.</param>
+/// <param name="CompletedAt">When it was sent or failed; null while it is queued.</param>
+public sealed record EmailLogEntry(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("template")] EmailTemplateName Template,
+    [property: JsonPropertyName("recipient")] string Recipient,
+    [property: JsonPropertyName("status")] EmailStatus Status,
+    [property: JsonPropertyName("smtpSource")] SmtpSource? SmtpSource,
+    [property: JsonPropertyName("attempts")] int Attempts,
+    [property: JsonPropertyName("errorCode")] EmailFailureCode? ErrorCode,
+    [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("completedAt")] DateTimeOffset? CompletedAt);
+
+/// <summary>One page of the email log, newest first.</summary>
+/// <param name="Items">The emails on this page.</param>
+/// <param name="NextCursor">The cursor of the next page; null on the last one.</param>
+public sealed record EmailPage(
+    [property: JsonPropertyName("items")] IReadOnlyList<EmailLogEntry> Items,
+    [property: JsonPropertyName("nextCursor")] string? NextCursor);
 
 /// <summary>Who an email is sent as.</summary>
 /// <param name="Email">The From address.</param>
@@ -684,6 +882,11 @@ public sealed record InstallSettings(
 public sealed record InstallSetup(
     [property: JsonPropertyName("setupRequired")] bool SetupRequired,
     [property: JsonPropertyName("signupOpen")] bool SignupOpen);
+
+/// <summary>The SMTP server of the whole install, which every project without its own sends through.</summary>
+/// <param name="Settings">The install's settings; null when none are set.</param>
+public sealed record InstallSmtp(
+    [property: JsonPropertyName("settings")] SmtpSettings? Settings);
 
 /// <summary>An invitation to join an org. Its link is shown only once, when it is created.</summary>
 /// <param name="Id">The invitation ID.</param>

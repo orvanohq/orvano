@@ -1,5 +1,5 @@
-// Transactional email (spec 0009, row 9): a project's SMTP settings and the test email. Templates, the email
-// log, and the install's own SMTP arrive with the later slices of the same spec.
+// Transactional email (spec 0009, row 9): a project's SMTP settings, the test email, and the email log. The
+// install's own SMTP and email log are in platform/install.tsp. Templates arrive with the next slice of the spec.
 import "@typespec/http";
 import "@typespec/openapi";
 import "../errors.tsp";
@@ -135,6 +135,131 @@ model EmailTestResult {
   @doc("The address the test email went to: your own console email.")
   @example("grace@example.com")
   sentTo: string;
+}
+
+@doc("Which email was sent: one of the four auth templates, or the console's own invite.")
+enum EmailTemplateName {
+  @doc("Confirms a user owns their email address.")
+  verification,
+
+  @doc("Lets a user reset their password.")
+  recovery,
+
+  @doc("Signs a user in with a link.")
+  magic_link,
+
+  @doc("Signs a user in with a one time code.")
+  email_code,
+
+  @doc("Invites someone to an org in the console.")
+  console_invitation,
+}
+
+@doc("Where an email is in its delivery.")
+enum EmailStatus {
+  @doc("Waiting to be sent, or being retried.")
+  queued,
+
+  @doc("The SMTP server accepted it.")
+  sent,
+
+  @doc("It was not sent; `errorCode` says why.")
+  failed,
+}
+
+@doc("Why an email was not sent.")
+enum EmailFailureCode {
+  @doc("The SMTP server could not be reached.")
+  smtp_unreachable,
+
+  @doc("The secure connection to the SMTP server failed.")
+  smtp_tls_failed,
+
+  @doc("The SMTP server refused the username or password.")
+  smtp_auth_failed,
+
+  @doc("The SMTP server refused the email.")
+  smtp_rejected,
+
+  @doc("The SMTP server did not answer in time.")
+  smtp_timeout,
+
+  @doc("The project's SMTP host points to a private network address.")
+  smtp_host_not_allowed,
+
+  @doc("No SMTP server was set up when the email was sent.")
+  email_not_configured,
+
+  @doc("The project was deleted before the email was sent.")
+  project_not_active,
+
+  @doc("The email waited more than 30 minutes in the queue.")
+  email_expired,
+
+  @doc("The server could not decrypt the queued email.")
+  email_unreadable,
+}
+
+@doc("One email in the log. The recipient is masked, and the content is never kept.")
+model EmailLogEntry {
+  @doc("The email's ID.")
+  @example("01924f5e-7c1a-7a3b-9f10-2c4d5e6f7a8b")
+  id: string;
+
+  @doc("Which email it was.")
+  template: EmailTemplateName;
+
+  @doc("The recipient, masked: the first character, then `***`, then the domain.")
+  @example("g***@example.com")
+  recipient: string;
+
+  @doc("Where it is in its delivery.")
+  status: EmailStatus;
+
+  @doc("Whose SMTP settings sent it; null until it is sent.")
+  smtpSource: SmtpSource | null;
+
+  @doc("How many times the server tried to send it.")
+  @example(1)
+  attempts: int32;
+
+  @doc("Why it was not sent; null unless `status` is `failed`.")
+  errorCode: EmailFailureCode | null;
+
+  @doc("When it was queued.")
+  createdAt: utcDateTime;
+
+  @doc("When it was sent or failed; null while it is queued.")
+  completedAt: utcDateTime | null;
+}
+
+@doc("One page of the email log, newest first.")
+model EmailPage {
+  @doc("The emails on this page.")
+  items: EmailLogEntry[];
+
+  @doc("The cursor of the next page; null on the last one.")
+  nextCursor: string | null;
+}
+
+@route("/v1/console/project/emails")
+@tag("console")
+@useAuth(consoleSession)
+interface ConsoleEmailsApi {
+  @doc("Lists the emails of the project named by `X-Orvano-Project` from the last 30 days, newest first. Any member.")
+  @operationId("consoleEmails.list")
+  @extension("x-orvano-audience", "console")
+  @extension("x-orvano-service", "consoleEmails")
+  @get
+  list(
+    @doc("The `nextCursor` of the page before; omit for the first page.")
+    @query
+    cursor?: string,
+
+    @doc("The page size, 1 to 100. Default 25.")
+    @query
+    limit?: int32,
+  ): EmailPage | Problem;
 }
 
 @route("/v1/console/project/email/smtp")

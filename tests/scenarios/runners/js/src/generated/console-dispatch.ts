@@ -68,6 +68,19 @@ export const consoleDispatch: DispatchTable = {
     status: 200,
     console: (o, _input) => o.consoleAuthKeys.rotate(),
   },
+  'consoleEmails.list': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleEmails.list({
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    consoleAll: (o, input) => o.consoleEmails.listAll({ limit: input.limit as number | undefined }),
+  },
+  'consoleInstall.deleteSmtp': {
+    status: 204,
+    console: (o, _input) => o.consoleInstall.deleteSmtp(),
+  },
   'consoleInstall.getSettings': {
     status: 200,
     console: (o, _input) => o.consoleInstall.getSettings(),
@@ -76,10 +89,32 @@ export const consoleDispatch: DispatchTable = {
     status: 200,
     console: (o, _input) => o.consoleInstall.getSetup(),
   },
+  'consoleInstall.getSmtp': {
+    status: 200,
+    console: (o, _input) => o.consoleInstall.getSmtp(),
+  },
+  'consoleInstall.listEmails': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleInstall.listEmails({
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    consoleAll: (o, input) =>
+      o.consoleInstall.listEmailsAll({ limit: input.limit as number | undefined }),
+  },
+  'consoleInstall.testSmtp': {
+    status: 200,
+    console: (o, input) => o.consoleInstall.testSmtp(input.body as SmtpSettingsInput),
+  },
   'consoleInstall.updateSettings': {
     status: 200,
     console: (o, input) =>
       o.consoleInstall.updateSettings(input.body as UpdateInstallSettingsRequest),
+  },
+  'consoleInstall.updateSmtp': {
+    status: 200,
+    console: (o, input) => o.consoleInstall.updateSmtp(input.body as SmtpSettingsInput),
   },
   'consoleInvitations.accept': {
     status: 200,

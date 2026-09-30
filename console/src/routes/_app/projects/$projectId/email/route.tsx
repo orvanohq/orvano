@@ -6,8 +6,11 @@ export const Route = createFileRoute('/_app/projects/$projectId/email')({
   component: EmailLayout,
 })
 
-/** The Email tabs, each its own route so it deep links. Later slices of spec 0009 add Templates and Log. */
-const tabs = [{ label: 'Settings', to: '/projects/$projectId/email/settings' }] as const
+/** The Email tabs, each its own route so it deep links. The next slice of spec 0009 adds Templates. */
+const tabs = [
+  { label: 'Settings', to: '/projects/$projectId/email/settings' },
+  { label: 'Log', to: '/projects/$projectId/email/log' },
+] as const
 
 /** The project's Email area (spec 0009, Screens): the heading, the tabs, and the tab's page below. */
 function EmailLayout() {

@@ -13,9 +13,12 @@ import type {
   CreateProjectRequest,
   CreatedApiKey,
   CreatedInvitation,
+  EmailLogEntry,
+  EmailPage,
   EmailTestResult,
   InstallSettings,
   InstallSetup,
+  InstallSmtp,
   Invitation,
   InvitationPage,
   InvitationPreview,
@@ -183,12 +186,51 @@ export class ConsoleAuthKeysService {
   }
 }
 
+/** Operations in the `consoleEmails` service. */
+export class ConsoleEmailsService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /** Lists the emails of the project named by `X-Orvano-Project` from the last 30 days, newest first. Any member. */
+  list(
+    query?: { cursor?: string | undefined; limit?: number | undefined },
+    options?: RequestOptions,
+  ): Promise<EmailPage> {
+    return this.#client.request<EmailPage>(
+      { method: 'GET', path: '/v1/console/project/emails', query },
+      options,
+    )
+  }
+
+  /** Every item of `list`, walking all pages: `for await (const item of ...)`. */
+  listAll(
+    query?: { limit?: number | undefined },
+    options?: RequestOptions,
+  ): AsyncGenerator<EmailLogEntry> {
+    return paginate((cursor) => this.list({ ...query, cursor }, options))
+  }
+}
+
 /** Operations in the `consoleInstall` service. */
 export class ConsoleInstallService {
   readonly #client: Client
 
   constructor(client: Client) {
     this.#client = client
+  }
+
+  /**
+   * Deletes the install's SMTP settings, so projects without their own can't send email. Install admins only.
+   * Answers 204 also when nothing is stored.
+   */
+  deleteSmtp(options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'DELETE', path: '/v1/console/install/smtp', idempotent: true },
+      options,
+    )
   }
 
   /** Gets the install settings. Install admins only. */
@@ -210,6 +252,44 @@ export class ConsoleInstallService {
     )
   }
 
+  /** Gets the install's SMTP settings. Install admins only. */
+  getSmtp(options?: RequestOptions): Promise<InstallSmtp> {
+    return this.#client.request<InstallSmtp>(
+      { method: 'GET', path: '/v1/console/install/smtp' },
+      options,
+    )
+  }
+
+  /** Lists the console's own emails (invites) from the last 30 days, newest first. Install admins only. */
+  listEmails(
+    query?: { cursor?: string | undefined; limit?: number | undefined },
+    options?: RequestOptions,
+  ): Promise<EmailPage> {
+    return this.#client.request<EmailPage>(
+      { method: 'GET', path: '/v1/console/install/emails', query },
+      options,
+    )
+  }
+
+  /** Every item of `listEmails`, walking all pages: `for await (const item of ...)`. */
+  listEmailsAll(
+    query?: { limit?: number | undefined },
+    options?: RequestOptions,
+  ): AsyncGenerator<EmailLogEntry> {
+    return paginate((cursor) => this.listEmails({ ...query, cursor }, options))
+  }
+
+  /**
+   * Sends a test email to your own console email through the given settings, saved or not, and stores nothing.
+   * Install admins only. Waits at most 20 seconds and never retries.
+   */
+  testSmtp(body: SmtpSettingsInput, options?: RequestOptions): Promise<EmailTestResult> {
+    return this.#client.request<EmailTestResult>(
+      { method: 'POST', path: '/v1/console/install/smtp/test', body },
+      options,
+    )
+  }
+
   /** Changes the install settings. Install admins only. */
   updateSettings(
     body: UpdateInstallSettingsRequest,
@@ -217,6 +297,17 @@ export class ConsoleInstallService {
   ): Promise<InstallSettings> {
     return this.#client.request<InstallSettings>(
       { method: 'PATCH', path: '/v1/console/install/settings', body },
+      options,
+    )
+  }
+
+  /**
+   * Saves the install's SMTP settings, replacing any stored ones. Install admins only. A private network address
+   * is allowed here, since the install admin already controls the server.
+   */
+  updateSmtp(body: SmtpSettingsInput, options?: RequestOptions): Promise<SmtpSettings> {
+    return this.#client.request<SmtpSettings>(
+      { method: 'PUT', path: '/v1/console/install/smtp', body, idempotent: true },
       options,
     )
   }
@@ -787,6 +878,8 @@ export class Orvano {
   readonly consoleApiKeys: ConsoleApiKeysService
   /** Operations in the `consoleAuthKeys` service. */
   readonly consoleAuthKeys: ConsoleAuthKeysService
+  /** Operations in the `consoleEmails` service. */
+  readonly consoleEmails: ConsoleEmailsService
   /** Operations in the `consoleInstall` service. */
   readonly consoleInstall: ConsoleInstallService
   /** Operations in the `consoleInvitations` service. */
@@ -809,6 +902,7 @@ export class Orvano {
     this.consoleAccount = new ConsoleAccountService(client)
     this.consoleApiKeys = new ConsoleApiKeysService(client)
     this.consoleAuthKeys = new ConsoleAuthKeysService(client)
+    this.consoleEmails = new ConsoleEmailsService(client)
     this.consoleInstall = new ConsoleInstallService(client)
     this.consoleInvitations = new ConsoleInvitationsService(client)
     this.consoleMembers = new ConsoleMembersService(client)

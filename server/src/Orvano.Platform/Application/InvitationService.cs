@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Orvano.Core.Http;
@@ -12,8 +13,11 @@ namespace Orvano.Platform.Application;
 /// <summary>An invitation with its state at the database clock and the inviter, if that account still exists.</summary>
 internal sealed record InvitationView(InvitationRow Row, InvitationState State, ConsoleUserSummary? InvitedBy);
 
-/// <summary>A new invitation and its link, which leaves the server only in this one response.</summary>
-internal sealed record CreatedInvite(InvitationView Invitation, string Url);
+/// <summary>
+/// A new invitation and its link, which leaves the server only in this one response and, when
+/// <paramref name="Emailed"/>, in the invite email (spec 0009, AC-23).
+/// </summary>
+internal sealed record CreatedInvite(InvitationView Invitation, string Url, bool Emailed);
 
 /// <summary>What an invite link is for (AC-5).</summary>
 internal sealed record InvitePreview(OrgRow Org, InvitationRow Invitation, string? InvitedByName);
@@ -27,11 +31,11 @@ internal sealed record ConsumedInvitation(Guid Id, Guid OrgId, OrgRole Role);
 /// <summary>
 /// Invitation use cases (spec 0008, AC-1 to AC-6): create (replacing the email's old one, cleaning up long expired
 /// ones, under the cap), list, revoke, preview, and accept. Every change locks the org row <c>FOR UPDATE</c> first.
-/// The token exists only in the create response; the database holds its hash, and no log line, event, or problem
-/// body carries it.
+/// The token exists only in the create response and the invite email; the database holds its hash, and no log line,
+/// event, or problem body carries it.
 /// </summary>
 internal sealed class InvitationService(
-    PlatformStore store, IConsoleUserDirectory directory, PublicUrl publicUrl, ILogger<InvitationService> logger)
+    PlatformStore store, IConsoleUserDirectory directory, PublicUrl publicUrl, IServiceProvider services, ILogger<InvitationService> logger)
 {
     public async Task<Outcome<CreatedInvite>> CreateAsync(Guid userId, Guid orgId, string? email, OrgRole? role, CancellationToken ct)
     {
@@ -85,7 +89,15 @@ internal sealed class InvitationService(
             await PlatformEvents.WriteAsync(uow.Tx, PlatformEvents.InvitationCreated, actor, row.Id.ToString(),
                 new Dictionary<string, string> { ["orgId"] = orgId.ToString(), ["invitationId"] = row.Id.ToString(), ["role"] = row.Role }, ct: ct);
             logger.LogInformation("Console user {UserId} created invitation {InvitationId} in org {OrgId}", userId, row.Id, orgId);
-            return new CreatedInvite(new InvitationView(row, InvitationState.Pending, inviter), token.Url(publicUrl.Origin));
+
+            // Resolved per request, so an install without the Messaging module still works and simply never emails
+            // (spec 0009, module seams). Any error here rolls the invitation back with it.
+            var url = token.Url(publicUrl.Origin);
+            var emailed = inviter is not null
+                && services.GetService<IConsoleInvitationMailer>() is { } mailer
+                && await mailer.QueueAsync(
+                    uow.Tx, new InvitationEmail(invited, org.Name, inviter.Name, inviter.Email, invitedRole, url, row.ExpiresAt), ct);
+            return new CreatedInvite(new InvitationView(row, InvitationState.Pending, inviter), url, emailed);
         }, ct);
     }
 

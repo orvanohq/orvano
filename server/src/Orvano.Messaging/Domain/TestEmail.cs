@@ -16,6 +16,9 @@ internal static class TestEmail
     /// <summary>The test email of the project called <paramref name="projectName"/>.</summary>
     public static EmailContent ForProject(string projectName) => Build($"the project {projectName}");
 
+    /// <summary>The test email of the install's own SMTP server (AC-7).</summary>
+    public static EmailContent ForInstall() => Build(InstallName);
+
     private static EmailContent Build(string sender)
     {
         var text =

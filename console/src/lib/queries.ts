@@ -15,6 +15,8 @@ export const keys = {
   accountOptional: ['console', 'account', 'optional'] as const,
   setup: ['console', 'install', 'setup'] as const,
   installSettings: ['console', 'install', 'settings'] as const,
+  installSmtp: ['console', 'install', 'smtp'] as const,
+  installEmails: ['console', 'install', 'emails'] as const,
   /** Holds no token: the invite page's token never enters a query key or cache (AC-20). */
   invitationPreview: ['console', 'invitations', 'preview'] as const,
   orgs: ['console', 'orgs'] as const,
@@ -32,6 +34,7 @@ export const keys = {
   apiKeys: (projectId: string) => ['console', 'projects', projectId, 'keys'] as const,
   platforms: (projectId: string) => ['console', 'projects', projectId, 'platforms'] as const,
   smtp: (projectId: string) => ['console', 'projects', projectId, 'email', 'smtp'] as const,
+  emails: (projectId: string) => ['console', 'projects', projectId, 'email', 'log'] as const,
   /** Whether the project has any key: the overview's first page of one (spec 0007, AC-21). */
   anyApiKey: (projectId: string) => ['console', 'projects', projectId, 'keys', 'any'] as const,
   /** Whether the project has any platform (spec 0007, AC-21). */
@@ -101,6 +104,25 @@ export function installSettingsQuery() {
   return queryOptions({
     queryKey: keys.installSettings,
     queryFn: ({ signal }) => consoleApi().consoleInstall.getSettings({ signal }),
+  })
+}
+
+/** The install's own SMTP settings; install admins only (spec 0009, AC-7). Never a password. */
+export function installSmtpQuery() {
+  return queryOptions({
+    queryKey: keys.installSmtp,
+    queryFn: ({ signal }) => consoleApi().consoleInstall.getSmtp({ signal }),
+  })
+}
+
+/** The console's own emails (invites), newest first, 25 per page; install admins only (spec 0009, AC-21). */
+export function installEmailsQuery() {
+  return infiniteQueryOptions({
+    queryKey: keys.installEmails,
+    queryFn: ({ pageParam, signal }) =>
+      consoleApi().consoleInstall.listEmails({ cursor: pageParam, limit: 25 }, { signal }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
   })
 }
 
@@ -264,5 +286,16 @@ export function smtpQuery(projectId: string) {
   return queryOptions({
     queryKey: keys.smtp(projectId),
     queryFn: ({ signal }) => projectClient(projectId).consoleSmtp.get({ signal }),
+  })
+}
+
+/** A project's emails of the last 30 days, newest first, 25 per page (spec 0009, AC-20). */
+export function emailsQuery(projectId: string) {
+  return infiniteQueryOptions({
+    queryKey: keys.emails(projectId),
+    queryFn: ({ pageParam, signal }) =>
+      projectClient(projectId).consoleEmails.list({ cursor: pageParam, limit: 25 }, { signal }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
   })
 }

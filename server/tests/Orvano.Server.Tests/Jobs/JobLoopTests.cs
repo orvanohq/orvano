@@ -90,6 +90,23 @@ public class JobLoopTests(PostgresFixture postgres) : IAsyncLifetime
         Assert.Equal("PermanentJobFailureException: never going to work", row.LastError);
     }
 
+    // Spec 0009, Core change: a handler that knows when to try again names the delay itself.
+    [Fact]
+    public async Task Retries_after_the_delay_a_handler_asks_for_and_still_goes_dead_at_the_last_attempt()
+    {
+        _work.HandleJob("paced", Queue, (_, _) => throw new JobRetryException(TimeSpan.FromMinutes(4), "try later"));
+        await using var loop = await StartLoopAsync();
+
+        var id = await EnqueueAsync(new NewJob("paced", Queue: Queue, MaxAttempts: 5));
+        var row = await Eventually.ReturnsAsync(() => ReadAsync(id), r => r.Attempts == 1 && r.Status == "queued", Wait, "the first retry");
+        Assert.Equal("JobRetryException: try later", row.LastError);
+        // The default backoff of attempt 1 is at most 2 seconds.
+        Assert.InRange(row.RunAtFromNow.TotalSeconds, 230, 240);
+
+        var last = await EnqueueAsync(new NewJob("paced", Queue: Queue, MaxAttempts: 1));
+        Assert.Equal(1, (await WaitForStatusAsync(last, "dead")).Attempts);
+    }
+
     [Fact]
     public async Task Enqueues_several_jobs_in_one_batch_behind_a_savepoint()
     {

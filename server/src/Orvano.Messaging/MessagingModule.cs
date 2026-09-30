@@ -6,14 +6,16 @@ using Orvano.Core.Modules;
 using Orvano.Messaging.Application;
 using Orvano.Messaging.Domain;
 using Orvano.Messaging.Endpoints;
+using Orvano.Messaging.Jobs;
 using Orvano.Messaging.Smtp;
+using Orvano.Platform.Contracts;
 
 namespace Orvano.Messaging;
 
 /// <summary>
-/// The Messaging module (spec 0009): SMTP settings per project with the install's as the fallback, and the test
-/// email. Templates and the send queue arrive with the spec's later slices. It reaches Platform only through its
-/// <c>Contracts</c> and never references Auth.
+/// The Messaging module (spec 0009): SMTP settings per project with the install's as the fallback, the test email,
+/// the sealed send queue with its worker, console invite emails, and the email log. Templates arrive with the
+/// spec's next slice. It reaches Platform only through its <c>Contracts</c> and never references Auth.
 /// </summary>
 internal sealed class MessagingModule : IOrvanoModule
 {
@@ -40,11 +42,21 @@ internal sealed class MessagingModule : IOrvanoModule
     {
         services.AddSingleton<ProjectAccess>();
         services.AddSingleton<SmtpSettingsService>();
+        services.AddSingleton<EmailLogService>();
+        services.AddSingleton<EmailQueue>();
+        // Platform resolves this per request; without it invitations are created and never emailed.
+        services.AddSingleton<IConsoleInvitationMailer, InvitationMailer>();
     }
 
     public void MapApi(RouteGroupBuilder v1) => ConsoleEmailEndpoints.Map(v1);
 
-    public void RegisterWork(IWorkRegistry work) { }
+    public void RegisterWork(IWorkRegistry work)
+    {
+        work.HandleJob(EmailSendJob.Kind, MessagingJobs.Queue, EmailSendJob.RunAsync);
+        work.HandleJob(MessagingJobs.PurgeProject, MessagingJobs.Queue, MessagingJobs.PurgeProjectAsync);
+        work.OnEvent(MessagingJobs.ProjectPurgedEvent, MessagingJobs.PurgeConsumer, MessagingJobs.OnProjectPurged);
+        work.AddInternalSchedule(MessagingRetention.Name, MessagingRetention.Interval, MessagingRetention.RunScheduledAsync);
+    }
 
     public void RegisterRealtime(IRealtimeRegistry realtime) { }
 }

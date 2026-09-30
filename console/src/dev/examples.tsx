@@ -769,6 +769,8 @@ const exampleInviteUrl = 'https://orvano.example.com/invite#example_not_a_real_i
 const exampleCreateInvitation = (body: CreateInvitationRequest) =>
   Promise.resolve({
     url: exampleInviteUrl,
+    // As on an install with an email server: the link step says the invite is also emailed.
+    emailed: true,
     invitation: {
       id: 'invitation00000000000a',
       email: body.email,

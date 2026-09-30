@@ -353,9 +353,45 @@ public static class ConsoleAuthKeysOperations
     }
 }
 
+/// <summary>Route constants for the <c>consoleEmails</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleEmailsOperations
+{
+    /// <summary>GET /v1/console/project/emails: Lists the emails of the project named by <c>X-Orvano-Project</c> from the last 30 days, newest first. Any member.</summary>
+    public static class List
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleEmails.list";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/emails";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
 /// <summary>Route constants for the <c>consoleInstall</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class ConsoleInstallOperations
 {
+    /// <summary>DELETE /v1/console/install/smtp: Deletes the install's SMTP settings, so projects without their own can't send email. Install admins only.</summary>
+    public static class DeleteSmtp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleInstall.deleteSmtp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/install/smtp";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>GET /v1/console/install/settings: Gets the install settings. Install admins only.</summary>
     public static class GetSettings
     {
@@ -388,6 +424,54 @@ public static class ConsoleInstallOperations
         public const string Audience = "console";
     }
 
+    /// <summary>GET /v1/console/install/smtp: Gets the install's SMTP settings. Install admins only.</summary>
+    public static class GetSmtp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleInstall.getSmtp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/install/smtp";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/console/install/emails: Lists the console's own emails (invites) from the last 30 days, newest first. Install admins only.</summary>
+    public static class ListEmails
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleInstall.listEmails";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/install/emails";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/install/smtp/test: Sends a test email to your own console email through the given settings, saved or not, and stores nothing.</summary>
+    public static class TestSmtp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleInstall.testSmtp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/install/smtp/test";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>PATCH /v1/console/install/settings: Changes the install settings. Install admins only.</summary>
     public static class UpdateSettings
     {
@@ -399,6 +483,22 @@ public static class ConsoleInstallOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/console/install/settings";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>PUT /v1/console/install/smtp: Saves the install's SMTP settings, replacing any stored ones. Install admins only. A private network address</summary>
+    public static class UpdateSmtp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleInstall.updateSmtp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PUT";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/install/smtp";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "console";

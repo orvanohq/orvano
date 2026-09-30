@@ -10,6 +10,26 @@ export type ApiKeyScope = 'users.read' | 'users.write'
 /** Who may create a console account. */
 export type ConsoleSignupMode = 'invite' | 'open'
 
+/** Why an email was not sent. */
+export type EmailFailureCode =
+  | 'smtp_unreachable'
+  | 'smtp_tls_failed'
+  | 'smtp_auth_failed'
+  | 'smtp_rejected'
+  | 'smtp_timeout'
+  | 'smtp_host_not_allowed'
+  | 'email_not_configured'
+  | 'project_not_active'
+  | 'email_expired'
+  | 'email_unreadable'
+
+/** Where an email is in its delivery. */
+export type EmailStatus = 'queued' | 'sent' | 'failed'
+
+/** Which email was sent: one of the four auth templates, or the console's own invite. */
+export type EmailTemplateName =
+  'verification' | 'recovery' | 'magic_link' | 'email_code' | 'console_invitation'
+
 /** Whether an invitation can still be accepted. */
 export type InvitationStatus = 'pending' | 'expired'
 
@@ -186,6 +206,38 @@ export interface CreatedInvitation {
   invitation: Invitation
   /** The link to share with the invited person. Anyone holding it can see the invitation until it is used or expires. */
   url: string
+  /** True when the server is also sending the link to the invited address by email (the install has an SMTP server). */
+  emailed: boolean
+}
+
+/** One email in the log. The recipient is masked, and the content is never kept. */
+export interface EmailLogEntry {
+  /** The email's ID. */
+  id: string
+  /** Which email it was. */
+  template: EmailTemplateName
+  /** The recipient, masked: the first character, then `***`, then the domain. */
+  recipient: string
+  /** Where it is in its delivery. */
+  status: EmailStatus
+  /** Whose SMTP settings sent it; null until it is sent. */
+  smtpSource: SmtpSource | null
+  /** How many times the server tried to send it. */
+  attempts: number
+  /** Why it was not sent; null unless `status` is `failed`. */
+  errorCode: EmailFailureCode | null
+  /** When it was queued. */
+  createdAt: string
+  /** When it was sent or failed; null while it is queued. */
+  completedAt: string | null
+}
+
+/** One page of the email log, newest first. */
+export interface EmailPage {
+  /** The emails on this page. */
+  items: EmailLogEntry[]
+  /** The cursor of the next page; null on the last one. */
+  nextCursor: string | null
 }
 
 /** Who an email is sent as. */
@@ -216,6 +268,12 @@ export interface InstallSetup {
   setupRequired: boolean
   /** True when anyone who can reach the console may create an account (`consoleSignup` is `open`). */
   signupOpen: boolean
+}
+
+/** The SMTP server of the whole install, which every project without its own sends through. */
+export interface InstallSmtp {
+  /** The install's settings; null when none are set. */
+  settings: SmtpSettings | null
 }
 
 /** An invitation to join an org. Its link is shown only once, when it is created. */

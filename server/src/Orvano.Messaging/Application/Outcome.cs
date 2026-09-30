@@ -15,6 +15,10 @@ internal sealed record Failure(int Status, string Code, string Detail)
 
     public static Failure Forbidden { get; } = new(403, ErrorCode.Forbidden, "Developers and owners only.");
 
+    public static Failure InstallAdminsOnly { get; } = new(403, ErrorCode.Forbidden, "Only install admins can do this.");
+
+    public static Failure InvalidCursor { get; } = new(400, ErrorCode.InvalidCursor, "The cursor is not one this server issued.");
+
     public static Failure ProjectNotFound { get; } = new(404, ErrorCode.ProjectNotFound, "No such project.");
 
     public static Failure ProjectNotReady { get; } =

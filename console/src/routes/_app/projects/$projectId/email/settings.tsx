@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { FormAlert } from '@/components/ui/form-alert'
 import { Skeleton } from '@/components/ui/skeleton'
+import { SmtpForm } from '@/email/smtp-form'
 import { projectClient } from '@/lib/console-client'
 import { usePageTitle } from '@/lib/page-title'
 import { keys, projectQuery, smtpQuery } from '@/lib/queries'
@@ -15,8 +16,6 @@ import { ErrorPanel } from '@/shell/error-panel'
 import { meetsRole } from '@/shell/nav'
 import { SettingsSection } from '@/shell/settings-section'
 import type { EmailSender } from '@orvano/console-client'
-
-import { SmtpForm } from '../-email/smtp-form'
 
 export const Route = createFileRoute('/_app/projects/$projectId/email/settings')({
   component: EmailSettingsPage,
