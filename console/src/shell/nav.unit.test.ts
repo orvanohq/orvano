@@ -25,10 +25,12 @@ describe('nav registry (AC-15)', () => {
     // Members sits between Projects and Settings, for every role (spec 0008, AC-15).
     expect(orgNav.map((entry) => entry.label)).toEqual(['Projects', 'Members', 'Settings'])
     expect(orgNav.find((entry) => entry.id === 'members')?.minRole).toBeUndefined()
-    // API keys and Platforms sit between Users and Settings (spec 0007, AC-11).
+    // API keys and Platforms sit between Users and Settings (spec 0007, AC-11); Email sits below
+    // Users (spec 0009, Screens).
     expect(projectNav.map((entry) => entry.label)).toEqual([
       'Overview',
       'Users',
+      'Email',
       'API keys',
       'Platforms',
       'Settings',

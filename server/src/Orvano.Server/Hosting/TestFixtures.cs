@@ -1,5 +1,7 @@
 using Orvano.Auth.Domain;
 using Orvano.Auth.Fixtures;
+using Orvano.Messaging.Domain;
+using Orvano.Messaging.Fixtures;
 using Orvano.Platform.Domain;
 using Orvano.Platform.Fixtures;
 using YamlDotNet.Core;
@@ -11,13 +13,14 @@ namespace Orvano.Server.Hosting;
 /// Test only seed data for the shared scenarios (<c>tests/scenarios/fixtures.yaml</c>), loaded from
 /// <c>ORVANO_TEST_FIXTURES</c> in the <c>Test</c> environment only (spec 0001): console accounts with passwords (the
 /// first is the install admin who owns the seeded projects), the projects, API keys, and platforms to seed
-/// (spec 0003), and the app users with their passwords (spec 0004).
+/// (spec 0003), the app users with their passwords (spec 0004), and the install's SMTP settings (spec 0009).
 /// </summary>
 /// <param name="ConsoleUsers">Console accounts to seed, signed up through the console's own path.</param>
 /// <param name="Projects">Projects to seed, owned by the first console account.</param>
 /// <param name="ApiKeys">API keys to seed with known secrets.</param>
 /// <param name="Platforms">Platforms to seed; a web one lets browsers of that host call the project.</param>
 /// <param name="Users">App users to seed with known passwords.</param>
+/// <param name="InstallSmtp">The install's SMTP server to seed, if any: a mail catcher that needs no sign in.</param>
 /// <param name="Problem">Why the fixtures can't be used; the role refuses to start when set.</param>
 internal sealed record TestFixtures(
     IReadOnlyList<FixtureConsoleUser> ConsoleUsers,
@@ -25,6 +28,7 @@ internal sealed record TestFixtures(
     IReadOnlyList<FixtureApiKey> ApiKeys,
     IReadOnlyList<FixturePlatform> Platforms,
     IReadOnlyList<FixtureUser> Users,
+    FixtureInstallSmtp? InstallSmtp = null,
     string? Problem = null)
 {
     public const string Setting = "ORVANO_TEST_FIXTURES";
@@ -100,7 +104,23 @@ internal sealed record TestFixtures(
 
         if (projects.Count > 0 && consoleUsers.Count == 0) return Fail($"{Setting}: projects need a console user to own them");
 
-        return new TestFixtures(consoleUsers, projects, keys, platforms, users);
+        FixtureInstallSmtp? installSmtp = null;
+        if (file?.InstallSmtp is { } smtp)
+        {
+            if (consoleUsers.Count == 0) return Fail($"{Setting}: installSmtp needs a console user to be the install admin");
+            var security = smtp.Security switch
+            {
+                "starttls" => SmtpSecurity.StartTls,
+                "tls" => SmtpSecurity.Tls,
+                "none" => SmtpSecurity.None,
+                _ => (SmtpSecurity?)null,
+            };
+            if (!SmtpSettingsRule.TryValidate(new SmtpSettingsDraft(smtp.Host, smtp.Port, security, null, null, smtp.FromEmail, null, null), null, out var valid, out var problem))
+                return Fail($"{Setting}: installSmtp {problem}");
+            installSmtp = new FixtureInstallSmtp(valid.Host, valid.Port, valid.Security, valid.FromEmail);
+        }
+
+        return new TestFixtures(consoleUsers, projects, keys, platforms, users, installSmtp);
     }
 
     private static TestFixtures Fail(string problem) => None with { Problem = problem };
@@ -125,6 +145,24 @@ internal sealed record TestFixtures(
 
         [YamlMember(Alias = "users")]
         public List<UserEntry>? Users { get; set; }
+
+        [YamlMember(Alias = "installSmtp")]
+        public InstallSmtpEntry? InstallSmtp { get; set; }
+    }
+
+    private sealed class InstallSmtpEntry
+    {
+        [YamlMember(Alias = "host")]
+        public string? Host { get; set; }
+
+        [YamlMember(Alias = "port")]
+        public int Port { get; set; }
+
+        [YamlMember(Alias = "security")]
+        public string? Security { get; set; }
+
+        [YamlMember(Alias = "fromEmail")]
+        public string? FromEmail { get; set; }
     }
 
     private sealed class PlatformEntry

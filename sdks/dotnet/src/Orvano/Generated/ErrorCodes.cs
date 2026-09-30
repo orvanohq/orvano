@@ -16,6 +16,12 @@ public static class ErrorCode
     /// <summary>The <c>csrf_rejected</c> error code.</summary>
     public const string CsrfRejected = "csrf_rejected";
 
+    /// <summary>The <c>email_not_configured</c> error code.</summary>
+    public const string EmailNotConfigured = "email_not_configured";
+
+    /// <summary>The <c>email_rate_limited</c> error code.</summary>
+    public const string EmailRateLimited = "email_rate_limited";
+
     /// <summary>The <c>forbidden</c> error code.</summary>
     public const string Forbidden = "forbidden";
 
@@ -96,6 +102,27 @@ public static class ErrorCode
 
     /// <summary>The <c>signup_closed</c> error code.</summary>
     public const string SignupClosed = "signup_closed";
+
+    /// <summary>The <c>smtp_auth_failed</c> error code.</summary>
+    public const string SmtpAuthFailed = "smtp_auth_failed";
+
+    /// <summary>The <c>smtp_host_not_allowed</c> error code.</summary>
+    public const string SmtpHostNotAllowed = "smtp_host_not_allowed";
+
+    /// <summary>The <c>smtp_rejected</c> error code.</summary>
+    public const string SmtpRejected = "smtp_rejected";
+
+    /// <summary>The <c>smtp_timeout</c> error code.</summary>
+    public const string SmtpTimeout = "smtp_timeout";
+
+    /// <summary>The <c>smtp_tls_failed</c> error code.</summary>
+    public const string SmtpTlsFailed = "smtp_tls_failed";
+
+    /// <summary>The <c>smtp_unreachable</c> error code.</summary>
+    public const string SmtpUnreachable = "smtp_unreachable";
+
+    /// <summary>The <c>template_invalid</c> error code.</summary>
+    public const string TemplateInvalid = "template_invalid";
 
     /// <summary>The <c>token_expired</c> error code.</summary>
     public const string TokenExpired = "token_expired";

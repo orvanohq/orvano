@@ -51,7 +51,10 @@ internal sealed class JobStore(NpgsqlDataSource db, string workerId)
         WHERE id = @id AND locked_by = @worker AND status = 'running'
         """, id, ct);
 
-    /// <summary>Retries with exponential backoff and jitter; after max_attempts the job is dead.</summary>
+    /// <summary>
+    /// Retries with exponential backoff and jitter, or after the delay a <see cref="JobRetryException"/> asks for;
+    /// after max_attempts the job is dead.
+    /// </summary>
     public Task FailAsync(ClaimedJob job, Exception error, CancellationToken ct) => ExecuteAsync(
         """
         UPDATE orvano.jobs SET
@@ -61,7 +64,7 @@ internal sealed class JobStore(NpgsqlDataSource db, string workerId)
             last_error = @error, lease_until = NULL, locked_by = NULL
         WHERE id = @id AND locked_by = @worker AND status = 'running'
         """, job.Id, ct,
-        ("delay", Backoff(job.Attempts)),
+        ("delay", error is JobRetryException retry ? retry.Delay : Backoff(job.Attempts)),
         ("error", Describe(error)));
 
     /// <summary>Marks the job dead at once, whatever attempts it has left. <c>attempts</c> already counts this one.</summary>

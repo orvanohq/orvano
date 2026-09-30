@@ -24,6 +24,13 @@ export function formatFull(iso: string): string {
   )
 }
 
+/** The date and time, short, in the browser's locale and time zone, for a table cell. */
+export function formatDateTime(iso: string): string {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
+    new Date(iso),
+  )
+}
+
 /** The date alone in the browser's locale and time zone, for example an API key's expiry. */
 export function formatDate(iso: string): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(iso))

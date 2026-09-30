@@ -14,6 +14,8 @@ using Orvano.Core.Notifications;
 using Orvano.Core.RateLimiting;
 using Orvano.Core.Scheduling;
 using Orvano.Core.Secrets;
+using Orvano.Messaging.Application;
+using Orvano.Messaging.Fixtures;
 using Orvano.Platform.Application;
 using Orvano.Platform.Contracts;
 using Orvano.Platform.Domain;
@@ -93,6 +95,8 @@ internal static class ServerRole
             await PlatformFixtures.SeedAsync(
                 app.Services.GetRequiredService<PlatformStore>(), owner!.Value, fixtures.Projects, fixtures.ApiKeys, fixtures.Platforms, logger, stopping);
             await AuthFixtures.SeedAsync(authStore, accounts, fixtures.Users, logger, stopping);
+            if (fixtures.InstallSmtp is { } installSmtp)
+                await MessagingFixtures.SeedInstallSmtpAsync(app.Services.GetRequiredService<MessagingStore>(), owner.Value, installSmtp, logger, stopping);
         }
 
         if (role == OrvanoRole.Api) app.UseForwardedHeaders();

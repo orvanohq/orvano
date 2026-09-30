@@ -76,6 +76,10 @@ model CreatedInvitation {
   @doc("The link to share with the invited person. Anyone holding it can see the invitation until it is used or expires.")
   @example("https://orvano.example.com/invite#Xy3aBcD4eF5gH6iJ7kL8mN9oP0qR1sT2uV3wX4yZ5a")
   url: string;
+
+  @doc("True when the server is also sending the link to the invited address by email (the install has an SMTP server).")
+  @example(true)
+  emailed: boolean;
 }
 
 @doc("An invitation token, from the fragment of an invite link.")

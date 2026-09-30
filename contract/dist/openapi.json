@@ -676,6 +676,67 @@
         "x-orvano-audience": "console"
       }
     },
+    "/v1/console/install/emails": {
+      "get": {
+        "operationId": "consoleInstall.listEmails",
+        "description": "Lists the console's own emails (invites) from the last 30 days, newest first. Install admins only.",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the page before; omit for the first page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "The page size, 1 to 100. Default 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleInstall",
+        "x-orvano-audience": "console"
+      }
+    },
     "/v1/console/install/settings": {
       "get": {
         "operationId": "consoleInstall.getSettings",
@@ -791,6 +852,173 @@
         },
         "tags": [
           "console"
+        ],
+        "x-orvano-service": "consoleInstall",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/install/smtp": {
+      "get": {
+        "operationId": "consoleInstall.getSmtp",
+        "description": "Gets the install's SMTP settings. Install admins only.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallSmtp"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleInstall",
+        "x-orvano-audience": "console"
+      },
+      "put": {
+        "operationId": "consoleInstall.updateSmtp",
+        "description": "Saves the install's SMTP settings, replacing any stored ones. Install admins only. A private network address\nis allowed here, since the install admin already controls the server.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmtpSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmtpSettingsInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-service": "consoleInstall",
+        "x-orvano-audience": "console"
+      },
+      "delete": {
+        "operationId": "consoleInstall.deleteSmtp",
+        "description": "Deletes the install's SMTP settings, so projects without their own can't send email. Install admins only.\nAnswers 204 also when nothing is stored.",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-service": "consoleInstall",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/install/smtp/test": {
+      "post": {
+        "operationId": "consoleInstall.testSmtp",
+        "description": "Sends a test email to your own console email through the given settings, saved or not, and stores nothing.\nInstall admins only. Waits at most 20 seconds and never retries.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailTestResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmtpSettingsInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
         ],
         "x-orvano-service": "consoleInstall",
         "x-orvano-audience": "console"
@@ -1890,6 +2118,234 @@
           }
         ],
         "x-orvano-service": "consoleAuthKeys",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/email/smtp": {
+      "get": {
+        "operationId": "consoleSmtp.get",
+        "description": "Gets the SMTP settings of the project named by `X-Orvano-Project`, and whose settings it sends through.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectSmtp"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleSmtp",
+        "x-orvano-audience": "console"
+      },
+      "put": {
+        "operationId": "consoleSmtp.update",
+        "description": "Saves the project's own SMTP settings, replacing any stored ones. Owners and developers. Fails with\n`smtp_host_not_allowed` when the host is, or resolves to, a private network address.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmtpSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmtpSettingsInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-service": "consoleSmtp",
+        "x-orvano-audience": "console"
+      },
+      "delete": {
+        "operationId": "consoleSmtp.delete",
+        "description": "Deletes the project's own SMTP settings, so it sends through the install's, if any. Owners and developers.\nAnswers 204 also when nothing is stored.",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-service": "consoleSmtp",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/email/smtp/test": {
+      "post": {
+        "operationId": "consoleSmtp.test",
+        "description": "Sends a test email to your own console email through the given settings, saved or not, and stores nothing.\nOwners and developers. Waits at most 20 seconds and never retries; a failure answers `smtp_unreachable`,\n`smtp_tls_failed`, `smtp_auth_failed`, `smtp_rejected`, or `smtp_timeout`.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailTestResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmtpSettingsInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleSmtp",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/emails": {
+      "get": {
+        "operationId": "consoleEmails.list",
+        "description": "Lists the emails of the project named by `X-Orvano-Project` from the last 30 days, newest first. Any member.",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the page before; omit for the first page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "The page size, 1 to 100. Default 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleEmails",
         "x-orvano-audience": "console"
       }
     },
@@ -4256,7 +4712,8 @@
         "type": "object",
         "required": [
           "invitation",
-          "url"
+          "url",
+          "emailed"
         ],
         "properties": {
           "invitation": {
@@ -4268,6 +4725,13 @@
             "description": "The link to share with the invited person. Anyone holding it can see the invitation until it is used or expires.",
             "examples": [
               "https://orvano.example.com/invite#Xy3aBcD4eF5gH6iJ7kL8mN9oP0qR1sT2uV3wX4yZ5a"
+            ]
+          },
+          "emailed": {
+            "type": "boolean",
+            "description": "True when the server is also sending the link to the invited address by email (the install has an SMTP server).",
+            "examples": [
+              true
             ]
           }
         },
@@ -4288,6 +4752,203 @@
           }
         },
         "description": "A request to delete the signed in user."
+      },
+      "EmailFailureCode": {
+        "type": "string",
+        "enum": [
+          "smtp_unreachable",
+          "smtp_tls_failed",
+          "smtp_auth_failed",
+          "smtp_rejected",
+          "smtp_timeout",
+          "smtp_host_not_allowed",
+          "email_not_configured",
+          "project_not_active",
+          "email_expired",
+          "email_unreadable"
+        ],
+        "description": "Why an email was not sent."
+      },
+      "EmailLogEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "template",
+          "recipient",
+          "status",
+          "smtpSource",
+          "attempts",
+          "errorCode",
+          "createdAt",
+          "completedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The email's ID.",
+            "examples": [
+              "01924f5e-7c1a-7a3b-9f10-2c4d5e6f7a8b"
+            ]
+          },
+          "template": {
+            "$ref": "#/components/schemas/EmailTemplateName",
+            "description": "Which email it was."
+          },
+          "recipient": {
+            "type": "string",
+            "description": "The recipient, masked: the first character, then `***`, then the domain.",
+            "examples": [
+              "g***@example.com"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/EmailStatus",
+            "description": "Where it is in its delivery."
+          },
+          "smtpSource": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SmtpSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whose SMTP settings sent it; null until it is sent."
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many times the server tried to send it.",
+            "examples": [
+              1
+            ]
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmailFailureCode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why it was not sent; null unless `status` is `failed`."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was queued."
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was sent or failed; null while it is queued."
+          }
+        },
+        "description": "One email in the log. The recipient is masked, and the content is never kept."
+      },
+      "EmailPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmailLogEntry"
+            },
+            "description": "The emails on this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor of the next page; null on the last one."
+          }
+        },
+        "description": "One page of the email log, newest first."
+      },
+      "EmailSender": {
+        "type": "object",
+        "required": [
+          "email",
+          "name"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The From address.",
+            "examples": [
+              "orvano@example.com"
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The name shown beside it, if any.",
+            "examples": [
+              "Orvano"
+            ]
+          }
+        },
+        "description": "Who an email is sent as."
+      },
+      "EmailStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "sent",
+          "failed"
+        ],
+        "description": "Where an email is in its delivery."
+      },
+      "EmailTemplateName": {
+        "type": "string",
+        "enum": [
+          "verification",
+          "recovery",
+          "magic_link",
+          "email_code",
+          "console_invitation"
+        ],
+        "description": "Which email was sent: one of the four auth templates, or the console's own invite."
+      },
+      "EmailTestResult": {
+        "type": "object",
+        "required": [
+          "sentTo"
+        ],
+        "properties": {
+          "sentTo": {
+            "type": "string",
+            "description": "The address the test email went to: your own console email.",
+            "examples": [
+              "grace@example.com"
+            ]
+          }
+        },
+        "description": "The result of a test email."
       },
       "ErrorCode": {
         "type": "string",
@@ -4325,6 +4986,15 @@
           "invitation_email_mismatch",
           "already_member",
           "invitation_limit",
+          "smtp_host_not_allowed",
+          "smtp_unreachable",
+          "smtp_tls_failed",
+          "smtp_auth_failed",
+          "smtp_rejected",
+          "smtp_timeout",
+          "template_invalid",
+          "email_not_configured",
+          "email_rate_limited",
           "rate_limited",
           "server_busy"
         ],
@@ -4396,6 +5066,26 @@
           }
         },
         "description": "Whether the install still waits for its first admin."
+      },
+      "InstallSmtp": {
+        "type": "object",
+        "required": [
+          "settings"
+        ],
+        "properties": {
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SmtpSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The install's settings; null when none are set."
+          }
+        },
+        "description": "The SMTP server of the whole install, which every project without its own sends through."
       },
       "Invitation": {
         "type": "object",
@@ -5160,6 +5850,43 @@
         },
         "description": "One page of an org's projects, oldest first."
       },
+      "ProjectSmtp": {
+        "type": "object",
+        "required": [
+          "source",
+          "settings",
+          "installSender"
+        ],
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/SmtpSource",
+            "description": "Whose settings the project uses right now."
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SmtpSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The project's own settings; null unless `source` is `project`."
+          },
+          "installSender": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmailSender"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who the install's own SMTP sends as, whenever the install has one; null when it has none."
+          }
+        },
+        "description": "The SMTP settings a project sends email through."
+      },
       "ProjectStatus": {
         "type": "string",
         "enum": [
@@ -5402,6 +6129,216 @@
           }
         },
         "description": "A project's signing keys, the active one first."
+      },
+      "SmtpSecurity": {
+        "type": "string",
+        "enum": [
+          "starttls",
+          "tls",
+          "none"
+        ],
+        "description": "How the connection to the SMTP server is secured."
+      },
+      "SmtpSettings": {
+        "type": "object",
+        "required": [
+          "host",
+          "port",
+          "security",
+          "username",
+          "hasPassword",
+          "fromEmail",
+          "fromName",
+          "replyTo",
+          "updatedAt"
+        ],
+        "properties": {
+          "host": {
+            "type": "string",
+            "description": "The SMTP server.",
+            "examples": [
+              "smtp.example.com"
+            ]
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The port.",
+            "examples": [
+              587
+            ]
+          },
+          "security": {
+            "$ref": "#/components/schemas/SmtpSecurity",
+            "description": "How the connection is secured."
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The username, if the server needs one.",
+            "examples": [
+              "apikey"
+            ]
+          },
+          "hasPassword": {
+            "type": "boolean",
+            "description": "True when a password is stored.",
+            "examples": [
+              true
+            ]
+          },
+          "fromEmail": {
+            "type": "string",
+            "description": "The address emails are sent from.",
+            "examples": [
+              "hello@example.com"
+            ]
+          },
+          "fromName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The name shown beside the From address.",
+            "examples": [
+              "Example"
+            ]
+          },
+          "replyTo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where replies go; null means the From address.",
+            "examples": [
+              "support@example.com"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the settings last changed."
+          }
+        },
+        "description": "Stored SMTP settings. The password is never returned."
+      },
+      "SmtpSettingsInput": {
+        "type": "object",
+        "required": [
+          "host",
+          "port",
+          "security",
+          "username",
+          "password",
+          "fromEmail",
+          "fromName",
+          "replyTo"
+        ],
+        "properties": {
+          "host": {
+            "type": "string",
+            "description": "The SMTP server: a host name, or an IPv4 or IPv6 address (no brackets). At most 253 characters.",
+            "examples": [
+              "smtp.example.com"
+            ]
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The port, 1 to 65535.",
+            "examples": [
+              587
+            ]
+          },
+          "security": {
+            "$ref": "#/components/schemas/SmtpSecurity",
+            "description": "How the connection is secured."
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The username to sign in with; null for a server that needs none. Needs `starttls` or `tls`.",
+            "examples": [
+              "apikey"
+            ]
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The password. Null keeps the stored one, which works only while the host, port, and username are the stored\nones; change any of them and you must send the password again."
+          },
+          "fromEmail": {
+            "type": "string",
+            "description": "The address emails are sent from.",
+            "examples": [
+              "hello@example.com"
+            ]
+          },
+          "fromName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The name shown beside the From address; null for none. At most 128 characters.",
+            "examples": [
+              "Example"
+            ]
+          },
+          "replyTo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where replies go; null to use the From address.",
+            "examples": [
+              "support@example.com"
+            ]
+          }
+        },
+        "description": "SMTP settings to save or to test."
+      },
+      "SmtpSource": {
+        "type": "string",
+        "enum": [
+          "project",
+          "install",
+          "none"
+        ],
+        "description": "Whose SMTP settings a project sends through."
       },
       "TestConsolePing": {
         "type": "object",

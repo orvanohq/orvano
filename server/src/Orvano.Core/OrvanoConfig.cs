@@ -40,4 +40,18 @@ public static class OrvanoConfig
             ? value
             : throw new OrvanoConfigException($"{key} must be a whole number from {min} to {max}, got '{raw}'.");
     }
+
+    /// <summary>The value of <paramref name="key"/> as <c>true</c> or <c>false</c>, or <paramref name="fallback"/> when unset or empty.</summary>
+    /// <exception cref="OrvanoConfigException">The setting is set but is neither <c>true</c> nor <c>false</c>.</exception>
+    public static bool Bool(IConfiguration config, string key, bool fallback)
+    {
+        var raw = config[key];
+        if (string.IsNullOrWhiteSpace(raw)) return fallback;
+        return raw switch
+        {
+            "true" => true,
+            "false" => false,
+            _ => throw new OrvanoConfigException($"{key} must be true or false, got '{raw}'."),
+        };
+    }
 }

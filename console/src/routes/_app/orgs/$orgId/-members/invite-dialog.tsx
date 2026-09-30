@@ -49,12 +49,13 @@ const schema = z.object({
 type Step =
   | { step: 'form' }
   | { step: 'resending'; error: string | null }
-  | { step: 'link'; url: string; invitation: Invitation }
+  | { step: 'link'; url: string; invitation: Invitation; emailed: boolean }
 
 /**
  * Invite a teammate (spec 0008, AC-16 and AC-17): Email and Role, then a "Share this invite link"
  * step. With `resend`, it skips the form and makes a new link for that email and role at once
- * (AC-18). The create mutation keeps nothing (`gcTime: 0`) and is reset as soon as the url is copied
+ * (AC-18). When the install has an email server the invite is also emailed, and the link step says
+ * so (spec 0009, AC-23). The create mutation keeps nothing (`gcTime: 0`) and is reset as soon as the url is copied
  * into this state, so the url is never in the query or mutation cache, storage, the address bar, a
  * toast, or a log. Escape, a click outside, the close button, and Done all close it.
  */
@@ -91,7 +92,12 @@ export function InviteDialog({
   const invite = async (body: CreateInvitationRequest) => {
     try {
       const created = await create.mutateAsync(body)
-      setStep({ step: 'link', url: created.url, invitation: created.invitation })
+      setStep({
+        step: 'link',
+        url: created.url,
+        invitation: created.invitation,
+        emailed: created.emailed,
+      })
       onCreated?.()
     } finally {
       create.reset()
@@ -167,6 +173,11 @@ export function InviteDialog({
                 .
               </DialogDescription>
             </DialogHeader>
+            {step.emailed ? (
+              <p>
+                We’re sending the invite to <strong>{step.invitation.email}</strong>.
+              </p>
+            ) : null}
             <CodeBlock code={step.url} label="invite link" copyRef={copyRef} />
             <FormAlert variant="warning" title="This link won't be shown again">
               Send it to them in any chat or email. Use Resend to make a new one.

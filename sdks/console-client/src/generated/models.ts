@@ -10,6 +10,26 @@ export type ApiKeyScope = 'users.read' | 'users.write'
 /** Who may create a console account. */
 export type ConsoleSignupMode = 'invite' | 'open'
 
+/** Why an email was not sent. */
+export type EmailFailureCode =
+  | 'smtp_unreachable'
+  | 'smtp_tls_failed'
+  | 'smtp_auth_failed'
+  | 'smtp_rejected'
+  | 'smtp_timeout'
+  | 'smtp_host_not_allowed'
+  | 'email_not_configured'
+  | 'project_not_active'
+  | 'email_expired'
+  | 'email_unreadable'
+
+/** Where an email is in its delivery. */
+export type EmailStatus = 'queued' | 'sent' | 'failed'
+
+/** Which email was sent: one of the four auth templates, or the console's own invite. */
+export type EmailTemplateName =
+  'verification' | 'recovery' | 'magic_link' | 'email_code' | 'console_invitation'
+
 /** Whether an invitation can still be accepted. */
 export type InvitationStatus = 'pending' | 'expired'
 
@@ -30,6 +50,12 @@ export type ProjectStatus = 'provisioning' | 'active' | 'failed' | 'deleting'
 
 /** What a signing key does. */
 export type SigningKeyStatus = 'active' | 'retiring'
+
+/** How the connection to the SMTP server is secured. */
+export type SmtpSecurity = 'starttls' | 'tls' | 'none'
+
+/** Whose SMTP settings a project sends through. */
+export type SmtpSource = 'project' | 'install' | 'none'
 
 /** The org an accepted invitation joined. */
 export interface AcceptedInvitation {
@@ -180,6 +206,52 @@ export interface CreatedInvitation {
   invitation: Invitation
   /** The link to share with the invited person. Anyone holding it can see the invitation until it is used or expires. */
   url: string
+  /** True when the server is also sending the link to the invited address by email (the install has an SMTP server). */
+  emailed: boolean
+}
+
+/** One email in the log. The recipient is masked, and the content is never kept. */
+export interface EmailLogEntry {
+  /** The email's ID. */
+  id: string
+  /** Which email it was. */
+  template: EmailTemplateName
+  /** The recipient, masked: the first character, then `***`, then the domain. */
+  recipient: string
+  /** Where it is in its delivery. */
+  status: EmailStatus
+  /** Whose SMTP settings sent it; null until it is sent. */
+  smtpSource: SmtpSource | null
+  /** How many times the server tried to send it. */
+  attempts: number
+  /** Why it was not sent; null unless `status` is `failed`. */
+  errorCode: EmailFailureCode | null
+  /** When it was queued. */
+  createdAt: string
+  /** When it was sent or failed; null while it is queued. */
+  completedAt: string | null
+}
+
+/** One page of the email log, newest first. */
+export interface EmailPage {
+  /** The emails on this page. */
+  items: EmailLogEntry[]
+  /** The cursor of the next page; null on the last one. */
+  nextCursor: string | null
+}
+
+/** Who an email is sent as. */
+export interface EmailSender {
+  /** The From address. */
+  email: string
+  /** The name shown beside it, if any. */
+  name: string | null
+}
+
+/** The result of a test email. */
+export interface EmailTestResult {
+  /** The address the test email went to: your own console email. */
+  sentTo: string
 }
 
 /** Settings for the whole install. */
@@ -196,6 +268,12 @@ export interface InstallSetup {
   setupRequired: boolean
   /** True when anyone who can reach the console may create an account (`consoleSignup` is `open`). */
   signupOpen: boolean
+}
+
+/** The SMTP server of the whole install, which every project without its own sends through. */
+export interface InstallSmtp {
+  /** The install's settings; null when none are set. */
+  settings: SmtpSettings | null
 }
 
 /** An invitation to join an org. Its link is shown only once, when it is created. */
@@ -359,6 +437,16 @@ export interface ProjectPage {
   nextCursor: string | null
 }
 
+/** The SMTP settings a project sends email through. */
+export interface ProjectSmtp {
+  /** Whose settings the project uses right now. */
+  source: SmtpSource
+  /** The project's own settings; null unless `source` is `project`. */
+  settings: SmtpSettings | null
+  /** Who the install's own SMTP sends as, whenever the install has one; null when it has none. */
+  installSender: EmailSender | null
+}
+
 /** A project's token signing key as the console shows it; never the key itself. */
 export interface SigningKey {
   /** The key ID, the `kid` of the tokens it signs. */
@@ -375,6 +463,51 @@ export interface SigningKey {
 export interface SigningKeys {
   /** The keys. */
   keys: SigningKey[]
+}
+
+/** Stored SMTP settings. The password is never returned. */
+export interface SmtpSettings {
+  /** The SMTP server. */
+  host: string
+  /** The port. */
+  port: number
+  /** How the connection is secured. */
+  security: SmtpSecurity
+  /** The username, if the server needs one. */
+  username: string | null
+  /** True when a password is stored. */
+  hasPassword: boolean
+  /** The address emails are sent from. */
+  fromEmail: string
+  /** The name shown beside the From address. */
+  fromName: string | null
+  /** Where replies go; null means the From address. */
+  replyTo: string | null
+  /** When the settings last changed. */
+  updatedAt: string
+}
+
+/** SMTP settings to save or to test. */
+export interface SmtpSettingsInput {
+  /** The SMTP server: a host name, or an IPv4 or IPv6 address (no brackets). At most 253 characters. */
+  host: string
+  /** The port, 1 to 65535. */
+  port: number
+  /** How the connection is secured. */
+  security: SmtpSecurity
+  /** The username to sign in with; null for a server that needs none. Needs `starttls` or `tls`. */
+  username: string | null
+  /**
+   * The password. Null keeps the stored one, which works only while the host, port, and username are the stored
+   * ones; change any of them and you must send the password again.
+   */
+  password: string | null
+  /** The address emails are sent from. */
+  fromEmail: string
+  /** The name shown beside the From address; null for none. At most 128 characters. */
+  fromName: string | null
+  /** Where replies go; null to use the From address. */
+  replyTo: string | null
 }
 
 /** Changes to the install settings. */

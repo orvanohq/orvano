@@ -99,7 +99,7 @@ internal static class ApiMapping
         view.Row.ExpiresAt,
         view.Row.CreatedAt);
 
-    public static Api.CreatedInvitation CreatedInvitation(CreatedInvite created) => new(Invitation(created.Invitation), created.Url);
+    public static Api.CreatedInvitation CreatedInvitation(CreatedInvite created) => new(Invitation(created.Invitation), created.Url, created.Emailed);
 
     public static Api.InvitationPreview InvitationPreview(InvitePreview preview) => new(
         preview.Org.Id.ToString(),

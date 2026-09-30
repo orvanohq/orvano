@@ -1,0 +1,88 @@
+# Verify: Transactional email · spec 0009 · updated 2026-09-30
+
+_Steps derived from spec 0009 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones._
+
+This file covers slices 1 and 2 of the build plan so far. Slice 1 (project SMTP and a test email that arrives): AC-1 to AC-6, AC-24, AC-25, AC-28, and the AppHost part of AC-29. Slice 2 has its own section below. Later slices add their own steps.
+
+Setup: `dotnet run --project dev/Orvano.AppHost`, open the console, create the first admin on `/setup`, make an org and a project, and wait until the project is active. In the Aspire dashboard, note Mailpit's `smtp` port and open its `http` endpoint to read mail. Add a second console account as a viewer of the org for the role steps.
+
+## UI / manual
+
+- [ ] Open the project, choose Email in the sidebar (below Users) → the address becomes `/projects/<id>/email/settings`, the Settings tab is current, and the document title is `Email settings · <project> · Orvano` → Screens
+- [ ] With no SMTP anywhere → the warning "No email server is set up" shows above an empty form that starts on STARTTLS with Port empty → AC-4 (`source: none`)
+- [ ] Choose TLS while Port is empty → Port becomes 465; type 2525, then choose None → Port stays 2525 → Screens
+- [ ] Fill Host `localhost`, Port (Mailpit's smtp port), Security None, From email `hello@shop.test`, From name `Shop`, then Send test email before saving → "Sent to <your console email>. Check your inbox." and Mailpit shows "Test email from Orvano" from `Shop <hello@shop.test>`, with a text part and an HTML part that both name the project → AC-6, value sourcing (`sentTo`, test email body, settings used)
+- [ ] Rename the project, send the test again → the new email names the new project name → value sourcing (`ProjectInfo.Name`)
+- [ ] Save → a success toast, Save turns off ("Nothing to save yet"), "Stop using these settings" appears; reload → the form is filled from the saved settings → AC-1, AC-4 (`source: project`)
+- [ ] Change Host to `bad host!` and Save → "Enter a host name or an IP address of at most 253 characters." shows under Host and is announced → AC-2
+- [ ] Set Security None, type a Username, Save → "A username needs STARTTLS or TLS." shows under Username → AC-2
+- [ ] Press Send test email with a Port nothing listens on → the alert says "Couldn't connect to the SMTP server." and no other server text → AC-6 (`smtp_unreachable`)
+- [ ] Press "Stop using these settings" → the confirm says "This project won't be able to send email." (no install SMTP yet), focus starts on Cancel; confirm → the tab shows the "No email server is set up" warning and an empty form → AC-5
+- [ ] Sign in as the viewer → every field is read only, there is no Password field, and Save, Send test email, and Stop using these settings are off with "Developers and owners only" → AC-24
+- [ ] Check the page at 375 px wide, in light and dark, and with keyboard only (Tab through every field, arrows in the Security group) → nothing overflows, focus is always visible → Screens
+
+## Commands
+
+- [ ] `dotnet test --solution Orvano.slnx` → all pass; `Orvano.Server.Tests.Messaging` covers the rules and the HTTP path against Mailpit → AC-1 to AC-6, AC-24, AC-25, AC-28
+- [ ] `PUT /v1/console/project/email/smtp` with a username and password, then `GET` → `hasPassword: true` and no password in either body; `SELECT password_ciphertext FROM orvano.messaging_smtp_settings` is a blob that does not contain the password; `SELECT payload FROM orvano.events WHERE type = 'messaging.smtp.updated'` holds `projectId`, `actor`, and `changed` only → AC-1, value sourcing (`hasPassword`, `updated_by_user_id`)
+- [ ] `PUT` again with `password: null` and the same host, port, and username → 200 and the same ciphertext; change only `host` with `password: null` → 400 `invalid_request`, `password: Enter the password again when you change the host, port, or username`, on update and on test → AC-1, value sourcing (stored password)
+- [ ] Start `api` without `ORVANO_SMTP_ALLOW_PRIVATE_HOSTS`; `PUT` and `POST .../test` with host `127.0.0.1`, `10.0.0.5`, `169.254.169.254`, `::ffff:10.0.0.5`, and `localhost` → 400 `smtp_host_not_allowed` each; a host that does not resolve saves with 200 and its test answers 502 `smtp_unreachable` → AC-3
+- [ ] With the install row present (`INSERT INTO orvano.messaging_smtp_settings` for project `console`) and no project row → `GET` returns `source: install`, `settings: null`, and `installSender` with only the From email and name; the tab shows "Using this server's email settings"; with a project row too, `source: project` and `installSender` still set, and the Stop using confirm says "Emails will use this server's settings" → AC-4, AC-5, value sourcing (`source`, `installSender`, confirm sentence)
+- [ ] As a console user outside the org → 404 `project_not_found` on get, update, delete, and test; as a viewer → 200 on get and 403 `forbidden` on the other three, also with an invalid body → AC-24
+- [ ] Set the project's status to `provisioning` → get still answers 200; update, delete, and test answer 409 `project_not_ready`, but an invalid body still answers 400 first → AC-24
+- [ ] Send 31 tests within 15 minutes as one console user → the 31st answers 429 `rate_limited` with `Retry-After`, even when the earlier ones failed the body check → AC-25
+- [ ] Start any role with `ORVANO_SMTP_ALLOW_PRIVATE_HOSTS=yes`, or `ORVANO_EMAIL_INSTALL_HOURLY_LIMIT=0` → it exits 1 and names the setting; with both empty it starts → AC-28
+- [ ] `dotnet run --project dev/Orvano.AppHost` → a `mailpit` resource runs, and `api` and `worker` start with `ORVANO_SMTP_ALLOW_PRIVATE_HOSTS=true` → AC-29 (AppHost part)
+- [ ] `dotnet run --project server/tests/Orvano.ModelDriftCheck` against an empty bootstrapped database → "EF model matches the database (18 tables checked)" → data model
+
+## Slice 2: the queue, through console invites
+
+Covers AC-7, AC-15 to AC-17, AC-19 to AC-23, AC-26, AC-27, and the compose part of AC-29. Setup as above, signed in as the install admin (the first account). In the Aspire dashboard, note Mailpit's `smtp` port.
+
+### UI / manual
+
+- [ ] Open `/install` → an "Email server" card shows an empty form starting on STARTTLS, and a "Console emails" card says "No emails in the last 30 days" → AC-7, AC-21
+- [ ] Fill Host `localhost`, Port (Mailpit's smtp port), Security None, From email `orvano@install.test`, press Send test email → "Sent to <your console email>", and the email in Mailpit says "this Orvano server" → AC-7, value sourcing (test email body)
+- [ ] Save → a toast, and "Remove email server" appears; open a project's Email > Settings → "Using this server's email settings, sending as orvano@install.test" → AC-7, AC-4
+- [ ] On an org's Members page, invite `new@example.com` as Developer → the link step shows "We're sending the invite to new@example.com." above the link → AC-23 (`emailed`)
+- [ ] In Mailpit → the email's subject is "<your name> invited you to join <org> on Orvano", it names the role, its "Accept invite" button opens the same link the dialog showed, and the expiry reads like `Oct 7, 2026, 07:05 UTC` → AC-23, value sourcing (invite email, expiry text)
+- [ ] Back on `/install` → Console emails lists Console invite, `n***@example.com`, Sent, 1 attempt, with Created and Completed in your own time zone (change the system time zone and reload: the times move, the row does not) → AC-21, AC-22, value sourcing (log times)
+- [ ] Open the project's Email > Log as a viewer → the tab loads, shows "No emails in the last 30 days", and the title is `Email log · <project> · Orvano` → AC-20
+- [ ] Press "Remove email server" → the confirm says "Projects without their own settings won't be able to send email.", focus starts on Cancel; confirm, then invite someone → no "We're sending" line → AC-7, AC-23
+- [ ] Sign in as an account that is not an install admin and open `/install` → the not found screen → AC-7
+
+### Commands
+
+- [ ] `dotnet test --solution Orvano.slnx` → all pass; `EmailQueueTests`, `InstallEmailApiTests`, and `EmailQueueDomainTests` cover the queue against Postgres and Mailpit → AC-7, AC-15 to AC-17, AC-19 to AC-23, AC-26, AC-27
+- [ ] After an invite is sent: `SELECT payload FROM orvano.jobs WHERE kind = 'messaging.email.send'` holds only `emailId`; `SELECT status, recipient_masked, content_ciphertext, smtp_source FROM orvano.messaging_emails` shows `sent`, the masked address, null content, `install`; the `messaging.email.sent` event holds `projectId`, `emailId`, and a `system` actor only; `grep` the api and worker logs for the invited address and the link token → nothing → AC-15, AC-22, AC-26, value sourcing (email ID, `recipient_masked`)
+- [ ] Point the install SMTP at a port nothing listens on, invite someone, and watch `SELECT attempts, run_at - now() FROM orvano.jobs WHERE kind = 'messaging.email.send'` → attempt 1 waits about 30 seconds, then 1, 2, 4, and 8 minutes; fix the port while it waits → the next attempt sends it → AC-15, AC-16, value sourcing (retry delay, SMTP settings at attempt time)
+- [ ] Leave the port wrong for 6 attempts → the row ends `failed` with `smtp_unreachable`, the job ends `succeeded`, and the Log's Reason reads "Couldn't connect to the SMTP server." → AC-16, value sourcing (failure code)
+- [ ] Queue an invite with the worker stopped, run `UPDATE orvano.messaging_emails SET created_at = now() - interval '31 minutes'`, start the worker → the row fails with `email_expired` and nothing arrives → AC-17, value sourcing (stale check)
+- [ ] Start `api` with `ORVANO_EMAIL_INSTALL_HOURLY_LIMIT=2` and send three invites → the third is created with `emailed: false` and only two rows exist → AC-19, AC-23, value sourcing (the cap's count and the limit)
+- [ ] As an account that is not an install admin: `GET`, `PUT`, `DELETE /v1/console/install/smtp`, `POST .../smtp/test`, and `GET /v1/console/install/emails` → 403 `forbidden` each; the 31st `testSmtp` in 15 minutes as the admin → 429 → AC-7, AC-21, AC-25
+- [ ] `GET /v1/console/project/emails?limit=2` on a project with 5 rows → newest first with a `nextCursor`; follow it to the end; `?cursor=nope` → 400 `invalid_cursor`; `?limit=0` → 400 → AC-20
+- [ ] Delete a project with grace days 0 and let the worker run → its rows are gone from `messaging_emails`, `messaging_email_templates`, and `messaging_smtp_settings` → AC-27
+- [ ] `docker compose -f tests/scenarios/compose.yml up -d --build --wait` → a `mailpit` service is healthy, `GET /v1/console/install/smtp` as the fixture admin shows host `mailpit`, and an invite created there appears at `http://localhost:8025` → AC-29 (compose part). Not yet run locally: Docker Hub pulls hung on the build machine.
+
+## Acceptance-criteria coverage
+
+- AC-1 · save and test steps, the password commands
+- AC-2 · the two field error steps, `SmtpSettingsRuleTests`
+- AC-3 · the private host command, `GlobalUnicastTests`, `SmtpConnectorTests`
+- AC-4 · the empty state step, the install row command
+- AC-5 · the Stop using step, the install row command
+- AC-6 · the test email steps
+- AC-24 · the viewer step, the role and state commands
+- AC-25 · the 31 tests command
+- AC-28 · the bad setting command
+- AC-29 (AppHost part) · the AppHost command
+- AC-7 · the `/install` steps, the install admin command
+- AC-15, AC-16 · the retry and sixth attempt commands, `EmailQueueTests`
+- AC-17 · the stale command, the retention test
+- AC-19 · the cap command
+- AC-20, AC-21, AC-22 · the Log and Console emails steps, the paging command
+- AC-23 · the invite steps
+- AC-26 · the jobs, events, and logs command
+- AC-27 · the purge command
+- AC-29 (compose part) · the compose command
+- Not built yet: AC-8 to AC-14, AC-18, AC-30

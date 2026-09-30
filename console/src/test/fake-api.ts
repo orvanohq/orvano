@@ -3,6 +3,7 @@ import type {
   ApiKeyScope,
   ConsoleAccount,
   ConsoleSignupMode,
+  EmailLogEntry,
   Invitation,
   InvitationPreview,
   Member,
@@ -11,6 +12,8 @@ import type {
   Platform,
   PlatformType,
   Project,
+  SmtpSettings,
+  SmtpSettingsInput,
 } from '@orvano/console-client'
 
 /*
@@ -59,6 +62,12 @@ export interface FakeApi {
   preview: InvitationPreview | null
   /** Who may create a console account, as the install settings say. */
   consoleSignup: ConsoleSignupMode
+  /** The install's SMTP settings (spec 0009); with them, a new invitation answers `emailed: true`. */
+  installSmtp: SmtpSettings | null
+  /** The console's own email log, as `consoleInstall.listEmails` answers. */
+  installEmails: EmailLogEntry[]
+  /** The project email log, as `consoleEmails.list` answers for any project. */
+  emails: EmailLogEntry[]
   projects: Project[]
   apiKeys: ApiKey[]
   platforms: Platform[]
@@ -189,6 +198,9 @@ export function installFakeApi(): FakeApi {
     invitations: {},
     preview: null,
     consoleSignup: 'invite',
+    installSmtp: null,
+    installEmails: [],
+    emails: [],
     projects: [],
     apiKeys: [],
     platforms: [],
@@ -251,6 +263,22 @@ export function installFakeApi(): FakeApi {
       }
       if (method === 'PATCH') api.consoleSignup = input.consoleSignup as ConsoleSignupMode
       return Response.json({ consoleSignup: api.consoleSignup, updatedAt: now })
+    }
+    if (path === '/v1/console/install/smtp' || path === '/v1/console/install/emails') {
+      if (!api.account.isInstallAdmin) {
+        return problem(403, 'forbidden', 'Only install admins can do this.')
+      }
+      if (path === '/v1/console/install/emails') return page(api.installEmails)
+      if (method === 'DELETE') {
+        api.installSmtp = null
+        return new Response(null, { status: 204 })
+      }
+      if (method === 'PUT') {
+        const { password, ...rest } = input as unknown as SmtpSettingsInput
+        api.installSmtp = { ...rest, hasPassword: password !== null, updatedAt: now }
+        return Response.json(api.installSmtp)
+      }
+      return Response.json({ settings: api.installSmtp })
     }
     if (path === '/v1/console/account/session' && method === 'POST') {
       api.signedIn = true
@@ -337,7 +365,10 @@ export function installFakeApi(): FakeApi {
           role: input.role as OrgRole,
         })
         api.invitations[id] = [...kept, invitation]
-        return Response.json({ invitation, url: fakeInviteUrl }, { status: 201 })
+        return Response.json(
+          { invitation, url: fakeInviteUrl, emailed: api.installSmtp !== null },
+          { status: 201 },
+        )
       }
       const found = invitations.find((item) => item.id === itemId)
       if (found === undefined) return problem(404, 'not_found', 'No such invitation.')
@@ -418,6 +449,7 @@ export function installFakeApi(): FakeApi {
         return Response.json(replace(api.projects, { ...current, purgeFailedAt: null }))
       }
       if (path === '/v1/console/project/auth/keys') return Response.json({ keys: [] })
+      if (path === '/v1/console/project/emails') return page(api.emails)
       if (path === '/v1/console/project/keys' && method === 'GET') {
         return page(url.searchParams.get('limit') === '1' ? api.apiKeys.slice(0, 1) : api.apiKeys)
       }

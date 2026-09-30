@@ -41,6 +41,9 @@ public static class RateLimitPolicies
 
     /// <summary><c>consoleInvitations.accept</c>, keyed by console user ID; every attempt counts (spec 0008, AC-6).</summary>
     public static RateLimitPolicy ConsoleInviteAcceptPerUser { get; } = new("console.invite_accept.user", 30, TimeSpan.FromMinutes(15));
+
+    /// <summary>Every test email (<c>consoleSmtp.test</c> and its siblings), keyed by console user ID; every attempt that passed the role check counts (spec 0009, AC-25).</summary>
+    public static RateLimitPolicy MessagingTestPerUser { get; } = new("messaging.test.user", 30, TimeSpan.FromMinutes(15));
 }
 
 /// <summary>The answer of a limit check.</summary>

@@ -10,6 +10,10 @@ export const ErrorCode = {
   contractViolation: 'contract_violation',
   /** `csrf_rejected` */
   csrfRejected: 'csrf_rejected',
+  /** `email_not_configured` */
+  emailNotConfigured: 'email_not_configured',
+  /** `email_rate_limited` */
+  emailRateLimited: 'email_rate_limited',
   /** `forbidden` */
   forbidden: 'forbidden',
   /** `insufficient_scope` */
@@ -64,6 +68,20 @@ export const ErrorCode = {
   setupTokenInvalid: 'setup_token_invalid',
   /** `signup_closed` */
   signupClosed: 'signup_closed',
+  /** `smtp_auth_failed` */
+  smtpAuthFailed: 'smtp_auth_failed',
+  /** `smtp_host_not_allowed` */
+  smtpHostNotAllowed: 'smtp_host_not_allowed',
+  /** `smtp_rejected` */
+  smtpRejected: 'smtp_rejected',
+  /** `smtp_timeout` */
+  smtpTimeout: 'smtp_timeout',
+  /** `smtp_tls_failed` */
+  smtpTlsFailed: 'smtp_tls_failed',
+  /** `smtp_unreachable` */
+  smtpUnreachable: 'smtp_unreachable',
+  /** `template_invalid` */
+  templateInvalid: 'template_invalid',
   /** `token_expired` */
   tokenExpired: 'token_expired',
   /** `user_already_exists` */

@@ -1,6 +1,7 @@
 # A real Orvano for the shared scenarios (spec 0001, AC-10): Postgres, migrate, the api role in the
 # Test environment, where every response is checked against the contract, and a worker, which
-# provisions the fixture projects (spec 0003). The api listens on
+# provisions the fixture projects (spec 0003) and sends queued emails to Mailpit (spec 0009), whose
+# API is on http://localhost:8025. The api listens on
 # http://localhost:8080. It builds the same image as deploy/compose, so the server under test is
 # the one that ships. The passwords are throwaway test values.
 #   docker compose -f tests/scenarios/compose.yml up -d --build --wait
@@ -28,6 +29,18 @@ services:
       timeout: 5s
       retries: 30
 
+  # A mail catcher (spec 0009, AC-29): the fixtures point the install's SMTP at it, and tests read
+  # what arrived through its API on http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:v1.31.3
+    ports:
+      - 127.0.0.1:8025:8025
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
   migrate:
     <<: *server
     restart: 'no'
@@ -50,6 +63,8 @@ services:
       ORVANO_TEST_FIXTURES: /fixtures/fixtures.yaml
       # A throwaway token, so the first console sign up behaves as on an installed server (spec 0006).
       ORVANO_SETUP_TOKEN: ost_scenarios-setup-token-000000000000000000000
+      # Mailpit is on the compose network, a private address.
+      ORVANO_SMTP_ALLOW_PRIVATE_HOSTS: 'true'
     volumes:
       - ./fixtures.yaml:/fixtures/fixtures.yaml:ro
     ports:
@@ -72,6 +87,7 @@ services:
       ORVANO_DB_URL: Host=postgres;Port=5432;Username=orvano_app;Password=scenarios-app;Database=orvano
       ORVANO_DB_ADMIN_URL: Host=postgres;Port=5432;Username=orvano_admin;Password=scenarios-admin;Database=orvano
       ORVANO_MASTER_KEYS: kscenarios:b3J2YW5vLXNjZW5hcmlvcy10ZXN0LW1hc3Rlci1rZXk=
+      ORVANO_SMTP_ALLOW_PRIVATE_HOSTS: 'true'
       ASPNETCORE_ENVIRONMENT: Test
     healthcheck:
       test: ['CMD', '/app/orvano', 'healthcheck']

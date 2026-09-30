@@ -10,6 +10,8 @@
 # platforms: a web platform lets browsers of that host call the project (the browser runners serve
 #   their pages from localhost or 127.0.0.1).
 # users: app users with known passwords, hashed at load like any sign up.
+# installSmtp: the install's SMTP server (spec 0009), the `mailpit` service of compose.yml, so invite
+#   emails arrive there and tests read them from http://localhost:8025.
 consoleUsers:
   - email: fixture-admin@example.com
     password: fixture console password
@@ -33,3 +35,8 @@ users:
     email: fixture-user@example.com
     password: fixture horse battery staple
     name: Fixture User
+installSmtp:
+  host: mailpit
+  port: 1025
+  security: none
+  fromEmail: orvano@scenarios.test

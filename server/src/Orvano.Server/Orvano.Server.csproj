@@ -19,6 +19,7 @@
     <ProjectReference Include="..\Orvano.Auth\Orvano.Auth.csproj" />
     <ProjectReference Include="..\Orvano.Contract\Orvano.Contract.csproj" />
     <ProjectReference Include="..\Orvano.Core\Orvano.Core.csproj" />
+    <ProjectReference Include="..\Orvano.Messaging\Orvano.Messaging.csproj" />
     <ProjectReference Include="..\Orvano.Platform\Orvano.Platform.csproj" />
   </ItemGroup>
 
