@@ -1,7 +1,7 @@
 # 0002. Orvano stack and architecture
 
 **Date**: 2026-09-24
-**Updated**: 2026-09-27 (module hooks: `ConfigureApiServices` for services only the api role can build, from PR #41); 2026-09-27 (the installer follow up is settled by spec 0006); 2026-09-25 (poison events: a failing event consumer no longer stalls the outbox)
+**Updated**: 2026-09-29 (row 3 is settled by spec 0003, and the worker also uses `orvano_admin` to purge deleted projects); 2026-09-27 (module hooks: `ConfigureApiServices` for services only the api role can build, from PR #41); 2026-09-27 (the installer follow up is settled by spec 0006); 2026-09-25 (poison events: a failing event consumer no longer stalls the outbox)
 **Status**: Accepted
 
 ## Summary
@@ -112,11 +112,11 @@ In local dev there is no Caddy: the Vite dev server proxies `/v1` and `/v1/realt
 | Postgres role | Login | Used by | Privileges |
 |---|---|---|---|
 | `postgres` (superuser) | yes | installer only, once, to create the roles and database | everything |
-| `orvano_admin` | yes | `migrate` role, and the `worker` for provisioning jobs only | owns database `orvano` and schema `orvano`; `CREATEROLE` |
+| `orvano_admin` | yes | `migrate` role, and the `worker` for the project provision and purge jobs only | owns database `orvano` and schema `orvano`; `CREATEROLE` |
 | `orvano_app` | yes | `api`, `worker`, `realtime` | DML on schema `orvano` only; member of every project role with `INHERIT FALSE, SET TRUE` |
 | `p_<projectId>` | no (`NOLOGIN`) | assumed per transaction | owns schema `p_<projectId>`; nothing in `orvano` |
 
-- **Provisioning a project** is a worker job using `orvano_admin`: `CREATE ROLE p_<id> NOLOGIN`, `CREATE SCHEMA p_<id> AUTHORIZATION p_<id>`, `GRANT p_<id> TO orvano_app WITH INHERIT FALSE, SET TRUE`. The public API never holds `CREATEROLE` or DDL rights on the platform schema. A project is therefore usable a moment after it is created; row 3 models that `provisioning` state.
+- **Provisioning a project** is a worker job using `orvano_admin`: `CREATE ROLE p_<id> NOLOGIN`, `CREATE SCHEMA p_<id> AUTHORIZATION p_<id>`, `GRANT p_<id> TO orvano_app WITH INHERIT FALSE, SET TRUE` (and the same grant to `orvano_admin` itself, so the worker can act as the project role, which the purge needs). The public API never holds `CREATEROLE` or DDL rights on the platform schema. A project is therefore usable a moment after it is created; [spec 0003](../0003-platform-data-model/index.md) models that `provisioning` state. **Purging a deleted project** is the matching worker job, also with `orvano_admin`. Only a schema's owner may drop it, so when role `p_<id>` exists the job grants it to itself (`INHERIT FALSE, SET TRUE`), switches to it with `SET LOCAL ROLE`, drops schema `p_<id>` with `CASCADE`, switches back, and drops the role.
 - **Why Postgres 16 or later is a hard requirement**: `GRANT ... WITH INHERIT FALSE, SET TRUE` needs Postgres 16, and `orvano_admin` can grant a project role only because, from Postgres 16, a `CREATEROLE` role automatically gets admin option on the roles it creates. So project roles must always be created by `orvano_admin`, never by the superuser (the installer included).
 - **Touching project data**: only through one `Orvano.Core` helper that opens an explicit `NpgsqlTransaction`, runs `SET LOCAL ROLE p_<id>` and `SET LOCAL search_path = p_<id>` inside it, runs the caller's work, and commits. No other code path may issue `SET LOCAL ROLE`, because outside an explicit transaction it reverts before the next statement. `LOCAL` resets at commit, which keeps pooled connections clean. Because `orvano_app` does not inherit project privileges, forgetting the helper fails closed (permission denied) instead of leaking.
 - **Naming**: schema and role names are `p_` plus the project ID. Row 3 must choose an ID format limited to `[a-z0-9]` and at most 60 characters (Postgres names cap at 63 bytes).
@@ -393,7 +393,7 @@ deploy/compose/                  docker-compose.yml and .env.example (the produc
 ## Follow-up
 
 - [ ] Update spec 0001 to add the `console` audience (excluded from all public SDKs, generated into `sdks/console-client/`) and to note that this spec confirms .NET 10 and GitHub Actions.
-- [ ] Row 3 (platform data model): pick a project ID format limited to `[a-z0-9]`, at most 60 characters; model the project `provisioning` state; decide where app users live (platform schema or project schema).
+- [x] Row 3 (platform data model): pick a project ID format limited to `[a-z0-9]`, at most 60 characters; model the project `provisioning` state; decide where app users live (platform schema or project schema). Settled by [spec 0003](../0003-platform-data-model/index.md): new project IDs are 20 characters from `[a-z0-9]` (the column allows up to 60, AC-2), a project is `provisioning` until its job creates the schema and role (AC-3), and app users live in the shared `orvano` schema, in `auth_users` keyed by project ID (AC-16).
 - [ ] Create the `orvanohq` GitHub org (the plain `orvano` name is unavailable on GitHub) and the `orvanohq/orvano` repo; GHCR images follow the org name. If the org ends up with another name, update the image and repo paths in this spec and in spec 0001.
 - [x] Row 6 (installer): generate the database passwords and `ORVANO_MASTER_KEYS`, and warn that the master key must be backed up. Decide whether to keep a hand written compose file or generate it with Aspire's Docker Compose publisher. Settled by [spec 0006](../0006-self-host-installer/index.md): `orvano install` generates every secret and prints the master key until you confirm you saved it (AC-8, AC-9, AC-15), and the compose file stays hand written, embedded in the server image so it always matches its version.
 - [ ] Row 22: design the realtime message protocol and decide whether to replay from `orvano.events` on reconnect.
