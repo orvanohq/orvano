@@ -208,15 +208,22 @@ public class SignUpSignInTests(PostgresFixture postgres)
         Assert.Equal((status, code), (reply.Status, reply.Code));
     }
 
-    [Fact]
-    public async Task A_project_still_provisioning_answers_409()
+    // Spec 0003 AC-4: provisioning and failed are not ready yet; deleting is gone at once.
+    [Theory]
+    [InlineData("provisioning", HttpStatusCode.Conflict, "project_not_ready")]
+    [InlineData("failed", HttpStatusCode.Conflict, "project_not_ready")]
+    [InlineData("deleting", HttpStatusCode.NotFound, "project_not_found")]
+    public async Task A_project_that_is_not_active_is_not_served(string status, HttpStatusCode expected, string code)
     {
         await using var api = await AuthApi.StartAsync(postgres);
-        await TestDatabase.ExecuteAsync(api.Database.Superuser, "UPDATE orvano.platform_projects SET status = 'provisioning' WHERE id = @id", ("id", AuthApi.OtherProject));
+        await TestDatabase.ExecuteAsync(api.Database.Superuser,
+            "UPDATE orvano.platform_projects SET status = @s, deleted_at = CASE WHEN @s = 'deleting' THEN now() END, " +
+            "purge_after = CASE WHEN @s = 'deleting' THEN now() + interval '7 days' END WHERE id = @id",
+            ("s", status), ("id", AuthApi.OtherProject));
 
         using var reply = await api.SignUpAsync("ada@x.com", project: AuthApi.OtherProject);
 
-        Assert.Equal((HttpStatusCode.Conflict, "project_not_ready"), (reply.Status, reply.Code));
+        Assert.Equal((expected, code), (reply.Status, reply.Code));
     }
 
     [Fact]

@@ -28,7 +28,7 @@ The internal model that every product hangs off: console accounts, organizations
    - [x] Row 8 slice: `auth_users`, request authentication (project lookup, key verification, scopes, origins), console accounts as users of `console`: `/develop app user sign up & sign in` (AC-4 to 8, 12 to 14, 16, 17)
    - [x] Row 15 slice: invitations and member management: `/develop console team members & roles` (AC-7, 9, 10)
 - [x] Verify it: `/check verify platform data model`
-- [ ] Test it: `/test platform data model`
+- [x] Test it: `/test platform data model`
 - [ ] Review it (fresh model): `/check review platform data model`
 - [ ] Document it: `/document platform data model`
 Spec [0003](../specs/0003-platform-data-model/index.md) · code in `server/src/Orvano.Platform/`, `server/src/Orvano.Auth/`, `server/migrations/platform/`

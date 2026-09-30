@@ -267,6 +267,26 @@ public class PlatformLifecycleTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task An_org_purge_comes_back_a_minute_after_its_latest_project_purge()
+    {
+        await using var p = await PlatformHarness.StartAsync(postgres, graceDays: 0);
+        var (user, project) = await ActiveProjectAsync(p);
+        var orgId = (await p.Get<ProjectService>().GetAsync(user, project, Ct)).Value!.OrgId!.Value;
+        await p.Get<ProjectService>().DeleteAsync(user, project, Ct);
+        await p.Get<OrgService>().DeleteAsync(user, orgId, Ct);
+        // The org is due now, but its project purges an hour from now.
+        await TestDatabase.ExecuteAsync(p.Database.Superuser,
+            "UPDATE orvano.platform_projects SET purge_after = now() + interval '1 hour' WHERE id = @p", ("p", project));
+
+        await p.RunJobsAsync(PlatformJobs.PurgeOrg);
+
+        // Value sourcing (purge org, when to run): the latest project purge_after plus 1 minute.
+        Assert.Equal(TimeSpan.FromMinutes(1), await p.ScalarAsync<TimeSpan>(
+            "SELECT j.run_at - (SELECT max(purge_after) FROM orvano.platform_projects WHERE org_id = @o) " +
+            "FROM orvano.jobs j WHERE j.kind = @k AND j.status = 'queued'", ("o", orgId), ("k", PlatformJobs.PurgeOrg)));
+    }
+
+    [Fact]
     public async Task Each_role_is_held_to_the_permission_matrix()
     {
         await using var p = await PlatformHarness.StartAsync(postgres);
@@ -377,6 +397,76 @@ public class PlatformLifecycleTests(PostgresFixture postgres)
             "SELECT payload->'actor'->>'type' FROM orvano.events WHERE type = 'platform.project.provisioned'"));
         Assert.Equal(project, await p.ScalarAsync<string>("SELECT project_id FROM orvano.events WHERE type = 'platform.key.created'"));
         Assert.True(await p.ScalarAsync<bool>("SELECT project_id IS NULL FROM orvano.events WHERE type = 'platform.org.created'"));
+    }
+
+    [Fact]
+    public async Task Every_lifecycle_change_writes_its_event_with_a_user_or_system_actor()
+    {
+        await using var p = await PlatformHarness.StartAsync(postgres, graceDays: 0);
+        var (admin, orgId) = await OwnerWithOrgAsync(p); // the first account, so also the install admin
+        var projects = p.Get<ProjectService>();
+        var orgs = p.Get<OrgService>();
+        await p.Get<InstallService>().UpdateAsync(admin, InstallService.Open, Ct);
+        await orgs.RenameAsync(admin, orgId, "Renamed", Ct);
+
+        // One project that provisions, then is deleted and restored.
+        var good = (await projects.CreateAsync(admin, orgId, "Good", Ct)).Value!.Id;
+        await p.RunJobsAsync(PlatformJobs.ProvisionProject);
+        await projects.DeleteAsync(admin, good, Ct);
+        await projects.RestoreAsync(admin, good, Ct);
+        await p.RunJobsAsync(PlatformJobs.PurgeProject); // the first delete's purge finds it restored and does nothing
+        await p.RunJobsAsync(PlatformJobs.ProvisionProject);
+
+        // One project whose provisioning fails on its last attempt (a role the admin can not grant).
+        var bad = (await projects.CreateAsync(admin, orgId, "Bad", Ct)).Value!.Id;
+        await TestDatabase.ExecuteAsync(p.Database.Superuser, $"CREATE ROLE p_{bad} NOLOGIN");
+        await p.RunJobsAsync(PlatformJobs.ProvisionProject, attempt: PlatformJobs.ProvisionMaxAttempts);
+        await TestDatabase.ExecuteAsync(p.Database.Superuser, $"DROP ROLE p_{bad}");
+
+        // Both deleted; the good one's purge fails on its last attempt, the bad one's succeeds.
+        await TestDatabase.ExecuteAsync(p.Database.Superuser, $"GRANT CONNECT ON DATABASE postgres TO p_{good}");
+        await projects.DeleteAsync(admin, good, Ct);
+        await projects.DeleteAsync(admin, bad, Ct);
+        await p.RunJobsAsync(PlatformJobs.PurgeProject, attempt: NewJob.DefaultMaxAttempts);
+
+        // The org is deleted, restored, deleted again, and purged once the good project's purge is retried.
+        await orgs.DeleteAsync(admin, orgId, Ct);
+        await orgs.RestoreAsync(admin, orgId, Ct);
+        await orgs.DeleteAsync(admin, orgId, Ct);
+        await TestDatabase.ExecuteAsync(p.Database.Superuser, $"REVOKE CONNECT ON DATABASE postgres FROM p_{good}");
+        await projects.RetryPurgeAsync(admin, good, Ct);
+        await p.RunJobsAsync(PlatformJobs.PurgeProject);
+        await TestDatabase.ExecuteAsync(p.Database.Superuser, "UPDATE orvano.jobs SET run_at = now() WHERE kind = @k AND status = 'queued'", ("k", PlatformJobs.PurgeOrg));
+        await p.RunJobsAsync(PlatformJobs.PurgeOrg);
+
+        // AC-19: one event per change, console changes by the user, job changes by the system, and a project ID
+        // only on project events.
+        string[] expected =
+        [
+            "platform.install.settings_updated  user",
+            "platform.org.updated  user",
+            $"platform.project.deleting {good} user", // deleted, restored, and deleted again
+            $"platform.project.restored {good} user",
+            $"platform.project.deleting {good} user",
+            $"platform.project.failed {bad} system",
+            $"platform.project.deleting {bad} user",
+            $"platform.project.purge_failed {good} system",
+            $"platform.project.purged {bad} system",
+            "platform.org.deleting  user",
+            "platform.org.restored  user",
+            "platform.org.deleting  user",
+            $"platform.project.purged {good} system",
+            "platform.org.purged  system",
+        ];
+        var types = expected.Select(e => e.Split(' ')[0]).Distinct().ToArray();
+        var actual = await p.ScalarAsync<string[]>(
+            "SELECT array_agg(type || ' ' || coalesce(project_id, '') || ' ' || (payload->'actor'->>'type')) FROM orvano.events WHERE type = ANY(@t)",
+            ("t", types));
+        Assert.Equal(expected.Order(), actual.Order());
+
+        Assert.Equal(admin.ToString(), await p.ScalarAsync<string>("SELECT payload->'actor'->>'id' FROM orvano.events WHERE type = 'platform.org.updated'"));
+        Assert.True(await p.ScalarAsync<bool>("SELECT payload->'actor'->'id' = 'null'::jsonb FROM orvano.events WHERE type = 'platform.org.purged'"));
+        Assert.Equal("[\"name\"]", await p.ScalarAsync<string>("SELECT (payload->'changed')::text FROM orvano.events WHERE type = 'platform.org.updated'"));
     }
 
     internal static async Task<(Guid User, Guid OrgId)> OwnerWithOrgAsync(PlatformHarness p)
