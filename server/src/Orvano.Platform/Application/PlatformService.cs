@@ -39,8 +39,9 @@ internal sealed class PlatformService(PlatformStore store, ILogger<PlatformServi
             if (!Names.TryNormalize(name, out var platformName)) return Failure.Invalid($"A platform name is 1 to {Names.MaxLength} characters.");
             if (!PlatformIdentifiers.TryNormalize(platformType, identifier, out var normalized, out var problem)) return Failure.Invalid(problem);
 
-            var (project, _, failure) = await ProjectService.FindAsync(uow.Db, userId, projectId, ConsoleAction.ManagePlatforms, ct);
+            var (project, _, failure) = await ProjectService.FindForChangeAsync(uow, userId, projectId, ConsoleAction.ManagePlatforms, ct);
             if (failure is not null) return failure;
+            if (await ProjectService.LiveProjectFailureAsync(uow, project!.Id, ct) is { } frozen) return frozen;
 
             var now = await uow.NowAsync(ct);
             var platform = new PlatformRow
@@ -63,8 +64,9 @@ internal sealed class PlatformService(PlatformStore store, ILogger<PlatformServi
     public Task<Outcome<PlatformRow>> UpdateAsync(Guid userId, string? projectId, string platformId, string? name, string? identifier, CancellationToken ct) =>
         Unique(store.WriteAsync<PlatformRow>(async (uow, ct) =>
         {
-            var (project, _, failure) = await ProjectService.FindAsync(uow.Db, userId, projectId, ConsoleAction.ManagePlatforms, ct);
+            var (project, _, failure) = await ProjectService.FindForChangeAsync(uow, userId, projectId, ConsoleAction.ManagePlatforms, ct);
             if (failure is not null) return failure;
+            if (await ProjectService.LiveProjectFailureAsync(uow, project!.Id, ct) is { } frozen) return frozen;
             if (!Guid.TryParse(platformId, out var id)) return Failure.NotFound("platform");
             var platform = await uow.Db.Platforms.SingleOrDefaultAsync(p => p.Id == id && p.ProjectId == project!.Id, ct);
             if (platform is null) return Failure.NotFound("platform");
@@ -99,7 +101,7 @@ internal sealed class PlatformService(PlatformStore store, ILogger<PlatformServi
     public Task<Outcome<Done>> DeleteAsync(Guid userId, string? projectId, string platformId, CancellationToken ct) =>
         store.WriteAsync<Done>(async (uow, ct) =>
         {
-            var (project, _, failure) = await ProjectService.FindAsync(uow.Db, userId, projectId, ConsoleAction.ManagePlatforms, ct);
+            var (project, _, failure) = await ProjectService.FindForChangeAsync(uow, userId, projectId, ConsoleAction.ManagePlatforms, ct);
             if (failure is not null) return failure;
             if (!Guid.TryParse(platformId, out var id)) return Failure.NotFound("platform");
             var platform = await uow.Db.Platforms.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id && p.ProjectId == project!.Id, ct);

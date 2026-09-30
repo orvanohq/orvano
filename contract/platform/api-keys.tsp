@@ -107,7 +107,10 @@ interface ConsoleApiKeysApi {
     limit?: int32,
   ): ApiKeyPage | Problem;
 
-  @doc("Creates an API key and returns its secret, once. Owners and developers.")
+  @doc("""
+    Creates an API key and returns its secret, once. Owners and developers; fails with `project_not_ready` while
+    the project is being deleted, and `org_not_active` while the org is.
+    """)
   @operationId("consoleApiKeys.create")
   @extension("x-orvano-audience", "console")
   @extension("x-orvano-service", "consoleApiKeys")
@@ -117,7 +120,10 @@ interface ConsoleApiKeysApi {
     @body key: CreatedApiKey;
   } | Problem;
 
-  @doc("Deletes an API key, which stops it working at once. Owners delete any key, developers their own.")
+  @doc("""
+    Deletes an API key, which stops it working at once. Owners delete any key, developers their own; still allowed
+    while the project is being deleted, but fails with `org_not_active` while the org is.
+    """)
   @operationId("consoleApiKeys.delete")
   @extension("x-orvano-audience", "console")
   @extension("x-orvano-service", "consoleApiKeys")

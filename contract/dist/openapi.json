@@ -1955,7 +1955,7 @@
       },
       "post": {
         "operationId": "consoleApiKeys.create",
-        "description": "Creates an API key and returns its secret, once. Owners and developers.",
+        "description": "Creates an API key and returns its secret, once. Owners and developers; fails with `project_not_ready` while\nthe project is being deleted, and `org_not_active` while the org is.",
         "parameters": [],
         "responses": {
           "201": {
@@ -2004,7 +2004,7 @@
     "/v1/console/project/keys/{keyId}": {
       "delete": {
         "operationId": "consoleApiKeys.delete",
-        "description": "Deletes an API key, which stops it working at once. Owners delete any key, developers their own.",
+        "description": "Deletes an API key, which stops it working at once. Owners delete any key, developers their own; still allowed\nwhile the project is being deleted, but fails with `org_not_active` while the org is.",
         "parameters": [
           {
             "name": "keyId",
@@ -2105,7 +2105,7 @@
       },
       "post": {
         "operationId": "consolePlatforms.create",
-        "description": "Adds a platform. Owners and developers.",
+        "description": "Adds a platform. Owners and developers; fails with `project_not_ready` while the project is being deleted, and\n`org_not_active` while the org is.",
         "parameters": [],
         "responses": {
           "201": {
@@ -2154,7 +2154,7 @@
     "/v1/console/project/platforms/{platformId}": {
       "patch": {
         "operationId": "consolePlatforms.update",
-        "description": "Renames a platform or changes its identifier. Owners and developers.",
+        "description": "Renames a platform or changes its identifier. Owners and developers; fails with `project_not_ready` while the\nproject is being deleted, and `org_not_active` while the org is.",
         "parameters": [
           {
             "name": "platformId",
@@ -2211,7 +2211,7 @@
       },
       "delete": {
         "operationId": "consolePlatforms.delete",
-        "description": "Removes a platform. Owners and developers.",
+        "description": "Removes a platform. Owners and developers; still allowed while the project is being deleted, but fails with\n`org_not_active` while the org is.",
         "parameters": [
           {
             "name": "platformId",

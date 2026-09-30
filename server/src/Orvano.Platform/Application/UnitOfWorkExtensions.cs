@@ -18,9 +18,16 @@ internal static class UnitOfWorkExtensions
         // Not composed (no LIMIT around it), so the lock clause runs exactly as written.
         (await uow.Db.Orgs.FromSql($"SELECT * FROM orvano.platform_orgs WHERE id = {orgId} FOR UPDATE").ToListAsync(ct)).SingleOrDefault();
 
-    /// <summary>The org, locked <c>FOR SHARE</c> (project create and restore), so it can't start deleting underneath.</summary>
+    /// <summary>The org, locked <c>FOR SHARE</c> (project changes), so it can't start deleting underneath.</summary>
     public static async Task<OrgRow?> LockOrgForShareAsync(this UnitOfWork uow, Guid orgId, CancellationToken ct) =>
         (await uow.Db.Orgs.FromSql($"SELECT * FROM orvano.platform_orgs WHERE id = {orgId} FOR SHARE").ToListAsync(ct)).SingleOrDefault();
+
+    /// <summary>
+    /// The project, locked <c>FOR SHARE</c> (key and platform changes), so it can't start deleting or be purged
+    /// underneath. Always taken after the org lock; the purge job locks only the project row.
+    /// </summary>
+    public static async Task<ProjectRow?> LockProjectForShareAsync(this UnitOfWork uow, string projectId, CancellationToken ct) =>
+        (await uow.Db.Projects.FromSql($"SELECT * FROM orvano.platform_projects WHERE id = {projectId} FOR SHARE").ToListAsync(ct)).SingleOrDefault();
 
     /// <summary>The caller's membership role in an org, as stored, or null.</summary>
     public static Task<string?> RoleInAsync(this PlatformDbContext db, Guid userId, Guid orgId, CancellationToken ct) =>

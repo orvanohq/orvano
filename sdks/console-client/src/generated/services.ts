@@ -109,7 +109,10 @@ export class ConsoleApiKeysService {
     this.#client = client
   }
 
-  /** Creates an API key and returns its secret, once. Owners and developers. */
+  /**
+   * Creates an API key and returns its secret, once. Owners and developers; fails with `project_not_ready` while
+   * the project is being deleted, and `org_not_active` while the org is.
+   */
   create(body: CreateApiKeyRequest, options?: RequestOptions): Promise<CreatedApiKey> {
     return this.#client.request<CreatedApiKey>(
       { method: 'POST', path: '/v1/console/project/keys', body },
@@ -117,7 +120,10 @@ export class ConsoleApiKeysService {
     )
   }
 
-  /** Deletes an API key, which stops it working at once. Owners delete any key, developers their own. */
+  /**
+   * Deletes an API key, which stops it working at once. Owners delete any key, developers their own; still allowed
+   * while the project is being deleted, but fails with `org_not_active` while the org is.
+   */
   delete(keyId: string, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
       { method: 'DELETE', path: `/v1/console/project/keys/${encodeURIComponent(keyId)}` },
@@ -433,7 +439,10 @@ export class ConsolePlatformsService {
     this.#client = client
   }
 
-  /** Adds a platform. Owners and developers. */
+  /**
+   * Adds a platform. Owners and developers; fails with `project_not_ready` while the project is being deleted, and
+   * `org_not_active` while the org is.
+   */
   create(body: CreatePlatformRequest, options?: RequestOptions): Promise<Platform> {
     return this.#client.request<Platform>(
       { method: 'POST', path: '/v1/console/project/platforms', body },
@@ -441,7 +450,10 @@ export class ConsolePlatformsService {
     )
   }
 
-  /** Removes a platform. Owners and developers. */
+  /**
+   * Removes a platform. Owners and developers; still allowed while the project is being deleted, but fails with
+   * `org_not_active` while the org is.
+   */
   delete(platformId: string, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
       { method: 'DELETE', path: `/v1/console/project/platforms/${encodeURIComponent(platformId)}` },
@@ -468,7 +480,10 @@ export class ConsolePlatformsService {
     return paginate((cursor) => this.list({ ...query, cursor }, options))
   }
 
-  /** Renames a platform or changes its identifier. Owners and developers. */
+  /**
+   * Renames a platform or changes its identifier. Owners and developers; fails with `project_not_ready` while the
+   * project is being deleted, and `org_not_active` while the org is.
+   */
   update(
     platformId: string,
     body: UpdatePlatformRequest,
