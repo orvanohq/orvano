@@ -52,7 +52,7 @@ Every product feature ships in all of these layers in the same version, unless i
 | 6 | Self host installer | Foundation | in-progress |
 | 7 | Console accounts, orgs & projects | v0.1 | done |
 | 8 | App user sign up & sign in | v0.1 | done |
-| 9 | Transactional email | v0.2 | planned |
+| 9 | Transactional email | v0.2 | in-progress |
 | 10 | Email verification, recovery & passwordless | v0.2 | planned |
 | 11 | Docs site & quickstarts | v0.2 | planned |
 | 12 | OAuth & ID token sign in | v0.3 | planned |
@@ -118,6 +118,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Signed images and installer**: cosign signatures on the images and `install.sh`, checked by the installer · from spec 0006
 - **Short install URL**: `get.orvano.dev` redirecting to the release's `install.sh` · from spec 0006
 - **RHEL family installs**: Rocky, Alma, and Fedora support once SELinux and firewalld are tested · from spec 0006
+- **Localized email templates**: a version of each email template per language, picked from the user's locale (the `locale` column is already in the key) · from spec 0009
 
 ## Legend
 
