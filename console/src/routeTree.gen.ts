@@ -33,6 +33,8 @@ import { Route as AppProjectsProjectIdEmailLogRouteImport } from './routes/_app/
 import { Route as AppProjectsProjectIdEmailSettingsRouteImport } from './routes/_app/projects/$projectId/email/settings'
 import { Route as AppProjectsProjectIdUsersIndexRouteImport } from './routes/_app/projects/$projectId/users/index'
 import { Route as AppProjectsProjectIdUsersUserIdRouteImport } from './routes/_app/projects/$projectId/users/$userId'
+import { Route as AppProjectsProjectIdEmailTemplatesIndexRouteImport } from './routes/_app/projects/$projectId/email/templates/index'
+import { Route as AppProjectsProjectIdEmailTemplatesKindRouteImport } from './routes/_app/projects/$projectId/email/templates/$kind'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -164,6 +166,18 @@ const AppProjectsProjectIdUsersUserIdRoute =
     path: '/users/$userId',
     getParentRoute: () => AppProjectsProjectIdRouteRoute,
   } as any)
+const AppProjectsProjectIdEmailTemplatesIndexRoute =
+  AppProjectsProjectIdEmailTemplatesIndexRouteImport.update({
+    id: '/templates/',
+    path: '/templates/',
+    getParentRoute: () => AppProjectsProjectIdEmailRouteRoute,
+  } as any)
+const AppProjectsProjectIdEmailTemplatesKindRoute =
+  AppProjectsProjectIdEmailTemplatesKindRouteImport.update({
+    id: '/templates/$kind',
+    path: '/templates/$kind',
+    getParentRoute: () => AppProjectsProjectIdEmailRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -189,6 +203,8 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/users/$userId': typeof AppProjectsProjectIdUsersUserIdRoute
   '/projects/$projectId/email/': typeof AppProjectsProjectIdEmailIndexRoute
   '/projects/$projectId/users/': typeof AppProjectsProjectIdUsersIndexRoute
+  '/projects/$projectId/email/templates/$kind': typeof AppProjectsProjectIdEmailTemplatesKindRoute
+  '/projects/$projectId/email/templates/': typeof AppProjectsProjectIdEmailTemplatesIndexRoute
 }
 export interface FileRoutesByTo {
   '/invite': typeof InviteRoute
@@ -211,6 +227,8 @@ export interface FileRoutesByTo {
   '/projects/$projectId/users/$userId': typeof AppProjectsProjectIdUsersUserIdRoute
   '/projects/$projectId/email': typeof AppProjectsProjectIdEmailIndexRoute
   '/projects/$projectId/users': typeof AppProjectsProjectIdUsersIndexRoute
+  '/projects/$projectId/email/templates/$kind': typeof AppProjectsProjectIdEmailTemplatesKindRoute
+  '/projects/$projectId/email/templates': typeof AppProjectsProjectIdEmailTemplatesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -238,6 +256,8 @@ export interface FileRoutesById {
   '/_app/projects/$projectId/users/$userId': typeof AppProjectsProjectIdUsersUserIdRoute
   '/_app/projects/$projectId/email/': typeof AppProjectsProjectIdEmailIndexRoute
   '/_app/projects/$projectId/users/': typeof AppProjectsProjectIdUsersIndexRoute
+  '/_app/projects/$projectId/email/templates/$kind': typeof AppProjectsProjectIdEmailTemplatesKindRoute
+  '/_app/projects/$projectId/email/templates/': typeof AppProjectsProjectIdEmailTemplatesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -265,6 +285,8 @@ export interface FileRouteTypes {
     | '/projects/$projectId/users/$userId'
     | '/projects/$projectId/email/'
     | '/projects/$projectId/users/'
+    | '/projects/$projectId/email/templates/$kind'
+    | '/projects/$projectId/email/templates/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/invite'
@@ -287,6 +309,8 @@ export interface FileRouteTypes {
     | '/projects/$projectId/users/$userId'
     | '/projects/$projectId/email'
     | '/projects/$projectId/users'
+    | '/projects/$projectId/email/templates/$kind'
+    | '/projects/$projectId/email/templates'
   id:
     | '__root__'
     | '/_app'
@@ -313,6 +337,8 @@ export interface FileRouteTypes {
     | '/_app/projects/$projectId/users/$userId'
     | '/_app/projects/$projectId/email/'
     | '/_app/projects/$projectId/users/'
+    | '/_app/projects/$projectId/email/templates/$kind'
+    | '/_app/projects/$projectId/email/templates/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -494,6 +520,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectsProjectIdUsersUserIdRouteImport
       parentRoute: typeof AppProjectsProjectIdRouteRoute
     }
+    '/_app/projects/$projectId/email/templates/': {
+      id: '/_app/projects/$projectId/email/templates/'
+      path: '/templates'
+      fullPath: '/projects/$projectId/email/templates/'
+      preLoaderRoute: typeof AppProjectsProjectIdEmailTemplatesIndexRouteImport
+      parentRoute: typeof AppProjectsProjectIdEmailRouteRoute
+    }
+    '/_app/projects/$projectId/email/templates/$kind': {
+      id: '/_app/projects/$projectId/email/templates/$kind'
+      path: '/templates/$kind'
+      fullPath: '/projects/$projectId/email/templates/$kind'
+      preLoaderRoute: typeof AppProjectsProjectIdEmailTemplatesKindRouteImport
+      parentRoute: typeof AppProjectsProjectIdEmailRouteRoute
+    }
   }
 }
 
@@ -516,6 +556,8 @@ interface AppProjectsProjectIdEmailRouteRouteChildren {
   AppProjectsProjectIdEmailLogRoute: typeof AppProjectsProjectIdEmailLogRoute
   AppProjectsProjectIdEmailSettingsRoute: typeof AppProjectsProjectIdEmailSettingsRoute
   AppProjectsProjectIdEmailIndexRoute: typeof AppProjectsProjectIdEmailIndexRoute
+  AppProjectsProjectIdEmailTemplatesKindRoute: typeof AppProjectsProjectIdEmailTemplatesKindRoute
+  AppProjectsProjectIdEmailTemplatesIndexRoute: typeof AppProjectsProjectIdEmailTemplatesIndexRoute
 }
 
 const AppProjectsProjectIdEmailRouteRouteChildren: AppProjectsProjectIdEmailRouteRouteChildren =
@@ -524,6 +566,10 @@ const AppProjectsProjectIdEmailRouteRouteChildren: AppProjectsProjectIdEmailRout
     AppProjectsProjectIdEmailSettingsRoute:
       AppProjectsProjectIdEmailSettingsRoute,
     AppProjectsProjectIdEmailIndexRoute: AppProjectsProjectIdEmailIndexRoute,
+    AppProjectsProjectIdEmailTemplatesKindRoute:
+      AppProjectsProjectIdEmailTemplatesKindRoute,
+    AppProjectsProjectIdEmailTemplatesIndexRoute:
+      AppProjectsProjectIdEmailTemplatesIndexRoute,
   }
 
 const AppProjectsProjectIdEmailRouteRouteWithChildren =
