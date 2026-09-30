@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orvano.Core;
 using Orvano.Core.Modules;
 using Orvano.Messaging.Application;
+using Orvano.Messaging.Contracts;
 using Orvano.Messaging.Domain;
 using Orvano.Messaging.Endpoints;
 using Orvano.Messaging.Jobs;
@@ -14,8 +15,9 @@ namespace Orvano.Messaging;
 
 /// <summary>
 /// The Messaging module (spec 0009): SMTP settings per project with the install's as the fallback, the test email,
-/// the sealed send queue with its worker, console invite emails, and the email log. Templates arrive with the
-/// spec's next slice. It reaches Platform only through its <c>Contracts</c> and never references Auth.
+/// the editable auth email templates, the sealed send queue with its worker, console invite emails, and the email
+/// log. It reaches Platform only through its <c>Contracts</c> and never references Auth, which queues its emails
+/// through <see cref="IEmailQueue"/>.
 /// </summary>
 internal sealed class MessagingModule : IOrvanoModule
 {
@@ -43,12 +45,18 @@ internal sealed class MessagingModule : IOrvanoModule
         services.AddSingleton<ProjectAccess>();
         services.AddSingleton<SmtpSettingsService>();
         services.AddSingleton<EmailLogService>();
+        services.AddSingleton<EmailTemplateService>();
         services.AddSingleton<EmailQueue>();
+        services.AddSingleton<IEmailQueue, AuthEmailQueue>();
         // Platform resolves this per request; without it invitations are created and never emailed.
         services.AddSingleton<IConsoleInvitationMailer, InvitationMailer>();
     }
 
-    public void MapApi(RouteGroupBuilder v1) => ConsoleEmailEndpoints.Map(v1);
+    public void MapApi(RouteGroupBuilder v1)
+    {
+        ConsoleEmailEndpoints.Map(v1);
+        ConsoleEmailTemplateEndpoints.Map(v1);
+    }
 
     public void RegisterWork(IWorkRegistry work)
     {

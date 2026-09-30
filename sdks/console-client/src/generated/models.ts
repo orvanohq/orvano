@@ -7,6 +7,9 @@ import type { UserStatus } from '@orvano/js'
  */
 export type ApiKeyScope = 'users.read' | 'users.write'
 
+/** One of the four auth email templates a project can edit. */
+export type AuthEmailKind = 'verification' | 'recovery' | 'magic_link' | 'email_code'
+
 /** Who may create a console account. */
 export type ConsoleSignupMode = 'invite' | 'open'
 
@@ -248,6 +251,56 @@ export interface EmailSender {
   name: string | null
 }
 
+/** One auth email template: the project's own version, or the default when it has none. */
+export interface EmailTemplate {
+  /** Which template it is. */
+  kind: AuthEmailKind
+  /** The template's language. Always `en` for now. */
+  locale: string
+  /** The subject line, a Liquid template. */
+  subject: string
+  /** The HTML part, a Liquid template. */
+  html: string
+  /** The plain text part; null when it is generated from the HTML. */
+  text: string | null
+  /** True when the project edited it; false for the default. */
+  isCustom: boolean
+  /** When it was last edited; null for the default. */
+  updatedAt: string | null
+  /** The values this template can use. */
+  variables: TemplateVariable[]
+}
+
+/** The auth email templates of a project. Always all four, so it is not paged. */
+export interface EmailTemplateCatalog {
+  /** The four templates. */
+  templates: EmailTemplateSummary[]
+}
+
+/** A template's content to save, preview, or test. Each part is a Liquid template. */
+export interface EmailTemplateInput {
+  /** The subject line, 1 to 255 characters. It is not HTML encoded. */
+  subject: string
+  /** The HTML part, at most 100 KB. Every `{{ }}` output in it is HTML encoded. */
+  html: string
+  /** The plain text part, at most 100 KB; null to generate it from the HTML. */
+  text: string | null
+}
+
+/** One template in the catalog. */
+export interface EmailTemplateSummary {
+  /** Which template it is. */
+  kind: AuthEmailKind
+  /** Its name. */
+  name: string
+  /** When it is sent. */
+  description: string
+  /** True when the project edited it; false for the default. */
+  isCustom: boolean
+  /** When it was last edited; null for the default. */
+  updatedAt: string | null
+}
+
 /** The result of a test email. */
 export interface EmailTestResult {
   /** The address the test email went to: your own console email. */
@@ -447,6 +500,16 @@ export interface ProjectSmtp {
   installSender: EmailSender | null
 }
 
+/** A template rendered with the sample values. */
+export interface RenderedEmail {
+  /** The rendered subject. */
+  subject: string
+  /** The rendered HTML part. */
+  html: string
+  /** The rendered text part, generated from the HTML when the template has none. */
+  text: string
+}
+
 /** A project's token signing key as the console shows it; never the key itself. */
 export interface SigningKey {
   /** The key ID, the `kid` of the tokens it signs. */
@@ -508,6 +571,16 @@ export interface SmtpSettingsInput {
   fromName: string | null
   /** Where replies go; null to use the From address. */
   replyTo: string | null
+}
+
+/** A value a template can use. */
+export interface TemplateVariable {
+  /** The name to write between `{{` and `}}`. */
+  name: string
+  /** What it holds. */
+  description: string
+  /** The value previews and test emails use. */
+  sample: string
 }
 
 /** Changes to the install settings. */

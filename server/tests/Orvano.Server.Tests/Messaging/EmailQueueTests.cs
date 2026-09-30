@@ -9,6 +9,7 @@ using Orvano.Core.Jobs;
 using Orvano.Core.Secrets;
 using Orvano.Messaging;
 using Orvano.Messaging.Application;
+using Orvano.Messaging.Contracts;
 using Orvano.Messaging.Domain;
 using Orvano.Messaging.Jobs;
 using Orvano.Platform;
@@ -17,8 +18,9 @@ using Orvano.Server.Tests.Infrastructure;
 
 namespace Orvano.Server.Tests.Messaging;
 
-// Spec 0009, slice 2, on real Postgres and a real SMTP server (Mailpit): an invite email is queued in the caller's
-// transaction, sealed, sent by the worker's handler with retries, and ends as a row that keeps only a masked address.
+// Spec 0009, slices 2 and 3, on real Postgres and a real SMTP server (Mailpit): an invite email and an auth email
+// are queued in the caller's transaction, sealed, sent by the worker's handler with retries, and end as rows that
+// keep only a masked address.
 public class EmailQueueTests(PostgresFixture postgres, MailpitFixture mailpit) : IClassFixture<MailpitFixture>
 {
     private const string Console = "console";
@@ -256,6 +258,116 @@ public class EmailQueueTests(PostgresFixture postgres, MailpitFixture mailpit) :
         Assert.Equal(2L, await t.ScalarAsync<long>("SELECT (SELECT count(*) FROM orvano.messaging_emails) + (SELECT count(*) FROM orvano.messaging_smtp_settings)"));
     }
 
+    // AC-14: row 10's one call, in its own transaction.
+    [Fact]
+    public async Task An_auth_email_is_rendered_from_the_default_template_queued_and_sent()
+    {
+        await using var t = await StartAsync();
+        await t.AddProjectAsync("shop");
+        await t.SetSmtpAsync(Console, mailpit.Host, mailpit.SmtpPort);
+        var to = NewEmail();
+        var email = new AuthEmail("shop", "Tom & <Jerry>", AuthEmailKind.Recovery, to, "Grace <b>", "https://shop.test/reset?token=abc&next=1", null, 60);
+
+        // Rolled back: neither the row nor the job exists.
+        Assert.IsType<EmailQueueResult.Queued>(await t.QueueAuthAsync(email, commit: false));
+        Assert.Equal(0L, await t.ScalarAsync<long>("SELECT (SELECT count(*) FROM orvano.messaging_emails) + (SELECT count(*) FROM orvano.jobs)"));
+
+        var queued = Assert.IsType<EmailQueueResult.Queued>(await t.QueueAuthAsync(email, commit: true));
+        Assert.Equal(("queued", $"{to[0]}***@invited.test", "recovery", 0), await t.RowAsync(queued.EmailId));
+        Assert.Equal(7, queued.EmailId.Version);
+        Assert.Equal($$"""{"emailId": "{{queued.EmailId}}"}""", await t.ScalarAsync<string>("SELECT payload::text FROM orvano.jobs WHERE kind = 'messaging.email.send'"));
+        Assert.Equal((6, "messaging", "shop"), await t.JobAsync());
+
+        Assert.Null(await t.RunSendAsync());
+
+        var message = await mailpit.WaitForMessageToAsync(to, Ct);
+        Assert.Equal("Reset your password for Tom & <Jerry>", message.GetProperty("Subject").GetString());
+        var html = message.GetProperty("HTML").GetString()!;
+        Assert.Contains("Hi Grace &lt;b&gt;,", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"https://shop.test/reset?token=abc&amp;next=1\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Jerry>", html, StringComparison.Ordinal);
+        var text = message.GetProperty("Text").GetString()!;
+        Assert.Contains("Hi Grace <b>,", text, StringComparison.Ordinal);
+        Assert.Contains("Reset password: https://shop.test/reset?token=abc&next=1", text, StringComparison.Ordinal);
+        Assert.Contains("This link works for 60 minutes and can be used once.", text, StringComparison.Ordinal);
+        var headers = await mailpit.HeadersAsync(message.GetProperty("ID").GetString()!, Ct);
+        Assert.Equal($"<{queued.EmailId}@localhost>", headers.GetProperty("Message-Id")[0].GetString());
+        Assert.Equal(("sent", $"{to[0]}***@invited.test", "recovery", 1), await t.RowAsync(queued.EmailId));
+
+        // AC-26: no address, link, or name anywhere but the sealed content, which is gone now.
+        var stored = await t.ScalarAsync<string>(
+            "SELECT (SELECT string_agg(payload::text, '') FROM orvano.jobs) || (SELECT string_agg(payload::text || coalesce(subject, ''), '') FROM orvano.events)");
+        Assert.DoesNotContain(to, stored, StringComparison.Ordinal);
+        Assert.DoesNotContain("token=abc", stored, StringComparison.Ordinal);
+        Assert.DoesNotContain("Grace", stored, StringComparison.Ordinal);
+    }
+
+    // AC-14, AC-19: no SMTP and the install cap write nothing and say why.
+    [Fact]
+    public async Task An_auth_email_is_refused_without_SMTP_and_over_the_install_cap()
+    {
+        await using var t = await StartAsync(hourlyLimit: 1);
+        AuthEmail Code() => new("shop", "Shop", AuthEmailKind.EmailCode, NewEmail(), null, null, "428613", 10);
+
+        Assert.IsType<EmailQueueResult.NotConfigured>(await t.QueueAuthAsync(Code(), commit: true));
+        Assert.Equal(0L, await t.ScalarAsync<long>("SELECT (SELECT count(*) FROM orvano.messaging_emails) + (SELECT count(*) FROM orvano.jobs)"));
+
+        await t.SetSmtpAsync(Console, mailpit.Host, mailpit.SmtpPort);
+        Assert.IsType<EmailQueueResult.Queued>(await t.QueueAuthAsync(Code(), commit: true));
+        var limited = Assert.IsType<EmailQueueResult.RateLimited>(await t.QueueAuthAsync(Code(), commit: true));
+        Assert.InRange(limited.RetryAfter.TotalMinutes, 59, 60);
+        Assert.Equal(1L, await t.ScalarAsync<long>("SELECT count(*) FROM orvano.messaging_emails"));
+
+        // Its own SMTP lifts the cap.
+        await t.SetSmtpAsync("shop", mailpit.Host, mailpit.SmtpPort);
+        Assert.IsType<EmailQueueResult.Queued>(await t.QueueAuthAsync(Code(), commit: true));
+
+        // A value that breaks its rule is a caller bug, and writes nothing.
+        await Assert.ThrowsAsync<ArgumentException>(() => t.QueueAuthAsync(Code() with { Code = "12" }, commit: true));
+        await Assert.ThrowsAsync<ArgumentException>(() => t.QueueAuthAsync(Code() with { Kind = AuthEmailKind.MagicLink, Code = null, ActionUrl = "ftp://shop.test/x" }, commit: true));
+        Assert.Equal(2L, await t.ScalarAsync<long>("SELECT count(*) FROM orvano.messaging_emails"));
+    }
+
+    // AC-14, AC-18: the project's own template is used, and the default when it can't be.
+    [Fact]
+    public async Task A_custom_template_is_used_and_the_default_replaces_one_that_fails()
+    {
+        await using var t = await StartAsync();
+        await t.AddProjectAsync("shop");
+        await t.SetSmtpAsync("shop", mailpit.Host, mailpit.SmtpPort);
+        async Task<System.Text.Json.JsonElement> SendAsync(AuthEmailKind kind, string subject, string html, string? userName = "Grace")
+        {
+            await t.ExecuteAsync(
+                """
+                INSERT INTO orvano.messaging_email_templates (project_id, kind, locale, subject, html, updated_by_user_id)
+                VALUES ('shop', @kind, 'en', @subject, @html, gen_random_uuid())
+                ON CONFLICT (project_id, kind, locale) DO UPDATE SET subject = excluded.subject, html = excluded.html
+                """, ("kind", EmailTemplateCatalog.Get(kind).Wire), ("subject", subject), ("html", html));
+            var to = NewEmail();
+            var link = kind == AuthEmailKind.EmailCode ? null : "https://shop.test/go?token=abc";
+            Assert.IsType<EmailQueueResult.Queued>(await t.QueueAuthAsync(
+                new AuthEmail("shop", "Shop", kind, to, userName, link, link is null ? "428613" : null, 15), commit: true));
+            Assert.Null(await t.RunSendAsync());
+            return await mailpit.WaitForMessageToAsync(to, Ct);
+        }
+
+        var custom = await SendAsync(AuthEmailKind.MagicLink, "Welcome back to {{ project.name }}, {{ user.name }}", "<p>Go: <a href=\"{{ action_url }}\">in</a> ({{ expires_in_minutes }})</p>");
+        Assert.Equal("Welcome back to Shop, Grace", custom.GetProperty("Subject").GetString());
+        Assert.Equal("Go: in (https://shop.test/go?token=abc) (15)", custom.GetProperty("Text").GetString()!.Trim());
+        Assert.Equal("shop@install.test", custom.GetProperty("From").GetProperty("Address").GetString());
+
+        // A subject that renders empty with the real values.
+        var empty = await SendAsync(AuthEmailKind.Verification, "{{ user.name }}", "<p>custom</p>", userName: null);
+        Assert.Equal("Verify your email for Shop", empty.GetProperty("Subject").GetString());
+        // A limit reached with the real values, and a template that no longer passes the rules.
+        var costly = await SendAsync(AuthEmailKind.Recovery, "Reset", "{% for i in (1..100001) %}x{% endfor %}");
+        Assert.Equal("Reset your password for Shop", costly.GetProperty("Subject").GetString());
+        var broken = await SendAsync(AuthEmailKind.EmailCode, "Code", "<p>{{ code | raw }}{{ nope }}</p>");
+        Assert.Equal("Your sign in code for Shop", broken.GetProperty("Subject").GetString());
+        Assert.Contains("428613", broken.GetProperty("Text").GetString(), StringComparison.Ordinal);
+        Assert.Equal(["project", "project", "project", "project"], await t.ScalarAsync<string[]>("SELECT array_agg(smtp_source) FROM orvano.messaging_emails"));
+    }
+
     // Unique per test, so one Mailpit serves every test of the class.
     private static string NewEmail() => $"{Guid.NewGuid():N}@invited.test";
 
@@ -330,11 +442,23 @@ public class EmailQueueTests(PostgresFixture postgres, MailpitFixture mailpit) :
                 tx, new InvitationEmail(to, "Acme", "Grace Hopper", "grace@console.test", OrgRole.Developer, Url, DateTimeOffset.UtcNow.AddDays(7)), Ct),
             commit);
 
+        /// <summary>Queues an auth email through the module's contract, as row 10's flows will.</summary>
+        public Task<EmailQueueResult> QueueAuthAsync(AuthEmail email, bool commit) =>
+            InTransactionAsync(tx => Get<IEmailQueue>().QueueAuthEmailAsync(tx, email, Ct), commit);
+
+        /// <summary>An active app project in a new org, so the send job finds it active.</summary>
+        public Task AddProjectAsync(string projectId) => ExecuteAsync(
+            """
+            WITH org AS (
+                INSERT INTO orvano.platform_orgs (name, status, created_by_user_id) VALUES ('Acme', 'active', gen_random_uuid()) RETURNING id)
+            INSERT INTO orvano.platform_projects (id, org_id, kind, name, status) SELECT @project, id, 'app', 'Shop', 'active' FROM org
+            """, ("project", projectId));
+
         /// <summary>Saves SMTP settings with no sign in for <paramref name="projectId"/>, replacing any.</summary>
         public Task SetSmtpAsync(string projectId, string host, int port) => ExecuteAsync(
             """
             INSERT INTO orvano.messaging_smtp_settings (project_id, host, port, security, from_email, updated_by_user_id)
-            VALUES (@project, @host, @port, 'none', 'orvano@install.test', gen_random_uuid())
+            VALUES (@project, @host, @port, 'none', CASE WHEN @project = 'console' THEN 'orvano@install.test' ELSE @project || '@install.test' END, gen_random_uuid())
             ON CONFLICT (project_id) DO UPDATE SET host = excluded.host, port = excluded.port
             """, ("project", projectId), ("host", host), ("port", port));
 

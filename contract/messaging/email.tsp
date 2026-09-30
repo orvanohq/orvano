@@ -1,5 +1,5 @@
-// Transactional email (spec 0009, row 9): a project's SMTP settings, the test email, and the email log. The
-// install's own SMTP and email log are in platform/install.tsp. Templates arrive with the next slice of the spec.
+// Transactional email (spec 0009, row 9): a project's SMTP settings, the test email, the auth email templates,
+// and the email log. The install's own SMTP and email log are in platform/install.tsp.
 import "@typespec/http";
 import "@typespec/openapi";
 import "../errors.tsp";
@@ -242,6 +242,120 @@ model EmailPage {
   nextCursor: string | null;
 }
 
+@doc("One of the four auth email templates a project can edit.")
+enum AuthEmailKind {
+  @doc("Confirms a user owns their email address.")
+  verification,
+
+  @doc("Lets a user reset their password.")
+  recovery,
+
+  @doc("Signs a user in with a link.")
+  magic_link,
+
+  @doc("Signs a user in with a one time code.")
+  email_code,
+}
+
+@doc("A template's content to save, preview, or test. Each part is a Liquid template.")
+model EmailTemplateInput {
+  @doc("The subject line, 1 to 255 characters. It is not HTML encoded.")
+  @example("Reset your password for {{ project.name }}")
+  subject: string;
+
+  @doc("The HTML part, at most 100 KB. Every `{{ }}` output in it is HTML encoded.")
+  @example("<p>Hi {{ user.name }}, <a href=\"{{ action_url }}\">reset your password</a>.</p>")
+  html: string;
+
+  @doc("The plain text part, at most 100 KB; null to generate it from the HTML.")
+  text: string | null;
+}
+
+@doc("A value a template can use.")
+model TemplateVariable {
+  @doc("The name to write between `{{` and `}}`.")
+  @example("project.name")
+  name: string;
+
+  @doc("What it holds.")
+  @example("Your project's name.")
+  description: string;
+
+  @doc("The value previews and test emails use.")
+  @example("Acme Shop")
+  sample: string;
+}
+
+@doc("One auth email template: the project's own version, or the default when it has none.")
+model EmailTemplate {
+  @doc("Which template it is.")
+  kind: AuthEmailKind;
+
+  @doc("The template's language. Always `en` for now.")
+  @example("en")
+  locale: string;
+
+  @doc("The subject line, a Liquid template.")
+  @example("Reset your password for {{ project.name }}")
+  subject: string;
+
+  @doc("The HTML part, a Liquid template.")
+  html: string;
+
+  @doc("The plain text part; null when it is generated from the HTML.")
+  text: string | null;
+
+  @doc("True when the project edited it; false for the default.")
+  @example(false)
+  isCustom: boolean;
+
+  @doc("When it was last edited; null for the default.")
+  updatedAt: utcDateTime | null;
+
+  @doc("The values this template can use.")
+  variables: TemplateVariable[];
+}
+
+@doc("One template in the catalog.")
+model EmailTemplateSummary {
+  @doc("Which template it is.")
+  kind: AuthEmailKind;
+
+  @doc("Its name.")
+  @example("Password reset")
+  name: string;
+
+  @doc("When it is sent.")
+  @example("Sent when a user asks to reset their password.")
+  description: string;
+
+  @doc("True when the project edited it; false for the default.")
+  @example(false)
+  isCustom: boolean;
+
+  @doc("When it was last edited; null for the default.")
+  updatedAt: utcDateTime | null;
+}
+
+@doc("The auth email templates of a project. Always all four, so it is not paged.")
+model EmailTemplateCatalog {
+  @doc("The four templates.")
+  templates: EmailTemplateSummary[];
+}
+
+@doc("A template rendered with the sample values.")
+model RenderedEmail {
+  @doc("The rendered subject.")
+  @example("Reset your password for Acme Shop")
+  subject: string;
+
+  @doc("The rendered HTML part.")
+  html: string;
+
+  @doc("The rendered text part, generated from the HTML when the template has none.")
+  text: string;
+}
+
 @route("/v1/console/project/emails")
 @tag("console")
 @useAuth(consoleSession)
@@ -306,4 +420,92 @@ interface ConsoleSmtpApi {
   @post
   @route("/test")
   test(@body request: SmtpSettingsInput): EmailTestResult | Problem;
+}
+
+@route("/v1/console/project/email/templates")
+@tag("console")
+@useAuth(consoleSession)
+interface ConsoleEmailTemplatesApi {
+  @doc("Lists the four auth email templates of the project named by `X-Orvano-Project`. Any member.")
+  @operationId("consoleEmailTemplates.getCatalog")
+  @extension("x-orvano-audience", "console")
+  @extension("x-orvano-service", "consoleEmailTemplates")
+  @get
+  getCatalog(): EmailTemplateCatalog | Problem;
+
+  @doc("Gets one template: the project's own version, or the default. Any member. An unknown `kind` answers `not_found`.")
+  @operationId("consoleEmailTemplates.get")
+  @extension("x-orvano-audience", "console")
+  @extension("x-orvano-service", "consoleEmailTemplates")
+  @get
+  @route("/{kind}")
+  get(
+    @doc("The template: `verification`, `recovery`, `magic_link`, or `email_code`.")
+    @path
+    kind: string,
+  ): EmailTemplate | Problem;
+
+  @doc("""
+    Saves the project's own version of a template, replacing any stored one (the last save wins). Owners and
+    developers. Fails with `template_invalid` when a part does not parse, names an unknown variable or filter, or
+    is too costly to render.
+    """)
+  @operationId("consoleEmailTemplates.update")
+  @extension("x-orvano-audience", "console")
+  @extension("x-orvano-service", "consoleEmailTemplates")
+  @extension("x-orvano-idempotent", true)
+  @put
+  @route("/{kind}")
+  update(
+    @doc("The template: `verification`, `recovery`, `magic_link`, or `email_code`.")
+    @path
+    kind: string,
+
+    @body request: EmailTemplateInput,
+  ): EmailTemplate | Problem;
+
+  @doc("Deletes the project's own version, so the default is used again. Owners and developers. Answers 204 also when it is already the default.")
+  @operationId("consoleEmailTemplates.reset")
+  @extension("x-orvano-audience", "console")
+  @extension("x-orvano-service", "consoleEmailTemplates")
+  @extension("x-orvano-idempotent", true)
+  @delete
+  @route("/{kind}")
+  reset(
+    @doc("The template: `verification`, `recovery`, `magic_link`, or `email_code`.")
+    @path
+    kind: string,
+  ): NoContentResponse | Problem;
+
+  @doc("Renders the given content, saved or not, with the sample values, and stores nothing. Owners and developers.")
+  @operationId("consoleEmailTemplates.preview")
+  @extension("x-orvano-audience", "console")
+  @extension("x-orvano-service", "consoleEmailTemplates")
+  @post
+  @route("/{kind}/preview")
+  preview(
+    @doc("The template: `verification`, `recovery`, `magic_link`, or `email_code`.")
+    @path
+    kind: string,
+
+    @body request: EmailTemplateInput,
+  ): RenderedEmail | Problem;
+
+  @doc("""
+    Renders the given content, saved or not, with the sample values and sends it to your own console email through
+    the SMTP settings the project uses. Owners and developers. Answers `email_not_configured` when there are none;
+    SMTP failures answer as `consoleSmtp.test` does.
+    """)
+  @operationId("consoleEmailTemplates.test")
+  @extension("x-orvano-audience", "console")
+  @extension("x-orvano-service", "consoleEmailTemplates")
+  @post
+  @route("/{kind}/test")
+  test(
+    @doc("The template: `verification`, `recovery`, `magic_link`, or `email_code`.")
+    @path
+    kind: string,
+
+    @body request: EmailTemplateInput,
+  ): EmailTestResult | Problem;
 }

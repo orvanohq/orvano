@@ -353,6 +353,106 @@ public static class ConsoleAuthKeysOperations
     }
 }
 
+/// <summary>Route constants for the <c>consoleEmailTemplates</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleEmailTemplatesOperations
+{
+    /// <summary>GET /v1/console/project/email/templates/{kind}: Gets one template: the project's own version, or the default. Any member. An unknown <c>kind</c> answers <c>not_found</c>.</summary>
+    public static class Get
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleEmailTemplates.get";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/email/templates/{kind}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/console/project/email/templates: Lists the four auth email templates of the project named by <c>X-Orvano-Project</c>. Any member.</summary>
+    public static class GetCatalog
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleEmailTemplates.getCatalog";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/email/templates";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/project/email/templates/{kind}/preview: Renders the given content, saved or not, with the sample values, and stores nothing. Owners and developers.</summary>
+    public static class Preview
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleEmailTemplates.preview";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/email/templates/{kind}/preview";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>DELETE /v1/console/project/email/templates/{kind}: Deletes the project's own version, so the default is used again. Owners and developers. Answers 204 also when it is already the default.</summary>
+    public static class Reset
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleEmailTemplates.reset";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/email/templates/{kind}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/project/email/templates/{kind}/test: Renders the given content, saved or not, with the sample values and sends it to your own console email through</summary>
+    public static class Test
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleEmailTemplates.test";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/email/templates/{kind}/test";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>PUT /v1/console/project/email/templates/{kind}: Saves the project's own version of a template, replacing any stored one (the last save wins). Owners and</summary>
+    public static class Update
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleEmailTemplates.update";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PUT";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/email/templates/{kind}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
 /// <summary>Route constants for the <c>consoleEmails</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class ConsoleEmailsOperations
 {

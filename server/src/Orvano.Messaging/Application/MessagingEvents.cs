@@ -6,7 +6,7 @@ namespace Orvano.Messaging.Application;
 
 /// <summary>
 /// The Messaging module's outbox events (spec 0009, AC-26). Each carries the project ID, the actor, and the email
-/// ID and error code or the names of the changed fields. Never an address, host, username, password, subject, or
+/// ID and error code, or the template kind, or the names of the changed fields. Never an address, host, username, password, subject, or
 /// content.
 /// </summary>
 internal static class MessagingEvents
@@ -18,6 +18,14 @@ internal static class MessagingEvents
     public static Task<long> WriteSmtpAsync(
         NpgsqlTransaction tx, string type, Guid actorUserId, string projectId, IReadOnlyList<string>? changed, CancellationToken ct) =>
         Outbox.WriteAsync(tx, new EventDraft(type, Payload(actorUserId, projectId, changed), projectId, projectId), ct);
+
+    public const string TemplateUpdated = "messaging.template.updated";
+    public const string TemplateReset = "messaging.template.reset";
+
+    /// <summary>Writes one event about a template of <paramref name="projectId"/> in <paramref name="tx"/>. It names the kind, never the content.</summary>
+    public static Task<long> WriteTemplateAsync(
+        NpgsqlTransaction tx, string type, Guid actorUserId, string projectId, string kind, IReadOnlyList<string>? changed, CancellationToken ct) =>
+        Outbox.WriteAsync(tx, new EventDraft(type, Payload(actorUserId, projectId, changed, kind), projectId, kind), ct);
 
     public const string EmailSent = "messaging.email.sent";
     public const string EmailFailed = "messaging.email.failed";
@@ -45,13 +53,14 @@ internal static class MessagingEvents
         return Outbox.WriteAsync(tx, new EventDraft(type, System.Text.Encoding.UTF8.GetString(buffer.ToArray()), projectId, emailId.ToString()), ct);
     }
 
-    internal static string Payload(Guid actorUserId, string projectId, IReadOnlyList<string>? changed)
+    internal static string Payload(Guid actorUserId, string projectId, IReadOnlyList<string>? changed, string? templateKind = null)
     {
         using var buffer = new MemoryStream();
         using (var w = new Utf8JsonWriter(buffer))
         {
             w.WriteStartObject();
             w.WriteString("projectId", projectId);
+            if (templateKind is not null) w.WriteString("kind", templateKind);
             w.WriteStartObject("actor");
             w.WriteString("type", "user");
             w.WriteString("id", actorUserId);
