@@ -2,7 +2,7 @@
 
 _Steps derived from spec 0009 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones._
 
-This file covers slices 1 and 2 of the build plan so far. Slice 1 (project SMTP and a test email that arrives): AC-1 to AC-6, AC-24, AC-25, AC-28, and the AppHost part of AC-29. Slice 2 has its own section below. Later slices add their own steps.
+This file covers slices 1 to 3 of the build plan so far. Slice 1 (project SMTP and a test email that arrives): AC-1 to AC-6, AC-24, AC-25, AC-28, and the AppHost part of AC-29. Slices 2 and 3 have their own sections below. The last slice adds its own steps.
 
 Setup: `dotnet run --project dev/Orvano.AppHost`, open the console, create the first admin on `/setup`, make an org and a project, and wait until the project is active. In the Aspire dashboard, note Mailpit's `smtp` port and open its `http` endpoint to read mail. Add a second console account as a viewer of the org for the role steps.
 
@@ -64,6 +64,52 @@ Covers AC-7, AC-15 to AC-17, AC-19 to AC-23, AC-26, AC-27, and the compose part 
 - [ ] Delete a project with grace days 0 and let the worker run → its rows are gone from `messaging_emails`, `messaging_email_templates`, and `messaging_smtp_settings` → AC-27
 - [ ] `docker compose -f tests/scenarios/compose.yml up -d --build --wait` → a `mailpit` service is healthy, `GET /v1/console/install/smtp` as the fixture admin shows host `mailpit`, and an invite created there appears at `http://localhost:8025` → AC-29 (compose part). Not yet run locally: Docker Hub pulls hung on the build machine.
 
+## Slice 3: templates and the auth queue
+
+Covers AC-8 to AC-14 and AC-18. Setup as above, with SMTP pointing at Mailpit (the project's own, or the install's). Sign in as an owner or developer unless a step says otherwise.
+
+### UI / manual
+
+- [ ] Open the project's Email, choose the Templates tab → four rows in this order: Email verification, Password reset, Magic link, Email code, each with its one line description and a Default badge; the title is `Email templates · <project> · Orvano` → AC-8
+- [ ] Open Password reset → a Subject input, an HTML editor, a Text editor, the variables `project.name`, `user.email`, `user.name`, `action_url`, `expires_in_minutes` each with a description, a sample, and a copy button, and a preview on the right → AC-9, value sourcing (`subject`, `html`, `text` when not custom, `variables`)
+- [ ] Read the samples → `project.name` is this project's real name, `user.email` and `user.name` are your own console email and name, `action_url` is `https://example.com/auth/confirm?token=sample`, `expires_in_minutes` is 60; open Email code → it lists `code` with sample `428613` and 10 minutes, and no `action_url` → value sourcing (sample values)
+- [ ] Rename the project to `Tom & <Jerry>` and reload the editor → the preview's Subject shows `Tom & <Jerry>` as typed, the HTML view shows the same text (view the frame's source: `Tom &amp; &lt;Jerry&gt;`), and the Text view shows it as typed → AC-11, value sourcing (`project.name`)
+- [ ] Type in the Subject and in the HTML editor, then stop → about half a second later the preview shows the change, and nothing was saved (reload: the old content is back, after the leave prompt) → AC-9
+- [ ] Clear the Text editor → its placeholder reads "Leave empty to generate it from the HTML", and the preview's Text view shows text made from the HTML, with each link as `text (url)` → AC-9, value sourcing (`text` when the input's is null)
+- [ ] Inspect the preview frame → an `iframe` with the title "Email preview", `sandbox=""`, and `srcdoc`, no `src` → AC-9, AC-30
+- [ ] Type `{{ action_ur }}` on line 4 of the HTML → under the HTML editor: "Line 4: unknown variable action_ur", and the preview says it is waiting; fix it → the error goes and the preview returns → AC-10
+- [ ] Try each in the HTML and read the error: `{{ user.emial }}`, `{{ user.name | raw }}`, `{% include 'x' %}`, `{% render 'x' %}`, `{% if %}`, `{% for i in (1..100001) %}x{% endfor %}` → unknown variable, unknown filter, include is not allowed, render is not allowed, a parse error with its line, and "rendering takes more than 100,000 steps" → AC-10
+- [ ] Use `{% assign greeting = "Hi" %}{{ greeting }}` and `{% for n in (1..2) %}{{ n }}{{ forloop.index }}{% endfor %}` → both preview with no error → AC-10 (names the template creates)
+- [ ] Change the subject to `Reset it, {{ project.name }}` and press Send test → "Sent to <your console email>. Check your inbox.", and the email in Mailpit has the edited subject with the project name, an HTML part, and a text part → AC-12, value sourcing (any test send `sentTo`)
+- [ ] Press Save → a "Template saved" toast, the badge turns to Custom with "Edited just now", Save goes back to "Nothing to save yet", and the Templates tab shows Custom with the time on that row → AC-8, AC-9, value sourcing (`isCustom`, `updatedAt`)
+- [ ] Change something, then choose "All templates" → a dialog asks "Leave without saving?" with focus on Cancel; Cancel keeps you and your text; "Leave without saving" leaves. Also try closing the tab → the browser asks first → AC-9
+- [ ] Press "Reset to default" → the confirm starts on Cancel; confirm → the editors show the default again, the badge reads Default, and the button is gone → AC-9
+- [ ] In two browsers, save different subjects for the same template one after the other → the second one is what a reload shows in both → AC-9 (last write wins)
+- [ ] Sign in as a viewer and open a template → the same page with read only editors and the variable list, a note that editing is for developers and owners, and no preview, Save, Reset to default, or Send test → AC-9, AC-24
+- [ ] Remove every SMTP server (the project's and the install's), then press Send test → "No email server is set up" in the form's alert → AC-12 (`email_not_configured`)
+- [ ] Click into the HTML editor, press Tab → the line indents and focus stays; press Escape, then Tab → focus moves to the Text editor → AC-30
+- [ ] Open `/projects/<id>/email/templates/console_invitation` → "No such template", with the link back to all templates → API surface (unknown `kind`)
+- [ ] Open a default template's preview and read it: one heading, a greeting, a button at least 44 px tall (or the code at 28 px in a monospace font), "This link works for 60 minutes and can be used once.", and "If you didn't ask for this, you can ignore this email." → AC-13
+
+### Commands
+
+- [ ] `dotnet test --solution Orvano.slnx` → all pass; `EmailTemplateDomainTests` (the rules, the limits, the encoding of every filter, the defaults), `EmailTemplateApiTests` (the operations over HTTP with Mailpit), and the auth email tests in `EmailQueueTests` cover the slice → AC-8 to AC-14, AC-18
+- [ ] `pnpm --filter @orvano/console test` → all pass; `email-templates.browser.test.tsx` covers the tab, the editor, the prompts, the keyboard, and axe in both themes and densities → AC-8, AC-9, AC-30
+- [ ] As a viewer: `PUT`, `DELETE`, `POST .../preview`, and `POST .../test` on `/v1/console/project/email/templates/recovery` → 403 `forbidden` each; the same on `/templates/nope` → 404 `not_found` first; as someone outside the org → 404 `project_not_found` → AC-24
+- [ ] `PUT` a subject of 256 characters, then an HTML part of 102,401 bytes → 400 `invalid_request` with `subject: ...` and `html: ...`; `PUT` `{{ action_ur }}` on line 4 → 422 `template_invalid` with `html: line 4: unknown variable action_ur` → AC-10
+- [ ] `PUT` an HTML part of `{% assign s = 'ab' %}{% for i in (1..30) %}{% assign s = s | append: s %}{% endfor %}` → 422 "a value or the output grows past 1 MB", answered at once with no memory spike on the api → AC-10, AC-11
+- [ ] Send 301 previews within 5 minutes → the 301st answers 429 with `Retry-After`; the 31st test within 15 minutes answers 429 → AC-25
+- [ ] Set a project to `provisioning` by hand, then `PUT`, `DELETE`, and `POST .../test` a valid template → 409 `project_not_ready`; `GET` and `POST .../preview` still answer 200 → AC-24
+- [ ] After a save and a reset: `SELECT type, subject, payload FROM orvano.events WHERE type LIKE 'messaging.template.%'` → `messaging.template.updated` and `messaging.template.reset`, each with `projectId`, `kind`, and the actor, the update with `changed`, and no subject or body text → AC-26
+- [ ] From a test or a scratch endpoint, call `IEmailQueue.QueueAuthEmailAsync` inside a transaction and roll it back → no row in `orvano.messaging_emails` and no job; commit one → one `queued` row whose `template` is the kind, one `messaging.email.send` job with 6 attempts on queue `messaging`, and the worker delivers it with `Message-ID: <emailId@public host>` → AC-14, value sourcing (email ID, `Message-ID` host, `recipient_masked`)
+- [ ] Queue with no SMTP anywhere → `NotConfigured` and nothing written; with `ORVANO_EMAIL_INSTALL_HOURLY_LIMIT=1` and only the install's SMTP, queue twice → the second is `RateLimited` with a `RetryAfter` just under an hour; give the project its own SMTP → it queues again → AC-14, AC-19, value sourcing (effective SMTP, the cap's count and `retryAfter`)
+- [ ] Queue with an `http` action url while `ORVANO_PUBLIC_URL` is `https` → `ArgumentException`; with a code of 3 characters → `ArgumentException`; nothing is written either time → AC-14
+- [ ] Save a custom verification template whose subject is `{{ user.name }}`, then queue a verification email for a user with no name → the email arrives with the default subject, and the api log has one warning that names the email ID and `verification` and no address → AC-18, value sourcing (the rendered email)
+
+### Known gap
+
+- [ ] Open the editor on the production shape (`docker compose -f tests/scenarios/compose.yml --profile console up -d --build --wait`, then `http://localhost:8081`) → the two editors look right and the browser console shows no Content Security Policy violation. The preview frame, however, inherits the console's policy, so the email's inline styles and any `<style>` block are blocked and the preview looks unstyled there (it looks right under the AppHost, which sends no policy). This needs a decision, see the heads up of the slice 3 build. `e2e/email-templates.spec.ts` covers the flow but was not run locally: Docker Hub pulls still hang on the build machine.
+
 ## Acceptance-criteria coverage
 
 - AC-1 · save and test steps, the password commands
@@ -85,4 +131,10 @@ Covers AC-7, AC-15 to AC-17, AC-19 to AC-23, AC-26, AC-27, and the compose part 
 - AC-26 · the jobs, events, and logs command
 - AC-27 · the purge command
 - AC-29 (compose part) · the compose command
-- Not built yet: AC-8 to AC-14, AC-18, AC-30
+- AC-8, AC-9 · the Templates tab and editor steps, `email-templates.browser.test.tsx`
+- AC-10, AC-11 · the error steps, the size and encoding commands, `EmailTemplateDomainTests`
+- AC-12 · the Send test steps, `EmailTemplateApiTests`
+- AC-13 · the default template step, `EmailTemplateDomainTests`
+- AC-14, AC-18 · the queue commands, `EmailQueueTests`
+- AC-30 (the editor part) · the keyboard step, the frame step, axe in the browser tests
+- Not built yet: the rest of AC-30, and the end to end pass of slice 4
