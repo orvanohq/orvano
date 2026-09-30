@@ -32,7 +32,7 @@ Start a real stack first: `docker compose -f tests/scenarios/compose.yml up -d -
 - [x] Org purge timing: delete a project and then its org with grace 7; the org purge job re-enqueues itself at the project's `purge_after` plus 1 minute → value sourcing (purge org, when to run)
 - [x] Key secret, prefix, and hash: in Postgres, `platform_api_keys` holds a 32 byte `secret_hash` and a 12 character `prefix`, and no column contains the rest of the secret → value sourcing (create API key)
 - [x] Key `expires_at`: a past `expiresAt` → 400; a future one is stored; after it passes, `IApiKeyVerifier` answers invalid → value sourcing (create and verify API key)
-- [ ] Key verification: the fixture key `orv_sk_scenario...000` verifies for `scenarios0000000000a`, and not for any other project, `console`, or after the project is deleted → value sourcing (verify API key), AC-5
+- [x] Key verification: the fixture key `orv_sk_scenario...000` verifies for `scenarios0000000000a`, and not for any other project, `console`, or after the project is deleted → value sourcing (verify API key), AC-5
 - [x] `last_used_at`: two verifications within 60 seconds write it once → value sourcing (verify API key, `last_used_at`), AC-12
 - [x] Console role: the caller's role comes from `platform_memberships` for the project's org; a viewer can list keys but not create one (403 `forbidden`) → value sourcing (console permission check), AC-9
 - [x] First account: sign up two accounts at once on an empty install (run `Two_racing_first_sign_ups_make_exactly_one_install_admin`) → exactly one install admin → value sourcing (console sign up), AC-7
