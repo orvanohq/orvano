@@ -200,6 +200,11 @@ describe('invite (AC-16, AC-17)', () => {
   it('shows already_member under Email and other refusals in the alert, keeping the dialog open', async () => {
     const { screen } = await openMembers('owner')
     await userEvent.click(button('Invite') ?? document.body)
+    // An empty email shows one message, not the format one as well.
+    await userEvent.click(dialogButton('Invite') ?? document.body)
+    await expect
+      .poll(() => document.getElementById('invite-email-error')?.textContent)
+      .toBe('Enter an email.')
     await screen.getByLabelText('Email').fill('grace@example.com')
     api.failNext('POST', /\/invitations$/, 409, 'already_member', 'Already a member.')
     await userEvent.click(dialogButton('Invite') ?? document.body)

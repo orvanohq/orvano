@@ -35,7 +35,8 @@ const schema = z.object({
   email: z
     .string()
     .trim()
-    .min(1, 'Enter an email.')
+    // abort: an empty email fails the regex too, and should show one message, not two
+    .min(1, { error: 'Enter an email.', abort: true })
     .max(320, 'Use at most 320 characters.')
     .regex(/^[^\s@]+@[^\s@]+$/, 'Enter an email address.'),
   role: z.custom<OrgRole>(),
