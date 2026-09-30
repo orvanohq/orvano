@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Orvano.Core.Http;
 using Orvano.Core.Secrets;
-using Orvano.Messaging.Data;
 using Orvano.Messaging.Domain;
 using Orvano.Platform.Contracts;
 
@@ -63,38 +62,28 @@ internal sealed class EmailTemplateService(
 
         return await store.WriteAsync<TemplateView>(async (uow, ct) =>
         {
-            var row = await uow.Db.EmailTemplates.SingleOrDefaultAsync(
+            var before = await uow.Db.EmailTemplates.AsNoTracking().SingleOrDefaultAsync(
                 t => t.ProjectId == caller.ProjectId && t.Kind == info.Wire && t.Locale == EmailTemplateCatalog.Locale, ct);
             var now = await uow.NowAsync(ct);
-            List<string> changed;
-            if (row is null)
+            List<string> changed = before is null ? ["subject", "html", "text"] : [];
+            if (before is not null)
             {
-                changed = ["subject", "html", "text"];
-                row = new EmailTemplateRow
-                {
-                    ProjectId = caller.ProjectId,
-                    Kind = info.Wire,
-                    Locale = EmailTemplateCatalog.Locale,
-                    Subject = source.Subject,
-                    Html = source.Html,
-                    CreatedAt = now,
-                };
-                uow.Db.EmailTemplates.Add(row);
-            }
-            else
-            {
-                changed = [];
-                if (row.Subject != source.Subject) changed.Add("subject");
-                if (row.Html != source.Html) changed.Add("html");
-                if (row.Text != source.Text) changed.Add("text");
+                if (before.Subject != source.Subject) changed.Add("subject");
+                if (before.Html != source.Html) changed.Add("html");
+                if (before.Text != source.Text) changed.Add("text");
             }
 
-            row.Subject = source.Subject;
-            row.Html = source.Html;
-            row.Text = source.Text;
-            row.UpdatedByUserId = caller.UserId;
-            row.UpdatedAt = now;
-            await uow.Db.SaveChangesAsync(ct);
+            // One statement, so two people saving at the same moment both succeed and the later one stays.
+            await uow.Db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO orvano.messaging_email_templates
+                    (project_id, kind, locale, subject, html, text, updated_by_user_id, created_at, updated_at)
+                VALUES ({caller.ProjectId}, {info.Wire}, {EmailTemplateCatalog.Locale}, {source.Subject}, {source.Html}, {source.Text},
+                        {caller.UserId}, {now}, {now})
+                ON CONFLICT (project_id, kind, locale) DO UPDATE
+                SET subject = excluded.subject, html = excluded.html, text = excluded.text,
+                    updated_by_user_id = excluded.updated_by_user_id, updated_at = excluded.updated_at
+                """, ct);
 
             await MessagingEvents.WriteTemplateAsync(uow.Tx, MessagingEvents.TemplateUpdated, caller.UserId, caller.ProjectId, info.Wire, changed, ct);
             logger.LogInformation(
