@@ -36,6 +36,55 @@ public class AuthMigrationTests(PostgresFixture postgres)
         Assert.Equal("auth_users_email_key", error.ConstraintName);
     }
 
+    // Spec 0003 AC-16: the database itself holds the phone rules, whatever code writes the row.
+    [Theory]
+    [InlineData("4155550100")] // no plus
+    [InlineData("+04155550100")] // country code starting with 0
+    [InlineData("+1")] // too short
+    [InlineData("+1415555010012345")] // more than 15 digits
+    [InlineData("+1 415 555 0100")] // spaces
+    public async Task Refuses_a_phone_that_is_not_E164(string phone)
+    {
+        await using var database = await postgres.NewDatabaseAsync();
+        await database.MigrateAsync();
+
+        var error = await Assert.ThrowsAsync<PostgresException>(() => InsertPhoneAsync(database, "shop", phone));
+
+        Assert.Equal(PostgresErrorCodes.CheckViolation, error.SqlState);
+    }
+
+    [Fact]
+    public async Task Allows_one_phone_per_project_and_the_same_phone_in_another_project()
+    {
+        await using var database = await postgres.NewDatabaseAsync();
+        await database.MigrateAsync();
+
+        await InsertPhoneAsync(database, "shop", "+14155550100");
+        await InsertPhoneAsync(database, "blog", "+14155550100");
+        var error = await Assert.ThrowsAsync<PostgresException>(() => InsertPhoneAsync(database, "shop", "+14155550100"));
+
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, error.SqlState);
+    }
+
+    [Fact]
+    public async Task A_new_user_is_active_with_empty_metadata_and_status_and_metadata_hold_their_rules()
+    {
+        await using var database = await postgres.NewDatabaseAsync();
+        await database.MigrateAsync();
+        var id = await InsertUserAsync(database, "shop", "ada@x.com");
+
+        var defaults = await TestDatabase.ScalarAsync<string>(database.App,
+            "SELECT status || ' ' || metadata::text FROM orvano.auth_users WHERE id = @id", ("id", id));
+        var badStatus = await Assert.ThrowsAsync<PostgresException>(() => TestDatabase.ExecuteAsync(database.App,
+            "UPDATE orvano.auth_users SET status = 'deleted' WHERE id = @id", ("id", id)));
+        var arrayMetadata = await Assert.ThrowsAsync<PostgresException>(() => TestDatabase.ExecuteAsync(database.App,
+            "UPDATE orvano.auth_users SET metadata = '[1]' WHERE id = @id", ("id", id)));
+
+        Assert.Equal("active {}", defaults);
+        Assert.Equal(PostgresErrorCodes.CheckViolation, badStatus.SqlState);
+        Assert.Equal(PostgresErrorCodes.CheckViolation, arrayMetadata.SqlState);
+    }
+
     [Fact]
     public async Task Keeps_at_most_one_active_signing_key_per_project()
     {
@@ -97,4 +146,8 @@ public class AuthMigrationTests(PostgresFixture postgres)
     private static async Task<Guid> InsertUserAsync(TestDatabase database, string projectId, string email) =>
         await TestDatabase.ScalarAsync<Guid>(database.App,
             "INSERT INTO orvano.auth_users (project_id, email) VALUES (@p, @e) RETURNING id", ("p", projectId), ("e", email));
+
+    private static Task InsertPhoneAsync(TestDatabase database, string projectId, string phone) =>
+        TestDatabase.ExecuteAsync(database.App,
+            "INSERT INTO orvano.auth_users (project_id, phone) VALUES (@p, @phone)", ("p", projectId), ("phone", phone));
 }
