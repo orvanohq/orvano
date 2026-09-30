@@ -2,7 +2,7 @@
 
 **Date**: 2026-09-26
 **Updated**: 2026-09-27 (the first account also needs the installer's setup token when one is set, spec 0006; the `x-orvano-scope` rule, `last_sign_in_at`, and the purge job's extra tables from spec 0004)
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
