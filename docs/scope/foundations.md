@@ -19,7 +19,7 @@ Capture conventions from the real scaffold, then install lint, format, type stri
 - [x] Capture conventions + tooling choices: `/audit`
 Code in `.editorconfig`, `Directory.Build.props`, `eslint.config.js`, `.prettierrc.json`, `lefthook.yml`, `.github/workflows/ci.yml`
 
-### 3. Platform data model · in-progress · GA
+### 3. Platform data model · done · GA
 The internal model that every product hangs off: console accounts, organizations, members and roles, projects, API keys and scopes, platforms (allowed web origins and app bundle IDs), and project scoped app users. Environments must fit in later without a breaking migration.
 **Done when:** the model supports many orgs and many projects per install, keeps each project's data isolated, and leaves room for environments, usage metering, and a future cloud.
 - [x] Design it (spec): `/architect platform data model`
