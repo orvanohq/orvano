@@ -41,7 +41,7 @@ Run the host steps on a throwaway Linux server or VM (Ubuntu 24.04), or in a `do
 
 ## UI / manual (interactive)
 - [x] Run through a real terminal (`curl ... | sudo sh`) on a fresh host → asks for the domain and the email, asks again on a bad value, and waits at the master key until you type `saved` → AC-1, AC-5, AC-7, AC-15
-- [ ] On a real server with DNS pointing at it: `https://<domain>/v1/health` answers 200 with a Let's Encrypt certificate and `Strict-Transport-Security: max-age=31536000` on every response → AC-1, AC-26
+- [x] On a real server with DNS pointing at it: `https://<domain>/v1/health` answers 200 with a Let's Encrypt certificate and `Strict-Transport-Security: max-age=31536000` on every response → AC-1, AC-26
 - [x] With `--email ops@example.com`, the gateway's `/etc/caddy/global.caddy` holds `email "ops@example.com"`; without an email the file is empty and Caddy starts → AC-7
 
 ## First admin (server)
