@@ -14,6 +14,12 @@ abstract final class ErrorCode {
   /// `csrf_rejected`
   static const csrfRejected = 'csrf_rejected';
 
+  /// `email_not_configured`
+  static const emailNotConfigured = 'email_not_configured';
+
+  /// `email_rate_limited`
+  static const emailRateLimited = 'email_rate_limited';
+
   /// `forbidden`
   static const forbidden = 'forbidden';
 
@@ -94,6 +100,27 @@ abstract final class ErrorCode {
 
   /// `signup_closed`
   static const signupClosed = 'signup_closed';
+
+  /// `smtp_auth_failed`
+  static const smtpAuthFailed = 'smtp_auth_failed';
+
+  /// `smtp_host_not_allowed`
+  static const smtpHostNotAllowed = 'smtp_host_not_allowed';
+
+  /// `smtp_rejected`
+  static const smtpRejected = 'smtp_rejected';
+
+  /// `smtp_timeout`
+  static const smtpTimeout = 'smtp_timeout';
+
+  /// `smtp_tls_failed`
+  static const smtpTlsFailed = 'smtp_tls_failed';
+
+  /// `smtp_unreachable`
+  static const smtpUnreachable = 'smtp_unreachable';
+
+  /// `template_invalid`
+  static const templateInvalid = 'template_invalid';
 
   /// `token_expired`
   static const tokenExpired = 'token_expired';

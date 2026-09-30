@@ -27,7 +27,7 @@ internal sealed class PlatformDirectory(PlatformStore store, TimeProvider clock)
             : store.ReadAsync(async (db, ct) =>
             {
                 var row = await db.Projects.AsNoTracking().SingleOrDefaultAsync(p => p.Id == projectId, ct);
-                return row is null ? null : new ProjectInfo(row.Id, row.OrgId, Statuses.Kind(row.Kind), Statuses.Project(row.Status), row.PurgeFailedAt);
+                return row is null ? null : new ProjectInfo(row.Id, row.OrgId, row.Name, Statuses.Kind(row.Kind), Statuses.Project(row.Status), row.PurgeFailedAt);
             }, ct);
 
     public Task<ApiKeyVerification> VerifyAsync(string projectId, string secret, CancellationToken ct)

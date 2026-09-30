@@ -363,6 +363,88 @@ public sealed class SigningKeyStatusJsonConverter : JsonConverter<SigningKeyStat
         });
 }
 
+/// <summary>How the connection to the SMTP server is secured.</summary>
+[JsonConverter(typeof(SmtpSecurityJsonConverter))]
+public enum SmtpSecurity
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>starttls</c>.</summary>
+    Starttls,
+
+    /// <summary>The wire value <c>tls</c>.</summary>
+    Tls,
+
+    /// <summary>The wire value <c>none</c>.</summary>
+    None,
+}
+
+/// <summary>Reads and writes <see cref="SmtpSecurity"/> by wire value; unknown values read as <see cref="SmtpSecurity.Unknown"/>.</summary>
+public sealed class SmtpSecurityJsonConverter : JsonConverter<SmtpSecurity>
+{
+    /// <inheritdoc/>
+    public override SmtpSecurity Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "starttls" => SmtpSecurity.Starttls,
+            "tls" => SmtpSecurity.Tls,
+            "none" => SmtpSecurity.None,
+            _ => SmtpSecurity.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, SmtpSecurity value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            SmtpSecurity.Starttls => "starttls",
+            SmtpSecurity.Tls => "tls",
+            SmtpSecurity.None => "none",
+            _ => throw new JsonException($"SmtpSecurity.{value} has no wire value"),
+        });
+}
+
+/// <summary>Whose SMTP settings a project sends through.</summary>
+[JsonConverter(typeof(SmtpSourceJsonConverter))]
+public enum SmtpSource
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>project</c>.</summary>
+    Project,
+
+    /// <summary>The wire value <c>install</c>.</summary>
+    Install,
+
+    /// <summary>The wire value <c>none</c>.</summary>
+    None,
+}
+
+/// <summary>Reads and writes <see cref="SmtpSource"/> by wire value; unknown values read as <see cref="SmtpSource.Unknown"/>.</summary>
+public sealed class SmtpSourceJsonConverter : JsonConverter<SmtpSource>
+{
+    /// <inheritdoc/>
+    public override SmtpSource Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "project" => SmtpSource.Project,
+            "install" => SmtpSource.Install,
+            "none" => SmtpSource.None,
+            _ => SmtpSource.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, SmtpSource value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            SmtpSource.Project => "project",
+            SmtpSource.Install => "install",
+            SmtpSource.None => "none",
+            _ => throw new JsonException($"SmtpSource.{value} has no wire value"),
+        });
+}
+
 /// <summary>Whether a user may sign in.</summary>
 [JsonConverter(typeof(UserStatusJsonConverter))]
 public enum UserStatus
@@ -569,6 +651,18 @@ public sealed record CreatedInvitation(
 /// <param name="Password">The user's current password.</param>
 public sealed record DeleteAccountRequest(
     [property: JsonPropertyName("password")] string Password);
+
+/// <summary>Who an email is sent as.</summary>
+/// <param name="Email">The From address.</param>
+/// <param name="Name">The name shown beside it, if any.</param>
+public sealed record EmailSender(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("name")] string? Name);
+
+/// <summary>The result of a test email.</summary>
+/// <param name="SentTo">The address the test email went to: your own console email.</param>
+public sealed record EmailTestResult(
+    [property: JsonPropertyName("sentTo")] string SentTo);
 
 /// <summary>Whether the server is up, and which Orvano version it runs.</summary>
 /// <param name="Status">Always <c>ok</c> when the server answers.</param>
@@ -783,6 +877,15 @@ public sealed record ProjectPage(
     [property: JsonPropertyName("items")] IReadOnlyList<Project> Items,
     [property: JsonPropertyName("nextCursor")] string? NextCursor);
 
+/// <summary>The SMTP settings a project sends email through.</summary>
+/// <param name="Source">Whose settings the project uses right now.</param>
+/// <param name="Settings">The project's own settings; null unless <c>source</c> is <c>project</c>.</param>
+/// <param name="InstallSender">Who the install's own SMTP sends as, whenever the install has one; null when it has none.</param>
+public sealed record ProjectSmtp(
+    [property: JsonPropertyName("source")] SmtpSource Source,
+    [property: JsonPropertyName("settings")] SmtpSettings? Settings,
+    [property: JsonPropertyName("installSender")] EmailSender? InstallSender);
+
 /// <summary>A trade of a refresh token for a new pair.</summary>
 /// <param name="RefreshToken">The session's current refresh token.</param>
 public sealed record RefreshSessionRequest(
@@ -840,6 +943,46 @@ public sealed record SigningKey(
 /// <param name="Keys">The keys.</param>
 public sealed record SigningKeys(
     [property: JsonPropertyName("keys")] IReadOnlyList<SigningKey> Keys);
+
+/// <summary>Stored SMTP settings. The password is never returned.</summary>
+/// <param name="Host">The SMTP server.</param>
+/// <param name="Port">The port.</param>
+/// <param name="Security">How the connection is secured.</param>
+/// <param name="Username">The username, if the server needs one.</param>
+/// <param name="HasPassword">True when a password is stored.</param>
+/// <param name="FromEmail">The address emails are sent from.</param>
+/// <param name="FromName">The name shown beside the From address.</param>
+/// <param name="ReplyTo">Where replies go; null means the From address.</param>
+/// <param name="UpdatedAt">When the settings last changed.</param>
+public sealed record SmtpSettings(
+    [property: JsonPropertyName("host")] string Host,
+    [property: JsonPropertyName("port")] int Port,
+    [property: JsonPropertyName("security")] SmtpSecurity Security,
+    [property: JsonPropertyName("username")] string? Username,
+    [property: JsonPropertyName("hasPassword")] bool HasPassword,
+    [property: JsonPropertyName("fromEmail")] string FromEmail,
+    [property: JsonPropertyName("fromName")] string? FromName,
+    [property: JsonPropertyName("replyTo")] string? ReplyTo,
+    [property: JsonPropertyName("updatedAt")] DateTimeOffset UpdatedAt);
+
+/// <summary>SMTP settings to save or to test.</summary>
+/// <param name="Host">The SMTP server: a host name, or an IPv4 or IPv6 address (no brackets). At most 253 characters.</param>
+/// <param name="Port">The port, 1 to 65535.</param>
+/// <param name="Security">How the connection is secured.</param>
+/// <param name="Username">The username to sign in with; null for a server that needs none. Needs <c>starttls</c> or <c>tls</c>.</param>
+/// <param name="Password">The password. Null keeps the stored one, which works only while the host, port, and username are the stored ones; change any of them and you must send the password again.</param>
+/// <param name="FromEmail">The address emails are sent from.</param>
+/// <param name="FromName">The name shown beside the From address; null for none. At most 128 characters.</param>
+/// <param name="ReplyTo">Where replies go; null to use the From address.</param>
+public sealed record SmtpSettingsInput(
+    [property: JsonPropertyName("host")] string Host,
+    [property: JsonPropertyName("port")] int Port,
+    [property: JsonPropertyName("security")] SmtpSecurity Security,
+    [property: JsonPropertyName("username")] string? Username,
+    [property: JsonPropertyName("password")] string? Password,
+    [property: JsonPropertyName("fromEmail")] string FromEmail,
+    [property: JsonPropertyName("fromName")] string? FromName,
+    [property: JsonPropertyName("replyTo")] string? ReplyTo);
 
 /// <summary>The answer to <c>test.consolePing</c>.</summary>
 /// <param name="Status">Always <c>ok</c>.</param>

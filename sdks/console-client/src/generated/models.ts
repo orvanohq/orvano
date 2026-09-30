@@ -31,6 +31,12 @@ export type ProjectStatus = 'provisioning' | 'active' | 'failed' | 'deleting'
 /** What a signing key does. */
 export type SigningKeyStatus = 'active' | 'retiring'
 
+/** How the connection to the SMTP server is secured. */
+export type SmtpSecurity = 'starttls' | 'tls' | 'none'
+
+/** Whose SMTP settings a project sends through. */
+export type SmtpSource = 'project' | 'install' | 'none'
+
 /** The org an accepted invitation joined. */
 export interface AcceptedInvitation {
   /** The org, with the caller's role in it. */
@@ -180,6 +186,20 @@ export interface CreatedInvitation {
   invitation: Invitation
   /** The link to share with the invited person. Anyone holding it can see the invitation until it is used or expires. */
   url: string
+}
+
+/** Who an email is sent as. */
+export interface EmailSender {
+  /** The From address. */
+  email: string
+  /** The name shown beside it, if any. */
+  name: string | null
+}
+
+/** The result of a test email. */
+export interface EmailTestResult {
+  /** The address the test email went to: your own console email. */
+  sentTo: string
 }
 
 /** Settings for the whole install. */
@@ -359,6 +379,16 @@ export interface ProjectPage {
   nextCursor: string | null
 }
 
+/** The SMTP settings a project sends email through. */
+export interface ProjectSmtp {
+  /** Whose settings the project uses right now. */
+  source: SmtpSource
+  /** The project's own settings; null unless `source` is `project`. */
+  settings: SmtpSettings | null
+  /** Who the install's own SMTP sends as, whenever the install has one; null when it has none. */
+  installSender: EmailSender | null
+}
+
 /** A project's token signing key as the console shows it; never the key itself. */
 export interface SigningKey {
   /** The key ID, the `kid` of the tokens it signs. */
@@ -375,6 +405,51 @@ export interface SigningKey {
 export interface SigningKeys {
   /** The keys. */
   keys: SigningKey[]
+}
+
+/** Stored SMTP settings. The password is never returned. */
+export interface SmtpSettings {
+  /** The SMTP server. */
+  host: string
+  /** The port. */
+  port: number
+  /** How the connection is secured. */
+  security: SmtpSecurity
+  /** The username, if the server needs one. */
+  username: string | null
+  /** True when a password is stored. */
+  hasPassword: boolean
+  /** The address emails are sent from. */
+  fromEmail: string
+  /** The name shown beside the From address. */
+  fromName: string | null
+  /** Where replies go; null means the From address. */
+  replyTo: string | null
+  /** When the settings last changed. */
+  updatedAt: string
+}
+
+/** SMTP settings to save or to test. */
+export interface SmtpSettingsInput {
+  /** The SMTP server: a host name, or an IPv4 or IPv6 address (no brackets). At most 253 characters. */
+  host: string
+  /** The port, 1 to 65535. */
+  port: number
+  /** How the connection is secured. */
+  security: SmtpSecurity
+  /** The username to sign in with; null for a server that needs none. Needs `starttls` or `tls`. */
+  username: string | null
+  /**
+   * The password. Null keeps the stored one, which works only while the host, port, and username are the stored
+   * ones; change any of them and you must send the password again.
+   */
+  password: string | null
+  /** The address emails are sent from. */
+  fromEmail: string
+  /** The name shown beside the From address; null for none. At most 128 characters. */
+  fromName: string | null
+  /** Where replies go; null to use the From address. */
+  replyTo: string | null
 }
 
 /** Changes to the install settings. */

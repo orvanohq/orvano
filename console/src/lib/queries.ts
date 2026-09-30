@@ -31,6 +31,7 @@ export const keys = {
   signingKeys: (projectId: string) => ['console', 'projects', projectId, 'signing-keys'] as const,
   apiKeys: (projectId: string) => ['console', 'projects', projectId, 'keys'] as const,
   platforms: (projectId: string) => ['console', 'projects', projectId, 'platforms'] as const,
+  smtp: (projectId: string) => ['console', 'projects', projectId, 'email', 'smtp'] as const,
   /** Whether the project has any key: the overview's first page of one (spec 0007, AC-21). */
   anyApiKey: (projectId: string) => ['console', 'projects', projectId, 'keys', 'any'] as const,
   /** Whether the project has any platform (spec 0007, AC-21). */
@@ -255,5 +256,13 @@ export function platformsQuery(projectId: string) {
       projectClient(projectId).consolePlatforms.list({ cursor: pageParam, limit: 25 }, { signal }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+}
+
+/** A project's SMTP settings and whose settings it sends through (spec 0009, AC-4). Never a password. */
+export function smtpQuery(projectId: string) {
+  return queryOptions({
+    queryKey: keys.smtp(projectId),
+    queryFn: ({ signal }) => projectClient(projectId).consoleSmtp.get({ signal }),
   })
 }

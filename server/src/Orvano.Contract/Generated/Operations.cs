@@ -841,6 +841,74 @@ public static class ConsoleProjectsOperations
     }
 }
 
+/// <summary>Route constants for the <c>consoleSmtp</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleSmtpOperations
+{
+    /// <summary>DELETE /v1/console/project/email/smtp: Deletes the project's own SMTP settings, so it sends through the install's, if any. Owners and developers.</summary>
+    public static class Delete
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleSmtp.delete";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/email/smtp";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/console/project/email/smtp: Gets the SMTP settings of the project named by <c>X-Orvano-Project</c>, and whose settings it sends through.</summary>
+    public static class Get
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleSmtp.get";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/email/smtp";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/project/email/smtp/test: Sends a test email to your own console email through the given settings, saved or not, and stores nothing.</summary>
+    public static class Test
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleSmtp.test";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/email/smtp/test";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>PUT /v1/console/project/email/smtp: Saves the project's own SMTP settings, replacing any stored ones. Owners and developers. Fails with</summary>
+    public static class Update
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleSmtp.update";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PUT";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/email/smtp";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
 /// <summary>Route constants for the <c>consoleUsers</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class ConsoleUsersOperations
 {

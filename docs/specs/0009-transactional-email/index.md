@@ -1,7 +1,7 @@
 # 0009. Transactional email: SMTP per project, editable templates, and a send queue
 
 **Date**: 2026-09-29
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 

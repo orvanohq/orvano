@@ -139,6 +139,33 @@ enum ErrorCode {
   @doc("The org already holds 100 invitations; revoke some first (409).")
   invitation_limit,
 
+  @doc("A project's SMTP host is, or resolves to, an address outside the public internet (400).")
+  smtp_host_not_allowed,
+
+  @doc("The SMTP server could not be reached: the name did not resolve, or the connection was refused or reset (502).")
+  smtp_unreachable,
+
+  @doc("The secure connection to the SMTP server failed: a bad certificate, or STARTTLS is not offered (502).")
+  smtp_tls_failed,
+
+  @doc("The SMTP server refused the username or password (502).")
+  smtp_auth_failed,
+
+  @doc("The SMTP server refused the email; `detail` carries its reply (502).")
+  smtp_rejected,
+
+  @doc("The SMTP server did not answer in time (504).")
+  smtp_timeout,
+
+  @doc("An email template failed to parse, names an unknown variable or filter, or is too costly to render (422).")
+  template_invalid,
+
+  @doc("Neither the project nor the install has an SMTP server set up (409).")
+  email_not_configured,
+
+  @doc("The project sent too many emails through the install's SMTP server this hour; wait for `Retry-After` (429).")
+  email_rate_limited,
+
   @doc("Too many requests; wait for the number of seconds in `Retry-After` (429).")
   rate_limited,
 

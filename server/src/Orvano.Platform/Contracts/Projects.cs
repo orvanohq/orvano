@@ -29,10 +29,11 @@ public enum ProjectStatus
 /// <summary>A project as other modules see it.</summary>
 /// <param name="Id">The project ID, 1 to 60 characters of <c>[a-z0-9]</c>.</param>
 /// <param name="OrgId">The owning org, or <see langword="null"/> for the <c>system</c> project.</param>
+/// <param name="Name">Its display name, 1 to 100 characters (spec 0009: emails name the project).</param>
 /// <param name="Kind">Whether it is an app or the system project.</param>
 /// <param name="Status">Its lifecycle state.</param>
 /// <param name="PurgeFailedAt">When its purge ran out of attempts, if it did.</param>
-public sealed record ProjectInfo(string Id, Guid? OrgId, ProjectKind Kind, ProjectStatus Status, DateTimeOffset? PurgeFailedAt);
+public sealed record ProjectInfo(string Id, Guid? OrgId, string Name, ProjectKind Kind, ProjectStatus Status, DateTimeOffset? PurgeFailedAt);
 
 /// <summary>Whether a public route may serve a project (AC-4). Exactly one of the three cases.</summary>
 public abstract record ProjectLookup

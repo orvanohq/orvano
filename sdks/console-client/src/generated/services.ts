@@ -13,6 +13,7 @@ import type {
   CreateProjectRequest,
   CreatedApiKey,
   CreatedInvitation,
+  EmailTestResult,
   InstallSettings,
   InstallSetup,
   Invitation,
@@ -27,7 +28,10 @@ import type {
   PlatformPage,
   Project,
   ProjectPage,
+  ProjectSmtp,
   SigningKeys,
+  SmtpSettings,
+  SmtpSettingsInput,
   UpdateInstallSettingsRequest,
   UpdateMemberRequest,
   UpdateOrgRequest,
@@ -586,6 +590,57 @@ export class ConsoleProjectsService {
   }
 }
 
+/** Operations in the `consoleSmtp` service. */
+export class ConsoleSmtpService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /**
+   * Deletes the project's own SMTP settings, so it sends through the install's, if any. Owners and developers.
+   * Answers 204 also when nothing is stored.
+   */
+  delete(options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'DELETE', path: '/v1/console/project/email/smtp', idempotent: true },
+      options,
+    )
+  }
+
+  /** Gets the SMTP settings of the project named by `X-Orvano-Project`, and whose settings it sends through. */
+  get(options?: RequestOptions): Promise<ProjectSmtp> {
+    return this.#client.request<ProjectSmtp>(
+      { method: 'GET', path: '/v1/console/project/email/smtp' },
+      options,
+    )
+  }
+
+  /**
+   * Sends a test email to your own console email through the given settings, saved or not, and stores nothing.
+   * Owners and developers. Waits at most 20 seconds and never retries; a failure answers `smtp_unreachable`,
+   * `smtp_tls_failed`, `smtp_auth_failed`, `smtp_rejected`, or `smtp_timeout`.
+   */
+  test(body: SmtpSettingsInput, options?: RequestOptions): Promise<EmailTestResult> {
+    return this.#client.request<EmailTestResult>(
+      { method: 'POST', path: '/v1/console/project/email/smtp/test', body },
+      options,
+    )
+  }
+
+  /**
+   * Saves the project's own SMTP settings, replacing any stored ones. Owners and developers. Fails with
+   * `smtp_host_not_allowed` when the host is, or resolves to, a private network address.
+   */
+  update(body: SmtpSettingsInput, options?: RequestOptions): Promise<SmtpSettings> {
+    return this.#client.request<SmtpSettings>(
+      { method: 'PUT', path: '/v1/console/project/email/smtp', body, idempotent: true },
+      options,
+    )
+  }
+}
+
 /** Operations in the `consoleUsers` service. */
 export class ConsoleUsersService {
   readonly #client: Client
@@ -744,6 +799,8 @@ export class Orvano {
   readonly consolePlatforms: ConsolePlatformsService
   /** Operations in the `consoleProjects` service. */
   readonly consoleProjects: ConsoleProjectsService
+  /** Operations in the `consoleSmtp` service. */
+  readonly consoleSmtp: ConsoleSmtpService
   /** Operations in the `consoleUsers` service. */
   readonly consoleUsers: ConsoleUsersService
 
@@ -758,6 +815,7 @@ export class Orvano {
     this.consoleOrgs = new ConsoleOrgsService(client)
     this.consolePlatforms = new ConsolePlatformsService(client)
     this.consoleProjects = new ConsoleProjectsService(client)
+    this.consoleSmtp = new ConsoleSmtpService(client)
     this.consoleUsers = new ConsoleUsersService(client)
   }
 }

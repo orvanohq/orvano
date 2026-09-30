@@ -9,6 +9,7 @@ import type {
   CreatePlatformRequest,
   CreateProjectRequest,
   InvitationTokenRequest,
+  SmtpSettingsInput,
   UpdateInstallSettingsRequest,
   UpdateMemberRequest,
   UpdateOrgRequest,
@@ -226,6 +227,22 @@ export const consoleDispatch: DispatchTable = {
   'consoleProjects.update': {
     status: 200,
     console: (o, input) => o.consoleProjects.update(input.body as UpdateProjectRequest),
+  },
+  'consoleSmtp.delete': {
+    status: 204,
+    console: (o, _input) => o.consoleSmtp.delete(),
+  },
+  'consoleSmtp.get': {
+    status: 200,
+    console: (o, _input) => o.consoleSmtp.get(),
+  },
+  'consoleSmtp.test': {
+    status: 200,
+    console: (o, input) => o.consoleSmtp.test(input.body as SmtpSettingsInput),
+  },
+  'consoleSmtp.update': {
+    status: 200,
+    console: (o, input) => o.consoleSmtp.update(input.body as SmtpSettingsInput),
   },
   'consoleUsers.block': {
     status: 200,

@@ -48,11 +48,21 @@ IResourceBuilder<ProjectResource> LongRunning(string role) =>
         .WithHttpHealthCheck("/internal/readyz")
         .WaitForCompletion(migrate);
 
-var api = LongRunning("api").WithEnvironment("ORVANO_MASTER_KEYS", masterKeys);
+// Mailpit catches every email the dev install sends (spec 0009): point a project's SMTP settings at
+// host `localhost`, the port of its `smtp` endpoint, security None, and read the mail on its `http`
+// endpoint. It is on a private address, so the roles that send are told to allow those.
+builder.AddContainer("mailpit", "axllent/mailpit", "v1.31.3")
+    .WithEndpoint(targetPort: 1025, name: "smtp", scheme: "tcp")
+    .WithHttpEndpoint(targetPort: 8025, name: "http");
+
+var api = LongRunning("api")
+    .WithEnvironment("ORVANO_MASTER_KEYS", masterKeys)
+    .WithEnvironment("ORVANO_SMTP_ALLOW_PRIVATE_HOSTS", "true");
 var realtime = LongRunning("realtime");
 LongRunning("worker")
     .WithEnvironment("ORVANO_DB_ADMIN_URL", adminDb)
-    .WithEnvironment("ORVANO_MASTER_KEYS", masterKeys);
+    .WithEnvironment("ORVANO_MASTER_KEYS", masterKeys)
+    .WithEnvironment("ORVANO_SMTP_ALLOW_PRIVATE_HOSTS", "true");
 
 var console = builder.AddViteApp("console", "../../console")
     .WithPnpm()
