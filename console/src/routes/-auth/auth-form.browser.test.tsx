@@ -42,8 +42,17 @@ describe('SignInForm', () => {
 
     await expect.element(screen.getByText('Enter your email.')).toBeVisible()
     await expect.element(screen.getByText('Enter your password.')).toBeVisible()
+    // An empty email shows one message, not the format one as well.
+    await expect.element(screen.getByText('Enter an email address.')).not.toBeInTheDocument()
     expect(onSubmit).not.toHaveBeenCalled()
     await expect.element(screen.getByLabelText('Email')).toHaveAttribute('aria-invalid', 'true')
+
+    await screen.getByLabelText('Email').fill('ada@')
+    await screen.getByLabelText('Password').fill('correct horse battery')
+    await screen.getByRole('button', { name: 'Sign in' }).click()
+    await expect.element(screen.getByText('Enter an email address.')).toBeVisible()
+    await expect.element(screen.getByText('Enter your email.')).not.toBeInTheDocument()
+    expect(onSubmit).not.toHaveBeenCalled()
   })
 
   it('is usable from the keyboard alone', async () => {

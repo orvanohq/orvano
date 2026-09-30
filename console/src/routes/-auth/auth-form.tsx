@@ -44,7 +44,8 @@ export function authErrorMessage(error: unknown): string {
 const email = z
   .string()
   .trim()
-  .min(1, 'Enter your email.')
+  // abort: an empty email fails the regex too, and should show one message, not two
+  .min(1, { error: 'Enter your email.', abort: true })
   .max(320)
   .regex(/^[^\s@]+@[^\s@]+$/, 'Enter an email address.')
 const password = z.string().min(1, 'Enter your password.')

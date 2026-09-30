@@ -108,6 +108,7 @@ describe('CreateUserDialog', () => {
     const dialog = screen.getByRole('dialog')
     await dialog.getByRole('button', { name: 'Create user' }).click()
     await expect.element(dialog.getByText('Enter an email.')).toBeVisible()
+    await expect.element(dialog.getByText('Enter an email address.')).not.toBeInTheDocument()
     await noAxeViolations()
 
     await dialog.getByLabelText('Email').fill('ada@example.com')

@@ -201,7 +201,8 @@ const createSchema = z.object({
   email: z
     .string()
     .trim()
-    .min(1, 'Enter an email.')
+    // abort: an empty email fails the regex too, and should show one message, not two
+    .min(1, { error: 'Enter an email.', abort: true })
     .max(320)
     .regex(/^[^\s@]+@[^\s@]+$/, 'Enter an email address.'),
   password: z.string().min(8, 'Use at least 8 characters.').max(256, 'Use at most 256 characters.'),
