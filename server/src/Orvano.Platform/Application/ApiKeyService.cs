@@ -41,8 +41,9 @@ internal sealed class ApiKeyService(PlatformStore store, ILogger<ApiKeyService> 
             if (!ApiKeyScopes.TryNormalize(scopes, out var wireScopes))
                 return Failure.Invalid($"Give at least one scope, each one of: {string.Join(", ", ApiKeyScopes.Known.Order(StringComparer.Ordinal))}.");
 
-            var (project, _, failure) = await ProjectService.FindAsync(uow.Db, userId, projectId, ConsoleAction.CreateApiKey, ct);
+            var (project, _, failure) = await ProjectService.FindForChangeAsync(uow, userId, projectId, ConsoleAction.CreateApiKey, ct);
             if (failure is not null) return failure;
+            if (await ProjectService.LiveProjectFailureAsync(uow, project!.Id, ct) is { } frozen) return frozen;
 
             var now = await uow.NowAsync(ct);
             if (expiresAt is { } expiry && expiry <= now) return Failure.Invalid("expiresAt must be in the future.");
@@ -56,7 +57,7 @@ internal sealed class ApiKeyService(PlatformStore store, ILogger<ApiKeyService> 
     public Task<Outcome<Done>> DeleteAsync(Guid userId, string? projectId, string keyId, CancellationToken ct) =>
         store.WriteAsync<Done>(async (uow, ct) =>
         {
-            var (project, role, failure) = await ProjectService.FindAsync(uow.Db, userId, projectId, ConsoleAction.View, ct);
+            var (project, role, failure) = await ProjectService.FindForChangeAsync(uow, userId, projectId, ConsoleAction.View, ct);
             if (failure is not null) return failure;
             if (!Guid.TryParse(keyId, out var id)) return Failure.NotFound("API key");
 

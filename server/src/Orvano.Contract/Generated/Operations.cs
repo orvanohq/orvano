@@ -268,7 +268,7 @@ public static class ConsoleAccountOperations
 /// <summary>Route constants for the <c>consoleApiKeys</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class ConsoleApiKeysOperations
 {
-    /// <summary>POST /v1/console/project/keys: Creates an API key and returns its secret, once. Owners and developers.</summary>
+    /// <summary>POST /v1/console/project/keys: Creates an API key and returns its secret, once. Owners and developers; fails with <c>project_not_ready</c> while</summary>
     public static class Create
     {
         /// <summary>The operationId, also the endpoint name.</summary>
@@ -284,7 +284,7 @@ public static class ConsoleApiKeysOperations
         public const string Audience = "console";
     }
 
-    /// <summary>DELETE /v1/console/project/keys/{keyId}: Deletes an API key, which stops it working at once. Owners delete any key, developers their own.</summary>
+    /// <summary>DELETE /v1/console/project/keys/{keyId}: Deletes an API key, which stops it working at once. Owners delete any key, developers their own; still allowed</summary>
     public static class Delete
     {
         /// <summary>The operationId, also the endpoint name.</summary>
@@ -644,7 +644,7 @@ public static class ConsoleOrgsOperations
 /// <summary>Route constants for the <c>consolePlatforms</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class ConsolePlatformsOperations
 {
-    /// <summary>POST /v1/console/project/platforms: Adds a platform. Owners and developers.</summary>
+    /// <summary>POST /v1/console/project/platforms: Adds a platform. Owners and developers; fails with <c>project_not_ready</c> while the project is being deleted, and</summary>
     public static class Create
     {
         /// <summary>The operationId, also the endpoint name.</summary>
@@ -660,7 +660,7 @@ public static class ConsolePlatformsOperations
         public const string Audience = "console";
     }
 
-    /// <summary>DELETE /v1/console/project/platforms/{platformId}: Removes a platform. Owners and developers.</summary>
+    /// <summary>DELETE /v1/console/project/platforms/{platformId}: Removes a platform. Owners and developers; still allowed while the project is being deleted, but fails with</summary>
     public static class Delete
     {
         /// <summary>The operationId, also the endpoint name.</summary>
@@ -692,7 +692,7 @@ public static class ConsolePlatformsOperations
         public const string Audience = "console";
     }
 
-    /// <summary>PATCH /v1/console/project/platforms/{platformId}: Renames a platform or changes its identifier. Owners and developers.</summary>
+    /// <summary>PATCH /v1/console/project/platforms/{platformId}: Renames a platform or changes its identifier. Owners and developers; fails with <c>project_not_ready</c> while the</summary>
     public static class Update
     {
         /// <summary>The operationId, also the endpoint name.</summary>

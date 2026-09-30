@@ -78,9 +78,8 @@ internal sealed class ProjectService(PlatformStore store, DeleteGrace grace, ILo
         store.WriteAsync<ProjectRow>(async (uow, ct) =>
         {
             if (!Names.TryNormalize(name, out var projectName)) return Failure.Invalid($"A project name is 1 to {Names.MaxLength} characters.");
-            var (project, _, failure) = await FindAsync(uow.Db, userId, projectId, ConsoleAction.EditProject, ct);
+            var (project, _, failure) = await FindForChangeAsync(uow, userId, projectId, ConsoleAction.EditProject, ct);
             if (failure is not null) return failure;
-            if (await ActiveOrgFailureAsync(uow, project!, ct) is { } inactive) return inactive;
 
             if (project!.Name != projectName)
             {
@@ -98,9 +97,8 @@ internal sealed class ProjectService(PlatformStore store, DeleteGrace grace, ILo
     public Task<Outcome<ProjectRow>> DeleteAsync(Guid userId, string? projectId, CancellationToken ct) =>
         store.WriteAsync<ProjectRow>(async (uow, ct) =>
         {
-            var (project, _, failure) = await FindAsync(uow.Db, userId, projectId, ConsoleAction.DeleteProject, ct);
+            var (project, _, failure) = await FindForChangeAsync(uow, userId, projectId, ConsoleAction.DeleteProject, ct);
             if (failure is not null) return failure;
-            if (await ActiveOrgFailureAsync(uow, project!, ct) is { } inactive) return inactive;
 
             var now = await uow.NowAsync(ct);
             var purgeAfter = ProjectLifecycle.PurgeAfter(now, grace);
@@ -124,9 +122,8 @@ internal sealed class ProjectService(PlatformStore store, DeleteGrace grace, ILo
     public Task<Outcome<ProjectRow>> RestoreAsync(Guid userId, string? projectId, CancellationToken ct) =>
         store.WriteAsync<ProjectRow>(async (uow, ct) =>
         {
-            var (project, _, failure) = await FindAsync(uow.Db, userId, projectId, ConsoleAction.RestoreProject, ct);
+            var (project, _, failure) = await FindForChangeAsync(uow, userId, projectId, ConsoleAction.RestoreProject, ct);
             if (failure is not null) return failure;
-            if (await ActiveOrgFailureAsync(uow, project!, ct) is { } inactive) return inactive;
 
             var now = await uow.NowAsync(ct);
             var updated = await uow.Db.Projects
@@ -148,9 +145,8 @@ internal sealed class ProjectService(PlatformStore store, DeleteGrace grace, ILo
     public Task<Outcome<ProjectRow>> RetryProvisioningAsync(Guid userId, string? projectId, CancellationToken ct) =>
         store.WriteAsync<ProjectRow>(async (uow, ct) =>
         {
-            var (project, _, failure) = await FindAsync(uow.Db, userId, projectId, ConsoleAction.RetryProvisioning, ct);
+            var (project, _, failure) = await FindForChangeAsync(uow, userId, projectId, ConsoleAction.RetryProvisioning, ct);
             if (failure is not null) return failure;
-            if (await ActiveOrgFailureAsync(uow, project!, ct) is { } inactive) return inactive;
 
             var now = await uow.NowAsync(ct);
             var updated = await uow.Db.Projects
@@ -232,18 +228,39 @@ internal sealed class ProjectService(PlatformStore store, DeleteGrace grace, ILo
         return ConsolePermissions.Allows(parsed, action) ? (project, parsed, null) : (null, parsed, Failure.Forbidden);
     }
 
+    /// <summary>
+    /// <see cref="FindAsync"/> for a change: the project's org is locked <c>FOR SHARE</c> first, and the project and the
+    /// caller's role are read after it. A membership change holds the org <c>FOR UPDATE</c>, so a role changed or removed
+    /// at the same moment is seen before the change goes ahead. A deleting org then gets 409 <c>org_not_active</c> (AC-15).
+    /// </summary>
+    internal static async Task<(ProjectRow? Project, OrgRole? Role, Failure? Failure)> FindForChangeAsync(
+        UnitOfWork uow, Guid userId, string? projectId, ConsoleAction action, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(projectId)) return (null, null, Failure.ProjectHeaderMissing);
+        if (await FindAppProjectAsync(uow.Db, projectId, ct) is not { } seen) return (null, null, Failure.ProjectNotFound);
+
+        var org = await uow.LockOrgForShareAsync(seen.OrgId!.Value, ct);
+        var (project, role, failure) = await FindAsync(uow.Db, userId, projectId, action, ct);
+        if (failure is not null) return (null, role, failure);
+        return org is not null && Statuses.Org(org.Status) == OrgStatus.Active ? (project, role, null) : (null, role, Failure.OrgNotActive);
+    }
+
+    /// <summary>
+    /// Keys and platforms of a deleting project can't be added or changed, only removed. The project row is locked
+    /// <c>FOR SHARE</c>, so the purge (which locks it <c>FOR UPDATE</c>) waits for this change, or already removed the row.
+    /// </summary>
+    internal static async Task<Failure?> LiveProjectFailureAsync(UnitOfWork uow, string projectId, CancellationToken ct)
+    {
+        var project = await uow.LockProjectForShareAsync(projectId, ct);
+        if (project is null) return Failure.ProjectNotFound;
+        return Statuses.Project(project.Status) == ProjectStatus.Deleting ? Failure.ProjectNotReady("The project is being deleted; restore it first.") : null;
+    }
+
     private static async Task<ProjectRow?> FindAppProjectAsync(PlatformDbContext db, string? projectId, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(projectId)) return null;
         var app = Statuses.Wire(ProjectKind.App);
         return await db.Projects.AsNoTracking().SingleOrDefaultAsync(p => p.Id == projectId && p.Kind == app, ct);
-    }
-
-    /// <summary>AC-15: while its org is deleting, a project can't change. The org row is taken <c>FOR SHARE</c>.</summary>
-    private static async Task<Failure?> ActiveOrgFailureAsync(UnitOfWork uow, ProjectRow project, CancellationToken ct)
-    {
-        var org = await uow.LockOrgForShareAsync(project.OrgId!.Value, ct);
-        return org is not null && Statuses.Org(org.Status) == OrgStatus.Active ? null : Failure.OrgNotActive;
     }
 
     private static async Task<Outcome<ProjectRow>> ReloadAsync(UnitOfWork uow, string projectId, CancellationToken ct) =>

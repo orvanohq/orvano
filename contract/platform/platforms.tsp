@@ -111,7 +111,10 @@ interface ConsolePlatformsApi {
     limit?: int32,
   ): PlatformPage | Problem;
 
-  @doc("Adds a platform. Owners and developers.")
+  @doc("""
+    Adds a platform. Owners and developers; fails with `project_not_ready` while the project is being deleted, and
+    `org_not_active` while the org is.
+    """)
   @operationId("consolePlatforms.create")
   @extension("x-orvano-audience", "console")
   @extension("x-orvano-service", "consolePlatforms")
@@ -121,7 +124,10 @@ interface ConsolePlatformsApi {
     @body platform: Platform;
   } | Problem;
 
-  @doc("Renames a platform or changes its identifier. Owners and developers.")
+  @doc("""
+    Renames a platform or changes its identifier. Owners and developers; fails with `project_not_ready` while the
+    project is being deleted, and `org_not_active` while the org is.
+    """)
   @operationId("consolePlatforms.update")
   @extension("x-orvano-audience", "console")
   @extension("x-orvano-service", "consolePlatforms")
@@ -135,7 +141,10 @@ interface ConsolePlatformsApi {
     @body request: UpdatePlatformRequest,
   ): Platform | Problem;
 
-  @doc("Removes a platform. Owners and developers.")
+  @doc("""
+    Removes a platform. Owners and developers; still allowed while the project is being deleted, but fails with
+    `org_not_active` while the org is.
+    """)
   @operationId("consolePlatforms.delete")
   @extension("x-orvano-audience", "console")
   @extension("x-orvano-service", "consolePlatforms")

@@ -122,6 +122,18 @@ public sealed class PlatformHarness : IAsyncDisposable
     public Task<T> ScalarAsync<T>(string sql, params (string Name, object Value)[] parameters) =>
         TestDatabase.ScalarAsync<T>(Database.Superuser, sql, parameters);
 
+    /// <summary>Waits until some session of this database is blocked on a row lock, so a race runs in a known order.</summary>
+    public async Task WaitForLockWaitAsync()
+    {
+        for (var i = 0; i < 200; i++)
+        {
+            if (await ScalarAsync<long>("SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") > 0) return;
+            await Task.Delay(25, Ct);
+        }
+
+        throw new TimeoutException("No session waited on a lock within 5 seconds.");
+    }
+
     public T Get<T>(string key) where T : notnull => _services.GetRequiredKeyedService<T>(key);
 
     public async ValueTask DisposeAsync()

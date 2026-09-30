@@ -37,6 +37,78 @@ public class ApiKeysAndIsolationTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task A_deleting_project_keeps_its_keys_and_platforms_frozen_but_they_can_still_be_removed()
+    {
+        await using var p = await PlatformHarness.StartAsync(postgres);
+        var (user, project) = await ActiveProjectAsync(p);
+        var keys = p.Get<ApiKeyService>();
+        var platforms = p.Get<PlatformService>();
+        var key = (await keys.CreateAsync(user, project, "Backend", [ApiKeyScope.UsersRead], null, Ct)).Value!.Key;
+        var site = (await platforms.CreateAsync(user, project, PlatformType.Web, "Site", "app.example.com", Ct)).Value!;
+
+        await p.Get<ProjectService>().DeleteAsync(user, project, Ct);
+
+        // Nothing new while it waits to be purged: a restore brings back exactly what was there.
+        Assert.Equal(ErrorCode.ProjectNotReady, (await keys.CreateAsync(user, project, "Late", [ApiKeyScope.UsersRead], null, Ct)).Failure?.Code);
+        Assert.Equal(ErrorCode.ProjectNotReady, (await platforms.CreateAsync(user, project, PlatformType.Web, "Late", "late.example.com", Ct)).Failure?.Code);
+        Assert.Equal(ErrorCode.ProjectNotReady, (await platforms.UpdateAsync(user, project, site.Id.ToString(), "Renamed", null, Ct)).Failure?.Code);
+        // A leaked key can still be revoked during the grace period.
+        Assert.True((await keys.DeleteAsync(user, project, key.Id.ToString(), Ct)).Succeeded);
+        Assert.True((await platforms.DeleteAsync(user, project, site.Id.ToString(), Ct)).Succeeded);
+        Assert.Equal(0L, await p.ScalarAsync<long>("SELECT count(*) FROM orvano.platform_api_keys WHERE project_id = @p", ("p", project)));
+    }
+
+    [Fact]
+    public async Task In_a_deleting_org_keys_and_platforms_can_not_change()
+    {
+        await using var p = await PlatformHarness.StartAsync(postgres);
+        var (user, project) = await ActiveProjectAsync(p);
+        var orgId = (await p.Get<ProjectService>().GetAsync(user, project, Ct)).Value!.OrgId!.Value;
+        var keys = p.Get<ApiKeyService>();
+        var platforms = p.Get<PlatformService>();
+        var key = (await keys.CreateAsync(user, project, "Backend", [ApiKeyScope.UsersRead], null, Ct)).Value!.Key;
+        var site = (await platforms.CreateAsync(user, project, PlatformType.Web, "Site", "app.example.com", Ct)).Value!;
+        await p.Get<ProjectService>().DeleteAsync(user, project, Ct);
+        await p.Get<OrgService>().DeleteAsync(user, orgId, Ct);
+
+        // AC-15: every change to a deleting org's projects waits for the org to be restored.
+        Assert.Equal(ErrorCode.OrgNotActive, (await keys.CreateAsync(user, project, "Late", [ApiKeyScope.UsersRead], null, Ct)).Failure?.Code);
+        Assert.Equal(ErrorCode.OrgNotActive, (await keys.DeleteAsync(user, project, key.Id.ToString(), Ct)).Failure?.Code);
+        Assert.Equal(ErrorCode.OrgNotActive, (await platforms.CreateAsync(user, project, PlatformType.Web, "Late", "late.example.com", Ct)).Failure?.Code);
+        Assert.Equal(ErrorCode.OrgNotActive, (await platforms.UpdateAsync(user, project, site.Id.ToString(), "Renamed", null, Ct)).Failure?.Code);
+        Assert.Equal(ErrorCode.OrgNotActive, (await platforms.DeleteAsync(user, project, site.Id.ToString(), Ct)).Failure?.Code);
+    }
+
+    [Fact]
+    public async Task A_key_created_while_the_purge_holds_the_project_finds_it_gone_instead_of_failing()
+    {
+        await using var p = await PlatformHarness.StartAsync(postgres);
+        var (user, project) = await ActiveProjectAsync(p);
+
+        // What the purge job does: lock the project row, then delete its rows and the project.
+        await using var purge = await p.Database.Superuser.OpenConnectionAsync(Ct);
+        await using var tx = await purge.BeginTransactionAsync(Ct);
+        await using (var lockRow = new NpgsqlCommand("SELECT 1 FROM orvano.platform_projects WHERE id = @p FOR UPDATE", purge, tx))
+        {
+            lockRow.Parameters.AddWithValue("p", project);
+            await lockRow.ExecuteNonQueryAsync(Ct);
+        }
+
+        var create = p.Get<ApiKeyService>().CreateAsync(user, project, "Racer", [ApiKeyScope.UsersRead], null, Ct);
+        await p.WaitForLockWaitAsync();
+        await using (var remove = new NpgsqlCommand("DELETE FROM orvano.platform_api_keys WHERE project_id = @p; DELETE FROM orvano.platform_projects WHERE id = @p", purge, tx))
+        {
+            remove.Parameters.AddWithValue("p", project);
+            await remove.ExecuteNonQueryAsync(Ct);
+        }
+
+        await tx.CommitAsync(Ct);
+
+        Assert.Equal(ErrorCode.ProjectNotFound, (await create).Failure?.Code); // not a foreign key 500
+        Assert.Equal(0L, await p.ScalarAsync<long>("SELECT count(*) FROM orvano.platform_api_keys"));
+    }
+
+    [Fact]
     public async Task A_key_used_with_another_project_or_after_expiry_or_deletion_is_invalid()
     {
         await using var p = await PlatformHarness.StartAsync(postgres);

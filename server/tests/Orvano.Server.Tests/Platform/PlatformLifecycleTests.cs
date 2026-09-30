@@ -1,3 +1,4 @@
+using Npgsql;
 using Orvano.Contract;
 using Orvano.Core.Jobs;
 using Orvano.Platform.Application;
@@ -287,6 +288,45 @@ public class PlatformLifecycleTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task An_owner_demoted_while_deleting_a_project_is_refused()
+    {
+        await using var p = await PlatformHarness.StartAsync(postgres);
+        var (owner, project) = await ActiveProjectAsync(p);
+        var orgId = (await p.Get<ProjectService>().GetAsync(owner, project, Ct)).Value!.OrgId!.Value;
+
+        // A role change holds the org FOR UPDATE; the delete starts while it is still open.
+        var (demotion, tx) = await HoldOrgForUpdateAsync(p, orgId);
+        var delete = p.Get<ProjectService>().DeleteAsync(owner, project, Ct);
+        await p.WaitForLockWaitAsync();
+        await ExecuteInAsync(tx, "UPDATE orvano.platform_memberships SET role = 'developer' WHERE org_id = @o AND user_id = @u", ("o", orgId), ("u", owner));
+        await tx.CommitAsync(Ct);
+        await demotion.DisposeAsync();
+
+        Assert.Equal(ErrorCode.Forbidden, (await delete).Failure?.Code); // the role after the change decides
+        Assert.Equal("active", await StatusAsync(p, project));
+    }
+
+    [Fact]
+    public async Task A_member_removed_while_creating_a_key_is_refused()
+    {
+        await using var p = await PlatformHarness.StartAsync(postgres);
+        var (owner, project) = await ActiveProjectAsync(p);
+        var orgId = (await p.Get<ProjectService>().GetAsync(owner, project, Ct)).Value!.OrgId!.Value;
+        var developer = Guid.CreateVersion7();
+        await p.AddMemberAsync(orgId, developer, OrgRole.Developer);
+
+        var (removal, tx) = await HoldOrgForUpdateAsync(p, orgId);
+        var create = p.Get<ApiKeyService>().CreateAsync(developer, project, "Late", [ApiKeyScope.UsersRead], null, Ct);
+        await p.WaitForLockWaitAsync();
+        await ExecuteInAsync(tx, "DELETE FROM orvano.platform_memberships WHERE org_id = @o AND user_id = @u", ("o", orgId), ("u", developer));
+        await tx.CommitAsync(Ct);
+        await removal.DisposeAsync();
+
+        Assert.Equal(ErrorCode.ProjectNotFound, (await create).Failure?.Code); // no longer a member, so it doesn't exist for them
+        Assert.Equal(0L, await p.ScalarAsync<long>("SELECT count(*) FROM orvano.platform_api_keys"));
+    }
+
+    [Fact]
     public async Task Each_role_is_held_to_the_permission_matrix()
     {
         await using var p = await PlatformHarness.StartAsync(postgres);
@@ -483,6 +523,22 @@ public class PlatformLifecycleTests(PostgresFixture postgres)
         await p.RunJobsAsync(PlatformJobs.ProvisionProject);
         Assert.Equal("active", await StatusAsync(p, project));
         return (user, project);
+    }
+
+    /// <summary>What a membership change does first: an open transaction holding the org row <c>FOR UPDATE</c>.</summary>
+    private static async Task<(NpgsqlConnection Connection, NpgsqlTransaction Tx)> HoldOrgForUpdateAsync(PlatformHarness p, Guid orgId)
+    {
+        var conn = await p.Database.Superuser.OpenConnectionAsync(Ct);
+        var tx = await conn.BeginTransactionAsync(Ct);
+        await ExecuteInAsync(tx, "SELECT 1 FROM orvano.platform_orgs WHERE id = @o FOR UPDATE", ("o", orgId));
+        return (conn, tx);
+    }
+
+    private static async Task ExecuteInAsync(NpgsqlTransaction tx, string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var cmd = new NpgsqlCommand(sql, tx.Connection, tx);
+        foreach (var (name, value) in parameters) cmd.Parameters.AddWithValue(name, value);
+        await cmd.ExecuteNonQueryAsync(Ct);
     }
 
     private static Task<string> StatusAsync(PlatformHarness p, string project) =>
