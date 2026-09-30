@@ -1,9 +1,9 @@
-# Verify: platform data model · spec 0003 · updated 2026-09-26
+# Verify: platform data model · spec 0003 · updated 2026-09-29
 _Steps derived from spec 0003 acceptance criteria and its value sourcing table. `/check verify` runs these; `/test` locks the durable ones._
 
 ## Row 7 slice (console accounts, orgs & projects, backend)
 
-Start a real stack first: `docker compose -f tests/scenarios/compose.yml up -d --build --wait` (Postgres, migrate, api in `Test`, worker). Console calls send the cookie `orvano_console=test-console-session`; project scoped ones also send `X-Orvano-Project`. Every response in `Test` is checked against the contract, so a shape mismatch shows up as 500 `contract_violation`.
+Start a real stack first: `docker compose -f tests/scenarios/compose.yml up -d --build --wait` (Postgres, migrate, api in `Test`, worker). Console calls sign in first as the fixture account (`POST /v1/console/account/session` with `fixture-admin@example.com` and its password from `tests/scenarios/fixtures.yaml`) and send the `orvano_console` cookie it sets, plus `Sec-Fetch-Site: same-origin` on every change (the CSRF rule, spec 0004); project scoped ones also send `X-Orvano-Project`. Every response in `Test` is checked against the contract, so a shape mismatch shows up as 500 `contract_violation`.
 
 ### UI / manual (HTTP)
 - [x] `POST /v1/console/orgs` with `{ "name": "  Acme  " }` → 201, `name` is `Acme` (trimmed), `role` is `owner` → AC-1, AC-9
@@ -42,7 +42,7 @@ Start a real stack first: `docker compose -f tests/scenarios/compose.yml up -d -
 
 ## Commands
 - [x] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-namespace "Orvano.Server.Tests.Platform"` → all pass → AC-1 to 5, 7 to 15, 17 to 19
-- [x] `ORVANO_DB_ADMIN_URL=... dotnet run --project server/tests/Orvano.ModelDriftCheck` on an empty Postgres → "EF model matches the database (10 tables checked)" → AC-17
+- [x] `ORVANO_DB_ADMIN_URL=... dotnet run --project server/tests/Orvano.ModelDriftCheck` on an empty Postgres → "EF model matches the database (15 tables checked)" → AC-17
 - [x] `ORVANO_ENDPOINT=http://localhost:8080 pnpm --filter @orvano/scenarios-js scenarios node` → `console-orgs.yaml` passes → AC-1, AC-3, AC-15
 - [x] In Postgres: no foreign key joins a `platform_` table to a non `platform_` table → AC-17
 - [x] Add `parent_project_id` and `environment` as nullable columns to `platform_projects` on a populated database → succeeds, nothing else changes → AC-18
