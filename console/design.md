@@ -50,7 +50,7 @@ Contrast rules: text pairs meet 4.5:1, control borders and focus rings meet 3:1 
 
 ## Type
 
-Inter for the interface (`font-feature-settings: 'cv11'`, one story `a`), JetBrains Mono for IDs, keys, and code. Both are bundled, so the console never loads a font from another host. Table numbers use `tabular-nums`. The type roles change with density through the `--fs-*` and `--lh-*` tokens, which `@theme inline` exposes as `text-body`, `text-small`, `text-mono`, and `text-h3`. Copied shadcn components use `text-sm` and `text-xs`, which are mapped to the body and small roles.
+Inter for the interface (`font-feature-settings: 'cv11'`, one story `a`), JetBrains Mono for IDs, keys, and code. Both are bundled, so the console never loads a font from another host. Table numbers use `tabular-nums`. The type roles change with density through the `--fs-*` and `--lh-*` tokens, which `@theme inline` exposes as `text-body`, `text-small`, `text-mono`, and `text-h3`. Copied shadcn components use `text-sm` and `text-xs`, which are mapped to the body and small roles. Inputs and textareas use `text-field` (`--fs-field`, `--lh-field`): the body role, raised to 16 px on 24 px under `(pointer: coarse)`, because iOS zooms the page into any field with smaller text and never zooms back out. The viewport tag must not block zoom instead (`maximum-scale=1`): that also stops pinch zoom (WCAG 1.4.4).
 
 | Role | Compact | Comfortable | Weight |
 |---|---|---|---|

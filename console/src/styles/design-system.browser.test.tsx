@@ -1,10 +1,14 @@
+/// <reference types="@vitest/browser-playwright" />
+// (Types `cdp()` as Playwright's CDP session, for the touch screen tests.)
 import { afterEach, describe, expect, it } from 'vitest'
-import { userEvent } from 'vitest/browser'
+import { cdp, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import { ChevronRight } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 
 function setDensity(density: 'compact' | 'comfortable') {
   document.documentElement.dataset.density = density
@@ -54,6 +58,44 @@ describe('density (AC-3)', () => {
     expect(size('body', 'fontSize')).toBe(16)
     expect(size('icon', 'width')).toBe(18)
     expect(rowHeight()).toBe(44)
+  })
+})
+
+describe('field text on touch screens', () => {
+  // DevTools' touch emulation (as in device mode) is what makes `(pointer: coarse)` match.
+  const emulatePointer = (value: 'coarse' | 'fine') =>
+    cdp().send('Emulation.setTouchEmulationEnabled', {
+      enabled: value === 'coarse',
+      maxTouchPoints: 5,
+    })
+
+  afterEach(async () => {
+    await emulatePointer('fine')
+  })
+
+  function Fields() {
+    return (
+      <main>
+        <Input aria-label="Email" data-testid="input" />
+        <Textarea aria-label="Notes" data-testid="textarea" />
+      </main>
+    )
+  }
+
+  it('is 16 px in compact density, so iOS does not zoom into the field', async () => {
+    await emulatePointer('coarse')
+    expect(matchMedia('(pointer: coarse)').matches).toBe(true)
+    await render(<Fields />)
+    expect(size('input', 'fontSize')).toBe(16)
+    expect(size('textarea', 'fontSize')).toBe(16)
+    expect(size('input', 'height')).toBe(32)
+  })
+
+  it('follows the body role with a mouse: 14 px compact', async () => {
+    expect(matchMedia('(pointer: coarse)').matches).toBe(false)
+    await render(<Fields />)
+    expect(size('input', 'fontSize')).toBe(14)
+    expect(size('textarea', 'fontSize')).toBe(14)
   })
 })
 
