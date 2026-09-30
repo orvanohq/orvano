@@ -30,7 +30,7 @@ The internal model that every product hangs off: console accounts, organizations
 - [x] Verify it: `/check verify platform data model`
 - [x] Test it: `/test platform data model`
 - [x] Review it (fresh model): `/check review platform data model`
-- [ ] Document it: `/document platform data model`
+- [x] Document it: `/document platform data model`
 Spec [0003](../specs/0003-platform-data-model/index.md) · code in `server/src/Orvano.Platform/`, `server/src/Orvano.Auth/`, `server/migrations/platform/`
 
 ### 4. API contract & SDK pipeline · done
