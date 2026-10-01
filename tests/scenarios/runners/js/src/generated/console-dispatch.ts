@@ -71,7 +71,7 @@ export const consoleDispatch: DispatchTable = {
   },
   'consoleEmailTemplates.get': {
     status: 200,
-    console: (o, input) => o.consoleEmailTemplates.get(input.kind),
+    console: (o, input) => o.consoleEmailTemplates.get(input.kind as string),
   },
   'consoleEmailTemplates.getCatalog': {
     status: 200,
@@ -80,21 +80,21 @@ export const consoleDispatch: DispatchTable = {
   'consoleEmailTemplates.preview': {
     status: 200,
     console: (o, input) =>
-      o.consoleEmailTemplates.preview(input.kind, input.body as EmailTemplateInput),
+      o.consoleEmailTemplates.preview(input.kind as string, input.body as EmailTemplateInput),
   },
   'consoleEmailTemplates.reset': {
     status: 204,
-    console: (o, input) => o.consoleEmailTemplates.reset(input.kind),
+    console: (o, input) => o.consoleEmailTemplates.reset(input.kind as string),
   },
   'consoleEmailTemplates.test': {
     status: 200,
     console: (o, input) =>
-      o.consoleEmailTemplates.test(input.kind, input.body as EmailTemplateInput),
+      o.consoleEmailTemplates.test(input.kind as string, input.body as EmailTemplateInput),
   },
   'consoleEmailTemplates.update': {
     status: 200,
     console: (o, input) =>
-      o.consoleEmailTemplates.update(input.kind, input.body as EmailTemplateInput),
+      o.consoleEmailTemplates.update(input.kind as string, input.body as EmailTemplateInput),
   },
   'consoleEmails.list': {
     status: 200,
