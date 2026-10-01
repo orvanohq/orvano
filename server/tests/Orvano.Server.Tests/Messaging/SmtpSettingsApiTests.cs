@@ -73,6 +73,37 @@ public class SmtpSettingsApiTests(PostgresFixture postgres, MailpitFixture mailp
         Assert.Equal(1L, await ScalarAsync<long>(server, "SELECT count(*) FROM orvano.events WHERE type = 'messaging.smtp.deleted'"));
     }
 
+    // AC-6, AC-26: a test never retries, so a 4xx reply is a rejection too, shown with its code; the logs keep neither
+    // the sender nor the subject.
+    [Fact]
+    public async Task A_refused_test_is_not_retried_and_answers_the_reply_code()
+    {
+        var owner = NewEmail("owner");
+        await using var server = await StartAsync(allowPrivateHosts: true, owner);
+        using var http = server.Api.Http();
+        try
+        {
+            foreach (var (sender, recipient, reply) in new[] { ((int?)451, (int?)null, "451"), (null, 550, "550") })
+            {
+                await mailpit.SetChaosAsync(sender, recipient, Ct);
+                using var test = await SendAsync(http, HttpMethod.Post, Path + "/test", Mailpit(), owner);
+                Assert.Equal(HttpStatusCode.BadGateway, test.Status);
+                Assert.Equal(ErrorCode.SmtpRejected, test.Body.GetProperty("code").GetString());
+                Assert.Contains(reply, test.Body.GetProperty("detail").GetString(), StringComparison.Ordinal);
+            }
+        }
+        finally
+        {
+            await mailpit.SetChaosAsync(senderCode: null, recipientCode: null, Ct);
+        }
+
+        Assert.Equal(0, await mailpit.CountToAsync(owner, Ct));
+        Assert.Equal(0L, await ScalarAsync<long>(server, "SELECT count(*) FROM orvano.messaging_emails"));
+        Assert.Contains("smtp_rejected", server.Api.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("hello@shop.test", server.Api.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("Test email from Orvano", server.Api.Output, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task The_password_is_sealed_never_returned_and_reused_only_for_the_same_server()
     {

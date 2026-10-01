@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using Orvano.Core.Data;
 using Orvano.Core.Events;
@@ -368,6 +369,88 @@ public class EmailQueueTests(PostgresFixture postgres, MailpitFixture mailpit) :
         Assert.Equal(["project", "project", "project", "project"], await t.ScalarAsync<string[]>("SELECT array_agg(smtp_source) FROM orvano.messaging_emails"));
     }
 
+    // AC-16: a real 4xx reply is retried and a 5xx one fails at once, both as smtp_rejected.
+    [Fact]
+    public async Task A_temporary_rejection_is_retried_and_a_permanent_one_fails_at_once()
+    {
+        await using var t = await StartAsync();
+        await t.SetSmtpAsync(Console, mailpit.Host, mailpit.SmtpPort);
+        try
+        {
+            var later = NewEmail();
+            Assert.True(await t.QueueInviteAsync(later, commit: true));
+            var id = await t.ScalarAsync<Guid>("SELECT id FROM orvano.messaging_emails");
+
+            await mailpit.SetChaosAsync(senderCode: 451, recipientCode: null, Ct);
+            var retry = Assert.IsType<JobRetryException>(await t.RunSendAsync());
+            Assert.Equal(TimeSpan.FromSeconds(30), retry.Delay);
+            Assert.Contains("smtp_rejected", retry.Message, StringComparison.Ordinal);
+            Assert.Equal(("queued", $"{later[0]}***@invited.test", "console_invitation", 1), await t.RowAsync(id));
+
+            // The server takes it on the next attempt.
+            await mailpit.SetChaosAsync(senderCode: null, recipientCode: null, Ct);
+            Assert.Null(await t.RunSendAsync());
+            Assert.Equal(("sent", $"{later[0]}***@invited.test", "console_invitation", 2), await t.RowAsync(id));
+            Assert.Equal(1, (await mailpit.WaitForMessageToAsync(later, Ct)).GetProperty("To").GetArrayLength());
+
+            // A permanent refusal of the recipient is final on the first attempt.
+            await mailpit.SetChaosAsync(senderCode: null, recipientCode: 550, Ct);
+            var refused = NewEmail();
+            Assert.True(await t.QueueInviteAsync(refused, commit: true));
+            Assert.Null(await t.RunSendAsync());
+            Assert.Equal("smtp_rejected", await t.OnlyErrorAsync());
+            Assert.Equal(0, await mailpit.CountToAsync(refused, Ct));
+        }
+        finally
+        {
+            await mailpit.SetChaosAsync(senderCode: null, recipientCode: null, Ct);
+        }
+    }
+
+    // AC-26: logs name the email, the project, and the codes, and never the address, link, name, subject, or host.
+    [Fact]
+    public async Task Logs_carry_IDs_and_codes_but_no_address_link_name_subject_or_host()
+    {
+        await using var t = await StartAsync();
+        await t.AddProjectAsync("shop");
+        await t.SetSmtpAsync("shop", mailpit.Host, mailpit.SmtpPort);
+        var to = NewEmail();
+        const string Link = "https://shop.test/reset?token=LeakCheckToken123";
+        // A custom template that fails with the real values, so the fallback warning is logged too (AC-18).
+        await t.ExecuteAsync(
+            "INSERT INTO orvano.messaging_email_templates (project_id, kind, locale, subject, html, updated_by_user_id) VALUES ('shop', 'recovery', 'en', 'Reset', '{% for i in (1..100001) %}x{% endfor %}', gen_random_uuid())");
+        try
+        {
+            var queued = Assert.IsType<EmailQueueResult.Queued>(await t.QueueAuthAsync(
+                new AuthEmail("shop", "Leaky Shop", AuthEmailKind.Recovery, to, "Grace Leakcheck", Link, null, 60), commit: true));
+            await mailpit.SetChaosAsync(senderCode: 451, recipientCode: null, Ct);
+            Assert.IsType<JobRetryException>(await t.RunSendAsync());
+            await mailpit.SetChaosAsync(senderCode: null, recipientCode: null, Ct);
+            Assert.Null(await t.RunSendAsync());
+            var subject = (await mailpit.WaitForMessageToAsync(to, Ct)).GetProperty("Subject").GetString()!;
+
+            // And one that never connects, to a host only the settings know.
+            await t.SetSmtpAsync("shop", "smtp.leak-check-host.invalid", 25);
+            Assert.IsType<EmailQueueResult.Queued>(await t.QueueAuthAsync(
+                new AuthEmail("shop", "Leaky Shop", AuthEmailKind.EmailCode, NewEmail(), "Grace Leakcheck", null, "428613", 10), commit: true));
+            Assert.Null(await t.RunSendAsync(attempt: 6));
+            Assert.Equal("smtp_unreachable", await t.OnlyErrorAsync());
+
+            var logs = t.Logs.FullText;
+            Assert.Contains(queued.EmailId.ToString(), logs, StringComparison.Ordinal);
+            Assert.Contains("shop", logs, StringComparison.Ordinal);
+            Assert.Contains("smtp_rejected", logs, StringComparison.Ordinal);
+            Assert.Contains("451", logs, StringComparison.Ordinal);
+            Assert.Contains("recovery", logs, StringComparison.Ordinal);
+            foreach (var secret in new[] { to, "invited.test", "LeakCheckToken123", "shop.test", "Leakcheck", subject, "Leaky Shop", "leak-check-host", "428613" })
+                Assert.DoesNotContain(secret, logs, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await mailpit.SetChaosAsync(senderCode: null, recipientCode: null, Ct);
+        }
+    }
+
     // Unique per test, so one Mailpit serves every test of the class.
     private static string NewEmail() => $"{Guid.NewGuid():N}@invited.test";
 
@@ -383,7 +466,8 @@ public class EmailQueueTests(PostgresFixture postgres, MailpitFixture mailpit) :
             })
             .Build();
         var services = new ServiceCollection();
-        services.AddLogging();
+        var logs = new ListLoggerProvider();
+        services.AddLogging(logging => logging.AddProvider(logs));
         services.AddKeyedSingleton(OrvanoDb.App, (_, _) => database.Track(NpgsqlDataSource.Create(database.AppUrl)));
         services.AddKeyedSingleton(OrvanoDb.Admin, (_, _) => database.Track(NpgsqlDataSource.Create(database.AdminUrl)));
         services.AddSingleton(new SecretBox(MasterKeys.Parse(OrvanoProcess.MasterKeys)));
@@ -392,13 +476,16 @@ public class EmailQueueTests(PostgresFixture postgres, MailpitFixture mailpit) :
         var messaging = new MessagingModule();
         messaging.ConfigureServices(services, config);
         messaging.ConfigureApiServices(services, config);
-        return new Harness(database, services.BuildServiceProvider());
+        return new Harness(database, services.BuildServiceProvider(), logs);
     }
 
     /// <summary>The Messaging module wired as the api and the worker wire it, over a fresh migrated database.</summary>
-    private sealed class Harness(TestDatabase database, ServiceProvider services) : IAsyncDisposable
+    private sealed class Harness(TestDatabase database, ServiceProvider services, ListLoggerProvider logs) : IAsyncDisposable
     {
         public TestDatabase Database => database;
+
+        /// <summary>Everything the module logged.</summary>
+        public ListLoggerProvider Logs => logs;
 
         public IServiceProvider Services => services;
 
