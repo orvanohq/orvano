@@ -17,7 +17,7 @@ The thinnest real auth thread: email and password sign up, sign in, sign out, an
 - [x] Document it: `/document app user sign up & sign in`
 Spec [0004](../specs/0004-app-user-auth/index.md) · code in `server/src/Orvano.Auth/`, `contract/auth/`, `sdks/`, `console/`
 
-### 9. Transactional email · in-progress
+### 9. Transactional email · done
 Send email from a project through SMTP you configure, with editable templates. Auth uses it first; messaging reuses it later.
 **Done when:** you can set SMTP per project, edit a template in the console, and send a test email that arrives.
 - [x] Design it (spec): `/architect transactional email`
@@ -27,8 +27,8 @@ Send email from a project through SMTP you configure, with editable templates. A
    - [x] Templates and the auth queue: Fluid with its limits, the four default templates, the validator, preview and test, the CodeMirror editor, and `IEmailQueue` for row 10 (AC-8 to 14, 18)
    - [x] Preview frame: the email preview gets its own sandboxed page and policy, so email styles and images show behind the gateway, and dev serves the same headers (AC-9, 30 to 33)
    - [x] Quality and end to end: integration tests with Mailpit, Playwright flows, axe, and keyboard checks (AC-30, and AC-1 to 33 end to end)
-- [ ] Verify it: `/check verify transactional email`
-- [ ] Test it: `/test transactional email`
+- [x] Verify it: `/check verify transactional email`
+- [x] Test it: `/test transactional email`
 Spec [0009](../specs/0009-transactional-email/index.md) · code in `server/src/Orvano.Messaging/`, `contract/messaging/`, `console/`
 
 ### 10. Email verification, recovery & passwordless · needs a decision · GA

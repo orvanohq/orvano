@@ -1,7 +1,7 @@
 # 0009. Transactional email: SMTP per project, editable templates, and a send queue
 
 **Date**: 2026-09-29
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
@@ -63,7 +63,7 @@ Orvano learns to send email. The install admin sets one SMTP server (the mail se
 - **AC-25**: Every test send (`consoleSmtp.test`, `consoleEmailTemplates.test`, `consoleInstall.testSmtp`) takes the new rate limit `messaging.test.user`, 30 per 15 minutes per console user, and every preview takes `messaging.preview.user`, 300 per 5 minutes per console user. Each counts every attempt that passed the role check (a 403 or 404 counts nothing); over it answers 429 `rate_limited` with `Retry-After`.
 - **AC-26**: No secret or personal data leaks. `orvano.jobs` payloads carry only the email ID. Events (`messaging.smtp.updated`, `messaging.smtp.deleted`, `messaging.template.updated`, `messaging.template.reset`, `messaging.email.sent`, `messaging.email.failed`) carry the project ID, the email ID or template kind, the error code, the changed field names, and the actor, never an address, host, username, password, subject, or content. Logs carry the email ID, project ID, error code, and SMTP reply code, never those values either. A final `messaging_emails` row has `content_ciphertext` null.
 - **AC-27**: Messaging's consumer `messaging.purge_project` of Platform's `platform.project.purged` event (the project ID read from the event, as Auth's `auth.purge_users` does; it only enqueues, no IO) queues `messaging.project.purge` on queue `messaging` with `ProjectId` set, which deletes the project's rows from all three tables. The job is idempotent.
-- **AC-28**: Every role validates `ORVANO_SMTP_ALLOW_PRIVATE_HOSTS` (`true` or `false`, default `false`) and `ORVANO_EMAIL_INSTALL_HOURLY_LIMIT` (an integer from 1 to 1,000,000, default 200) at startup, in `MessagingModule.ConfigureServices`, and refuses to start on a bad value. An unset or empty value means the default, since Compose passes `${VAR:-}` as an empty string.
+- **AC-28**: Every role that loads modules (`api`, `worker`, and `realtime`) validates `ORVANO_SMTP_ALLOW_PRIVATE_HOSTS` (`true` or `false`, default `false`) and `ORVANO_EMAIL_INSTALL_HOURLY_LIMIT` (an integer from 1 to 1,000,000, default 200) at startup, in `MessagingModule.ConfigureServices`, and refuses to start on a bad value. An unset or empty value means the default, since Compose passes `${VAR:-}` as an empty string. `migrate` never loads modules or sends email, so it neither reads nor checks either setting.
 - **AC-29**: The Aspire AppHost starts Mailpit (a local mail catcher) and gives `api` and `worker` `ORVANO_SMTP_ALLOW_PRIVATE_HOSTS=true`. `tests/scenarios/compose.yml` adds a `mailpit` service (SMTP on `mailpit:1025`, its API published on `localhost:8025`) with the same setting for the server, and a new fixture in `ORVANO_TEST_FIXTURES` seeds the install SMTP as host `mailpit`, port 1025, `security: none`, no username, From `orvano@scenarios.test`. Integration tests run Mailpit through Testcontainers and read arrived mail through its API.
 - **AC-30**: Every new screen meets WCAG AA (axe in both themes and densities). The CodeMirror editors have visible labels and can be left with Escape then Tab, the preview's outer frame has the title "Email preview" and its inner frame "Email content", and every form error is announced.
 
@@ -353,8 +353,8 @@ A `srcdoc` frame inherits its parent's Content Security Policy whatever its `san
 
 ### Configuration required
 
-- `ORVANO_SMTP_ALLOW_PRIVATE_HOSTS` (`api`, `worker`; read in `MessagingModule.ConfigureServices`, so every role validates it): `true` lets project SMTP use private addresses. Default `false`. The AppHost and the scenario compose set `true` for Mailpit.
-- `ORVANO_EMAIL_INSTALL_HOURLY_LIMIT` (used by `api`, validated by every role): emails per project per hour through the install SMTP, 1 to 1,000,000, default 200.
+- `ORVANO_SMTP_ALLOW_PRIVATE_HOSTS` (`api`, `worker`; read in `MessagingModule.ConfigureServices`, so `api`, `worker`, and `realtime` validate it): `true` lets project SMTP use private addresses. Default `false`. The AppHost and the scenario compose set `true` for Mailpit.
+- `ORVANO_EMAIL_INSTALL_HOURLY_LIMIT` (used by `api`, validated by `api`, `worker`, and `realtime`): emails per project per hour through the install SMTP, 1 to 1,000,000, default 200.
 - Unset or empty means the default for both. No new setting is required for production. The embedded `deploy/compose/docker-compose.yml` (which `orvano install` writes to every install) passes both to `api` and `worker` as `${VAR:-}`, and the installer does not prompt for them.
 
 ### Critical test scenarios
