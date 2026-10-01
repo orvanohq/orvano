@@ -109,3 +109,51 @@ Within Option 1, each engineer choice follows a force from Context. The install 
 - `contract/errors.tsp` has `rate_limited`, `project_not_ready`, `forbidden`, and `invalid_request`, which this row reuses.
 - Spec 0008's rationale (Option 2) deferred SMTP here so there would be one email system, and its Follow-up asks this row to email the invite url.
 - `.claude/skills/email-best-practices/` (installed during this design): the accessibility rules in AC-13 (`lang` and `dir` in two places, presentational tables, one `h1`, button and code sizes) and the advice against `noreply@` senders.
+
+## Preview frame (decided 2026-09-30, after slice 3)
+
+### Context
+
+Slice 3's verify found that the template preview looks right under the AppHost and wrong behind the gateway. The editor drew the rendered HTML in `<iframe sandbox="" srcdoc>`. A `srcdoc` document inherits its parent's Content Security Policy (the browser's list of what a page may load and run), and `sandbox` changes nothing about that. So the console's policy from spec 0005 (`style-src 'self'` plus one hash, `img-src 'self' data:`) applied inside the email. The browser blocked all 13 inline styles of the default password reset template, showed its hidden preheader, drew the button as a plain link, and would block any remote logo. The AppHost sends no policy, so dev never showed it. The end to end test missed it too: its `securitypolicyviolation` listener sits on the console page, and a frame's violations fire on the frame's own document.
+
+The forces: email HTML is styled almost entirely by inline `style` attributes and `<style>` blocks, so a preview without them misleads. Every console page must keep spec 0005's strict policy (`e2e/headers.spec.ts` asserts no `unsafe-inline`). Templates are written by developers and previewed by owners, so the preview must stay a place where a template can't act against the person viewing it. And the contract rules allow only JSON or empty responses with named model bodies.
+
+### Options considered
+
+**Option A: a static frame page with its own policy, fed by `postMessage` (chosen).** A page in `console/public/frames/`, served by Caddy with a policy written for email, runs in an opaque origin, receives the HTML the editor already has, and draws it in an inner `srcdoc` frame without `allow-scripts`, which inherits the email policy.
+- Pros: no API, contract, or SDK change, and still one request per keystroke. The email's scripts are stopped by the sandbox and by the policy, two separate layers. The console's own policy doesn't change. Row 26 can reuse it.
+- Cons: a small script runs in the frame page, and its hash must be kept in step with the policy. It's a second policy to maintain, and it adds a path rule to the Caddyfile.
+
+**Option B: the API serves the preview as a document.** The editor posts a form into the frame, and the API renders it and answers `text/html` with its own policy.
+- Pros: no script in any frame. The API sets the header, so dev and production match with no extra work.
+- Cons: breaks the contract rule (one JSON or empty 2xx, named model bodies), so it needs a rule exception or an endpoint outside the contract. Every keystroke costs two requests, which doubles the cost against `messaging.preview.user`. Form encoded bodies are a second request format on a JSON API.
+
+**Option C: loosen the console's policy.** Add `style-src-attr 'unsafe-inline'`, `style-src-elem 'unsafe-inline'`, and `img-src https:` for every console file.
+- Pros: one line, no new files.
+- Cons: weakens every console page against style injection and remote image beacons, reverses spec 0005's rule, and fails `headers.spec.ts`. It also doesn't cover what a frame should block anyway (remote stylesheets, frames).
+
+### Rationale
+
+Option A keeps the console's policy whole (the spec 0005 force), keeps the email unable to run script (the force about developers and owners), and doesn't bend the contract (the contract force). Option B's main gain, dev parity, is bought back cheaply with a Vite plugin that reads the same header file. Option C fixes the preview by weakening the one thing spec 0005 promised.
+
+The engineer chose each policy point: remote images load (`https:` and `data:`), since a preview without the logo misleads, accepting that the image host sees the previewing member's IP address. Remote stylesheets and fonts are blocked, since Gmail and Outlook drop them, so the preview shows what most readers see. Links open in a new tab, so an author can check where they go. Dev serves the frame page with the production headers, since a missing policy in dev is exactly how this slipped through.
+
+### Calls made while writing (recommended, not asked)
+
+| Call | Pick | Why | Runner up |
+|---|---|---|---|
+| Where the email renders | An inner `srcdoc` frame without `allow-scripts`, inside the frame page | The email's script stays blocked by the sandbox even if the policy is ever wrong | `document.write` into the frame page, leaving the policy as the only guard |
+| Opening links in a new tab | Parse with `DOMParser`, add `<base target="_blank">`, serialize with the original doctype | The inner frame gets its own opaque origin (sandbox flags are inherited), so the page can't reach into it after load; a parsed copy loads and runs nothing | Rewrite every `href` with string edits |
+| Referrer | `no-referrer` on the frame page, inherited by the email | Image hosts and opened links don't learn the console's address | The console's `strict-origin-when-cross-origin` |
+| `sandbox` in the policy header too | Yes, the same flags as the outer frame | The page stays sandboxed even if opened on its own, not in a frame | The `iframe` attribute only |
+| Message shape | `orvano.email-preview.ready` and `orvano.email-preview.render`, checked on `source` and shape | The page can't check the sender's origin (it is opaque), but it can check the sender is its parent | Accept any message |
+| One source for the headers | A `.caddy` file the Caddyfile imports and the Vite plugin reads | One file to edit; the plugin fails loudly if it can't find the policy | The same string in two places, with a test checking they match |
+| Hash drift | A Vitest node test comparing the script's hash with the policy | Fails in the unit run, before the slower end to end test | Rely on the end to end test |
+| Fonts | Blocked, including `data:` | The engineer chose to block remote fonts; inline `data:` fonts are rare in email and widen the policy for little | `font-src data:` |
+| Links other than `http`, `https`, `mailto` | `href` removed in the preview copy, `rel="noopener noreferrer"` on all | `allow-popups-to-escape-sandbox` lifts the sandbox for popups, so a `javascript:` link must never reach it (found by the cross check) | Trust the hash only `script-src` to stop it |
+| A template's own referrer settings | Removed or overridden in the preview copy | Inherited `no-referrer` is only a default; `<meta name="referrer">` would undo it (found by the cross check) | Say "no Referer by default" |
+| The preview during an error | Keep the last successful HTML mounted and dimmed | `keepPreviousData` drops data on an error, which would reload the frame after every fix (found by the cross check) | Unmount and reload |
+| Reposting unchanged HTML | Never: the editor and the page both skip it | Setting `srcdoc` again reloads the frame and fetches the images again | Post on every answer |
+| A frame that never loads | A message after 5 seconds | A header regression would otherwise show as a blank white box | Leave it blank |
+| Hashed bytes | `.prettierignore` and `eol=lf` for the frame page and header file | `pnpm format` or a Windows checkout would change the hash (found by the cross check) | Compute the hash at build time |
+| Caddy override | A nested `handle` for the path | Runs after the outer `header` block, whatever the directive order | A sibling `header @frame` that depends on source order |
