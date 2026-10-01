@@ -23,7 +23,7 @@ Setup: `dotnet run --project dev/Orvano.AppHost`, open the console, create the f
 
 ## Commands
 
-- [ ] `dotnet test --solution Orvano.slnx` → all pass; `Orvano.Server.Tests.Messaging` covers the rules and the HTTP path against Mailpit → AC-1 to AC-6, AC-24, AC-25, AC-28
+- [x] `dotnet test --solution Orvano.slnx` → all pass; `Orvano.Server.Tests.Messaging` covers the rules and the HTTP path against Mailpit → AC-1 to AC-6, AC-24, AC-25, AC-28 · checked 2026-09-30: 1,100 of 1,100 passed
 - [ ] `PUT /v1/console/project/email/smtp` with a username and password, then `GET` → `hasPassword: true` and no password in either body; `SELECT password_ciphertext FROM orvano.messaging_smtp_settings` is a blob that does not contain the password; `SELECT payload FROM orvano.events WHERE type = 'messaging.smtp.updated'` holds `projectId`, `actor`, and `changed` only → AC-1, value sourcing (`hasPassword`, `updated_by_user_id`)
 - [ ] `PUT` again with `password: null` and the same host, port, and username → 200 and the same ciphertext; change only `host` with `password: null` → 400 `invalid_request`, `password: Enter the password again when you change the host, port, or username`, on update and on test → AC-1, value sourcing (stored password)
 - [ ] Start `api` without `ORVANO_SMTP_ALLOW_PRIVATE_HOSTS`; `PUT` and `POST .../test` with host `127.0.0.1`, `10.0.0.5`, `169.254.169.254`, `::ffff:10.0.0.5`, and `localhost` → 400 `smtp_host_not_allowed` each; a host that does not resolve saves with 200 and its test answers 502 `smtp_unreachable` → AC-3
@@ -53,7 +53,7 @@ Covers AC-7, AC-15 to AC-17, AC-19 to AC-23, AC-26, AC-27, and the compose part 
 
 ### Commands
 
-- [ ] `dotnet test --solution Orvano.slnx` → all pass; `EmailQueueTests`, `InstallEmailApiTests`, and `EmailQueueDomainTests` cover the queue against Postgres and Mailpit → AC-7, AC-15 to AC-17, AC-19 to AC-23, AC-26, AC-27
+- [x] `dotnet test --solution Orvano.slnx` → all pass; `EmailQueueTests`, `InstallEmailApiTests`, and `EmailQueueDomainTests` cover the queue against Postgres and Mailpit → AC-7, AC-15 to AC-17, AC-19 to AC-23, AC-26, AC-27 · checked 2026-09-30: 1,100 of 1,100 passed
 - [ ] After an invite is sent: `SELECT payload FROM orvano.jobs WHERE kind = 'messaging.email.send'` holds only `emailId`; `SELECT status, recipient_masked, content_ciphertext, smtp_source FROM orvano.messaging_emails` shows `sent`, the masked address, null content, `install`; the `messaging.email.sent` event holds `projectId`, `emailId`, and a `system` actor only; `grep` the api and worker logs for the invited address and the link token → nothing → AC-15, AC-22, AC-26, value sourcing (email ID, `recipient_masked`)
 - [ ] Point the install SMTP at a port nothing listens on, invite someone, and watch `SELECT attempts, run_at - now() FROM orvano.jobs WHERE kind = 'messaging.email.send'` → attempt 1 waits about 30 seconds, then 1, 2, 4, and 8 minutes; fix the port while it waits → the next attempt sends it → AC-15, AC-16, value sourcing (retry delay, SMTP settings at attempt time)
 - [ ] Leave the port wrong for 6 attempts → the row ends `failed` with `smtp_unreachable`, the job ends `succeeded`, and the Log's Reason reads "Couldn't connect to the SMTP server." → AC-16, value sourcing (failure code)
@@ -62,7 +62,7 @@ Covers AC-7, AC-15 to AC-17, AC-19 to AC-23, AC-26, AC-27, and the compose part 
 - [ ] As an account that is not an install admin: `GET`, `PUT`, `DELETE /v1/console/install/smtp`, `POST .../smtp/test`, and `GET /v1/console/install/emails` → 403 `forbidden` each; the 31st `testSmtp` in 15 minutes as the admin → 429 → AC-7, AC-21, AC-25
 - [ ] `GET /v1/console/project/emails?limit=2` on a project with 5 rows → newest first with a `nextCursor`; follow it to the end; `?cursor=nope` → 400 `invalid_cursor`; `?limit=0` → 400 → AC-20
 - [ ] Delete a project with grace days 0 and let the worker run → its rows are gone from `messaging_emails`, `messaging_email_templates`, and `messaging_smtp_settings` → AC-27
-- [ ] `docker compose -f tests/scenarios/compose.yml up -d --build --wait` → a `mailpit` service is healthy, `GET /v1/console/install/smtp` as the fixture admin shows host `mailpit`, and an invite created there appears at `http://localhost:8025` → AC-29 (compose part). Not yet run locally: Docker Hub pulls hung on the build machine.
+- [x] `docker compose -f tests/scenarios/compose.yml up -d --build --wait` → a `mailpit` service is healthy, `GET /v1/console/install/smtp` as the fixture admin shows host `mailpit`, and an invite created there appears at `http://localhost:8025` → AC-29 (compose part). Not yet run locally: Docker Hub pulls hung on the build machine. · checked 2026-09-30: run on a fresh rebuild: `mailpit` healthy, and `e2e/members.spec.ts` read the invite from `http://localhost:8025`, delivered through the fixture's install SMTP
 
 ## Slice 3: templates and the auth queue
 
@@ -93,8 +93,8 @@ Covers AC-8 to AC-14 and AC-18. Setup as above, with SMTP pointing at Mailpit (t
 
 ### Commands
 
-- [ ] `dotnet test --solution Orvano.slnx` → all pass; `EmailTemplateDomainTests` (the rules, the limits, the encoding of every filter, the defaults), `EmailTemplateApiTests` (the operations over HTTP with Mailpit), and the auth email tests in `EmailQueueTests` cover the slice → AC-8 to AC-14, AC-18
-- [ ] `pnpm --filter @orvano/console test` → all pass; `email-templates.browser.test.tsx` covers the tab, the editor, the prompts, the keyboard, and axe in both themes and densities → AC-8, AC-9, AC-30
+- [x] `dotnet test --solution Orvano.slnx` → all pass; `EmailTemplateDomainTests` (the rules, the limits, the encoding of every filter, the defaults), `EmailTemplateApiTests` (the operations over HTTP with Mailpit), and the auth email tests in `EmailQueueTests` cover the slice → AC-8 to AC-14, AC-18 · checked 2026-09-30: 1,100 of 1,100 passed
+- [x] `pnpm --filter @orvano/console test` → all pass; `email-templates.browser.test.tsx` covers the tab, the editor, the prompts, the keyboard, and axe in both themes and densities → AC-8, AC-9, AC-30 · checked 2026-09-30: 613 of 613 passed
 - [ ] As a viewer: `PUT`, `DELETE`, `POST .../preview`, and `POST .../test` on `/v1/console/project/email/templates/recovery` → 403 `forbidden` each; the same on `/templates/nope` → 404 `not_found` first; as someone outside the org → 404 `project_not_found` → AC-24
 - [ ] `PUT` a subject of 256 characters, then an HTML part of 102,401 bytes → 400 `invalid_request` with `subject: ...` and `html: ...`; `PUT` `{{ action_ur }}` on line 4 → 422 `template_invalid` with `html: line 4: unknown variable action_ur` → AC-10
 - [ ] `PUT` an HTML part of `{% assign s = 'ab' %}{% for i in (1..30) %}{% assign s = s | append: s %}{% endfor %}` → 422 "a value or the output grows past 1 MB", answered at once with no memory spike on the api → AC-10, AC-11
@@ -125,8 +125,8 @@ Covers AC-8 to AC-14 and AC-18. Setup as above, with SMTP pointing at Mailpit (t
 - [ ] The same two `curl` calls against the Vite dev server and `vite preview` → the same answers → AC-32
 - [ ] `pnpm --filter @orvano/console exec vitest run --project unit src/email` → the hash test passes; change one byte of the frame page's script → it fails and names the new hash → AC-32, value sourcing (the `script-src` hash)
 - [ ] `docker build -f deploy/gateway/Dockerfile .` → the `caddy validate` step passes → AC-32
-- [ ] `pnpm --filter @orvano/console test` → the handshake tests pass (ready answered with the latest HTML, foreign sources and shapes ignored, no post for a subject only change, a reload gets the HTML again, the 5 second alert) → AC-33
-- [ ] `pnpm --filter @orvano/console test:e2e` with the `console` compose profile up → `headers.spec.ts` and `email-templates.spec.ts` pass → AC-31, AC-32, AC-33
+- [x] `pnpm --filter @orvano/console test` → the handshake tests pass (ready answered with the latest HTML, foreign sources and shapes ignored, no post for a subject only change, a reload gets the HTML again, the 5 second alert) → AC-33 · checked 2026-09-30: 613 of 613 passed
+- [x] `pnpm --filter @orvano/console test:e2e` with the `console` compose profile up → `headers.spec.ts` and `email-templates.spec.ts` pass → AC-31, AC-32, AC-33 · checked 2026-09-30: 31 of 31 end to end tests passed on a fresh rebuild
 
 ## Slice 5: quality and end to end · updated 2026-09-30
 
@@ -138,12 +138,12 @@ Covers AC-8 to AC-14 and AC-18. Setup as above, with SMTP pointing at Mailpit (t
 - [ ] As a viewer on Settings → the fields are read only, there is no Password field, and Save, Send test email, and Stop using these settings are disabled with "Developers and owners only" → AC-24
 
 ### Commands
-- [ ] `dotnet test --project server/tests/Orvano.Server.Tests --filter-class "Orvano.Server.Tests.Messaging.EmailQueueTests"` → `A_temporary_rejection_is_retried_and_a_permanent_one_fails_at_once` passes: Mailpit's chaos mode answers 451, the send retries after 30 seconds as `smtp_rejected`, then arrives on attempt 2; a 550 for the recipient fails at once → AC-15, AC-16, value sourcing (the retry decision from the reply code)
-- [ ] Same class → `Logs_carry_IDs_and_codes_but_no_address_link_name_subject_or_host` passes: every log line from a queue, a fallback, a 451 retry, a send, and an unreachable host carries the email ID, project, codes, and 451, and none of the address, link, token, user name, subject, project name, host, or code → AC-18, AC-26
-- [ ] `dotnet test --project server/tests/Orvano.Server.Tests --filter-class "Orvano.Server.Tests.Messaging.SmtpSettingsApiTests"` → `A_refused_test_is_not_retried_and_answers_the_reply_code` passes: a 451 and a 550 each answer 502 `smtp_rejected` with the code in `detail`, nothing arrives, nothing is stored, and the api output has no sender or subject → AC-6, AC-26
-- [ ] `pnpm --filter @orvano/console exec vitest run --project browser email-settings` → the Settings tab tests pass (sources, port filling, save, test, field and SMTP errors, Stop using with both confirms, the viewer, axe in four modes) → AC-1 to AC-6, AC-24, AC-30
-- [ ] With the `console` compose profile up, `pnpm --filter @orvano/console test:e2e` → `email-settings.spec.ts` passes (project SMTP pointed at Mailpit, a refused From email shown under its field, an unreachable port shown in the alert, a test email that arrives from the new sender to the caller, save across a reload, Stop using) and `members.spec.ts` passes (the link step says the invite is being sent, the same link arrives in Mailpit with the right subject, and `/install` Console emails shows it Sent as `e***@example.com`) → AC-1, AC-2, AC-4 to AC-6, AC-21 to AC-23
-- [ ] Run `test:e2e` twice in a row within 15 minutes → expect the shell sign in test to hit the console sign in limit (10 per 15 minutes); that is the limit working, not a failure of this slice
+- [x] `dotnet test --project server/tests/Orvano.Server.Tests --filter-class "Orvano.Server.Tests.Messaging.EmailQueueTests"` → `A_temporary_rejection_is_retried_and_a_permanent_one_fails_at_once` passes: Mailpit's chaos mode answers 451, the send retries after 30 seconds as `smtp_rejected`, then arrives on attempt 2; a 550 for the recipient fails at once → AC-15, AC-16, value sourcing (the retry decision from the reply code) · checked 2026-09-30: passed
+- [x] Same class → `Logs_carry_IDs_and_codes_but_no_address_link_name_subject_or_host` passes: every log line from a queue, a fallback, a 451 retry, a send, and an unreachable host carries the email ID, project, codes, and 451, and none of the address, link, token, user name, subject, project name, host, or code → AC-18, AC-26 · checked 2026-09-30: passed
+- [x] `dotnet test --project server/tests/Orvano.Server.Tests --filter-class "Orvano.Server.Tests.Messaging.SmtpSettingsApiTests"` → `A_refused_test_is_not_retried_and_answers_the_reply_code` passes: a 451 and a 550 each answer 502 `smtp_rejected` with the code in `detail`, nothing arrives, nothing is stored, and the api output has no sender or subject → AC-6, AC-26 · checked 2026-09-30: passed
+- [x] `pnpm --filter @orvano/console exec vitest run --project browser email-settings` → the Settings tab tests pass (sources, port filling, save, test, field and SMTP errors, Stop using with both confirms, the viewer, axe in four modes) → AC-1 to AC-6, AC-24, AC-30 · checked 2026-09-30: 12 of 12 passed
+- [x] With the `console` compose profile up, `pnpm --filter @orvano/console test:e2e` → `email-settings.spec.ts` passes (project SMTP pointed at Mailpit, a refused From email shown under its field, an unreachable port shown in the alert, a test email that arrives from the new sender to the caller, save across a reload, Stop using) and `members.spec.ts` passes (the link step says the invite is being sent, the same link arrives in Mailpit with the right subject, and `/install` Console emails shows it Sent as `e***@example.com`) → AC-1, AC-2, AC-4 to AC-6, AC-21 to AC-23 · checked 2026-09-30: 31 of 31 passed on a fresh rebuild
+- [x] Run `test:e2e` twice in a row within 15 minutes → expect the shell sign in test to hit the console sign in limit (10 per 15 minutes); that is the limit working, not a failure of this slice · checked 2026-09-30: observed: the second back to back run failed only that test, with "Too many attempts"
 
 ## Acceptance-criteria coverage
 
