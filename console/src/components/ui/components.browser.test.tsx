@@ -80,6 +80,38 @@ describe('every inventory component has an example and a script (AC-5)', () => {
   })
 })
 
+/**
+ * What keyboard focus draws on the focused element: the focus outline (spec 0005, Focus), or, for
+ * a control inside an input group, the outline on the group's border. Empty when nothing shows.
+ */
+function focusRing(element: Element): string {
+  const outline = (target: Element) => {
+    const style = getComputedStyle(target)
+    return style.outlineStyle === 'none' || parseFloat(style.outlineWidth) === 0
+      ? ''
+      : `${style.outlineStyle} ${style.outlineWidth}`
+  }
+  const group = element.closest('[data-slot=input-group]')
+  return outline(element) || (group === null ? '' : outline(group))
+}
+
+describe('keyboard focus is always visible (spec 0005, Focus)', () => {
+  it.each(Object.keys(examples))('%s', async (id) => {
+    const screen = await render(<main>{must(examples[id], id).render()}</main>)
+    const hidden: string[] = []
+    const seen = new Set<Element>()
+    for (let stop = 0; stop < 40; stop++) {
+      await userEvent.tab()
+      const active = document.activeElement
+      if (active === null || active === document.body || seen.has(active)) break
+      seen.add(active)
+      if (focusRing(active) === '') hidden.push(active.outerHTML.slice(0, 160))
+    }
+    expect(hidden).toEqual([])
+    await screen.unmount()
+  })
+})
+
 describe.each<Theme>(['dark', 'light'])('keyboard scripts and axe in the %s theme', (theme) => {
   it.each(keyboardScripts.map((script) => [script.component, script] as const))(
     '%s',
