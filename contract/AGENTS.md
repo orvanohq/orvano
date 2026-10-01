@@ -11,6 +11,7 @@ The Orvano API written once in TypeSpec (spec 0001). It compiles to `dist/openap
 | `main.tsp` | The service, and `@info` version, which must equal the repo's `VERSION` (SdkGen refuses to run otherwise) |
 | `system/health.tsp` | `GET /v1/health`, the thin thread operation |
 | `platform/` | The console operations for orgs, projects, API keys, platforms, and install settings (spec 0003), and the `ApiKeyScope` catalog |
+| `messaging/` | The console operations for SMTP settings, the test email, email templates, and the email log (spec 0009) |
 | `errors.tsp` | The `Problem` error body, the public `ErrorCode` catalog, and the runner only `TestErrorCode` |
 | `test/test.tsp` | Test only operations and models (`test.*`) that prove the SDK conventions; they never ship |
 | `tspconfig.yaml` | Emits OpenAPI 3.1 JSON to `dist/openapi.json` |

@@ -23,6 +23,8 @@ The Orvano console: a React SPA built with Vite and served as static files by Ca
 | `src/routes/sign-up.tsx`, `invite.tsx`, `-invite/` | Open sign up and the public invite page, which reads its token from the URL fragment and clears it (spec 0008) |
 | `src/routes/_app/orgs/$orgId/members.tsx`, `-members/`; `src/routes/_app/install.tsx` | The Members page with invites and row actions, and the install settings page (spec 0008) |
 | `src/routes/_app/projects/$projectId/users/` | The project's Users page and user detail (spec 0004) |
+| `src/routes/_app/projects/$projectId/email/`, `-email/`; `src/email/` | The project's Email pages (templates, log, settings), the CodeMirror template editor, and the SMTP form and log table the install page shares (spec 0009) |
+| `public/frames/email-preview.html`, `email-preview-headers.ts` | The sandboxed email preview page, and the Vite plugin that serves it with the headers in `deploy/gateway/email-preview-headers.caddy` |
 | `design.md` | The design system: tokens, type, density, and the component inventory |
 | `src/styles/tokens.css` | Every design token; the only file allowed a color literal (a unit test scans for them) |
 | `src/components/ui/` | shadcn components (Base UI flavor) restyled to the tokens; `keyboard-scripts.ts` is each component's keyboard test as data |
@@ -67,6 +69,8 @@ pnpm --filter @orvano/console test:e2e
 
 - The console is always same origin as the API (Vite proxy in dev, Caddy in production), so there is no CORS. Routing bugs that differ between the two only show up in the compose check.
 - The production CSP allows scripts and styles only from the console's own files: no inline script, and no library that injects a `<style>` element (why the toast is Base UI's, not sonner). An exception is a hash plus a note in `design.md`.
+- CodeMirror mounts in a shadow root (`code-editor.tsx`), where it uses a constructed stylesheet the CSP allows; mounted in the page it would add a `<style>` element and be refused. It is large, so `template-editor.tsx` loads it lazily; keep it out of the main bundle.
+- Changing one byte of the email preview page's inline script changes its hash: write the new hash (the unit test names it) into `deploy/gateway/email-preview-headers.caddy`.
 - `main.tsx` imports `@/lib/zod-config` first: it sets Zod's `jitless`, so building a schema never probes `new Function`, which the CSP reports as a violation. Keep it the first import.
 - In a page test, call `installFakeApi()` at the top of the file and load app modules only dynamically after it (as `renderApp` does): the console client keeps the `fetch` it finds when it loads. Seed IDs the fake never generates (not `org000…1` or `proj000…1`), and find dialogs by `[data-slot=dialog-content]`, since Base UI toasts are `role=dialog` too.
 - The global session error handler in `main.tsx` sends any 401 to sign in, except for queries and mutations marked `meta: { sessionOptional: true }`. Public pages that also work signed out (`/invite`, `/sign-up`) must mark their account query that way, or they redirect.
@@ -85,6 +89,7 @@ pnpm --filter @orvano/console test:e2e
 - [tanstack-form](../.claude/skills/tanstack-form/): `tanstack-skills/tanstack-skills`, typed forms with Standard Schema validation
 - [tanstack-table](../.claude/skills/tanstack-table/): `tanstack-skills/tanstack-skills`, headless tables behind `DataTable`
 - [zod](../.claude/skills/zod/): `pproenca/dot-skills`, Zod schemas and parsing (the console uses Zod 4)
+- [codemirror](../.claude/skills/codemirror/): `solanabettercall/skills`, CodeMirror 6 setup, extensions, themes, and key bindings (low adoption, read it before relying on it; the shadow root rule above wins)
 
 MCP servers: shadcn MCP `npx shadcn@latest mcp` (recommended)
 
@@ -97,5 +102,6 @@ Declined: Base UI MCP, a11y MCP `ronantakizawa/a11ymcp`
 - [0004 App user sign up, sign in, and sessions](../docs/specs/0004-app-user-auth/index.md) (console sessions, the CSRF rule, the Users page)
 - [0007 Console screens for orgs, projects, API keys, and platforms](../docs/specs/0007-console-platform-screens/index.md) (create, rename, delete, and restore flows, the one time key secret, platform identifiers)
 - [0008 Console team members, invitations, and roles](../docs/specs/0008-console-team-members/index.md) (Members page, invite links, `/invite`, `/sign-up`, `/install`)
+- [0009 Transactional email](../docs/specs/0009-transactional-email/index.md) (the Email pages, the template editor, the preview frame and its policy)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
