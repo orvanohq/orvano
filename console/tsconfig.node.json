@@ -22,6 +22,7 @@
   },
   "include": [
     "vite.config.ts",
+    "email-preview-headers.ts",
     "vitest.config.ts",
     "playwright.config.ts",
     "e2e",

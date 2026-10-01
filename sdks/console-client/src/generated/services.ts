@@ -15,6 +15,9 @@ import type {
   CreatedInvitation,
   EmailLogEntry,
   EmailPage,
+  EmailTemplate,
+  EmailTemplateCatalog,
+  EmailTemplateInput,
   EmailTestResult,
   InstallSettings,
   InstallSetup,
@@ -32,6 +35,7 @@ import type {
   Project,
   ProjectPage,
   ProjectSmtp,
+  RenderedEmail,
   SigningKeys,
   SmtpSettings,
   SmtpSettingsInput,
@@ -181,6 +185,92 @@ export class ConsoleAuthKeysService {
   rotate(options?: RequestOptions): Promise<SigningKeys> {
     return this.#client.request<SigningKeys>(
       { method: 'POST', path: '/v1/console/project/auth/keys/rotate' },
+      options,
+    )
+  }
+}
+
+/** Operations in the `consoleEmailTemplates` service. */
+export class ConsoleEmailTemplatesService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /** Gets one template: the project's own version, or the default. Any member. An unknown `kind` answers `not_found`. */
+  get(kind: string, options?: RequestOptions): Promise<EmailTemplate> {
+    return this.#client.request<EmailTemplate>(
+      { method: 'GET', path: `/v1/console/project/email/templates/${encodeURIComponent(kind)}` },
+      options,
+    )
+  }
+
+  /** Lists the four auth email templates of the project named by `X-Orvano-Project`. Any member. */
+  getCatalog(options?: RequestOptions): Promise<EmailTemplateCatalog> {
+    return this.#client.request<EmailTemplateCatalog>(
+      { method: 'GET', path: '/v1/console/project/email/templates' },
+      options,
+    )
+  }
+
+  /** Renders the given content, saved or not, with the sample values, and stores nothing. Owners and developers. */
+  preview(
+    kind: string,
+    body: EmailTemplateInput,
+    options?: RequestOptions,
+  ): Promise<RenderedEmail> {
+    return this.#client.request<RenderedEmail>(
+      {
+        method: 'POST',
+        path: `/v1/console/project/email/templates/${encodeURIComponent(kind)}/preview`,
+        body,
+      },
+      options,
+    )
+  }
+
+  /** Deletes the project's own version, so the default is used again. Owners and developers. Answers 204 also when it is already the default. */
+  reset(kind: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      {
+        method: 'DELETE',
+        path: `/v1/console/project/email/templates/${encodeURIComponent(kind)}`,
+        idempotent: true,
+      },
+      options,
+    )
+  }
+
+  /**
+   * Renders the given content, saved or not, with the sample values and sends it to your own console email through
+   * the SMTP settings the project uses. Owners and developers. Answers `email_not_configured` when there are none;
+   * SMTP failures answer as `consoleSmtp.test` does.
+   */
+  test(kind: string, body: EmailTemplateInput, options?: RequestOptions): Promise<EmailTestResult> {
+    return this.#client.request<EmailTestResult>(
+      {
+        method: 'POST',
+        path: `/v1/console/project/email/templates/${encodeURIComponent(kind)}/test`,
+        body,
+      },
+      options,
+    )
+  }
+
+  /**
+   * Saves the project's own version of a template, replacing any stored one (the last save wins). Owners and
+   * developers. Fails with `template_invalid` when a part does not parse, names an unknown variable or filter, or
+   * is too costly to render.
+   */
+  update(kind: string, body: EmailTemplateInput, options?: RequestOptions): Promise<EmailTemplate> {
+    return this.#client.request<EmailTemplate>(
+      {
+        method: 'PUT',
+        path: `/v1/console/project/email/templates/${encodeURIComponent(kind)}`,
+        body,
+        idempotent: true,
+      },
       options,
     )
   }
@@ -878,6 +968,8 @@ export class Orvano {
   readonly consoleApiKeys: ConsoleApiKeysService
   /** Operations in the `consoleAuthKeys` service. */
   readonly consoleAuthKeys: ConsoleAuthKeysService
+  /** Operations in the `consoleEmailTemplates` service. */
+  readonly consoleEmailTemplates: ConsoleEmailTemplatesService
   /** Operations in the `consoleEmails` service. */
   readonly consoleEmails: ConsoleEmailsService
   /** Operations in the `consoleInstall` service. */
@@ -902,6 +994,7 @@ export class Orvano {
     this.consoleAccount = new ConsoleAccountService(client)
     this.consoleApiKeys = new ConsoleApiKeysService(client)
     this.consoleAuthKeys = new ConsoleAuthKeysService(client)
+    this.consoleEmailTemplates = new ConsoleEmailTemplatesService(client)
     this.consoleEmails = new ConsoleEmailsService(client)
     this.consoleInstall = new ConsoleInstallService(client)
     this.consoleInvitations = new ConsoleInvitationsService(client)

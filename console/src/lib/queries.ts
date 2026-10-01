@@ -35,6 +35,10 @@ export const keys = {
   platforms: (projectId: string) => ['console', 'projects', projectId, 'platforms'] as const,
   smtp: (projectId: string) => ['console', 'projects', projectId, 'email', 'smtp'] as const,
   emails: (projectId: string) => ['console', 'projects', projectId, 'email', 'log'] as const,
+  emailTemplates: (projectId: string) =>
+    ['console', 'projects', projectId, 'email', 'templates'] as const,
+  emailTemplate: (projectId: string, kind: string) =>
+    ['console', 'projects', projectId, 'email', 'templates', kind] as const,
   /** Whether the project has any key: the overview's first page of one (spec 0007, AC-21). */
   anyApiKey: (projectId: string) => ['console', 'projects', projectId, 'keys', 'any'] as const,
   /** Whether the project has any platform (spec 0007, AC-21). */
@@ -286,6 +290,23 @@ export function smtpQuery(projectId: string) {
   return queryOptions({
     queryKey: keys.smtp(projectId),
     queryFn: ({ signal }) => projectClient(projectId).consoleSmtp.get({ signal }),
+  })
+}
+
+/** A project's four auth email templates, each marked Default or Custom (spec 0009, AC-8). */
+export function emailTemplatesQuery(projectId: string) {
+  return queryOptions({
+    // Shares its prefix with the single templates, so one invalidation refreshes the list and the editor.
+    queryKey: [...keys.emailTemplates(projectId), 'catalog'] as const,
+    queryFn: ({ signal }) => projectClient(projectId).consoleEmailTemplates.getCatalog({ signal }),
+  })
+}
+
+/** One template with its variables: the project's own version, or the default (spec 0009, AC-9). */
+export function emailTemplateQuery(projectId: string, kind: string) {
+  return queryOptions({
+    queryKey: keys.emailTemplate(projectId, kind),
+    queryFn: ({ signal }) => projectClient(projectId).consoleEmailTemplates.get(kind, { signal }),
   })
 }
 

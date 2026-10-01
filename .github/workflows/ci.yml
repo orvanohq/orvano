@@ -43,7 +43,8 @@ jobs:
           # Everything Orvano.slnx builds and tests (SdkGen's tests read the SDK manifests).
           dotnet    server/* tools/* dev/* sdks/dotnet/* tests/scenarios/runners/dotnet/* sdks/*/package.json sdks/*/pubspec.yaml tests/scenarios/runners/*/pubspec.yaml contract/dist/openapi.json deploy/compose/initdb/* Orvano.slnx global.json Directory.Build.props Directory.Packages.props .editorconfig VERSION
           js        contract/* console/* sdks/js/* sdks/nextjs/* sdks/console-client/* tests/scenarios/runners/js/* tests/scenarios/runners/nextjs/* package.json pnpm-lock.yaml pnpm-workspace.yaml eslint.config.js .prettierrc.json .tool-versions
-          console   console/* sdks/js/* sdks/console-client/* package.json pnpm-lock.yaml pnpm-workspace.yaml .tool-versions
+          # The frame page's hash test reads its headers file in the gateway folder (spec 0009, AC-32).
+          console   console/* sdks/js/* sdks/console-client/* deploy/gateway/email-preview-headers.caddy package.json pnpm-lock.yaml pnpm-workspace.yaml .tool-versions
           # The console against the real API: the console, the gateway, and the server image.
           e2e       console/* sdks/js/* sdks/console-client/* deploy/gateway/* deploy/server.Dockerfile deploy/compose/* server/* contract/dist/openapi.json tests/scenarios/compose.yml tests/scenarios/fixtures.yaml package.json pnpm-lock.yaml pnpm-workspace.yaml global.json Directory.Build.props Directory.Packages.props .dockerignore .tool-versions VERSION
           # The self host install path: the installer, both images, and the Compose file.

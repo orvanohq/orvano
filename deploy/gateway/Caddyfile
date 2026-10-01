@@ -46,6 +46,17 @@
 			Cross-Origin-Opener-Policy same-origin
 		}
 
+		# The email preview frame page (spec 0009, AC-32) gets a policy written for email instead. This
+		# `header` runs after the one above, so its fields replace the console's. path_regexp is case
+		# sensitive, unlike `path`, so /Frames/... stays a console file with the console's headers.
+		@emailPreview path_regexp ^/frames/email-preview\.html$
+		handle @emailPreview {
+			header {
+				import email-preview-headers.caddy
+			}
+			file_server
+		}
+
 		# Hashed build files never change, so a file that exists caches for a year. A missing one is a
 		# plain 404 that is never cached: falling back to index.html would let a browser keep HTML as
 		# JavaScript for a year (for example a chunk from the previous build).

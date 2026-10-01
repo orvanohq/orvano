@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Email preview</title>
+    <!--
+      The email preview frame (spec 0009, AC-31, AC-32). The console loads this page in a sandboxed
+      frame with no allow-same-origin, so it runs in an opaque origin, and the gateway serves it with
+      its own policy (deploy/gateway/email-preview-headers.caddy). The script's SHA-256 is in that
+      policy: change one byte of it and put the new hash there (the hash test says which).
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #ffffff;
+        color-scheme: light;
+      }
+      iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <iframe title="Email content" sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
+    <script>
+      ;(function () {
+        var inner = document.querySelector('iframe')
+        var last = null
+        var kept = ['http:', 'https:', 'mailto:']
+
+        function allowed(href) {
+          try {
+            return kept.indexOf(new URL(href).protocol) !== -1
+          } catch (error) {
+            return false
+          }
+        }
+
+        function doctypeOf(doc) {
+          var type = doc.doctype
+          if (!type) return ''
+          if (type.publicId) {
+            return (
+              '<!DOCTYPE ' +
+              type.name +
+              ' PUBLIC "' +
+              type.publicId +
+              '"' +
+              (type.systemId ? ' "' + type.systemId + '"' : '') +
+              '>'
+            )
+          }
+          if (type.systemId) return '<!DOCTYPE ' + type.name + ' SYSTEM "' + type.systemId + '">'
+          return '<!DOCTYPE ' + type.name + '>'
+        }
+
+        function clean(html) {
+          var doc = new DOMParser().parseFromString(html, 'text/html')
+          var base = doc.createElement('base')
+          base.setAttribute('target', '_blank')
+          doc.head.insertBefore(base, doc.head.firstChild)
+          doc.querySelectorAll('a, area').forEach(function (link) {
+            ;['href', 'xlink:href'].forEach(function (name) {
+              var value = link.getAttribute(name)
+              if (value !== null && !allowed(value)) link.removeAttribute(name)
+            })
+            link.setAttribute('rel', 'noopener noreferrer')
+          })
+          doc.querySelectorAll('meta[name="referrer" i]').forEach(function (meta) {
+            meta.remove()
+          })
+          doc.querySelectorAll('img').forEach(function (image) {
+            image.setAttribute('referrerpolicy', 'no-referrer')
+          })
+          return doctypeOf(doc) + doc.documentElement.outerHTML
+        }
+
+        window.addEventListener('message', function (event) {
+          if (event.source !== window.parent) return
+          var data = event.data
+          if (typeof data !== 'object' || data === null) return
+          if (data.type !== 'orvano.email-preview.render' || typeof data.html !== 'string') return
+          if (data.html === last) return
+          last = data.html
+          inner.srcdoc = clean(data.html)
+        })
+
+        window.parent.postMessage({ type: 'orvano.email-preview.ready' }, '*')
+      })()
+    </script>
+  </body>
+</html>

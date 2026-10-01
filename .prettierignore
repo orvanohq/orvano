@@ -18,3 +18,5 @@ tests/scenarios/runners/flutter/web/
 console/test-results/
 console/playwright-report/
 console/.vitest/
+# The email preview frame page: its policy allows its script by hash, so its bytes never change.
+console/public/frames/

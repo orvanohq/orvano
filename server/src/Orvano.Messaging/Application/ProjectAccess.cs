@@ -3,7 +3,11 @@ using Orvano.Platform.Contracts;
 namespace Orvano.Messaging.Application;
 
 /// <summary>A console user who passed the project checks, and their role in the project's org.</summary>
-internal sealed record ProjectCaller(Guid UserId, string ProjectId, OrgRole Role);
+internal sealed record ProjectCaller(Guid UserId, string ProjectId, OrgRole Role)
+{
+    /// <summary>True for an owner or a developer, who may change email settings and templates.</summary>
+    public bool CanChange => Role is OrgRole.Owner or OrgRole.Developer;
+}
 
 /// <summary>
 /// The first two checks of every project email operation (spec 0009, AC-24): someone who is not a member of the
@@ -19,7 +23,8 @@ internal sealed class ProjectAccess(IConsoleAccess access)
     {
         if (projectId is null) return Failure.ProjectHeaderMissing;
         if (await access.GetProjectRoleAsync(userId, projectId, ct) is not { } role) return Failure.ProjectNotFound;
-        if (change && role is not (OrgRole.Owner or OrgRole.Developer)) return Failure.Forbidden;
-        return new ProjectCaller(userId, projectId, role);
+        var caller = new ProjectCaller(userId, projectId, role);
+        if (change && !caller.CanChange) return Failure.Forbidden;
+        return caller;
     }
 }

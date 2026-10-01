@@ -2288,6 +2288,311 @@
         "x-orvano-audience": "console"
       }
     },
+    "/v1/console/project/email/templates": {
+      "get": {
+        "operationId": "consoleEmailTemplates.getCatalog",
+        "description": "Lists the four auth email templates of the project named by `X-Orvano-Project`. Any member.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailTemplateCatalog"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleEmailTemplates",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/email/templates/{kind}": {
+      "get": {
+        "operationId": "consoleEmailTemplates.get",
+        "description": "Gets one template: the project's own version, or the default. Any member. An unknown `kind` answers `not_found`.",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "description": "The template: `verification`, `recovery`, `magic_link`, or `email_code`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailTemplate"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleEmailTemplates",
+        "x-orvano-audience": "console"
+      },
+      "put": {
+        "operationId": "consoleEmailTemplates.update",
+        "description": "Saves the project's own version of a template, replacing any stored one (the last save wins). Owners and\ndevelopers. Fails with `template_invalid` when a part does not parse, names an unknown variable or filter, or\nis too costly to render.",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "description": "The template: `verification`, `recovery`, `magic_link`, or `email_code`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailTemplate"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailTemplateInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-service": "consoleEmailTemplates",
+        "x-orvano-audience": "console"
+      },
+      "delete": {
+        "operationId": "consoleEmailTemplates.reset",
+        "description": "Deletes the project's own version, so the default is used again. Owners and developers. Answers 204 also when it is already the default.",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "description": "The template: `verification`, `recovery`, `magic_link`, or `email_code`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-service": "consoleEmailTemplates",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/email/templates/{kind}/preview": {
+      "post": {
+        "operationId": "consoleEmailTemplates.preview",
+        "description": "Renders the given content, saved or not, with the sample values, and stores nothing. Owners and developers.",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "description": "The template: `verification`, `recovery`, `magic_link`, or `email_code`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderedEmail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailTemplateInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleEmailTemplates",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/email/templates/{kind}/test": {
+      "post": {
+        "operationId": "consoleEmailTemplates.test",
+        "description": "Renders the given content, saved or not, with the sample values and sends it to your own console email through\nthe SMTP settings the project uses. Owners and developers. Answers `email_not_configured` when there are none;\nSMTP failures answer as `consoleSmtp.test` does.",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "description": "The template: `verification`, `recovery`, `magic_link`, or `email_code`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailTestResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailTemplateInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleEmailTemplates",
+        "x-orvano-audience": "console"
+      }
+    },
     "/v1/console/project/emails": {
       "get": {
         "operationId": "consoleEmails.list",
@@ -4228,6 +4533,16 @@
         ],
         "description": "What an API key may do: `<resource>.<read|write>`. A `write` scope does not imply `read`. Each product\nadds its own scopes."
       },
+      "AuthEmailKind": {
+        "type": "string",
+        "enum": [
+          "verification",
+          "recovery",
+          "magic_link",
+          "email_code"
+        ],
+        "description": "One of the four auth email templates a project can edit."
+      },
       "AuthResult": {
         "type": "object",
         "required": [
@@ -4923,6 +5238,133 @@
         ],
         "description": "Where an email is in its delivery."
       },
+      "EmailTemplate": {
+        "type": "object",
+        "required": [
+          "kind",
+          "locale",
+          "subject",
+          "html",
+          "text",
+          "isCustom",
+          "updatedAt",
+          "variables"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/AuthEmailKind",
+            "description": "Which template it is."
+          },
+          "locale": {
+            "type": "string",
+            "description": "The template's language. Always `en` for now.",
+            "examples": [
+              "en"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "description": "The subject line, a Liquid template.",
+            "examples": [
+              "Reset your password for {{ project.name }}"
+            ]
+          },
+          "html": {
+            "type": "string",
+            "description": "The HTML part, a Liquid template."
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The plain text part; null when it is generated from the HTML."
+          },
+          "isCustom": {
+            "type": "boolean",
+            "description": "True when the project edited it; false for the default.",
+            "examples": [
+              false
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was last edited; null for the default."
+          },
+          "variables": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateVariable"
+            },
+            "description": "The values this template can use."
+          }
+        },
+        "description": "One auth email template: the project's own version, or the default when it has none."
+      },
+      "EmailTemplateCatalog": {
+        "type": "object",
+        "required": [
+          "templates"
+        ],
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmailTemplateSummary"
+            },
+            "description": "The four templates."
+          }
+        },
+        "description": "The auth email templates of a project. Always all four, so it is not paged."
+      },
+      "EmailTemplateInput": {
+        "type": "object",
+        "required": [
+          "subject",
+          "html",
+          "text"
+        ],
+        "properties": {
+          "subject": {
+            "type": "string",
+            "description": "The subject line, 1 to 255 characters. It is not HTML encoded.",
+            "examples": [
+              "Reset your password for {{ project.name }}"
+            ]
+          },
+          "html": {
+            "type": "string",
+            "description": "The HTML part, at most 100 KB. Every `{{ }}` output in it is HTML encoded.",
+            "examples": [
+              "<p>Hi {{ user.name }}, <a href=\"{{ action_url }}\">reset your password</a>.</p>"
+            ]
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The plain text part, at most 100 KB; null to generate it from the HTML."
+          }
+        },
+        "description": "A template's content to save, preview, or test. Each part is a Liquid template."
+      },
       "EmailTemplateName": {
         "type": "string",
         "enum": [
@@ -4933,6 +5375,56 @@
           "console_invitation"
         ],
         "description": "Which email was sent: one of the four auth templates, or the console's own invite."
+      },
+      "EmailTemplateSummary": {
+        "type": "object",
+        "required": [
+          "kind",
+          "name",
+          "description",
+          "isCustom",
+          "updatedAt"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/AuthEmailKind",
+            "description": "Which template it is."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name.",
+            "examples": [
+              "Password reset"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "When it is sent.",
+            "examples": [
+              "Sent when a user asks to reset their password."
+            ]
+          },
+          "isCustom": {
+            "type": "boolean",
+            "description": "True when the project edited it; false for the default.",
+            "examples": [
+              false
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was last edited; null for the default."
+          }
+        },
+        "description": "One template in the catalog."
       },
       "EmailTestResult": {
         "type": "object",
@@ -5913,6 +6405,32 @@
         },
         "description": "A trade of a refresh token for a new pair."
       },
+      "RenderedEmail": {
+        "type": "object",
+        "required": [
+          "subject",
+          "html",
+          "text"
+        ],
+        "properties": {
+          "subject": {
+            "type": "string",
+            "description": "The rendered subject.",
+            "examples": [
+              "Reset your password for Acme Shop"
+            ]
+          },
+          "html": {
+            "type": "string",
+            "description": "The rendered HTML part."
+          },
+          "text": {
+            "type": "string",
+            "description": "The rendered text part, generated from the HTML when the template has none."
+          }
+        },
+        "description": "A template rendered with the sample values."
+      },
       "Session": {
         "type": "object",
         "required": [
@@ -6339,6 +6857,38 @@
           "none"
         ],
         "description": "Whose SMTP settings a project sends through."
+      },
+      "TemplateVariable": {
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "sample"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name to write between `{{` and `}}`.",
+            "examples": [
+              "project.name"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "What it holds.",
+            "examples": [
+              "Your project's name."
+            ]
+          },
+          "sample": {
+            "type": "string",
+            "description": "The value previews and test emails use.",
+            "examples": [
+              "Acme Shop"
+            ]
+          }
+        },
+        "description": "A value a template can use."
       },
       "TestConsolePing": {
         "type": "object",

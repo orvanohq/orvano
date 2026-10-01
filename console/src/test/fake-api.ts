@@ -1,9 +1,12 @@
 import type {
   ApiKey,
   ApiKeyScope,
+  AuthEmailKind,
   ConsoleAccount,
   ConsoleSignupMode,
   EmailLogEntry,
+  EmailTemplate,
+  EmailTemplateInput,
   Invitation,
   InvitationPreview,
   Member,
@@ -68,6 +71,10 @@ export interface FakeApi {
   installEmails: EmailLogEntry[]
   /** The project email log, as `consoleEmails.list` answers for any project. */
   emails: EmailLogEntry[]
+  /** The email templates a project edited, by kind (spec 0009); the rest are the fake's defaults. */
+  emailTemplates: Partial<Record<AuthEmailKind, EmailTemplateInput & { updatedAt: string }>>
+  /** Whether any SMTP server is set up; without one a template test answers 409 (spec 0009, AC-12). */
+  emailConfigured: boolean
   projects: Project[]
   apiKeys: ApiKey[]
   platforms: Platform[]
@@ -81,6 +88,38 @@ export interface FakeApi {
 }
 
 export const accountId = 'user00000000000000001'
+
+/** The four templates as the catalog lists them (spec 0009, Template variables). */
+export const fakeTemplates: Record<AuthEmailKind, { name: string; description: string }> = {
+  verification: {
+    name: 'Email verification',
+    description: 'Sent to confirm a user owns their email address.',
+  },
+  recovery: {
+    name: 'Password reset',
+    description: 'Sent when a user asks to reset their password.',
+  },
+  magic_link: {
+    name: 'Magic link',
+    description: 'Sent when a user signs in with a link instead of a password.',
+  },
+  email_code: {
+    name: 'Email code',
+    description: 'Sent when a user signs in with a one time code.',
+  },
+}
+
+const sampleUrl = 'https://example.com/auth/confirm?token=sample'
+
+/** A short default template: enough Liquid for a preview to have something to fill in. */
+function defaultTemplate(kind: AuthEmailKind): EmailTemplateInput {
+  const action = kind === 'email_code' ? '{{ code }}' : '<a href="{{ action_url }}">Open</a>'
+  return {
+    subject: `${fakeTemplates[kind].name} for {{ project.name }}`,
+    html: `<h1>${fakeTemplates[kind].name}</h1>\n<p>Hi {{ user.name }}, ${action}</p>`,
+    text: `${fakeTemplates[kind].name}: ${kind === 'email_code' ? '{{ code }}' : '{{ action_url }}'}`,
+  }
+}
 
 /** An org you belong to with `role`. */
 export function makeOrg(overrides: Partial<Org> & { id: string; role?: OrgRole }): Org {
@@ -201,6 +240,8 @@ export function installFakeApi(): FakeApi {
     installSmtp: null,
     installEmails: [],
     emails: [],
+    emailTemplates: {},
+    emailConfigured: true,
     projects: [],
     apiKeys: [],
     platforms: [],
@@ -214,6 +255,12 @@ export function installFakeApi(): FakeApi {
     },
   }
 
+  const templateKinds: readonly AuthEmailKind[] = [
+    'verification',
+    'recovery',
+    'magic_link',
+    'email_code',
+  ]
   const orgById = (id: string) => api.orgs.find((org) => org.id === id)
   const projectById = (id: string | null) => api.projects.find((project) => project.id === id)
   const replace = <T extends { id: string }>(list: T[], next: T) => {
@@ -450,6 +497,92 @@ export function installFakeApi(): FakeApi {
       }
       if (path === '/v1/console/project/auth/keys') return Response.json({ keys: [] })
       if (path === '/v1/console/project/emails') return page(api.emails)
+      if (path === '/v1/console/project/email/templates') {
+        return Response.json({
+          templates: templateKinds.map((kind) => ({
+            kind,
+            ...fakeTemplates[kind],
+            isCustom: api.emailTemplates[kind] !== undefined,
+            updatedAt: api.emailTemplates[kind]?.updatedAt ?? null,
+          })),
+        })
+      }
+      match = /^\/v1\/console\/project\/email\/templates\/([^/]+)(\/preview|\/test)?$/.exec(path)
+      if (match !== null) {
+        const kind = templateKinds.find((item) => item === match?.[1])
+        if (kind === undefined) return problem(404, 'not_found', 'No such email template.')
+        const values: Record<string, string> = {
+          'project.name': current.name,
+          'user.email': api.account.email ?? '',
+          'user.name': api.account.name ?? '',
+          ...(kind === 'email_code' ? { code: '428613' } : { action_url: sampleUrl }),
+          expires_in_minutes: kind === 'email_code' ? '10' : '60',
+        }
+        const template = (): EmailTemplate => {
+          const custom = api.emailTemplates[kind]
+          const source = custom ?? defaultTemplate(kind)
+          return {
+            kind,
+            locale: 'en',
+            subject: source.subject,
+            html: source.html,
+            text: source.text,
+            isCustom: custom !== undefined,
+            updatedAt: custom?.updatedAt ?? null,
+            variables: Object.entries(values).map(([name, sample]) => ({
+              name,
+              description: `What ${name} holds.`,
+              sample,
+            })),
+          }
+        }
+        const action = match.at(2)
+        if (action === undefined) {
+          if (method === 'GET') return Response.json(template())
+          if (method === 'DELETE') {
+            api.emailTemplates = { ...api.emailTemplates, [kind]: undefined }
+            return new Response(null, { status: 204 })
+          }
+        }
+        // The real server's rule, in small: a name outside the template's variables is refused.
+        const given = input as unknown as EmailTemplateInput
+        const fill = (part: string, source: string): string | Response => {
+          const unknown = [...source.matchAll(/\{\{\s*([\w.]+)\s*\}\}/g)].find(
+            (found) => !Object.hasOwn(values, found[1]),
+          )
+          if (unknown !== undefined) {
+            const line = source.slice(0, unknown.index).split('\n').length
+            const detail = `${part}: line ${String(line)}: unknown variable ${unknown[1]}`
+            return problem(422, 'template_invalid', detail)
+          }
+          return source.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, name: string) => values[name])
+        }
+        if (given.subject.trim() === '') {
+          return problem(400, 'invalid_request', 'subject: Enter a subject.')
+        }
+        const subject = fill('subject', given.subject.trim())
+        if (subject instanceof Response) return subject
+        const html = fill('html', given.html)
+        if (html instanceof Response) return html
+        const text = fill('text', given.text ?? given.html.replace(/<[^>]+>/g, ''))
+        if (text instanceof Response) return text
+        if (action === '/preview') return Response.json({ subject, html, text })
+        if (action === '/test') {
+          return api.emailConfigured
+            ? Response.json({ sentTo: api.account.email ?? '' })
+            : problem(409, 'email_not_configured', 'No email server is set up.')
+        }
+        api.emailTemplates = {
+          ...api.emailTemplates,
+          [kind]: {
+            subject: given.subject.trim(),
+            html: given.html,
+            text: given.text,
+            updatedAt: '2026-06-02T10:00:00.000Z',
+          },
+        }
+        return Response.json(template())
+      }
       if (path === '/v1/console/project/keys' && method === 'GET') {
         return page(url.searchParams.get('limit') === '1' ? api.apiKeys.slice(0, 1) : api.apiKeys)
       }

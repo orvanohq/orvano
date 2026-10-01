@@ -2,3 +2,6 @@
 # Migration checksums are taken over the file bytes; keep them identical on every OS.
 *.sql text eol=lf
 *.sh text eol=lf
+# The email preview frame page and its headers: the policy hashes the page's script bytes.
+console/public/frames/*.html text eol=lf
+deploy/gateway/*.caddy text eol=lf

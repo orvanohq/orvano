@@ -8,6 +8,7 @@ import type {
   CreateOrgRequest,
   CreatePlatformRequest,
   CreateProjectRequest,
+  EmailTemplateInput,
   InvitationTokenRequest,
   SmtpSettingsInput,
   UpdateInstallSettingsRequest,
@@ -67,6 +68,33 @@ export const consoleDispatch: DispatchTable = {
   'consoleAuthKeys.rotate': {
     status: 200,
     console: (o, _input) => o.consoleAuthKeys.rotate(),
+  },
+  'consoleEmailTemplates.get': {
+    status: 200,
+    console: (o, input) => o.consoleEmailTemplates.get(input.kind as string),
+  },
+  'consoleEmailTemplates.getCatalog': {
+    status: 200,
+    console: (o, _input) => o.consoleEmailTemplates.getCatalog(),
+  },
+  'consoleEmailTemplates.preview': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleEmailTemplates.preview(input.kind as string, input.body as EmailTemplateInput),
+  },
+  'consoleEmailTemplates.reset': {
+    status: 204,
+    console: (o, input) => o.consoleEmailTemplates.reset(input.kind as string),
+  },
+  'consoleEmailTemplates.test': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleEmailTemplates.test(input.kind as string, input.body as EmailTemplateInput),
+  },
+  'consoleEmailTemplates.update': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleEmailTemplates.update(input.kind as string, input.body as EmailTemplateInput),
   },
   'consoleEmails.list': {
     status: 200,

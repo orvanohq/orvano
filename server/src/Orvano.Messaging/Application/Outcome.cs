@@ -21,6 +21,13 @@ internal sealed record Failure(int Status, string Code, string Detail)
 
     public static Failure ProjectNotFound { get; } = new(404, ErrorCode.ProjectNotFound, "No such project.");
 
+    public static Failure TemplateNotFound { get; } = new(404, ErrorCode.NotFound, "No such email template.");
+
+    public static Failure EmailNotConfigured { get; } = new(
+        409, ErrorCode.EmailNotConfigured, "No email server is set up. Add one in Email settings, or ask the install admin to add one for the whole server.");
+
+    public static Failure TemplateInvalid(string detail) => new(422, ErrorCode.TemplateInvalid, detail);
+
     public static Failure ProjectNotReady { get; } =
         new(409, ErrorCode.ProjectNotReady, "The project is not active, so its email settings can't change and it can't send email.");
 

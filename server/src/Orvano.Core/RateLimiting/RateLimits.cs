@@ -44,6 +44,9 @@ public static class RateLimitPolicies
 
     /// <summary>Every test email (<c>consoleSmtp.test</c> and its siblings), keyed by console user ID; every attempt that passed the role check counts (spec 0009, AC-25).</summary>
     public static RateLimitPolicy MessagingTestPerUser { get; } = new("messaging.test.user", 30, TimeSpan.FromMinutes(15));
+
+    /// <summary>Every template preview (<c>consoleEmailTemplates.preview</c>), keyed by console user ID; every attempt that passed the role check counts (spec 0009, AC-25).</summary>
+    public static RateLimitPolicy MessagingPreviewPerUser { get; } = new("messaging.preview.user", 300, TimeSpan.FromMinutes(5));
 }
 
 /// <summary>The answer of a limit check.</summary>

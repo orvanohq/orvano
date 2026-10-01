@@ -17,8 +17,12 @@ COPY console/ console/
 RUN pnpm --filter @orvano/console... build
 
 FROM caddy:2.11.4-alpine
-COPY deploy/gateway/Caddyfile /etc/caddy/Caddyfile
+COPY deploy/gateway/Caddyfile deploy/gateway/email-preview-headers.caddy /etc/caddy/
 COPY --chmod=755 deploy/gateway/entrypoint.sh /usr/local/bin/orvano-gateway-entrypoint
 COPY --from=console /src/console/dist /srv/console
+# A Caddyfile or headers file that doesn't parse fails the image build, not the first start. The
+# empty global.caddy stands in for the one entrypoint.sh writes at start.
+RUN touch /etc/caddy/global.caddy \
+  && ORVANO_PUBLIC_URL=http://localhost caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 ENTRYPOINT ["/usr/local/bin/orvano-gateway-entrypoint"]
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

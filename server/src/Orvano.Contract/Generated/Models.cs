@@ -40,6 +40,52 @@ public sealed class ApiKeyScopeJsonConverter : JsonConverter<ApiKeyScope>
         });
 }
 
+/// <summary>One of the four auth email templates a project can edit.</summary>
+[JsonConverter(typeof(AuthEmailKindJsonConverter))]
+public enum AuthEmailKind
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>verification</c>.</summary>
+    Verification,
+
+    /// <summary>The wire value <c>recovery</c>.</summary>
+    Recovery,
+
+    /// <summary>The wire value <c>magic_link</c>.</summary>
+    MagicLink,
+
+    /// <summary>The wire value <c>email_code</c>.</summary>
+    EmailCode,
+}
+
+/// <summary>Reads and writes <see cref="AuthEmailKind"/> by wire value; unknown values read as <see cref="AuthEmailKind.Unknown"/>.</summary>
+public sealed class AuthEmailKindJsonConverter : JsonConverter<AuthEmailKind>
+{
+    /// <inheritdoc/>
+    public override AuthEmailKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "verification" => AuthEmailKind.Verification,
+            "recovery" => AuthEmailKind.Recovery,
+            "magic_link" => AuthEmailKind.MagicLink,
+            "email_code" => AuthEmailKind.EmailCode,
+            _ => AuthEmailKind.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, AuthEmailKind value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            AuthEmailKind.Verification => "verification",
+            AuthEmailKind.Recovery => "recovery",
+            AuthEmailKind.MagicLink => "magic_link",
+            AuthEmailKind.EmailCode => "email_code",
+            _ => throw new JsonException($"AuthEmailKind.{value} has no wire value"),
+        });
+}
+
 /// <summary>Who may create a console account.</summary>
 [JsonConverter(typeof(ConsoleSignupModeJsonConverter))]
 public enum ConsoleSignupMode
@@ -857,6 +903,52 @@ public sealed record EmailSender(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("name")] string? Name);
 
+/// <summary>One auth email template: the project's own version, or the default when it has none.</summary>
+/// <param name="Kind">Which template it is.</param>
+/// <param name="Locale">The template's language. Always <c>en</c> for now.</param>
+/// <param name="Subject">The subject line, a Liquid template.</param>
+/// <param name="Html">The HTML part, a Liquid template.</param>
+/// <param name="Text">The plain text part; null when it is generated from the HTML.</param>
+/// <param name="IsCustom">True when the project edited it; false for the default.</param>
+/// <param name="UpdatedAt">When it was last edited; null for the default.</param>
+/// <param name="Variables">The values this template can use.</param>
+public sealed record EmailTemplate(
+    [property: JsonPropertyName("kind")] AuthEmailKind Kind,
+    [property: JsonPropertyName("locale")] string Locale,
+    [property: JsonPropertyName("subject")] string Subject,
+    [property: JsonPropertyName("html")] string Html,
+    [property: JsonPropertyName("text")] string? Text,
+    [property: JsonPropertyName("isCustom")] bool IsCustom,
+    [property: JsonPropertyName("updatedAt")] DateTimeOffset? UpdatedAt,
+    [property: JsonPropertyName("variables")] IReadOnlyList<TemplateVariable> Variables);
+
+/// <summary>The auth email templates of a project. Always all four, so it is not paged.</summary>
+/// <param name="Templates">The four templates.</param>
+public sealed record EmailTemplateCatalog(
+    [property: JsonPropertyName("templates")] IReadOnlyList<EmailTemplateSummary> Templates);
+
+/// <summary>A template's content to save, preview, or test. Each part is a Liquid template.</summary>
+/// <param name="Subject">The subject line, 1 to 255 characters. It is not HTML encoded.</param>
+/// <param name="Html">The HTML part, at most 100 KB. Every <c>{{ }}</c> output in it is HTML encoded.</param>
+/// <param name="Text">The plain text part, at most 100 KB; null to generate it from the HTML.</param>
+public sealed record EmailTemplateInput(
+    [property: JsonPropertyName("subject")] string Subject,
+    [property: JsonPropertyName("html")] string Html,
+    [property: JsonPropertyName("text")] string? Text);
+
+/// <summary>One template in the catalog.</summary>
+/// <param name="Kind">Which template it is.</param>
+/// <param name="Name">Its name.</param>
+/// <param name="Description">When it is sent.</param>
+/// <param name="IsCustom">True when the project edited it; false for the default.</param>
+/// <param name="UpdatedAt">When it was last edited; null for the default.</param>
+public sealed record EmailTemplateSummary(
+    [property: JsonPropertyName("kind")] AuthEmailKind Kind,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("description")] string Description,
+    [property: JsonPropertyName("isCustom")] bool IsCustom,
+    [property: JsonPropertyName("updatedAt")] DateTimeOffset? UpdatedAt);
+
 /// <summary>The result of a test email.</summary>
 /// <param name="SentTo">The address the test email went to: your own console email.</param>
 public sealed record EmailTestResult(
@@ -1094,6 +1186,15 @@ public sealed record ProjectSmtp(
 public sealed record RefreshSessionRequest(
     [property: JsonPropertyName("refreshToken")] string RefreshToken);
 
+/// <summary>A template rendered with the sample values.</summary>
+/// <param name="Subject">The rendered subject.</param>
+/// <param name="Html">The rendered HTML part.</param>
+/// <param name="Text">The rendered text part, generated from the HTML when the template has none.</param>
+public sealed record RenderedEmail(
+    [property: JsonPropertyName("subject")] string Subject,
+    [property: JsonPropertyName("html")] string Html,
+    [property: JsonPropertyName("text")] string Text);
+
 /// <summary>An active session of a user: one signed in device or browser.</summary>
 /// <param name="Id">The session ID.</param>
 /// <param name="CreatedAt">When the user signed in.</param>
@@ -1186,6 +1287,15 @@ public sealed record SmtpSettingsInput(
     [property: JsonPropertyName("fromEmail")] string FromEmail,
     [property: JsonPropertyName("fromName")] string? FromName,
     [property: JsonPropertyName("replyTo")] string? ReplyTo);
+
+/// <summary>A value a template can use.</summary>
+/// <param name="Name">The name to write between <c>{{</c> and <c>}}</c>.</param>
+/// <param name="Description">What it holds.</param>
+/// <param name="Sample">The value previews and test emails use.</param>
+public sealed record TemplateVariable(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("description")] string Description,
+    [property: JsonPropertyName("sample")] string Sample);
 
 /// <summary>The answer to <c>test.consolePing</c>.</summary>
 /// <param name="Status">Always <c>ok</c>.</param>
