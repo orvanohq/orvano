@@ -19,6 +19,7 @@ import { notifySuccess } from '@/lib/toast'
 import { RelativeTime } from '@/shell/relative-time'
 import type { EmailTemplate, RenderedEmail } from '@orvano/console-client'
 
+import { EmailPreviewFrame } from './email-preview-frame'
 import {
   initialValues,
   isChanged,
@@ -108,6 +109,10 @@ export function TemplateEditor({
     gcTime: 0,
   })
   const previewProblem = preview.isError ? placeError(preview.error) : null
+  // The last successful preview stays through a 422 or a failure (AC-33), so fixing an error never
+  // reloads the frame. keepPreviousData keeps it only while a request is on its way.
+  const [shown, setShown] = useState<RenderedEmail | undefined>(undefined)
+  if (preview.data !== undefined && preview.data !== shown) setShown(preview.data)
 
   const setPart = (part: TemplatePart, value: string) => {
     setValues((current) => ({ ...current, [part]: value }))
@@ -320,7 +325,7 @@ export function TemplateEditor({
         <div className="flex min-w-0 flex-col gap-6">
           {readOnly ? null : (
             <TemplatePreview
-              rendered={preview.data}
+              rendered={shown}
               stale={preview.isFetching || settled !== values}
               // A problem in one part already shows under that part.
               failure={preview.isError && previewProblem === null ? preview.error : null}
@@ -372,8 +377,10 @@ export function TemplateEditor({
 }
 
 /**
- * The preview (spec 0009, AC-9): the rendered subject, then the HTML in a sandboxed frame that runs
- * no scripts, or the text part. While a newer render is on its way the last one stays, dimmed.
+ * The preview (spec 0009, AC-9, AC-33): the rendered subject, then the HTML in the preview frame,
+ * or the text part. While a newer render is on its way, or the template has an error, the last
+ * successful one stays, dimmed. The HTML view stays mounted while the Text view shows, so switching
+ * never reloads the frame.
  */
 function TemplatePreview({
   rendered,
@@ -428,12 +435,10 @@ function TemplatePreview({
               <TabsTrigger value="html">HTML</TabsTrigger>
               <TabsTrigger value="text">Text</TabsTrigger>
             </TabsList>
-            <TabsContent value="html">
-              {/* An empty sandbox: no scripts, no forms, no same origin access. Emails assume a white page. */}
-              <iframe
-                title="Email preview"
-                sandbox=""
-                srcDoc={rendered.html}
+            <TabsContent value="html" keepMounted>
+              {/* Emails assume a white page; the frame page is white whatever the console's theme. */}
+              <EmailPreviewFrame
+                html={rendered.html}
                 className="h-128 w-full rounded-lg border border-border bg-white"
               />
             </TabsContent>

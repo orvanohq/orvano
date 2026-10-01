@@ -1,0 +1,15 @@
+# The headers of /frames/email-preview.html, the email preview frame page (spec 0009, AC-32).
+# They replace the console's headers for that one path. The Caddyfile imports this file, and the
+# console's Vite dev and preview servers read it, so every way of serving the page sends the same.
+#
+# One header per line, as Name "value": double quotes, no escapes inside. Blank lines and # comments
+# are allowed. The script-src hash is the SHA-256 of the page's one inline script; the hash test in
+# console/src/email/ fails when it no longer matches.
+
+Content-Security-Policy "default-src 'none'; script-src 'sha256-D3uC84D3INT3zOOit77HNCS2dBiaZCI+UdCTIlUfwLU='; style-src 'unsafe-inline'; img-src https: data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox"
+X-Frame-Options "SAMEORIGIN"
+Referrer-Policy "no-referrer"
+X-Content-Type-Options "nosniff"
+Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+Cross-Origin-Opener-Policy "same-origin"
+Cache-Control "no-cache"

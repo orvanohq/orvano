@@ -1,12 +1,12 @@
 import axe from 'axe-core'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { userEvent } from 'vitest/browser'
 
 import { renderApp, setMode } from '@/test/app'
 import { installFakeApi, makeOrg, makeProject, type FakeApi } from '@/test/fake-api'
 import type { OrgRole } from '@orvano/console-client'
 
-// Spec 0009, AC-8 to AC-12 and AC-30: the Templates tab and the template editor.
+// Spec 0009, AC-8 to AC-12, AC-30, and AC-33: the Templates tab and the template editor.
 
 const api: FakeApi = installFakeApi()
 const projectId = 'proj0000000000000001'
@@ -118,12 +118,12 @@ describe('the template editor', () => {
     )
     expect(labels).toEqual(['HTML', 'Text'])
 
-    // AC-9: the HTML renders in a frame that can run nothing, from srcdoc, never a URL.
-    expect(frame()?.getAttribute('sandbox')).toBe('')
-    expect(frame()?.hasAttribute('src')).toBe(false)
-    expect(frame()?.getAttribute('srcdoc')).toContain(
-      '<a href="https://example.com/auth/confirm?token=sample">Open</a>',
+    // AC-31: the frame page, in an opaque origin (no allow-same-origin), never the HTML itself.
+    expect(frame()?.getAttribute('src')).toBe('/frames/email-preview.html')
+    expect(frame()?.getAttribute('sandbox')).toBe(
+      'allow-scripts allow-popups allow-popups-to-escape-sandbox',
     )
+    expect(frame()?.hasAttribute('srcdoc')).toBe(false)
     expect(sent('POST', previewPath)[0]?.body).toEqual({
       subject: 'Password reset for {{ project.name }}',
       html: '<h1>Password reset</h1>\n<p>Hi {{ user.name }}, <a href="{{ action_url }}">Open</a></p>',
@@ -342,6 +342,7 @@ describe('the template editor', () => {
     ).toBe('Text')
   })
 
+  // AC-30: the frame page's own title and lang are checked in the end to end test, which can enter it.
   it.each([
     ['dark', 'compact'],
     ['light', 'compact'],
@@ -356,5 +357,129 @@ describe('the template editor', () => {
     seed('viewer')
     await renderApp(base)
     await expect.poll(text).toContain('Email verification')
+  })
+})
+
+/**
+ * The editor's side of the preview frame (AC-33). The frame page runs in an opaque origin, so this
+ * test can't look inside it: the outer frame's window is a stub that records what is posted to it,
+ * and the page's messages are dispatched with that stub as their source.
+ */
+describe('the preview frame handshake', () => {
+  const posts: { message: unknown; target: string }[] = []
+  const stub = {
+    postMessage: (message: unknown, target: string) => {
+      posts.push({ message, target })
+    },
+  }
+  const real = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow')
+
+  beforeEach(() => {
+    posts.length = 0
+    Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
+      configurable: true,
+      get(this: HTMLIFrameElement): unknown {
+        return this.title === 'Email preview' ? stub : (real?.get?.call(this) as unknown)
+      },
+    })
+  })
+  afterEach(() => {
+    if (real !== undefined)
+      Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', real)
+  })
+
+  /** The HTML the editor sent the frame page, in order. */
+  const rendered = () =>
+    posts.flatMap(({ message, target }) => {
+      const data = message as { type?: unknown; html?: unknown }
+      return data.type === 'orvano.email-preview.render' ? [{ html: data.html, target }] : []
+    })
+  /** A message from the frame page, or from `source` when given. */
+  const fromFrame = (data: unknown, source: unknown = stub) => {
+    const event = new MessageEvent('message', { data })
+    Object.defineProperty(event, 'source', { value: source })
+    window.dispatchEvent(event)
+  }
+  const ready = { type: 'orvano.email-preview.ready' }
+  const firstHtml =
+    '<h1>Password reset</h1>\n<p>Hi Ada, <a href="https://example.com/auth/confirm?token=sample">Open</a></p>'
+
+  it('answers ready with the HTML, then posts only when the HTML changes', async () => {
+    const { screen } = await openEditor()
+    expect(rendered()).toEqual([])
+
+    // Another window, or a message of another shape, gets nothing.
+    fromFrame(ready, window)
+    fromFrame({ type: 'axe.ping' })
+    fromFrame('orvano.email-preview.ready')
+    expect(rendered()).toEqual([])
+
+    fromFrame(ready)
+    expect(rendered()).toEqual([{ html: firstHtml, target: '*' }])
+
+    // A change to the subject alone posts nothing.
+    await screen.getByLabelText('Subject').fill('Reset it, {{ project.name }}')
+    await expect.poll(previewSubject).toBe('Reset it, Shop')
+    expect(rendered()).toHaveLength(1)
+
+    // A change to the HTML posts the new HTML once.
+    await userEvent.click(editor('HTML') ?? document.body)
+    await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}Plain words')
+    await expect.poll(() => rendered().length).toBe(2)
+    expect(rendered()[1]).toEqual({ html: 'Plain words', target: '*' })
+
+    // A reload of the frame page says ready again, and gets the latest HTML again.
+    fromFrame(ready)
+    expect(rendered()).toEqual([
+      { html: firstHtml, target: '*' },
+      { html: 'Plain words', target: '*' },
+      { html: 'Plain words', target: '*' },
+    ])
+  })
+
+  it('keeps the same frame through an error and while the Text view shows', async () => {
+    const { screen } = await openEditor()
+    fromFrame(ready)
+    const mounted = frame()
+
+    // A 422: the last preview stays, dimmed, in the same frame, and nothing new is posted.
+    await screen.getByLabelText('Subject').fill('Hi {{ user.emial }}')
+    await expect.poll(text).toContain('The preview is waiting')
+    expect(frame()).toBe(mounted)
+    expect(previewSubject()).toBe('Password reset for Shop')
+    expect(
+      document.querySelector('section[aria-labelledby=template-preview] .opacity-60'),
+    ).not.toBeNull()
+
+    // The Text view hides the frame without unmounting it.
+    await userEvent.click(screen.getByRole('tab', { name: 'Text' }))
+    await expect.poll(() => frame()?.checkVisibility()).toBe(false)
+    expect(frame()).toBe(mounted)
+    await userEvent.click(screen.getByRole('tab', { name: 'HTML' }))
+    expect(frame()).toBe(mounted)
+
+    // Fixing the error brings the preview back, with no reload and no second post of the same HTML.
+    await screen.getByLabelText('Subject').fill('Hi {{ user.email }}')
+    await expect.poll(previewSubject).toBe('Hi ada@example.com')
+    expect(frame()).toBe(mounted)
+    expect(rendered()).toHaveLength(1)
+  })
+
+  it('says so when the frame page never answers, and the other views keep working', async () => {
+    const { screen } = await openEditor()
+    await expect
+      .poll(text, { timeout: 7000 })
+      .toContain("Couldn't load the previewReload the page to try again.")
+    await screen.getByLabelText('Subject').fill('Still {{ project.name }}')
+    await expect.poll(previewSubject).toBe('Still Shop')
+    await userEvent.click(screen.getByRole('tab', { name: 'Text' }))
+    await expect
+      .poll(text)
+      .toContain('Password reset: https://example.com/auth/confirm?token=sample')
+
+    // A late ready still works, and the message goes away.
+    fromFrame(ready)
+    await expect.poll(text).not.toContain('Reload the page to try again.')
+    expect(rendered()).toHaveLength(1)
   })
 })

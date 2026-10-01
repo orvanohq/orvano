@@ -25,7 +25,7 @@ Send email from a project through SMTP you configure, with editable templates. A
    - [x] Thin thread: the Messaging module and its tables, project SMTP settings with the host and password rules, and a test email from the Settings tab that arrives in Mailpit (AC-1 to 6, 24, 25, 28, 29)
    - [x] The queue through console invites: install SMTP, the sealed queue and cap, the worker with retries, invite emails, the Log tab, retention, and purge (AC-7, 15 to 17, 19 to 23, 26, 27, 29)
    - [x] Templates and the auth queue: Fluid with its limits, the four default templates, the validator, preview and test, the CodeMirror editor, and `IEmailQueue` for row 10 (AC-8 to 14, 18)
-   - [ ] Preview frame: the email preview gets its own sandboxed page and policy, so email styles and images show behind the gateway, and dev serves the same headers (AC-9, 30 to 33)
+   - [x] Preview frame: the email preview gets its own sandboxed page and policy, so email styles and images show behind the gateway, and dev serves the same headers (AC-9, 30 to 33)
    - [ ] Quality and end to end: integration tests with Mailpit, Playwright flows, axe, and keyboard checks (AC-30, and AC-1 to 33 end to end)
 - [ ] Verify it: `/check verify transactional email`
 - [ ] Test it: `/test transactional email`

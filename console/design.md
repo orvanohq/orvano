@@ -155,3 +155,11 @@ The Content Security Policy allows scripts and styles only from the console's ow
 | `'sha256-kLmvWqfziFavKtqHqRsb90f006UAK2Dmd0It5Iz2KFA='` in `style-src` | Base UI's Select popup (and ScrollArea) injects one `<style>` that hides the popup's scrollbar: `.base-ui-disable-scrollbar{scrollbar-width:none}.base-ui-disable-scrollbar::-webkit-scrollbar{display:none}`. Found by spec 0007's Expiry and Type selects. | `deploy/gateway/Caddyfile`; `e2e/headers.spec.ts` opens both selects and fails on any violation |
 
 A Base UI upgrade that changes that text changes the hash: the end to end test then fails, and the browser's console error names the new hash to put in both places.
+
+One file has a policy of its own instead of the console's:
+
+| Path | Its policy allows | Why | Where it lives |
+|---|---|---|---|
+| `/frames/email-preview.html` | its one inline script by hash, `style-src 'unsafe-inline'`, `img-src https: data:`, framing by the console only | The email preview (spec 0009, AC-31, AC-32). Emails style themselves inline and with `<style>`, and load remote images; the console's policy blocked both in the old `srcdoc` frame. The page runs in an opaque origin, and the email inside it runs no script. | `deploy/gateway/email-preview-headers.caddy` (the Caddyfile and the Vite dev and preview servers read it); `src/email/email-preview-page.unit.test.ts` checks the hash; `e2e/headers.spec.ts` and `e2e/email-templates.spec.ts` check the headers and that the default templates log no violation |
+
+Change one byte of the frame page's script and its hash changes: the unit test names the new hash to write into the `.caddy` file.

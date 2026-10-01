@@ -1,3 +1,4 @@
+import { emailPreviewPath, readEmailPreviewHeaders } from '../email-preview-headers.ts'
 import { expect, fixturesOrgId, scenariosProject, test } from './fixtures.ts'
 
 test('every console file carries the security headers (AC-24)', async ({ request }) => {
@@ -13,6 +14,23 @@ test('every console file carries the security headers (AC-24)', async ({ request
     expect(headers['permissions-policy'], path).toContain('camera=()')
     expect(headers['cross-origin-opener-policy'], path).toBe('same-origin')
   }
+})
+
+test('the email preview frame page has its own headers, on that exact path only (spec 0009, AC-32)', async ({
+  request,
+}) => {
+  const response = await request.get(emailPreviewPath)
+  expect(response.status()).toBe(200)
+  const headers = response.headers()
+  for (const [name, value] of readEmailPreviewHeaders())
+    expect(headers[name.toLowerCase()], name).toBe(value)
+  expect(headers['content-security-policy']).toMatch(/^default-src 'none'; script-src 'sha256-/)
+
+  // A differently cased path is not the frame page: it is a console file with the console's headers.
+  const other = await request.get('/Frames/email-preview.html')
+  expect(other.headers()['content-security-policy']).toContain("frame-ancestors 'none'")
+  expect(other.headers()['x-frame-options']).toBe('DENY')
+  expect(other.headers()['referrer-policy']).toBe('strict-origin-when-cross-origin')
 })
 
 test('hashed assets cache for a year, and the shell revalidates (AC-24)', async ({ request }) => {

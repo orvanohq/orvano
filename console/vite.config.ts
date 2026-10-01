@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 
+import { emailPreviewHeaders } from './email-preview-headers.ts'
+
 // Local dev only: Aspire starts the api and realtime roles and passes their
 // addresses in. The proxy keeps the console same origin, like Caddy does in
 // production (spec 0002, request routing).
@@ -12,7 +14,12 @@ const realtimeUrl =
   process.env.REALTIME_HTTP ?? process.env.services__realtime__http__0 ?? 'http://localhost:8081'
 
 export default defineConfig({
-  plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss()],
+  plugins: [
+    tanstackRouter({ target: 'react', autoCodeSplitting: true }),
+    react(),
+    tailwindcss(),
+    emailPreviewHeaders(),
+  ],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   build: {
     // Fonts stay files served from this origin: the Content Security Policy allows no data: fonts.
