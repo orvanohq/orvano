@@ -25,6 +25,12 @@
       "skillPath": "skills/aspire-monitoring/SKILL.md",
       "computedHash": "25db489c65a5881cec175cefcd179ed30222c553bd84588dbcfed57f3d9cbcf8"
     },
+    "codemirror": {
+      "source": "solanabettercall/skills",
+      "sourceType": "github",
+      "skillPath": "skills/codemirror/SKILL.md",
+      "computedHash": "691f68166f4881f7607780b3ffc251a3eb2281a2366fc46aa575d4308ac1586e"
+    },
     "configuring-opentelemetry-dotnet": {
       "source": "dotnet/skills",
       "sourceType": "github",

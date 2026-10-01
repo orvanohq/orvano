@@ -28,6 +28,8 @@ The Orvano server: one .NET 10 program, built as separate modules, shipped as on
 | `src/Orvano.Core/RateLimiting/RateLimits.cs` | The in memory rate limiter and its named `RateLimitPolicies` |
 | `src/Orvano.Server/Modules/TestingModule.cs` | The fixed answers of the test only operations; registered only in `Test` |
 | `src/Orvano.Platform/` | The Platform module: orgs, projects, API keys, platforms, install settings, and their jobs (spec 0003); see its AGENTS.md |
+| `src/Orvano.Messaging/` | The Messaging module: SMTP settings, email templates, the send queue, and invite emails (spec 0009); see its AGENTS.md |
+| `src/Orvano.Core/Jobs/JobRetryException.cs` | Thrown by a job handler to set the next attempt's delay in place of the default backoff |
 | `src/Orvano.Core/Http/`, `src/Orvano.Core/Paging/PageCursor.cs` | What module endpoints share: `ApiProblem.Result`, `ConsoleUser`, and the keyset cursor and limit rule for list operations |
 | `migrations/platform/` | Platform SQL migrations, embedded into the binary |
 | `tests/Orvano.ModelDriftCheck/` | Fails when the EF model and the SQL migrations disagree |
@@ -86,5 +88,6 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 - [0001 API contract and SDK pipeline](../docs/specs/0001-api-contract-sdk-pipeline/index.md) (generated `Orvano.Contract` types)
 - [0004 App user sign up, sign in, and sessions](../docs/specs/0004-app-user-auth/index.md) (`Orvano.Auth`, tokens, sessions, signing keys)
 - [0006 Self host installer](../docs/specs/0006-self-host-installer/index.md) (`orvano install`, `setup-status`, the setup token)
+- [0009 Transactional email](../docs/specs/0009-transactional-email/index.md) (`Orvano.Messaging`, SMTP, templates, the send queue)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

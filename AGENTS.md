@@ -102,6 +102,7 @@ MCP servers: Aspire MCP (recommended), GitHub MCP (recommended), Postgres MCP Pr
 - [server/AGENTS.md](server/AGENTS.md) (.NET server: modules, Core kernel, migrations, tests)
 - [server/src/Orvano.Platform/AGENTS.md](server/src/Orvano.Platform/AGENTS.md): the Platform module, its layers, unit of work, jobs, and console endpoints
 - [server/src/Orvano.Auth/AGENTS.md](server/src/Orvano.Auth/AGENTS.md): the Auth module, app users and console accounts, sessions, signing keys, and which hook registers what
+- [server/src/Orvano.Messaging/AGENTS.md](server/src/Orvano.Messaging/AGENTS.md): the Messaging module, SMTP settings, Liquid templates, the sealed send queue, and invite emails
 - [console/AGENTS.md](console/AGENTS.md) (React console: routes, data fetching, UI rules)
 - [contract/AGENTS.md](contract/AGENTS.md): the TypeSpec API contract, operation metadata, how to add an endpoint
 - [tools/sdkgen/AGENTS.md](tools/sdkgen/AGENTS.md): SdkGen, the C# generator, its templates and type mapping

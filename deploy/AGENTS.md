@@ -11,6 +11,7 @@ Everything that ships Orvano to a server: the two images (the server image every
 | `server.Dockerfile` | The one server image (`ghcr.io/orvanohq/orvano`): `orvano api|worker|realtime|migrate`, plus `install`, `setup-status`, and `healthcheck` |
 | `gateway/Dockerfile` | The gateway image (`ghcr.io/orvanohq/orvano-gateway`): builds the console with pnpm, then serves it from Caddy |
 | `gateway/Caddyfile` | The only public entry point: routing to `api` and `realtime`, the console's security headers, asset caching, and HSTS |
+| `gateway/email-preview-headers.caddy` | The headers of the console's email preview page (spec 0009): the Caddyfile imports it and the console's Vite servers read it, so keep one `Name "value"` per line |
 | `gateway/entrypoint.sh` | Writes `/etc/caddy/global.caddy` (the ACME email) at start, then runs Caddy |
 | `compose/docker-compose.yml` | The production shape on one host; installer managed |
 | `compose/docker-compose.build.yml` | Repo only overlay that builds both images from the checkout |
@@ -59,5 +60,6 @@ The production shape command (`docker-compose.yml` plus `docker-compose.build.ym
 - [0002 Stack and architecture](../docs/specs/0002-stack-architecture/index.md) (containers on one server, request routing, the Postgres roles)
 - [0005 Console design system and shell](../docs/specs/0005-console-design-system-shell/index.md) (the console's security headers)
 - [0006 Self host installer](../docs/specs/0006-self-host-installer/index.md) (the installer, the image only Compose file, the gateway's ACME email and HSTS)
+- [0009 Transactional email](../docs/specs/0009-transactional-email/index.md) (the SMTP settings, the email preview page's headers)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

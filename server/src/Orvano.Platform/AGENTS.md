@@ -8,7 +8,7 @@ The Platform module (spec 0003): install settings and admins, orgs, memberships,
 
 | Folder | Owns |
 |---|---|
-| `Contracts/` | The only public types: `IProjectDirectory`, `IApiKeyVerifier`, `IConsoleAccess`, `IConsoleSignupPolicy`, `IConsoleAccountCreated`, `IConsoleAccountGuard`, `IWebOriginPolicy` (the host's public CORS check), `IConsoleUserDirectory` (console account names and emails, which Auth implements), `IInstallAdmins` (the install admin flag Auth reads) and their records |
+| `Contracts/` | The only public types: `IProjectDirectory`, `IApiKeyVerifier`, `IConsoleAccess`, `IConsoleSignupPolicy`, `IConsoleAccountCreated`, `IConsoleAccountGuard`, `IWebOriginPolicy` (the host's public CORS check), `IConsoleUserDirectory` (console account names and emails, which Auth implements), `IInstallAdmins` (the install admin flag Auth reads), `IConsoleInvitationMailer` (invite emails, which Messaging implements) and their records |
 | `Domain/` | Business rules as plain types: project IDs, lifecycles, the permission matrix, the owner rule, key secrets, web origin patterns, platform identifiers, names, invite tokens and invitation lifetimes (`Invitations.cs`) |
 | `Application/` | Use cases (`OrgService`, `ProjectService`, `ApiKeyService`, `PlatformService`, `InstallService`, `ConsoleAccounts`, `PlatformDirectory`, `InvitationService`, `MemberService`), `PlatformStore`, `Outcome`/`Failure`, `PlatformEvents` |
 | `Data/PlatformDbContext.cs` | EF Core mapping of the `platform_` tables; internal, checked by the drift check |

@@ -10,7 +10,7 @@ One list of scenarios every SDK surface runs against a real Orvano (spec 0001, A
 |---|---|
 | `*.yaml` (except `fixtures.yaml`) | One scenario each; picked up by every runner automatically |
 | `fixtures.yaml` | Seed data for `ORVANO_TEST_FIXTURES`: `consoleUsers` with passwords (the first is the install admin and owns the projects), `projects`, `apiKeys` (known secrets, `orv_sk_` plus exactly 43 characters, or the api refuses to start), `platforms` (web platforms for `localhost` and `127.0.0.1`), and app `users` with passwords. The old `consoleSessions` key is refused |
-| `compose.yml` | Postgres, migrate, the api role in the `Test` environment on `:8080`, and a worker that provisions the fixture projects; `--profile console` adds the gateway (Caddy plus the console build) on `:8081` for the console end to end tests (spec 0005) |
+| `compose.yml` | Postgres, migrate, the api role in the `Test` environment on `:8080`, and a worker that provisions the fixture projects, and Mailpit, which catches every email (its API on `:8025`, spec 0009); `--profile console` adds the gateway (Caddy plus the console build) on `:8081` for the console end to end tests (spec 0005) |
 | `runners/js/` | Interpreter for Node, Bun, Deno, Chromium, workerd, and the Next.js driver (`src/cli.ts`) |
 | `runners/nextjs/` | Next.js app; its route handler and server component page use `@orvano/nextjs` |
 | `runners/dart/` | Dart interpreter shared with Flutter; `bin/run.dart` is the Dart server runner |
