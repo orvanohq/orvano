@@ -110,6 +110,9 @@ export function CodeEditor({
           EditorView.contentAttributes.of({
             'aria-label': label,
             'aria-multiline': 'true',
+            // Already a tab stop as contenteditable; axe counts only a tabindex as focusable
+            // content, so a scrolling editor fails scrollable-region-focusable without it.
+            tabindex: '0',
             ...(readOnly ? { 'aria-readonly': 'true' } : {}),
           }),
           ...(placeholder === undefined ? [] : [placeholderText(placeholder)]),
