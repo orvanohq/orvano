@@ -33,7 +33,8 @@ test('an owner edits a template, previews it, sends a test, saves, and resets', 
 
   // The editors are CodeMirror in a shadow root: labelled, styled, and with no CSP violation.
   const html = page.getByRole('textbox', { name: 'HTML' })
-  await expect(html).toContainText('{{ action_url }}')
+  // CodeMirror draws only the lines near the visible area, so check the top of the document.
+  await expect(html).toContainText('<title>Reset your password for {{ project.name }}</title>')
   await expect(page.getByRole('textbox', { name: 'Text' })).toContainText('Reset password:')
   expect(await html.evaluate((node) => getComputedStyle(node).fontFamily)).toContain(
     'JetBrains Mono',
@@ -87,7 +88,9 @@ test('an owner edits a template, previews it, sends a test, saves, and resets', 
   await confirm.getByRole('button', { name: 'Reset to default' }).click()
   await expect(page.getByText('Template reset')).toBeVisible()
   await expect(page.getByLabel('Subject')).toHaveValue('Reset your password for {{ project.name }}')
-  await expect(page.getByRole('textbox', { name: 'HTML' })).toContainText('{{ action_url }}')
+  await expect(page.getByRole('textbox', { name: 'HTML' })).toContainText(
+    '<title>Reset your password for {{ project.name }}</title>',
+  )
 
   expect(await page.evaluate(() => (window as unknown as { __csp: string[] }).__csp)).toEqual([])
 })

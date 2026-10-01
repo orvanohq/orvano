@@ -108,7 +108,7 @@ Covers AC-8 to AC-14 and AC-18. Setup as above, with SMTP pointing at Mailpit (t
 
 ### Known gap
 
-- [ ] Open the editor on the production shape (`docker compose -f tests/scenarios/compose.yml --profile console up -d --build --wait`, then `http://localhost:8081`) → the two editors look right and the browser console shows no Content Security Policy violation. The preview frame, however, inherits the console's policy, so the email's inline styles and any `<style>` block are blocked and the preview looks unstyled there (it looks right under the AppHost, which sends no policy). This needs a decision, see the heads up of the slice 3 build. `e2e/email-templates.spec.ts` covers the flow but was not run locally: Docker Hub pulls still hang on the build machine.
+- [ ] Open the editor on the production shape (`docker compose -f tests/scenarios/compose.yml --profile console up -d --build --wait`, then `http://localhost:8081`) → the two editors look right and the page reports no Content Security Policy violation. The preview frame, however, inherits the console's policy: the browser blocks every inline style inside it (13 for the default password reset template, logged in the frame, not the page), so the preview shows the hidden preheader, a plain blue link for the button, and default fonts. It looks right under the AppHost, which sends no policy. This needs a decision, see the heads up of the slice 3 build. `e2e/email-templates.spec.ts` passed on this stack, with the other 26 end to end tests, on a fresh database.
 
 ## Acceptance-criteria coverage
 
