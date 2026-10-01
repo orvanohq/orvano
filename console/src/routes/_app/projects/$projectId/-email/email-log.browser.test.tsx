@@ -91,8 +91,13 @@ describe('the Email Log tab', () => {
     await expect.poll(text).toContain('No emails in the last 30 days')
   })
 
-  it.each(['dark', 'light'] as const)('has no axe violations in the %s theme', async (theme) => {
-    setMode(theme, 'comfortable')
+  it.each([
+    ['dark', 'compact'],
+    ['light', 'compact'],
+    ['dark', 'comfortable'],
+    ['light', 'comfortable'],
+  ] as const)('has no axe violations in %s, %s', async (theme, density) => {
+    setMode(theme, density)
     seed([sent])
     await renderApp(`/projects/${projectId}/email/log`)
     await expect.poll(text).toContain('g***@example.com')

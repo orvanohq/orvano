@@ -67,6 +67,8 @@ export interface FakeApi {
   consoleSignup: ConsoleSignupMode
   /** The install's SMTP settings (spec 0009); with them, a new invitation answers `emailed: true`. */
   installSmtp: SmtpSettings | null
+  /** The project's own SMTP settings (spec 0009, AC-4); they win over the install's. */
+  projectSmtp: SmtpSettings | null
   /** The console's own email log, as `consoleInstall.listEmails` answers. */
   installEmails: EmailLogEntry[]
   /** The project email log, as `consoleEmails.list` answers for any project. */
@@ -238,6 +240,7 @@ export function installFakeApi(): FakeApi {
     preview: null,
     consoleSignup: 'invite',
     installSmtp: null,
+    projectSmtp: null,
     installEmails: [],
     emails: [],
     emailTemplates: {},
@@ -497,6 +500,29 @@ export function installFakeApi(): FakeApi {
       }
       if (path === '/v1/console/project/auth/keys') return Response.json({ keys: [] })
       if (path === '/v1/console/project/emails') return page(api.emails)
+      if (path === '/v1/console/project/email/smtp/test' && method === 'POST') {
+        return Response.json({ sentTo: api.account.email ?? '' })
+      }
+      if (path === '/v1/console/project/email/smtp') {
+        if (method === 'DELETE') {
+          api.projectSmtp = null
+          return new Response(null, { status: 204 })
+        }
+        if (method === 'PUT') {
+          const { password, ...rest } = input as unknown as SmtpSettingsInput
+          // As the server does: a null password keeps the stored one.
+          const hasPassword = password !== null || api.projectSmtp?.hasPassword === true
+          api.projectSmtp = { ...rest, hasPassword, updatedAt: now }
+          return Response.json(api.projectSmtp)
+        }
+        const install = api.installSmtp
+        return Response.json({
+          source: api.projectSmtp !== null ? 'project' : install !== null ? 'install' : 'none',
+          settings: api.projectSmtp,
+          installSender:
+            install === null ? null : { email: install.fromEmail, name: install.fromName },
+        })
+      }
       if (path === '/v1/console/project/email/templates') {
         return Response.json({
           templates: templateKinds.map((kind) => ({

@@ -128,8 +128,13 @@ describe('/install', () => {
     await expect.poll(text).toContain('No emails in the last 30 days')
   })
 
-  it.each(['dark', 'light'] as const)('has no axe violations in the %s theme', async (theme) => {
-    setMode(theme, 'comfortable')
+  it.each([
+    ['dark', 'compact'],
+    ['light', 'compact'],
+    ['dark', 'comfortable'],
+    ['light', 'comfortable'],
+  ] as const)('has no axe violations in %s, %s', async (theme, density) => {
+    setMode(theme, density)
     await renderApp('/install')
     await expect.poll(text).toContain('Console sign up')
     await expect.poll(text).toContain('No emails in the last 30 days')

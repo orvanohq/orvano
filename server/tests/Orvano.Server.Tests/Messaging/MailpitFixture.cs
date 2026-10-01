@@ -17,6 +17,8 @@ public sealed class MailpitFixture : IAsyncLifetime
     private readonly IContainer _container = new ContainerBuilder("axllent/mailpit:v1.31.3")
         .WithPortBinding(Smtp, assignRandomHostPort: true)
         .WithPortBinding(Api, assignRandomHostPort: true)
+        // Lets a test make the server refuse emails with a reply code of its choice (SetChaosAsync).
+        .WithEnvironment("MP_ENABLE_CHAOS", "true")
         .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r => r.ForPort(Api).ForPath("/readyz")))
         .Build();
 
@@ -62,4 +64,20 @@ public sealed class MailpitFixture : IAsyncLifetime
     public async Task<int> CountToAsync(string recipient, CancellationToken ct) =>
         (await _http.GetFromJsonAsync<JsonElement>($"/api/v1/search?query={Uri.EscapeDataString($"to:{recipient}")}", ct))
             .GetProperty("messages").GetArrayLength();
+
+    /// <summary>
+    /// Makes Mailpit answer every <c>MAIL FROM</c> with <paramref name="senderCode"/> and every <c>RCPT TO</c> with
+    /// <paramref name="recipientCode"/>, through its chaos mode; null accepts. Call it with two nulls when done: the
+    /// setting stays for every later test of the class.
+    /// </summary>
+    public async Task SetChaosAsync(int? senderCode, int? recipientCode, CancellationToken ct)
+    {
+        static object Trigger(int? code, int idle) => new { ErrorCode = code ?? idle, Probability = code is null ? 0 : 100 };
+
+        using var response = await _http.PutAsJsonAsync(
+            "/api/v1/chaos",
+            new { Sender = Trigger(senderCode, 451), Recipient = Trigger(recipientCode, 451), Authentication = Trigger(null, 535) },
+            ct);
+        response.EnsureSuccessStatusCode();
+    }
 }

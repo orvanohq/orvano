@@ -350,13 +350,17 @@ describe('the template editor', () => {
     ['light', 'comfortable'],
   ] as const)('has no axe violations in %s, %s', async (theme, density) => {
     setMode(theme, density)
-    await openEditor()
+    const editorApp = await openEditor()
     const results = await axe.run(document.body)
     expect(results.violations.map((violation) => violation.id)).toEqual([])
 
+    // The list, as a viewer sees it.
+    await editorApp.screen.unmount()
     seed('viewer')
     await renderApp(base)
     await expect.poll(text).toContain('Email verification')
+    const listResults = await axe.run(document.body)
+    expect(listResults.violations.map((violation) => violation.id)).toEqual([])
   })
 })
 

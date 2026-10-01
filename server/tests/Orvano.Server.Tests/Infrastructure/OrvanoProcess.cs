@@ -114,10 +114,15 @@ public sealed class OrvanoProcess : IAsyncDisposable
         Timeout = TimeSpan.FromSeconds(5),
     };
 
-    /// <summary>Waits until <c>/internal/healthz</c> answers, which happens only after the startup checks pass.</summary>
+    /// <summary>
+    /// Waits until this process says it listens on <see cref="Port"/> and <c>/internal/healthz</c> answers, which
+    /// happens only after the startup checks pass. Both, because a healthy answer alone could come from another test's
+    /// process that took the port first.
+    /// </summary>
     public async Task WaitUntilListeningAsync()
     {
         using var http = Http();
+        var listening = $"Now listening on: http://127.0.0.1:{Port}";
         var clock = Stopwatch.StartNew();
         while (true)
         {
@@ -125,8 +130,11 @@ public sealed class OrvanoProcess : IAsyncDisposable
             if (clock.Elapsed > TimeSpan.FromSeconds(60)) throw new TimeoutException($"orvano did not start listening:\n{Output}");
             try
             {
-                using var response = await http.GetAsync("/internal/healthz", TestContext.Current.CancellationToken);
-                if (response.IsSuccessStatusCode) return;
+                if (_output.Any(line => line.Contains(listening, StringComparison.Ordinal)))
+                {
+                    using var response = await http.GetAsync("/internal/healthz", TestContext.Current.CancellationToken);
+                    if (response.IsSuccessStatusCode) return;
+                }
             }
             catch (HttpRequestException)
             {
@@ -136,12 +144,22 @@ public sealed class OrvanoProcess : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// A loopback port nothing listens on right now, never one this test run handed out before: the port is free again
+    /// once this returns, so two processes started at once could otherwise be given the same one.
+    /// </summary>
     public static int FreePort()
     {
-        using var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        return ((IPEndPoint)listener.LocalEndpoint).Port;
+        while (true)
+        {
+            using var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            if (HandedOut.TryAdd(port, 0)) return port;
+        }
     }
+
+    private static readonly ConcurrentDictionary<int, byte> HandedOut = new();
 
     public async ValueTask DisposeAsync()
     {

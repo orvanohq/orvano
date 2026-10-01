@@ -1,7 +1,15 @@
 import { expect, fixturesOrgId, scenariosProject, test } from './fixtures.ts'
 
+const mailpit = process.env.MAILPIT_URL ?? 'http://localhost:8025'
+
+interface MailpitSearch {
+  messages: { ID: string }[]
+}
+
 // Spec 0008 AC-27 against the real API, through the UI only: the fixture owner invites a new email as
-// developer and reads the link from the link step; a second browser opens it, creates an account,
+// developer and reads the link from the link step; the same link arrives by email through the
+// install's SMTP (Mailpit) and shows as sent in the console's email log (spec 0009, AC-21, AC-23);
+// a second browser opens it, creates an account,
 // and lands in the org; the owner makes that member a viewer, who then can't create keys; the owner
 // removes them, and their next visit to the org shows the not found screen.
 
@@ -27,6 +35,7 @@ test('an owner invites a teammate, changes their role, and removes them', async 
   await inviteDialog.getByRole('button', { name: 'Invite', exact: true }).click()
   const linkStep = owner.getByRole('dialog', { name: 'Share this invite link' })
   await expect(linkStep).toBeVisible()
+  await expect(linkStep).toContainText(`We’re sending the invite to ${email}.`)
   await expect(linkStep.getByRole('button', { name: 'Copy invite link' })).toBeFocused()
   const url = (await linkStep.getByLabel('invite link', { exact: true }).textContent()) ?? ''
   expect(url).toMatch(/\/invite#[A-Za-z0-9_-]{43}$/)
@@ -34,6 +43,42 @@ test('an owner invites a teammate, changes their role, and removes them', async 
   await expect(linkStep).toBeHidden()
   await expect(owner.getByText(url)).toHaveCount(0)
   await expect(owner.getByRole('cell', { name: email, exact: true })).toBeVisible()
+
+  // The install has SMTP, so the same link also arrives by email (spec 0009, AC-23). The worker
+  // sends it from the queue, which can take a while right after the stack starts.
+  let id = ''
+  await expect
+    .poll(
+      async () => {
+        const search = await request.get(
+          `${mailpit}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`,
+        )
+        id = ((await search.json()) as MailpitSearch).messages[0]?.ID ?? ''
+        return id
+      },
+      { timeout: 20_000 },
+    )
+    .not.toBe('')
+  const message = (await (await request.get(`${mailpit}/api/v1/message/${id}`)).json()) as {
+    Subject: string
+    Text: string
+    HTML: string
+  }
+  expect(message.Subject).toBe('Fixture Admin invited you to join Fixtures on Orvano')
+  expect(message.Text).toContain(url)
+  expect(message.HTML).toContain(`href="${url}"`)
+
+  // The console's email log shows it sent, with the address masked (spec 0009, AC-21, AC-22).
+  await owner.goto('/install')
+  const newest = owner.getByRole('region', { name: 'Console emails' }).locator('tbody tr').first()
+  await expect(async () => {
+    await owner.reload()
+    await expect(newest).toContainText('Sent', { timeout: 1000 })
+  }).toPass()
+  await expect(newest).toContainText('Console invite')
+  await expect(newest).toContainText('e***@example.com')
+  await expect(owner.getByText(email)).toHaveCount(0)
+  await owner.goto(`/orgs/${orgId}/members`)
 
   // The teammate opens the link in their own browser and creates an account (AC-20, AC-22). The
   // link carries the API's public URL; the console is served here, so keep only its fragment.
