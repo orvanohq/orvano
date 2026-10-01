@@ -110,6 +110,24 @@ Covers AC-8 to AC-14 and AC-18. Setup as above, with SMTP pointing at Mailpit (t
 
 - [ ] Open the editor on the production shape (`docker compose -f tests/scenarios/compose.yml --profile console up -d --build --wait`, then `http://localhost:8081`) → the two editors look right and the page reports no Content Security Policy violation. The preview frame, however, inherits the console's policy: the browser blocks every inline style inside it (13 for the default password reset template, logged in the frame, not the page), so the preview shows the hidden preheader, a plain blue link for the button, and default fonts. It looks right under the AppHost, which sends no policy. Decided on 2026-09-30: the preview gets its own frame page and policy (AC-31 to AC-33), built as slice 4; this step then expects the styles to show. `e2e/email-templates.spec.ts` passed on this stack, with the other 26 end to end tests, on a fresh database.
 
+## Slice 4: the preview frame · updated 2026-09-30
+
+### UI / manual
+- [ ] On `http://localhost:8081` (the gateway), open the password reset template → its preview shows the button dark and 44 px tall, the preheader hidden, and the browser console shows no Content Security Policy message from any frame → AC-31, AC-32 (this closes the known gap above)
+- [ ] Inspect the preview → an outer `iframe` titled "Email preview" with `src="/frames/email-preview.html"` and `sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"`; inside it, `<html lang="en">`, a white page, and an `iframe` titled "Email content" with `srcdoc` and `sandbox="allow-popups allow-popups-to-escape-sandbox"` → AC-30, AC-31
+- [ ] Paste HTML with a `<style>` rule, a `data:` image, an `https:` image, a remote stylesheet, a `<script>`, an `onclick`, an `https` link, a `javascript:` link, a relative link, and `<meta name="referrer" content="unsafe-url">` → the style and both images apply (the `https:` image request has no `Referer`); the stylesheet is blocked; the script and handler never run; the `https` link opens a new tab with no opener; the `javascript:` and relative links have no `href` and do nothing; the meta tag is gone → AC-31, AC-32, value sourcing (where links open, the referrer images send)
+- [ ] Edit only the subject, then make the subject invalid → the frame page loads once (Network tab), the last preview stays dimmed through the 422, and fixing it brings the preview back without a reload → AC-33
+- [ ] Switch the preview to Text and back → the frame is not reloaded and no image is fetched again → AC-33
+- [ ] Under `pnpm --filter @orvano/console dev` (or the AppHost) and `vite preview`, the preview looks the same as behind the gateway → AC-32
+
+### Commands
+- [ ] `curl -sI http://localhost:8081/frames/email-preview.html` → exactly the headers in `deploy/gateway/email-preview-headers.caddy`; `curl -sI http://localhost:8081/Frames/email-preview.html` → the console's headers (`frame-ancestors 'none'`, `X-Frame-Options: DENY`) → AC-32
+- [ ] The same two `curl` calls against the Vite dev server and `vite preview` → the same answers → AC-32
+- [ ] `pnpm --filter @orvano/console exec vitest run --project unit src/email` → the hash test passes; change one byte of the frame page's script → it fails and names the new hash → AC-32, value sourcing (the `script-src` hash)
+- [ ] `docker build -f deploy/gateway/Dockerfile .` → the `caddy validate` step passes → AC-32
+- [ ] `pnpm --filter @orvano/console test` → the handshake tests pass (ready answered with the latest HTML, foreign sources and shapes ignored, no post for a subject only change, a reload gets the HTML again, the 5 second alert) → AC-33
+- [ ] `pnpm --filter @orvano/console test:e2e` with the `console` compose profile up → `headers.spec.ts` and `email-templates.spec.ts` pass → AC-31, AC-32, AC-33
+
 ## Acceptance-criteria coverage
 
 - AC-1 · save and test steps, the password commands
@@ -137,4 +155,6 @@ Covers AC-8 to AC-14 and AC-18. Setup as above, with SMTP pointing at Mailpit (t
 - AC-13 · the default template step, `EmailTemplateDomainTests`
 - AC-14, AC-18 · the queue commands, `EmailQueueTests`
 - AC-30 (the editor part) · the keyboard step, the frame step, axe in the browser tests
-- Not built yet: the rest of AC-30, and the end to end pass of slice 4
+- AC-31, AC-32, AC-33 · the slice 4 steps and commands, `email-preview-page.unit.test.ts`, the handshake tests in `email-templates.browser.test.tsx`, `e2e/headers.spec.ts`, `e2e/email-templates.spec.ts`
+- AC-30 (the frame titles) · the slice 4 inspect step
+- Not built yet: the rest of AC-30 (slice 5)
