@@ -114,6 +114,8 @@ const search = () =>
 const options = () => [...document.querySelectorAll('[role=option]')]
 const highlighted = () =>
   document.querySelector('[role=option][data-highlighted]')?.textContent ?? ''
+const searchFocused = () =>
+  document.activeElement?.getAttribute('aria-label') === 'Search: Switch org'
 const optionNames = () => options().map((option) => option.textContent)
 const popupText = () => document.querySelector('[role=listbox]')?.parentElement?.textContent ?? ''
 const loadMoreButton = () =>
@@ -293,6 +295,9 @@ describe('Switcher keyboard and picking (AC-13)', () => {
     ;(trigger() as HTMLElement).focus()
     await userEvent.keyboard('{Enter}')
     await expect.poll(() => options().length).toBe(3)
+    // The popup moves focus to its search box a moment after the options render; a key sent before
+    // that reaches the trigger and is lost, so wait for the move.
+    await expect.poll(searchFocused).toBe(true)
 
     // Each key waits for the highlight to move: in CI a key sent while the popup settles was lost.
     await userEvent.keyboard('{ArrowDown}')
