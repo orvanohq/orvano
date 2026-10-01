@@ -128,6 +128,23 @@ Covers AC-8 to AC-14 and AC-18. Setup as above, with SMTP pointing at Mailpit (t
 - [ ] `pnpm --filter @orvano/console test` → the handshake tests pass (ready answered with the latest HTML, foreign sources and shapes ignored, no post for a subject only change, a reload gets the HTML again, the 5 second alert) → AC-33
 - [ ] `pnpm --filter @orvano/console test:e2e` with the `console` compose profile up → `headers.spec.ts` and `email-templates.spec.ts` pass → AC-31, AC-32, AC-33
 
+## Slice 5: quality and end to end · updated 2026-09-30
+
+### UI / manual
+- [ ] Open a project's Email entry → it lands on Settings, titled `Email settings · <project> · Orvano`, with Settings current in the tabs; with only the install's SMTP the info line names its sender and never its host → AC-4
+- [ ] On an empty form, pick TLS → Port fills with 465; pick None → Port stays 465; clear Port, pick STARTTLS → 587 → Screens
+- [ ] Press Send test email on an empty form → Host, Port, and From email each show their error under the field, read out as alerts, and nothing is sent → AC-2, AC-30
+- [ ] Each Email tab (Settings, Templates list, editor, Log) and `/install` in dark and light, compact and comfortable → axe finds nothing, and the Settings tab also passes with an SMTP error showing and as a viewer → AC-30
+- [ ] As a viewer on Settings → the fields are read only, there is no Password field, and Save, Send test email, and Stop using these settings are disabled with "Developers and owners only" → AC-24
+
+### Commands
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests --filter-class "Orvano.Server.Tests.Messaging.EmailQueueTests"` → `A_temporary_rejection_is_retried_and_a_permanent_one_fails_at_once` passes: Mailpit's chaos mode answers 451, the send retries after 30 seconds as `smtp_rejected`, then arrives on attempt 2; a 550 for the recipient fails at once → AC-15, AC-16, value sourcing (the retry decision from the reply code)
+- [ ] Same class → `Logs_carry_IDs_and_codes_but_no_address_link_name_subject_or_host` passes: every log line from a queue, a fallback, a 451 retry, a send, and an unreachable host carries the email ID, project, codes, and 451, and none of the address, link, token, user name, subject, project name, host, or code → AC-18, AC-26
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests --filter-class "Orvano.Server.Tests.Messaging.SmtpSettingsApiTests"` → `A_refused_test_is_not_retried_and_answers_the_reply_code` passes: a 451 and a 550 each answer 502 `smtp_rejected` with the code in `detail`, nothing arrives, nothing is stored, and the api output has no sender or subject → AC-6, AC-26
+- [ ] `pnpm --filter @orvano/console exec vitest run --project browser email-settings` → the Settings tab tests pass (sources, port filling, save, test, field and SMTP errors, Stop using with both confirms, the viewer, axe in four modes) → AC-1 to AC-6, AC-24, AC-30
+- [ ] With the `console` compose profile up, `pnpm --filter @orvano/console test:e2e` → `email-settings.spec.ts` passes (project SMTP pointed at Mailpit, a refused From email shown under its field, an unreachable port shown in the alert, a test email that arrives from the new sender to the caller, save across a reload, Stop using) and `members.spec.ts` passes (the link step says the invite is being sent, the same link arrives in Mailpit with the right subject, and `/install` Console emails shows it Sent as `e***@example.com`) → AC-1, AC-2, AC-4 to AC-6, AC-21 to AC-23
+- [ ] Run `test:e2e` twice in a row within 15 minutes → expect the shell sign in test to hit the console sign in limit (10 per 15 minutes); that is the limit working, not a failure of this slice
+
 ## Acceptance-criteria coverage
 
 - AC-1 · save and test steps, the password commands
@@ -157,4 +174,6 @@ Covers AC-8 to AC-14 and AC-18. Setup as above, with SMTP pointing at Mailpit (t
 - AC-30 (the editor part) · the keyboard step, the frame step, axe in the browser tests
 - AC-31, AC-32, AC-33 · the slice 4 steps and commands, `email-preview-page.unit.test.ts`, the handshake tests in `email-templates.browser.test.tsx`, `e2e/headers.spec.ts`, `e2e/email-templates.spec.ts`
 - AC-30 (the frame titles) · the slice 4 inspect step
-- Not built yet: the rest of AC-30 (slice 5)
+- AC-30 (the rest) · the slice 5 axe and field error steps, `email-settings.browser.test.tsx`, axe in four modes in every Email browser test and `-install.browser.test.tsx`
+- AC-1 to AC-6, AC-21 to AC-23 end to end · `e2e/email-settings.spec.ts`, `e2e/members.spec.ts`
+- AC-16 (a real 4xx reply), AC-26 (logs) · the slice 5 commands
