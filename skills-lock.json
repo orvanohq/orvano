@@ -25,6 +25,24 @@
       "skillPath": "skills/aspire-monitoring/SKILL.md",
       "computedHash": "25db489c65a5881cec175cefcd179ed30222c553bd84588dbcfed57f3d9cbcf8"
     },
+    "astro": {
+      "source": "astrolicious/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/astro/SKILL.md",
+      "computedHash": "ebefe26b231d32379c14e41a46c2de7b4b0184543bedab7febdabe4fb21fba4e"
+    },
+    "astro-developer": {
+      "source": "withastro/astro",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/astro-developer/SKILL.md",
+      "computedHash": "cd767f617a4c2baef1950ab5fe45bc9b5e88d255f3c374e64b7bc1ee929eb920"
+    },
+    "astro-starlight": {
+      "source": "fusengine/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/astro-expert/skills/astro-starlight/SKILL.md",
+      "computedHash": "cdb9067bed1b7465196e1d22c8d8bc8c885f592d645a7d05359a1bdd25aabf93"
+    },
     "codemirror": {
       "source": "solanabettercall/skills",
       "sourceType": "github",
@@ -264,6 +282,12 @@
       "sourceType": "github",
       "skillPath": "skills/workers-best-practices/SKILL.md",
       "computedHash": "61834fa098e16280aae54e584f5a16e047391790b1e1e4995c0e9a111d6d75c3"
+    },
+    "wrangler": {
+      "source": "cloudflare/skills",
+      "sourceType": "github",
+      "skillPath": "skills/wrangler/SKILL.md",
+      "computedHash": "6d2bade1438d89034a750b1ddf30d0e5b62823306eccf85a5b25ccc4352ff8a9"
     },
     "zod": {
       "source": "pproenca/dot-skills",
