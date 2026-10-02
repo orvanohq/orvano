@@ -43,6 +43,7 @@ try {
   await shot(page, 'setup', page.locator('main'))
   await page.getByRole('button', { name: 'Create the first admin' }).click()
   await page.waitForURL(/\/orgs\/[^/]+$/)
+  const orgUrl = page.url()
 
   // A project in the personal org the admin starts with.
   await page.getByRole('button', { name: 'Create project' }).first().click()
@@ -100,8 +101,56 @@ try {
     { mode: 0o600 },
   )
   console.log(`Project ${projectId} is ready; its IDs and key are in ${outFile}.`)
+
+  // The console guides' screenshots: email, team members, and the install's email server. CI skips them.
+  if (takeShots) await consoleGuideShots(page, nav, orgUrl)
 } finally {
   await browser.close()
+}
+
+/** The screens the console guide pages show, after the quickstart journey (AC-21). */
+async function consoleGuideShots(page: Page, nav: Locator, orgUrl: string): Promise<void> {
+  // A reload clears the earlier steps' toasts, which would cover these pages.
+  await page.reload()
+
+  // The project's email pages. A local stack's install email server (Mailpit) sends for the project.
+  await nav.getByRole('link', { name: 'Email' }).click()
+  const emailTabs = page.getByRole('navigation', { name: 'Email sections' })
+  await emailTabs.getByRole('link', { name: 'Settings' }).click()
+  await page.getByText('Using this server’s email settings').waitFor()
+  await shot(page, 'email-settings', page.locator('main'))
+  await emailTabs.getByRole('link', { name: 'Templates' }).click()
+  const templates = page.getByRole('region', { name: 'Templates' })
+  await templates.getByRole('link', { name: 'Email verification' }).waitFor()
+  await shot(page, 'email-templates', templates)
+  await templates.getByRole('link', { name: 'Email verification' }).click()
+  await page.getByRole('button', { name: 'Save' }).waitFor()
+  // The preview renders shortly after the editor loads.
+  await page.waitForTimeout(1500)
+  await shot(page, 'email-template-editor', page.locator('main'))
+
+  // Inviting a teammate from the org's Members page; closed before it creates the invite.
+  await page.goto(orgUrl)
+  await page
+    .getByRole('navigation', { name: 'Org navigation' })
+    .getByRole('link', { name: 'Members' })
+    .click()
+  await page.getByRole('heading', { level: 1, name: 'Members' }).waitFor()
+  await page.getByRole('button', { name: 'Invite', exact: true }).click()
+  const invite = page.getByRole('dialog', { name: 'Invite a teammate' })
+  await invite.getByLabel('Email').fill('grace@example.com')
+  await shot(page, 'invite-member', invite)
+  await page.keyboard.press('Escape')
+  await invite.waitFor({ state: 'hidden' })
+
+  // The install's email server, which `install --local` points at Mailpit.
+  await page.getByRole('button', { name: 'Account menu' }).click()
+  await page.getByRole('menuitem', { name: 'Install settings' }).click()
+  const server = page
+    .locator('[data-slot="card"]')
+    .filter({ has: page.getByRole('heading', { name: 'Email server' }) })
+  await server.getByLabel('Host', { exact: true }).waitFor()
+  await shot(page, 'install-email-server', server)
 }
 
 async function addPlatform(

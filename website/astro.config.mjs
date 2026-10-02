@@ -2,6 +2,7 @@
 import starlight from '@astrojs/starlight'
 import { defineConfig } from 'astro/config'
 import starlightLinksValidator from 'starlight-links-validator'
+import starlightLlmsTxt from 'starlight-llms-txt'
 import starlightOpenAPI, { openAPISidebarGroups } from 'starlight-openapi'
 
 const isDev = process.argv.includes('dev')
@@ -93,6 +94,30 @@ export default defineConfig({
             },
           },
         ]),
+        // AC-5: /llms.txt and /llms-full.txt for coding agents. scripts/markdown-copies.ts adds a `.md` copy of every page.
+        starlightLlmsTxt({
+          projectName: 'Orvano',
+          details: [
+            'Every page also has a plain Markdown copy: drop the trailing slash and add `.md`, for example https://orvano.dev/docs/local.md or https://orvano.dev/docs/api/operations/usersget.md.',
+            '',
+            '- Client SDKs (`@orvano/js`, `@orvano/nextjs`, `orvano_flutter`) sign users in and act as them. Server SDKs (`@orvano/js/server`, `orvano_dart`, the `Orvano` NuGet package) use an API key and verify access tokens.',
+            '- Every failed call answers with RFC 9457 problem details; its `code` has a page at https://orvano.dev/errors/<code>.',
+          ].join('\n'),
+          optionalLinks: [
+            {
+              label: 'Error codes',
+              url: 'https://orvano.dev/errors/',
+              description: 'every error code and how to fix it',
+            },
+            {
+              label: 'Source',
+              url: 'https://github.com/orvanohq/orvano',
+              description: 'the Orvano repository, examples included',
+            },
+          ],
+          promote: ['docs', 'docs/local', 'docs/quickstarts/**', 'docs/concepts/**'],
+          demote: ['errors/**'],
+        }),
         // The reference pages are routes of starlight-openapi, which this validator can't see; scripts/prepare.ts
         // checks every link to them against the contract instead.
         starlightLinksValidator({ exclude: ['/docs/api/', '/docs/api/**'] }),

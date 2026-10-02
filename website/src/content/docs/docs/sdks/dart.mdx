@@ -5,8 +5,81 @@ sidebar:
   order: 4
 ---
 
-The orvano_dart package for your Dart server.
+import { Code } from '@astrojs/starlight/components'
+import { version } from '../../../../lib/site'
 
-:::note
-This page is being written for this release.
-:::
+`orvano_dart` is the server SDK for Dart (Dart 3.8 or later). It runs on your own server with an API key: it manages your project's users and checks the access tokens your app's users send. For a Flutter app, use [`orvano_flutter`](/docs/sdks/flutter/) instead.
+
+## Install
+
+<Code code={`dart pub add orvano_dart:${version}`} lang="sh" />
+
+The [Dart server quickstart](/docs/quickstarts/dart/) builds a `shelf` server with it.
+
+## Create the client
+
+```dart
+import 'dart:io';
+
+import 'package:orvano_dart/orvano_dart.dart';
+
+final client = Client(
+  endpoint: Platform.environment['ORVANO_ENDPOINT']!,
+  project: Platform.environment['ORVANO_PROJECT'],
+  apiKey: Platform.environment['ORVANO_API_KEY'],
+);
+final orvano = Orvano(client);
+```
+
+| Option | What it does |
+|---|---|
+| `endpoint` | Your Orvano server, without `/v1`. Required. |
+| `project` | Your project ID. Needed to verify tokens. |
+| `apiKey` | A server [API key](/docs/concepts/api-keys/), sent as `X-Orvano-Key`. Keep it in the environment, never in code. |
+| `timeout`, `maxRetries` | 30 seconds and 3 retries (of reads after a 429 or 503) by default. |
+| `httpClient`, `headers`, `onWarning` | Your own `http.Client`, extra headers, and where warnings go. |
+
+Make one client for the whole server, and call `client.close()` when the server stops.
+
+## What it can call
+
+| Service | Methods |
+|---|---|
+| `users` | `create`, `get`, `list`, `listAll`, `delete`, `block`, `unblock`, `updateEmail`, `updateEmailVerification`, `createVerification`, `createRecovery`, `listSessions`, `listSessionsAll`, `deleteSession`, `deleteSessions` |
+| `account` | `get` (for a user's own token) |
+| `health` | `get` |
+| `keys` | `getJwks`, `getOpenIdConfiguration` |
+
+`users` calls need the key's `users.read` or `users.write` scope. `listAll` gives you a `Stream<User>` that walks every page:
+
+```dart
+await for (final user in orvano.users.listAll(emailVerified: false)) {
+  print(user.email);
+}
+```
+
+[Manage users with an API key](/docs/auth/manage-users/) shows the common tasks.
+
+## Verify a user's token
+
+```dart
+final token = await client.verifyAccessToken(accessToken);
+print(token.userId); // also sessionId, emailVerified, expiresAt
+```
+
+It checks the token against the project's public keys without a call to Orvano once the keys are cached. Pass `online: true` to also catch a session that ended in the last 15 minutes. [Verify tokens on your server](/docs/auth/verify-tokens/) explains both.
+
+## Errors
+
+Refused calls throw `OrvanoException` with `status`, `code`, `message`, `requestId`, and `retryAfter`. Compare `code` with the `ErrorCode` constants:
+
+```dart
+try {
+  await orvano.users.get(userId);
+} on OrvanoException catch (error) {
+  if (error.code != ErrorCode.userNotFound) rethrow;
+  // the user was deleted
+}
+```
+
+See [Errors](/docs/concepts/errors/).

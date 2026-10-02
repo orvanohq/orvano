@@ -5,8 +5,37 @@ sidebar:
   order: 2
 ---
 
-Server API keys, the scopes they carry, and where to keep them.
+An **API key** lets your own server call a project with more power than a signed in user has, for example to create or block users. Only the [server SDKs](/docs/concepts/client-and-server-sdks/) can send one. Never put a key in a browser, a mobile app, or anything else you ship to users.
 
-:::note
-This page is being written for this release.
-:::
+## What a key looks like
+
+A key is `orv_sk_` followed by 43 characters. The console shows it **once**, when you create it. Orvano keeps only a hash of it and its first 12 characters (such as `orv_sk_Xy3aB`), which the console lists so you can tell keys apart. If you lose a key, delete it and create a new one.
+
+A key belongs to one project and works only for that project. It can have an expiry date. The SDKs send it in the `X-Orvano-Key` header, next to the project ID in `X-Orvano-Project`.
+
+## Scopes
+
+A key can do only what its scopes allow. Pick the fewest scopes your server needs.
+
+| Scope | Allows |
+|---|---|
+| `users.read` | Read a project's users and their sessions: [`users.list`](/docs/api/operations/userslist/), [`users.get`](/docs/api/operations/usersget/), [`users.listSessions`](/docs/api/operations/userslistsessions/). |
+| `users.write` | Create, change, and delete users, end their sessions, and send them verification or reset emails: [`users.create`](/docs/api/operations/userscreate/), [`users.block`](/docs/api/operations/usersblock/), [`users.delete`](/docs/api/operations/usersdelete/), and the rest of `users`. |
+
+A write scope doesn't include read: a server that creates users and then reads them needs both. Each operation's page in the [API reference](/docs/api/operations/usersget/) names the scope it needs.
+
+## When a key is refused
+
+| Answer | Why |
+|---|---|
+| [`invalid_api_key`](/errors/invalid_api_key/) (401) | The key is wrong, deleted, expired, from another project, or the project isn't active. |
+| [`insufficient_scope`](/errors/insufficient_scope/) (403) | The key works, but lacks the scope this call needs. |
+
+## Keep it safe
+
+- Read the key from an environment variable or a secret store, never from code. Every quickstart does this.
+- Give each server its own key, so you can revoke one without touching the others.
+- Set an expiry on keys for short lived jobs.
+- If a key leaks, delete it in the console right away. Deleting works even while its project is being deleted.
+
+[API keys in the console](/docs/console/api-keys/) shows how to create, scope, and delete them.

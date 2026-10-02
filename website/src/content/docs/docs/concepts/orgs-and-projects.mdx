@@ -5,8 +5,43 @@ sidebar:
   order: 1
 ---
 
-How orgs hold projects, and what a project gives your app.
+One Orvano install holds many **orgs**, and each org holds many **projects**. A project is what your app talks to: it has its own users, sessions, signing keys, API keys, platforms, and its own Postgres schema. Nothing is shared between projects, so a staging and a production project of the same app are fully separate.
 
-:::note
-This page is being written for this release.
-:::
+## Orgs
+
+An org is a team. People join it as members, each with one role:
+
+| Role | Can do |
+|---|---|
+| **Owner** | Everything, including deleting projects, managing members, and the org itself. |
+| **Developer** | Creates and edits projects, API keys, and platforms; deletes only the keys they created. |
+| **Viewer** | Reads only. |
+
+Every console account gets a personal org when it signs up, and anyone can create more. An org always keeps at least one owner. [Team members and roles](/docs/console/team-members/) shows how to invite people.
+
+Someone outside an org gets a "not found" for it and its projects, so nothing reveals that they exist. A member whose role doesn't allow an action gets [`forbidden`](/errors/forbidden/).
+
+## Projects
+
+Every project has a 20 character **project ID** of lowercase letters and digits. Your app sends it with every call, in the `X-Orvano-Project` header; the SDKs do that for you from their `project` option.
+
+A project moves through these states:
+
+| Status | What it means | What your app sees |
+|---|---|---|
+| `provisioning` | Orvano is creating its schema, a few seconds after you create it. | [`project_not_ready`](/errors/project_not_ready/) (409) |
+| `active` | Ready to use. | normal answers |
+| `failed` | The setup failed; an owner or developer can retry it. | `project_not_ready` (409) |
+| `deleting` | Deleted, and restorable for a grace period (7 days unless the install changed it). | [`project_not_found`](/errors/project_not_found/) (404) |
+
+After the grace period Orvano removes the project for good: its schema, users, keys, and platforms. While a project waits for removal you can still delete its API keys, for example to revoke a leaked one.
+
+## The console project
+
+Each install also has a hidden project named `console`. It holds the console's own accounts and the install's email settings. Your apps never use it, and the API answers `project_not_found` for it.
+
+## Next
+
+- [Create orgs and projects in the console](/docs/console/orgs-and-projects/)
+- [API keys and scopes](/docs/concepts/api-keys/)
+- [Platforms](/docs/concepts/platforms/)

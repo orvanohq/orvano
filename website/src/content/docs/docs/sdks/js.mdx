@@ -5,8 +5,119 @@ sidebar:
   order: 1
 ---
 
-The @orvano/js package for browsers, Node, Bun, Deno, and edge runtimes.
+import { Code } from '@astrojs/starlight/components'
+import { version } from '../../../../lib/site'
 
-:::note
-This page is being written for this release.
-:::
+`@orvano/js` is the JavaScript and TypeScript SDK. It has two entry points:
+
+- **`@orvano/js`** is the client SDK. It runs in the browser (and anywhere else), signs users in, and acts as them. It can't hold an API key.
+- **`@orvano/js/server`** is the server SDK. It runs on your server with an API key, manages users, and checks the access tokens your users send.
+
+Both use plain `fetch`, so they run in browsers, Node, Bun, Deno, and edge runtimes such as Cloudflare Workers. The package is ESM only. For a Next.js app, use [`@orvano/nextjs`](/docs/sdks/nextjs/) instead: it builds on this package and keeps the session in cookies.
+
+## Install
+
+<Code code={`npm install @orvano/js@${version}`} lang="sh" />
+
+Pin the version of the Orvano you run. The SDK warns once (through `console.warn`, or the `logger` you give it) when the server's version doesn't match.
+
+## In the browser
+
+```ts
+import { Client, Orvano } from '@orvano/js'
+
+export const orvano = new Orvano(
+  new Client({ endpoint: 'http://localhost:7700', project: 'your-project-id' }),
+)
+
+await orvano.account.createPasswordSession({ email, password })
+const user = await orvano.account.get()
+```
+
+Make one client for the whole app. Before your app calls Orvano from a browser, add its hostname as a [web platform](/docs/concepts/platforms/), or Orvano refuses the call with [`origin_not_allowed`](/errors/origin_not_allowed/).
+
+The [JavaScript quickstart](/docs/quickstarts/js/) builds a full sign up and sign in app with it.
+
+### Client options
+
+| Option | What it does |
+|---|---|
+| `endpoint` | Your Orvano server, such as `https://orvano.example.com`, without `/v1`. Required. |
+| `project` | Your project ID, sent with every call. |
+| `session` | Where the session lives. In a browser the default keeps it in `localStorage` under `orvano.session.<projectId>`; elsewhere it lives in memory. Pass your own `SessionStore` to change that. |
+| `timeoutMs` | How long one call may take, retries included. 30 seconds by default; 0 turns it off. |
+| `maxRetries` | How often a read is retried after a 429 or 503. 3 by default. |
+| `fetch`, `headers`, `logger` | Your own `fetch`, extra headers, and where warnings go. |
+
+Every method also takes a last argument with a `signal` (an `AbortSignal`) and a `timeoutMs` for that one call.
+
+### Sessions
+
+Signing in (`account.create`, `account.createPasswordSession`, an emailed link or code) stores the session on the client. Before each call the client refreshes the session when its access token has less than a minute left, and it retries a call once after a refresh when the token was refused as expired. Several tabs share one session, and only one tab refreshes at a time.
+
+Listen for changes, including those from other tabs:
+
+```ts
+const stop = orvano.client.onAuthStateChange((event, session) => {
+  // event is 'signedIn', 'signedOut', 'tokenRefreshed', or 'userUpdated'
+})
+```
+
+`orvano.client.getSession()` gives you the current session (refreshed first when needed), or `null` when nobody is signed in. [Users and sessions](/docs/concepts/users-and-sessions/) explains the two tokens.
+
+### What the client SDK can call
+
+| Service | Methods |
+|---|---|
+| `account` | `create`, `createPasswordSession`, `get`, `update`, `updatePassword`, `delete`, `deleteCurrentSession` (sign out), `listSessions`, `listSessionsAll`, `deleteSession`, `deleteOtherSessions`, `refreshSession`, and the email flows: `createVerification`, `verifyEmail`, `createRecovery`, `completeRecovery`, `createMagicLink`, `createMagicLinkSession`, `createEmailCode`, `createEmailCodeSession`, `updateEmail`, `confirmEmailChange` |
+| `health` | `get` |
+| `keys` | `getJwks`, `getOpenIdConfiguration` |
+
+The client also has two helpers for email sign in: `orvano.client.redeemLink()` finishes any emailed link on the page it lands on, and `orvano.client.signInWithEmailCode(email, code)` signs in with an emailed code. The [auth guides](/docs/auth/email-and-password/) show each flow.
+
+## On your server
+
+```ts
+import { Client, Orvano } from '@orvano/js/server'
+
+const client = new Client({
+  endpoint: process.env.ORVANO_ENDPOINT!,
+  project: process.env.ORVANO_PROJECT!,
+  apiKey: process.env.ORVANO_API_KEY!,
+})
+export const orvano = new Orvano(client)
+
+const user = await orvano.users.get('user-id')
+```
+
+The server client sends your [API key](/docs/concepts/api-keys/) with every call. Keep the key in an environment variable or a secret store. The client refuses to set a key in a browser.
+
+### What the server SDK can call
+
+| Service | Methods |
+|---|---|
+| `users` | `create`, `get`, `list`, `listAll`, `delete`, `block`, `unblock`, `updateEmail`, `updateEmailVerification`, `createVerification`, `createRecovery`, `listSessions`, `listSessionsAll`, `deleteSession`, `deleteSessions` |
+| `account` | `get` (for a user's own token) |
+| `health`, `keys` | as above |
+
+`client.verifyAccessToken(token)` checks a user's access token on your server. See [Verify tokens on your server](/docs/auth/verify-tokens/).
+
+## Errors
+
+Every refused call throws an `OrvanoError` with the HTTP `status`, a stable `code`, a `message`, the `requestId`, and `retryAfter` (seconds, on a 429 or 503). Match on `code` with the `ErrorCode` constants:
+
+```ts
+import { ErrorCode, OrvanoError } from '@orvano/js'
+
+try {
+  await orvano.account.createPasswordSession({ email, password })
+} catch (error) {
+  if (error instanceof OrvanoError && error.code === ErrorCode.invalidCredentials) {
+    // show "Wrong email or password"
+  } else {
+    throw error
+  }
+}
+```
+
+A network failure or a timeout throws the runtime's own error (a `TypeError` from `fetch`, or a `TimeoutError`), not an `OrvanoError`. [Errors](/docs/concepts/errors/) covers the rest.

@@ -5,8 +5,113 @@ sidebar:
   order: 6
 ---
 
-How Orvano reports errors, and how each SDK surfaces them.
+import { TabItem, Tabs } from '@astrojs/starlight/components'
 
-:::note
-This page is being written for this release.
-:::
+## What the API sends
+
+Every failed call answers with a [problem details](https://www.rfc-editor.org/rfc/rfc9457) body, `Content-Type: application/problem+json`:
+
+```json
+{
+  "type": "https://orvano.dev/errors/invalid_credentials",
+  "title": "Unauthorized",
+  "status": 401,
+  "detail": "The email or password is wrong.",
+  "code": "invalid_credentials",
+  "requestId": "0HN7Q4R1M2K3J:00000001"
+}
+```
+
+| Field | What it holds |
+|---|---|
+| `code` | A stable code. Match on this; it never changes for a given error. |
+| `type` | A link to the code's page on this site, with why it happens and how to fix it. |
+| `status` | The HTTP status. |
+| `title`, `detail` | Text for people. Don't match on it: it may change. |
+| `requestId` | The ID the server logged the failure under, also in the `X-Request-Id` header. Quote it when you report a problem. |
+
+A 429 or 503 also sends a `Retry-After` header with the seconds to wait. [Every error code](/errors/) lists them all.
+
+## What the SDKs throw
+
+Each SDK throws one error type for every refused call, with the same fields, and offers the codes as constants:
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript and Next.js">
+
+```ts
+import { ErrorCode, OrvanoError } from '@orvano/js'
+
+try {
+  await orvano.account.createPasswordSession({ email, password })
+} catch (error) {
+  if (!(error instanceof OrvanoError)) throw error
+  switch (error.code) {
+    case ErrorCode.invalidCredentials:
+      return 'Wrong email or password.'
+    case ErrorCode.rateLimited:
+      return `Too many tries. Wait ${String(error.retryAfter ?? 60)} seconds.`
+    default:
+      throw error
+  }
+}
+```
+
+`OrvanoError` has `status`, `code`, `message`, `requestId`, and `retryAfter` (seconds).
+
+  </TabItem>
+  <TabItem label="Dart and Flutter">
+
+```dart
+try {
+  await orvano.account.createPasswordSession(
+    CreatePasswordSessionRequest(email: email, password: password),
+  );
+} on OrvanoException catch (error) {
+  switch (error.code) {
+    case ErrorCode.invalidCredentials:
+      return 'Wrong email or password.';
+    case ErrorCode.rateLimited:
+      return 'Too many tries. Wait ${error.retryAfter?.inSeconds ?? 60} seconds.';
+    default:
+      rethrow;
+  }
+}
+```
+
+`OrvanoException` has `status`, `code`, `message`, `requestId`, and `retryAfter` (a `Duration`).
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+try
+{
+    await orvano.Users.GetAsync(userId);
+}
+catch (OrvanoException error) when (error.Code == ErrorCode.UserNotFound)
+{
+    return Results.NotFound();
+}
+```
+
+`OrvanoException` has `Status`, `Code`, `Message`, `RequestId`, and `RetryAfter` (a `TimeSpan`).
+
+  </TabItem>
+</Tabs>
+
+A code your SDK version doesn't know yet still arrives as a plain string in `code`, so an older app keeps working against a newer server.
+
+Failures that never reached Orvano aren't this type: a network error or a timeout throws the platform's own error (`TypeError` or `TimeoutError` in JavaScript, `TimeoutException` in Dart and .NET).
+
+## Codes to handle in most apps
+
+| Code | When | What to do |
+|---|---|---|
+| [`invalid_credentials`](/errors/invalid_credentials/) | wrong email or password | say so, without saying which one |
+| [`user_already_exists`](/errors/user_already_exists/) | sign up with a taken email | offer to sign in instead |
+| [`invalid_password`](/errors/invalid_password/) | a password outside 8 to 256 characters | show the rule |
+| [`rate_limited`](/errors/rate_limited/) | too many tries | wait `retryAfter` |
+| [`token_expired`](/errors/token_expired/), [`invalid_token`](/errors/invalid_token/) | an old or bad access token | the client SDKs refresh and retry for you |
+| [`invalid_refresh_token`](/errors/invalid_refresh_token/) | the session has ended | show the sign in screen |
+| [`origin_not_allowed`](/errors/origin_not_allowed/) | a browser on an unregistered site | add a [web platform](/docs/concepts/platforms/) |

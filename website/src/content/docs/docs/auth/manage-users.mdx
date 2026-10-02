@@ -5,10 +5,169 @@ sidebar:
   order: 9
 ---
 
-Create, read, and update users from your server.
+import { TabItem, Tabs } from '@astrojs/starlight/components'
 
-Your server lists, creates, and blocks users with an API key: [`users.list`](/docs/api/operations/userslist/), [`users.create`](/docs/api/operations/userscreate/), [`users.block`](/docs/api/operations/usersblock/).
+Your own servers and support tools manage a project's users through `users`, with an [API key](/docs/concepts/api-keys/). Reading needs the `users.read` scope; everything that changes a user needs `users.write`. Create the key in the console ([API keys](/docs/console/api-keys/)) and read it from the environment.
 
-:::note
-This page is being written for this release.
-:::
+The snippets assume a server client, as in the [Dart](/docs/quickstarts/dart/) and [.NET](/docs/quickstarts/dotnet/) quickstarts or [`@orvano/js/server`](/docs/sdks/js/#on-your-server).
+
+## Create a user
+
+[`users.create`](/docs/api/operations/userscreate/) creates a user with a password, for example when you import users or invite them yourself. It doesn't sign them in. Pass `emailVerified: true` only when you've already checked the email.
+
+<Tabs syncKey="server-sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const user = await orvano.users.create({ email, password, name })
+```
+
+  </TabItem>
+  <TabItem label="Dart">
+
+```dart
+final user = await orvano.users.create(
+  CreateUserRequest(email: email, password: password, name: name),
+);
+```
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+var user = await orvano.Users.CreateAsync(new CreateUserRequest(email, password, Name: name));
+```
+
+  </TabItem>
+</Tabs>
+
+## Find users
+
+[`users.get`](/docs/api/operations/usersget/) reads one user by ID, and [`users.list`](/docs/api/operations/userslist/) lists them, newest first. Filter by `email` (matches the start), `status`, `emailVerified`, `createdAfter`, and `createdBefore`. `listAll` walks every page:
+
+<Tabs syncKey="server-sdk">
+  <TabItem label="JavaScript">
+
+```ts
+for await (const user of orvano.users.listAll({ emailVerified: false })) {
+  console.log(user.email)
+}
+```
+
+  </TabItem>
+  <TabItem label="Dart">
+
+```dart
+await for (final user in orvano.users.listAll(emailVerified: false)) {
+  print(user.email);
+}
+```
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+await foreach (var user in orvano.Users.ListAllAsync(emailVerified: false))
+{
+    Console.WriteLine(user.Email);
+}
+```
+
+  </TabItem>
+</Tabs>
+
+## Block and unblock
+
+[`users.block`](/docs/api/operations/usersblock/) ends every session of the user and stops them from signing in; they get [`user_blocked`](/errors/user_blocked/). [`users.unblock`](/docs/api/operations/usersunblock/) lets them sign in again, but their old sessions stay ended.
+
+<Tabs syncKey="server-sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.users.block(userId)
+await orvano.users.unblock(userId)
+```
+
+  </TabItem>
+  <TabItem label="Dart">
+
+```dart
+await orvano.users.block(userId);
+await orvano.users.unblock(userId);
+```
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+await orvano.Users.BlockAsync(userId);
+await orvano.Users.UnblockAsync(userId);
+```
+
+  </TabItem>
+</Tabs>
+
+## Send a verification or reset email
+
+[`users.createVerification`](/docs/api/operations/userscreateverification/) and [`users.createRecovery`](/docs/api/operations/userscreaterecovery/) send the user the same emails as [Email verification](/docs/auth/email-verification/) and [Password reset](/docs/auth/password-reset/), to a `redirectUrl` of your app:
+
+<Tabs syncKey="server-sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.users.createRecovery(userId, { redirectUrl: 'https://app.example.com/auth/reset' })
+```
+
+  </TabItem>
+  <TabItem label="Dart">
+
+```dart
+await orvano.users.createRecovery(
+  userId,
+  const CreateUserRecoveryRequest(redirectUrl: 'https://app.example.com/auth/reset'),
+);
+```
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+await orvano.Users.CreateRecoveryAsync(userId, new CreateUserRecoveryRequest("https://app.example.com/auth/reset"));
+```
+
+  </TabItem>
+</Tabs>
+
+## Change a user's email
+
+[`users.updateEmail`](/docs/api/operations/usersupdateemail/) changes the email at once, with no confirmation email, and keeps the user's sessions. [`users.updateEmailVerification`](/docs/api/operations/usersupdateemailverification/) marks the email verified or not.
+
+## Delete a user
+
+[`users.delete`](/docs/api/operations/usersdelete/) deletes the user, their password, and every session, for good.
+
+<Tabs syncKey="server-sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.users.delete(userId)
+```
+
+  </TabItem>
+  <TabItem label="Dart">
+
+```dart
+await orvano.users.delete(userId);
+```
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+await orvano.Users.DeleteAsync(userId);
+```
+
+  </TabItem>
+</Tabs>
+
+A user ID that doesn't exist gets [`user_not_found`](/errors/user_not_found/). The console's **Users** page does all of this by hand.

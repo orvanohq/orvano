@@ -5,8 +5,54 @@ sidebar:
   order: 4
 ---
 
-App users, access and refresh tokens, and how sessions end.
+## Users
 
-:::note
-This page is being written for this release.
-:::
+Each project has its own **users**: the people who sign in to your app. They are separate from console accounts, and a user of one project doesn't exist in another. A user has:
+
+| Field | What it holds |
+|---|---|
+| `id` | The user's ID. Use it to link your own data to the user. |
+| `email` | Unique in the project, ignoring case. |
+| `emailVerified`, `emailVerifiedAt` | Whether and when they proved they own the email. |
+| `name` | Optional, up to 256 characters. |
+| `status` | `active`, or `blocked`: a blocked user can't sign in. |
+| `metadata` | Your own JSON, up to 16 KB. The user can change it, so never store permissions here. |
+| `createdAt`, `lastSignInAt` | When they signed up, and last signed in. |
+
+Users sign up with an email and a password, or without a password through a [magic link](/docs/auth/magic-links/) or an [emailed code](/docs/auth/email-codes/). A password has 8 to 256 characters.
+
+## Sessions
+
+Each sign in opens a **session**, and a user can hold many at once: one per browser or device. A session has two tokens:
+
+- The **access token** proves who the user is. It's a JWT signed with ES256 and valid for **15 minutes**. Your app sends it with every call, and your own servers can check it without asking Orvano ([Verify tokens on your server](/docs/auth/verify-tokens/)). It holds the user ID (`sub`), the session ID (`sid`), and `email_verified`, but no email or name.
+- The **refresh token** gets a new pair of tokens before the access token runs out. Each refresh replaces it, so it works once. Using an old refresh token again ends the session, which protects a user whose token was stolen.
+
+The client SDKs refresh for you, a minute before the access token expires. A session ends after **30 days** without a refresh, and after **365 days** at most.
+
+### Where the SDKs keep the session
+
+| SDK | Storage |
+|---|---|
+| `@orvano/nextjs` | two cookies: `orvano_access`, and `orvano_refresh` (`HttpOnly`) |
+| `@orvano/js` in a browser | `localStorage`, under `orvano.session.<projectId>` |
+| `orvano_flutter` | the platform's secure storage, under the same key |
+
+## How sessions end
+
+| Event | Sessions ended |
+|---|---|
+| The user signs out | this one |
+| The user ends a session from their session list | that one |
+| The user changes their password | all but the current one |
+| The user resets a forgotten password | all, then a new one starts |
+| You block the user | all |
+| The user or you delete the account | all |
+| The user confirms an email change | none |
+
+Orvano refuses an ended session's tokens at once. A server that checks access tokens on its own still accepts one for up to 15 minutes, until it expires, unless it uses the [online check](/docs/auth/verify-tokens/#catch-ended-sessions-right-away).
+
+## Next
+
+- [Manage sessions](/docs/auth/manage-sessions/)
+- [Email and password](/docs/auth/email-and-password/)

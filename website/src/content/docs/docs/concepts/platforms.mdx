@@ -5,8 +5,41 @@ sidebar:
   order: 3
 ---
 
-Which web origins and app IDs may talk to a project.
+A **platform** is an app allowed to use a project: a website, an Android app, an iOS or macOS app, or a Windows or Linux app. Add one in the console for each app before it calls Orvano.
 
-:::note
-This page is being written for this release.
-:::
+## Web platforms
+
+When a browser calls Orvano, it sends the page's origin. Orvano checks that origin against the project's web platforms and refuses a call from any other site with [`origin_not_allowed`](/errors/origin_not_allowed/) (403). This stops someone else's website from signing your users in to your project.
+
+A web platform is a hostname. It matches on any scheme and any port:
+
+| Platform | Matches | Doesn't match |
+|---|---|---|
+| `app.example.com` | `https://app.example.com`, `http://app.example.com:8080` | `https://www.example.com` |
+| `*.example.com` | `https://a.example.com` | `https://example.com`, `https://a.b.example.com` |
+| `localhost` | `http://localhost:3000`, `http://localhost:5173` | `http://127.0.0.1:3000` |
+| `127.0.0.1` | `http://127.0.0.1:3000` | `http://localhost:3000` |
+
+A wildcard covers exactly one extra label, and `*` alone or `*.com` isn't allowed. One `localhost` platform covers every local dev server, which is why the quickstarts add just that.
+
+Requests without an `Origin` header, such as those from your servers and from mobile and desktop apps, aren't checked.
+
+## App platforms
+
+| Type | Identifier | Example |
+|---|---|---|
+| Android | package name | `dev.orvano.quickstart` |
+| iOS, macOS | bundle ID | `dev.orvano.quickstart` |
+| Windows, Linux | a label of your choice | `desktop` |
+
+Apps don't send an origin, so Orvano doesn't check these on every call. They matter for emailed links: a verification or email change link may open your app through a custom scheme only when that scheme equals a registered iOS, Android, or macOS identifier, such as `com.acme.app://auth`. See [Email verification](/docs/auth/email-verification/#where-the-link-opens).
+
+## Where links may point
+
+Every emailed link (verification, password reset, magic link, email change) goes to a `redirectUrl` your app passes. Orvano refuses one that isn't allowed with [`redirect_url_not_allowed`](/errors/redirect_url_not_allowed/) (400):
+
+- `https` on a host that matches one of the project's web platforms is always allowed.
+- `http` is allowed only on `localhost` or `127.0.0.1`, when that matches a web platform.
+- A custom scheme is allowed only for verification and email change links, and only when it matches an app platform. Magic links and password reset links sign the user in, so they must use https.
+
+[Platforms in the console](/docs/console/platforms/) shows how to add them.

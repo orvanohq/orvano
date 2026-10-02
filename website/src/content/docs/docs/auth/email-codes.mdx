@@ -5,8 +5,75 @@ sidebar:
   order: 5
 ---
 
-Sign users in with a 6 digit emailed code.
+import { TabItem, Tabs } from '@astrojs/starlight/components'
 
-:::note
-This page is being written for this release.
-:::
+With an email code, a user types their email, gets a 6 digit code by email, and types the code into your app to sign in. It needs no links, so it works the same in every app on every platform, with no deep link setup: the easiest passwordless sign in for a Flutter app. If the email has no account yet, the code creates one.
+
+This guide starts from a finished quickstart running against [Orvano on your machine](/docs/local/); the code lands in the local inbox at `http://localhost:8025`.
+
+## 1. Send the code
+
+[`account.createEmailCode`](/docs/api/operations/accountcreateemailcode/) needs no session, and answers the same way whether or not the email has an account.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.account.createEmailCode({ email })
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+'use server'
+await (await orvano()).account.createEmailCode({ email })
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+await orvano.account.createEmailCode(CreateEmailCodeRequest(email: email));
+```
+
+  </TabItem>
+</Tabs>
+
+Pass `createUser: false` to send codes only to existing users. A code works for 10 minutes. Sending a new one makes the older one stop working.
+
+Open `http://localhost:8025`: you should see "Your sign in code for" your project, with the 6 digits.
+
+## 2. Sign in with the code
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const { user, isNewUser } = await orvano.client.signInWithEmailCode(email, code)
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+'use server'
+// In a server action, so the SDK sets the session cookies.
+const { user, isNewUser } = await (await orvano()).account.createEmailCodeSession({ email, code })
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final result = await orvano.account.createEmailCodeSession(
+  CreateEmailCodeSessionRequest(email: email, code: code),
+);
+```
+
+  </TabItem>
+</Tabs>
+
+The user is signed in and their email is verified. As with [magic links](/docs/auth/magic-links/), `isNewUser` tells you the code created the account, and the account has no password yet.
+
+A wrong code gets [`invalid_code`](/errors/invalid_code/). After 5 wrong tries the code stops working, and an expired or unknown code gets the same answer, so tell the user to ask for a new code. Help them type it: an `inputmode="numeric"` field with `autocomplete="one-time-code"` lets phones fill it in from the email.

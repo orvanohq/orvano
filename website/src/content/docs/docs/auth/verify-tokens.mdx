@@ -5,10 +5,124 @@ sidebar:
   order: 8
 ---
 
-Check a user's access token on your own server.
+import { TabItem, Tabs } from '@astrojs/starlight/components'
 
-The SDKs check a token's signature against the project's public keys from [`keys.getJwks`](/docs/api/operations/keysgetjwks/), then load the user with [`users.get`](/docs/api/operations/usersget/).
+When your app calls your own backend, it sends the user's access token in `Authorization: Bearer <token>`. Your backend checks the token and learns who the user is, usually without calling Orvano. The [Dart](/docs/quickstarts/dart/) and [.NET](/docs/quickstarts/dotnet/) quickstarts build exactly this.
 
-:::note
-This page is being written for this release.
-:::
+## Get the token in your app
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const session = await orvano.client.getSession() // refreshed first when needed
+await fetch('/api/orders', { headers: { Authorization: `Bearer ${session!.accessToken}` } })
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+Your Next.js server already has the session, in the `orvano_access` cookie. From a client component, call your route handlers with `fetch`, and the cookie goes along.
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final session = await orvano.client.getSession(); // refreshed first when needed
+await http.get(apiUrl, headers: {'Authorization': 'Bearer ${session!.accessToken}'});
+```
+
+  </TabItem>
+</Tabs>
+
+## Check it on your server
+
+<Tabs syncKey="server-sdk">
+  <TabItem label="JavaScript">
+
+```ts
+import { Client, OrvanoError } from '@orvano/js/server'
+
+const client = new Client({ endpoint: process.env.ORVANO_ENDPOINT!, project: process.env.ORVANO_PROJECT! })
+
+try {
+  const token = await client.verifyAccessToken(accessToken)
+  // token.userId, token.sessionId, token.emailVerified, token.expiresAt
+} catch (error) {
+  if (error instanceof OrvanoError && error.status === 401) return new Response(null, { status: 401 })
+  throw error
+}
+```
+
+  </TabItem>
+  <TabItem label="Dart">
+
+```dart
+try {
+  final token = await client.verifyAccessToken(accessToken);
+  // token.userId, token.sessionId, token.emailVerified, token.expiresAt
+} on OrvanoException catch (error) {
+  if (error.status != 401) rethrow;
+  return Response.unauthorized('Send a valid access token.');
+}
+```
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+try
+{
+    var token = await orvano.VerifyAccessTokenAsync(accessToken);
+    // token.UserId, token.SessionId, token.EmailVerified, token.ExpiresAt
+}
+catch (OrvanoException error) when (error.Status == 401)
+{
+    return Results.Unauthorized();
+}
+```
+
+  </TabItem>
+</Tabs>
+
+The SDK checks that:
+
+- the token is an ES256 JWT signed by one of the project's keys, which it fetches from [`keys.getJwks`](/docs/api/operations/keysgetjwks/) and keeps for 10 minutes;
+- it was issued for this project (`iss` is `<your Orvano URL>/v1/projects/<projectId>`, and `aud` is the project ID);
+- it hasn't expired, allowing 30 seconds of clock difference.
+
+A bad token throws a 401 [`invalid_token`](/errors/invalid_token/), an expired one a 401 [`token_expired`](/errors/token_expired/). Answer 401 to both; the client SDKs refresh the session and try again. Checking needs only the project ID, not an API key. The SDK needs an API key only for what comes next, such as loading the user with [`users.get`](/docs/api/operations/usersget/).
+
+## Catch ended sessions right away
+
+The check above is offline: a token whose session ended (sign out, a password change, a blocked user) still passes until it expires, at most 15 minutes later. For actions where that matters, such as payments or deleting data, pass `online: true`. The SDK then also asks Orvano whether the session is still active, which costs one call:
+
+<Tabs syncKey="server-sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const token = await client.verifyAccessToken(accessToken, { online: true })
+```
+
+  </TabItem>
+  <TabItem label="Dart">
+
+```dart
+final token = await client.verifyAccessToken(accessToken, online: true);
+```
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+var token = await orvano.VerifyAccessTokenAsync(accessToken, online: true);
+```
+
+  </TabItem>
+</Tabs>
+
+## In other languages
+
+Any JWT library can check the tokens. Point it at the project's keys, `<your Orvano URL>/v1/projects/<projectId>/.well-known/jwks.json`, or at the discovery document from [`keys.getOpenIdConfiguration`](/docs/api/operations/keysgetopenidconfiguration/). Accept only `ES256`, and check `iss`, `aud`, and `exp` as above. The claims are `sub` (the user ID), `sid` (the session ID), and `email_verified`.
+
+Orvano rotates a project's signing key when an owner asks; the old key stays in the key set for 24 hours, so tokens signed with it keep working until they expire. When you see an unknown key ID, fetch the key set again.

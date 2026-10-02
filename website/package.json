@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/prepare.ts && astro dev",
-    "build": "node scripts/prepare.ts && astro check && astro build",
+    "build": "node scripts/prepare.ts && astro check && astro build && node scripts/markdown-copies.ts",
     "preview": "astro preview",
     "screenshots": "node scripts/screenshots.ts",
     "check:web-quickstart": "node scripts/check-web-quickstart.ts",
@@ -21,13 +21,21 @@
     "github-slugger": "^2.0.0",
     "sharp": "^0.35.5",
     "starlight-links-validator": "^0.26.0",
+    "starlight-llms-txt": "^0.12.0",
     "starlight-openapi": "^0.26.3"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
+    "@types/hast": "^3.0.5",
     "@types/node": "^24.13.3",
+    "hast-util-select": "^6.0.4",
     "playwright": "1.63.0",
+    "rehype-parse": "^9.0.1",
+    "rehype-remark": "^10.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-stringify": "^11.0.0",
     "typescript": "~6.0.3",
+    "unified": "^11.0.5",
     "wrangler": "^4.145.0"
   }
 }

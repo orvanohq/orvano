@@ -5,8 +5,57 @@ sidebar:
   order: 3
 ---
 
-Every ORVANO_* setting and what it does.
+Orvano reads its settings from environment variables. On a server they live in `/opt/orvano/.env`, which Docker Compose passes to each service. Every setting is checked when a service starts: a bad value stops that service with a message that names the setting (never its value), so a typo can't half work.
 
-:::note
-This page is being written for this release.
-:::
+After you change `.env`, apply it from `/opt/orvano`:
+
+```sh
+docker compose up -d
+```
+
+## Settings the installer writes
+
+The installer writes these, and keeps them on every later run. Change them by running the installer again with a flag, not by hand.
+
+| Setting | What it holds |
+|---|---|
+| `ORVANO_PUBLIC_URL` | The address of your install, such as `https://orvano.example.com`. It is in every token Orvano issues, so changing it signs everyone out. Use `--domain`. |
+| `ORVANO_ACME_EMAIL` | The Let's Encrypt account email, or empty. |
+| `ORVANO_VERSION` | The installed version. |
+| `ORVANO_MASTER_KEYS` | The key Orvano encrypts stored secrets with. Back it up. |
+| `ORVANO_SETUP_TOKEN` | The token in the setup link. Once the first admin exists, it does nothing. |
+| `POSTGRES_PASSWORD`, `ORVANO_ADMIN_PASSWORD`, `ORVANO_APP_PASSWORD` | The database passwords. |
+
+## Settings you may change
+
+| Setting | Default | What it does |
+|---|---|---|
+| `ORVANO_DELETE_GRACE_DAYS` | `7` | How many days a deleted project or org can be restored before it's removed for good. A whole number from 0 to 90. |
+| `ORVANO_TRUSTED_PROXIES` | `private` | Which proxies in front of Orvano may tell it the client's real IP address: `private` (loopback and private networks), `none`, or a comma separated list of addresses and CIDR ranges. The IP shows in session lists and drives per IP rate limits. |
+| `ORVANO_EMAIL_INSTALL_HOURLY_LIMIT` | `200` | How many emails an hour each project may send through the install's email server. Projects with their own server have no limit. A whole number from 1 to 1,000,000. |
+| `ORVANO_SMTP_ALLOW_PRIVATE_HOSTS` | `false` | `true` lets projects use an email server on a private network address. Leave it off unless your mail server is on your private network. See [Email delivery](/docs/self-hosting/email-delivery/#private-mail-servers). |
+| `ORVANO_INSTALL_SMTP_URL` | not set | Sets up the install's email server from configuration, such as `smtps://user:password@smtp.example.com`. See [Email delivery](/docs/self-hosting/email-delivery/#set-it-up-from-configuration). |
+| `ORVANO_INSTALL_SMTP_FROM` | not set | The From address for that server. Required when the URL is set. |
+| `ORVANO_EVENT_RETENTION_DAYS` | `7` | How many days Orvano keeps its internal event records. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | not set | Send traces, metrics, and logs to an OpenTelemetry collector. |
+
+## Postgres memory
+
+On every run the installer sizes Postgres to the server's memory and writes `ORVANO_PG_SHARED_BUFFERS`, `ORVANO_PG_EFFECTIVE_CACHE_SIZE`, `ORVANO_PG_WORK_MEM`, `ORVANO_PG_MAINTENANCE_WORK_MEM`, and `ORVANO_PG_MEMORY_LIMIT`. To set them yourself, add `ORVANO_PG_TUNING=manual` to `.env`; the installer then leaves all five alone.
+
+## Your own changes
+
+To change how a service runs, such as adding an environment variable or a volume, write `/opt/orvano/docker-compose.override.yml`. The installer never touches it, and Compose merges it into `docker-compose.yml` on every start:
+
+```yaml title="docker-compose.override.yml"
+services:
+  api:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4317
+```
+
+Override a service's own keys, as above, not the `x-` blocks at the top of `docker-compose.yml`: Compose resolves those before it merges the files.
+
+## A local install
+
+`orvano install --local` writes a few more settings into its folder's `.env`, which only the installer reads: `ORVANO_LOCAL`, `ORVANO_LOCAL_PORT`, and Compose's own `COMPOSE_FILE`, `COMPOSE_PATH_SEPARATOR`, and `COMPOSE_PROJECT_NAME`. It also sets `ORVANO_INSTALL_SMTP_URL` to the local inbox. See [Run Orvano locally](/docs/local/).

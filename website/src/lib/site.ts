@@ -21,6 +21,9 @@ export const version = readFileSync(join(repoRoot, 'VERSION'), 'utf8').trim()
 /** The server image every command uses, at exactly this version, never `latest` (AC-8). */
 export const serverImage = `ghcr.io/orvanohq/orvano:${version}`
 
+/** The server installer attached to this version's GitHub release, never `latest` (AC-8). */
+export const installScript = `https://github.com/orvanohq/orvano/releases/download/v${version}/install.sh`
+
 /** The local stack's console and API (spec 0011, AC-1). Always `localhost`, never `127.0.0.1`. */
 export const localUrl = 'http://localhost:7700'
 
