@@ -1,0 +1,128 @@
+---
+title: Next.js quickstart
+description: "From an empty folder to a Next.js app where you sign up, sign in, see your name and email, and sign out."
+---
+
+import { Code, Steps, TabItem, Tabs } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../components/ExampleCode.astro'
+import Screenshot from '../../../../components/Screenshot.astro'
+import { localStart, localUrl, version } from '../../../../lib/site'
+
+You build a Next.js App Router app where people sign up with an email and a password, sign in, see their name and email, and sign out. It uses `@orvano/nextjs` {version}: server actions sign people in, and the session lives in two cookies. It takes about ten minutes.
+
+The finished app is [`examples/nextjs-quickstart`](https://github.com/orvanohq/orvano/tree/main/examples/nextjs-quickstart) in the Orvano repo. Every file below comes from it, and CI runs it on every change.
+
+## 1. Start Orvano
+
+If Orvano isn't running on your machine yet, run these three commands. [Run Orvano locally](/docs/local/) explains each one.
+
+<Tabs syncKey="shell">
+  <TabItem label="macOS and Linux">
+    <Code code={localStart.unix} lang="sh" />
+  </TabItem>
+  <TabItem label="Windows PowerShell">
+    <Code code={localStart.powershell} lang="powershell" />
+  </TabItem>
+</Tabs>
+
+You should see every service report `Healthy`, and the console open at <code>{localUrl}</code>.
+
+## 2. Set up your project in the console
+
+<Steps>
+
+1. Open the setup link the installer printed and create the first admin. You land in your personal org.
+
+   <Screenshot name="setup" alt="The setup page with a name, email, and password filled in, above the Create the first admin button." />
+
+2. Select **Create project**, name it, and select **Create project** again. Setting it up takes a few seconds.
+
+   <Screenshot name="create-project" alt="The Create a project dialog with the name My app." />
+
+3. On the project's overview, copy the **Project ID**. Your app sends it with every request.
+
+   <Screenshot name="project-overview" alt="The project overview, showing the project ID with a copy button." />
+
+4. Open **Platforms**, select **Add platform**, keep the type **Web**, name it, enter `localhost` as the hostname, and select **Add platform**. A web platform allows your app's origin to call Orvano; `localhost` covers every port, so it covers `next dev` on 3000.
+
+   <Screenshot name="add-web-platform" alt="The Add a platform dialog with the type Web, the name Local web, and the hostname localhost." />
+
+</Steps>
+
+## 3. Create the app
+
+Make a folder for the app with this `package.json`, then run `npm install`. It pins `@orvano/nextjs` to {version}, the version of the Orvano you're running.
+
+<ExampleCode example="nextjs-quickstart" file="package.json" />
+
+<details>
+<summary>Also add `tsconfig.json` and `next.config.ts`</summary>
+
+<ExampleCode example="nextjs-quickstart" file="tsconfig.json" />
+<ExampleCode example="nextjs-quickstart" file="next.config.ts" />
+
+</details>
+
+## 4. Add your settings
+
+Create `.env.local` with your Orvano server and the project ID you copied:
+
+<ExampleCode example="nextjs-quickstart" file=".env.example" region="settings" lang="ini" title=".env.local" />
+
+Then read them in one place:
+
+<ExampleCode example="nextjs-quickstart" file="lib/config.ts" />
+
+## 5. Talk to Orvano from the server
+
+`createServerClient` makes a client for one request. It reads the user's session from the request's cookies and, in server actions, writes a new session to them. `currentUser` answers null instead of throwing when nobody is signed in.
+
+<ExampleCode example="nextjs-quickstart" file="lib/orvano.ts" />
+
+The proxy runs before every page and refreshes the session when its access token is about to run out, so a signed in user stays signed in:
+
+<ExampleCode example="nextjs-quickstart" file="proxy.ts" />
+
+## 6. Sign up, sign in, and sign out
+
+Three server actions do the work. `account.create` and `account.createPasswordSession` sign the user in, and the client stores the new session in the cookies. When Orvano refuses (a taken email, a wrong password), the action returns its message for the form to show.
+
+<ExampleCode example="nextjs-quickstart" file="app/actions.ts" />
+
+The forms are a client component, so they can show that message:
+
+<ExampleCode example="nextjs-quickstart" file="app/auth-forms.tsx" />
+
+The page shows the signed in user, or the forms:
+
+<ExampleCode example="nextjs-quickstart" file="app/page.tsx" />
+
+<details>
+<summary>Also add `app/layout.tsx` and `app/globals.css`</summary>
+
+<ExampleCode example="nextjs-quickstart" file="app/layout.tsx" />
+<ExampleCode example="nextjs-quickstart" file="app/globals.css" />
+
+</details>
+
+## 7. Try it
+
+Run `npm run dev` and open `http://localhost:3000`.
+
+<Steps>
+
+1. Fill in the **Sign up** form and select **Sign up**. You should see "You're signed in" with your name and email.
+2. Reload the page. You should still be signed in: the session is in the cookies.
+3. Select **Sign out**. You should see the two forms again.
+4. Fill in the **Sign in** form with the same email and password. You should see your name and email again.
+5. Try signing in with a wrong password. You should see Orvano's message under the form.
+
+</Steps>
+
+The new user is in the console too: open your project's **Users** page.
+
+## Next
+
+- Send a verification email and read it in the local inbox: [Email verification](/docs/auth/email-verification/).
+- Learn what the session cookies hold: [Users and sessions](/docs/concepts/users-and-sessions/).
+- See everything `@orvano/nextjs` can do: [Next.js SDK](/docs/sdks/nextjs/).

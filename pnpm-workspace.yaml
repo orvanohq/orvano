@@ -6,10 +6,13 @@ packages:
   - console
   - tests/scenarios/runners/js
   - tests/scenarios/runners/nextjs
+  - website
 
 # Dependency build scripts pnpm may run. lefthook's postinstall installs the git hooks (skipped in CI);
-# esbuild and workerd (the scenario runners' bundler and edge runtime) check their native binaries.
+# esbuild and workerd (the scenario runners' bundler and edge runtime) check their native binaries;
+# sharp is the website's image optimizer.
 allowBuilds:
   esbuild: true
+  sharp: true
   lefthook: true
   workerd: true

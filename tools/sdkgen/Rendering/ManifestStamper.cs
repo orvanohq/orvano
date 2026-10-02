@@ -21,6 +21,15 @@ internal static partial class ManifestStamper
         "sdks/console-client/package.json",
     ];
 
+    /// <summary>
+    /// The quickstart examples (spec 0011, AC-14): each pins its <c>@orvano/*</c> packages to exactly
+    /// <c>VERSION</c>, never a range, and its own <c>version</c> stays as it is.
+    /// </summary>
+    private static readonly string[] ExamplePackageJsons =
+    [
+        "examples/nextjs-quickstart/package.json",
+    ];
+
     /// <summary>The published Dart packages; their <c>version</c> follows <c>VERSION</c>.</summary>
     private static readonly string[] DartPackages =
     [
@@ -40,6 +49,9 @@ internal static partial class ManifestStamper
     [GeneratedRegex("^(  \"version\": )\"[^\"]*\"", RegexOptions.Multiline)]
     private static partial Regex PackageJsonVersion();
 
+    [GeneratedRegex("^(\\s+\"@orvano/[a-z-]+\": )\"[^\"]*\"", RegexOptions.Multiline)]
+    private static partial Regex OrvanoDependency();
+
     [GeneratedRegex("^version: .*$", RegexOptions.Multiline)]
     private static partial Regex PubspecVersion();
 
@@ -50,6 +62,8 @@ internal static partial class ManifestStamper
     {
         foreach (var file in PackageJsons)
             await RewriteAsync(root, file, s => PackageJsonVersion().Replace(s, $"$1\"{version}\"", 1));
+        foreach (var file in ExamplePackageJsons)
+            await RewriteAsync(root, file, s => OrvanoDependency().Replace(s, $"$1\"{version}\""));
         foreach (var file in DartDependents)
         {
             var published = DartPackages.Contains(file, StringComparer.Ordinal);

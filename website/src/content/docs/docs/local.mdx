@@ -1,0 +1,88 @@
+---
+title: Run Orvano locally
+description: "Start Orvano on your own machine with three commands, with a local inbox for its emails."
+---
+
+import { Code, TabItem, Tabs } from '@astrojs/starlight/components'
+import Screenshot from '../../../components/Screenshot.astro'
+import { inboxUrl, localStart, localUrl, serverImage, version } from '../../../lib/site'
+
+Every quickstart starts here. You run Orvano {version} on your own machine, on <code>{localUrl}</code>, with a local inbox that catches every email it sends. Nothing is reachable from your network, and you need no domain, server, or email account.
+
+## What you need
+
+- Docker Desktop, or Docker Engine on Linux, with Docker Compose 2.24.6 or later. Check with `docker compose version`.
+- Ports 7700 and 8025 free on your machine.
+
+## Start it
+
+Make a folder for this install, write its files, and start it:
+
+<Tabs syncKey="shell">
+  <TabItem label="macOS and Linux">
+    <Code code={localStart.unix} lang="sh" />
+  </TabItem>
+  <TabItem label="Windows PowerShell">
+    <Code code={localStart.powershell} lang="powershell" />
+  </TabItem>
+</Tabs>
+
+The second command runs the Orvano image once. It writes `.env`, `docker-compose.yml`, `docker-compose.local.yml`, and `initdb/` into the folder, generates every secret, and prints what to do next. On macOS and Linux, `--user` makes the files yours. The third command starts Orvano and waits until every service is healthy, which takes about a minute the first time while Docker pulls the images.
+
+The installer prints, in this order:
+
+1. The next command, `docker compose up -d --wait`.
+2. The console, <code>{localUrl}</code>.
+3. The setup link, <code>{localUrl}/setup#ost_...</code>.
+4. The local inbox, <code>{inboxUrl}</code>.
+5. Your master key. Keep the whole `.env` file somewhere safe: losing it makes every secret Orvano stores unrecoverable.
+6. How to stop and reset the stack.
+
+## Create the first admin
+
+Open the setup link the installer printed. Only that link can create the first admin, once. Fill in your name, email, and a password, then select **Create the first admin**.
+
+<Screenshot name="setup" alt="The console's setup page with the name, email, and password filled in, above the Create the first admin button." />
+
+You land in your personal org, signed in. From here every quickstart creates a project and adds the platform its app needs.
+
+## Read the emails Orvano sends
+
+Every email Orvano sends from this stack (verification links, password resets, sign in codes, invites) lands in the inbox at <code>{inboxUrl}</code>. No email ever leaves your machine. The installer set this up for you, so the email guides work right away.
+
+## What runs
+
+| Service | What it does | Reachable at |
+|---|---|---|
+| `gateway` | Serves the console and the API | <code>{localUrl}</code> |
+| `mailpit` | Catches every email | <code>{inboxUrl}</code> |
+| `api`, `worker`, `realtime` | Orvano itself | inside Docker only |
+| `postgres` | Your data | inside Docker only |
+
+Both published ports listen on `127.0.0.1` only. Docker names the containers and the data volume after the folder's own `COMPOSE_PROJECT_NAME`, so two local folders never share a database.
+
+## Stop, start, and reset
+
+Run these in the install folder:
+
+- Stop it, keeping your data: `docker compose down`
+- Start it again: `docker compose up -d --wait`
+- Delete everything (every project, user, and email): `docker compose down -v`. Run this before you delete the folder, or the data volume stays behind.
+
+## Upgrade
+
+Run the same `docker run` command in the same folder with a newer version of the image, then `docker compose up -d --wait`. It keeps every secret and your data; migrations run on start. This page is for <code>{serverImage}</code>.
+
+## Use another port
+
+Add `--port <n>` to the `docker run` command (1024 to 65535, not 8025). On a folder that already runs on another port, everyone has to sign in again, so the installer asks first; `--yes` answers for you.
+
+## Troubleshooting
+
+- **Port 7700 or 8025 is already in use.** Stop the program using it, or rerun the `docker run` command with `--port 7800` for the console. Port 8025 is fixed; stop the other mail catcher.
+- **Use `localhost`, never `127.0.0.1`.** The gateway answers only `localhost`, and Orvano builds its token issuer from that URL. Your app's settings must say <code>{localUrl}</code>.
+- **`localhost` resolves to `::1` first.** Browsers, Node, Dart, and .NET all fall back to `127.0.0.1` on their own; you don't need to change anything.
+- **Compose says it doesn't know `!override`.** Your Docker Compose is older than 2.24.6. Update Docker Desktop or the Compose plugin.
+- **The folder already holds a server install.** A folder is either local or a server install, never both, and the installer refuses to convert one. Use an empty folder.
+
+This stack is for building on your machine. To run Orvano for real users, [install it on a server](/docs/self-hosting/install/).

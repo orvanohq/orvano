@@ -15,6 +15,8 @@ export default defineConfig(
     '**/.next/',
     '**/next-env.d.ts',
     '**/build/',
+    '**/.astro/',
+    '**/.wrangler/',
     '**/.dart_tool/',
     '**/*.gen.ts',
     '.claude/',
@@ -86,6 +88,19 @@ export default defineConfig(
   {
     files: ['console/*.config.ts'],
     languageOptions: { globals: globals.node },
+  },
+
+  // The website's build and screenshot scripts run on Node.
+  {
+    files: ['website/scripts/**/*.ts'],
+    languageOptions: { globals: globals.node },
+  },
+
+  // Examples are what a reader copies (spec 0011): their own framework defaults, and no type aware rules, because
+  // their packages are installed only in a copy outside this workspace.
+  {
+    files: ['examples/**/*.{ts,tsx}'],
+    extends: [tseslint.configs.disableTypeChecked],
   },
 
   // Last, so Prettier owns formatting and no lint rule fights it.

@@ -1,0 +1,32 @@
+---
+/**
+ * A code block pulled at build time from a named region of a file in `examples/` (spec 0011, AC-9),
+ * so a quickstart page and its app can't disagree. A region is the lines between `#region <name>` and
+ * `#endregion <name>` comments; without `region`, the whole file. A missing file or region fails the
+ * build (AC-18).
+ */
+import { Code } from '@astrojs/starlight/components'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { extractRegion } from '../lib/regions'
+import { repoRoot } from '../lib/site'
+
+interface Props {
+  /** The example's folder name, for example `nextjs-quickstart`. */
+  example: string
+  /** The file's path inside the example. */
+  file: string
+  region?: string
+  /** The language to highlight; defaults to the file's extension. */
+  lang?: string
+  /** The title over the block; defaults to the file's path. */
+  title?: string
+}
+
+const { example, file, region, lang, title } = Astro.props
+const path = join(repoRoot, 'examples', example, file)
+const source = readFileSync(path, 'utf8')
+const code = extractRegion(source, region, `examples/${example}/${file}`)
+---
+
+<Code code={code} lang={lang ?? file.split('.').at(-1) ?? 'text'} title={title ?? file} />

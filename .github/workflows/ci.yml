@@ -75,6 +75,11 @@ jobs:
       # Type aware lint rules need the types of workspace packages, which live in their dist/.
       - if: needs.changes.outputs.lint == 'true'
         run: pnpm --filter "@orvano/scenarios-nextjs^..." build
+      # The website's `astro:` modules get their types from .astro/, which `astro sync` writes.
+      - if: needs.changes.outputs.lint == 'true'
+        run: pnpm --filter @orvano/website exec astro sync
+        env:
+          ORVANO_SITE_ENV: preview
       - if: needs.changes.outputs.lint == 'true'
         run: pnpm lint
       - if: needs.changes.outputs.lint == 'true'
@@ -123,7 +128,8 @@ jobs:
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
       - run: pnpm install --frozen-lockfile
-      - run: pnpm -r build
+      # The website builds in website.yml, with its own checks.
+      - run: pnpm -r --filter "!@orvano/website" build
 
   console-tests:
     name: Console tests (unit and browser)

@@ -1,0 +1,24 @@
+{
+  "name": "nextjs-quickstart",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The finished app of the Orvano Next.js quickstart: https://orvano.dev/docs/quickstarts/nextjs/",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000"
+  },
+  "dependencies": {
+    "@orvano/nextjs": "0.0.0",
+    "next": "16.3.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "typescript": "~6.0.3"
+  }
+}

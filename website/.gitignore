@@ -1,0 +1,5 @@
+dist/
+.astro/
+.wrangler/
+# Written by `pnpm screenshots` (spec 0011, AC-19): the IDs and key of a local stack.
+quickstart.env

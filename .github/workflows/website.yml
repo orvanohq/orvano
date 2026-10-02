@@ -1,0 +1,236 @@
+# orvano.dev (spec 0011). `build` builds the site and fails on a broken link, a missing quickstart code region, or a
+# type error (AC-18); ESLint and Prettier for website/ run in ci.yml's lint job. `preview` deploys a same repo pull
+# request to its own Cloudflare preview URL (AC-26). `quickstarts` starts a local stack from this checkout and runs
+# every quickstart against it (AC-19). A manual run can redeploy production from a chosen ref, behind the
+# `website-production` environment's approval (AC-25); release.yml owns the normal production deploy.
+
+name: Website
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The ref to build and deploy to orvano.dev
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Which areas this pull request touches (.github/scripts/changed-areas.sh). Markdown counts here: the site renders
+  # it. "Website passed" at the end is the one check to require: it passes when every job passed or was skipped.
+  changes:
+    name: Changed areas
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      website: ${{ steps.areas.outputs.website }}
+      quickstarts: ${{ steps.areas.outputs.quickstarts }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The pull request's merge commit and its first parent, the base branch.
+          fetch-depth: 2
+      - id: areas
+        run: |
+          .github/scripts/changed-areas.sh HEAD^1 HEAD <<'RULES'
+          all          .github/workflows/website.yml .github/scripts/changed-areas.sh .github/scripts/check-example-pins.mjs
+          # AC-27: what the site reads, plus the console for its screenshots.
+          website      website/* examples/* contract/* sdks/* deploy/* server/src/Orvano.Server/Install/* console/* CHANGELOG.md VERSION package.json pnpm-lock.yaml pnpm-workspace.yaml .tool-versions
+          # AC-19: what a quickstart runs on, never a content only change.
+          quickstarts  examples/* sdks/* contract/* deploy/* console/* server/src/Orvano.Server/Install/* website/scripts/* .github/scripts/use-local-sdks.mjs !*.md
+          RULES
+
+  build:
+    name: Build the site
+    needs: changes
+    if: needs.changes.outputs.website == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+      - run: corepack enable pnpm
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+      - run: pnpm install --frozen-lockfile
+      - run: node .github/scripts/check-example-pins.mjs
+      - run: pnpm --filter @orvano/website build
+        env:
+          ORVANO_SITE_ENV: preview
+      - uses: actions/upload-artifact@v7
+        with:
+          name: website-preview
+          path: website/dist
+          retention-days: 7
+
+  # Same repo pull requests only: a fork's code never runs with the Cloudflare token (AC-26). `pull_request`, never
+  # `pull_request_target`.
+  preview:
+    name: Preview deploy
+    needs: build
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: website-preview
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # Until the Cloudflare prerequisites in spec 0011 are done, there is no token and nothing to deploy to.
+      - id: token
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
+          else echo "::notice::No CLOUDFLARE_API_TOKEN in the website-preview environment yet, so no preview deploy."; fi
+      - if: steps.token.outputs.ready == 'true'
+        uses: actions/checkout@v7
+      - if: steps.token.outputs.ready == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+      - if: steps.token.outputs.ready == 'true'
+        run: corepack enable pnpm
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+      - if: steps.token.outputs.ready == 'true'
+        run: pnpm install --frozen-lockfile --filter @orvano/website
+      - if: steps.token.outputs.ready == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: website-preview
+          path: website/dist
+      - name: Upload a preview version
+        if: steps.token.outputs.ready == 'true'
+        id: upload
+        working-directory: website
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ALIAS: pr-${{ github.event.pull_request.number }}
+        run: |
+          pnpm exec wrangler versions upload --preview-alias "$ALIAS" --message "PR #${{ github.event.pull_request.number }}" | tee "$RUNNER_TEMP/upload.out"
+          url=$(grep -oE "https://$ALIAS-[a-z0-9.-]+\.workers\.dev" "$RUNNER_TEMP/upload.out" | head -n 1)
+          test -n "$url" || { echo "::error::wrangler printed no preview URL."; exit 1; }
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+      - name: Post the preview URL
+        if: steps.token.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          URL: ${{ steps.upload.outputs.url }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          marker='<!-- orvano-website-preview -->'
+          body=$(printf '%s\nThe docs site for this pull request: %s (commit %s). Search engines never index it.' "$marker" "$URL" "${SHA:0:7}")
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body" >/dev/null
+          else
+            gh pr comment "$PR" --body "$body"
+          fi
+
+  quickstarts:
+    name: Quickstarts against a local stack
+    needs: changes
+    if: needs.changes.outputs.quickstarts == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+      - run: corepack enable pnpm
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @orvano/website exec playwright install --with-deps chromium
+      - name: Build the images
+        run: |
+          V=$(cat VERSION)
+          echo "V=$V" >> "$GITHUB_ENV"
+          docker build -f deploy/server.Dockerfile -t "ghcr.io/orvanohq/orvano:$V" .
+          docker build -f deploy/gateway/Dockerfile -t "ghcr.io/orvanohq/orvano-gateway:$V" .
+      - name: Pack the SDKs
+        run: |
+          mkdir -p "$RUNNER_TEMP/packs"
+          pnpm --filter @orvano/js --filter @orvano/nextjs build
+          for sdk in js nextjs; do (cd "sdks/$sdk" && pnpm pack --pack-destination "$RUNNER_TEMP/packs"); done
+      - name: Start a local stack with install --local
+        run: |
+          mkdir -p "$RUNNER_TEMP/stack"
+          docker run --rm --user "$(id -u):$(id -g)" -v "$RUNNER_TEMP/stack:/install" "ghcr.io/orvanohq/orvano:$V" install --local --yes >/dev/null
+          cd "$RUNNER_TEMP/stack" && docker compose up -d --wait
+      # AC-10: the console steps every quickstart shows, saving the project ID and the server key it creates.
+      - name: Console journey
+        run: pnpm --filter @orvano/website screenshots
+        env:
+          ORVANO_LOCAL_DIR: ${{ runner.temp }}/stack
+          QUICKSTART_ENV: ${{ runner.temp }}/quickstart.env
+          SCREENSHOTS: '0'
+      # Each example runs from a copy outside the repo, on the SDKs packed above; the committed pins stay untouched.
+      - name: Next.js quickstart
+        run: |
+          . "$RUNNER_TEMP/quickstart.env"
+          app="$RUNNER_TEMP/nextjs-quickstart"
+          cp -R examples/nextjs-quickstart "$app"
+          node .github/scripts/use-local-sdks.mjs "$app" "$RUNNER_TEMP/packs"
+          printf 'NEXT_PUBLIC_ORVANO_ENDPOINT=%s\nNEXT_PUBLIC_ORVANO_PROJECT=%s\n' "$ORVANO_ENDPOINT" "$ORVANO_PROJECT" > "$app/.env.local"
+          (cd "$app" && npm install --no-audit --no-fund && npm run build)
+          (cd "$app" && npm start > "$RUNNER_TEMP/nextjs.log" 2>&1 &)
+          for _ in $(seq 1 30); do curl -fsS -o /dev/null http://localhost:3000 && break; sleep 1; done
+          pnpm --filter @orvano/website check:web-quickstart http://localhost:3000
+      - if: failure()
+        run: |
+          cat "$RUNNER_TEMP/nextjs.log" || true
+          cd "$RUNNER_TEMP/stack" && docker compose ps --all && docker compose logs
+      - if: always()
+        run: cd "$RUNNER_TEMP/stack" && docker compose down -v || true
+
+  # AC-25: redeploy orvano.dev from a chosen ref, only after you approve it in the `website-production` environment.
+  production:
+    name: Deploy production (manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: website-production
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+      - run: corepack enable pnpm
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @orvano/website build
+        env:
+          ORVANO_SITE_ENV: production
+          PUBLIC_CF_BEACON_TOKEN: ${{ vars.PUBLIC_CF_BEACON_TOKEN }}
+      - working-directory: website
+        run: pnpm exec wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  passed:
+    name: Website passed
+    if: always() && github.event_name != 'workflow_dispatch'
+    needs: [changes, build, preview, quickstarts]
+    runs-on: ubuntu-latest
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "::error::A website job failed or was cancelled."
+          exit 1
