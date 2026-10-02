@@ -7,7 +7,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { projectClient } from '@/lib/console-client'
 import { isNotFound } from '@/lib/errors'
 import { usePageTitle } from '@/lib/page-title'
-import { keys, userQuery, userSessionsQuery } from '@/lib/queries'
+import { keys, platformsQuery, userQuery, userSessionsQuery } from '@/lib/queries'
 import { roleReason, useOrgRole } from '@/lib/roles'
 import { notifyError, notifySuccess } from '@/lib/toast'
 import { InShellNotFound } from '@/shell/in-shell-not-found'
@@ -16,6 +16,7 @@ import { PageHeading } from '@/shell/page-heading'
 import { RelativeTime } from '@/shell/relative-time'
 import type { User } from '@orvano/console-client'
 
+import { EmailCard } from '../-users/email-parts'
 import { SessionsTable, UserStatusBadge } from '../-users/parts'
 
 export const Route = createFileRoute('/_app/projects/$projectId/users/$userId')({
@@ -35,8 +36,9 @@ export const Route = createFileRoute('/_app/projects/$projectId/users/$userId')(
 })
 
 /**
- * One user (spec 0004, AC-29): their details and active sessions. Owners and developers block,
- * unblock, delete, and end sessions; viewers see the same buttons with the reason.
+ * One user (spec 0004, AC-29): their details, email and verification (spec 0010, AC-22, AC-23), and
+ * active sessions. Owners and developers block, unblock, delete, end sessions, and run the email
+ * actions; viewers see the same buttons with the reason.
  */
 function UserPage() {
   const { projectId, userId } = Route.useParams()
@@ -47,6 +49,10 @@ function UserPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const sessions = useInfiniteQuery(userSessionsQuery(projectId, userId))
+  const platforms = useInfiniteQuery(platformsQuery(projectId))
+  const webHosts = (platforms.data?.pages.flatMap((page) => page.items) ?? [])
+    .filter((platform) => platform.type === 'web')
+    .map((platform) => platform.identifier)
   const client = projectClient(projectId)
 
   const refresh = async () => {
@@ -115,8 +121,6 @@ function UserPage() {
         </dd>
         <dt className="text-muted-foreground">Name</dt>
         <dd>{user.name ?? 'None'}</dd>
-        <dt className="text-muted-foreground">Email verified</dt>
-        <dd>{user.emailVerified ? 'Yes' : 'No'}</dd>
         <dt className="text-muted-foreground">Signed up</dt>
         <dd>
           <RelativeTime iso={user.createdAt} />
@@ -124,6 +128,30 @@ function UserPage() {
         <dt className="text-muted-foreground">Last sign in</dt>
         <dd>{user.lastSignInAt === null ? 'Never' : <RelativeTime iso={user.lastSignInAt} />}</dd>
       </dl>
+      <EmailCard
+        user={user}
+        projectId={projectId}
+        webHosts={webHosts}
+        disabledReason={reason}
+        onSetVerified={async (verified) => {
+          await client.consoleUsers.updateEmailVerification(userId, { verified })
+          await refresh()
+          notifySuccess(verified ? 'Marked as verified' : 'Marked as unverified', label)
+        }}
+        onSendVerification={async (redirectUrl) => {
+          await client.consoleUsers.createVerification(userId, { redirectUrl })
+          notifySuccess(`Sent to ${label}.`)
+        }}
+        onSendRecovery={async (redirectUrl) => {
+          await client.consoleUsers.createRecovery(userId, { redirectUrl })
+          notifySuccess(`Sent to ${label}.`)
+        }}
+        onChangeEmail={async ({ email, emailVerified }) => {
+          const changed = await client.consoleUsers.updateEmail(userId, { email, emailVerified })
+          await refresh()
+          notifySuccess('Email changed', changed.email ?? email)
+        }}
+      />
       <section aria-labelledby="sessions-heading" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <h2 id="sessions-heading" className="text-lg font-semibold">

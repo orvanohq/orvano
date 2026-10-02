@@ -3,6 +3,19 @@ using System.Text.Json.Serialization;
 
 namespace Orvano.Scenarios.Generated;
 
+/// <summary>The newest email Mailpit caught for an address, read from its text part.</summary>
+/// <param name="Subject">The subject line.</param>
+/// <param name="Type">The <c>orvano_type</c> of the first link carrying <c>orvano_token</c>; null when there is none.</param>
+/// <param name="Token">The <c>orvano_token</c> of that link; null when there is none.</param>
+/// <param name="Code">The first run of exactly 6 digits, when the email has no such link; null otherwise.</param>
+/// <param name="Url">That link in full; null when there is none.</param>
+public sealed record TestEmail(
+    [property: JsonPropertyName("subject")] string Subject,
+    [property: JsonPropertyName("type")] string? Type,
+    [property: JsonPropertyName("token")] string? Token,
+    [property: JsonPropertyName("code")] string? Code,
+    [property: JsonPropertyName("url")] string? Url);
+
 /// <summary>One fixed item in the <c>test.list</c> page.</summary>
 /// <param name="Id"><c>item-1</c> to <c>item-5</c>.</param>
 public sealed record TestItem(

@@ -3,10 +3,13 @@ import {
   MemorySessionStore,
   authorizationHeader,
   hasLocalStorage,
+  readAccessClaims,
   sessionFrom,
 } from './auth.js'
 import type { AuthEvent, AuthSession, AuthStateListener, SessionStore } from './auth.js'
 import { OrvanoError } from './error.js'
+import { directEmailAuth, readEmailLink, removeLinkFromAddressBar } from './links.js'
+import type { EmailAuthTransport, EmailCodeResult, LinkResult, RedeemLinkOptions } from './links.js'
 import { sdkHeader, sdkName, serverVersionHeader, versionMismatch } from './version.js'
 import type { Logger } from './version.js'
 import { sdkVersion } from '../generated/version.js'
@@ -33,6 +36,11 @@ export interface ClientConfig {
   timeoutMs?: number
   /** How many times a safe call is retried after a 429 or 503. Defaults to 3. */
   maxRetries?: number
+  /**
+   * How emailed links and codes are redeemed (spec 0010). Defaults to the matching `account`
+   * operation; `@orvano/nextjs` posts them to the app's route handler instead.
+   */
+  emailAuth?: EmailAuthTransport
   /** A custom `fetch`, for tests or runtimes without a global one. */
   fetch?: typeof fetch
   /**
@@ -127,6 +135,7 @@ export class Client {
   readonly #fetch: typeof fetch
   readonly #logger: Logger
   readonly #refresher: SessionRefresher
+  readonly #emailAuth: EmailAuthTransport
   readonly #listeners = new Set<AuthStateListener>()
   #known: AuthSession | null | undefined
   #refreshing: Promise<AuthSession | null> | undefined
@@ -156,6 +165,7 @@ export class Client {
       config.session ??
       (hasLocalStorage() ? new LocalStorageSessionStore(config.project) : new MemorySessionStore())
     this.#refresher = config.refresh ?? refreshWithToken
+    this.#emailAuth = config.emailAuth ?? directEmailAuth
     this.#timeoutMs = config.timeoutMs ?? defaultTimeoutMs
     this.#maxRetries = config.maxRetries ?? defaultMaxRetries
     // Bound, because some runtimes (Cloudflare Workers) reject a fetch called on another `this`.
@@ -190,6 +200,60 @@ export class Client {
    */
   async getSession(): Promise<AuthSession | null> {
     return this.#sessionForCall()
+  }
+
+  /**
+   * Redeems a link Orvano emailed (spec 0010, AC-24): reads `orvano_type` and `orvano_token`, calls
+   * the matching operation, and returns what it did, or null when the URL carries neither
+   * parameter. A magic link or password reset stores the new session (replacing any) and says
+   * `signedIn`; a verification or email change refreshes and says `userUpdated` when this client
+   * holds that user's session. In a browser `url` defaults to `location.href`, and then the two
+   * parameters are removed from the address bar after a success.
+   *
+   * @throws TypeError, before any call, for an unknown `orvano_type` or a `recovery` link without
+   * `password`.
+   * @throws {@link OrvanoError} when Orvano refuses the link, for example `invalid_email_token`.
+   */
+  async redeemLink(
+    url?: string | URL | URLSearchParams,
+    options: RedeemLinkOptions = {},
+  ): Promise<LinkResult | null> {
+    const location = (globalThis as { location?: { href: string } }).location
+    const source = url ?? location?.href
+    if (source === undefined)
+      throw new TypeError('Orvano: pass the link URL; this runtime has no location.')
+    const fromAddressBar = String(source) === location?.href
+    const { password, ...request } = options
+    const link = readEmailLink(source, password)
+    if (link === null) return null
+    const result = await this.#emailAuth.redeemLink(link, this, request)
+    if (fromAddressBar) removeLinkFromAddressBar()
+    return result
+  }
+
+  /**
+   * Signs in with a 6 digit code Orvano emailed (`account.createEmailCodeSession`), stores the
+   * session, and says `signedIn`. In `@orvano/nextjs`'s browser client it goes through the app's
+   * route handler, which sets the session cookies.
+   *
+   * @throws {@link OrvanoError} for a wrong or used up code (`invalid_code`) and every other refusal.
+   */
+  signInWithEmailCode(
+    email: string,
+    code: string,
+    options?: RequestOptions,
+  ): Promise<EmailCodeResult> {
+    return this.#emailAuth.signInWithEmailCode(email, code, this, options)
+  }
+
+  /**
+   * Reads the session store again and tells listeners `event`. For transports whose session is
+   * written somewhere else, such as a route handler that sets cookies.
+   */
+  async reloadSession(event: AuthEvent): Promise<void> {
+    const session = await this.session.get()
+    this.#known = session
+    this.#emit(event, session)
   }
 
   /**
@@ -255,8 +319,9 @@ export class Client {
       const response = await this.#fetch(url, init)
       this.#checkVersion(response)
       if (response.ok) {
-        const result: unknown =
-          response.status === 204 || spec.method === 'HEAD' ? undefined : await response.json()
+        // A 204, a HEAD, or an accepted call with no body (202) answers undefined.
+        const text = response.status === 204 || spec.method === 'HEAD' ? '' : await response.text()
+        const result: unknown = text === '' ? undefined : JSON.parse(text)
         await this.#applySession(spec.session, result)
         return result as T
       }
@@ -348,9 +413,34 @@ export class Client {
         await this.#save(null, 'signedOut')
         return
       case 'user':
-        this.#emit('userUpdated', await this.session.get())
+        await this.#userChanged(result)
         return
     }
+  }
+
+  /**
+   * A call changed a user (spec 0010, AC-14). When this client holds that user's session it says
+   * `userUpdated`, refreshing first when the token's `email_verified` claim no longer matches, so
+   * the next call carries the new claim. A session for another user, or none, hears nothing.
+   */
+  async #userChanged(result: unknown): Promise<void> {
+    const session = await this.session.get()
+    if (session === null) return
+    const claims = readAccessClaims(session.accessToken)
+    const user = result as { id?: unknown; emailVerified?: unknown } | undefined
+    if (claims !== null && typeof user?.id === 'string' && claims.sub !== user.id) return
+    if (
+      claims !== null &&
+      typeof user?.emailVerified === 'boolean' &&
+      user.emailVerified !== claims.emailVerified
+    ) {
+      try {
+        if ((await this.#refresh(session)) === null) return
+      } catch {
+        // A network error keeps the session; the claim updates at the next refresh.
+      }
+    }
+    this.#emit('userUpdated', await this.session.get())
   }
 
   async #save(session: AuthSession | null, event: AuthEvent): Promise<void> {

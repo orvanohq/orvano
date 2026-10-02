@@ -19,6 +19,8 @@ internal sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : D
 
     public DbSet<SigningKeyRow> SigningKeys => Set<SigningKeyRow>();
 
+    public DbSet<EmailTokenRow> EmailTokens => Set<EmailTokenRow>();
+
     /// <summary>A context on an open connection the caller owns; it never opens or closes it.</summary>
     public static AuthDbContext On(NpgsqlConnection connection) =>
         new(new DbContextOptionsBuilder<AuthDbContext>().UseNpgsql(connection).Options);
@@ -78,6 +80,24 @@ internal sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : D
             e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
             e.Property(x => x.EndedAt).HasColumnName("ended_at");
             e.Property(x => x.EndReason).HasColumnName("end_reason");
+            e.Property(x => x.Method).HasColumnName("method").HasDefaultValueSql("'password'");
+            e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        model.Entity<EmailTokenRow>(e =>
+        {
+            e.ToTable("auth_email_tokens");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasDefaultValueSql("uuidv7()");
+            e.Property(x => x.ProjectId).HasColumnName("project_id");
+            e.Property(x => x.Kind).HasColumnName("kind");
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.Email).HasColumnName("email");
+            e.Property(x => x.SecretHash).HasColumnName("secret_hash");
+            e.Property(x => x.MacKeyId).HasColumnName("mac_key_id");
+            e.Property(x => x.Attempts).HasColumnName("attempts");
+            e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -179,6 +199,41 @@ internal sealed class SessionRow
 
     /// <summary>One of <see cref="Domain.SessionEndReason"/>, set together with <see cref="EndedAt"/>.</summary>
     public string? EndReason { get; set; }
+
+    /// <summary>How the session began, one of <see cref="Domain.SessionMethod"/>.</summary>
+    public required string Method { get; set; }
+}
+
+/// <summary>
+/// <c>auth_email_tokens</c> (spec 0010): one live email link or code. The secret is stored only as a hash, and
+/// redeeming deletes the row.
+/// </summary>
+internal sealed class EmailTokenRow
+{
+    public Guid Id { get; set; }
+
+    public required string ProjectId { get; set; }
+
+    /// <summary>One of <see cref="Domain.EmailTokenKinds"/>.</summary>
+    public required string Kind { get; set; }
+
+    /// <summary>Null only for a magic link or code sent to an email with no user yet.</summary>
+    public Guid? UserId { get; set; }
+
+    /// <summary>Where the email went. Personal data: never log it.</summary>
+    public required string Email { get; set; }
+
+    /// <summary>Links: SHA-256 of the token; codes: the HMAC.</summary>
+    public required byte[] SecretHash { get; set; }
+
+    /// <summary>The master key ID of a code's HMAC; null for links.</summary>
+    public string? MacKeyId { get; set; }
+
+    public short Attempts { get; set; }
+
+    public DateTimeOffset ExpiresAt { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
 }
 
 /// <summary><c>auth_signing_keys</c>: a project's ES256 key pair, the private half envelope encrypted.</summary>

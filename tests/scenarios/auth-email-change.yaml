@@ -1,0 +1,68 @@
+# Spec 0010, AC-17, AC-18, AC-27: an email change waits for the link sent to the new address.
+name: a user changes their email after confirming the new address
+requires: []
+steps:
+  - op: account.create
+    as: client
+    input:
+      body: { email: 'old-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }
+  - op: account.updateEmail
+    as: client
+    input:
+      body:
+        email: 'new-${unique}@example.com'
+        redirectUrl: 'http://localhost:3000/auth/callback'
+        password: wrong horse battery staple
+    expect: { status: 401, code: invalid_credentials }
+  - op: now
+    as: client
+    input: {}
+    expect: { status: 200 }
+    save:
+      beforeChange: $.now
+  - op: account.updateEmail
+    as: client
+    input:
+      body:
+        email: 'new-${unique}@example.com'
+        redirectUrl: 'http://localhost:3000/auth/callback'
+        password: correct horse battery staple
+    expect: { status: 202 }
+  - op: account.get
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body: { email: 'old-${unique}@example.com' }
+  - op: test.getLatestEmail
+    as: client
+    input: { to: 'new-${unique}@example.com', after: '${beforeChange}' }
+    expect:
+      status: 200
+      body: { type: email_change }
+    save:
+      token: $.token
+  - op: account.confirmEmailChange
+    as: client
+    input:
+      body: { token: '${token}' }
+    expect:
+      status: 200
+      body: { email: 'new-${unique}@example.com', emailVerified: true }
+  - op: account.get
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body: { email: 'new-${unique}@example.com' }
+  - op: account.confirmEmailChange
+    as: client
+    input:
+      body: { token: '${token}' }
+    expect: { status: 401, code: invalid_email_token }
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'new-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }

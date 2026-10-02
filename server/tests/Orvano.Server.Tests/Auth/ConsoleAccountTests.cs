@@ -198,7 +198,7 @@ public class ConsoleAccountTests(PostgresFixture postgres)
         var clock = new ManualClock(DateTimeOffset.UtcNow);
         var keys = new SigningKeys(database.App, new SecretBox(MasterKeys.Parse(OrvanoProcess.MasterKeys)), clock);
         var tokens = new AccessTokens(keys, PublicUrl.Parse(OrvanoProcess.PublicUrl), clock);
-        var issued = await tokens.IssueAsync(ConsoleProject.Id, Guid.CreateVersion7(), Guid.CreateVersion7(), Ct);
+        var issued = await tokens.IssueAsync(ConsoleProject.Id, Guid.CreateVersion7(), Guid.CreateVersion7(), emailVerified: false, Ct);
         var checks = new ConsoleSessionChecks(tokens, null!);
 
         clock.Advance(TimeSpan.FromMinutes(16));
@@ -214,6 +214,13 @@ public class ConsoleAccountTests(PostgresFixture postgres)
         await using var api = await AuthApi.StartAsync(postgres);
         using var shop = await api.SignUpAsync("ada@x.com");
         using var other = await api.SignUpAsync("ada@x.com", project: AuthApi.OtherProject);
+        // Spec 0010 AC-29: email tokens go too, including those for emails with no user.
+        await TestDatabase.ExecuteAsync(api.Database.Superuser,
+            """
+            INSERT INTO orvano.auth_email_tokens (project_id, kind, email, secret_hash, expires_at)
+            VALUES (@p, 'magic_link', 'new@x.com', decode(repeat('aa', 32), 'hex'), now() + interval '15 minutes'),
+                   (@o, 'magic_link', 'new@x.com', decode(repeat('bb', 32), 'hex'), now() + interval '15 minutes')
+            """, ("p", AuthApi.Project), ("o", AuthApi.OtherProject));
         var work = new WorkRegistry();
         new AuthModule().RegisterWork(work);
         var purged = new OutboxEvent(1, AuthApi.Project, AuthJobs.ProjectPurgedEvent, AuthApi.Project, "{}", DateTimeOffset.UtcNow);
@@ -229,7 +236,7 @@ public class ConsoleAccountTests(PostgresFixture postgres)
             await handler(new JobContext(new ClaimedJob(1, job.Queue, job.Kind, AuthApi.Project, job.PayloadJson, 1, 10), services), Ct);
 
         Assert.Equal("auth", job.Queue);
-        foreach (var table in new[] { "auth_users", "auth_passwords", "auth_sessions", "auth_signing_keys" })
+        foreach (var table in new[] { "auth_users", "auth_passwords", "auth_sessions", "auth_signing_keys", "auth_email_tokens" })
         {
             Assert.Equal(0L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, $"SELECT count(*) FROM orvano.{table} WHERE project_id = @p", ("p", AuthApi.Project)));
             Assert.NotEqual(0L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, $"SELECT count(*) FROM orvano.{table} WHERE project_id = @p", ("p", AuthApi.OtherProject)));

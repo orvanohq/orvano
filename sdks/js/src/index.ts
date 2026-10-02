@@ -29,7 +29,23 @@ export {
   sessionStorageKey,
 } from './runtime/auth.js'
 export type { AuthEvent, AuthSession, AuthStateListener, SessionStore } from './runtime/auth.js'
-export { OrvanoError } from './runtime/error.js'
+export { OrvanoError, retryAfterSeconds } from './runtime/error.js'
+export {
+  directEmailAuth,
+  emailLinkTypes,
+  linkTokenParameter,
+  linkTypeParameter,
+  readEmailLink,
+  removeLinkFromAddressBar,
+} from './runtime/links.js'
+export type {
+  EmailAuthTransport,
+  EmailCodeResult,
+  EmailLink,
+  EmailLinkType,
+  LinkResult,
+  RedeemLinkOptions,
+} from './runtime/links.js'
 export { paginate } from './runtime/pagination.js'
 export type { Page } from './runtime/pagination.js'
 export { decodeEvent } from './runtime/events.js'

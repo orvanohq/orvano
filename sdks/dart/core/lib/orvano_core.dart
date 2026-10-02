@@ -23,5 +23,6 @@ export 'src/generated/events.dart';
 export 'src/generated/models.dart';
 export 'src/generated/services.dart';
 export 'src/generated/version.dart';
+export 'src/links.dart';
 export 'src/orvano_exception.dart';
 export 'src/pagination.dart';

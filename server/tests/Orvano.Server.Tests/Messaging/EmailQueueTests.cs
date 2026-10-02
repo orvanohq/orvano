@@ -310,22 +310,29 @@ public class EmailQueueTests(PostgresFixture postgres, MailpitFixture mailpit) :
         await using var t = await StartAsync(hourlyLimit: 1);
         AuthEmail Code() => new("shop", "Shop", AuthEmailKind.EmailCode, NewEmail(), null, null, "428613", 10);
 
+        var queue = t.Get<IEmailQueue>();
+        Assert.IsType<EmailAvailability.NotConfigured>(await queue.CheckAvailabilityAsync("shop", Ct));
         Assert.IsType<EmailQueueResult.NotConfigured>(await t.QueueAuthAsync(Code(), commit: true));
         Assert.Equal(0L, await t.ScalarAsync<long>("SELECT (SELECT count(*) FROM orvano.messaging_emails) + (SELECT count(*) FROM orvano.jobs)"));
 
         await t.SetSmtpAsync(Console, mailpit.Host, mailpit.SmtpPort);
+        Assert.IsType<EmailAvailability.Available>(await queue.CheckAvailabilityAsync("shop", Ct));
         Assert.IsType<EmailQueueResult.Queued>(await t.QueueAuthAsync(Code(), commit: true));
+        // Spec 0010 AC-31: the availability check reaches the same answer as the queue, before anything is written.
+        var unavailable = Assert.IsType<EmailAvailability.RateLimited>(await queue.CheckAvailabilityAsync("shop", Ct));
+        Assert.InRange(unavailable.RetryAfter.TotalMinutes, 59, 60);
         var limited = Assert.IsType<EmailQueueResult.RateLimited>(await t.QueueAuthAsync(Code(), commit: true));
         Assert.InRange(limited.RetryAfter.TotalMinutes, 59, 60);
         Assert.Equal(1L, await t.ScalarAsync<long>("SELECT count(*) FROM orvano.messaging_emails"));
 
         // Its own SMTP lifts the cap.
         await t.SetSmtpAsync("shop", mailpit.Host, mailpit.SmtpPort);
+        Assert.IsType<EmailAvailability.Available>(await queue.CheckAvailabilityAsync("shop", Ct));
         Assert.IsType<EmailQueueResult.Queued>(await t.QueueAuthAsync(Code(), commit: true));
 
         // A value that breaks its rule is a caller bug, and writes nothing.
         await Assert.ThrowsAsync<ArgumentException>(() => t.QueueAuthAsync(Code() with { Code = "12" }, commit: true));
-        await Assert.ThrowsAsync<ArgumentException>(() => t.QueueAuthAsync(Code() with { Kind = AuthEmailKind.MagicLink, Code = null, ActionUrl = "ftp://shop.test/x" }, commit: true));
+        await Assert.ThrowsAsync<ArgumentException>(() => t.QueueAuthAsync(Code() with { Kind = AuthEmailKind.MagicLink, Code = null, ActionUrl = "javascript:alert(1)" }, commit: true));
         Assert.Equal(2L, await t.ScalarAsync<long>("SELECT count(*) FROM orvano.messaging_emails"));
     }
 

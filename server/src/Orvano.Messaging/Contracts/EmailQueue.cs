@@ -54,9 +54,34 @@ public abstract record EmailQueueResult
     public sealed record RateLimited(TimeSpan RetryAfter) : EmailQueueResult;
 }
 
+/// <summary>Whether a project can send an email right now (<see cref="IEmailQueue.CheckAvailabilityAsync"/>).</summary>
+public abstract record EmailAvailability
+{
+    private EmailAvailability() { }
+
+    /// <summary>An SMTP server is set up and the project is under the install's hourly limit.</summary>
+    public sealed record Available : EmailAvailability;
+
+    /// <summary>Neither the project nor the install has an SMTP server.</summary>
+    public sealed record NotConfigured : EmailAvailability;
+
+    /// <summary>The project reached the install's hourly email limit.</summary>
+    /// <param name="RetryAfter">How long until a slot frees.</param>
+    public sealed record RateLimited(TimeSpan RetryAfter) : EmailAvailability;
+}
+
 /// <summary>Queues auth emails (spec 0009, AC-14). Registered only in the <c>api</c> role.</summary>
 public interface IEmailQueue
 {
+    /// <summary>
+    /// Whether <paramref name="projectId"/> could queue an email now, by the same SMTP resolution and hourly limit
+    /// <see cref="QueueAuthEmailAsync"/> uses, on a connection of its own (spec 0010, AC-31). A caller that must not
+    /// reveal whether an account exists asks this first, so every mail problem is decided before the account is read.
+    /// </summary>
+    /// <param name="projectId">The project that would send.</param>
+    /// <param name="ct">Cancels the call.</param>
+    Task<EmailAvailability> CheckAvailabilityAsync(string projectId, CancellationToken ct);
+
     /// <summary>
     /// Renders the project's template for <paramref name="email"/> and queues it in <paramref name="tx"/>, so the
     /// email exists only if the caller's change commits. The worker sends it with retries.

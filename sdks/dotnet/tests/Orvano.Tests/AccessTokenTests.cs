@@ -32,6 +32,9 @@ public class AccessTokenTests
         Assert.Equal("session-1", first.SessionId);
         Assert.Equal(new DateTimeOffset(expires, TimeSpan.Zero).ToUnixTimeSeconds(), first.ExpiresAt.ToUnixTimeSeconds());
         Assert.Equal("user-1", second.UserId);
+        Assert.False(first.EmailVerified); // spec 0010 AC-14: a token without the claim reads as unverified
+        Assert.True((await client.VerifyAccessTokenAsync(Sign(key, emailVerified: true), cancellationToken: Ct)).EmailVerified);
+        Assert.False((await client.VerifyAccessTokenAsync(Sign(key, emailVerified: false), cancellationToken: Ct)).EmailVerified);
         var fetch = Assert.Single(server.Requests);
         Assert.Equal("/v1/projects/shop/.well-known/jwks.json", fetch.RequestUri!.AbsolutePath);
         Assert.Null(fetch.Headers.CacheControl);
@@ -150,13 +153,14 @@ public class AccessTokenTests
     private static ECDsaSecurityKey NewKey(string kid) => new(ECDsa.Create(ECCurve.NamedCurves.nistP256)) { KeyId = kid };
 
     private static string Sign(
-        ECDsaSecurityKey key, string audience = Project, string issuer = Issuer, string? sid = "session-1", DateTime? expires = null)
+        ECDsaSecurityKey key, string audience = Project, string issuer = Issuer, string? sid = "session-1", DateTime? expires = null, bool? emailVerified = null)
     {
         var claims = new List<Claim> { new("sub", "user-1") };
         if (sid is not null) claims.Add(new Claim("sid", sid));
         var exp = expires ?? DateTime.UtcNow.AddMinutes(15);
         return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
+            Claims = emailVerified is { } verified ? new Dictionary<string, object> { ["email_verified"] = verified } : null,
             Issuer = issuer,
             Audience = audience,
             Subject = new ClaimsIdentity(claims),

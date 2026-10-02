@@ -16,6 +16,8 @@ internal static class ApiMapping
     {
         if (failure.Kind == FailureKind.Busy)
             http.Response.Headers.RetryAfter = "1";
+        if (failure.RetryAfter is { } retryAfter)
+            http.Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
 
         return ApiProblem.Result(failure.Kind switch
         {
@@ -40,10 +42,14 @@ internal static class ApiMapping
     public static IResult NoContent(HttpContext http, Outcome<Done> outcome) =>
         outcome.Succeeded ? TypedResults.NoContent() : Problem(http, outcome.Failure!);
 
+    public static IResult Accepted(HttpContext http, Outcome<Done> outcome) =>
+        outcome.Succeeded ? TypedResults.StatusCode(StatusCodes.Status202Accepted) : Problem(http, outcome.Failure!);
+
     public static Api.User User(UserRow row) => new(
         row.Id.ToString(),
         row.Email,
         row.EmailVerifiedAt is not null,
+        row.EmailVerifiedAt,
         row.Name,
         row.Status == UserStatuses.Blocked ? Api.UserStatus.Blocked : Api.UserStatus.Active,
         JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(row.Metadata) ?? [],
@@ -53,7 +59,7 @@ internal static class ApiMapping
     public static Api.ConsoleAccount ConsoleAccount(UserRow row, bool isInstallAdmin)
     {
         var user = User(row);
-        return new(user.Id, user.Email, user.EmailVerified, user.Name, user.Status, user.Metadata, user.CreatedAt, user.LastSignInAt, isInstallAdmin);
+        return new(user.Id, user.Email, user.EmailVerified, user.EmailVerifiedAt, user.Name, user.Status, user.Metadata, user.CreatedAt, user.LastSignInAt, isInstallAdmin);
     }
 
     public static Api.SessionTokens SessionTokens(SessionTokensView view) => new(
@@ -70,13 +76,32 @@ internal static class ApiMapping
         view.UserAgent,
         view.Sdk,
         view.IpAddress?.ToString(),
-        view.Current);
+        view.Current,
+        SessionMethodOf(view.Method));
+
+    public static Api.SessionMethod SessionMethodOf(string method) => method switch
+    {
+        SessionMethod.Password => Api.SessionMethod.Password,
+        SessionMethod.SignUp => Api.SessionMethod.SignUp,
+        SessionMethod.MagicLink => Api.SessionMethod.MagicLink,
+        SessionMethod.EmailCode => Api.SessionMethod.EmailCode,
+        SessionMethod.Recovery => Api.SessionMethod.Recovery,
+        _ => throw new ArgumentOutOfRangeException(nameof(method), method, "Unknown session method."),
+    };
 
     public static Api.SessionPage SessionPage(Page<SessionView> page) => new([.. page.Items.Select(Session)], page.NextCursor);
 
     public static Api.UserPage UserPage(Page<UserRow> page) => new([.. page.Items.Select(User)], page.NextCursor);
 
-    public static Api.AuthResult AuthResult(SignedIn signedIn) => new(User(signedIn.User), SessionTokens(signedIn.Session));
+    public static Api.AuthResult AuthResult(SignedIn signedIn) =>
+        new(User(signedIn.User), SessionTokens(signedIn.Session), signedIn.IsNewUser, signedIn.VerificationEmail switch
+        {
+            null => null,
+            VerificationEmail.Queued => Api.VerificationEmailStatus.Queued,
+            VerificationEmail.NotConfigured => Api.VerificationEmailStatus.NotConfigured,
+            VerificationEmail.RateLimited => Api.VerificationEmailStatus.RateLimited,
+            _ => throw new ArgumentOutOfRangeException(nameof(signedIn), signedIn.VerificationEmail, "Unknown verification email status."),
+        });
 
     public static Api.Jwk Jwk(PublicSigningKey key) =>
         JsonSerializer.Deserialize<Api.Jwk>(key.PublicJwk) ?? throw new InvalidOperationException($"Signing key {key.Kid} has no public JWK.");

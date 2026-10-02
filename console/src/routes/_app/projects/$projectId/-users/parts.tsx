@@ -35,6 +35,8 @@ import { RelativeTime } from '@/shell/relative-time'
 import { authErrorMessage } from '@/routes/-auth/auth-form'
 import type { Session, SigningKey, User, UserStatus } from '@orvano/console-client'
 
+import { VerifiedBadge, sessionMethodLabel } from './email-parts'
+
 /** A user's status as a word with its dot; every status shows its word (spec 0005). */
 export function UserStatusBadge({ status }: { status: UserStatus }) {
   return (
@@ -61,6 +63,11 @@ export function userColumns(projectId: string): ColumnDef<User>[] {
       ),
     },
     { accessorKey: 'name', header: 'Name', cell: ({ row }) => row.original.name ?? '' },
+    {
+      accessorKey: 'emailVerified',
+      header: 'Verified',
+      cell: ({ row }) => <VerifiedBadge verified={row.original.emailVerified} />,
+    },
     {
       accessorKey: 'status',
       header: 'Status',
@@ -95,7 +102,7 @@ export function NoUsers({ searching }: { searching: boolean }) {
         <EmptyTitle>{searching ? 'No matching users' : 'No users yet'}</EmptyTitle>
         <EmptyDescription>
           {searching
-            ? 'No email starts with what you typed.'
+            ? 'No user matches the search and filter.'
             : 'People who sign up to your app, or that you create here, appear here.'}
         </EmptyDescription>
       </EmptyHeader>
@@ -136,6 +143,11 @@ export function SessionsTable({
       accessorKey: 'lastRefreshedAt',
       header: 'Last active',
       cell: ({ row }) => <RelativeTime iso={row.original.lastRefreshedAt} />,
+    },
+    {
+      accessorKey: 'method',
+      header: 'Method',
+      cell: ({ row }) => sessionMethodLabel(row.original.method),
     },
     {
       accessorKey: 'userAgent',

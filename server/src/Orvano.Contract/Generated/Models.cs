@@ -198,6 +198,52 @@ public sealed class EmailFailureCodeJsonConverter : JsonConverter<EmailFailureCo
         });
 }
 
+/// <summary>What an emailed link is for: the <c>orvano_type</c> parameter Orvano adds to every link it emails, beside <c>orvano_token</c>. The SDKs' link helpers (<c>redeemLink</c>, <c>handleLink</c>) read it to call the right operation.</summary>
+[JsonConverter(typeof(EmailLinkTypeJsonConverter))]
+public enum EmailLinkType
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>verification</c>.</summary>
+    Verification,
+
+    /// <summary>The wire value <c>recovery</c>.</summary>
+    Recovery,
+
+    /// <summary>The wire value <c>magic_link</c>.</summary>
+    MagicLink,
+
+    /// <summary>The wire value <c>email_change</c>.</summary>
+    EmailChange,
+}
+
+/// <summary>Reads and writes <see cref="EmailLinkType"/> by wire value; unknown values read as <see cref="EmailLinkType.Unknown"/>.</summary>
+public sealed class EmailLinkTypeJsonConverter : JsonConverter<EmailLinkType>
+{
+    /// <inheritdoc/>
+    public override EmailLinkType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "verification" => EmailLinkType.Verification,
+            "recovery" => EmailLinkType.Recovery,
+            "magic_link" => EmailLinkType.MagicLink,
+            "email_change" => EmailLinkType.EmailChange,
+            _ => EmailLinkType.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, EmailLinkType value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            EmailLinkType.Verification => "verification",
+            EmailLinkType.Recovery => "recovery",
+            EmailLinkType.MagicLink => "magic_link",
+            EmailLinkType.EmailChange => "email_change",
+            _ => throw new JsonException($"EmailLinkType.{value} has no wire value"),
+        });
+}
+
 /// <summary>Where an email is in its delivery.</summary>
 [JsonConverter(typeof(EmailStatusJsonConverter))]
 public enum EmailStatus
@@ -541,6 +587,57 @@ public sealed class ProjectStatusJsonConverter : JsonConverter<ProjectStatus>
         });
 }
 
+/// <summary>How a session began.</summary>
+[JsonConverter(typeof(SessionMethodJsonConverter))]
+public enum SessionMethod
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>password</c>.</summary>
+    Password,
+
+    /// <summary>The wire value <c>sign_up</c>.</summary>
+    SignUp,
+
+    /// <summary>The wire value <c>magic_link</c>.</summary>
+    MagicLink,
+
+    /// <summary>The wire value <c>email_code</c>.</summary>
+    EmailCode,
+
+    /// <summary>The wire value <c>recovery</c>.</summary>
+    Recovery,
+}
+
+/// <summary>Reads and writes <see cref="SessionMethod"/> by wire value; unknown values read as <see cref="SessionMethod.Unknown"/>.</summary>
+public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
+{
+    /// <inheritdoc/>
+    public override SessionMethod Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "password" => SessionMethod.Password,
+            "sign_up" => SessionMethod.SignUp,
+            "magic_link" => SessionMethod.MagicLink,
+            "email_code" => SessionMethod.EmailCode,
+            "recovery" => SessionMethod.Recovery,
+            _ => SessionMethod.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, SessionMethod value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            SessionMethod.Password => "password",
+            SessionMethod.SignUp => "sign_up",
+            SessionMethod.MagicLink => "magic_link",
+            SessionMethod.EmailCode => "email_code",
+            SessionMethod.Recovery => "recovery",
+            _ => throw new JsonException($"SessionMethod.{value} has no wire value"),
+        });
+}
+
 /// <summary>What a signing key does.</summary>
 [JsonConverter(typeof(SigningKeyStatusJsonConverter))]
 public enum SigningKeyStatus
@@ -695,6 +792,47 @@ public sealed class UserStatusJsonConverter : JsonConverter<UserStatus>
         });
 }
 
+/// <summary>What happened to the verification email of a sign up. The user and session are created whatever it says.</summary>
+[JsonConverter(typeof(VerificationEmailStatusJsonConverter))]
+public enum VerificationEmailStatus
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>queued</c>.</summary>
+    Queued,
+
+    /// <summary>The wire value <c>not_configured</c>.</summary>
+    NotConfigured,
+
+    /// <summary>The wire value <c>rate_limited</c>.</summary>
+    RateLimited,
+}
+
+/// <summary>Reads and writes <see cref="VerificationEmailStatus"/> by wire value; unknown values read as <see cref="VerificationEmailStatus.Unknown"/>.</summary>
+public sealed class VerificationEmailStatusJsonConverter : JsonConverter<VerificationEmailStatus>
+{
+    /// <inheritdoc/>
+    public override VerificationEmailStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "queued" => VerificationEmailStatus.Queued,
+            "not_configured" => VerificationEmailStatus.NotConfigured,
+            "rate_limited" => VerificationEmailStatus.RateLimited,
+            _ => VerificationEmailStatus.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, VerificationEmailStatus value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            VerificationEmailStatus.Queued => "queued",
+            VerificationEmailStatus.NotConfigured => "not_configured",
+            VerificationEmailStatus.RateLimited => "rate_limited",
+            _ => throw new JsonException($"VerificationEmailStatus.{value} has no wire value"),
+        });
+}
+
 /// <summary>The org an accepted invitation joined.</summary>
 /// <param name="Org">The org, with the caller's role in it.</param>
 /// <param name="AlreadyMember">True when the caller was already a member; their role did not change.</param>
@@ -733,14 +871,31 @@ public sealed record ApiKeyPage(
 /// <summary>A signed in user and their new session.</summary>
 /// <param name="User">The user.</param>
 /// <param name="Session">The new session's tokens.</param>
+/// <param name="IsNewUser">Whether this call created the user: true from sign up, and from a magic link or email code for a new email.</param>
+/// <param name="VerificationEmail">What happened to the verification email sign up was asked to send; null when none was asked for.</param>
 public sealed record AuthResult(
     [property: JsonPropertyName("user")] User User,
-    [property: JsonPropertyName("session")] SessionTokens Session);
+    [property: JsonPropertyName("session")] SessionTokens Session,
+    [property: JsonPropertyName("isNewUser")] bool IsNewUser,
+    [property: JsonPropertyName("verificationEmail")] VerificationEmailStatus? VerificationEmail);
+
+/// <summary>A password reset, with the token from the emailed link.</summary>
+/// <param name="Token">The <c>orvano_token</c> parameter of the emailed link.</param>
+/// <param name="Password">The new password: 8 to 256 characters after Unicode NFKC normalization.</param>
+public sealed record CompleteRecoveryRequest(
+    [property: JsonPropertyName("token")] string Token,
+    [property: JsonPropertyName("password")] string Password);
+
+/// <summary>An email change confirmation, with the token from the link sent to the new address.</summary>
+/// <param name="Token">The <c>orvano_token</c> parameter of the emailed link.</param>
+public sealed record ConfirmEmailChangeRequest(
+    [property: JsonPropertyName("token")] string Token);
 
 /// <summary>A console account: a user of the console, and whether it is an install admin.</summary>
 /// <param name="Id">The user ID.</param>
 /// <param name="Email">The email, as typed at sign up; null for a user without one.</param>
-/// <param name="EmailVerified">Whether the email has been verified.</param>
+/// <param name="EmailVerified">Whether the email has been verified. Also the access token's <c>email_verified</c> claim.</param>
+/// <param name="EmailVerifiedAt">When the email was verified; null while it is not.</param>
 /// <param name="Name">The display name; null when none was given.</param>
 /// <param name="Status">Whether the user may sign in.</param>
 /// <param name="Metadata">Your own data about the user: a JSON object of at most 16 KB.</param>
@@ -751,6 +906,7 @@ public sealed record ConsoleAccount(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("email")] string? Email,
     [property: JsonPropertyName("emailVerified")] bool EmailVerified,
+    [property: JsonPropertyName("emailVerifiedAt")] DateTimeOffset? EmailVerifiedAt,
     [property: JsonPropertyName("name")] string? Name,
     [property: JsonPropertyName("status")] UserStatus Status,
     [property: JsonPropertyName("metadata")] IReadOnlyDictionary<string, JsonElement> Metadata,
@@ -771,10 +927,12 @@ public sealed record ConsoleUserRef(
 /// <param name="Email">The email, trimmed, at most 320 characters. Unique in the project, ignoring case.</param>
 /// <param name="Password">8 to 256 characters after Unicode NFKC normalization.</param>
 /// <param name="Name">A display name, at most 256 characters.</param>
+/// <param name="VerificationRedirectUrl">When set, also emails a verification link that opens here: a host that is one of the project's web platforms, or your app's own scheme. <c>AuthResult.verificationEmail</c> says whether it was sent.</param>
 public sealed record CreateAccountRequest(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("password")] string Password,
-    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null);
+    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null,
+    [property: JsonPropertyName("verificationRedirectUrl"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? VerificationRedirectUrl = null);
 
 /// <summary>A new API key.</summary>
 /// <param name="Name">A name to recognize the key by; trimmed, 1 to 100 characters.</param>
@@ -805,12 +963,40 @@ public sealed record CreateConsoleSessionRequest(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("password")] string Password);
 
+/// <summary>A request to email a 6 digit sign in code.</summary>
+/// <param name="Email">The email to sign in as; case does not matter.</param>
+/// <param name="CreateUser">Whether the code may create a user for an email that has none. Defaults to true.</param>
+public sealed record CreateEmailCodeRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("createUser"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? CreateUser = null);
+
+/// <summary>A sign in with an emailed code.</summary>
+/// <param name="Email">The email the code was sent to; case does not matter.</param>
+/// <param name="Code">The 6 digit code from the email.</param>
+public sealed record CreateEmailCodeSessionRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("code")] string Code);
+
 /// <summary>A new invitation.</summary>
 /// <param name="Email">The email to invite; trimmed, at most 320 characters. Inviting an email again replaces its old invitation.</param>
 /// <param name="Role">The role the invitation grants.</param>
 public sealed record CreateInvitationRequest(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("role")] OrgRole Role);
+
+/// <summary>A request to email a sign in link.</summary>
+/// <param name="Email">The email to sign in as; case does not matter.</param>
+/// <param name="RedirectUrl">Your page that receives the link, on a host that is one of the project's web platforms (<c>http</c> only on <c>localhost</c> or <c>127.0.0.1</c>). The link adds <c>orvano_type=magic_link</c> and <c>orvano_token</c> to it.</param>
+/// <param name="CreateUser">Whether the link may create a user for an email that has none. Defaults to true.</param>
+public sealed record CreateMagicLinkRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("redirectUrl")] string RedirectUrl,
+    [property: JsonPropertyName("createUser"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? CreateUser = null);
+
+/// <summary>A sign in with the token from a magic link.</summary>
+/// <param name="Token">The <c>orvano_token</c> parameter of the emailed link.</param>
+public sealed record CreateMagicLinkSessionRequest(
+    [property: JsonPropertyName("token")] string Token);
 
 /// <summary>A new org. The caller becomes its owner.</summary>
 /// <param name="Name">The org name; trimmed, 1 to 100 characters.</param>
@@ -838,14 +1024,38 @@ public sealed record CreatePlatformRequest(
 public sealed record CreateProjectRequest(
     [property: JsonPropertyName("name")] string Name);
 
+/// <summary>A request to email a password reset link.</summary>
+/// <param name="Email">The email of the account; case does not matter.</param>
+/// <param name="RedirectUrl">Your page that receives the link, on a host that is one of the project's web platforms (<c>http</c> only on <c>localhost</c> or <c>127.0.0.1</c>). The link adds <c>orvano_type=recovery</c> and <c>orvano_token</c> to it.</param>
+public sealed record CreateRecoveryRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("redirectUrl")] string RedirectUrl);
+
+/// <summary>A request to email a user a password reset link.</summary>
+/// <param name="RedirectUrl">The page that receives the link, on a host that is one of the project's web platforms (<c>http</c> only on <c>localhost</c> or <c>127.0.0.1</c>). The link adds <c>orvano_type=recovery</c> and <c>orvano_token</c> to it.</param>
+public sealed record CreateUserRecoveryRequest(
+    [property: JsonPropertyName("redirectUrl")] string RedirectUrl);
+
 /// <summary>A new user with an email and password, created by a server. No session is created.</summary>
 /// <param name="Email">The email, trimmed, at most 320 characters. Unique in the project, ignoring case.</param>
 /// <param name="Password">8 to 256 characters after Unicode NFKC normalization.</param>
 /// <param name="Name">A display name, at most 256 characters.</param>
+/// <param name="EmailVerified">True to create the user with their email already verified, as when importing accounts. Defaults to false.</param>
 public sealed record CreateUserRequest(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("password")] string Password,
-    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null);
+    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null,
+    [property: JsonPropertyName("emailVerified"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? EmailVerified = null);
+
+/// <summary>A request to email a user a link that verifies their email.</summary>
+/// <param name="RedirectUrl">The page that receives the link: a host that is one of the project's web platforms (<c>http</c> only on <c>localhost</c> or <c>127.0.0.1</c>), or the app's own scheme. The link adds <c>orvano_type=verification</c> and <c>orvano_token</c> to it.</param>
+public sealed record CreateUserVerificationRequest(
+    [property: JsonPropertyName("redirectUrl")] string RedirectUrl);
+
+/// <summary>A request to email a verification link to the signed in user.</summary>
+/// <param name="RedirectUrl">Your page that receives the link: a host that is one of the project's web platforms (<c>http</c> only on <c>localhost</c> or <c>127.0.0.1</c>), or your app's own scheme (its iOS, Android, or macOS identifier). The link adds <c>orvano_type=verification</c> and <c>orvano_token</c> to it.</param>
+public sealed record CreateVerificationRequest(
+    [property: JsonPropertyName("redirectUrl")] string RedirectUrl);
 
 /// <summary>A new API key with its secret. The secret is shown only here, once.</summary>
 /// <param name="ApiKey">The key.</param>
@@ -864,9 +1074,9 @@ public sealed record CreatedInvitation(
     [property: JsonPropertyName("emailed")] bool Emailed);
 
 /// <summary>A request to delete the signed in user.</summary>
-/// <param name="Password">The user's current password.</param>
+/// <param name="Password">The user's current password. A user without one leaves it out, and must have signed in within 10 minutes.</param>
 public sealed record DeleteAccountRequest(
-    [property: JsonPropertyName("password")] string Password);
+    [property: JsonPropertyName("password"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Password = null);
 
 /// <summary>One email in the log. The recipient is masked, and the content is never kept.</summary>
 /// <param name="Id">The email's ID.</param>
@@ -1203,6 +1413,7 @@ public sealed record RenderedEmail(
 /// <param name="Sdk">The SDK that signed in, from <c>X-Orvano-SDK</c>; null when none was sent.</param>
 /// <param name="IpAddress">The IP address last seen for the session; null when unknown.</param>
 /// <param name="Current">Whether this is the session making the call.</param>
+/// <param name="Method">How the session began.</param>
 public sealed record Session(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
@@ -1210,7 +1421,8 @@ public sealed record Session(
     [property: JsonPropertyName("userAgent")] string? UserAgent,
     [property: JsonPropertyName("sdk")] string? Sdk,
     [property: JsonPropertyName("ipAddress")] string? IpAddress,
-    [property: JsonPropertyName("current")] bool Current);
+    [property: JsonPropertyName("current")] bool Current,
+    [property: JsonPropertyName("method")] SessionMethod Method);
 
 /// <summary>One page of a user's active sessions, newest first.</summary>
 /// <param name="Items">The sessions on this page.</param>
@@ -1302,6 +1514,19 @@ public sealed record TemplateVariable(
 public sealed record TestConsolePing(
     [property: JsonPropertyName("status")] string Status);
 
+/// <summary>The newest email Mailpit caught for an address, read from its text part.</summary>
+/// <param name="Subject">The subject line.</param>
+/// <param name="Type">The <c>orvano_type</c> of the first link carrying <c>orvano_token</c>; null when there is none.</param>
+/// <param name="Token">The <c>orvano_token</c> of that link; null when there is none.</param>
+/// <param name="Code">The first run of exactly 6 digits, when the email has no such link; null otherwise.</param>
+/// <param name="Url">That link in full; null when there is none.</param>
+public sealed record TestEmail(
+    [property: JsonPropertyName("subject")] string Subject,
+    [property: JsonPropertyName("type")] string? Type,
+    [property: JsonPropertyName("token")] string? Token,
+    [property: JsonPropertyName("code")] string? Code,
+    [property: JsonPropertyName("url")] string? Url);
+
 /// <summary>One fixed item in the <c>test.list</c> page.</summary>
 /// <param name="Id"><c>item-1</c> to <c>item-5</c>.</param>
 public sealed record TestItem(
@@ -1328,6 +1553,20 @@ public sealed record UpdateAccountRequest(
     [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null,
     [property: JsonPropertyName("metadata"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<string, JsonElement>? Metadata = null);
 
+/// <summary>A request to change the signed in user's email. It changes once the link sent to the new address is opened.</summary>
+/// <param name="Email">The new email, trimmed, at most 320 characters.</param>
+/// <param name="RedirectUrl">Your page that receives the confirmation link: a host that is one of the project's web platforms, or your app's own scheme. The link adds <c>orvano_type=email_change</c> and <c>orvano_token</c> to it.</param>
+/// <param name="Password">The user's current password. A user without one leaves it out, and must have signed in within 10 minutes.</param>
+public sealed record UpdateEmailRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("redirectUrl")] string RedirectUrl,
+    [property: JsonPropertyName("password"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Password = null);
+
+/// <summary>Sets whether a user's email is verified.</summary>
+/// <param name="Verified">True marks it verified (keeping an earlier date); false marks it unverified.</param>
+public sealed record UpdateEmailVerificationRequest(
+    [property: JsonPropertyName("verified")] bool Verified);
+
 /// <summary>Changes to the install settings.</summary>
 /// <param name="ConsoleSignup">Who may create a console account.</param>
 public sealed record UpdateInstallSettingsRequest(
@@ -1344,11 +1583,11 @@ public sealed record UpdateOrgRequest(
     [property: JsonPropertyName("name")] string Name);
 
 /// <summary>A password change.</summary>
-/// <param name="CurrentPassword">The user's current password.</param>
 /// <param name="NewPassword">The new password: 8 to 256 characters after Unicode NFKC normalization.</param>
+/// <param name="CurrentPassword">The user's current password. A user without one leaves it out, and must have signed in within 10 minutes.</param>
 public sealed record UpdatePasswordRequest(
-    [property: JsonPropertyName("currentPassword")] string CurrentPassword,
-    [property: JsonPropertyName("newPassword")] string NewPassword);
+    [property: JsonPropertyName("newPassword")] string NewPassword,
+    [property: JsonPropertyName("currentPassword"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CurrentPassword = null);
 
 /// <summary>Changes to a platform. Its type never changes.</summary>
 /// <param name="Name">A new name; trimmed, 1 to 100 characters.</param>
@@ -1362,10 +1601,18 @@ public sealed record UpdatePlatformRequest(
 public sealed record UpdateProjectRequest(
     [property: JsonPropertyName("name")] string Name);
 
+/// <summary>Changes a user's email at once, without a confirmation email.</summary>
+/// <param name="Email">The new email, trimmed, at most 320 characters. Unique in the project, ignoring case.</param>
+/// <param name="EmailVerified">True marks the new email verified; it is unverified otherwise. Defaults to false.</param>
+public sealed record UpdateUserEmailRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("emailVerified"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? EmailVerified = null);
+
 /// <summary>A user of a project.</summary>
 /// <param name="Id">The user ID.</param>
 /// <param name="Email">The email, as typed at sign up; null for a user without one.</param>
-/// <param name="EmailVerified">Whether the email has been verified.</param>
+/// <param name="EmailVerified">Whether the email has been verified. Also the access token's <c>email_verified</c> claim.</param>
+/// <param name="EmailVerifiedAt">When the email was verified; null while it is not.</param>
 /// <param name="Name">The display name; null when none was given.</param>
 /// <param name="Status">Whether the user may sign in.</param>
 /// <param name="Metadata">Your own data about the user: a JSON object of at most 16 KB.</param>
@@ -1375,6 +1622,7 @@ public sealed record User(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("email")] string? Email,
     [property: JsonPropertyName("emailVerified")] bool EmailVerified,
+    [property: JsonPropertyName("emailVerifiedAt")] DateTimeOffset? EmailVerifiedAt,
     [property: JsonPropertyName("name")] string? Name,
     [property: JsonPropertyName("status")] UserStatus Status,
     [property: JsonPropertyName("metadata")] IReadOnlyDictionary<string, JsonElement> Metadata,
@@ -1387,3 +1635,8 @@ public sealed record User(
 public sealed record UserPage(
     [property: JsonPropertyName("items")] IReadOnlyList<User> Items,
     [property: JsonPropertyName("nextCursor")] string? NextCursor);
+
+/// <summary>An email verification, with the token from the emailed link.</summary>
+/// <param name="Token">The <c>orvano_token</c> parameter of the emailed link.</param>
+public sealed record VerifyEmailRequest(
+    [property: JsonPropertyName("token")] string Token);

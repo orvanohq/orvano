@@ -8,6 +8,7 @@ using Orvano.Messaging.Application;
 using Orvano.Messaging.Domain;
 using Orvano.Messaging.Smtp;
 using SmtpSecurity = Orvano.Messaging.Domain.SmtpSecurity;
+using TestEmail = Orvano.Messaging.Domain.TestEmail;
 
 namespace Orvano.Server.Tests.Messaging;
 

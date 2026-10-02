@@ -11,6 +11,8 @@ final orvano = Orvano(Client(endpoint: 'https://orvano.example.com'));
 final health = await orvano.health.get();
 ```
 
+`orvano.client.handleLink(uri)` redeems any link Orvano emails (verification, password reset, magic link, email change); see `orvano_flutter` for wiring deep links. Every failure is an `OrvanoException`; a limit's refusal carries `retryAfter`.
+
 ## About
 
 Orvano is the open source backend you host yourself: auth, Postgres databases, storage, functions, realtime, messaging, webhooks, jobs, and backups, run from one console.

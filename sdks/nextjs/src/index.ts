@@ -25,7 +25,16 @@
  * @packageDocumentation
  */
 import { Client, MemorySessionStore, Orvano, OrvanoError } from '@orvano/js'
-import type { AuthSession, ClientConfig, SessionRefresher, SessionStore } from '@orvano/js'
+import type {
+  AuthSession,
+  ClientConfig,
+  EmailAuthTransport,
+  EmailCodeResult,
+  LinkResult,
+  RequestOptions,
+  SessionRefresher,
+  SessionStore,
+} from '@orvano/js'
 
 export { Client, ErrorCode, Orvano, OrvanoError } from '@orvano/js'
 export type {
@@ -33,6 +42,9 @@ export type {
   AuthSession,
   AuthStateListener,
   ClientConfig,
+  EmailCodeResult,
+  EmailLinkType,
+  LinkResult,
   RequestOptions,
   SessionStore,
 } from '@orvano/js'
@@ -338,6 +350,41 @@ export function refreshThroughHandler(handlerPath = defaultHandlerPath): Session
   }
 }
 
+/**
+ * The browser's {@link EmailAuthTransport} (spec 0010, AC-25): links and codes go to the app's
+ * route handler (`.../redeem` and `.../email-code`), which redeems them with Orvano and sets both
+ * session cookies, so the browser never holds the refresh token. The client then reads the new
+ * access cookie and tells its listeners.
+ */
+export function emailAuthThroughHandler(handlerPath = defaultHandlerPath): EmailAuthTransport {
+  const post = async <T>(action: string, body: unknown, options?: RequestOptions): Promise<T> => {
+    const init: RequestInit = {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+    if (options?.signal !== undefined) init.signal = options.signal
+    const response = await globalThis.fetch(`${handlerPath}/${action}`, init)
+    if (!response.ok) throw await OrvanoError.fromResponse(response)
+    return (await response.json()) as T
+  }
+  return {
+    async redeemLink(link, client, options): Promise<LinkResult> {
+      const result = await post<LinkResult>('redeem', link, options)
+      if (link.type === 'magic_link' || link.type === 'recovery')
+        await client.reloadSession('signedIn')
+      else if ((await client.session.get()) !== null) await client.reloadSession('userUpdated')
+      return { type: result.type, user: result.user, isNewUser: result.isNewUser }
+    },
+    async signInWithEmailCode(email, code, client, options): Promise<EmailCodeResult> {
+      const result = await post<EmailCodeResult>('email-code', { email, code }, options)
+      await client.reloadSession('signedIn')
+      return { user: result.user, isNewUser: result.isNewUser }
+    },
+  }
+}
+
 /** Settings for {@link createBrowserClient}. */
 export interface BrowserClientConfig extends Omit<ClientConfig, 'session' | 'refresh'> {
   /** Where the app mounts `createOrvanoRouteHandler`. Defaults to `/api/orvano`. */
@@ -350,7 +397,9 @@ const browserClients = new Map<string, Orvano>()
  * An Orvano client for client components. Returns one shared instance per endpoint and project,
  * so calling it on every render is cheap. It sends the `orvano_access` cookie's token and
  * refreshes through the app's route handler (`createOrvanoRouteHandler`, mounted at
- * `app/api/orvano/[...orvano]/route.ts`) when under a minute of it is left.
+ * `app/api/orvano/[...orvano]/route.ts`) when under a minute of it is left. Its
+ * `client.redeemLink` and `client.signInWithEmailCode` go through that handler too, so the
+ * session lands in the cookies.
  */
 export function createBrowserClient(config: BrowserClientConfig): Orvano {
   const { handlerPath, ...rest } = config
@@ -365,6 +414,7 @@ export function createBrowserClient(config: BrowserClientConfig): Orvano {
           ? new BrowserCookieSessionStore(config.project, handlerPath)
           : new MemorySessionStore(),
         refresh: refreshThroughHandler(handlerPath),
+        emailAuth: emailAuthThroughHandler(handlerPath),
       }),
     )
     browserClients.set(key, orvano)

@@ -49,9 +49,50 @@ model TestPinged {
   at: utcDateTime;
 }
 
+@doc("The newest email Mailpit caught for an address, read from its text part.")
+@extension("x-orvano-test", true)
+model TestEmail {
+  @doc("The subject line.")
+  @example("Reset your password")
+  subject: string;
+
+  @doc("The `orvano_type` of the first link carrying `orvano_token`; null when there is none.")
+  @example("recovery")
+  type: string | null;
+
+  @doc("The `orvano_token` of that link; null when there is none.")
+  @example("orv_el_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE")
+  token: string | null;
+
+  @doc("The first run of exactly 6 digits, when the email has no such link; null otherwise.")
+  @example("428613")
+  code: string | null;
+
+  @doc("That link in full; null when there is none.")
+  @example("http://localhost:3000/auth?orvano_type=recovery&orvano_token=orv_el_x")
+  url: string | null;
+}
+
 @route("/v1/test")
 @tag("test")
 interface TestApi {
+  @doc("Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after`, and reads it.")
+  @operationId("test.getLatestEmail")
+  @extension("x-orvano-audience", "both")
+  @extension("x-orvano-service", "test")
+  @extension("x-orvano-test", true)
+  @get
+  @route("/emails/latest")
+  getLatestEmail(
+    @doc("The recipient.")
+    @query
+    to: string,
+
+    @doc("Only an email received after this time.")
+    @query
+    after?: utcDateTime,
+  ): TestEmail | Problem;
+
   @doc("Always answers 409 with code `test_conflict`.")
   @operationId("test.conflict")
   @extension("x-orvano-audience", "both")

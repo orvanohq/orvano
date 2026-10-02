@@ -104,8 +104,10 @@ export interface ConsoleAccount {
   id: string
   /** The email, as typed at sign up; null for a user without one. */
   email: string | null
-  /** Whether the email has been verified. */
+  /** Whether the email has been verified. Also the access token's `email_verified` claim. */
   emailVerified: boolean
+  /** When the email was verified; null while it is not. */
+  emailVerifiedAt: string | null
   /** The display name; null when none was given. */
   name: string | null
   /** Whether the user may sign in. */

@@ -17,6 +17,19 @@ orvano.client.authStateChanges.listen((change) => print(change.event));
 
 `createClient` keeps the signed in user's session in secure storage (the Keychain, the Keystore, or encrypted web storage) under `orvano.session.<project>`, so it survives restarts, and checks it for a refresh each time the app resumes.
 
+## Email links and codes
+
+Orvano emails verification, password reset, magic link, and email change links with `orvano_type` and `orvano_token` added to the URL you choose. Wire your app's deep links (for example with `app_links` or `go_router`) and pass the `Uri` on:
+
+```dart
+final result = await orvano.client.handleLink(uri);
+// a LinkResult (type, user, isNewUser), or null when the URI is not an Orvano link
+```
+
+A magic link or reset signs the user in (pass `password:` for a reset). A verification or email change refreshes the session when the same user is signed in.
+
+Magic links and resets sign someone in, so Orvano sends them only to `https` pages on the project's web platforms: use https app links (Android App Links, iOS Universal Links) for them, or sign in with an emailed code instead. Your app's own scheme (its bundle ID or package name, such as `com.acme.app://auth`) works only for verification and email change links, and some email clients won't open it.
+
 ## About
 
 Orvano is the open source backend you host yourself: auth, Postgres databases, storage, functions, realtime, messaging, webhooks, jobs, and backups, run from one console.

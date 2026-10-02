@@ -12,6 +12,9 @@ internal sealed record Actor(string Type, string? Id)
     public static Actor ApiKey(Guid keyId) => new("apiKey", keyId.ToString());
 
     public static Actor System { get; } = new("system", null);
+
+    /// <summary>Someone asking for a magic link or code for an email that has no user yet (spec 0010, AC-30).</summary>
+    public static Actor UnknownUser { get; } = new("user", null);
 }
 
 /// <summary>
@@ -30,8 +33,14 @@ internal static class AuthEvents
     public const string SessionCreated = "auth.session.created";
     public const string SessionEnded = "auth.session.ended";
     public const string KeyRotated = "auth.key.rotated";
+    public const string EmailTokenCreated = "auth.email_token.created";
+    public const string PasswordReset = "auth.password.reset";
+    public const string PasswordRemoved = "auth.password.removed";
 
-    /// <summary>Writes one event about a user (the event's subject) or one of their sessions.</summary>
+    /// <summary>
+    /// Writes one event about a user (the event's subject) or one of their sessions. <paramref name="fields"/> carries
+    /// other plain values, such as a session's <c>method</c> or a token's <c>kind</c>, never personal data.
+    /// </summary>
     public static Task<long> WriteAsync(
         NpgsqlTransaction tx,
         string type,
@@ -41,10 +50,13 @@ internal static class AuthEvents
         IReadOnlyDictionary<string, string> ids,
         IReadOnlyList<string>? changed = null,
         string? reason = null,
+        IReadOnlyDictionary<string, string?>? fields = null,
         CancellationToken ct = default) =>
-        Outbox.WriteAsync(tx, new EventDraft(type, Payload(actor, ids, changed, reason), projectId, subject), ct);
+        Outbox.WriteAsync(tx, new EventDraft(type, Payload(actor, ids, changed, reason, fields), projectId, subject), ct);
 
-    internal static string Payload(Actor actor, IReadOnlyDictionary<string, string> ids, IReadOnlyList<string>? changed, string? reason)
+    internal static string Payload(
+        Actor actor, IReadOnlyDictionary<string, string> ids, IReadOnlyList<string>? changed, string? reason,
+        IReadOnlyDictionary<string, string?>? fields = null)
     {
         using var buffer = new MemoryStream();
         using (var w = new Utf8JsonWriter(buffer))
@@ -64,6 +76,12 @@ internal static class AuthEvents
             }
 
             if (reason is not null) w.WriteString("reason", reason);
+            foreach (var (name, value) in (fields ?? new Dictionary<string, string?>()).OrderBy(f => f.Key, StringComparer.Ordinal))
+            {
+                if (value is null) w.WriteNull(name);
+                else w.WriteString(name, value);
+            }
+
             w.WriteEndObject();
         }
 

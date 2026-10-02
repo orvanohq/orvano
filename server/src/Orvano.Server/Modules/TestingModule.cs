@@ -22,7 +22,7 @@ internal sealed class TestingModule : IOrvanoModule
 
     public string Name => "testing";
 
-    public void ConfigureServices(IServiceCollection services, IConfiguration config) { }
+    public void ConfigureServices(IServiceCollection services, IConfiguration config) => services.AddSingleton<TestEmails>();
 
     public void MapApi(RouteGroupBuilder v1)
     {
@@ -31,6 +31,15 @@ internal sealed class TestingModule : IOrvanoModule
             .WithName(TestOperations.Conflict.Id);
 
         v1.MapGet(TestOperations.List.Route, List).WithName(TestOperations.List.Id);
+
+        v1.MapGet(TestOperations.GetLatestEmail.Route, async Task<Results<Ok<TestEmail>, ProblemHttpResult>> (
+                string? to, DateTimeOffset? after, TestEmails emails, CancellationToken ct) =>
+            string.IsNullOrWhiteSpace(to)
+                ? Problems.Result(StatusCodes.Status400BadRequest, ErrorCode.InvalidRequest, "Send the recipient as to.")
+                : await emails.FindLatestAsync(to, after, ct) is { } email
+                    ? TypedResults.Ok(email)
+                    : Problems.Result(StatusCodes.Status404NotFound, ErrorCode.NotFound, "No email to that address arrived within 15 seconds."))
+            .WithName(TestOperations.GetLatestEmail.Id);
 
         v1.MapGet(TestOperations.ConsolePing.Route, () => TypedResults.Ok(new TestConsolePing("ok")))
             .WithName(TestOperations.ConsolePing.Id);

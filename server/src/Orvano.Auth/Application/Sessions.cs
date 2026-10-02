@@ -35,10 +35,12 @@ internal sealed class Sessions(SecretBox secrets)
     public const string RefreshColumn = "refresh_ciphertext";
 
     /// <summary>
-    /// Inserts a session for the user, sets their <c>last_sign_in_at</c>, and writes <c>auth.session.created</c>. The
-    /// session ID comes from Postgres' <c>uuidv7()</c> first, since the encrypted refresh token is bound to it.
+    /// Inserts a session for the user, sets their <c>last_sign_in_at</c>, and writes <c>auth.session.created</c> with
+    /// the <paramref name="method"/> (one of <see cref="SessionMethod"/>). The session ID comes from Postgres'
+    /// <c>uuidv7()</c> first, since the encrypted refresh token is bound to it.
     /// </summary>
-    public async Task<SessionGrant> CreateAsync(AuthUnitOfWork uow, string projectId, Guid userId, ClientInfo client, Actor actor, CancellationToken ct)
+    public async Task<SessionGrant> CreateAsync(
+        AuthUnitOfWork uow, string projectId, Guid userId, ClientInfo client, Actor actor, string method, CancellationToken ct)
     {
         var conn = uow.Tx.Connection!;
         Guid sessionId;
@@ -53,10 +55,10 @@ internal sealed class Sessions(SecretBox secrets)
             WITH created AS (
                 INSERT INTO orvano.auth_sessions (
                     id, project_id, user_id, refresh_hash, refresh_ciphertext, user_agent, sdk, ip_created, ip_last,
-                    created_at, last_refreshed_at, idle_expires_at, expires_at)
+                    created_at, last_refreshed_at, idle_expires_at, expires_at, method)
                 VALUES (
                     @id, @project, @user, @hash, @ciphertext, @agent, @sdk, @ip, @ip,
-                    now(), now(), least(now() + @idle, now() + @absolute), now() + @absolute)
+                    now(), now(), least(now() + @idle, now() + @absolute), now() + @absolute, @method)
                 RETURNING idle_expires_at, expires_at),
             signed_in AS (
                 UPDATE orvano.auth_users SET last_sign_in_at = now() WHERE id = @user)
@@ -72,10 +74,12 @@ internal sealed class Sessions(SecretBox secrets)
         insert.Parameters.AddWithValue("ip", NpgsqlDbType.Inet, (object?)client.Ip ?? DBNull.Value);
         insert.Parameters.AddWithValue("idle", AuthTimings.IdleExpiry);
         insert.Parameters.AddWithValue("absolute", AuthTimings.AbsoluteExpiry);
+        insert.Parameters.AddWithValue("method", method);
         var endsAt = (DateTime)(await insert.ExecuteScalarAsync(ct))!;
 
         await AuthEvents.WriteAsync(uow.Tx, AuthEvents.SessionCreated, projectId, actor, userId.ToString(),
-            new Dictionary<string, string> { ["userId"] = userId.ToString(), ["sessionId"] = sessionId.ToString() }, ct: ct);
+            new Dictionary<string, string> { ["userId"] = userId.ToString(), ["sessionId"] = sessionId.ToString() },
+            fields: new Dictionary<string, string?> { ["method"] = method }, ct: ct);
         return new SessionGrant(sessionId, token, new DateTimeOffset(endsAt, TimeSpan.Zero));
     }
 

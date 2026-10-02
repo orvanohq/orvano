@@ -32,4 +32,25 @@ internal static class AuthTimings
 
     /// <summary>How long a decrypted signing key stays in process memory.</summary>
     public static readonly TimeSpan SigningKeyCache = TimeSpan.FromMinutes(10);
+
+    /// <summary>How long an email verification link works (spec 0010, AC-2).</summary>
+    public static readonly TimeSpan VerificationToken = TimeSpan.FromHours(24);
+
+    /// <summary>How long a password reset link works.</summary>
+    public static readonly TimeSpan RecoveryToken = TimeSpan.FromHours(1);
+
+    /// <summary>How long a magic link works.</summary>
+    public static readonly TimeSpan MagicLinkToken = TimeSpan.FromMinutes(15);
+
+    /// <summary>How long an email code works.</summary>
+    public static readonly TimeSpan EmailCodeToken = TimeSpan.FromMinutes(10);
+
+    /// <summary>How long an email change link works.</summary>
+    public static readonly TimeSpan EmailChangeToken = TimeSpan.FromHours(1);
+
+    /// <summary>A user without a password must call from a session at most this old to change sensitive things (AC-17, AC-19).</summary>
+    public static readonly TimeSpan Reauthentication = TimeSpan.FromMinutes(10);
+
+    /// <summary>The open email requests answer no sooner than this after they start, whether or not the account exists (AC-8).</summary>
+    public static readonly TimeSpan OpenSendFloor = TimeSpan.FromMilliseconds(500);
 }

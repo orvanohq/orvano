@@ -1,0 +1,95 @@
+# Spec 0010, AC-14, AC-21, AC-27: a server reads, sets, and triggers a user's verification, sends a reset, and
+# changes an email.
+name: a server imports a verified user, marks one verified, sends a reset, and changes an email
+requires: []
+steps:
+  - op: users.create
+    as: server
+    input:
+      body:
+        email: 'ivy-${unique}@example.com'
+        password: correct horse battery staple
+        emailVerified: true
+    expect:
+      status: 201
+      body: { emailVerified: true }
+  - op: users.create
+    as: server
+    input:
+      body: { email: 'uma-${unique}@example.com', password: correct horse battery staple }
+    expect:
+      status: 201
+      body: { emailVerified: false }
+    save:
+      userId: $.id
+  - op: users.list
+    as: server
+    input: { email: 'uma-${unique}', emailVerified: false }
+    expect:
+      status: 200
+      body:
+        items: [{ email: 'uma-${unique}@example.com' }]
+  - op: users.updateEmailVerification
+    as: server
+    input:
+      userId: '${userId}'
+      body: { verified: true }
+    expect:
+      status: 200
+      body: { emailVerified: true }
+  - op: users.list
+    as: server
+    input: { email: 'uma-${unique}', emailVerified: false }
+    expect:
+      status: 200
+      body: { items: [] }
+  # The server SDK reads the email_verified claim of a token issued after the change.
+  - op: signIn
+    as: client
+    input:
+      body: { email: 'uma-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }
+    save:
+      token: $.session.accessToken
+  - op: verifyAccessToken
+    as: server
+    input: { token: '${token}' }
+    expect:
+      status: 200
+      body: { userId: '${userId}', emailVerified: true }
+  - op: now
+    as: server
+    input: {}
+    expect: { status: 200 }
+    save:
+      beforeReset: $.now
+  - op: users.createRecovery
+    as: server
+    input:
+      userId: '${userId}'
+      body: { redirectUrl: 'http://localhost:3000/auth/callback' }
+    expect: { status: 202 }
+  - op: test.getLatestEmail
+    as: server
+    input: { to: 'uma-${unique}@example.com', after: '${beforeReset}' }
+    expect:
+      status: 200
+      body: { type: recovery }
+  - op: users.updateEmail
+    as: server
+    input:
+      userId: '${userId}'
+      body: { email: 'uma-moved-${unique}@example.com' }
+    expect:
+      status: 200
+      body: { email: 'uma-moved-${unique}@example.com', emailVerified: false }
+  - op: users.block
+    as: server
+    input: { userId: '${userId}' }
+    expect: { status: 200 }
+  - op: users.createRecovery
+    as: server
+    input:
+      userId: '${userId}'
+      body: { redirectUrl: 'http://localhost:3000/auth/callback' }
+    expect: { status: 403, code: user_blocked }

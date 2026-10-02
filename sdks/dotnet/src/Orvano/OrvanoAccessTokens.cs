@@ -7,7 +7,11 @@ namespace Orvano;
 /// <param name="UserId">The user ID (the <c>sub</c> claim).</param>
 /// <param name="SessionId">The session ID (the <c>sid</c> claim).</param>
 /// <param name="ExpiresAt">When the token expires (the <c>exp</c> claim).</param>
-public sealed record VerifiedAccessToken(string UserId, string SessionId, DateTimeOffset ExpiresAt);
+/// <param name="EmailVerified">
+/// Whether the user's email was verified when the token was issued (the <c>email_verified</c> claim); false when the
+/// claim is missing. Up to 15 minutes old: verify <c>online</c> for the current value.
+/// </param>
+public sealed record VerifiedAccessToken(string UserId, string SessionId, DateTimeOffset ExpiresAt, bool EmailVerified);
 
 public sealed partial class OrvanoClient
 {
@@ -89,7 +93,8 @@ public sealed partial class OrvanoClient
             await SendAsync(new OrvanoRequest("GET", "/v1/account", null, null, false) { Bearer = token }, cancellationToken).ConfigureAwait(false);
         }
 
-        return new VerifiedAccessToken(userId, sessionId, new DateTimeOffset(jwt.ValidTo, TimeSpan.Zero));
+        var emailVerified = jwt.TryGetPayloadValue<bool>("email_verified", out var verified) && verified;
+        return new VerifiedAccessToken(userId, sessionId, new DateTimeOffset(jwt.ValidTo, TimeSpan.Zero), emailVerified);
     }
 
     private static readonly JsonWebTokenHandler Handler = new() { MapInboundClaims = false };

@@ -9,6 +9,11 @@ export interface VerifiedAccessToken {
   userId: string
   /** The session ID (the `sid` claim). */
   sessionId: string
+  /**
+   * Whether the user's email was verified when the token was issued (the `email_verified` claim);
+   * false when the claim is missing. Up to 15 minutes old: verify `online` for the current value.
+   */
+  emailVerified: boolean
   /** When the token expires (the `exp` claim). */
   expiresAt: Date
 }
@@ -87,7 +92,12 @@ export class AccessTokenVerifier {
       throw invalid('The access token is not valid for this project.')
     }
 
-    const { sub, sid, exp } = payload as { sub?: unknown; sid?: unknown; exp?: unknown }
+    const { sub, sid, exp, email_verified } = payload as {
+      sub?: unknown
+      sid?: unknown
+      exp?: unknown
+      email_verified?: unknown
+    }
     if (
       typeof sub !== 'string' ||
       sub === '' ||
@@ -104,7 +114,12 @@ export class AccessTokenVerifier {
         options.signal === undefined ? undefined : { signal: options.signal },
       )
     }
-    return { userId: sub, sessionId: sid, expiresAt: new Date(exp * 1000) }
+    return {
+      userId: sub,
+      sessionId: sid,
+      emailVerified: email_verified === true,
+      expiresAt: new Date(exp * 1000),
+    }
   }
 
   /**

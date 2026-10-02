@@ -44,6 +44,34 @@ final class UsersService {
     return User.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Emails a user a password reset link.
+  Future<void> createRecovery(
+    String userId,
+    CreateUserRecoveryRequest body, {
+    RequestOptions? options,
+  }) async {
+    await _client.send(
+      'POST',
+      '/v1/users/${Uri.encodeComponent(userId)}/recovery',
+      body: body.toJson(),
+      options: options,
+    );
+  }
+
+  /// Emails a user a link that verifies their email.
+  Future<void> createVerification(
+    String userId,
+    CreateUserVerificationRequest body, {
+    RequestOptions? options,
+  }) async {
+    await _client.send(
+      'POST',
+      '/v1/users/${Uri.encodeComponent(userId)}/verification',
+      body: body.toJson(),
+      options: options,
+    );
+  }
+
   /// Deletes a user with their password and sessions. It can't be undone.
   Future<void> delete(String userId, {RequestOptions? options}) async {
     await _client.send(
@@ -91,6 +119,7 @@ final class UsersService {
     String? status,
     DateTime? createdAfter,
     DateTime? createdBefore,
+    bool? emailVerified,
     String? cursor,
     int? limit,
     RequestOptions? options,
@@ -103,6 +132,7 @@ final class UsersService {
         'status': status,
         'createdAfter': createdAfter?.toUtc().toIso8601String(),
         'createdBefore': createdBefore?.toUtc().toIso8601String(),
+        'emailVerified': emailVerified?.toString(),
         'cursor': cursor,
         'limit': limit?.toString(),
       },
@@ -117,6 +147,7 @@ final class UsersService {
     String? status,
     DateTime? createdAfter,
     DateTime? createdBefore,
+    bool? emailVerified,
     int? limit,
     RequestOptions? options,
   }) => paginate(
@@ -125,6 +156,7 @@ final class UsersService {
       status: status,
       createdAfter: createdAfter,
       createdBefore: createdBefore,
+      emailVerified: emailVerified,
       cursor: cursor,
       limit: limit,
       options: options,
@@ -164,6 +196,39 @@ final class UsersService {
     final json = await _client.send(
       'POST',
       '/v1/users/${Uri.encodeComponent(userId)}/unblock',
+      idempotent: true,
+      options: options,
+    );
+    return User.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Changes a user's email at once, without a confirmation email. It deletes the user's live email links and codes,
+  /// and keeps their sessions.
+  Future<User> updateEmail(
+    String userId,
+    UpdateUserEmailRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'PUT',
+      '/v1/users/${Uri.encodeComponent(userId)}/email',
+      body: body.toJson(),
+      idempotent: true,
+      options: options,
+    );
+    return User.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Marks a user's email verified or unverified. Marking it verified deletes any live verification links.
+  Future<User> updateEmailVerification(
+    String userId,
+    UpdateEmailVerificationRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'PUT',
+      '/v1/users/${Uri.encodeComponent(userId)}/email-verification',
+      body: body.toJson(),
       idempotent: true,
       options: options,
     );

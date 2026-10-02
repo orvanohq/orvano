@@ -65,6 +65,8 @@ services:
       ORVANO_SETUP_TOKEN: ost_scenarios-setup-token-000000000000000000000
       # Mailpit is on the compose network, a private address.
       ORVANO_SMTP_ALLOW_PRIVATE_HOSTS: 'true'
+      # test.getLatestEmail reads the emails the scenarios trigger from Mailpit's API (spec 0010).
+      ORVANO_TEST_MAILPIT_URL: http://mailpit:8025
     volumes:
       - ./fixtures.yaml:/fixtures/fixtures.yaml:ro
     ports:
@@ -79,6 +81,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      mailpit:
+        condition: service_healthy
 
   worker:
     <<: *server

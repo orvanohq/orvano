@@ -251,18 +251,21 @@ public class EmailTemplateDomainTests
         Assert.StartsWith("Grace  Bcc: evil@example.com ppp", email.Subject, StringComparison.Ordinal);
     }
 
-    // AC-14: what a caller may hand the queue.
+    // AC-14, amended by spec 0010 AC-31: what a caller may hand the queue.
     [Fact]
     public void An_auth_email_is_checked_before_it_is_queued()
     {
         var link = new AuthEmail("shop", "Shop", AuthEmailKind.Verification, "grace@example.com", null, "https://shop.test/verify?token=abc", null, 60);
         var code = new AuthEmail("shop", "Shop", AuthEmailKind.EmailCode, "grace@example.com", "Grace", null, "Ab12", 10);
 
-        Assert.Equal(new TemplateValues("Shop", "grace@example.com", "", "https://shop.test/verify?token=abc", null, 60), AuthEmailRule.Check(link, allowHttp: false));
-        Assert.Equal(new TemplateValues("Shop", "grace@example.com", "Grace", null, "Ab12", 10), AuthEmailRule.Check(code, allowHttp: false));
-        Assert.Equal("http://localhost:3000/verify", AuthEmailRule.Check(link with { ActionUrl = "http://localhost:3000/verify" }, allowHttp: true).ActionUrl);
-        AuthEmailRule.Check(link with { ExpiresInMinutes = 1 }, allowHttp: false);
-        AuthEmailRule.Check(code with { ExpiresInMinutes = 10_080, Code = "ABCDEF123456" }, allowHttp: false);
+        Assert.Equal(new TemplateValues("Shop", "grace@example.com", "", "https://shop.test/verify?token=abc", null, 60), AuthEmailRule.Check(link));
+        Assert.Equal(new TemplateValues("Shop", "grace@example.com", "Grace", null, "Ab12", 10), AuthEmailRule.Check(code));
+        Assert.Equal("http://localhost:3000/verify", AuthEmailRule.Check(link with { ActionUrl = "http://localhost:3000/verify" }).ActionUrl);
+        // Auth checks links against the project's platforms (spec 0010 AC-6), so an app's own scheme passes here.
+        Assert.Equal("com.acme.app://auth?x=1", AuthEmailRule.Check(link with { ActionUrl = "com.acme.app://auth?x=1" }).ActionUrl);
+        Assert.Equal("http://shop.test/verify", AuthEmailRule.Check(link with { ActionUrl = "http://shop.test/verify" }).ActionUrl);
+        AuthEmailRule.Check(link with { ExpiresInMinutes = 1 });
+        AuthEmailRule.Check(code with { ExpiresInMinutes = 10_080, Code = "ABCDEF123456" });
 
         AuthEmail[] broken =
         [
@@ -275,8 +278,14 @@ public class EmailTemplateDomainTests
             link with { To = new string('a', 312) + "@example.com" },
             link with { ActionUrl = null },
             link with { ActionUrl = "/verify?token=abc" },
-            link with { ActionUrl = "http://shop.test/verify" },
             link with { ActionUrl = "javascript:alert(1)" },
+            link with { ActionUrl = "JavaScript:alert(1)" },
+            link with { ActionUrl = "data:text/html,hi" },
+            link with { ActionUrl = "vbscript:x" },
+            link with { ActionUrl = "file:///etc/passwd" },
+            link with { ActionUrl = "blob:https://shop.test/1" },
+            link with { ActionUrl = "about:blank" },
+            link with { ActionUrl = "https://grace:pw@shop.test/verify" },
             link with { Code = "428613" },
             link with { ExpiresInMinutes = 0 },
             link with { ExpiresInMinutes = 10_081 },
@@ -289,13 +298,11 @@ public class EmailTemplateDomainTests
         ];
         foreach (var email in broken)
         {
-            var thrown = Assert.ThrowsAny<ArgumentException>(() => AuthEmailRule.Check(email, allowHttp: false));
+            var thrown = Assert.ThrowsAny<ArgumentException>(() => AuthEmailRule.Check(email));
             // The message names the member and its rule, never the value.
             Assert.DoesNotContain("grace", thrown.Message, StringComparison.Ordinal);
             Assert.DoesNotContain("token=abc", thrown.Message, StringComparison.Ordinal);
         }
-
-        Assert.ThrowsAny<ArgumentException>(() => AuthEmailRule.Check(link with { ActionUrl = "ftp://shop.test/x" }, allowHttp: true));
     }
 
     [Fact]

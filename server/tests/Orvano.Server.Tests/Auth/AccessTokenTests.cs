@@ -23,7 +23,7 @@ public class AccessTokenTests(PostgresFixture postgres)
         var (tokens, clock) = Build(database);
         var user = Guid.CreateVersion7();
         var session = Guid.CreateVersion7();
-        var issued = await tokens.IssueAsync("shop", user, session, Ct);
+        var issued = await tokens.IssueAsync("shop", user, session, emailVerified: false, Ct);
 
         clock.Advance(TimeSpan.FromSeconds(900 + 30));
         var atLeeway = await tokens.ValidateAsync(issued.Token, "shop", Ct);
@@ -40,8 +40,8 @@ public class AccessTokenTests(PostgresFixture postgres)
     {
         await using var database = await Migrated();
         var (tokens, _) = Build(database);
-        var issued = await tokens.IssueAsync("shop", Guid.CreateVersion7(), Guid.CreateVersion7(), Ct);
-        await tokens.IssueAsync("blog", Guid.CreateVersion7(), Guid.CreateVersion7(), Ct);
+        var issued = await tokens.IssueAsync("shop", Guid.CreateVersion7(), Guid.CreateVersion7(), emailVerified: false, Ct);
+        await tokens.IssueAsync("blog", Guid.CreateVersion7(), Guid.CreateVersion7(), emailVerified: false, Ct);
 
         var check = await tokens.ValidateAsync(issued.Token, "blog", Ct);
 
@@ -54,7 +54,7 @@ public class AccessTokenTests(PostgresFixture postgres)
     {
         await using var database = await Migrated();
         var (tokens, _) = Build(database);
-        var issued = await tokens.IssueAsync("shop", Guid.CreateVersion7(), Guid.CreateVersion7(), Ct);
+        var issued = await tokens.IssueAsync("shop", Guid.CreateVersion7(), Guid.CreateVersion7(), emailVerified: false, Ct);
         var parts = issued.Token.Split('.');
         var kid = System.Text.Json.JsonDocument.Parse(Base64Url.DecodeFromChars(parts[0])).RootElement.GetProperty("kid").GetString();
 
@@ -72,7 +72,7 @@ public class AccessTokenTests(PostgresFixture postgres)
     {
         await using var database = await Migrated();
         var (first, _) = Build(database);
-        var issued = await first.IssueAsync("shop", Guid.CreateVersion7(), Guid.CreateVersion7(), Ct);
+        var issued = await first.IssueAsync("shop", Guid.CreateVersion7(), Guid.CreateVersion7(), emailVerified: false, Ct);
 
         var (second, _) = Build(database);
 
@@ -87,7 +87,7 @@ public class AccessTokenTests(PostgresFixture postgres)
         var issued = await Task.WhenAll(Enumerable.Range(0, 20).Select(async _ =>
         {
             var (tokens, _) = Build(database);
-            return (tokens, await tokens.IssueAsync("shop", Guid.CreateVersion7(), Guid.CreateVersion7(), Ct));
+            return (tokens, await tokens.IssueAsync("shop", Guid.CreateVersion7(), Guid.CreateVersion7(), emailVerified: false, Ct));
         }));
 
         Assert.Equal(1L, await TestDatabase.ScalarAsync<long>(database.Superuser, "SELECT count(*) FROM orvano.auth_signing_keys"));

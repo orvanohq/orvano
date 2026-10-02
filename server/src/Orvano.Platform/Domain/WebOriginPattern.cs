@@ -63,9 +63,11 @@ internal sealed class WebOriginPattern
     /// Whether a browser <c>Origin</c> header value is allowed by this pattern. <c>null</c> never matches,
     /// nor does anything that is not an absolute http or https origin.
     /// </summary>
-    public bool Matches(string origin)
+    public bool Matches(string origin) => TryHostOf(origin, out var host) && MatchesHost(host);
+
+    /// <summary>Whether a lowercase host, without brackets, port, or a trailing dot, is allowed by this pattern.</summary>
+    public bool MatchesHost(string host)
     {
-        if (!TryHostOf(origin, out var host)) return false;
         if (!_wildcard) return host == Value;
 
         var suffix = Value[1..]; // ".example.com"

@@ -22,7 +22,7 @@ internal abstract record QueueRefusal
 /// <summary>
 /// The shared core of queueing an email (spec 0009, AC-14 and AC-19), in raw Npgsql on the caller's transaction, so
 /// the row and its job exist only if the change that asked for them commits, and no second EF context shares the
-/// caller's connection. A caller first asks <see cref="AdmitAsync"/>, then renders, then calls
+/// caller's connection. A caller first asks <see cref="AdmitAsync(NpgsqlTransaction, string, CancellationToken)"/>, then renders, then calls
 /// <see cref="InsertAsync"/>.
 /// </summary>
 internal sealed class EmailQueue(SecretBox secrets, PublicUrl publicUrl, MessagingSettings settings)
@@ -31,14 +31,18 @@ internal sealed class EmailQueue(SecretBox secrets, PublicUrl publicUrl, Messagi
     /// Resolves the project's effective SMTP and applies the install cap. Returns <see langword="null"/> when the
     /// email may be queued. The cap is soft: two requests at the same moment can both pass (no lock).
     /// </summary>
-    public async Task<QueueRefusal?> AdmitAsync(NpgsqlTransaction tx, string projectId, CancellationToken ct)
+    public Task<QueueRefusal?> AdmitAsync(NpgsqlTransaction tx, string projectId, CancellationToken ct) =>
+        AdmitAsync(tx.Connection!, tx, projectId, ct);
+
+    /// <summary>The same decision as <see cref="AdmitAsync(NpgsqlTransaction, string, CancellationToken)"/>, on any connection, in or out of a transaction.</summary>
+    public async Task<QueueRefusal?> AdmitAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, string projectId, CancellationToken ct)
     {
         bool own, install;
         await using (var smtp = new NpgsqlCommand(
             """
             SELECT EXISTS (SELECT 1 FROM orvano.messaging_smtp_settings WHERE project_id = @project),
                    EXISTS (SELECT 1 FROM orvano.messaging_smtp_settings WHERE project_id = @install)
-            """, tx.Connection, tx))
+            """, conn, tx))
         {
             smtp.Parameters.AddWithValue("project", projectId);
             smtp.Parameters.AddWithValue("install", SmtpSettingsService.InstallProjectId);
@@ -62,7 +66,7 @@ internal sealed class EmailQueue(SecretBox secrets, PublicUrl publicUrl, Messagi
                    (SELECT extract(epoch FROM created_at + @window - now())::float8 FROM recent
                     ORDER BY created_at
                     OFFSET greatest((SELECT count(*) FROM recent) - @limit, 0) LIMIT 1)
-            """, tx.Connection, tx);
+            """, conn, tx);
         cap.Parameters.AddWithValue("project", projectId);
         cap.Parameters.AddWithValue("window", EmailDelivery.CapWindow);
         cap.Parameters.AddWithValue("limit", (long)settings.InstallHourlyLimit);

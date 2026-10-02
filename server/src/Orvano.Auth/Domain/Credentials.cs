@@ -60,6 +60,14 @@ internal static partial class EmailRule
         trimmed = email?.Trim() ?? "";
         return trimmed.Length is > 0 and <= MaxLength && Pattern().IsMatch(trimmed);
     }
+
+    /// <summary>
+    /// Whether two stored emails are the same address, ignoring case. Uses invariant lowercasing, which agrees with
+    /// the database's <c>lower(email)</c> for every ASCII address; a non ASCII address the two lowercase differently
+    /// only fails the match, so it can't let a token reach another account.
+    /// </summary>
+    public static bool SameAddress(string? stored, string other) =>
+        stored is not null && string.Equals(stored.ToLowerInvariant(), other.ToLowerInvariant(), StringComparison.Ordinal);
 }
 
 /// <summary>A user's display name: at most 256 characters, or none.</summary>

@@ -12,7 +12,7 @@ internal sealed record Page<T>(IReadOnlyList<T> Items, string? NextCursor);
 
 /// <summary>An active session as the list shows it (the contract's <c>Session</c>).</summary>
 internal sealed record SessionView(
-    Guid Id, DateTimeOffset CreatedAt, DateTimeOffset LastRefreshedAt, string? UserAgent, string? Sdk, IPAddress? IpAddress, bool Current);
+    Guid Id, DateTimeOffset CreatedAt, DateTimeOffset LastRefreshedAt, string? UserAgent, string? Sdk, IPAddress? IpAddress, bool Current, string Method);
 
 /// <summary>
 /// The signed in user's sessions (spec 0004, <c>account</c> service): refresh with rotation, grace, and reuse
@@ -21,7 +21,7 @@ internal sealed record SessionView(
 internal sealed class SessionService(AuthStore store, Sessions sessions, SessionChecks checks, AccessTokens tokens)
 {
     /// <summary>What the locked refresh decided; a reuse is committed (the session ended) and still answers 401.</summary>
-    private sealed record Refreshed(RefreshAction Action, Guid UserId, string? RefreshToken, DateTimeOffset EndsAt);
+    private sealed record Refreshed(RefreshAction Action, Guid UserId, string? RefreshToken, DateTimeOffset EndsAt, bool EmailVerified = false);
 
     /// <summary>
     /// Trades a refresh token (AC-8, AC-9), deciding on the session row locked <c>FOR UPDATE</c>, so a refresh racing a
@@ -36,7 +36,7 @@ internal sealed class SessionService(AuthStore store, Sessions sessions, Session
             await using var read = new NpgsqlCommand(
                 """
                 SELECT s.user_id, s.ended_at IS NOT NULL OR u.status <> 'active', s.idle_expires_at, s.expires_at,
-                       s.refresh_hash, s.previous_refresh_hash, s.rotated_at, s.refresh_ciphertext, now()
+                       s.refresh_hash, s.previous_refresh_hash, s.rotated_at, s.refresh_ciphertext, now(), u.email_verified_at IS NOT NULL
                 FROM orvano.auth_sessions s
                 JOIN orvano.auth_users u ON u.id = s.user_id
                 WHERE s.id = @id AND s.project_id = @project
@@ -49,6 +49,7 @@ internal sealed class SessionService(AuthStore store, Sessions sessions, Session
             RefreshState state;
             byte[] sealedToken;
             DateTimeOffset now;
+            bool emailVerified;
             await using (var reader = await read.ExecuteReaderAsync(token))
             {
                 if (!await reader.ReadAsync(token)) return new Refreshed(RefreshAction.Refuse, Guid.Empty, null, default);
@@ -62,6 +63,7 @@ internal sealed class SessionService(AuthStore store, Sessions sessions, Session
                     reader.IsDBNull(6) ? null : reader.GetFieldValue<DateTimeOffset>(6));
                 sealedToken = reader.GetFieldValue<byte[]>(7);
                 now = reader.GetFieldValue<DateTimeOffset>(8);
+                emailVerified = reader.GetBoolean(9);
             }
 
             var action = RefreshDecision.Decide(state, presented.SecretHash, now);
@@ -84,13 +86,13 @@ internal sealed class SessionService(AuthStore store, Sessions sessions, Session
                         rotate.Parameters.AddWithValue("ip", NpgsqlDbType.Inet, (object?)client.Ip ?? DBNull.Value);
                         rotate.Parameters.AddWithValue("id", presented.SessionId);
                         var endsAt = (DateTime)(await rotate.ExecuteScalarAsync(token))!;
-                        return new Refreshed(action, userId, next.Value, new DateTimeOffset(endsAt, TimeSpan.Zero));
+                        return new Refreshed(action, userId, next.Value, new DateTimeOffset(endsAt, TimeSpan.Zero), emailVerified);
                     }
 
                 case RefreshAction.Replay:
                     // The pair the winning refresh got: the current token, decrypted, with a fresh access token.
                     return new Refreshed(action, userId, sessions.Open(sealedToken, presented.SessionId),
-                        SessionLifetime.EndsAt(state.IdleExpiresAt, state.ExpiresAt));
+                        SessionLifetime.EndsAt(state.IdleExpiresAt, state.ExpiresAt), emailVerified);
 
                 case RefreshAction.Reuse:
                     await sessions.EndAsync(uow, projectId, userId, presented.SessionId, SessionEndReason.ReuseDetected, Actor.System, token);
@@ -105,7 +107,7 @@ internal sealed class SessionService(AuthStore store, Sessions sessions, Session
         if (refreshed.Action == RefreshAction.Reuse) await checks.EvictAsync(presented.SessionId, ct);
         if (refreshed.RefreshToken is not { } current) return Failure.InvalidRefreshToken;
 
-        var access = await tokens.IssueAsync(projectId, refreshed.UserId, presented.SessionId, ct);
+        var access = await tokens.IssueAsync(projectId, refreshed.UserId, presented.SessionId, refreshed.EmailVerified, ct);
         return new SessionTokensView(access.Token, access.ExpiresAt, current, refreshed.EndsAt, presented.SessionId);
     }
 
@@ -125,7 +127,7 @@ internal sealed class SessionService(AuthStore store, Sessions sessions, Session
             var conn = (NpgsqlConnection)db.Database.GetDbConnection();
             await using var cmd = new NpgsqlCommand(
                 $"""
-                SELECT id, created_at, last_refreshed_at, user_agent, sdk, ip_last
+                SELECT id, created_at, last_refreshed_at, user_agent, sdk, ip_last, method
                 FROM orvano.auth_sessions
                 WHERE user_id = @user AND project_id = @project AND ended_at IS NULL AND now() < least(idle_expires_at, expires_at)
                 {(after is null ? "" : "AND (created_at, id) < (@afterCreated, @afterId)")}
@@ -153,7 +155,8 @@ internal sealed class SessionService(AuthStore store, Sessions sessions, Session
                     reader.IsDBNull(3) ? null : reader.GetString(3),
                     reader.IsDBNull(4) ? null : reader.GetString(4),
                     reader.IsDBNull(5) ? null : reader.GetFieldValue<IPAddress>(5),
-                    id == current));
+                    id == current,
+                    reader.GetString(6)));
             }
 
             return found;

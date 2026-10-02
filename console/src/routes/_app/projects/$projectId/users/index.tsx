@@ -6,6 +6,13 @@ import { useEffect, useState } from 'react'
 import { DataTable } from '@/components/ui/data-table'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { projectClient } from '@/lib/console-client'
 import { usePageTitle } from '@/lib/page-title'
 import { keys, projectQuery, usersQuery } from '@/lib/queries'
@@ -16,16 +23,32 @@ import { PageHeading } from '@/shell/page-heading'
 
 import { CreateUserDialog, NoUsers, userColumns } from '../-users/parts'
 
+/** The verification filter's choices; the URL keeps `emailVerified=true` or `false` (spec 0010, AC-22). */
+const verificationOptions = [
+  { value: 'all', label: 'All' },
+  { value: 'verified', label: 'Verified' },
+  { value: 'unverified', label: 'Unverified' },
+] as const
+
+type VerificationChoice = (typeof verificationOptions)[number]['value']
+
 export const Route = createFileRoute('/_app/projects/$projectId/users/')({
+  validateSearch: (search: Record<string, unknown>): { emailVerified?: boolean } =>
+    typeof search.emailVerified === 'boolean' ? { emailVerified: search.emailVerified } : {},
   component: UsersPage,
 })
 
 /**
- * The project's users (spec 0004, AC-29): newest first, paged, with a prefix search on email.
- * Owners and developers create users; viewers see the button with the reason it is not theirs.
+ * The project's users (spec 0004, AC-29): newest first, paged, with a prefix search on email and
+ * a verification filter kept in the URL (spec 0010, AC-22). Owners and developers create users;
+ * viewers see the button with the reason it is not theirs.
  */
 function UsersPage() {
   const { projectId } = Route.useParams()
+  const { emailVerified } = Route.useSearch()
+  const navigate = Route.useNavigate()
+  const choice: VerificationChoice =
+    emailVerified === undefined ? 'all' : emailVerified ? 'verified' : 'unverified'
   const project = useQuery(projectQuery(projectId)).data
   usePageTitle('Users', project?.name)
   const role = useOrgRole()
@@ -41,7 +64,7 @@ function UsersPage() {
       clearTimeout(timer)
     }
   }, [typed])
-  const users = useInfiniteQuery(usersQuery(projectId, email))
+  const users = useInfiniteQuery(usersQuery(projectId, email, emailVerified))
   const rows = users.data?.pages.flatMap((page) => page.items) ?? []
 
   return (
@@ -63,22 +86,49 @@ function UsersPage() {
           />
         </div>
       </div>
-      <div className="flex max-w-sm flex-col gap-1.5">
-        <Label htmlFor="users-search">Search by email</Label>
-        <InputGroup>
-          <InputGroupAddon>
-            <Search aria-hidden />
-          </InputGroupAddon>
-          <InputGroupInput
-            id="users-search"
-            type="search"
-            placeholder="Starts with…"
-            value={typed}
-            onChange={(event) => {
-              setTyped(event.target.value)
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="flex w-full max-w-sm flex-col gap-1.5">
+          <Label htmlFor="users-search">Search by email</Label>
+          <InputGroup>
+            <InputGroupAddon>
+              <Search aria-hidden />
+            </InputGroupAddon>
+            <InputGroupInput
+              id="users-search"
+              type="search"
+              placeholder="Starts with…"
+              value={typed}
+              onChange={(event) => {
+                setTyped(event.target.value)
+              }}
+            />
+          </InputGroup>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="users-verification">Verification</Label>
+          <Select
+            items={verificationOptions}
+            value={choice}
+            onValueChange={(next) => {
+              if (next === null) return
+              void navigate({
+                search: next === 'all' ? {} : { emailVerified: next === 'verified' },
+                replace: true,
+              })
             }}
-          />
-        </InputGroup>
+          >
+            <SelectTrigger id="users-verification" className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {verificationOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <DataTable
         label="Users"
@@ -94,7 +144,7 @@ function UsersPage() {
         onLoadMore={() => {
           void users.fetchNextPage()
         }}
-        empty={<NoUsers searching={email !== ''} />}
+        empty={<NoUsers searching={email !== '' || emailVerified !== undefined} />}
       />
     </div>
   )

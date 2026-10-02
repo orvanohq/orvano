@@ -8,9 +8,6 @@ export default async function Page() {
     endpoint: process.env.ORVANO_ENDPOINT!,
     cookies: await cookies(),
   })
-  await orvano.account.updatePassword({
-    currentPassword: 'correct horse battery staple',
-    newPassword: 'another horse battery staple',
-  })
+  await orvano.account.updatePassword({ newPassword: 'another horse battery staple' })
   return <p>Done</p>
 }

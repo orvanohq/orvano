@@ -41,6 +41,22 @@ export const { POST } = createOrvanoRouteHandler({ endpoint: process.env.ORVANO_
 
 Sign users in on the server (a server action with `createServerClient`), so both cookies get set. In client components, `createBrowserClient` reads the access cookie and refreshes through that route handler.
 
+## Email links and codes
+
+Orvano emails verification, password reset, magic link, and email change links that open your own page, with `orvano_type` and `orvano_token` added to the URL. In a client component, `orvano.client.redeemLink()` posts the link to the route handler's `redeem` action, which redeems it with Orvano and sets both cookies; `orvano.client.signInWithEmailCode(email, code)` does the same through `email-code`. Neither answer carries a token. A server action can call the same methods on `createServerClient`.
+
+```tsx
+'use client'
+import { createBrowserClient } from '@orvano/nextjs'
+
+export function Continue() {
+  const orvano = createBrowserClient({ endpoint: process.env.NEXT_PUBLIC_ORVANO_ENDPOINT!, project: 'my-project' })
+  return <button onClick={() => orvano.client.redeemLink()}>Continue</button>
+}
+```
+
+Redeem on a click, not on page load: mail scanners open links to check them, and each link works only once. The handler has no GET action for the same reason. Send `Referrer-Policy: no-referrer` on the landing page (in `next.config.ts` headers), so the token never leaks in a `Referer` header.
+
 ## About
 
 Orvano is the open source backend you host yourself: auth, Postgres databases, storage, functions, realtime, messaging, webhooks, jobs, and backups, run from one console.

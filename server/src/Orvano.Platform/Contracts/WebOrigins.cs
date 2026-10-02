@@ -11,4 +11,16 @@ public interface IWebOriginPolicy
     /// <param name="origin">The request's <c>Origin</c> header value.</param>
     /// <param name="ct">Cancels the check.</param>
     Task<bool> AllowsAsync(string projectId, string origin, CancellationToken ct);
+
+    /// <summary>
+    /// Whether an email link may open at <paramref name="redirectUrl"/> (spec 0010, AC-6): <c>https</c> on a host
+    /// that matches a <c>web</c> platform (any port and path); <c>http</c> only on <c>localhost</c> or
+    /// <c>127.0.0.1</c> when that host is a web platform; or a custom scheme equal, ignoring case, to the identifier of
+    /// an <c>ios</c>, <c>android</c>, or <c>macos</c> platform. The caller checks the URL's shape first and decides
+    /// which links may use a custom scheme.
+    /// </summary>
+    /// <param name="projectId">The servable project the link is for.</param>
+    /// <param name="redirectUrl">An absolute URL with no user info and a host.</param>
+    /// <param name="ct">Cancels the check.</param>
+    Task<bool> AllowsRedirectAsync(string projectId, Uri redirectUrl, CancellationToken ct);
 }

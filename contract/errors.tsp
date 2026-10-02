@@ -169,6 +169,24 @@ enum ErrorCode {
   @doc("Too many requests; wait for the number of seconds in `Retry-After` (429).")
   rate_limited,
 
+  @doc("The redirect URL is malformed, or its host or scheme is not a platform of the project (400).")
+  redirect_url_not_allowed,
+
+  @doc("The email link's token is unknown, already used, expired, or replaced by a newer email (401).")
+  invalid_email_token,
+
+  @doc("The email code is wrong, expired, or used up; ask for a new one after 5 wrong tries (401).")
+  invalid_code,
+
+  @doc("A user without a password must sign in again, by link or code, within 10 minutes before this action (403).")
+  reauthentication_required,
+
+  @doc("The email is already verified (409).")
+  email_already_verified,
+
+  @doc("Another user of the project has this email (409).")
+  email_already_in_use,
+
   @doc("The server is too busy to check a password right now; retry after `Retry-After` (503).")
   server_busy,
 }

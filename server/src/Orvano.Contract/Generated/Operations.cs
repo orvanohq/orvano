@@ -4,6 +4,38 @@ namespace Orvano.Contract;
 /// <summary>Route constants for the <c>account</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class AccountOperations
 {
+    /// <summary>POST /v1/account/recovery/confirm: Sets a new password with the token from a reset link, and signs the user in. Every other session of the user</summary>
+    public static class CompleteRecovery
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.completeRecovery";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/recovery/confirm";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/email/confirm: Changes a user's email to the new address with the token from the confirmation link, and marks it verified. It</summary>
+    public static class ConfirmEmailChange
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.confirmEmailChange";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/email/confirm";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account: Signs a new user up with an email and password, and signs them in.</summary>
     public static class Create
     {
@@ -20,6 +52,70 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>POST /v1/account/email-code: Emails a 6 digit sign in code that works for 10 minutes. An email without a user gets one that creates the user,</summary>
+    public static class CreateEmailCode
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createEmailCode";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/email-code";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/sessions/email-code: Signs a user in with an emailed code. After 5 wrong tries the code stops working; ask for a new one.</summary>
+    public static class CreateEmailCodeSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createEmailCodeSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/email-code";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/magic-link: Emails a sign in link. An email without a user gets one that creates the user, unless <c>createUser</c> is false. The</summary>
+    public static class CreateMagicLink
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createMagicLink";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/magic-link";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/sessions/magic-link: Signs a user in with the token from a magic link, creating them when the link was for a new email. The token works once.</summary>
+    public static class CreateMagicLinkSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createMagicLinkSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/magic-link";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account/sessions/password: Signs a user in with their email and password.</summary>
     public static class CreatePasswordSession
     {
@@ -31,6 +127,38 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/sessions/password";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/recovery: Emails a password reset link, if the email belongs to an active user. The answer is the same 202 whether or not</summary>
+    public static class CreateRecovery
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createRecovery";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/recovery";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/verification: Emails the signed in user a link that verifies their email.</summary>
+    public static class CreateVerification
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createVerification";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/verification";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";
@@ -164,6 +292,22 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>PUT /v1/account/email: Starts changing the signed in user's email: emails a confirmation link to the new address. The email changes</summary>
+    public static class UpdateEmail
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.updateEmail";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PUT";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/email";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>PUT /v1/account/password: Changes the signed in user's password and ends every other session of theirs.</summary>
     public static class UpdatePassword
     {
@@ -175,6 +319,22 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/password";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/verification/confirm: Verifies a user's email with the token from a verification link. It needs no session and creates none; a client</summary>
+    public static class VerifyEmail
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.verifyEmail";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/verification/confirm";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";
@@ -1144,6 +1304,38 @@ public static class ConsoleUsersOperations
         public const string Audience = "console";
     }
 
+    /// <summary>POST /v1/console/project/users/{userId}/recovery: Emails a user a password reset link. Owners and developers.</summary>
+    public static class CreateRecovery
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.createRecovery";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/recovery";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/project/users/{userId}/verification: Emails a user a link that verifies their email. Owners and developers.</summary>
+    public static class CreateVerification
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.createVerification";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/verification";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>DELETE /v1/console/project/users/{userId}: Deletes a user with their password and sessions. It can't be undone.</summary>
     public static class Delete
     {
@@ -1255,6 +1447,38 @@ public static class ConsoleUsersOperations
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "console";
     }
+
+    /// <summary>PUT /v1/console/project/users/{userId}/email: Changes a user's email at once, without a confirmation email. Owners and developers.</summary>
+    public static class UpdateEmail
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.updateEmail";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PUT";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/email";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>PUT /v1/console/project/users/{userId}/email-verification: Marks a user's email verified or unverified. Owners and developers.</summary>
+    public static class UpdateEmailVerification
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.updateEmailVerification";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PUT";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/email-verification";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
 }
 
 /// <summary>Route constants for the <c>health</c> service. Routes are relative to the <c>/v1</c> group.</summary>
@@ -1348,6 +1572,22 @@ public static class TestOperations
         public const string Audience = "console";
     }
 
+    /// <summary>GET /v1/test/emails/latest: Waits up to 15 seconds for the newest email to <c>to</c> that Mailpit caught after <c>after</c>, and reads it.</summary>
+    public static class GetLatestEmail
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "test.getLatestEmail";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/test/emails/latest";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "both";
+    }
+
     /// <summary>GET /v1/test/items: Pages through five fixed items.</summary>
     public static class List
     {
@@ -1398,6 +1638,44 @@ public static class UsersOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/users";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
+    /// <summary>POST /v1/users/{userId}/recovery: Emails a user a password reset link.</summary>
+    public static class CreateRecovery
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.createRecovery";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/recovery";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
+    /// <summary>POST /v1/users/{userId}/verification: Emails a user a link that verifies their email.</summary>
+    public static class CreateVerification
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.createVerification";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/verification";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "server";
@@ -1531,6 +1809,44 @@ public static class UsersOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/users/{userId}/unblock";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
+    /// <summary>PUT /v1/users/{userId}/email: Changes a user's email at once, without a confirmation email. It deletes the user's live email links and codes,</summary>
+    public static class UpdateEmail
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.updateEmail";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PUT";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/email";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
+    /// <summary>PUT /v1/users/{userId}/email-verification: Marks a user's email verified or unverified. Marking it verified deletes any live verification links.</summary>
+    public static class UpdateEmailVerification
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.updateEmailVerification";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PUT";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/email-verification";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "server";

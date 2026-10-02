@@ -31,9 +31,9 @@ internal static class ConsoleUsersEndpoints
     public static void Map(RouteGroupBuilder v1)
     {
         v1.MapGet(Ops.List.Route, async (
-                HttpContext http, string? email, string? status, DateTimeOffset? createdAfter, DateTimeOffset? createdBefore, string? cursor, int? limit,
-                UsersService users, CancellationToken ct) =>
-            Ok(http, await users.ListAsync(Project(http), new UserFilter(email, status, createdAfter, createdBefore), cursor, limit, ct), UserPage))
+                HttpContext http, string? email, string? status, DateTimeOffset? createdAfter, DateTimeOffset? createdBefore, bool? emailVerified,
+                string? cursor, int? limit, UsersService users, CancellationToken ct) =>
+            Ok(http, await users.ListAsync(Project(http), new UserFilter(email, status, createdAfter, createdBefore, emailVerified), cursor, limit, ct), UserPage))
             .WithName(Ops.List.Id)
             .RequireRole(Need.Read);
 
@@ -46,7 +46,8 @@ internal static class ConsoleUsersEndpoints
         {
             var limit = limits.Acquire(RateLimitPolicies.SignUpPerIp, ConnectionIp.Key(http));
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
-            return Created(http, await users.CreateAsync(Project(http), request.Email, request.Password, request.Name, Me(http), ct), User);
+            return Created(http, await users.CreateAsync(
+                Project(http), request.Email, request.Password, request.Name, Me(http), ct, request.EmailVerified ?? false), User);
         })
             .WithName(Ops.Create.Id)
             .RequireRole(Need.Write);
@@ -64,6 +65,26 @@ internal static class ConsoleUsersEndpoints
         v1.MapDelete(Ops.Delete.Route, async (HttpContext http, string userId, UsersService users, CancellationToken ct) =>
             NoContent(http, await users.DeleteAsync(Project(http), userId, Me(http), ct)))
             .WithName(Ops.Delete.Id)
+            .RequireRole(Need.Write);
+
+        v1.MapPut(Ops.UpdateEmailVerification.Route, async (HttpContext http, string userId, Api.UpdateEmailVerificationRequest request, UsersService users, CancellationToken ct) =>
+            Ok(http, await users.UpdateEmailVerificationAsync(Project(http), userId, request.Verified, Me(http), ct), User))
+            .WithName(Ops.UpdateEmailVerification.Id)
+            .RequireRole(Need.Write);
+
+        v1.MapPost(Ops.CreateVerification.Route, async (HttpContext http, string userId, Api.CreateUserVerificationRequest request, UsersService users, CancellationToken ct) =>
+            Accepted(http, await users.CreateVerificationAsync(Project(http), userId, request.RedirectUrl, Me(http), ct)))
+            .WithName(Ops.CreateVerification.Id)
+            .RequireRole(Need.Write);
+
+        v1.MapPost(Ops.CreateRecovery.Route, async (HttpContext http, string userId, Api.CreateUserRecoveryRequest request, UsersService users, CancellationToken ct) =>
+            Accepted(http, await users.CreateRecoveryAsync(Project(http), userId, request.RedirectUrl, Me(http), ct)))
+            .WithName(Ops.CreateRecovery.Id)
+            .RequireRole(Need.Write);
+
+        v1.MapPut(Ops.UpdateEmail.Route, async (HttpContext http, string userId, Api.UpdateUserEmailRequest request, UsersService users, CancellationToken ct) =>
+            Ok(http, await users.UpdateEmailAsync(Project(http), userId, request.Email, request.EmailVerified ?? false, Me(http), ct), User))
+            .WithName(Ops.UpdateEmail.Id)
             .RequireRole(Need.Write);
 
         v1.MapGet(Ops.ListSessions.Route, async (HttpContext http, string userId, string? cursor, int? limit, UsersService users, CancellationToken ct) =>

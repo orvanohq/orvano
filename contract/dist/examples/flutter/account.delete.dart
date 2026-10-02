@@ -3,7 +3,5 @@ import 'package:orvano_flutter/orvano_flutter.dart';
 
 Future<void> main() async {
   final orvano = Orvano(Client(endpoint: 'https://orvano.example.com'));
-  await orvano.account.delete(
-    DeleteAccountRequest(password: 'correct horse battery staple'),
-  );
+  await orvano.account.delete(DeleteAccountRequest());
 }

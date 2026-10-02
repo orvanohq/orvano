@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Auth module (spec 0004): app users and console accounts, Argon2id password hashes, sessions with rotating refresh tokens, and each project's ES256 signing keys. Console accounts are users of the reserved project `console`. Other modules reach it only through `Contracts/`; it reaches Platform only through `Orvano.Platform.Contracts` (`IApiKeyVerifier`, `IProjectDirectory`, `IConsoleSignupPolicy`, `IConsoleAccountCreated`, `IInstallAdmins`). It also implements Platform's `IConsoleUserDirectory` (`Application/ConsoleUserDirectory.cs`), which names members, inviters, and key creators.
+The Auth module (spec 0004): app users and console accounts, Argon2id password hashes, sessions with rotating refresh tokens, and each project's ES256 signing keys. Spec 0010 adds email verification, password reset, magic link and email code sign in, and email change. Console accounts are users of the reserved project `console`. Other modules reach it only through `Contracts/`; it reaches Platform only through `Orvano.Platform.Contracts` (`IApiKeyVerifier`, `IProjectDirectory`, `IConsoleSignupPolicy`, `IConsoleAccountCreated`, `IInstallAdmins`, `IWebOriginPolicy` for link redirects), and Messaging only through `Orvano.Messaging.Contracts` (`IEmailQueue`). It also implements Platform's `IConsoleUserDirectory` (`Application/ConsoleUserDirectory.cs`), which names members, inviters, and key creators.
 
 ## Layout
 
@@ -10,8 +10,8 @@ The Auth module (spec 0004): app users and console accounts, Argon2id password h
 |---|---|
 | `Contracts/` | The only public types: `IUserDirectory` and its records, `IConsoleSessions` and `ConsoleSessionCheck` (the host's `/v1/console` rule calls it) |
 | `Domain/` | Plain rules: the password rule (`Credentials`), `PasswordHasher` (Argon2id through NSec), the refresh token format (`Sessions`), access token claims, and every time constant in `AuthTimings` |
-| `Application/` | Use cases (`AccountService`, `SessionService`, `UsersService`), `Sessions`, `SigningKeys`, `AccessTokens`, `SessionChecks` and `ConsoleSessionChecks`, `UserDirectory`, `AuthStore`, `Outcome`/`Failure`, `AuthEvents` |
-| `Data/AuthDbContext.cs` | EF Core mapping of `auth_users`, `auth_passwords`, `auth_sessions`, `auth_signing_keys` (migration `0003_auth.sql`); internal, checked by the drift check |
+| `Application/` | Use cases (`AccountService`, `SessionService`, `UsersService`), `Sessions`, `SigningKeys`, `AccessTokens`, `SessionChecks` and `ConsoleSessionChecks`, `UserDirectory`, `AuthStore`, `Outcome`/`Failure`, `AuthEvents`; the email flows (spec 0010): `RecoveryService`, `VerificationService`, `PasswordlessService`, `EmailChangeService`, over `EmailTokens` (the `auth_email_tokens` rows), `AuthMailer` (the one send path), `EmailEvents`, and `AuthTelemetry` |
+| `Data/AuthDbContext.cs` | EF Core mapping of `auth_users`, `auth_passwords`, `auth_sessions`, `auth_signing_keys` (migration `0003_auth.sql`), and `auth_email_tokens` (`0006_auth_email_tokens.sql`); internal, checked by the drift check |
 | `Endpoints/` | Thin endpoints for `account.*`, `keys.*`, `users.*`, `consoleAccount.*`, `consoleUsers.*`; `PublicRequests` holds the request filters; `ApiMapping` maps rows to contract models and failures to problems |
 | `Jobs/` | `auth.project.purge_users` on queue `auth` (queued by the `auth.purge_users` consumer of Platform's project purge event) and the hourly `AuthRetention` schedule |
 | `Fixtures/AuthFixtures.cs` | `Test` only seeding of console accounts and app users, through the same sign up code |
@@ -20,7 +20,10 @@ The Auth module (spec 0004): app users and console accounts, Argon2id password h
 
 - Register in `ConfigureServices` only what every role can build. Anything that needs `PublicUrl` or `SecretBox` (signing keys, tokens, sessions, the use cases, `IConsoleSessions`) goes in `ConfigureApiServices` (spec 0002, *Module structure*). The worker's jobs use only the database.
 - Every write goes through `AuthStore.WriteAsync`: one transaction for the EF context, the outbox, and Platform's module hooks. It commits only when the use case returns success, so a `Failure` leaves no half change and no event.
+- The one exception is `AuthStore.WriteDecidingAsync`, for the wrong email code whose attempt count must commit with a refusal (spec 0010, AC-5). Use it nowhere else.
 - Public endpoints declare their caller with the `PublicRequests` filters: `RequireProject` (or `RequireProjectInPath`), then `RequireUser` for a bearer token or `RequireApiKey(<the operation's generated Scope>)` for a server key.
+- Every auth email goes through `AuthMailer.SendLinkAsync` or `SendCodeAsync` (token, URL, queue, and `auth.email_token.created` in the caller's transaction). An open request (`createRecovery`, `createMagicLink`, `createEmailCode`) decides every refusal before it reads the account, then answers 202 no sooner than the 500 ms floor.
+- Lock order: the user row (`UserLocks`) before any `auth_email_tokens` row. `EmailTokens.ConsumeLinkAsync` locks the token's user itself; a new write that touches both must lock the user first, or it can deadlock with a send.
 - Sign up, sign in, refresh, and password checks take a named limit from `RateLimitPolicies` (`Orvano.Core.RateLimiting`), keyed by `ConnectionIp.Key`, never by `X-Orvano-Client-IP`.
 - Secrets at rest go through `SecretBox` with associated data `<table>:<rowId>:<column>`: signing private keys and the current refresh token (`refresh_ciphertext`). Refresh lookups use only the SHA-256 of the token's secret (`refresh_hash`, and `previous_refresh_hash` for reuse detection).
 - Events (`AuthEvents`) carry IDs, changed field names, the end reason, and the actor. Never an email, name, password, token, hash, IP, or user agent.
@@ -42,5 +45,6 @@ The Auth module (spec 0004): app users and console accounts, Argon2id password h
 - [0004 App user sign up, sign in, and sessions](../../../docs/specs/0004-app-user-auth/index.md)
 - [0008 Console team members, invitations, and roles](../../../docs/specs/0008-console-team-members/index.md) (invited sign up, `ConsoleAccount.isInstallAdmin`)
 - [0002 Stack and architecture](../../../docs/specs/0002-stack-architecture/index.md) (module hooks, envelope encryption)
+- [0010 Email verification, recovery, and passwordless](../../../docs/specs/0010-email-verification-recovery-passwordless/index.md) (with `verify.md`)
 
 _Drafted by /sync from the introducing change, worth a quick human pass._

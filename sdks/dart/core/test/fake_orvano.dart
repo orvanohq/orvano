@@ -61,16 +61,21 @@ Answer status(int code, {String? retryAfter}) => (response) async {
   await response.close();
 };
 
-/// A problem details answer.
-Answer problem(int code, Map<String, Object?> body, {String? requestId}) =>
-    (response) async {
-      response
-        ..statusCode = code
-        ..headers.set('Content-Type', 'application/problem+json');
-      if (requestId != null) response.headers.set('X-Request-Id', requestId);
-      response.write(jsonEncode(body));
-      await response.close();
-    };
+/// A problem details answer, optionally with `X-Request-Id` and `Retry-After`.
+Answer problem(
+  int code,
+  Map<String, Object?> body, {
+  String? requestId,
+  String? retryAfter,
+}) => (response) async {
+  response
+    ..statusCode = code
+    ..headers.set('Content-Type', 'application/problem+json');
+  if (requestId != null) response.headers.set('X-Request-Id', requestId);
+  if (retryAfter != null) response.headers.set('Retry-After', retryAfter);
+  response.write(jsonEncode(body));
+  await response.close();
+};
 
 /// Never answers, until the client gives up.
 Answer hang() =>

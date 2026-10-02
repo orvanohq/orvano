@@ -10,8 +10,8 @@ namespace Orvano.Auth.Jobs;
 
 /// <summary>
 /// The Auth side of a project purge (spec 0003, AC-14; spec 0004, data model): when Platform purges a project, the
-/// consumer <c>auth.purge_users</c> queues <c>auth.project.purge_users</c>, which deletes the project's users,
-/// passwords, sessions, and signing keys in batches.
+/// consumer <c>auth.purge_users</c> queues <c>auth.project.purge_users</c>, which deletes the project's email tokens
+/// (spec 0010, AC-29), users, passwords, sessions, and signing keys in batches.
 /// </summary>
 internal static class AuthJobs
 {
@@ -43,8 +43,9 @@ internal static class AuthJobs
 
         var db = job.Services.GetRequiredKeyedService<NpgsqlDataSource>(OrvanoDb.App);
         var total = 0;
-        // Sessions first so each user batch cascades over few rows; passwords go with their users.
-        foreach (var table in new[] { "auth_sessions", "auth_users", "auth_signing_keys" })
+        // Tokens and sessions first so each user batch cascades over few rows; passwords go with their users. Tokens
+        // for emails with no user yet have no user to cascade from.
+        foreach (var table in new[] { "auth_email_tokens", "auth_sessions", "auth_users", "auth_signing_keys" })
         {
             int deleted;
             do

@@ -1,6 +1,7 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
-using Orvano.Core.Http;
+using Orvano.Core.Data;
 using Orvano.Messaging.Contracts;
 using Orvano.Messaging.Domain;
 
@@ -11,12 +12,25 @@ namespace Orvano.Messaging.Application;
 /// install cap, renders the project's template (or the default) with the caller's values, and inserts the sealed
 /// row and its job, all on the caller's transaction in raw Npgsql.
 /// </summary>
-internal sealed class AuthEmailQueue(EmailQueue queue, PublicUrl publicUrl, ILogger<AuthEmailQueue> logger) : IEmailQueue
+internal sealed class AuthEmailQueue(EmailQueue queue, [FromKeyedServices(OrvanoDb.App)] NpgsqlDataSource db, ILogger<AuthEmailQueue> logger) : IEmailQueue
 {
+    public async Task<EmailAvailability> CheckAvailabilityAsync(string projectId, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectId);
+        await using var conn = await db.OpenConnectionAsync(ct);
+        return await queue.AdmitAsync(conn, null, projectId, ct) switch
+        {
+            null => new EmailAvailability.Available(),
+            QueueRefusal.NotConfigured => new EmailAvailability.NotConfigured(),
+            QueueRefusal.RateLimited limited => new EmailAvailability.RateLimited(limited.RetryAfter),
+            var other => throw new InvalidOperationException($"Unknown queue refusal {other.GetType().Name}."),
+        };
+    }
+
     public async Task<EmailQueueResult> QueueAuthEmailAsync(NpgsqlTransaction tx, AuthEmail email, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(tx);
-        var values = AuthEmailRule.Check(email, allowHttp: publicUrl.Origin.StartsWith("http://", StringComparison.Ordinal));
+        var values = AuthEmailRule.Check(email);
 
         switch (await queue.AdmitAsync(tx, email.ProjectId, ct))
         {

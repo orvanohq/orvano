@@ -8,6 +8,7 @@ namespace Orvano.Scenarios.Generated;
     RespectNullableAnnotations = true,
     RespectRequiredConstructorParameters = true,
     DefaultIgnoreCondition = JsonIgnoreCondition.Never)]
+[JsonSerializable(typeof(TestEmail))]
 [JsonSerializable(typeof(TestItem))]
 [JsonSerializable(typeof(TestItemPage))]
 [JsonSerializable(typeof(TestPinged))]

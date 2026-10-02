@@ -6,11 +6,71 @@ import '../dispatch_table.dart';
 
 /// Every non console operation; a missing `client` or `server` call means the SDK has none.
 final Map<String, DispatchEntry> dispatch = {
+  'account.completeRecovery': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.completeRecovery(
+        CompleteRecoveryRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.confirmEmailChange': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.confirmEmailChange(
+        ConfirmEmailChangeRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
   'account.create': DispatchEntry(
     status: 201,
     client: (o, input) async {
       final r = await o.account.create(
         CreateAccountRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.createEmailCode': DispatchEntry(
+    status: 202,
+    client: (o, input) async {
+      await o.account.createEmailCode(
+        CreateEmailCodeRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return null;
+    },
+  ),
+  'account.createEmailCodeSession': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createEmailCodeSession(
+        CreateEmailCodeSessionRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.createMagicLink': DispatchEntry(
+    status: 202,
+    client: (o, input) async {
+      await o.account.createMagicLink(
+        CreateMagicLinkRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return null;
+    },
+  ),
+  'account.createMagicLinkSession': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createMagicLinkSession(
+        CreateMagicLinkSessionRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
       );
       return r.toJson();
     },
@@ -24,6 +84,26 @@ final Map<String, DispatchEntry> dispatch = {
         ),
       );
       return r.toJson();
+    },
+  ),
+  'account.createRecovery': DispatchEntry(
+    status: 202,
+    client: (o, input) async {
+      await o.account.createRecovery(
+        CreateRecoveryRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return null;
+    },
+  ),
+  'account.createVerification': DispatchEntry(
+    status: 202,
+    client: (o, input) async {
+      await o.account.createVerification(
+        CreateVerificationRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return null;
     },
   ),
   'account.delete': DispatchEntry(
@@ -102,6 +182,15 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.updateEmail': DispatchEntry(
+    status: 202,
+    client: (o, input) async {
+      await o.account.updateEmail(
+        UpdateEmailRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return null;
+    },
+  ),
   'account.updatePassword': DispatchEntry(
     status: 204,
     client: (o, input) async {
@@ -109,6 +198,15 @@ final Map<String, DispatchEntry> dispatch = {
         UpdatePasswordRequest.fromJson(input['body'] as Map<String, dynamic>),
       );
       return null;
+    },
+  ),
+  'account.verifyEmail': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.verifyEmail(
+        VerifyEmailRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
     },
   ),
   'health.get': DispatchEntry(
@@ -157,6 +255,27 @@ final Map<String, DispatchEntry> dispatch = {
     server: (o, input) async {
       await o.test.conflict();
       return null;
+    },
+  ),
+  'test.getLatestEmail': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.test.getLatestEmail(
+        to: input['to'] as String,
+        after: input['after'] == null
+            ? null
+            : DateTime.parse(input['after'] as String),
+      );
+      return r.toJson();
+    },
+    server: (o, input) async {
+      final r = await o.test.getLatestEmail(
+        to: input['to'] as String,
+        after: input['after'] == null
+            ? null
+            : DateTime.parse(input['after'] as String),
+      );
+      return r.toJson();
     },
   ),
   'test.list': DispatchEntry(
@@ -208,6 +327,32 @@ final Map<String, DispatchEntry> dispatch = {
     },
     scope: 'users.write',
   ),
+  'users.createRecovery': DispatchEntry(
+    status: 202,
+    server: (o, input) async {
+      await o.users.createRecovery(
+        input['userId'] as String,
+        CreateUserRecoveryRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return null;
+    },
+    scope: 'users.write',
+  ),
+  'users.createVerification': DispatchEntry(
+    status: 202,
+    server: (o, input) async {
+      await o.users.createVerification(
+        input['userId'] as String,
+        CreateUserVerificationRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return null;
+    },
+    scope: 'users.write',
+  ),
   'users.delete': DispatchEntry(
     status: 204,
     server: (o, input) async {
@@ -255,6 +400,9 @@ final Map<String, DispatchEntry> dispatch = {
         createdBefore: input['createdBefore'] == null
             ? null
             : DateTime.parse(input['createdBefore'] as String),
+        emailVerified: input['emailVerified'] == null
+            ? null
+            : input['emailVerified'] as bool,
         cursor: input['cursor'] == null ? null : input['cursor'] as String,
         limit: input['limit'] == null ? null : (input['limit'] as num).toInt(),
       );
@@ -270,6 +418,9 @@ final Map<String, DispatchEntry> dispatch = {
           createdBefore: input['createdBefore'] == null
               ? null
               : DateTime.parse(input['createdBefore'] as String),
+          emailVerified: input['emailVerified'] == null
+              ? null
+              : input['emailVerified'] as bool,
           limit: input['limit'] == null
               ? null
               : (input['limit'] as num).toInt(),
@@ -301,6 +452,30 @@ final Map<String, DispatchEntry> dispatch = {
     status: 200,
     server: (o, input) async {
       final r = await o.users.unblock(input['userId'] as String);
+      return r.toJson();
+    },
+    scope: 'users.write',
+  ),
+  'users.updateEmail': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.users.updateEmail(
+        input['userId'] as String,
+        UpdateUserEmailRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+    scope: 'users.write',
+  ),
+  'users.updateEmailVerification': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.users.updateEmailVerification(
+        input['userId'] as String,
+        UpdateEmailVerificationRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
       return r.toJson();
     },
     scope: 'users.write',

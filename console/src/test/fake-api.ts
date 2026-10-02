@@ -226,6 +226,7 @@ export function installFakeApi(): FakeApi {
       id: accountId,
       email: 'ada@example.com',
       emailVerified: true,
+      emailVerifiedAt: now,
       name: 'Ada',
       status: 'active',
       metadata: {},

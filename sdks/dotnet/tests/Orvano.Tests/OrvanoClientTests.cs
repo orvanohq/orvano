@@ -139,6 +139,21 @@ public class OrvanoClientTests
     }
 
     [Fact]
+    public async Task Carries_Retry_After_on_the_exception() // covers: spec 0010 AC-26
+    {
+        var seconds = new FakeServer().ThenStatus(429, retryAfter: "42");
+        var date = new FakeServer().ThenStatus(429, retryAfter: DateTimeOffset.UtcNow.AddSeconds(90).ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        var none = new FakeServer().ThenStatus(401);
+        using var a = seconds.Client(o => o.MaxRetries = 0);
+        using var b = date.Client(o => o.MaxRetries = 0);
+        using var c = none.Client(o => o.MaxRetries = 0);
+
+        Assert.Equal(TimeSpan.FromSeconds(42), (await Assert.ThrowsAsync<OrvanoException>(() => a.Health.GetAsync(Ct))).RetryAfter);
+        Assert.InRange((await Assert.ThrowsAsync<OrvanoException>(() => b.Health.GetAsync(Ct))).RetryAfter!.Value.TotalSeconds, 85, 90);
+        Assert.Null((await Assert.ThrowsAsync<OrvanoException>(() => c.Health.GetAsync(Ct))).RetryAfter);
+    }
+
+    [Fact]
     public async Task Does_not_retry_other_failures() // covers: AC-14
     {
         var server = new FakeServer().ThenStatus(500);

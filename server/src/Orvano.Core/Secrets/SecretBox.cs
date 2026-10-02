@@ -6,6 +6,11 @@ namespace Orvano.Core.Secrets;
 /// <summary>A blob could not be decrypted: tampered, moved to another row, or sealed with a master key that is gone.</summary>
 public sealed class SecretBoxException(string message) : CryptographicException(message);
 
+/// <summary>An HMAC tag and the ID of the master key it was derived from (<see cref="SecretBox.Mac"/>).</summary>
+/// <param name="KeyId">The master key's ID; store it beside the tag, so a key rotation never breaks a live tag.</param>
+/// <param name="Tag">HMAC-SHA256, 32 bytes.</param>
+public sealed record MacTag(string KeyId, byte[] Tag);
+
 /// <summary>
 /// Envelope encryption for secrets at rest (spec 0002). Each value gets a fresh random 32 byte data key and is sealed
 /// with AES-256-GCM, bound by associated data to its row and column (<see cref="AssociatedData"/>), so a ciphertext
@@ -65,6 +70,44 @@ public sealed class SecretBox(MasterKeys keys)
         }
 
         return blob;
+    }
+
+    /// <summary>
+    /// An HMAC-SHA256 over <paramref name="data"/>, keyed by HKDF-SHA256 of the active master key with
+    /// <paramref name="purpose"/> as the info (spec 0010, AC-1). The key never leaves the process, so a database dump
+    /// alone can't check a guess against the tag.
+    /// </summary>
+    /// <param name="purpose">Separates keys by use, as in <c>orvano.auth.email-code</c>.</param>
+    /// <param name="data">The bytes to authenticate.</param>
+    public MacTag Mac(string purpose, ReadOnlySpan<byte> data) => new(keys.ActiveId, Tag(keys.Active, purpose, data));
+
+    /// <summary>
+    /// Whether <paramref name="tag"/> is the <see cref="Mac"/> of <paramref name="data"/> under the master key
+    /// <paramref name="keyId"/>, compared in fixed time. A key that is no longer configured never matches.
+    /// </summary>
+    /// <param name="keyId">The <see cref="MacTag.KeyId"/> stored with the tag.</param>
+    /// <param name="purpose">The purpose the tag was made with.</param>
+    /// <param name="data">The bytes to check.</param>
+    /// <param name="tag">The stored tag.</param>
+    public bool VerifyMac(string keyId, string purpose, ReadOnlySpan<byte> data, ReadOnlySpan<byte> tag)
+    {
+        if (!keys.TryGet(keyId, out var masterKey)) return false;
+        var expected = Tag(masterKey, purpose, data);
+        return CryptographicOperations.FixedTimeEquals(expected, tag);
+    }
+
+    private static byte[] Tag(ReadOnlySpan<byte> masterKey, string purpose, ReadOnlySpan<byte> data)
+    {
+        Span<byte> macKey = stackalloc byte[DataKeySize];
+        try
+        {
+            HKDF.DeriveKey(HashAlgorithmName.SHA256, masterKey, macKey, [], Encoding.UTF8.GetBytes(purpose));
+            return HMACSHA256.HashData(macKey, data);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(macKey);
+        }
     }
 
     /// <summary>Opens a blob <see cref="Encrypt"/> sealed for the same <paramref name="associatedData"/>.</summary>

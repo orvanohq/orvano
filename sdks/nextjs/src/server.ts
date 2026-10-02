@@ -1,6 +1,7 @@
 /**
  * Server only helpers for Next.js: `updateSession` for middleware and the route handler that
- * refreshes and signs out for the browser client (spec 0004, AC-23).
+ * refreshes, signs out, and redeems emailed links and codes for the browser client (spec 0004,
+ * AC-23; spec 0010, AC-25).
  *
  * @example
  * ```ts
@@ -24,10 +25,12 @@ import {
   Client,
   MemorySessionStore,
   OrvanoError,
+  directEmailAuth,
+  emailLinkTypes,
   refreshMarginMs,
   refreshWithToken,
 } from '@orvano/js'
-import type { AuthSession, ClientConfig } from '@orvano/js'
+import type { AuthSession, ClientConfig, EmailLink, EmailLinkType } from '@orvano/js'
 import { NextResponse } from 'next/server.js'
 import type { NextRequest } from 'next/server.js'
 
@@ -144,12 +147,131 @@ function problem(status: number, code: string, detail: string): NextResponse {
   )
 }
 
+/** The reason phrases of the statuses Orvano's email flows answer with. */
+const reasons: Record<number, string> = {
+  400: 'Bad Request',
+  401: 'Unauthorized',
+  403: 'Forbidden',
+  404: 'Not Found',
+  409: 'Conflict',
+  429: 'Too Many Requests',
+  503: 'Service Unavailable',
+}
+
+/** Orvano's refusal, passed through with its status, code, detail, request ID, and `Retry-After`. */
+function passThrough(error: OrvanoError): NextResponse {
+  const response = NextResponse.json(
+    {
+      type: `https://orvano.dev/errors/${error.code}`,
+      title: reasons[error.status] ?? 'Error',
+      status: error.status,
+      detail: error.message,
+      code: error.code,
+      ...(error.requestId === null ? {} : { requestId: error.requestId }),
+    },
+    { status: error.status, headers: { 'Content-Type': 'application/problem+json' } },
+  )
+  if (error.retryAfter !== null) response.headers.set('Retry-After', String(error.retryAfter))
+  return response
+}
+
+/** The JSON object body of a request, or null when it is not one. */
+async function jsonBody(request: NextRequest): Promise<Record<string, unknown> | null> {
+  try {
+    const body: unknown = await request.json()
+    return typeof body === 'object' && body !== null && !Array.isArray(body)
+      ? (body as Record<string, unknown>)
+      : null
+  } catch {
+    return null
+  }
+}
+
+function isLinkType(value: unknown): value is EmailLinkType {
+  return typeof value === 'string' && (emailLinkTypes as readonly string[]).includes(value)
+}
+
 /**
- * The route handler the browser client refreshes and signs out through. Mount it once, at
- * `app/api/orvano/[...orvano]/route.ts`: `POST .../refresh` trades the `HttpOnly` refresh cookie
- * and sets both cookies again, answering only the access token; `POST .../signout` ends the
- * session and clears both cookies. A request whose `Origin` is missing or is not the app's own
- * gets 403 before any cookie is read.
+ * `POST .../redeem` (spec 0010, AC-25): redeems a link with Orvano as the browser. A magic link or
+ * reset sets both cookies; a verification or email change refreshes them when they exist, so the
+ * access token carries the new claim. Answers `{ type, user, isNewUser }`, never a token.
+ */
+async function redeem(
+  request: NextRequest,
+  client: Client,
+  secure: boolean,
+): Promise<NextResponse> {
+  const body = await jsonBody(request)
+  if (body === null || !isLinkType(body.type) || typeof body.token !== 'string')
+    return problem(400, 'invalid_request', 'Send { type, token } and, for a reset, password.')
+  const link: EmailLink = { type: body.type, token: body.token }
+  if (typeof body.password === 'string') link.password = body.password
+
+  let result
+  try {
+    result = await directEmailAuth.redeemLink(link, client)
+  } catch (error) {
+    if (error instanceof OrvanoError) return passThrough(error)
+    throw error
+  }
+
+  const response = NextResponse.json({
+    type: result.type,
+    user: result.user,
+    isNewUser: result.isNewUser,
+  })
+  if (link.type === 'magic_link' || link.type === 'recovery') {
+    writeResponse(response, await client.session.get(), secure)
+    return response
+  }
+  const refreshToken = request.cookies.get(refreshCookie)?.value
+  if (refreshToken !== undefined && refreshToken !== '') {
+    try {
+      const session = await refreshWith(client, refreshToken)
+      writeResponse(response, session, secure)
+    } catch {
+      // Orvano is unreachable: the cookies stay, and the claim updates at the next refresh.
+    }
+  }
+  return response
+}
+
+/** `POST .../email-code` (spec 0010, AC-25): signs in with an emailed code and sets both cookies. */
+async function emailCode(
+  request: NextRequest,
+  client: Client,
+  secure: boolean,
+): Promise<NextResponse> {
+  const body = await jsonBody(request)
+  if (body === null || typeof body.email !== 'string' || typeof body.code !== 'string')
+    return problem(400, 'invalid_request', 'Send { email, code }.')
+
+  let result
+  try {
+    result = await directEmailAuth.signInWithEmailCode(body.email, body.code, client)
+  } catch (error) {
+    if (error instanceof OrvanoError) return passThrough(error)
+    throw error
+  }
+
+  const response = NextResponse.json({
+    type: 'email_code',
+    user: result.user,
+    isNewUser: result.isNewUser,
+  })
+  writeResponse(response, await client.session.get(), secure)
+  return response
+}
+
+/**
+ * The route handler the browser client refreshes, signs out, and redeems emailed links and codes
+ * through. Mount it once, at `app/api/orvano/[...orvano]/route.ts`: `POST .../refresh` trades the
+ * `HttpOnly` refresh cookie and sets both cookies again, answering only the access token;
+ * `POST .../signout` ends the session and clears both cookies; `POST .../redeem`
+ * (`{ type, token, password? }`) and `POST .../email-code` (`{ email, code }`) redeem with Orvano
+ * and set both cookies, answering `{ type, user, isNewUser }`. A request whose `Origin` is missing
+ * or is not the app's own gets 403 before any cookie is read. There is no GET action, so a mail
+ * scanner that opens a link never uses it up.
  */
 export function createOrvanoRouteHandler(config: OrvanoNextConfig): {
   POST: (request: NextRequest) => Promise<NextResponse>
@@ -211,6 +333,9 @@ export function createOrvanoRouteHandler(config: OrvanoNextConfig): {
         writeResponse(response, null, secure)
         return response
       }
+
+      if (action === 'redeem') return redeem(request, client, secure)
+      if (action === 'email-code') return emailCode(request, client, secure)
 
       return problem(404, 'not_found', 'Unknown Orvano action.')
     },

@@ -141,4 +141,38 @@ public class SecretBoxTests(PostgresFixture postgres)
 
         Assert.Equal("stored secret", Encoding.UTF8.GetString(box.Decrypt(read, Row)));
     }
+
+    // Spec 0010 AC-1: email codes are stored as an HMAC keyed from the master key, tied to the key's ID.
+    [Fact]
+    public void A_mac_verifies_under_its_key_and_purpose_only_and_survives_a_rotation()
+    {
+        var box = new SecretBox(MasterKeys.Parse($"ka:{KeyA}"));
+        var tag = box.Mac("orvano.auth.email-code", "row:123456"u8);
+
+        Assert.Equal("ka", tag.KeyId);
+        Assert.Equal(32, tag.Tag.Length);
+        Assert.Equal(tag.Tag, box.Mac("orvano.auth.email-code", "row:123456"u8).Tag); // deterministic
+        Assert.True(box.VerifyMac("ka", "orvano.auth.email-code", "row:123456"u8, tag.Tag));
+        Assert.False(box.VerifyMac("ka", "orvano.auth.email-code", "row:123457"u8, tag.Tag));
+        Assert.False(box.VerifyMac("ka", "another.purpose", "row:123456"u8, tag.Tag));
+        Assert.False(box.VerifyMac("kb", "orvano.auth.email-code", "row:123456"u8, tag.Tag)); // a key that is not configured
+
+        // After a rotation the old key still verifies its tags, and new tags use the new key.
+        var rotated = new SecretBox(MasterKeys.Parse($"kb:{KeyB},ka:{KeyA}"));
+        Assert.True(rotated.VerifyMac(tag.KeyId, "orvano.auth.email-code", "row:123456"u8, tag.Tag));
+        Assert.Equal("kb", rotated.Mac("orvano.auth.email-code", "row:123456"u8).KeyId);
+        Assert.NotEqual(tag.Tag, rotated.Mac("orvano.auth.email-code", "row:123456"u8).Tag);
+
+        // Once the key is removed, its tags never match again.
+        Assert.False(new SecretBox(MasterKeys.Parse($"kb:{KeyB}")).VerifyMac("ka", "orvano.auth.email-code", "row:123456"u8, tag.Tag));
+    }
+
+    [Fact]
+    public void A_mac_is_not_a_plain_hmac_of_the_master_key()
+    {
+        var box = new SecretBox(MasterKeys.Parse($"ka:{KeyA}"));
+        var plain = HMACSHA256.HashData(Convert.FromBase64String(KeyA), "row:123456"u8);
+
+        Assert.NotEqual(plain, box.Mac("orvano.auth.email-code", "row:123456"u8).Tag);
+    }
 }

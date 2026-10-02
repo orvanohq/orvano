@@ -39,6 +39,24 @@ export interface SessionStore {
   readonly lockName?: string | undefined
 }
 
+/**
+ * The `sub` and `email_verified` claims of an access token, read without checking it (the client
+ * only compares them with a user it was just sent); null when it is not a readable JWT.
+ */
+export function readAccessClaims(token: string): { sub: string; emailVerified: boolean } | null {
+  const payload = token.split('.')[1]
+  if (payload === undefined) return null
+  try {
+    const padded = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const claims = JSON.parse(atob(padded)) as { sub?: unknown; email_verified?: unknown }
+    return typeof claims.sub === 'string'
+      ? { sub: claims.sub, emailVerified: claims.email_verified === true }
+      : null
+  } catch {
+    return null
+  }
+}
+
 /** What happened to the signed in user, as `onAuthStateChange` tells it. */
 export type AuthEvent = 'signedIn' | 'signedOut' | 'tokenRefreshed' | 'userUpdated'
 

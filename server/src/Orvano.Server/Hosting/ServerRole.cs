@@ -44,6 +44,8 @@ internal static class ServerRole
         builder.Services.AddOrvanoProblems();
         var modules = OrvanoModules.For(builder.Environment);
         var fixtures = TestFixtures.Load(builder.Environment, config);
+        var mailpit = TestMailpit.Load(builder.Environment, config);
+        builder.Services.AddSingleton(mailpit);
 
         var appUrl = OrvanoConfig.Required(config, "ORVANO_DB_URL");
         var appPool = role switch
@@ -82,6 +84,7 @@ internal static class ServerRole
 
         if (!StartupChecks.TimeZonesAvailable(logger)) return 1;
         if (!StartupChecks.TestFixturesUsable(fixtures, logger)) return 1;
+        if (!StartupChecks.TestMailpitUsable(mailpit, logger)) return 1;
         if (role == OrvanoRole.Api && !StartupChecks.PasswordHashingAvailable(app.Services, logger)) return 1;
         var appDb = app.Services.GetRequiredKeyedService<NpgsqlDataSource>(OrvanoDb.App);
         if (!await StartupChecks.SchemaMatchesAsync(appDb, logger, app.Lifetime.ApplicationStopping)) return 1;

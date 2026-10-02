@@ -3,4 +3,4 @@ import { Client, Orvano } from '@orvano/js'
 
 const orvano = new Orvano(new Client({ endpoint: 'https://orvano.example.com' }))
 
-await orvano.account.delete({ password: 'correct horse battery staple' })
+await orvano.account.delete({})
