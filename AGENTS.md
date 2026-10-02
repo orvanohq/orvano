@@ -20,11 +20,12 @@ Tracer Bullet: each version ships one capability end to end through every layer 
 corepack enable pnpm && pnpm install                    # install
 flutter pub get                                         # install the Dart workspace (SDKs and scenario runners)
 dotnet run --project dev/Orvano.AppHost                 # dev: Postgres, every role, console, Aspire dashboard
-dotnet build Orvano.slnx && pnpm -r build               # build
+dotnet build Orvano.slnx && pnpm -r --filter "!@orvano/website" build   # build (the site needs ORVANO_SITE_ENV, below)
 dotnet test --solution Orvano.slnx                      # test (Docker must be running)
 dotnet format Orvano.slnx && pnpm lint:fix && pnpm format   # fix lint and format (CI checks all three)
 docker compose -f deploy/compose/docker-compose.yml -f deploy/compose/docker-compose.build.yml up --build   # production shape on http://localhost, images built from this checkout (needs deploy/compose/.env)
 pnpm --filter @orvano/contract build && dotnet run --project tools/sdkgen   # after a contract change: regenerate, then commit both
+ORVANO_SITE_ENV=preview pnpm --filter @orvano/website build   # the docs site into website/dist/ (website/AGENTS.md has its checks)
 docker compose -f tests/scenarios/compose.yml up -d --build --wait   # Test server on :8080 for the shared scenarios
 docker compose -f tests/scenarios/compose.yml --profile console up -d --build --wait   # adds the gateway (Caddy plus the console build) on :8081; then `pnpm --filter @orvano/console test:e2e`
 ```
@@ -44,6 +45,7 @@ Stored in `docs/specs/NNNN-title/` (`index.md`, `rationale.md`, optional `verify
 - Validate config at startup: every `ORVANO_*` setting is checked when a role starts, and the role refuses to run on a bad value.
 - Never log event payloads, secrets, tokens, connection strings, or the master key.
 - Document public APIs: XML doc comments on public C# members, TSDoc on exported TS symbols, `///` docs on public Dart members.
+- Docs ship with the feature: a new public operation, error code, or console screen adds or updates its page on the docs site in the same pull request ([CONTRIBUTING.md](CONTRIBUTING.md)). The site build fails on an error code without a fix page or a reference tag no guide links to.
 - Naming: .NET casing with an `Async` suffix; TS camelCase, PascalCase components, kebab-case files, named exports only; Dart snake_case files; SQL snake_case.
 - Tests: unit tests for domain and use cases, integration tests against real Postgres 18 via Testcontainers, never a mocked database. The console meets WCAG AA. CI must be green to merge.
 
@@ -56,6 +58,7 @@ Installed (scope row 2):
 - CI: `.github/workflows/ci.yml` runs lint and format checks (`dotnet format --verify-no-changes`, `pnpm lint`, `pnpm format:check`), build, tests, the console browser and end to end tests, the EF drift check, and the install job (ShellCheck, then `install.sh --no-pull` twice on amd64 and arm64).
 - SDK CI: `.github/workflows/sdks.yml` fails when `contract/dist/openapi.json` or generated code is stale, then runs the shared scenarios on Node, Bun, Deno, Chromium, workerd, Next.js, Dart, Flutter (Chrome, Android), and .NET (`net10.0`, `netstandard2.0`). `sdks-nightly.yml` runs Flutter on the iOS simulator. `sdks.yml` also runs the TS and Dart SDK unit tests and reports breaking changes since the last release tag (oasdiff).
 - Changed areas: on a pull request, the first job of `ci.yml` and `sdks.yml` runs `.github/scripts/changed-areas.sh`, and every other job runs only when its area changed (the rules sit inline in each workflow; Markdown counts for no area). Pushes to `main`, releases, and manual runs run every job. `CI passed` and `SDKs passed` are the checks to require. A new job or a new input folder needs a line in that workflow's rules, or it is skipped on PRs.
+- Website CI: `.github/workflows/website.yml` builds the site and runs its checks (links, code regions, axe, the CSP), deploys a preview per same repo pull request, and runs the five quickstarts against a local stack (`install --local`); `Website passed` is its check to require. `links.yml` checks external links weekly. Production deploys come only from `release.yml`, after the packages publish and the `examples` job builds every quickstart from the real registries.
 - Release: pushing the tag `v<VERSION>` runs `.github/workflows/release.yml`, which runs `sdks.yml` and then publishes to npm, pub.dev, and NuGet and updates the `orvano-js`, `orvano-dart`, and `orvano-dotnet` mirrors. It also pushes the server and gateway images to GHCR and attaches the version stamped `install.sh` and its `.sha256` to the GitHub Release. It is a dry run until 0.1, and a manual run is always a dry run. Flutter 3.44.2 is pinned in `.tool-versions` and both workflows so `dart format` output matches everywhere.
 
 ## Git
@@ -92,10 +95,15 @@ Installed (scope row 2):
 - [session-management](.claude/skills/session-management/): `secondsky/claude-skills`, refresh token rotation and cookie rules (it assumes Redis; spec 0004 wins)
 - [email-and-password-best-practices](.claude/skills/email-and-password-best-practices/): `better-auth/skills`, password auth flows and policies (written for Better Auth; use the practices, not the library)
 - [owasp-top-10-testing](.claude/skills/owasp-top-10-testing/): `usestrix/strix`, OWASP Top 10 testing for GA reviews (security scan: one alert, read it before relying on it)
+- [astro-starlight](.agents/skills/astro-starlight/): `fusengine/agents`, the Starlight docs site in `website/` (skip its "MANDATORY" agent step; use only its reference pages)
+- [astro](.agents/skills/astro/): `astrolicious/agent-skills`, Astro components, content collections, and builds
+- [wrangler](.agents/skills/wrangler/): `cloudflare/skills`, deploying the docs site to Cloudflare Workers and its preview URLs
 
 Declined: ESLint, typescript-eslint, and Prettier skills (the configs are small; the ESLint MCP covers live linting)
 
-MCP servers: Aspire MCP (recommended), GitHub MCP (recommended), Postgres MCP Pro, dev database only (recommended), ESLint MCP `@eslint/mcp` (recommended), Dart and Flutter MCP `dart mcp-server` (recommended), Playwright MCP (recommended), Next.js DevTools MCP `next-devtools-mcp` (recommended)
+Declined: `withastro/astro@astro-developer` (it is for contributors to Astro itself, not sites built with it)
+
+MCP servers: Cloudflare MCP (skipped for now), Aspire MCP (recommended), GitHub MCP (recommended), Postgres MCP Pro, dev database only (recommended), ESLint MCP `@eslint/mcp` (recommended), Dart and Flutter MCP `dart mcp-server` (recommended), Playwright MCP (recommended), Next.js DevTools MCP `next-devtools-mcp` (recommended)
 
 ## Context files
 
@@ -109,6 +117,8 @@ MCP servers: Aspire MCP (recommended), GitHub MCP (recommended), Postgres MCP Pr
 - [sdks/AGENTS.md](sdks/AGENTS.md): the five SDK surfaces, generated versus handwritten code, audience routing
 - [tests/scenarios/AGENTS.md](tests/scenarios/AGENTS.md): the shared scenarios and one runner per SDK surface
 - [deploy/AGENTS.md](deploy/AGENTS.md): the server and gateway images, the Compose file, the Postgres bootstrap, and what else reuses them
+- [website/AGENTS.md](website/AGENTS.md): the docs site at orvano.dev, its build steps and checks, previews, and production deploys
+- [examples/AGENTS.md](examples/AGENTS.md): the five quickstart apps, their version pins, code regions, and how CI runs them
 - [deploy/install/AGENTS.md](deploy/install/AGENTS.md): the self host installer, what `install.sh` owns versus `orvano install`, exit codes, and how to try it safely
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

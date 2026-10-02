@@ -16,12 +16,13 @@ The Orvano API written once in TypeSpec (spec 0001). It compiles to `dist/openap
 | `test/test.tsp` | Test only operations and models (`test.*`) that prove the SDK conventions; they never ship |
 | `tspconfig.yaml` | Emits OpenAPI 3.1 JSON to `dist/openapi.json` |
 | `dist/openapi.json` | The compiled contract; committed, CI fails when it is stale |
+| `scripts/error-catalog.mjs`, `dist/errors.json` | Run by `build` after `tsp compile`: every public `ErrorCode` with its HTTP status and description, for the docs site's error pages (spec 0011); committed |
 | `dist/openapi.public.json`, `dist/examples/` | Written by SdkGen: the public contract (the docs reference and the breaking change check read it) and the docs snippets; committed |
 
 ## Commands
 
 ```bash
-pnpm --filter @orvano/contract build     # compile to dist/openapi.json
+pnpm --filter @orvano/contract build     # compile to dist/openapi.json, then write dist/errors.json
 dotnet run --project tools/sdkgen        # then regenerate every SDK and the server types
 ```
 
@@ -34,6 +35,7 @@ Commit `dist/openapi.json` and the generated code together. The server's handler
 - Paths live under `/v1/`; `console` operations, and only they, live under `/v1/console/`. Project scoped console operations take the project from `X-Orvano-Project` (never a path parameter) and live under `/v1/console/project/`.
 - A create answers 201 with the created model; a delete with nothing to return answers 204 (`NoContentResponse`). A PATCH uses `@patch(#{ implicitOptionality: false })` with an explicit request model.
 - Every operation returns `| Problem` (its `default` response). A new error code goes in `enum ErrorCode`, which SdkGen turns into constants in every SDK and the server.
+- An `ErrorCode` member's `@doc` ends with its one HTTP status in parentheses (`No such user in the project (404).`), or the build fails. A new code also needs `website/src/content/error-fixes/<code>.mdx`, or the site build fails (`CONTRIBUTING.md`). A code that only the `Test` environment sends starts its `@doc` with `` `Test` environment only`` and gets no page.
 - A list operation is a GET with optional query `cursor` (string) and `limit` (int32) that returns a model of exactly `items: T[]` and `nextCursor: string | null`; SdkGen then adds an async iterator (`listAll`, `ListAllAsync`).
 - A realtime event is its payload model marked `@extension("x-orvano-event", "<name>")`; SdkGen adds it to each SDK's event registry.
 - Test only operations carry `@extension("x-orvano-test", true)`, service `test`, and live under `/v1/test/` or `/v1/console/test/` (the flag and the path must agree). A model, enum, or event that only test code reaches carries the flag too. They are generated only into the scenario runners and `Orvano.Contract`.
@@ -58,5 +60,6 @@ Commit `dist/openapi.json` and the generated code together. The server's handler
 - [0001 API contract and SDK pipeline](../docs/specs/0001-api-contract-sdk-pipeline/index.md)
 - [0004 App user sign up, sign in, and sessions](../docs/specs/0004-app-user-auth/index.md) (auth schemes, scopes, session effects)
 - [0010 Email verification, recovery, and passwordless](../docs/specs/0010-email-verification-recovery-passwordless/index.md) (the email `account.*`, `users.*`, and `consoleUsers.*` operations, and `test.getLatestEmail`)
+- [0011 Docs site and quickstarts](../docs/specs/0011-docs-site-quickstarts/index.md) (`dist/errors.json` and the error pages)
 
 _Drafted by /sync from the introducing change, worth a quick human pass._
