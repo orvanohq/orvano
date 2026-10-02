@@ -49,6 +49,7 @@ internal static class ApiMapping
         row.Id.ToString(),
         row.Email,
         row.EmailVerifiedAt is not null,
+        row.EmailVerifiedAt,
         row.Name,
         row.Status == UserStatuses.Blocked ? Api.UserStatus.Blocked : Api.UserStatus.Active,
         JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(row.Metadata) ?? [],
@@ -58,7 +59,7 @@ internal static class ApiMapping
     public static Api.ConsoleAccount ConsoleAccount(UserRow row, bool isInstallAdmin)
     {
         var user = User(row);
-        return new(user.Id, user.Email, user.EmailVerified, user.Name, user.Status, user.Metadata, user.CreatedAt, user.LastSignInAt, isInstallAdmin);
+        return new(user.Id, user.Email, user.EmailVerified, user.EmailVerifiedAt, user.Name, user.Status, user.Metadata, user.CreatedAt, user.LastSignInAt, isInstallAdmin);
     }
 
     public static Api.SessionTokens SessionTokens(SessionTokensView view) => new(
@@ -92,7 +93,15 @@ internal static class ApiMapping
 
     public static Api.UserPage UserPage(Page<UserRow> page) => new([.. page.Items.Select(User)], page.NextCursor);
 
-    public static Api.AuthResult AuthResult(SignedIn signedIn) => new(User(signedIn.User), SessionTokens(signedIn.Session), signedIn.IsNewUser);
+    public static Api.AuthResult AuthResult(SignedIn signedIn) =>
+        new(User(signedIn.User), SessionTokens(signedIn.Session), signedIn.IsNewUser, signedIn.VerificationEmail switch
+        {
+            null => null,
+            VerificationEmail.Queued => Api.VerificationEmailStatus.Queued,
+            VerificationEmail.NotConfigured => Api.VerificationEmailStatus.NotConfigured,
+            VerificationEmail.RateLimited => Api.VerificationEmailStatus.RateLimited,
+            _ => throw new ArgumentOutOfRangeException(nameof(signedIn), signedIn.VerificationEmail, "Unknown verification email status."),
+        });
 
     public static Api.Jwk Jwk(PublicSigningKey key) =>
         JsonSerializer.Deserialize<Api.Jwk>(key.PublicJwk) ?? throw new InvalidOperationException($"Signing key {key.Kid} has no public JWK.");

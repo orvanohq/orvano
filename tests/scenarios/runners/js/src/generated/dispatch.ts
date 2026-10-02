@@ -2,14 +2,22 @@
 // Test only: maps each operationId to its SDK call for the scenario interpreter. Never published.
 import type {
   CompleteRecoveryRequest,
+  ConfirmEmailChangeRequest,
   CreateAccountRequest,
+  CreateEmailCodeRequest,
+  CreateEmailCodeSessionRequest,
+  CreateMagicLinkRequest,
+  CreateMagicLinkSessionRequest,
   CreatePasswordSessionRequest,
   CreateRecoveryRequest,
   CreateUserRequest,
+  CreateVerificationRequest,
   DeleteAccountRequest,
   RefreshSessionRequest,
   UpdateAccountRequest,
+  UpdateEmailRequest,
   UpdatePasswordRequest,
+  VerifyEmailRequest,
 } from '@orvano/js'
 import type { DispatchTable } from '../dispatch-table.js'
 
@@ -19,9 +27,31 @@ export const dispatch: DispatchTable = {
     status: 201,
     client: (o, input) => o.account.completeRecovery(input.body as CompleteRecoveryRequest),
   },
+  'account.confirmEmailChange': {
+    status: 200,
+    client: (o, input) => o.account.confirmEmailChange(input.body as ConfirmEmailChangeRequest),
+  },
   'account.create': {
     status: 201,
     client: (o, input) => o.account.create(input.body as CreateAccountRequest),
+  },
+  'account.createEmailCode': {
+    status: 202,
+    client: (o, input) => o.account.createEmailCode(input.body as CreateEmailCodeRequest),
+  },
+  'account.createEmailCodeSession': {
+    status: 201,
+    client: (o, input) =>
+      o.account.createEmailCodeSession(input.body as CreateEmailCodeSessionRequest),
+  },
+  'account.createMagicLink': {
+    status: 202,
+    client: (o, input) => o.account.createMagicLink(input.body as CreateMagicLinkRequest),
+  },
+  'account.createMagicLinkSession': {
+    status: 201,
+    client: (o, input) =>
+      o.account.createMagicLinkSession(input.body as CreateMagicLinkSessionRequest),
   },
   'account.createPasswordSession': {
     status: 201,
@@ -31,6 +61,10 @@ export const dispatch: DispatchTable = {
   'account.createRecovery': {
     status: 202,
     client: (o, input) => o.account.createRecovery(input.body as CreateRecoveryRequest),
+  },
+  'account.createVerification': {
+    status: 202,
+    client: (o, input) => o.account.createVerification(input.body as CreateVerificationRequest),
   },
   'account.delete': {
     status: 204,
@@ -71,9 +105,17 @@ export const dispatch: DispatchTable = {
     status: 200,
     client: (o, input) => o.account.update(input.body as UpdateAccountRequest),
   },
+  'account.updateEmail': {
+    status: 202,
+    client: (o, input) => o.account.updateEmail(input.body as UpdateEmailRequest),
+  },
   'account.updatePassword': {
     status: 204,
     client: (o, input) => o.account.updatePassword(input.body as UpdatePasswordRequest),
+  },
+  'account.verifyEmail': {
+    status: 200,
+    client: (o, input) => o.account.verifyEmail(input.body as VerifyEmailRequest),
   },
   'health.get': {
     status: 200,

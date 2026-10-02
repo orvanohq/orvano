@@ -25,7 +25,9 @@ internal static class AccountEndpoints
             var limit = limits.Acquire(RateLimitPolicies.SignUpPerIp, ConnectionIp.Key(http));
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
 
-            var outcome = await accounts.SignUpAsync(PublicRequests.Project(http), request.Email, request.Password, request.Name, PublicRequests.Client(http), ct);
+            var outcome = await accounts.SignUpAsync(
+                PublicRequests.Project(http), request.Email, request.Password, request.Name, PublicRequests.Client(http), ct,
+                verificationRedirectUrl: request.VerificationRedirectUrl);
             return Created(http, outcome, AuthResult);
         })
             .WithName(Api.AccountOperations.Create.Id)
@@ -59,6 +61,74 @@ internal static class AccountEndpoints
             EmailRequests.RedeemAsync<Api.CompleteRecoveryRequest>(http, limits, ct, async request =>
                 Created(http, await recovery.CompleteAsync(PublicRequests.Project(http), request.Token, request.Password, PublicRequests.Client(http), ct), AuthResult)))
             .WithName(Api.AccountOperations.CompleteRecovery.Id)
+            .RequireProject();
+
+        v1.MapPost(Api.AccountOperations.CreateVerification.Route, async (HttpContext http, Api.CreateVerificationRequest request, VerificationService verification, CancellationToken ct) =>
+        {
+            var user = PublicRequests.User(http);
+            return Accepted(http, await verification.RequestAsync(PublicRequests.Project(http), user.UserId, request.RedirectUrl, Actor.User(user.UserId), ct));
+        })
+            .WithName(Api.AccountOperations.CreateVerification.Id)
+            .RequireProject()
+            .RequireUser();
+
+        v1.MapPost(Api.AccountOperations.VerifyEmail.Route, (HttpContext http, VerificationService verification, RateLimits limits, CancellationToken ct) =>
+            EmailRequests.RedeemAsync<Api.VerifyEmailRequest>(http, limits, ct, async request =>
+                Ok(http, await verification.VerifyAsync(PublicRequests.Project(http), request.Token, ct), User)))
+            .WithName(Api.AccountOperations.VerifyEmail.Id)
+            .RequireProject();
+
+        v1.MapPost(Api.AccountOperations.CreateMagicLink.Route, async (HttpContext http, Api.CreateMagicLinkRequest request, PasswordlessService passwordless, CancellationToken ct) =>
+        {
+            var started = Stopwatch.StartNew();
+            var outcome = await passwordless.RequestLinkAsync(
+                PublicRequests.Project(http), request.Email, request.RedirectUrl, request.CreateUser, ConnectionIp.Key(http), ct);
+            return await EmailRequests.OpenAcceptedAsync(http, outcome, started, ct);
+        })
+            .WithName(Api.AccountOperations.CreateMagicLink.Id)
+            .RequireProject();
+
+        v1.MapPost(Api.AccountOperations.CreateMagicLinkSession.Route, (HttpContext http, PasswordlessService passwordless, RateLimits limits, CancellationToken ct) =>
+            EmailRequests.RedeemAsync<Api.CreateMagicLinkSessionRequest>(http, limits, ct, async request =>
+                Created(http, await passwordless.SignInWithLinkAsync(
+                    PublicRequests.Project(http), request.Token, PublicRequests.Client(http), ConnectionIp.Key(http), ct), AuthResult)))
+            .WithName(Api.AccountOperations.CreateMagicLinkSession.Id)
+            .RequireProject();
+
+        v1.MapPost(Api.AccountOperations.CreateEmailCode.Route, async (HttpContext http, Api.CreateEmailCodeRequest request, PasswordlessService passwordless, CancellationToken ct) =>
+        {
+            var started = Stopwatch.StartNew();
+            var outcome = await passwordless.RequestCodeAsync(PublicRequests.Project(http), request.Email, request.CreateUser, ConnectionIp.Key(http), ct);
+            return await EmailRequests.OpenAcceptedAsync(http, outcome, started, ct);
+        })
+            .WithName(Api.AccountOperations.CreateEmailCode.Id)
+            .RequireProject();
+
+        v1.MapPost(Api.AccountOperations.CreateEmailCodeSession.Route, (HttpContext http, PasswordlessService passwordless, RateLimits limits, CancellationToken ct) =>
+            EmailRequests.RedeemAsync<Api.CreateEmailCodeSessionRequest>(http, limits, ct, async request =>
+                Created(http, await passwordless.SignInWithCodeAsync(
+                    PublicRequests.Project(http), request.Email, request.Code, PublicRequests.Client(http), ConnectionIp.Key(http), ct), AuthResult)))
+            .WithName(Api.AccountOperations.CreateEmailCodeSession.Id)
+            .RequireProject();
+
+        v1.MapPut(Api.AccountOperations.UpdateEmail.Route, async (HttpContext http, Api.UpdateEmailRequest request, EmailChangeService emailChange, RateLimits limits, CancellationToken ct) =>
+        {
+            var user = PublicRequests.User(http);
+            // Every attempt counts, like the other password checks (spec 0004, rate limits).
+            var limit = limits.Acquire(RateLimitPolicies.PasswordCheckPerUser, user.UserId.ToString());
+            if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
+
+            return Accepted(http, await emailChange.RequestAsync(
+                PublicRequests.Project(http), user.UserId, user.SessionId, request.Email, request.RedirectUrl, request.Password, ct));
+        })
+            .WithName(Api.AccountOperations.UpdateEmail.Id)
+            .RequireProject()
+            .RequireUser();
+
+        v1.MapPost(Api.AccountOperations.ConfirmEmailChange.Route, (HttpContext http, EmailChangeService emailChange, RateLimits limits, CancellationToken ct) =>
+            EmailRequests.RedeemAsync<Api.ConfirmEmailChangeRequest>(http, limits, ct, async request =>
+                Ok(http, await emailChange.ConfirmAsync(PublicRequests.Project(http), request.Token, ct), User)))
+            .WithName(Api.AccountOperations.ConfirmEmailChange.Id)
             .RequireProject();
 
         v1.MapGet(Api.AccountOperations.Get.Route, async (HttpContext http, AccountService accounts, CancellationToken ct) =>
@@ -103,7 +173,7 @@ internal static class AccountEndpoints
             var limit = limits.Acquire(RateLimitPolicies.PasswordCheckPerUser, user.UserId.ToString());
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
 
-            return NoContent(http, await accounts.DeleteAsync(PublicRequests.Project(http), user.UserId, request.Password, ct));
+            return NoContent(http, await accounts.DeleteAsync(PublicRequests.Project(http), user.UserId, user.SessionId, request.Password, ct));
         })
             .WithName(Api.AccountOperations.Delete.Id)
             .RequireProject()

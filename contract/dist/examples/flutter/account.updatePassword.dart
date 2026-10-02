@@ -4,9 +4,6 @@ import 'package:orvano_flutter/orvano_flutter.dart';
 Future<void> main() async {
   final orvano = Orvano(Client(endpoint: 'https://orvano.example.com'));
   await orvano.account.updatePassword(
-    UpdatePasswordRequest(
-      currentPassword: 'correct horse battery staple',
-      newPassword: 'another horse battery staple',
-    ),
+    UpdatePasswordRequest(newPassword: 'another horse battery staple'),
   );
 }

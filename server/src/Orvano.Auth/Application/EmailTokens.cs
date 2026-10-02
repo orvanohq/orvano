@@ -120,11 +120,11 @@ internal sealed class EmailTokens(SecretBox secrets)
     public static async Task CountWrongAttemptAsync(AuthUnitOfWork uow, IReadOnlyList<CodeRow> rows, CancellationToken ct)
     {
         if (rows.Count == 0) return;
+        // Two statements: one statement can't both update and delete a row.
         await using var cmd = new NpgsqlCommand(
             """
-            WITH counted AS (
-                UPDATE orvano.auth_email_tokens SET attempts = attempts + 1 WHERE id = ANY(@ids) RETURNING id, attempts)
-            DELETE FROM orvano.auth_email_tokens WHERE id IN (SELECT id FROM counted WHERE attempts >= @max)
+            UPDATE orvano.auth_email_tokens SET attempts = attempts + 1 WHERE id = ANY(@ids);
+            DELETE FROM orvano.auth_email_tokens WHERE id = ANY(@ids) AND attempts >= @max;
             """, uow.Tx.Connection, uow.Tx);
         cmd.Parameters.AddWithValue("ids", rows.Select(r => r.Id).ToArray());
         cmd.Parameters.AddWithValue("max", (short)EmailCode.MaxAttempts);

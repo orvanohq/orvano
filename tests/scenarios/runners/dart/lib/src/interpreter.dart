@@ -142,6 +142,7 @@ final Map<String, DispatchEntry> _runnerDispatch = {
       return {
         'userId': verified.userId,
         'sessionId': verified.sessionId,
+        'emailVerified': verified.emailVerified,
         'expiresAt': verified.expiresAt.toIso8601String(),
       };
     },

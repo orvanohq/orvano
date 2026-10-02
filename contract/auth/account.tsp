@@ -29,9 +29,12 @@ model User {
   @example("ada@example.com")
   email: string | null;
 
-  @doc("Whether the email has been verified.")
+  @doc("Whether the email has been verified. Also the access token's `email_verified` claim.")
   @example(false)
   emailVerified: boolean;
+
+  @doc("When the email was verified; null while it is not.")
+  emailVerifiedAt: utcDateTime | null;
 
   @doc("The display name; null when none was given.")
   @example("Ada Lovelace")
@@ -85,6 +88,111 @@ model AuthResult {
   @doc("Whether this call created the user: true from sign up, and from a magic link or email code for a new email.")
   @example(false)
   isNewUser: boolean;
+
+  @doc("What happened to the verification email sign up was asked to send; null when none was asked for.")
+  verificationEmail: VerificationEmailStatus | null;
+}
+
+@doc("What happened to the verification email of a sign up. The user and session are created whatever it says.")
+enum VerificationEmailStatus {
+  @doc("Queued; it arrives shortly.")
+  queued,
+
+  @doc("Neither the project nor the install has an SMTP server, so nothing was sent.")
+  not_configured,
+
+  @doc("A send limit was reached, so nothing was sent; ask again later with `account.createVerification`.")
+  rate_limited,
+}
+
+@doc("A request to email a verification link to the signed in user.")
+model CreateVerificationRequest {
+  @doc("""
+    Your page that receives the link: a host that is one of the project's web platforms (`http` only on `localhost`
+    or `127.0.0.1`), or your app's own scheme (its iOS, Android, or macOS identifier). The link adds
+    `orvano_type=verification` and `orvano_token` to it.
+    """)
+  @example("https://app.example.com/auth/callback")
+  redirectUrl: string;
+}
+
+@doc("An email verification, with the token from the emailed link.")
+model VerifyEmailRequest {
+  @doc("The `orvano_token` parameter of the emailed link.")
+  @example("orv_el_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE")
+  token: string;
+}
+
+@doc("A request to email a sign in link.")
+model CreateMagicLinkRequest {
+  @doc("The email to sign in as; case does not matter.")
+  @example("ada@example.com")
+  email: string;
+
+  @doc("""
+    Your page that receives the link, on a host that is one of the project's web platforms (`http` only on
+    `localhost` or `127.0.0.1`). The link adds `orvano_type=magic_link` and `orvano_token` to it.
+    """)
+  @example("https://app.example.com/auth/callback")
+  redirectUrl: string;
+
+  @doc("Whether the link may create a user for an email that has none. Defaults to true.")
+  @example(true)
+  createUser?: boolean;
+}
+
+@doc("A sign in with the token from a magic link.")
+model CreateMagicLinkSessionRequest {
+  @doc("The `orvano_token` parameter of the emailed link.")
+  @example("orv_el_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE")
+  token: string;
+}
+
+@doc("A request to email a 6 digit sign in code.")
+model CreateEmailCodeRequest {
+  @doc("The email to sign in as; case does not matter.")
+  @example("ada@example.com")
+  email: string;
+
+  @doc("Whether the code may create a user for an email that has none. Defaults to true.")
+  @example(true)
+  createUser?: boolean;
+}
+
+@doc("A sign in with an emailed code.")
+model CreateEmailCodeSessionRequest {
+  @doc("The email the code was sent to; case does not matter.")
+  @example("ada@example.com")
+  email: string;
+
+  @doc("The 6 digit code from the email.")
+  @example("428613")
+  code: string;
+}
+
+@doc("A request to change the signed in user's email. It changes once the link sent to the new address is opened.")
+model UpdateEmailRequest {
+  @doc("The new email, trimmed, at most 320 characters.")
+  @example("ada.king@example.com")
+  email: string;
+
+  @doc("""
+    Your page that receives the confirmation link: a host that is one of the project's web platforms, or your app's
+    own scheme. The link adds `orvano_type=email_change` and `orvano_token` to it.
+    """)
+  @example("https://app.example.com/auth/callback")
+  redirectUrl: string;
+
+  @doc("The user's current password. A user without one leaves it out, and must have signed in within 10 minutes.")
+  @example("correct horse battery staple")
+  password?: string;
+}
+
+@doc("An email change confirmation, with the token from the link sent to the new address.")
+model ConfirmEmailChangeRequest {
+  @doc("The `orvano_token` parameter of the emailed link.")
+  @example("orv_el_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE")
+  token: string;
 }
 
 @doc("How a session began.")
@@ -143,6 +251,13 @@ model CreateAccountRequest {
   @doc("A display name, at most 256 characters.")
   @example("Ada Lovelace")
   name?: string | null;
+
+  @doc("""
+    When set, also emails a verification link that opens here: a host that is one of the project's web platforms, or
+    your app's own scheme. `AuthResult.verificationEmail` says whether it was sent.
+    """)
+  @example("https://app.example.com/auth/callback")
+  verificationRedirectUrl?: string;
 }
 
 @doc("Changes to the signed in user. A field left out stays as it is.")
@@ -157,9 +272,9 @@ model UpdateAccountRequest {
 
 @doc("A password change.")
 model UpdatePasswordRequest {
-  @doc("The user's current password.")
+  @doc("The user's current password. A user without one leaves it out, and must have signed in within 10 minutes.")
   @example("correct horse battery staple")
-  currentPassword: string;
+  currentPassword?: string;
 
   @doc("The new password: 8 to 256 characters after Unicode NFKC normalization.")
   @example("another horse battery staple")
@@ -168,9 +283,9 @@ model UpdatePasswordRequest {
 
 @doc("A request to delete the signed in user.")
 model DeleteAccountRequest {
-  @doc("The user's current password.")
+  @doc("The user's current password. A user without one leaves it out, and must have signed in within 10 minutes.")
   @example("correct horse battery staple")
-  password: string;
+  password?: string;
 }
 
 @doc("A trade of a refresh token for a new pair.")
@@ -285,6 +400,105 @@ interface AccountApi {
     @statusCode statusCode: 201;
     @body body: AuthResult;
   } | Problem;
+
+  @doc("Emails the signed in user a link that verifies their email.")
+  @operationId("account.createVerification")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @useAuth(bearer)
+  @route("/verification")
+  @post
+  createVerification(@body request: CreateVerificationRequest): {
+    @statusCode statusCode: 202;
+  } | Problem;
+
+  @doc("""
+    Verifies a user's email with the token from a verification link. It needs no session and creates none; a client
+    signed in as that user refreshes its session, so the access token's claim changes at once. The token works once.
+    """)
+  @operationId("account.verifyEmail")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @extension("x-orvano-session", "user")
+  @route("/verification/confirm")
+  @post
+  verifyEmail(@body request: VerifyEmailRequest): User | Problem;
+
+  @doc("""
+    Emails a sign in link. An email without a user gets one that creates the user, unless `createUser` is false. The
+    answer is the same 202 either way, so it never tells anyone which emails have accounts.
+    """)
+  @operationId("account.createMagicLink")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @route("/magic-link")
+  @post
+  createMagicLink(@body request: CreateMagicLinkRequest): {
+    @statusCode statusCode: 202;
+  } | Problem;
+
+  @doc("Signs a user in with the token from a magic link, creating them when the link was for a new email. The token works once.")
+  @operationId("account.createMagicLinkSession")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @extension("x-orvano-session", "start")
+  @route("/sessions/magic-link")
+  @post
+  createMagicLinkSession(@body request: CreateMagicLinkSessionRequest): {
+    @statusCode statusCode: 201;
+    @body body: AuthResult;
+  } | Problem;
+
+  @doc("""
+    Emails a 6 digit sign in code that works for 10 minutes. An email without a user gets one that creates the user,
+    unless `createUser` is false. The answer is the same 202 either way.
+    """)
+  @operationId("account.createEmailCode")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @route("/email-code")
+  @post
+  createEmailCode(@body request: CreateEmailCodeRequest): {
+    @statusCode statusCode: 202;
+  } | Problem;
+
+  @doc("Signs a user in with an emailed code. After 5 wrong tries the code stops working; ask for a new one.")
+  @operationId("account.createEmailCodeSession")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @extension("x-orvano-session", "start")
+  @route("/sessions/email-code")
+  @post
+  createEmailCodeSession(@body request: CreateEmailCodeSessionRequest): {
+    @statusCode statusCode: 201;
+    @body body: AuthResult;
+  } | Problem;
+
+  @doc("""
+    Starts changing the signed in user's email: emails a confirmation link to the new address. The email changes
+    when that link is opened.
+    """)
+  @operationId("account.updateEmail")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @useAuth(bearer)
+  @route("/email")
+  @put
+  updateEmail(@body request: UpdateEmailRequest): {
+    @statusCode statusCode: 202;
+  } | Problem;
+
+  @doc("""
+    Changes a user's email to the new address with the token from the confirmation link, and marks it verified. It
+    needs no session and keeps every session. The token works once.
+    """)
+  @operationId("account.confirmEmailChange")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @extension("x-orvano-session", "user")
+  @route("/email/confirm")
+  @post
+  confirmEmailChange(@body request: ConfirmEmailChangeRequest): User | Problem;
 
   @doc("Gets the signed in user. A server can call it with a user's access token to check that the session is still active.")
   @operationId("account.get")

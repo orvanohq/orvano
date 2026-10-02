@@ -198,7 +198,7 @@ public class ConsoleAccountTests(PostgresFixture postgres)
         var clock = new ManualClock(DateTimeOffset.UtcNow);
         var keys = new SigningKeys(database.App, new SecretBox(MasterKeys.Parse(OrvanoProcess.MasterKeys)), clock);
         var tokens = new AccessTokens(keys, PublicUrl.Parse(OrvanoProcess.PublicUrl), clock);
-        var issued = await tokens.IssueAsync(ConsoleProject.Id, Guid.CreateVersion7(), Guid.CreateVersion7(), Ct);
+        var issued = await tokens.IssueAsync(ConsoleProject.Id, Guid.CreateVersion7(), Guid.CreateVersion7(), emailVerified: false, Ct);
         var checks = new ConsoleSessionChecks(tokens, null!);
 
         clock.Advance(TimeSpan.FromMinutes(16));

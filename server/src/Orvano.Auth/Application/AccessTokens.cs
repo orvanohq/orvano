@@ -29,7 +29,7 @@ internal readonly record struct TokenCheck(TokenIdentity? Identity, TokenRejecti
 
 /// <summary>
 /// Issues and checks access tokens (AC-6, AC-7): ES256 JWTs signed with the project's key, carrying only
-/// <c>iss</c>, <c>aud</c>, <c>sub</c>, <c>sid</c>, <c>iat</c>, and <c>exp</c>. A check pins <c>alg</c> to ES256, needs
+/// <c>iss</c>, <c>aud</c>, <c>sub</c>, <c>sid</c>, <c>email_verified</c> (spec 0010, AC-14), <c>iat</c>, and <c>exp</c>. A check pins <c>alg</c> to ES256, needs
 /// the signature to verify against the header project's keys, <c>iss</c> and <c>aud</c> to name that project, and
 /// <c>exp</c> not to have passed (30 seconds of leeway). The session check is the caller's.
 /// </summary>
@@ -37,10 +37,11 @@ internal sealed class AccessTokens(SigningKeys keys, PublicUrl publicUrl, TimePr
 {
     private static readonly JsonWebTokenHandler Handler = new() { SetDefaultTimesOnTokenCreation = false, MapInboundClaims = false };
 
-    public async Task<IssuedToken> IssueAsync(string projectId, Guid userId, Guid sessionId, CancellationToken ct)
+    /// <summary>Signs a token for the session; <paramref name="emailVerified"/> is read from the user row by the caller.</summary>
+    public async Task<IssuedToken> IssueAsync(string projectId, Guid userId, Guid sessionId, bool emailVerified, CancellationToken ct)
     {
         var key = await keys.GetActiveAsync(projectId, ct);
-        var claims = AccessTokenClaims.For(publicUrl.Origin, projectId, userId, sessionId, clock.GetUtcNow());
+        var claims = AccessTokenClaims.For(publicUrl.Origin, projectId, userId, sessionId, emailVerified, clock.GetUtcNow());
         var token = Handler.CreateToken(new SecurityTokenDescriptor
         {
             Issuer = claims.Issuer,
@@ -51,6 +52,7 @@ internal sealed class AccessTokens(SigningKeys keys, PublicUrl publicUrl, TimePr
             {
                 [JwtRegisteredClaimNames.Sub] = claims.Subject.ToString(),
                 [AccessTokenClaims.SessionClaim] = claims.SessionId.ToString(),
+                [AccessTokenClaims.EmailVerifiedClaim] = claims.EmailVerified,
             },
             SigningCredentials = new SigningCredentials(new ECDsaSecurityKey(key.PrivateKey) { KeyId = key.Kid }, SecurityAlgorithms.EcdsaSha256),
         });

@@ -4,9 +4,15 @@ import { paginate } from '../runtime/pagination.js'
 import type {
   AuthResult,
   CompleteRecoveryRequest,
+  ConfirmEmailChangeRequest,
   CreateAccountRequest,
+  CreateEmailCodeRequest,
+  CreateEmailCodeSessionRequest,
+  CreateMagicLinkRequest,
+  CreateMagicLinkSessionRequest,
   CreatePasswordSessionRequest,
   CreateRecoveryRequest,
+  CreateVerificationRequest,
   DeleteAccountRequest,
   Health,
   Jwks,
@@ -16,8 +22,10 @@ import type {
   SessionPage,
   SessionTokens,
   UpdateAccountRequest,
+  UpdateEmailRequest,
   UpdatePasswordRequest,
   User,
+  VerifyEmailRequest,
 } from './models.js'
 
 /** Operations in the `account` service. */
@@ -39,10 +47,65 @@ export class AccountService {
     )
   }
 
+  /**
+   * Changes a user's email to the new address with the token from the confirmation link, and marks it verified. It
+   * needs no session and keeps every session. The token works once.
+   */
+  confirmEmailChange(body: ConfirmEmailChangeRequest, options?: RequestOptions): Promise<User> {
+    return this.#client.request<User>(
+      { method: 'POST', path: '/v1/account/email/confirm', body, session: 'user' },
+      options,
+    )
+  }
+
   /** Signs a new user up with an email and password, and signs them in. */
   create(body: CreateAccountRequest, options?: RequestOptions): Promise<AuthResult> {
     return this.#client.request<AuthResult>(
       { method: 'POST', path: '/v1/account', body, session: 'start' },
+      options,
+    )
+  }
+
+  /**
+   * Emails a 6 digit sign in code that works for 10 minutes. An email without a user gets one that creates the user,
+   * unless `createUser` is false. The answer is the same 202 either way.
+   */
+  createEmailCode(body: CreateEmailCodeRequest, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'POST', path: '/v1/account/email-code', body },
+      options,
+    )
+  }
+
+  /** Signs a user in with an emailed code. After 5 wrong tries the code stops working; ask for a new one. */
+  createEmailCodeSession(
+    body: CreateEmailCodeSessionRequest,
+    options?: RequestOptions,
+  ): Promise<AuthResult> {
+    return this.#client.request<AuthResult>(
+      { method: 'POST', path: '/v1/account/sessions/email-code', body, session: 'start' },
+      options,
+    )
+  }
+
+  /**
+   * Emails a sign in link. An email without a user gets one that creates the user, unless `createUser` is false. The
+   * answer is the same 202 either way, so it never tells anyone which emails have accounts.
+   */
+  createMagicLink(body: CreateMagicLinkRequest, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'POST', path: '/v1/account/magic-link', body },
+      options,
+    )
+  }
+
+  /** Signs a user in with the token from a magic link, creating them when the link was for a new email. The token works once. */
+  createMagicLinkSession(
+    body: CreateMagicLinkSessionRequest,
+    options?: RequestOptions,
+  ): Promise<AuthResult> {
+    return this.#client.request<AuthResult>(
+      { method: 'POST', path: '/v1/account/sessions/magic-link', body, session: 'start' },
       options,
     )
   }
@@ -65,6 +128,14 @@ export class AccountService {
   createRecovery(body: CreateRecoveryRequest, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
       { method: 'POST', path: '/v1/account/recovery', body },
+      options,
+    )
+  }
+
+  /** Emails the signed in user a link that verifies their email. */
+  createVerification(body: CreateVerificationRequest, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'POST', path: '/v1/account/verification', body },
       options,
     )
   }
@@ -147,10 +218,32 @@ export class AccountService {
     )
   }
 
+  /**
+   * Starts changing the signed in user's email: emails a confirmation link to the new address. The email changes
+   * when that link is opened.
+   */
+  updateEmail(body: UpdateEmailRequest, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'PUT', path: '/v1/account/email', body },
+      options,
+    )
+  }
+
   /** Changes the signed in user's password and ends every other session of theirs. */
   updatePassword(body: UpdatePasswordRequest, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
       { method: 'PUT', path: '/v1/account/password', body },
+      options,
+    )
+  }
+
+  /**
+   * Verifies a user's email with the token from a verification link. It needs no session and creates none; a client
+   * signed in as that user refreshes its session, so the access token's claim changes at once. The token works once.
+   */
+  verifyEmail(body: VerifyEmailRequest, options?: RequestOptions): Promise<User> {
+    return this.#client.request<User>(
+      { method: 'POST', path: '/v1/account/verification/confirm', body, session: 'user' },
       options,
     )
   }

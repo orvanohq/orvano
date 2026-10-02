@@ -119,7 +119,13 @@ internal sealed class UsersService(AuthStore store, AccountService accounts, Ses
             if (changed)
             {
                 var blocked = status == UserStatuses.Blocked;
-                if (blocked) ended = [.. await sessions.EndAllAsync(uow, projectId, id, SessionEndReason.UserBlocked, actor, keep: null, token)];
+                if (blocked)
+                {
+                    ended = [.. await sessions.EndAllAsync(uow, projectId, id, SessionEndReason.UserBlocked, actor, keep: null, token)];
+                    // Spec 0010 AC-29: a blocked user's live email links and codes go with their sessions.
+                    await EmailTokens.DeleteForUserAsync(uow, projectId, id, kind: null, token);
+                }
+
                 await AuthEvents.WriteAsync(uow.Tx, blocked ? AuthEvents.UserBlocked : AuthEvents.UserUnblocked, projectId, actor, id.ToString(),
                     new Dictionary<string, string> { ["userId"] = id.ToString() }, ct: token);
             }

@@ -29,6 +29,7 @@ internal static class RunnerDispatch
             {
                 ["userId"] = verified.UserId,
                 ["sessionId"] = verified.SessionId,
+                ["emailVerified"] = verified.EmailVerified,
                 ["expiresAt"] = verified.ExpiresAt.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
             };
         }, null),

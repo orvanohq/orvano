@@ -1,0 +1,203 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Npgsql;
+using Orvano.Auth.Domain;
+using Orvano.Core.RateLimiting;
+
+namespace Orvano.Auth.Application;
+
+/// <summary>
+/// Magic link and email code sign in (spec 0010, AC-5, AC-7, AC-8, AC-15, AC-16, AC-32): open requests that answer
+/// the same whether or not the account exists, and the redemptions that sign in, create the user for a new email,
+/// and claim an unverified account for the inbox owner.
+/// </summary>
+internal sealed class PasswordlessService(
+    AuthStore store,
+    AuthMailer mailer,
+    EmailTokens tokens,
+    Sessions sessions,
+    SessionChecks checks,
+    SigningKeys keys,
+    AccountService accounts,
+    RateLimits limits,
+    ILogger<PasswordlessService> logger)
+{
+    /// <summary>What a redemption decided: the user, their new session, whether it created them, and sessions to evict.</summary>
+    private sealed record Redeemed(Guid UserId, SessionGrant Grant, bool IsNewUser, Guid[] Ended);
+
+    /// <summary><c>account.createMagicLink</c> (AC-7, AC-8).</summary>
+    public async Task<Outcome<Done>> RequestLinkAsync(string projectId, string? email, string? redirectUrl, bool? createUser, string ipKey, CancellationToken ct)
+    {
+        if (!EmailRule.TryNormalize(email, out var trimmed)) return InvalidEmail;
+        if (await mailer.CheckRedirectAsync(projectId, redirectUrl, EmailTokenKind.MagicLink, ct) is not { } redirect) return Failure.RedirectUrlNotAllowed;
+        return await RequestAsync(projectId, trimmed, EmailTokenKind.MagicLink, redirect, createUser ?? true, ipKey, ct);
+    }
+
+    /// <summary><c>account.createEmailCode</c> (AC-7, AC-8).</summary>
+    public async Task<Outcome<Done>> RequestCodeAsync(string projectId, string? email, bool? createUser, string ipKey, CancellationToken ct) =>
+        EmailRule.TryNormalize(email, out var trimmed)
+            ? await RequestAsync(projectId, trimmed, EmailTokenKind.EmailCode, redirect: null, createUser ?? true, ipKey, ct)
+            : InvalidEmail;
+
+    /// <summary>
+    /// <c>account.createMagicLinkSession</c> (AC-3, AC-15): consumes the token and signs its user in, creating them for
+    /// a new email. A failure after the token was found rolls back, so the token still works.
+    /// </summary>
+    public async Task<Outcome<SignedIn>> SignInWithLinkAsync(string projectId, string? tokenValue, ClientInfo client, string ipKey, CancellationToken ct)
+    {
+        if (!LinkToken.TryParse(tokenValue, out var link)) return Failure.InvalidEmailToken;
+        await keys.GetActiveAsync(projectId, ct);
+
+        var outcome = await store.WriteAsync<Redeemed>(async (uow, token) =>
+            await EmailTokens.ConsumeLinkAsync(uow, projectId, EmailTokenKind.MagicLink, link, token) is { Expired: false } consumed
+                ? await SignInAsync(uow, projectId, consumed.UserId, consumed.Email, SessionMethod.MagicLink, Failure.InvalidEmailToken, client, ipKey, token)
+                : Failure.InvalidEmailToken, ct);
+        return await FinishAsync(projectId, outcome, ct);
+    }
+
+    /// <summary>
+    /// <c>account.createEmailCodeSession</c> (AC-5, AC-15): checks the code against the email's live code rows,
+    /// locked, in fixed time. A wrong code counts an attempt on every live row and deletes those that reached 5; those
+    /// writes commit even though the answer is 401 <c>invalid_code</c>, so parallel guesses can't exceed 5.
+    /// </summary>
+    public async Task<Outcome<SignedIn>> SignInWithCodeAsync(string projectId, string? email, string? code, ClientInfo client, string ipKey, CancellationToken ct)
+    {
+        if (!EmailRule.TryNormalize(email, out var trimmed)) return InvalidEmail;
+        if (!EmailCode.IsWellFormed(code)) return Failure.Invalid($"The code must be exactly {EmailCode.Length} digits.");
+        var perEmail = limits.Acquire(RateLimitPolicies.EmailCodePerRecipient, $"{projectId}\n{trimmed.ToLowerInvariant()}");
+        if (!perEmail.Allowed) return Failure.RateLimited(perEmail.RetryAfter);
+        await keys.GetActiveAsync(projectId, ct);
+
+        var outcome = await store.WriteDecidingAsync<Redeemed>(async (uow, token) =>
+        {
+            var rows = await EmailTokens.LockCodesAsync(uow, projectId, trimmed, token);
+            if (rows.FirstOrDefault(row => tokens.CodeMatches(row, code!)) is not { } match)
+            {
+                await EmailTokens.CountWrongAttemptAsync(uow, rows, token);
+                return (Failure.InvalidCode, true);
+            }
+
+            await EmailTokens.DeleteAsync(uow, match.Id, token);
+            var redeemed = await SignInAsync(uow, projectId, match.UserId, match.Email, SessionMethod.EmailCode, Failure.InvalidCode, client, ipKey, token);
+            return (redeemed, redeemed.Succeeded);
+        }, ct);
+        return await FinishAsync(projectId, outcome, ct);
+    }
+
+    private static Failure InvalidEmail => Failure.Invalid("The email must be an address of at most 320 characters.");
+
+    /// <summary>The open request: every refusal before the account is read, then the same success whatever it finds (AC-8, AC-9).</summary>
+    private async Task<Outcome<Done>> RequestAsync(
+        string projectId, string email, EmailTokenKind kind, RedirectUrl? redirect, bool createUser, string ipKey, CancellationToken ct)
+    {
+        var refused = mailer.TakeIpLimit(ipKey)
+            ?? mailer.TakeRecipientLimits(projectId, email, kind)
+            ?? await mailer.CheckAvailabilityAsync(projectId, ct);
+        if (refused is not null) return refused;
+
+        var projectName = await mailer.ProjectNameAsync(projectId, ct);
+        var outcome = await store.WriteAsync<Done>(async (uow, token) =>
+        {
+            var user = await UserLocks.ByEmailAsync(uow, projectId, email, token);
+            // AC-8: a blocked user, and an unknown email with createUser false, get nothing, and the same answer.
+            if (user is { Status: not UserStatuses.Active } || user is null && !createUser) return default(Done);
+
+            var to = user?.Email ?? email;
+            Failure? notQueued;
+            if (kind == EmailTokenKind.EmailCode)
+            {
+                var code = await tokens.CreateCodeAsync(uow, projectId, user?.Id, to, token);
+                notQueued = await mailer.QueueCodeAsync(uow.Tx, projectId, projectName, to, user?.Name, code, token);
+            }
+            else
+            {
+                var link = await tokens.CreateLinkAsync(uow, projectId, kind, user?.Id, to, token);
+                notQueued = await mailer.QueueLinkAsync(uow.Tx, projectId, projectName, kind, to, user?.Name, LinkUrl.Build(redirect!.Url, kind, link), token);
+            }
+
+            if (notQueued is not null) return notQueued;
+            await EmailEvents.TokenCreatedAsync(uow, projectId, kind, user?.Id, user is null ? Actor.UnknownUser : Actor.User(user.Id), token);
+            return default(Done);
+        }, ct);
+
+        if (!outcome.Succeeded)
+            logger.LogWarning("A {Kind} email of project {ProjectId} was not queued: {Code}", EmailTokenKinds.Wire(kind), projectId, outcome.Failure!.Code);
+        return default(Done);
+    }
+
+    /// <summary>
+    /// AC-15 and AC-32 inside the redeeming transaction: resolves the user (the token's, else the one with the email
+    /// now, else a new verified user under the sign up limit), refuses a blocked user, claims an unverified account
+    /// that has a password, marks the email verified, and creates the session.
+    /// </summary>
+    private async Task<Outcome<Redeemed>> SignInAsync(
+        AuthUnitOfWork uow, string projectId, Guid? tokenUserId, string tokenEmail, string method, Failure invalid, ClientInfo client, string ipKey,
+        CancellationToken ct)
+    {
+        LockedUser? user;
+        if (tokenUserId is { } id)
+        {
+            user = await UserLocks.ByIdAsync(uow, projectId, id, ct);
+            // AC-3: the account's email moved since the token was sent.
+            if (user is null || !RecoveryService.SameEmail(user.Email, tokenEmail)) return invalid;
+        }
+        else
+        {
+            user = await UserLocks.ByEmailAsync(uow, projectId, tokenEmail, ct);
+        }
+
+        var created = false;
+        if (user is null)
+        {
+            var signUp = limits.Acquire(RateLimitPolicies.SignUpPerIp, ipKey);
+            if (!signUp.Allowed) return Failure.RateLimited(signUp.RetryAfter);
+            if (await UserRecords.TryInsertAsync(uow, projectId, tokenEmail, name: null, verified: true, ct) is { } newId)
+            {
+                created = true;
+                await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserCreated, projectId, Actor.User(newId), newId.ToString(),
+                    new Dictionary<string, string> { ["userId"] = newId.ToString() }, fields: new Dictionary<string, string?> { ["method"] = method }, ct: ct);
+            }
+
+            // Two redemptions created the same email at once: the other won, so this one signs in to that user.
+            user = await UserLocks.ByEmailAsync(uow, projectId, tokenEmail, ct)
+                ?? throw new InvalidOperationException("A user that just existed is gone.");
+        }
+
+        if (user.Status != UserStatuses.Active) return Failure.UserBlocked;
+
+        var actor = Actor.User(user.Id);
+        Guid[] ended = [];
+        if (!created && user.EmailVerifiedAt is null)
+        {
+            // AC-32: the inbox owner just proved the email, so a password and sessions made before that proof go.
+            if (user.HasPassword)
+            {
+                await using (var remove = new NpgsqlCommand("DELETE FROM orvano.auth_passwords WHERE user_id = @user", uow.Tx.Connection, uow.Tx))
+                {
+                    remove.Parameters.AddWithValue("user", user.Id);
+                    await remove.ExecuteNonQueryAsync(ct);
+                }
+
+                ended = [.. await sessions.EndAllAsync(uow, projectId, user.Id, SessionEndReason.AccountClaimed, actor, keep: null, ct)];
+                await AuthEvents.WriteAsync(uow.Tx, AuthEvents.PasswordRemoved, projectId, actor, user.Id.ToString(),
+                    new Dictionary<string, string> { ["userId"] = user.Id.ToString() }, ct: ct);
+            }
+
+            await VerificationService.MarkVerifiedAsync(uow, user.Id, ct);
+            await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserUpdated, projectId, actor, user.Id.ToString(),
+                new Dictionary<string, string> { ["userId"] = user.Id.ToString() }, ["emailVerified"], ct: ct);
+        }
+
+        var grant = await sessions.CreateAsync(uow, projectId, user.Id, client, actor, method, ct);
+        return new Redeemed(user.Id, grant, created, ended);
+    }
+
+    private async Task<Outcome<SignedIn>> FinishAsync(string projectId, Outcome<Redeemed> outcome, CancellationToken ct)
+    {
+        if (!outcome.Succeeded) return outcome.Failure!;
+        var redeemed = outcome.Value!;
+        foreach (var id in redeemed.Ended) await checks.EvictAsync(id, ct);
+        var row = await store.ReadAsync((db, token) => db.Users.AsNoTracking().SingleAsync(u => u.Id == redeemed.UserId, token), ct);
+        return await accounts.SignedInAsync(projectId, row, redeemed.Grant, ct, redeemed.IsNewUser);
+    }
+}

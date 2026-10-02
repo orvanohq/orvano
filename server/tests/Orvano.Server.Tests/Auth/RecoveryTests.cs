@@ -208,8 +208,14 @@ public class RecoveryTests(PostgresFixture postgres)
         var user = AuthApi.UserId(signUp);
         var token = await RequestTokenAsync(api, "ada@x.com");
 
-        // A blocked user: 403, and the token still works once they are unblocked.
-        using (await api.AsServerAsync(HttpMethod.Post, $"/v1/users/{user}/block"))
+        // A blocked user: 403, and the token still works once they are unblocked. Blocking deletes the user's live
+        // tokens (AC-29), so the row is put back as it was to reach the 403 a racing block could cause.
+        var hash = await TestDatabase.ScalarAsync<byte[]>(api.Database.Superuser, "SELECT secret_hash FROM orvano.auth_email_tokens");
+        using (await api.AsServerAsync(HttpMethod.Post, $"/v1/users/{user}/block")) { }
+        Assert.Equal(0L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, "SELECT count(*) FROM orvano.auth_email_tokens"));
+        await TestDatabase.ExecuteAsync(api.Database.Superuser,
+            "INSERT INTO orvano.auth_email_tokens (project_id, kind, user_id, email, secret_hash, expires_at) VALUES (@p, 'recovery', @u::uuid, 'ada@x.com', @h, now() + interval '1 hour')",
+            ("p", AuthApi.Project), ("u", user), ("h", hash));
         using (var blocked = await api.SendAsync(HttpMethod.Post, "/v1/account/recovery/confirm", new { token, password = NewPassword }))
         {
             Assert.Equal(HttpStatusCode.Forbidden, blocked.Status);

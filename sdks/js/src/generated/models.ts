@@ -6,6 +6,9 @@ export type SessionMethod = 'password' | 'sign_up' | 'magic_link' | 'email_code'
 /** Whether a user may sign in. */
 export type UserStatus = 'active' | 'blocked'
 
+/** What happened to the verification email of a sign up. The user and session are created whatever it says. */
+export type VerificationEmailStatus = 'queued' | 'not_configured' | 'rate_limited'
+
 /** A signed in user and their new session. */
 export interface AuthResult {
   /** The user. */
@@ -14,6 +17,8 @@ export interface AuthResult {
   session: SessionTokens
   /** Whether this call created the user: true from sign up, and from a magic link or email code for a new email. */
   isNewUser: boolean
+  /** What happened to the verification email sign up was asked to send; null when none was asked for. */
+  verificationEmail: VerificationEmailStatus | null
 }
 
 /** A password reset, with the token from the emailed link. */
@@ -24,6 +29,12 @@ export interface CompleteRecoveryRequest {
   password: string
 }
 
+/** An email change confirmation, with the token from the link sent to the new address. */
+export interface ConfirmEmailChangeRequest {
+  /** The `orvano_token` parameter of the emailed link. */
+  token: string
+}
+
 /** A new user with an email and password. */
 export interface CreateAccountRequest {
   /** The email, trimmed, at most 320 characters. Unique in the project, ignoring case. */
@@ -32,6 +43,46 @@ export interface CreateAccountRequest {
   password: string
   /** A display name, at most 256 characters. */
   name?: string | null
+  /**
+   * When set, also emails a verification link that opens here: a host that is one of the project's web platforms, or
+   * your app's own scheme. `AuthResult.verificationEmail` says whether it was sent.
+   */
+  verificationRedirectUrl?: string
+}
+
+/** A request to email a 6 digit sign in code. */
+export interface CreateEmailCodeRequest {
+  /** The email to sign in as; case does not matter. */
+  email: string
+  /** Whether the code may create a user for an email that has none. Defaults to true. */
+  createUser?: boolean
+}
+
+/** A sign in with an emailed code. */
+export interface CreateEmailCodeSessionRequest {
+  /** The email the code was sent to; case does not matter. */
+  email: string
+  /** The 6 digit code from the email. */
+  code: string
+}
+
+/** A request to email a sign in link. */
+export interface CreateMagicLinkRequest {
+  /** The email to sign in as; case does not matter. */
+  email: string
+  /**
+   * Your page that receives the link, on a host that is one of the project's web platforms (`http` only on
+   * `localhost` or `127.0.0.1`). The link adds `orvano_type=magic_link` and `orvano_token` to it.
+   */
+  redirectUrl: string
+  /** Whether the link may create a user for an email that has none. Defaults to true. */
+  createUser?: boolean
+}
+
+/** A sign in with the token from a magic link. */
+export interface CreateMagicLinkSessionRequest {
+  /** The `orvano_token` parameter of the emailed link. */
+  token: string
 }
 
 /** A sign in with an email and password. */
@@ -63,10 +114,20 @@ export interface CreateUserRequest {
   name?: string | null
 }
 
+/** A request to email a verification link to the signed in user. */
+export interface CreateVerificationRequest {
+  /**
+   * Your page that receives the link: a host that is one of the project's web platforms (`http` only on `localhost`
+   * or `127.0.0.1`), or your app's own scheme (its iOS, Android, or macOS identifier). The link adds
+   * `orvano_type=verification` and `orvano_token` to it.
+   */
+  redirectUrl: string
+}
+
 /** A request to delete the signed in user. */
 export interface DeleteAccountRequest {
-  /** The user's current password. */
-  password: string
+  /** The user's current password. A user without one leaves it out, and must have signed in within 10 minutes. */
+  password?: string
 }
 
 /** Whether the server is up, and which Orvano version it runs. */
@@ -177,10 +238,23 @@ export interface UpdateAccountRequest {
   metadata?: Record<string, unknown>
 }
 
+/** A request to change the signed in user's email. It changes once the link sent to the new address is opened. */
+export interface UpdateEmailRequest {
+  /** The new email, trimmed, at most 320 characters. */
+  email: string
+  /**
+   * Your page that receives the confirmation link: a host that is one of the project's web platforms, or your app's
+   * own scheme. The link adds `orvano_type=email_change` and `orvano_token` to it.
+   */
+  redirectUrl: string
+  /** The user's current password. A user without one leaves it out, and must have signed in within 10 minutes. */
+  password?: string
+}
+
 /** A password change. */
 export interface UpdatePasswordRequest {
-  /** The user's current password. */
-  currentPassword: string
+  /** The user's current password. A user without one leaves it out, and must have signed in within 10 minutes. */
+  currentPassword?: string
   /** The new password: 8 to 256 characters after Unicode NFKC normalization. */
   newPassword: string
 }
@@ -191,8 +265,10 @@ export interface User {
   id: string
   /** The email, as typed at sign up; null for a user without one. */
   email: string | null
-  /** Whether the email has been verified. */
+  /** Whether the email has been verified. Also the access token's `email_verified` claim. */
   emailVerified: boolean
+  /** When the email was verified; null while it is not. */
+  emailVerifiedAt: string | null
   /** The display name; null when none was given. */
   name: string | null
   /** Whether the user may sign in. */
@@ -211,4 +287,10 @@ export interface UserPage {
   items: User[]
   /** Pass it as `cursor` to get the next page; null on the last page. */
   nextCursor: string | null
+}
+
+/** An email verification, with the token from the emailed link. */
+export interface VerifyEmailRequest {
+  /** The `orvano_token` parameter of the emailed link. */
+  token: string
 }

@@ -32,10 +32,19 @@ async function newKey(kid: string): Promise<TestKey> {
 
 async function sign(
   key: TestKey,
-  claims: { aud?: string; iss?: string; sid?: string | null; exp?: number } = {},
+  claims: {
+    aud?: string
+    iss?: string
+    sid?: string | null
+    exp?: number
+    emailVerified?: boolean
+  } = {},
 ): Promise<string> {
   const exp = claims.exp ?? Math.floor(Date.now() / 1000) + 900
-  const jwt = new SignJWT({ ...(claims.sid === null ? {} : { sid: claims.sid ?? 'session-1' }) })
+  const jwt = new SignJWT({
+    ...(claims.sid === null ? {} : { sid: claims.sid ?? 'session-1' }),
+    ...(claims.emailVerified === undefined ? {} : { email_verified: claims.emailVerified }),
+  })
     .setProtectedHeader({ alg: 'ES256', typ: 'JWT', kid: key.kid })
     .setSubject('user-1')
     .setIssuer(claims.iss ?? issuer)
@@ -86,8 +95,13 @@ describe('verifyAccessToken', () => {
     expect(first).toEqual({
       userId: 'user-1',
       sessionId: 'session-1',
+      emailVerified: false,
       expiresAt: new Date(exp * 1000),
     })
+    // Spec 0010 AC-14: the email_verified claim, false when missing.
+    expect(
+      (await client.verifyAccessToken(await sign(key, { emailVerified: true }))).emailVerified,
+    ).toBe(true)
     expect(sent).toHaveLength(1)
     expect(new URL(sent[0]?.url ?? '').pathname).toBe('/v1/projects/shop/.well-known/jwks.json')
     expect(sent[0]?.headers.has('Cache-Control')).toBe(false)

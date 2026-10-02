@@ -26,6 +26,22 @@ final class AccountService {
     return AuthResult.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Changes a user's email to the new address with the token from the confirmation link, and marks it verified. It
+  /// needs no session and keeps every session. The token works once.
+  Future<User> confirmEmailChange(
+    ConfirmEmailChangeRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/email/confirm',
+      body: body.toJson(),
+      session: SessionChange.user,
+      options: options,
+    );
+    return User.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Signs a new user up with an email and password, and signs them in.
   Future<AuthResult> create(
     CreateAccountRequest body, {
@@ -34,6 +50,64 @@ final class AccountService {
     final json = await _client.send(
       'POST',
       '/v1/account',
+      body: body.toJson(),
+      session: SessionChange.start,
+      options: options,
+    );
+    return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Emails a 6 digit sign in code that works for 10 minutes. An email without a user gets one that creates the user,
+  /// unless `createUser` is false. The answer is the same 202 either way.
+  Future<void> createEmailCode(
+    CreateEmailCodeRequest body, {
+    RequestOptions? options,
+  }) async {
+    await _client.send(
+      'POST',
+      '/v1/account/email-code',
+      body: body.toJson(),
+      options: options,
+    );
+  }
+
+  /// Signs a user in with an emailed code. After 5 wrong tries the code stops working; ask for a new one.
+  Future<AuthResult> createEmailCodeSession(
+    CreateEmailCodeSessionRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/sessions/email-code',
+      body: body.toJson(),
+      session: SessionChange.start,
+      options: options,
+    );
+    return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Emails a sign in link. An email without a user gets one that creates the user, unless `createUser` is false. The
+  /// answer is the same 202 either way, so it never tells anyone which emails have accounts.
+  Future<void> createMagicLink(
+    CreateMagicLinkRequest body, {
+    RequestOptions? options,
+  }) async {
+    await _client.send(
+      'POST',
+      '/v1/account/magic-link',
+      body: body.toJson(),
+      options: options,
+    );
+  }
+
+  /// Signs a user in with the token from a magic link, creating them when the link was for a new email. The token works once.
+  Future<AuthResult> createMagicLinkSession(
+    CreateMagicLinkSessionRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/sessions/magic-link',
       body: body.toJson(),
       session: SessionChange.start,
       options: options,
@@ -65,6 +139,19 @@ final class AccountService {
     await _client.send(
       'POST',
       '/v1/account/recovery',
+      body: body.toJson(),
+      options: options,
+    );
+  }
+
+  /// Emails the signed in user a link that verifies their email.
+  Future<void> createVerification(
+    CreateVerificationRequest body, {
+    RequestOptions? options,
+  }) async {
+    await _client.send(
+      'POST',
+      '/v1/account/verification',
       body: body.toJson(),
       options: options,
     );
@@ -171,6 +258,20 @@ final class AccountService {
     return User.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Starts changing the signed in user's email: emails a confirmation link to the new address. The email changes
+  /// when that link is opened.
+  Future<void> updateEmail(
+    UpdateEmailRequest body, {
+    RequestOptions? options,
+  }) async {
+    await _client.send(
+      'PUT',
+      '/v1/account/email',
+      body: body.toJson(),
+      options: options,
+    );
+  }
+
   /// Changes the signed in user's password and ends every other session of theirs.
   Future<void> updatePassword(
     UpdatePasswordRequest body, {
@@ -182,6 +283,22 @@ final class AccountService {
       body: body.toJson(),
       options: options,
     );
+  }
+
+  /// Verifies a user's email with the token from a verification link. It needs no session and creates none; a client
+  /// signed in as that user refreshes its session, so the access token's claim changes at once. The token works once.
+  Future<User> verifyEmail(
+    VerifyEmailRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/verification/confirm',
+      body: body.toJson(),
+      session: SessionChange.user,
+      options: options,
+    );
+    return User.fromJson(json as Map<String, dynamic>);
   }
 }
 

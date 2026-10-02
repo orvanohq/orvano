@@ -10,8 +10,19 @@ namespace Orvano.Auth.Application;
 /// <summary>A session's tokens as the API returns them (the contract's <c>SessionTokens</c>).</summary>
 internal sealed record SessionTokensView(string AccessToken, DateTimeOffset AccessTokenExpiresAt, string RefreshToken, DateTimeOffset RefreshTokenExpiresAt, Guid SessionId);
 
-/// <summary>A signed in user and their new session (the contract's <c>AuthResult</c>); <paramref name="IsNewUser"/> when this call created them.</summary>
-internal sealed record SignedIn(UserRow User, SessionTokensView Session, bool IsNewUser = false);
+/// <summary>What happened to the verification email a sign up asked for (spec 0010, AC-11).</summary>
+internal enum VerificationEmail
+{
+    Queued,
+    NotConfigured,
+    RateLimited,
+}
+
+/// <summary>
+/// A signed in user and their new session (the contract's <c>AuthResult</c>); <paramref name="IsNewUser"/> when this
+/// call created them, and <paramref name="VerificationEmail"/> when a sign up asked for a verification email.
+/// </summary>
+internal sealed record SignedIn(UserRow User, SessionTokensView Session, bool IsNewUser = false, VerificationEmail? VerificationEmail = null);
 
 /// <summary>
 /// Changes to the signed in user (AC-13). A null <see cref="Metadata"/> leaves the metadata alone; <see cref="SetName"/>
@@ -37,20 +48,27 @@ internal sealed class AccountService(
     AccessTokens tokens,
     SigningKeys keys,
     IConsoleSignupPolicy signupPolicy,
-    IConsoleAccountCreated accountCreated)
+    IConsoleAccountCreated accountCreated,
+    AuthMailer mailer,
+    EmailTokens emailTokens)
 {
-    public const string EmailIndex = "auth_users_email_key";
+    public const string EmailIndex = UserRecords.EmailIndex;
 
     /// <summary>
     /// Sign up (AC-1 to AC-3): creates the user, their password row, and a session in one transaction. The password is
-    /// hashed before the transaction opens, so no connection waits on Argon2id.
+    /// hashed before the transaction opens, so no connection waits on Argon2id. With
+    /// <paramref name="verificationRedirectUrl"/>, the same transaction also queues a verification email (spec 0010,
+    /// AC-11); the user and session are created whatever happens to it.
     /// </summary>
     public async Task<Outcome<SignedIn>> SignUpAsync(
-        string projectId, string? email, string? password, string? name, ClientInfo client, CancellationToken ct, ConsoleGate? gate = null)
+        string projectId, string? email, string? password, string? name, ClientInfo client, CancellationToken ct, ConsoleGate? gate = null,
+        string? verificationRedirectUrl = null)
     {
         await keys.GetActiveAsync(projectId, ct); // the first token of a project creates its key, before any commit
-        var outcome = await CreateAsync(projectId, email, password, name, userId => Actor.User(userId), client, ct, gate);
-        return outcome.Succeeded ? await SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant!, ct, isNewUser: true) : outcome.Failure!;
+        var outcome = await CreateAsync(projectId, email, password, name, userId => Actor.User(userId), client, ct, gate, verificationRedirectUrl);
+        if (!outcome.Succeeded) return outcome.Failure!;
+        var signedIn = await SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant!, ct, isNewUser: true);
+        return signedIn with { VerificationEmail = outcome.Value.Verification };
     }
 
     /// <summary>A console account created without signing it in: the <c>Test</c> fixtures' seeding.</summary>
@@ -72,18 +90,26 @@ internal sealed class AccountService(
     /// up passes <paramref name="gate"/>: Platform's <c>AdmitAsync</c> decides first and <c>OnCreatedAsync</c> runs
     /// after the insert, both in this transaction (spec 0003 AC-7, AC-8).
     /// </summary>
-    private async Task<Outcome<(UserRow User, SessionGrant? Grant)>> CreateAsync(
+    private async Task<Outcome<(UserRow User, SessionGrant? Grant, VerificationEmail? Verification)>> CreateAsync(
         string projectId, string? email, string? password, string? name, Func<Guid, Actor> actorOf, ClientInfo? client, CancellationToken ct,
-        ConsoleGate? gate = null)
+        ConsoleGate? gate = null, string? verificationRedirectUrl = null)
     {
         if (!EmailRule.TryNormalize(email, out var trimmed)) return Failure.Invalid("The email must be an address of at most 320 characters.");
         if (!UserName.IsValid(name)) return Failure.Invalid($"The name must be at most {UserName.MaxLength} characters.");
         if (!PasswordPolicy.TryNormalize(password, out var normalized)) return Failure.InvalidPassword;
+        // Spec 0010 AC-11: checked with the rest of the body, before the 409 and before anything is created.
+        RedirectUrl? verification = null;
+        if (verificationRedirectUrl is not null)
+        {
+            verification = await mailer.CheckRedirectAsync(projectId, verificationRedirectUrl, EmailTokenKind.Verification, ct);
+            if (verification is null) return Failure.RedirectUrlNotAllowed;
+        }
 
+        var projectName = verification is null ? null : await mailer.ProjectNameAsync(projectId, ct);
         var hash = await hasher.TryHashAsync(normalized, ct);
         if (hash is null) return Failure.Busy;
 
-        return await store.WriteAsync<(UserRow User, SessionGrant? Grant)>(async (uow, token) =>
+        return await store.WriteAsync<(UserRow User, SessionGrant? Grant, VerificationEmail? Verification)>(async (uow, token) =>
         {
             SignupAdmission.Admitted? admitted = null;
             if (gate is { Seeded: true })
@@ -115,7 +141,7 @@ internal sealed class AccountService(
                 }
             }
 
-            if (await InsertUserAsync(uow, projectId, trimmed, name, token) is not { } userId) return Failure.UserAlreadyExists;
+            if (await UserRecords.TryInsertAsync(uow, projectId, trimmed, name, verified: false, token) is not { } userId) return Failure.UserAlreadyExists;
 
             await InsertPasswordAsync(uow, userId, projectId, hash, token);
             if (admitted is not null) await accountCreated.OnCreatedAsync(uow.Tx, userId, name, trimmed, admitted, token);
@@ -124,8 +150,33 @@ internal sealed class AccountService(
                 new Dictionary<string, string> { ["userId"] = userId.ToString() },
                 fields: new Dictionary<string, string?> { ["method"] = client is null ? null : SessionMethod.SignUp }, ct: token);
             var grant = client is null ? null : await sessions.CreateAsync(uow, projectId, userId, client, actor, SessionMethod.SignUp, token);
-            return (await ReloadAsync(uow.Db, userId, token), grant);
+            var sent = verification is null ? (VerificationEmail?)null
+                : await SendSignUpVerificationAsync(uow, projectId, projectName!, userId, trimmed, name, verification, actor, token);
+            return (await ReloadAsync(uow.Db, userId, token), grant, sent);
         }, ct);
+    }
+
+    /// <summary>
+    /// The verification email of a sign up (spec 0010, AC-11), inside its transaction: the recipient limits, the
+    /// token, and the email, behind a savepoint, so a refusal leaves no token and never fails the sign up.
+    /// </summary>
+    private async Task<VerificationEmail> SendSignUpVerificationAsync(
+        AuthUnitOfWork uow, string projectId, string projectName, Guid userId, string email, string? name, RedirectUrl redirect, Actor actor, CancellationToken ct)
+    {
+        if (mailer.TakeRecipientLimits(projectId, email, EmailTokenKind.Verification) is not null) return VerificationEmail.RateLimited;
+
+        await uow.Tx.SaveAsync("verification_email", ct);
+        var link = await emailTokens.CreateLinkAsync(uow, projectId, EmailTokenKind.Verification, userId, email, ct);
+        var url = LinkUrl.Build(redirect.Url, EmailTokenKind.Verification, link);
+        if (await mailer.QueueLinkAsync(uow.Tx, projectId, projectName, EmailTokenKind.Verification, email, name, url, ct) is { } refused)
+        {
+            await uow.Tx.RollbackAsync("verification_email", ct);
+            return refused.Code == Orvano.Contract.ErrorCode.EmailNotConfigured ? VerificationEmail.NotConfigured : VerificationEmail.RateLimited;
+        }
+
+        await uow.Tx.ReleaseAsync("verification_email", ct);
+        await EmailEvents.TokenCreatedAsync(uow, projectId, EmailTokenKind.Verification, userId, actor, ct);
+        return VerificationEmail.Queued;
     }
 
     /// <summary>
@@ -228,32 +279,40 @@ internal sealed class AccountService(
 
     /// <summary>
     /// Changes the password (AC-14): the current one must match, the new one must meet the policy. Every other session
-    /// of the user ends (<c>password_changed</c>) in the same transaction; the caller's stays.
+    /// of the user ends (<c>password_changed</c>) in the same transaction; the caller's stays, and the user's live reset
+    /// links are deleted (spec 0010, AC-29). A user without a password sets a first one from a session at most 10
+    /// minutes old, and any current password they send is ignored (spec 0010, AC-19).
     /// </summary>
     public async Task<Outcome<Done>> UpdatePasswordAsync(string projectId, Guid userId, Guid sessionId, string? currentPassword, string? newPassword, CancellationToken ct)
     {
         if (!PasswordPolicy.TryNormalize(newPassword, out var normalized)) return Failure.InvalidPassword;
-        var check = await CheckPasswordAsync(projectId, userId, currentPassword, ct);
+        var check = await CheckCredentialAsync(projectId, userId, sessionId, currentPassword, ct);
         if (check.Failure is not null) return check.Failure;
+        var verified = check.Value!.Hash;
 
         var hash = await hasher.TryHashAsync(normalized, ct);
         if (hash is null) return Failure.Busy;
 
         var outcome = await store.WriteAsync<Guid[]>(async (uow, token) =>
         {
-            // Only over the hash just verified: a racing change in between makes this one fail as a wrong password.
+            // Only over the hash just verified (or none at all): a racing change in between makes this one fail as a
+            // wrong password.
             await using (var update = new NpgsqlCommand(
-                "UPDATE orvano.auth_passwords SET hash = @hash, updated_at = now() WHERE user_id = @user AND hash = @verified",
+                verified is null
+                    ? "INSERT INTO orvano.auth_passwords (user_id, project_id, hash) VALUES (@user, @project, @hash) ON CONFLICT (user_id) DO NOTHING"
+                    : "UPDATE orvano.auth_passwords SET hash = @hash, updated_at = now() WHERE user_id = @user AND hash = @verified",
                 uow.Tx.Connection, uow.Tx))
             {
                 update.Parameters.AddWithValue("hash", hash);
                 update.Parameters.AddWithValue("user", userId);
-                update.Parameters.AddWithValue("verified", check.Value!);
+                update.Parameters.AddWithValue("project", projectId);
+                update.Parameters.AddWithValue("verified", NpgsqlDbType.Text, (object?)verified ?? DBNull.Value);
                 if (await update.ExecuteNonQueryAsync(token) == 0) return Failure.InvalidCredentials;
             }
 
             var actor = Actor.User(userId);
             var ended = await sessions.EndAllAsync(uow, projectId, userId, SessionEndReason.PasswordChanged, actor, sessionId, token);
+            await EmailTokens.DeleteForUserAsync(uow, projectId, userId, EmailTokenKind.Recovery, token);
             await AuthEvents.WriteAsync(uow.Tx, AuthEvents.PasswordChanged, projectId, actor, userId.ToString(),
                 new Dictionary<string, string> { ["userId"] = userId.ToString() }, ct: token);
             return ended.ToArray();
@@ -268,9 +327,9 @@ internal sealed class AccountService(
     /// Deletes the user (AC-15) after checking their password: the user, their password, and all their sessions in one
     /// transaction, with <c>auth.user.deleted</c>. Every token of the user then fails at the api.
     /// </summary>
-    public async Task<Outcome<Done>> DeleteAsync(string projectId, Guid userId, string? password, CancellationToken ct)
+    public async Task<Outcome<Done>> DeleteAsync(string projectId, Guid userId, Guid sessionId, string? password, CancellationToken ct)
     {
-        var check = await CheckPasswordAsync(projectId, userId, password, ct);
+        var check = await CheckCredentialAsync(projectId, userId, sessionId, password, ct);
         if (check.Failure is not null) return check.Failure;
 
         var outcome = await store.WriteAsync<Guid[]>(async (uow, token) =>
@@ -281,25 +340,37 @@ internal sealed class AccountService(
         return default(Done);
     }
 
+    /// <summary>The credential a sensitive change was checked with: the verified hash, or null for a user without a password.</summary>
+    internal sealed record Credential(string? Hash);
+
     /// <summary>
-    /// Checks the signed in user's password with one Argon2id run, and returns the verified hash. A user without a
-    /// password, or a password that can't meet the policy, is still checked against the dummy hash.
+    /// Checks the signed in user's credential (spec 0004 AC-14, AC-15; spec 0010 AC-17, AC-19): a user with a password
+    /// must send it (missing or wrong: 401 <c>invalid_credentials</c>, one Argon2id run); a user without one must call
+    /// from a session created at most 10 minutes ago (otherwise 403 <c>reauthentication_required</c>), and any
+    /// password they send is ignored.
     /// </summary>
-    private async Task<Outcome<string>> CheckPasswordAsync(string projectId, Guid userId, string? password, CancellationToken ct)
+    internal async Task<Outcome<Credential>> CheckCredentialAsync(string projectId, Guid userId, Guid sessionId, string? password, CancellationToken ct)
     {
         var hash = await store.ReadAsync((db, token) =>
             db.Passwords.AsNoTracking().Where(p => p.UserId == userId && p.ProjectId == projectId).Select(p => p.Hash).SingleOrDefaultAsync(token), ct);
+        if (hash is null)
+        {
+            var fresh = await store.ReadAsync((db, token) =>
+                UserRecords.IsSessionFreshAsync((NpgsqlConnection)db.Database.GetDbConnection(), null, userId, sessionId, token), ct);
+            return fresh ? new Credential(null) : Failure.ReauthenticationRequired;
+        }
+
         var wellFormed = PasswordPolicy.TryNormalize(password, out var normalized);
         var check = await hasher.TryVerifyAsync(normalized, wellFormed ? hash : null, ct);
         if (check is null) return Failure.Busy;
-        if (!check.Value.Matches || hash is null) return Failure.InvalidCredentials;
-        return hash;
+        if (!check.Value.Matches) return Failure.InvalidCredentials;
+        return new Credential(hash);
     }
 
     /// <summary>Issues the new session's access token and returns the <c>AuthResult</c> value.</summary>
     public async Task<SignedIn> SignedInAsync(string projectId, UserRow user, SessionGrant grant, CancellationToken ct, bool isNewUser = false)
     {
-        var access = await tokens.IssueAsync(projectId, user.Id, grant.SessionId, ct);
+        var access = await tokens.IssueAsync(projectId, user.Id, grant.SessionId, user.EmailVerifiedAt is not null, ct);
         return new SignedIn(user, new SessionTokensView(access.Token, access.ExpiresAt, grant.RefreshToken.Value, grant.RefreshTokenExpiresAt, grant.SessionId), isNewUser);
     }
 
@@ -323,32 +394,6 @@ internal sealed class AccountService(
                 ? new Account(reader.GetGuid(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2))
                 : null;
         }, ct);
-
-    /// <summary>
-    /// Inserts the user and returns their ID, or null when the email is taken in the project: the unique index on
-    /// (<c>project_id</c>, <c>lower(email)</c>) decides between racing sign ups (AC-3). The savepoint keeps the
-    /// transaction usable after the violation.
-    /// </summary>
-    private static async Task<Guid?> InsertUserAsync(AuthUnitOfWork uow, string projectId, string email, string? name, CancellationToken ct)
-    {
-        await uow.Tx.SaveAsync("insert_user", ct);
-        try
-        {
-            await using var cmd = new NpgsqlCommand(
-                "INSERT INTO orvano.auth_users (project_id, email, name) VALUES (@project, @email, @name) RETURNING id", uow.Tx.Connection, uow.Tx);
-            cmd.Parameters.AddWithValue("project", projectId);
-            cmd.Parameters.AddWithValue("email", email);
-            cmd.Parameters.AddWithValue("name", NpgsqlDbType.Text, (object?)name ?? DBNull.Value);
-            var id = (Guid)(await cmd.ExecuteScalarAsync(ct))!;
-            await uow.Tx.ReleaseAsync("insert_user", ct);
-            return id;
-        }
-        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.ConstraintName == EmailIndex)
-        {
-            await uow.Tx.RollbackAsync("insert_user", ct);
-            return null;
-        }
-    }
 
     private static async Task InsertPasswordAsync(AuthUnitOfWork uow, Guid userId, string projectId, string hash, CancellationToken ct)
     {

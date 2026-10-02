@@ -15,11 +15,62 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.confirmEmailChange': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.confirmEmailChange(
+        ConfirmEmailChangeRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
   'account.create': DispatchEntry(
     status: 201,
     client: (o, input) async {
       final r = await o.account.create(
         CreateAccountRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.createEmailCode': DispatchEntry(
+    status: 202,
+    client: (o, input) async {
+      await o.account.createEmailCode(
+        CreateEmailCodeRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return null;
+    },
+  ),
+  'account.createEmailCodeSession': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createEmailCodeSession(
+        CreateEmailCodeSessionRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.createMagicLink': DispatchEntry(
+    status: 202,
+    client: (o, input) async {
+      await o.account.createMagicLink(
+        CreateMagicLinkRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return null;
+    },
+  ),
+  'account.createMagicLinkSession': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createMagicLinkSession(
+        CreateMagicLinkSessionRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
       );
       return r.toJson();
     },
@@ -40,6 +91,17 @@ final Map<String, DispatchEntry> dispatch = {
     client: (o, input) async {
       await o.account.createRecovery(
         CreateRecoveryRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return null;
+    },
+  ),
+  'account.createVerification': DispatchEntry(
+    status: 202,
+    client: (o, input) async {
+      await o.account.createVerification(
+        CreateVerificationRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
       );
       return null;
     },
@@ -120,6 +182,15 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.updateEmail': DispatchEntry(
+    status: 202,
+    client: (o, input) async {
+      await o.account.updateEmail(
+        UpdateEmailRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return null;
+    },
+  ),
   'account.updatePassword': DispatchEntry(
     status: 204,
     client: (o, input) async {
@@ -127,6 +198,15 @@ final Map<String, DispatchEntry> dispatch = {
         UpdatePasswordRequest.fromJson(input['body'] as Map<String, dynamic>),
       );
       return null;
+    },
+  ),
+  'account.verifyEmail': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.verifyEmail(
+        VerifyEmailRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
     },
   ),
   'health.get': DispatchEntry(

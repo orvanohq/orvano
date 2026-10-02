@@ -1,0 +1,49 @@
+# Spec 0010, AC-5, AC-15, AC-27, AC-32: an emailed code signs in and claims the unverified account, so the password
+# set before the inbox was proven stops working.
+name: an emailed code signs a user in once and claims their unverified account
+requires: []
+steps:
+  - op: account.create
+    as: client
+    input:
+      body: { email: 'cal-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }
+  - op: now
+    as: client
+    input: {}
+    expect: { status: 200 }
+    save:
+      beforeCode: $.now
+  - op: account.createEmailCode
+    as: client
+    input:
+      body: { email: 'cal-${unique}@example.com' }
+    expect: { status: 202 }
+  - op: test.getLatestEmail
+    as: client
+    input: { to: 'cal-${unique}@example.com', after: '${beforeCode}' }
+    expect: { status: 200 }
+    save:
+      code: $.code
+  - op: account.createEmailCodeSession
+    as: client
+    input:
+      body: { email: 'cal-${unique}@example.com', code: '12345' }
+    expect: { status: 400, code: invalid_request }
+  - op: account.createEmailCodeSession
+    as: client
+    input:
+      body: { email: 'CAL-${unique}@example.com', code: '${code}' }
+    expect:
+      status: 201
+      body: { isNewUser: false, user: { emailVerified: true } }
+  - op: account.createEmailCodeSession
+    as: client
+    input:
+      body: { email: 'cal-${unique}@example.com', code: '${code}' }
+    expect: { status: 401, code: invalid_code }
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'cal-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 401, code: invalid_credentials }

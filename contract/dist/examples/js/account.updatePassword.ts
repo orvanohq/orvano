@@ -3,7 +3,4 @@ import { Client, Orvano } from '@orvano/js'
 
 const orvano = new Orvano(new Client({ endpoint: 'https://orvano.example.com' }))
 
-await orvano.account.updatePassword({
-  currentPassword: 'correct horse battery staple',
-  newPassword: 'another horse battery staple',
-})
+await orvano.account.updatePassword({ newPassword: 'another horse battery staple' })

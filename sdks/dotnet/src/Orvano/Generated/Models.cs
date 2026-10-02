@@ -171,7 +171,8 @@ public sealed record SessionPage(
 /// <summary>A user of a project.</summary>
 /// <param name="Id">The user ID.</param>
 /// <param name="Email">The email, as typed at sign up; null for a user without one.</param>
-/// <param name="EmailVerified">Whether the email has been verified.</param>
+/// <param name="EmailVerified">Whether the email has been verified. Also the access token's <c>email_verified</c> claim.</param>
+/// <param name="EmailVerifiedAt">When the email was verified; null while it is not.</param>
 /// <param name="Name">The display name; null when none was given.</param>
 /// <param name="Status">Whether the user may sign in.</param>
 /// <param name="Metadata">Your own data about the user: a JSON object of at most 16 KB.</param>
@@ -181,6 +182,7 @@ public sealed record User(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("email")] string? Email,
     [property: JsonPropertyName("emailVerified")] bool EmailVerified,
+    [property: JsonPropertyName("emailVerifiedAt")] DateTimeOffset? EmailVerifiedAt,
     [property: JsonPropertyName("name")] string? Name,
     [property: JsonPropertyName("status")] UserStatus Status,
     [property: JsonPropertyName("metadata")] IReadOnlyDictionary<string, JsonElement> Metadata,

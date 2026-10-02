@@ -8,6 +8,6 @@ export default async function Page() {
     endpoint: process.env.ORVANO_ENDPOINT!,
     cookies: await cookies(),
   })
-  await orvano.account.delete({ password: 'correct horse battery staple' })
+  await orvano.account.delete({})
   return <p>Done</p>
 }

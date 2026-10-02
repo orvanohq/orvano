@@ -51,6 +51,30 @@ enum UserStatus {
       values.firstWhere((e) => e.value == value, orElse: () => unknown);
 }
 
+/// What happened to the verification email of a sign up. The user and session are created whatever it says.
+enum VerificationEmailStatus {
+  /// The wire value `queued`.
+  queued('queued'),
+
+  /// The wire value `not_configured`.
+  notConfigured('not_configured'),
+
+  /// The wire value `rate_limited`.
+  rateLimited('rate_limited'),
+
+  /// A value this SDK version does not know yet.
+  unknown('');
+
+  const VerificationEmailStatus(this.value);
+
+  /// The value on the wire.
+  final String value;
+
+  /// Decodes a wire value; values this SDK does not know map to [unknown].
+  static VerificationEmailStatus fromJson(String value) =>
+      values.firstWhere((e) => e.value == value, orElse: () => unknown);
+}
+
 /// A signed in user and their new session.
 final class AuthResult {
   /// Creates a [AuthResult].
@@ -58,6 +82,7 @@ final class AuthResult {
     required this.user,
     required this.session,
     required this.isNewUser,
+    this.verificationEmail,
   });
 
   /// Decodes a [AuthResult] from JSON.
@@ -65,6 +90,9 @@ final class AuthResult {
     user: User.fromJson(json['user'] as Map<String, dynamic>),
     session: SessionTokens.fromJson(json['session'] as Map<String, dynamic>),
     isNewUser: json['isNewUser'] as bool,
+    verificationEmail: json['verificationEmail'] == null
+        ? null
+        : VerificationEmailStatus.fromJson(json['verificationEmail'] as String),
   );
 
   /// The user.
@@ -76,11 +104,18 @@ final class AuthResult {
   /// Whether this call created the user: true from sign up, and from a magic link or email code for a new email.
   final bool isNewUser;
 
+  /// What happened to the verification email sign up was asked to send; null when none was asked for.
+  final VerificationEmailStatus? verificationEmail;
+
   /// Encodes this [AuthResult] as JSON.
   Map<String, dynamic> toJson() => {
     'user': user.toJson(),
     'session': session.toJson(),
     'isNewUser': isNewUser,
+    'verificationEmail': switch (verificationEmail) {
+      final v? => v.value,
+      null => null,
+    },
   };
 }
 
@@ -106,6 +141,22 @@ final class CompleteRecoveryRequest {
   Map<String, dynamic> toJson() => {'token': token, 'password': password};
 }
 
+/// An email change confirmation, with the token from the link sent to the new address.
+final class ConfirmEmailChangeRequest {
+  /// Creates a [ConfirmEmailChangeRequest].
+  const ConfirmEmailChangeRequest({required this.token});
+
+  /// Decodes a [ConfirmEmailChangeRequest] from JSON.
+  factory ConfirmEmailChangeRequest.fromJson(Map<String, dynamic> json) =>
+      ConfirmEmailChangeRequest(token: json['token'] as String);
+
+  /// The `orvano_token` parameter of the emailed link.
+  final String token;
+
+  /// Encodes this [ConfirmEmailChangeRequest] as JSON.
+  Map<String, dynamic> toJson() => {'token': token};
+}
+
 /// A new user with an email and password.
 final class CreateAccountRequest {
   /// Creates a [CreateAccountRequest].
@@ -113,6 +164,7 @@ final class CreateAccountRequest {
     required this.email,
     required this.password,
     this.name,
+    this.verificationRedirectUrl,
   });
 
   /// Decodes a [CreateAccountRequest] from JSON.
@@ -121,6 +173,9 @@ final class CreateAccountRequest {
         email: json['email'] as String,
         password: json['password'] as String,
         name: json['name'] == null ? null : json['name'] as String,
+        verificationRedirectUrl: json['verificationRedirectUrl'] == null
+            ? null
+            : json['verificationRedirectUrl'] as String,
       );
 
   /// The email, trimmed, at most 320 characters. Unique in the project, ignoring case.
@@ -132,12 +187,119 @@ final class CreateAccountRequest {
   /// A display name, at most 256 characters.
   final String? name;
 
+  /// When set, also emails a verification link that opens here: a host that is one of the project's web platforms, or
+  /// your app's own scheme. `AuthResult.verificationEmail` says whether it was sent.
+  final String? verificationRedirectUrl;
+
   /// Encodes this [CreateAccountRequest] as JSON.
   Map<String, dynamic> toJson() => {
     'email': email,
     'password': password,
     'name': ?name,
+    'verificationRedirectUrl': ?verificationRedirectUrl,
   };
+}
+
+/// A request to email a 6 digit sign in code.
+final class CreateEmailCodeRequest {
+  /// Creates a [CreateEmailCodeRequest].
+  const CreateEmailCodeRequest({required this.email, this.createUser});
+
+  /// Decodes a [CreateEmailCodeRequest] from JSON.
+  factory CreateEmailCodeRequest.fromJson(Map<String, dynamic> json) =>
+      CreateEmailCodeRequest(
+        email: json['email'] as String,
+        createUser: json['createUser'] == null
+            ? null
+            : json['createUser'] as bool,
+      );
+
+  /// The email to sign in as; case does not matter.
+  final String email;
+
+  /// Whether the code may create a user for an email that has none. Defaults to true.
+  final bool? createUser;
+
+  /// Encodes this [CreateEmailCodeRequest] as JSON.
+  Map<String, dynamic> toJson() => {'email': email, 'createUser': ?createUser};
+}
+
+/// A sign in with an emailed code.
+final class CreateEmailCodeSessionRequest {
+  /// Creates a [CreateEmailCodeSessionRequest].
+  const CreateEmailCodeSessionRequest({
+    required this.email,
+    required this.code,
+  });
+
+  /// Decodes a [CreateEmailCodeSessionRequest] from JSON.
+  factory CreateEmailCodeSessionRequest.fromJson(Map<String, dynamic> json) =>
+      CreateEmailCodeSessionRequest(
+        email: json['email'] as String,
+        code: json['code'] as String,
+      );
+
+  /// The email the code was sent to; case does not matter.
+  final String email;
+
+  /// The 6 digit code from the email.
+  final String code;
+
+  /// Encodes this [CreateEmailCodeSessionRequest] as JSON.
+  Map<String, dynamic> toJson() => {'email': email, 'code': code};
+}
+
+/// A request to email a sign in link.
+final class CreateMagicLinkRequest {
+  /// Creates a [CreateMagicLinkRequest].
+  const CreateMagicLinkRequest({
+    required this.email,
+    required this.redirectUrl,
+    this.createUser,
+  });
+
+  /// Decodes a [CreateMagicLinkRequest] from JSON.
+  factory CreateMagicLinkRequest.fromJson(Map<String, dynamic> json) =>
+      CreateMagicLinkRequest(
+        email: json['email'] as String,
+        redirectUrl: json['redirectUrl'] as String,
+        createUser: json['createUser'] == null
+            ? null
+            : json['createUser'] as bool,
+      );
+
+  /// The email to sign in as; case does not matter.
+  final String email;
+
+  /// Your page that receives the link, on a host that is one of the project's web platforms (`http` only on
+  /// `localhost` or `127.0.0.1`). The link adds `orvano_type=magic_link` and `orvano_token` to it.
+  final String redirectUrl;
+
+  /// Whether the link may create a user for an email that has none. Defaults to true.
+  final bool? createUser;
+
+  /// Encodes this [CreateMagicLinkRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'email': email,
+    'redirectUrl': redirectUrl,
+    'createUser': ?createUser,
+  };
+}
+
+/// A sign in with the token from a magic link.
+final class CreateMagicLinkSessionRequest {
+  /// Creates a [CreateMagicLinkSessionRequest].
+  const CreateMagicLinkSessionRequest({required this.token});
+
+  /// Decodes a [CreateMagicLinkSessionRequest] from JSON.
+  factory CreateMagicLinkSessionRequest.fromJson(Map<String, dynamic> json) =>
+      CreateMagicLinkSessionRequest(token: json['token'] as String);
+
+  /// The `orvano_token` parameter of the emailed link.
+  final String token;
+
+  /// Encodes this [CreateMagicLinkSessionRequest] as JSON.
+  Map<String, dynamic> toJson() => {'token': token};
 }
 
 /// A sign in with an email and password.
@@ -222,20 +384,40 @@ final class CreateUserRequest {
   };
 }
 
+/// A request to email a verification link to the signed in user.
+final class CreateVerificationRequest {
+  /// Creates a [CreateVerificationRequest].
+  const CreateVerificationRequest({required this.redirectUrl});
+
+  /// Decodes a [CreateVerificationRequest] from JSON.
+  factory CreateVerificationRequest.fromJson(Map<String, dynamic> json) =>
+      CreateVerificationRequest(redirectUrl: json['redirectUrl'] as String);
+
+  /// Your page that receives the link: a host that is one of the project's web platforms (`http` only on `localhost`
+  /// or `127.0.0.1`), or your app's own scheme (its iOS, Android, or macOS identifier). The link adds
+  /// `orvano_type=verification` and `orvano_token` to it.
+  final String redirectUrl;
+
+  /// Encodes this [CreateVerificationRequest] as JSON.
+  Map<String, dynamic> toJson() => {'redirectUrl': redirectUrl};
+}
+
 /// A request to delete the signed in user.
 final class DeleteAccountRequest {
   /// Creates a [DeleteAccountRequest].
-  const DeleteAccountRequest({required this.password});
+  const DeleteAccountRequest({this.password});
 
   /// Decodes a [DeleteAccountRequest] from JSON.
   factory DeleteAccountRequest.fromJson(Map<String, dynamic> json) =>
-      DeleteAccountRequest(password: json['password'] as String);
+      DeleteAccountRequest(
+        password: json['password'] == null ? null : json['password'] as String,
+      );
 
-  /// The user's current password.
-  final String password;
+  /// The user's current password. A user without one leaves it out, and must have signed in within 10 minutes.
+  final String? password;
 
   /// Encodes this [DeleteAccountRequest] as JSON.
-  Map<String, dynamic> toJson() => {'password': password};
+  Map<String, dynamic> toJson() => {'password': ?password};
 }
 
 /// Whether the server is up, and which Orvano version it runs.
@@ -575,30 +757,67 @@ final class UpdateAccountRequest {
   Map<String, dynamic> toJson() => {'name': ?name, 'metadata': ?metadata};
 }
 
+/// A request to change the signed in user's email. It changes once the link sent to the new address is opened.
+final class UpdateEmailRequest {
+  /// Creates a [UpdateEmailRequest].
+  const UpdateEmailRequest({
+    required this.email,
+    required this.redirectUrl,
+    this.password,
+  });
+
+  /// Decodes a [UpdateEmailRequest] from JSON.
+  factory UpdateEmailRequest.fromJson(Map<String, dynamic> json) =>
+      UpdateEmailRequest(
+        email: json['email'] as String,
+        redirectUrl: json['redirectUrl'] as String,
+        password: json['password'] == null ? null : json['password'] as String,
+      );
+
+  /// The new email, trimmed, at most 320 characters.
+  final String email;
+
+  /// Your page that receives the confirmation link: a host that is one of the project's web platforms, or your app's
+  /// own scheme. The link adds `orvano_type=email_change` and `orvano_token` to it.
+  final String redirectUrl;
+
+  /// The user's current password. A user without one leaves it out, and must have signed in within 10 minutes.
+  final String? password;
+
+  /// Encodes this [UpdateEmailRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'email': email,
+    'redirectUrl': redirectUrl,
+    'password': ?password,
+  };
+}
+
 /// A password change.
 final class UpdatePasswordRequest {
   /// Creates a [UpdatePasswordRequest].
   const UpdatePasswordRequest({
-    required this.currentPassword,
+    this.currentPassword,
     required this.newPassword,
   });
 
   /// Decodes a [UpdatePasswordRequest] from JSON.
   factory UpdatePasswordRequest.fromJson(Map<String, dynamic> json) =>
       UpdatePasswordRequest(
-        currentPassword: json['currentPassword'] as String,
+        currentPassword: json['currentPassword'] == null
+            ? null
+            : json['currentPassword'] as String,
         newPassword: json['newPassword'] as String,
       );
 
-  /// The user's current password.
-  final String currentPassword;
+  /// The user's current password. A user without one leaves it out, and must have signed in within 10 minutes.
+  final String? currentPassword;
 
   /// The new password: 8 to 256 characters after Unicode NFKC normalization.
   final String newPassword;
 
   /// Encodes this [UpdatePasswordRequest] as JSON.
   Map<String, dynamic> toJson() => {
-    'currentPassword': currentPassword,
+    'currentPassword': ?currentPassword,
     'newPassword': newPassword,
   };
 }
@@ -610,6 +829,7 @@ final class User {
     required this.id,
     this.email,
     required this.emailVerified,
+    this.emailVerifiedAt,
     this.name,
     required this.status,
     required this.metadata,
@@ -622,6 +842,9 @@ final class User {
     id: json['id'] as String,
     email: json['email'] == null ? null : json['email'] as String,
     emailVerified: json['emailVerified'] as bool,
+    emailVerifiedAt: json['emailVerifiedAt'] == null
+        ? null
+        : DateTime.parse(json['emailVerifiedAt'] as String),
     name: json['name'] == null ? null : json['name'] as String,
     status: UserStatus.fromJson(json['status'] as String),
     metadata: Map<String, Object?>.from(
@@ -639,8 +862,11 @@ final class User {
   /// The email, as typed at sign up; null for a user without one.
   final String? email;
 
-  /// Whether the email has been verified.
+  /// Whether the email has been verified. Also the access token's `email_verified` claim.
   final bool emailVerified;
+
+  /// When the email was verified; null while it is not.
+  final DateTime? emailVerifiedAt;
 
   /// The display name; null when none was given.
   final String? name;
@@ -662,6 +888,10 @@ final class User {
     'id': id,
     'email': email,
     'emailVerified': emailVerified,
+    'emailVerifiedAt': switch (emailVerifiedAt) {
+      final v? => v.toUtc().toIso8601String(),
+      null => null,
+    },
     'name': name,
     'status': status.value,
     'metadata': metadata,
@@ -699,4 +929,20 @@ final class UserPage {
     'items': items.map((e) => e.toJson()).toList(),
     'nextCursor': nextCursor,
   };
+}
+
+/// An email verification, with the token from the emailed link.
+final class VerifyEmailRequest {
+  /// Creates a [VerifyEmailRequest].
+  const VerifyEmailRequest({required this.token});
+
+  /// Decodes a [VerifyEmailRequest] from JSON.
+  factory VerifyEmailRequest.fromJson(Map<String, dynamic> json) =>
+      VerifyEmailRequest(token: json['token'] as String);
+
+  /// The `orvano_token` parameter of the emailed link.
+  final String token;
+
+  /// Encodes this [VerifyEmailRequest] as JSON.
+  Map<String, dynamic> toJson() => {'token': token};
 }

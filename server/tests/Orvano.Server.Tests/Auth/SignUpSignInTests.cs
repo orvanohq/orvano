@@ -147,7 +147,9 @@ public class SignUpSignInTests(PostgresFixture postgres)
 
         Assert.Equal("ES256", header.RootElement.GetProperty("alg").GetString());
         Assert.Equal(22, header.RootElement.GetProperty("kid").GetString()!.Length);
-        Assert.Equal(["aud", "exp", "iat", "iss", "sid", "sub"], claims.RootElement.EnumerateObject().Select(p => p.Name).Order());
+        Assert.Equal(["aud", "email_verified", "exp", "iat", "iss", "sid", "sub"], claims.RootElement.EnumerateObject().Select(p => p.Name).Order());
+        // Spec 0010 AC-14: a boolean read from the user row when the token is issued.
+        Assert.Equal(System.Text.Json.JsonValueKind.False, claims.RootElement.GetProperty("email_verified").ValueKind);
         Assert.Equal($"{OrvanoProcess.PublicUrl}/v1/projects/{AuthApi.Project}", claims.RootElement.GetProperty("iss").GetString());
         Assert.Equal(AuthApi.Project, claims.RootElement.GetProperty("aud").GetString());
         Assert.Equal(AuthApi.UserId(reply), claims.RootElement.GetProperty("sub").GetString());

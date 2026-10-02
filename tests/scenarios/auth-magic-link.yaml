@@ -1,0 +1,55 @@
+# Spec 0010, AC-3, AC-8, AC-15, AC-16, AC-27: a new email signs up by magic link, read from Mailpit.
+name: a new email signs up by magic link, the link works once, and createUser false sends nothing
+requires: []
+steps:
+  - op: now
+    as: client
+    input: {}
+    expect: { status: 200 }
+    save:
+      beforeLink: $.now
+  - op: account.createMagicLink
+    as: client
+    input:
+      body:
+        { email: 'mia-${unique}@example.com', redirectUrl: 'http://localhost:3000/auth/callback' }
+    expect: { status: 202 }
+  - op: test.getLatestEmail
+    as: client
+    input: { to: 'mia-${unique}@example.com', after: '${beforeLink}' }
+    expect:
+      status: 200
+      body: { type: magic_link }
+    save:
+      token: $.token
+  - op: account.createMagicLinkSession
+    as: client
+    input:
+      body: { token: '${token}' }
+    expect:
+      status: 201
+      body: { isNewUser: true, user: { email: 'mia-${unique}@example.com', emailVerified: true } }
+  - op: account.get
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body: { email: 'mia-${unique}@example.com' }
+  - op: account.createMagicLinkSession
+    as: client
+    input:
+      body: { token: '${token}' }
+    expect: { status: 401, code: invalid_email_token }
+  # The same answer for an email that may not create a user, and nothing arrives.
+  - op: account.createMagicLink
+    as: client
+    input:
+      body:
+        email: 'nobody-${unique}@example.com'
+        redirectUrl: 'http://localhost:3000/auth/callback'
+        createUser: false
+    expect: { status: 202 }
+  - op: test.getLatestEmail
+    as: client
+    input: { to: 'nobody-${unique}@example.com' }
+    expect: { status: 404, code: not_found }

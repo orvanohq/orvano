@@ -5,6 +5,54 @@ namespace Orvano.Auth.Application;
 /// <summary>Writes on a user row that more than one use case shares, inside the caller's transaction.</summary>
 internal static class UserRecords
 {
+    /// <summary>The unique index on (<c>project_id</c>, <c>lower(email)</c>).</summary>
+    public const string EmailIndex = "auth_users_email_key";
+
+    /// <summary>
+    /// Inserts a user and returns their ID, or null when the email is taken in the project: the unique index decides
+    /// between racing inserts (spec 0004 AC-3, spec 0010 AC-15). <paramref name="verified"/> sets
+    /// <c>email_verified_at = now()</c>. The savepoint keeps the transaction usable after the violation.
+    /// </summary>
+    public static async Task<Guid?> TryInsertAsync(AuthUnitOfWork uow, string projectId, string email, string? name, bool verified, CancellationToken ct)
+    {
+        await uow.Tx.SaveAsync("insert_user", ct);
+        try
+        {
+            await using var cmd = new NpgsqlCommand(
+                """
+                INSERT INTO orvano.auth_users (project_id, email, name, email_verified_at)
+                VALUES (@project, @email, @name, CASE WHEN @verified THEN now() END)
+                RETURNING id
+                """, uow.Tx.Connection, uow.Tx);
+            cmd.Parameters.AddWithValue("project", projectId);
+            cmd.Parameters.AddWithValue("email", email);
+            cmd.Parameters.AddWithValue("name", NpgsqlTypes.NpgsqlDbType.Text, (object?)name ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("verified", verified);
+            var id = (Guid)(await cmd.ExecuteScalarAsync(ct))!;
+            await uow.Tx.ReleaseAsync("insert_user", ct);
+            return id;
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.ConstraintName == EmailIndex)
+        {
+            await uow.Tx.RollbackAsync("insert_user", ct);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Whether the caller's session was created at most 10 minutes ago, on the database clock (spec 0010, AC-17,
+    /// AC-19): how a user without a password proves who they are.
+    /// </summary>
+    public static async Task<bool> IsSessionFreshAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, Guid userId, Guid sessionId, CancellationToken ct)
+    {
+        await using var cmd = new NpgsqlCommand("SELECT created_at, now() FROM orvano.auth_sessions WHERE id = @id AND user_id = @user", conn, tx);
+        cmd.Parameters.AddWithValue("id", sessionId);
+        cmd.Parameters.AddWithValue("user", userId);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        return await reader.ReadAsync(ct)
+            && Domain.SessionFreshness.IsFresh(reader.GetFieldValue<DateTimeOffset>(0), reader.GetFieldValue<DateTimeOffset>(1));
+    }
+
     /// <summary>
     /// Deletes the user with their password and sessions and writes <c>auth.user.deleted</c> (AC-15, AC-17). Returns
     /// the deleted session IDs to evict after the commit, or null when the project has no such user.

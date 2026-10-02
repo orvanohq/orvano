@@ -32,6 +32,7 @@ export const runnerDispatch: DispatchTable = {
       return {
         userId: verified.userId,
         sessionId: verified.sessionId,
+        emailVerified: verified.emailVerified,
         expiresAt: verified.expiresAt.toISOString(),
       }
     },

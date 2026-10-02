@@ -11,6 +11,7 @@ final class VerifiedAccessToken {
   const VerifiedAccessToken({
     required this.userId,
     required this.sessionId,
+    required this.emailVerified,
     required this.expiresAt,
   });
 
@@ -19,6 +20,11 @@ final class VerifiedAccessToken {
 
   /// The session ID (the `sid` claim).
   final String sessionId;
+
+  /// Whether the user's email was verified when the token was issued (the
+  /// `email_verified` claim); false when the claim is missing. Up to 15
+  /// minutes old: verify `online` for the current value.
+  final bool emailVerified;
 
   /// When the token expires (the `exp` claim), in UTC.
   final DateTime expiresAt;
@@ -110,6 +116,7 @@ final class AccessTokenVerifier {
       return VerifiedAccessToken(
         userId: userId,
         sessionId: sessionId,
+        emailVerified: payload['email_verified'] == true,
         expiresAt: expiresAt,
       );
     }

@@ -55,6 +55,7 @@ String sign(
   String issuer = '$endpoint/v1/projects/$project',
   String? sid = 'session-1',
   DateTime? expires,
+  bool? emailVerified,
 }) {
   final key = JWTKey.fromJWK({...publicJwk(kid, name), 'd': keys[name]!.$1});
   final exp = expires ?? clock.now().add(const Duration(minutes: 15));
@@ -62,6 +63,7 @@ String sign(
     {
       'sub': 'user-1',
       'sid': ?sid,
+      'email_verified': ?emailVerified,
       'iat': exp.millisecondsSinceEpoch ~/ 1000 - 900,
       'exp': exp.millisecondsSinceEpoch ~/ 1000,
     },
@@ -108,7 +110,15 @@ void main() {
 
     expect(first.userId, 'user-1');
     expect(first.sessionId, 'session-1');
+    expect(
+      first.emailVerified,
+      isFalse,
+    ); // spec 0010 AC-14: missing reads as false
     expect(second.userId, 'user-1');
+    expect(
+      (await c.verifyAccessToken(sign('a', emailVerified: true))).emailVerified,
+      isTrue,
+    );
     expect(sent.single.url.path, '/v1/projects/shop/.well-known/jwks.json');
     expect(sent.single.headers.containsKey('Cache-Control'), isFalse);
   });
