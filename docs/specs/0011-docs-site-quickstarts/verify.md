@@ -1,5 +1,5 @@
-# Verify: Docs site & quickstarts · spec 0011 · updated 2026-10-02 (milestone 3)
-_Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones. Covers milestones 1 (local stack), 2 (thin thread), and 3 (remaining quickstarts and the generated reference); later milestones append here._
+# Verify: Docs site & quickstarts · spec 0011 · updated 2026-10-02 (milestone 4)
+_Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones. Covers milestones 1 (local stack), 2 (thin thread), 3 (remaining quickstarts and the generated reference), and 4 (content); later milestones append here._
 
 ## Commands
 - [ ] In an empty folder, `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/install" ghcr.io/orvanohq/orvano:<V> install --local --yes` → exit 0. The folder now holds `.env` (0600, owned by you), `docker-compose.yml`, `docker-compose.local.yml`, and `initdb/`. The output lists, in this order, the up command, `http://localhost:7700`, the setup link, `http://localhost:8025`, the master key block, and the stop and reset commands → AC-1
@@ -55,6 +55,24 @@ _Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `
 - [ ] The Flutter page shows `adb reverse tcp:7700 tcp:7700`, the debug only `network_security_config.xml` for `localhost`, the iOS `NSAllowsLocalNetworking` key, and `flutter run -d chrome --web-port 5050` → AC-11
 - [ ] The Dart and .NET pages show the settings and the token call in macOS and Linux and Windows PowerShell tabs, and the API key only as an environment variable → AC-12, AC-13
 
+## Commands: content (milestone 4)
+- [ ] `ORVANO_SITE_ENV=preview pnpm --filter @orvano/website build` → passes, "All internal links are valid", and "Wrote a Markdown copy of" about 126 pages → AC-6, AC-18
+- [ ] `grep -rl "being written for this release" website/src/content` → finds nothing: every page AC-6 names has content → AC-6
+- [ ] `website/dist/llms.txt` names Orvano, says how to get a page's `.md` copy, and links `llms-full.txt` and `llms-small.txt`; `llms-full.txt` holds the quickstarts' code (`grep -c createServerClient` finds it) → AC-5
+- [ ] `website/dist/docs/local.md`, `dist/docs/auth/email-verification.md`, `dist/docs/api/operations/usersget.md`, and `dist/errors/user_blocked.md` exist, start with the page title, and show code as fenced blocks with tab labels in bold → AC-5
+- [ ] Add a line under `## [Unreleased]` in `CHANGELOG.md`, rebuild → `/docs/changelog/` shows it; `website/src/content/docs/docs/changelog.md` is generated and gitignored → AC-28
+- [ ] On a fresh local stack, `ORVANO_LOCAL_DIR=<folder> pnpm --filter @orvano/website screenshots` → 24 PNGs: the 14 quickstart ones plus `email-settings`, `email-templates`, `email-template-editor`, `invite-member`, and `install-email-server`, each light and dark, with no toast covering a page; `SCREENSHOTS=0` skips the new steps → AC-21
+
+## UI / manual: milestone 4
+- [ ] Every page in Concepts, Auth guides, SDKs, Console, and Self hosting has real content, in the order AC-6 lists, and Changelog renders `CHANGELOG.md` → AC-6, AC-28
+- [ ] Each auth guide has a tab per SDK: JavaScript, Next.js, and Flutter for the user's own account; JavaScript, Dart, and .NET for the server parts; the tab choice sticks across pages → AC-29
+- [ ] Email verification shows the landing page pattern (a Continue button that posts through `redeemLink` or `handleLink`, and `Referrer-Policy: no-referrer`), gating on `emailVerified` in the app and on the server, and Flutter deep links with https app links, saying that part can't run against a local stack → AC-29
+- [ ] Each email guide (verification, password reset, magic links, email codes, change email) starts from a finished quickstart and the local inbox at `http://localhost:8025` → AC-29
+- [ ] On a local stack with the Next.js quickstart, follow Email verification: the email shows in Mailpit with a Verify email button; Continue on `/auth/confirm` verifies the user, and the console's Users page shows them verified → AC-29
+- [ ] The console pages show their screenshots in the reader's theme, each with alt text that describes the step → AC-21
+- [ ] Install on a server and Upgrade and repair hold everything the README's install section said, with the install command at `releases/download/v<VERSION>/install.sh` (never `latest`); the README keeps a two line summary that links to them → AC-8, AC-28
+- [ ] `CONTRIBUTING.md` says a pull request that adds a public operation, an error code, or a console screen updates its guide, concept, or console page in the same pull request, and which of those the build enforces → AC-30
+
 ## Value sourcing
 - [ ] Port: no flag on a fresh folder gives 7700; on a rerun with no flag it keeps the `.env` port; `--port` wins → local install port
 - [ ] Setup link: the token in the printed link equals `ORVANO_SETUP_TOKEN` in `.env` → printed setup link
@@ -69,8 +87,12 @@ _Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `
 - [ ] Dev ports: Vite 5173, Flutter web 5050, Dart 3001, .NET 3002 → example dev ports
 - [ ] App IDs: the Flutter iOS bundle ID and Android `applicationId` equal `appId` in `website/scripts/screenshots.ts` → iOS bundle ID, Android package name
 
+- [ ] Install command: change `VERSION`, rebuild → Install on a server, Upgrade and repair, and every SDK install command follow it (`releases/download/v<new>/install.sh`, `@orvano/js@<new>`) → install and image command version
+- [ ] Changelog entries: the Changelog page shows `CHANGELOG.md` and nothing else → changelog page entries
+
 ## Acceptance-criteria coverage
 - AC-1 to AC-4: the Commands steps above, plus `LocalInstallTests`, `InstallSmtpSeedRuleTests`, and `InstallSmtpSeedTests`
 - AC-5 to AC-11, AC-13, AC-14, AC-18, AC-19, AC-21, AC-24 (noindex part), AC-26, AC-27: the steps above
 - AC-9 to AC-12, AC-14 to AC-20: the milestone 3 steps above, plus `ManifestStamperTests`
-- AC-22, AC-23, AC-25, AC-28 to AC-30: later milestones
+- AC-5 (llms.txt, Markdown copies), AC-6, AC-21, AC-28 to AC-30: the milestone 4 steps above
+- AC-22, AC-23, AC-25: later milestones
