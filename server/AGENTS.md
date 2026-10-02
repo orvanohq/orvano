@@ -54,6 +54,7 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 - API errors are problem details (`AddOrvanoProblems` in `Hosting/Problems.cs`); never let a raw exception message reach a client. A handler returns `Problems.Result(status, ErrorCode.X, detail)` (in a module, `ApiProblem.Result` from `Orvano.Core.Http`) with a generated error code and a short safe `detail`.
 - `/v1` endpoints use the generated `Orvano.Contract` types, never handwritten request or response records: `v1.MapGet(HealthOperations.Get.Route, ...).WithName(HealthOperations.Get.Id)`. The endpoint name must be the operationId, or contract validation rejects the response.
 - Tests: one Postgres container per run through `PostgresFixture`, one fresh database per test through `TestDatabase`. No database mocks.
+- One time `api` startup work, such as seeding a row from configuration, goes in `IOrvanoModule.OnApiStartingAsync`: it runs after the schema check and before the first request, and a throw stops the role. Every `api` replica runs it, so make it safe to run twice (`ON CONFLICT DO NOTHING`).
 
 ## Gotchas
 
@@ -62,7 +63,7 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 - Test only routes (`/v1/test/*`, `/v1/console/test/*`) exist only in `Test`, because `OrvanoModules` adds `TestingModule` only there.
 - In the `Test` environment a response that breaks the contract (extra, missing, or mistyped field, undeclared 2xx status, unnamed endpoint) becomes a 500 `contract_violation`. `ORVANO_TEST_FIXTURES` and `ORVANO_TEST_MAILPIT_URL` (`Hosting/TestMailpit.cs`, read by `test.getLatestEmail`) are refused outside `Test`.
 - `Orvano.Contract` embeds `contract/dist/openapi.json`, so `deploy/server.Dockerfile` copies that file too; a new server project also needs its csproj copied before restore there.
-- `Orvano.Server` embeds `deploy/compose/docker-compose.yml` and `deploy/compose/initdb/10-orvano-roles.sh`, which `orvano install` writes to every install, so editing either changes what the next release installs. `install`, `setup-status`, and `healthcheck` are checked before role selection in `OrvanoProgram`, so they run with no `ORVANO_ROLE`.
+- `Orvano.Server` embeds `deploy/compose/docker-compose.yml`, `deploy/compose/docker-compose.local.yml` (local installs only), and `deploy/compose/initdb/10-orvano-roles.sh`, which `orvano install` writes to every install, so editing either changes what the next release installs. `install`, `setup-status`, and `healthcheck` are checked before role selection in `OrvanoProgram`, so they run with no `ORVANO_ROLE`.
 - In `Production`, `api` refuses to start while no install admin exists and `ORVANO_SETUP_TOKEN` is unset; a malformed token is refused in every environment (spec 0006, AC-21).
 - Every job handler must be idempotent, and no consumer may rely on event order. A consumer that throws is retried later through the `events.redispatch` job.
 - Consumers stay small and do no IO: a hanging consumer still stalls the dispatcher.

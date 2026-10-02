@@ -14,7 +14,7 @@ Orvano's own generator (spec 0001), a C# console app. It reads `contract/dist/op
 | Docs snippets, one per public operation per SDK, into `contract/dist/examples/<sdk>/` (AC-15) | `Languages/Snippets.cs`, `templates/snippets/*.scriban` |
 | `contract/dist/openapi.public.json`: the contract minus console and test operations and the schemas only they reach | `Contract/PublicContract.cs` |
 | Write, delete stale files, format | `Rendering/OutputWriter.cs` |
-| Stamp `VERSION` into package.json and pubspec files, and a section into each Dart CHANGELOG (AC-11) | `Rendering/ManifestStamper.cs` |
+| Stamp `VERSION` into package.json and pubspec files, and a section into each Dart CHANGELOG (AC-11); in the `examples/` quickstarts it stamps only the Orvano package pins (spec 0011, AC-14) | `Rendering/ManifestStamper.cs` |
 | Entry, repo root discovery, exit codes | `Program.cs` |
 
 ## Commands

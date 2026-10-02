@@ -38,6 +38,7 @@ docker exec orv-try sh /src/install.sh --version <V> --domain localhost --yes
 - Questions read `/dev/tty`, because under `curl ... | sh` standard input is the script. `orvano install` gets `-it </dev/tty` only when there is a terminal.
 - Flags reach `orvano install` exactly as the user typed them (`"$@"`), after `--existing-data` and `--version`. The container parser ignores script only flags and lets a later repeat win, so a new flag must be safe to repeat.
 - `orvano install` hands its result back in `<dir>/.install-result`, never on stdout. `install.sh` deletes a stale one before the run and after reading it, and shows the master key block when it cannot read one.
+- A folder is a server install or a local one (`orvano install --local`, spec 0011, marked `ORVANO_LOCAL=true` in `.env`), never converted either way: `install.sh` (`check_not_local`) and `orvano install` both refuse the other kind with exit 2. A local install skips `install.sh` entirely; the reader runs the image with `docker run ... install --local` and then `docker compose up -d --wait`.
 - The installer image is pulled before `docker run`, which then uses `--pull never`. With `--no-pull`, every image must already be local, or the run exits 2 naming it.
 
 ## Gotchas
@@ -49,5 +50,6 @@ docker exec orv-try sh /src/install.sh --version <V> --domain localhost --yes
 ## Related specs
 
 - [0006 Self host installer](../../docs/specs/0006-self-host-installer/index.md) (the design, exit codes, and `verify.md` with the host steps)
+- [0011 Docs site and quickstarts](../../docs/specs/0011-docs-site-quickstarts/index.md) (`--local` and `--port`, `LocalRule.cs`)
 
 _Drafted by /sync from the introducing change, worth a quick human pass._

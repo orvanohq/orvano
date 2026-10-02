@@ -27,6 +27,7 @@ The Messaging module (spec 0009): SMTP settings per project with the install's a
 - `IEmailQueue.CheckAvailabilityAsync` (spec 0010) must resolve SMTP and the hourly cap exactly as `QueueAuthEmailAsync` does, so Auth can refuse before it reads an account. Change both together.
 - Templates render only through `LiquidEngine`: no file access, an HTML encoder on every output, no `raw` filter, and caps on steps, characters, and filter work.
 - `ORVANO_SMTP_ALLOW_PRIVATE_HOSTS` and `ORVANO_EMAIL_INSTALL_HOURLY_LIMIT` (the soft hourly cap on install SMTP per project) are read in `ConfigureServices`, so every role refuses a bad value.
+- `ORVANO_INSTALL_SMTP_URL` and `ORVANO_INSTALL_SMTP_FROM` (spec 0011) seed the install SMTP row once: `InstallSmtpSeeder` runs from `OnApiStartingAsync` with `ON CONFLICT DO NOTHING`, so a console save always wins, and sets `updated_by_user_id` to the all zero UUID ("from configuration"). `InstallSmtpSeed` parses them in `ConfigureServices`, so every role refuses a bad value, and its errors name the setting but never print the URL (it can hold a password).
 - Services that need `SecretBox` or `PublicUrl` register in `ConfigureApiServices`; the worker side only needs the sender and the store.
 
 ## Tests
@@ -37,6 +38,7 @@ The Messaging module (spec 0009): SMTP settings per project with the install's a
 
 - [0009 Transactional email](../../../docs/specs/0009-transactional-email/index.md) (with `verify.md`)
 - [0010 Email verification, recovery, and passwordless](../../../docs/specs/0010-email-verification-recovery-passwordless/index.md) (`CheckAvailabilityAsync`, the `ActionUrl` rule)
+- [0011 Docs site and quickstarts](../../../docs/specs/0011-docs-site-quickstarts/index.md) (the install SMTP seed)
 
 ## Agent skills
 
