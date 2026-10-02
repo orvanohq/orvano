@@ -1,0 +1,7 @@
+## Why it happens
+
+The SMTP server accepted the connection but refused the email. Its reply is in the error's `detail`.
+
+## How to fix
+
+Read the server's reply. Common causes: the From address isn't verified with your provider, or the domain lacks SPF or DKIM records.

@@ -1,12 +1,124 @@
 ---
 title: JavaScript quickstart
-description: "Sign a user in from a Vite app with plain TypeScript."
-sidebar:
-  order: 2
+description: "From an empty folder to a Vite app in plain TypeScript where you sign up, sign in, see your name and email, and sign out."
 ---
 
-Sign a user in from a Vite app with plain TypeScript.
+import { Code, Steps, TabItem, Tabs } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../components/ExampleCode.astro'
+import Screenshot from '../../../../components/Screenshot.astro'
+import { localStart, localUrl, version } from '../../../../lib/site'
 
-:::note
-This page is being written for this release.
-:::
+You build a small web app in plain TypeScript where people sign up with an email and a password, sign in, see their name and email, and sign out. It uses `@orvano/js` {version} in the browser, with Vite to serve it. The session lives in the browser's `localStorage`, so people stay signed in across reloads. It takes about ten minutes.
+
+The finished app is [`examples/js-quickstart`](https://github.com/orvanohq/orvano/tree/main/examples/js-quickstart) in the Orvano repo. Every file below comes from it, and CI runs it on every change.
+
+## 1. Start Orvano
+
+If Orvano isn't running on your machine yet, run these three commands. [Run Orvano locally](/docs/local/) explains each one.
+
+<Tabs syncKey="shell">
+  <TabItem label="macOS and Linux">
+    <Code code={localStart.unix} lang="sh" />
+  </TabItem>
+  <TabItem label="Windows PowerShell">
+    <Code code={localStart.powershell} lang="powershell" />
+  </TabItem>
+</Tabs>
+
+You should see every service report `Healthy`, and the console open at <code>{localUrl}</code>.
+
+## 2. Set up your project in the console
+
+<Steps>
+
+1. Open the setup link the installer printed and create the first admin. You land in your personal org.
+
+   <Screenshot name="setup" alt="The setup page with a name, email, and password filled in, above the Create the first admin button." />
+
+2. Select **Create project**, name it, and select **Create project** again. Setting it up takes a few seconds.
+
+   <Screenshot name="create-project" alt="The Create a project dialog with the name My app." />
+
+3. On the project's overview, copy the **Project ID**. Your app sends it with every request.
+
+   <Screenshot name="project-overview" alt="The project overview, showing the project ID with a copy button." />
+
+4. Open **Platforms**, select **Add platform**, keep the type **Web**, name it, enter `localhost` as the hostname, and select **Add platform**. Browsers send the page's origin with every call, and Orvano answers only the origins of your Web platforms. `localhost` covers every port, so it covers Vite on 5173.
+
+   <Screenshot name="add-web-platform" alt="The Add a platform dialog with the type Web, the name Local web, and the hostname localhost." />
+
+</Steps>
+
+## 3. Create the app
+
+Make a folder for the app with this `package.json`, then run `npm install`. It pins `@orvano/js` to {version}, the version of the Orvano you're running.
+
+<ExampleCode example="js-quickstart" file="package.json" />
+
+<details>
+<summary>Also add `tsconfig.json`, `index.html`, and `src/style.css`</summary>
+
+<ExampleCode example="js-quickstart" file="tsconfig.json" />
+<ExampleCode example="js-quickstart" file="index.html" />
+<ExampleCode example="js-quickstart" file="src/style.css" />
+
+</details>
+
+## 4. Add your settings
+
+Create `.env.local` with your Orvano server and the project ID you copied. Vite gives the page every setting that starts with `VITE_`:
+
+<ExampleCode example="js-quickstart" file=".env.example" region="settings" lang="ini" title=".env.local" />
+
+Then read them in one place:
+
+<ExampleCode example="js-quickstart" file="src/config.ts" />
+
+## 5. Talk to Orvano
+
+Make one client for the whole app. In a browser it stores the session in `localStorage` and refreshes it before its access token runs out. `currentUser` answers null instead of throwing when nobody is signed in.
+
+<ExampleCode example="js-quickstart" file="src/orvano.ts" />
+
+## 6. Sign up, sign in, and sign out
+
+`src/main.ts` draws the page. When someone is signed in it shows their name and email and a **Sign out** button, which calls `account.deleteCurrentSession`:
+
+<ExampleCode example="js-quickstart" file="src/main.ts" region="render" title="src/main.ts" />
+
+Otherwise it shows two forms. `account.create` and `account.createPasswordSession` sign the user in, and the client stores the new session. When Orvano refuses (a taken email, a wrong password), the form shows its message:
+
+<ExampleCode example="js-quickstart" file="src/main.ts" region="forms" title="src/main.ts" />
+
+Last, it draws the page once, and again whenever the session changes, even in another tab:
+
+<ExampleCode example="js-quickstart" file="src/main.ts" region="start" title="src/main.ts" />
+
+<details>
+<summary>The whole `src/main.ts`, with its small DOM helpers</summary>
+
+<ExampleCode example="js-quickstart" file="src/main.ts" />
+
+</details>
+
+## 7. Try it
+
+Run `npm run dev` and open `http://localhost:5173`.
+
+<Steps>
+
+1. Fill in the **Sign up** form and select **Sign up**. You should see "You're signed in" with your name and email.
+2. Reload the page. You should still be signed in: the session is in `localStorage`.
+3. Select **Sign out**. You should see the two forms again.
+4. Fill in the **Sign in** form with the same email and password. You should see your name and email again.
+5. Try signing in with a wrong password. You should see Orvano's message under the form.
+
+</Steps>
+
+The new user is in the console too: open your project's **Users** page.
+
+## Next
+
+- Send a verification email and read it in the local inbox: [Email verification](/docs/auth/email-verification/).
+- Learn how the session is stored and refreshed: [Users and sessions](/docs/concepts/users-and-sessions/).
+- See everything `@orvano/js` can do: [JavaScript SDK](/docs/sdks/js/).

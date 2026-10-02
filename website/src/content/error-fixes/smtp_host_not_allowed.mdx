@@ -1,0 +1,7 @@
+## Why it happens
+
+A project's SMTP host is, or resolves to, a private, loopback, or other non public address. Projects can only send through servers on the public internet, so a project can't reach your internal network.
+
+## How to fix
+
+Use a public SMTP host from your email provider. To send through a server on a private network, set it as the install SMTP (in the console's install email settings) instead of a project's. See [Email delivery](/docs/self-hosting/email-delivery/).

@@ -9,7 +9,14 @@ public sealed class ManifestStamperTests : IDisposable
     private static readonly string[] PackageJsons =
         ["contract/package.json", "console/package.json", "sdks/js/package.json", "sdks/nextjs/package.json", "sdks/console-client/package.json"];
 
-    private static readonly string[] ExamplePackageJsons = ["examples/nextjs-quickstart/package.json"];
+    private static readonly string[] Examples =
+    [
+        "examples/nextjs-quickstart/package.json",
+        "examples/js-quickstart/package.json",
+        "examples/dart-quickstart/pubspec.yaml",
+        "examples/flutter-quickstart/pubspec.yaml",
+        "examples/dotnet-quickstart/DotnetQuickstart.csproj",
+    ];
 
     private static readonly string[] DartPackages = ["sdks/dart/core", "sdks/dart/flutter", "sdks/dart/server"];
 
@@ -19,7 +26,7 @@ public sealed class ManifestStamperTests : IDisposable
 
     public ManifestStamperTests()
     {
-        foreach (var file in PackageJsons.Concat(ExamplePackageJsons).Concat(RunnerPubspecs).Concat(DartPackages.SelectMany(d => new[] { $"{d}/pubspec.yaml", $"{d}/CHANGELOG.md" })))
+        foreach (var file in PackageJsons.Concat(Examples).Concat(RunnerPubspecs).Concat(DartPackages.SelectMany(d => new[] { $"{d}/pubspec.yaml", $"{d}/CHANGELOG.md" })))
         {
             var target = Path.Combine(_root, file);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
@@ -62,6 +69,12 @@ public sealed class ManifestStamperTests : IDisposable
         Assert.Contains("\"@orvano/nextjs\": \"0.4.2\"", example, StringComparison.Ordinal);
         Assert.Contains("\n  \"version\": \"0.0.0\",", example, StringComparison.Ordinal);
         Assert.Contains("\"next\": \"16.3.6\"", example, StringComparison.Ordinal);
+        Assert.Contains("\"@orvano/js\": \"0.4.2\"", Read("examples/js-quickstart/package.json"), StringComparison.Ordinal);
+        Assert.Contains("\n  orvano_dart: 0.4.2\n", Read("examples/dart-quickstart/pubspec.yaml"), StringComparison.Ordinal);
+        var flutter = Read("examples/flutter-quickstart/pubspec.yaml");
+        Assert.Contains("\n  orvano_flutter: 0.4.2\n", flutter, StringComparison.Ordinal);
+        Assert.Contains("\nversion: 1.0.0+1\n", flutter, StringComparison.Ordinal);
+        Assert.Contains("<PackageReference Include=\"Orvano\" Version=\"0.4.2\" />", Read("examples/dotnet-quickstart/DotnetQuickstart.csproj"), StringComparison.Ordinal);
     }
 
     [Fact]

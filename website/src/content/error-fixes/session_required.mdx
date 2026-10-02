@@ -1,0 +1,7 @@
+## Why it happens
+
+The operation needs a signed in user, and the request had no access token in `Authorization: Bearer`.
+
+## How to fix
+
+Sign the user in first. With a client SDK, check that the session is stored: in Next.js it lives in cookies, so call Orvano from a server component, server action, or route handler that reads them.

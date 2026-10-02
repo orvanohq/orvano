@@ -2,6 +2,7 @@
 import starlight from '@astrojs/starlight'
 import { defineConfig } from 'astro/config'
 import starlightLinksValidator from 'starlight-links-validator'
+import starlightOpenAPI, { openAPISidebarGroups } from 'starlight-openapi'
 
 const isDev = process.argv.includes('dev')
 const siteEnv = process.env.ORVANO_SITE_ENV ?? (isDev ? 'preview' : undefined)
@@ -75,11 +76,27 @@ export default defineConfig({
         { label: 'SDKs', items: [{ autogenerate: { directory: 'docs/sdks' } }] },
         { label: 'Console', items: [{ autogenerate: { directory: 'docs/console' } }] },
         { label: 'Self hosting', items: [{ autogenerate: { directory: 'docs/self-hosting' } }] },
-        { label: 'API reference', items: [{ autogenerate: { directory: 'docs/api' } }] },
+        // AC-15: one page per public operation, from the copy scripts/prepare.ts writes with the SDK snippets.
+        { label: 'API reference', items: openAPISidebarGroups },
         { label: 'Errors', items: [{ label: 'Every error code', slug: 'errors' }] },
         { label: 'Changelog', slug: 'docs/changelog' },
       ],
-      plugins: [starlightLinksValidator()],
+      plugins: [
+        starlightOpenAPI([
+          {
+            base: 'docs/api',
+            schema: './.generated/openapi.docs.json',
+            sidebar: {
+              label: 'Operations',
+              collapsed: false,
+              operations: { labels: 'operationId' },
+            },
+          },
+        ]),
+        // The reference pages are routes of starlight-openapi, which this validator can't see; scripts/prepare.ts
+        // checks every link to them against the contract instead.
+        starlightLinksValidator({ exclude: ['/docs/api/', '/docs/api/**'] }),
+      ],
     }),
   ],
 })

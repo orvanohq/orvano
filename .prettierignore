@@ -14,8 +14,14 @@ contract/dist/*.json
 tests/scenarios/runners/flutter/android/
 tests/scenarios/runners/flutter/ios/
 tests/scenarios/runners/flutter/web/
+examples/flutter-quickstart/android/
+examples/flutter-quickstart/ios/
+examples/flutter-quickstart/web/
 
 **/.astro/
+# Written by the website's prebuild step (scripts/prepare.ts).
+website/.generated/
+website/src/content/docs/errors/
 **/.wrangler/
 
 console/test-results/

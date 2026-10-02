@@ -1,0 +1,7 @@
+## Why it happens
+
+The project ID is unknown, the project was deleted or purged, or your console account can't see it. App requests send it in the `X-Orvano-Project` header.
+
+## How to fix
+
+Copy the project ID again from the project's overview in the console and check your app's setting (for example `NEXT_PUBLIC_ORVANO_PROJECT`). Check that the endpoint points at the Orvano install that holds the project.

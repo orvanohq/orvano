@@ -1,12 +1,137 @@
 ---
 title: .NET quickstart
-description: "Verify a user's token on an ASP.NET Core server."
-sidebar:
-  order: 4
+description: "An ASP.NET Core Minimal API that checks an Orvano user's access token and answers with the user, plus a command that creates users with an API key."
 ---
 
-Verify a user's token on an ASP.NET Core server.
+import { Code, Steps, TabItem, Tabs } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../components/ExampleCode.astro'
+import Screenshot from '../../../../components/Screenshot.astro'
+import { localStart, localUrl, serverSettings, tokenCommands, version } from '../../../../lib/site'
 
-:::note
-This page is being written for this release.
-:::
+export const token = tokenCommands(3002)
+
+You build an ASP.NET Core Minimal API whose `GET /me` reads a user's access token, checks it with the `Orvano` NuGet package {version}, and answers with that user. You also write a command that creates a user with a server API key. This is the pattern for any backend of yours that sits next to an app signing users in with Orvano. It takes about ten minutes.
+
+The finished app is [`examples/dotnet-quickstart`](https://github.com/orvanohq/orvano/tree/main/examples/dotnet-quickstart) in the Orvano repo. Every file below comes from it, and CI runs it on every change.
+
+## 1. Start Orvano
+
+If Orvano isn't running on your machine yet, run these three commands. [Run Orvano locally](/docs/local/) explains each one.
+
+<Tabs syncKey="shell">
+  <TabItem label="macOS and Linux">
+    <Code code={localStart.unix} lang="sh" />
+  </TabItem>
+  <TabItem label="Windows PowerShell">
+    <Code code={localStart.powershell} lang="powershell" />
+  </TabItem>
+</Tabs>
+
+You should see every service report `Healthy`, and the console open at <code>{localUrl}</code>.
+
+## 2. Set up your project in the console
+
+<Steps>
+
+1. Open the setup link the installer printed and create the first admin. You land in your personal org.
+
+   <Screenshot name="setup" alt="The setup page with a name, email, and password filled in, above the Create the first admin button." />
+
+2. Select **Create project**, name it, and select **Create project** again. Setting it up takes a few seconds.
+
+   <Screenshot name="create-project" alt="The Create a project dialog with the name My app." />
+
+3. On the project's overview, copy the **Project ID**.
+
+   <Screenshot name="project-overview" alt="The project overview, showing the project ID with a copy button." />
+
+4. Open **API keys** and select **Create key**. Name it, tick the scopes **Users read** and **Users write**, and select **Create key**. Copy the key it shows: you only see it once. A key can do only what its scopes allow, so this one can read and create users and nothing else.
+
+   <Screenshot name="create-api-key" alt="The Create an API key dialog with the name Quickstart server and the scopes Users read and Users write ticked." />
+
+</Steps>
+
+## 3. Create the server
+
+You need the .NET 10 SDK. Make a folder with this project file, named `DotnetQuickstart.csproj`. It pins the `Orvano` package to {version}, the version of the Orvano you're running.
+
+<ExampleCode example="dotnet-quickstart" file="DotnetQuickstart.csproj" region="project" lang="xml" />
+
+Every piece of code below goes in one `Program.cs`, in the order shown.
+
+## 4. Add your settings
+
+The server reads its settings from the environment, so the API key never sits in your code or your repo. Set them in the terminal you run the server from, with your project ID and the key you copied:
+
+<Tabs syncKey="shell">
+  <TabItem label="macOS and Linux">
+    <Code code={serverSettings.unix} lang="sh" />
+  </TabItem>
+  <TabItem label="Windows PowerShell">
+    <Code code={serverSettings.powershell} lang="powershell" />
+  </TabItem>
+</Tabs>
+
+## 5. Talk to Orvano
+
+Make one client for the server. It sends the API key with every call, and it checks access tokens against your project's public keys, which it caches for 10 minutes:
+
+<ExampleCode example="dotnet-quickstart" file="Program.cs" region="client" title="Program.cs" />
+
+## 6. Create a user
+
+On a server, you create users with the API key, for example when you import them from another system. `dotnet run -- create-user` creates one and exits before the web server starts; it runs on your machine and is never an open HTTP route:
+
+<ExampleCode example="dotnet-quickstart" file="Program.cs" region="create-user" title="Program.cs" />
+
+Run it:
+
+```sh
+dotnet run -- create-user ada@example.com 'a long password' 'Ada Lovelace'
+```
+
+You should see `Created user` with the new user's ID. The user is in the console too, on your project's **Users** page.
+
+## 7. Check a user's token on your server
+
+`GET /me` reads the token from `Authorization: Bearer <token>`. `VerifyAccessTokenAsync` checks its signature, its project, and its expiry, and answers with the user's ID, so the server loads the user with `Users.GetAsync`. A missing or bad token gets 401.
+
+<ExampleCode example="dotnet-quickstart" file="Program.cs" region="me" title="Program.cs" />
+
+<details>
+<summary>The whole `Program.cs`, with the web host and the settings helper</summary>
+
+<ExampleCode example="dotnet-quickstart" file="Program.cs" />
+
+</details>
+
+## 8. Try it
+
+Start the server with `dotnet run`. You should see `Now listening on: http://localhost:3002`.
+
+In another terminal (with the same settings), sign in as the user you created to get an access token, the way an app's sign in would, and call `/me` with it:
+
+<Tabs syncKey="shell">
+  <TabItem label="macOS and Linux">
+    <Code code={token.unix} lang="sh" />
+  </TabItem>
+  <TabItem label="Windows PowerShell">
+    <Code code={token.powershell} lang="powershell" />
+  </TabItem>
+</Tabs>
+
+<Steps>
+
+1. You should see `200 OK` and the user's ID, email, and name.
+2. Call `/me` again without the `Authorization` header. You should see `401 Unauthorized`.
+3. Change one character of the token and call it again. You should see `401` again: the signature no longer matches.
+
+</Steps>
+
+Access tokens last 15 minutes. In a real app, the client SDK refreshes the session and sends a fresh token with each call.
+
+## Next
+
+- Learn what a token proves, and when to ask Orvano instead: [Verify tokens on your server](/docs/auth/verify-tokens/).
+- List, block, and delete users from your server: [Manage users with an API key](/docs/auth/manage-users/).
+- See everything the `Orvano` package can do: [.NET SDK](/docs/sdks/dotnet/).

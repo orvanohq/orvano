@@ -1,0 +1,7 @@
+## Why it happens
+
+Something failed on the server that it did not expect: a bug, a database that went away, or a dependency that broke. The response never says more, so no internal detail leaks to a caller.
+
+## How to fix
+
+Retry once; a short outage often clears. If it keeps happening, look in the `api` logs for the request ID from the error (`docker compose logs api` on a local or Compose install) and report it with that ID on GitHub.

@@ -1,0 +1,7 @@
+## Why it happens
+
+A browser called Orvano from an origin that matches none of the project's Web platforms. Browsers send the page's origin with every call, and Orvano only answers ones you added.
+
+## How to fix
+
+In the console, open the project's **Platforms** and add a Web platform with your site's hostname. `localhost` covers every port, so one platform covers `next dev`, Vite, and Flutter web on your machine. See [Platforms](/docs/concepts/platforms/).

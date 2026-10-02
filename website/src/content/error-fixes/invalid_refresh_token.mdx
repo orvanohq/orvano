@@ -1,0 +1,7 @@
+## Why it happens
+
+The refresh token is malformed, was already used, or its session has ended or expired. A refresh token works once; using an old one again also ends the session, in case it was stolen.
+
+## How to fix
+
+Sign the user in again. If you see this often, check that two places in your app aren't refreshing the same session at once with the same token. The SDKs coordinate refreshes for you.

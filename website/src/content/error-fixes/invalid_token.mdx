@@ -1,0 +1,7 @@
+## Why it happens
+
+The access token is malformed, was signed by a key the project doesn't know, belongs to another project, or its session has ended (signed out or revoked).
+
+## How to fix
+
+Sign the user in again. The client SDKs clear the stored session for you. On your server, answer 401 and let the app sign in again; never accept the token. See [Verify tokens on your server](/docs/auth/verify-tokens/).

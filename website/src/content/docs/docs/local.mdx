@@ -27,7 +27,7 @@ Make a folder for this install, write its files, and start it:
   </TabItem>
 </Tabs>
 
-The second command runs the Orvano image once. It writes `.env`, `docker-compose.yml`, `docker-compose.local.yml`, and `initdb/` into the folder, generates every secret, and prints what to do next. On macOS and Linux, `--user` makes the files yours. The third command starts Orvano and waits until every service is healthy, which takes about a minute the first time while Docker pulls the images.
+The second command runs the Orvano image once. It writes `.env`, `docker-compose.yml`, `docker-compose.local.yml`, and `initdb/` into the folder, generates every secret, and prints what to do next. On macOS and Linux, `--user` makes the files yours. The third command starts Orvano and waits until every service is healthy, which takes about a minute the first time while Docker pulls the images. To check it yourself, call <code>{localUrl}/v1/health</code> ([`health.get`](/docs/api/operations/healthget/)); it answers 200.
 
 The installer prints, in this order:
 

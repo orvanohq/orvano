@@ -1,0 +1,7 @@
+## Why it happens
+
+The project sent more emails through the install's SMTP server this hour than the install allows (`ORVANO_EMAIL_INSTALL_HOURLY_LIMIT`, 200 by default). The limit protects the install's sending reputation.
+
+## How to fix
+
+Wait for the number of seconds in `Retry-After`. For more mail, give the project its own SMTP server, which has no install cap, or raise the setting on your install.

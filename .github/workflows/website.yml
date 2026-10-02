@@ -1,7 +1,7 @@
 # orvano.dev (spec 0011). `build` builds the site and fails on a broken link, a missing quickstart code region, or a
 # type error (AC-18); ESLint and Prettier for website/ run in ci.yml's lint job. `preview` deploys a same repo pull
 # request to its own Cloudflare preview URL (AC-26). `quickstarts` starts a local stack from this checkout and runs
-# every quickstart against it (AC-19). A manual run can redeploy production from a chosen ref, behind the
+# all five quickstarts against it (AC-19); the nightly SDK workflow adds Flutter on Android and iOS (AC-20). A manual run can redeploy production from a chosen ref, behind the
 # `website-production` environment's approval (AC-25); release.yml owns the normal production deploy.
 
 name: Website
@@ -19,6 +19,10 @@ on:
 
 permissions:
   contents: read
+
+env:
+  # Keep in step with .tool-versions and sdks.yml.
+  FLUTTER_VERSION: 3.44.2
 
 concurrency:
   group: website-${{ github.ref }}
@@ -46,7 +50,7 @@ jobs:
           # AC-27: what the site reads, plus the console for its screenshots.
           website      website/* examples/* contract/* sdks/* deploy/* server/src/Orvano.Server/Install/* console/* CHANGELOG.md VERSION package.json pnpm-lock.yaml pnpm-workspace.yaml .tool-versions
           # AC-19: what a quickstart runs on, never a content only change.
-          quickstarts  examples/* sdks/* contract/* deploy/* console/* server/src/Orvano.Server/Install/* website/scripts/* .github/scripts/use-local-sdks.mjs !*.md
+          quickstarts  examples/* sdks/* contract/* deploy/* console/* server/src/Orvano.Server/Install/* website/scripts/* .github/scripts/use-local-sdks.mjs global.json !*.md
           RULES
 
   build:
@@ -144,7 +148,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.quickstarts == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -155,17 +159,28 @@ jobs:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @orvano/website exec playwright install --with-deps chromium
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - uses: nanasess/setup-chromedriver@v3
       - name: Build the images
         run: |
           V=$(cat VERSION)
           echo "V=$V" >> "$GITHUB_ENV"
           docker build -f deploy/server.Dockerfile -t "ghcr.io/orvanohq/orvano:$V" .
           docker build -f deploy/gateway/Dockerfile -t "ghcr.io/orvanohq/orvano-gateway:$V" .
+      # npm tarballs and the NuGet package; the Dart examples use sdks/dart/ by path (use-local-sdks.mjs).
       - name: Pack the SDKs
         run: |
           mkdir -p "$RUNNER_TEMP/packs"
           pnpm --filter @orvano/js --filter @orvano/nextjs build
           for sdk in js nextjs; do (cd "sdks/$sdk" && pnpm pack --pack-destination "$RUNNER_TEMP/packs"); done
+          dotnet pack sdks/dotnet/src/Orvano -c Release -o "$RUNNER_TEMP/packs"
       - name: Start a local stack with install --local
         run: |
           mkdir -p "$RUNNER_TEMP/stack"
@@ -178,21 +193,68 @@ jobs:
           ORVANO_LOCAL_DIR: ${{ runner.temp }}/stack
           QUICKSTART_ENV: ${{ runner.temp }}/quickstart.env
           SCREENSHOTS: '0'
-      # Each example runs from a copy outside the repo, on the SDKs packed above; the committed pins stay untouched.
+      # Each example runs from a copy outside the repo, on the SDKs of this checkout; the committed pins stay untouched.
+      - name: Copy the examples
+        run: |
+          for example in nextjs js dart dotnet flutter; do
+            cp -R "examples/$example-quickstart" "$RUNNER_TEMP/"
+            node .github/scripts/use-local-sdks.mjs "$RUNNER_TEMP/$example-quickstart" "$RUNNER_TEMP/packs"
+          done
       - name: Next.js quickstart
         run: |
           . "$RUNNER_TEMP/quickstart.env"
-          app="$RUNNER_TEMP/nextjs-quickstart"
-          cp -R examples/nextjs-quickstart "$app"
-          node .github/scripts/use-local-sdks.mjs "$app" "$RUNNER_TEMP/packs"
-          printf 'NEXT_PUBLIC_ORVANO_ENDPOINT=%s\nNEXT_PUBLIC_ORVANO_PROJECT=%s\n' "$ORVANO_ENDPOINT" "$ORVANO_PROJECT" > "$app/.env.local"
-          (cd "$app" && npm install --no-audit --no-fund && npm run build)
-          (cd "$app" && npm start > "$RUNNER_TEMP/nextjs.log" 2>&1 &)
+          cd "$RUNNER_TEMP/nextjs-quickstart"
+          printf 'NEXT_PUBLIC_ORVANO_ENDPOINT=%s\nNEXT_PUBLIC_ORVANO_PROJECT=%s\n' "$ORVANO_ENDPOINT" "$ORVANO_PROJECT" > .env.local
+          npm install --no-audit --no-fund && npm run build
+          npm start > "$RUNNER_TEMP/nextjs.log" 2>&1 &
           for _ in $(seq 1 30); do curl -fsS -o /dev/null http://localhost:3000 && break; sleep 1; done
-          pnpm --filter @orvano/website check:web-quickstart http://localhost:3000
+          cd "$GITHUB_WORKSPACE" && pnpm --filter @orvano/website check:web-quickstart http://localhost:3000
+      - name: JavaScript quickstart
+        run: |
+          . "$RUNNER_TEMP/quickstart.env"
+          cd "$RUNNER_TEMP/js-quickstart"
+          printf 'VITE_ORVANO_ENDPOINT=%s\nVITE_ORVANO_PROJECT=%s\n' "$ORVANO_ENDPOINT" "$ORVANO_PROJECT" > .env.local
+          npm install --no-audit --no-fund && npm run build
+          npm run preview > "$RUNNER_TEMP/js.log" 2>&1 &
+          for _ in $(seq 1 30); do curl -fsS -o /dev/null http://localhost:5173 && break; sleep 1; done
+          cd "$GITHUB_WORKSPACE" && pnpm --filter @orvano/website check:web-quickstart http://localhost:5173
+      # AC-12: create a user with the API key, sign in as them with the quickstart's call, then GET /me.
+      - name: Dart server quickstart
+        run: |
+          set -a; . "$RUNNER_TEMP/quickstart.env"; set +a
+          cd "$RUNNER_TEMP/dart-quickstart"
+          dart pub get
+          dart format --output=none --set-exit-if-changed .
+          dart analyze --fatal-infos
+          dart run bin/create_user.dart dart@example.com 'a long password' 'Ada Lovelace'
+          dart run bin/server.dart > "$RUNNER_TEMP/dart.log" 2>&1 &
+          for _ in $(seq 1 60); do [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/me)" = 401 ] && break; sleep 1; done
+          cd "$GITHUB_WORKSPACE" && pnpm --filter @orvano/website check:server-quickstart http://localhost:3001 dart@example.com 'a long password'
+      - name: .NET quickstart
+        run: |
+          set -a; . "$RUNNER_TEMP/quickstart.env"; set +a
+          dotnet format whitespace examples/dotnet-quickstart --folder --verify-no-changes
+          cd "$RUNNER_TEMP/dotnet-quickstart"
+          dotnet build -c Release -warnaserror
+          dotnet run -c Release --no-build -- create-user dotnet@example.com 'a long password' 'Grace Hopper'
+          dotnet run -c Release --no-build > "$RUNNER_TEMP/dotnet.log" 2>&1 &
+          for _ in $(seq 1 60); do [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3002/me)" = 401 ] && break; sleep 1; done
+          cd "$GITHUB_WORKSPACE" && pnpm --filter @orvano/website check:server-quickstart http://localhost:3002 dotnet@example.com 'a long password'
+      # The app's own integration test, in Chrome on port 5050, the origin the Web platform `localhost` allows.
+      - name: Flutter quickstart on Chrome
+        run: |
+          . "$RUNNER_TEMP/quickstart.env"
+          chromedriver --port=4444 &
+          cd "$RUNNER_TEMP/flutter-quickstart"
+          flutter pub get
+          dart format --output=none --set-exit-if-changed lib integration_test test_driver
+          flutter analyze --fatal-infos
+          flutter drive -d web-server --browser-name=chrome --web-port 5050 \
+            --driver=test_driver/integration_test.dart --target=integration_test/app_test.dart \
+            --dart-define=ORVANO_ENDPOINT="$ORVANO_ENDPOINT" --dart-define=ORVANO_PROJECT="$ORVANO_PROJECT"
       - if: failure()
         run: |
-          cat "$RUNNER_TEMP/nextjs.log" || true
+          for log in nextjs js dart dotnet; do echo "::group::$log"; cat "$RUNNER_TEMP/$log.log" || true; echo "::endgroup::"; done
           cd "$RUNNER_TEMP/stack" && docker compose ps --all && docker compose logs
       - if: always()
         run: cd "$RUNNER_TEMP/stack" && docker compose down -v || true

@@ -3,3 +3,6 @@ dist/
 .wrangler/
 # Written by `pnpm screenshots` (spec 0011, AC-19): the IDs and key of a local stack.
 quickstart.env
+# Written by scripts/prepare.ts before every build (spec 0011): the error pages and the docs copy of the contract.
+.generated/
+src/content/docs/errors/

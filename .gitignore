@@ -24,6 +24,7 @@ bin/
 obj/
 # Dart keeps executables in bin/, so the scenario runner's is source, not build output.
 !tests/scenarios/runners/dart/bin/
+!examples/dart-quickstart/bin/
 *.user
 *.suo
 TestResults/

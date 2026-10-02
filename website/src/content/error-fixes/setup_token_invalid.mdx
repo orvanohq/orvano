@@ -1,0 +1,7 @@
+## Why it happens
+
+The first console account on an install needs the setup token, and the request had none or the wrong one. The token is in the setup link the installer printed.
+
+## How to fix
+
+Open the full setup link, including the part after `#`. On a local install it is `http://localhost:7700/setup#` followed by `ORVANO_SETUP_TOKEN` from the `.env` file in your install folder. Run the installer again to print the link once more.

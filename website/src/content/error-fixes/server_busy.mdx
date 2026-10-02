@@ -1,0 +1,7 @@
+## Why it happens
+
+The server is checking too many passwords at once. Checking a password is deliberately slow, so the server caps how many run together and turns the rest away instead of slowing everything down.
+
+## How to fix
+
+Retry after the number of seconds in `Retry-After`. If it happens often under normal load, give the `api` service more CPU or run more `api` replicas.
