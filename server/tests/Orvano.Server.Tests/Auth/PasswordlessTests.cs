@@ -5,7 +5,7 @@ using Orvano.Server.Tests.Infrastructure;
 namespace Orvano.Server.Tests.Auth;
 
 // Spec 0010 build task 3 over HTTP against the real binary: magic link and email code sign in, attempts, races, and
-// account claiming. AC-3, AC-5, AC-8, AC-15, AC-16, AC-19, AC-30, AC-32.
+// account claiming. AC-3, AC-5, AC-8, AC-15, AC-16, AC-19, AC-28, AC-30, AC-32.
 public class PasswordlessTests(PostgresFixture postgres)
 {
     private const string Redirect = "https://app.example.com/auth/callback";
@@ -240,6 +240,69 @@ public class PasswordlessTests(PostgresFixture postgres)
         using (await api.AsServerAsync(HttpMethod.Post, $"/v1/users/{AuthApi.UserId(signUp)}/unblock")) { }
         using var works = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/magic-link", new { token });
         Assert.Equal(HttpStatusCode.Created, works.Status);
+    }
+
+    [Fact]
+    public async Task Creating_a_user_by_link_takes_the_sign_up_limit_and_a_limited_redemption_leaves_the_link_working()
+    {
+        // AC-15: a new user takes spec 0004's auth.sign_up.ip limit; over it, 429 rolled back with the token intact.
+        await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
+        var full = new Dictionary<string, string> { ["X-Forwarded-For"] = "203.0.113.60" };
+        for (var i = 0; i < 60; i++)
+        {
+            // An invalid password: no hash is spent, but the attempt still counts against the IP.
+            using var attempt = await api.SendAsync(HttpMethod.Post, "/v1/account", new { email = $"u{i}@x.com", password = "short" }, headers: full);
+            Assert.Equal(HttpStatusCode.BadRequest, attempt.Status);
+        }
+
+        using var signUp = await api.SignUpAsync("known@x.com");
+        var newEmail = await MagicLinkAsync(api, "late@x.com");
+        var knownEmail = await MagicLinkAsync(api, "known@x.com");
+
+        using var limited = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/magic-link", new { token = newEmail }, headers: full);
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.Status);
+        Assert.Equal("rate_limited", limited.Code);
+        Assert.Equal(0L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, "SELECT count(*) FROM orvano.auth_users WHERE email = 'late@x.com'"));
+
+        // Signing in to a user who exists creates no one, so the full IP is no obstacle.
+        using var existing = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/magic-link", new { token = knownEmail }, headers: full);
+        Assert.Equal(HttpStatusCode.Created, existing.Status);
+        Assert.False(existing.Body.GetProperty("isNewUser").GetBoolean());
+
+        using var elsewhere = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/magic-link", new { token = newEmail },
+            headers: new Dictionary<string, string> { ["X-Forwarded-For"] = "203.0.113.61" });
+        Assert.Equal(HttpStatusCode.Created, elsewhere.Status);
+        Assert.True(elsewhere.Body.GetProperty("isNewUser").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Every_code_attempt_for_an_email_counts_and_the_eleventh_in_15_minutes_is_limited_even_when_right()
+    {
+        // AC-28: auth.email_code.recipient, 10 per 15 minutes per project and lowercased email, on every attempt.
+        await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
+        for (var i = 0; i < 6; i++)
+        {
+            // No code is live yet: the same 401 as a wrong code, and it still counts.
+            using var early = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/email-code", new { email = i % 2 == 0 ? "ADA@x.com" : "ada@x.com", code = "000000" });
+            Assert.Equal("invalid_code", early.Code);
+        }
+
+        var code = await EmailCodeAsync(api, "ada@x.com");
+        for (var i = 0; i < 4; i++)
+        {
+            using var wrong = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/email-code", new { email = "ada@x.com", code = Wrong(code, i) });
+            Assert.Equal("invalid_code", wrong.Code);
+        }
+
+        using var limited = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/email-code", new { email = "Ada@X.com", code });
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.Status);
+        Assert.Equal("rate_limited", limited.Code);
+        Assert.NotNull(limited.Headers.RetryAfter);
+        Assert.Equal(1L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, "SELECT count(*) FROM orvano.auth_email_tokens WHERE kind = 'email_code'"));
+
+        var other = await EmailCodeAsync(api, "bob@x.com");
+        using var otherEmail = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/email-code", new { email = "bob@x.com", code = other });
+        Assert.Equal(HttpStatusCode.Created, otherEmail.Status);
     }
 
     internal static async Task<string> MagicLinkAsync(AuthApi api, string email, string redirect = Redirect)

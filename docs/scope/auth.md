@@ -40,8 +40,8 @@ Verify email, reset password, magic link, and email one time code sign in.
    - [x] Verification, passwordless, and email change: verify at sign up and on resend, the `email_verified` claim, magic link and code sign in with HMAC codes and attempts, account claiming, email change, and passwordless self service (AC-1, 5, 11 to 19, 28, 29, 32)
    - [x] Servers and SDK helpers: the new `users.*` operations, `redeemLink` and `handleLink`, the Next.js `redeem` and `email-code` actions, and `retryAfter` on every SDK error (AC-21, 24 to 27)
    - [x] Console and hardening: the Users page verified column, filter, actions, and send dialogs; events, retention, purge, and the leak, timing, and race tests (AC-1, 22, 23, 29, 30)
-- [ ] Verify it: `/check verify email verification, recovery & passwordless`
-- [ ] Test it: `/test email verification, recovery & passwordless`
+- [x] Verify it: `/check verify email verification, recovery & passwordless`
+- [x] Test it: `/test email verification, recovery & passwordless`
 - [ ] Review it (fresh model): `/check review email verification, recovery & passwordless`
 - [ ] Document it: `/document email verification, recovery & passwordless`
 Spec [0010](../specs/0010-email-verification-recovery-passwordless/index.md) · code in `server/src/Orvano.Auth/`, `server/src/Orvano.Messaging/`, `contract/auth/`, `sdks/`, `console/`, `tests/scenarios/`

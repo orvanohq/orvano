@@ -201,6 +201,26 @@ public class RecoveryTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task The_recipient_limits_count_each_kind_on_its_own()
+    {
+        // AC-7: keyed by project, lowercased email, and kind, so a reset doesn't use up the minute of a magic link or a code.
+        await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
+        using var known = await api.SignUpAsync("known@x.com");
+
+        using var reset = await api.SendAsync(HttpMethod.Post, "/v1/account/recovery", new { email = "known@x.com", redirectUrl = Redirect });
+        using var link = await api.SendAsync(HttpMethod.Post, "/v1/account/magic-link", new { email = "KNOWN@x.com", redirectUrl = Redirect });
+        using var code = await api.SendAsync(HttpMethod.Post, "/v1/account/email-code", new { email = "Known@X.com" });
+        using var secondLink = await api.SendAsync(HttpMethod.Post, "/v1/account/magic-link", new { email = "known@x.com", redirectUrl = Redirect });
+
+        Assert.Equal(HttpStatusCode.Accepted, reset.Status);
+        Assert.Equal(HttpStatusCode.Accepted, link.Status);
+        Assert.Equal(HttpStatusCode.Accepted, code.Status);
+        Assert.Equal(HttpStatusCode.TooManyRequests, secondLink.Status);
+        Assert.Equal("rate_limited", secondLink.Code);
+        Assert.Equal(3L, await api.QueuedEmailCountAsync());
+    }
+
+    [Fact]
     public async Task A_reset_token_fails_when_expired_blocked_or_the_email_changed_and_a_failure_leaves_it_usable()
     {
         await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
