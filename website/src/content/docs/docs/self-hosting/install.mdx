@@ -1,0 +1,104 @@
+---
+title: Install on a server
+description: "Install Orvano on one Linux server with install.sh."
+sidebar:
+  order: 1
+---
+
+import { Code } from '@astrojs/starlight/components'
+import { installScript, version } from '../../../../lib/site'
+
+One command installs Orvano on a Linux server, with HTTPS from Let's Encrypt. To try Orvano on your own computer instead, see [Run Orvano locally](/docs/local/).
+
+## What you need
+
+- A Linux server running Ubuntu 22.04 or 24.04, or Debian 12 or 13, on amd64 or arm64.
+- At least 2 GB of memory; 4 GB is recommended.
+- Ports 80 and 443 open to the internet.
+- A domain whose DNS points to the server, such as `orvano.example.com`.
+
+Docker isn't needed up front: the installer offers to install it.
+
+## Install
+
+<Code code={`curl -fsSL ${installScript} | sudo sh`} lang="sh" />
+
+The installer:
+
+1. checks the server: memory, the firewall, the clock, Docker, and that ports 80 and 443 are free;
+2. offers to install Docker (24 or later, with Compose 2.24 or later) if it's missing;
+3. asks for your domain and an optional email for Let's Encrypt, then checks that the domain's DNS points to this server;
+4. generates every secret, writes the files into `/opt/orvano`, and starts Orvano;
+5. waits until `https://<your domain>` answers, and prints the console's address.
+
+To check the script before you run it, download `install.sh` and `install.sh.sha256` from the [v{version} release](https://github.com/orvanohq/orvano/releases) and run `sha256sum -c install.sh.sha256`.
+
+## Open the setup link right away
+
+At the end the installer prints `https://<your domain>/setup#...`. Only that link can create the first admin account, and only once. Until you use it, anyone who finds your server can see it's unclaimed, but can't claim it. [First admin and setup](/docs/console/first-admin/) walks through it.
+
+## Back up your master key
+
+On the first run the installer prints your **master key** and waits until you type `saved`. Orvano encrypts every secret it stores with it, such as your email server's password. It lives in `/opt/orvano/.env` with the database passwords. If you lose it, those secrets can't be recovered: keep a copy of the whole `.env` somewhere safe, outside the server.
+
+## Answer every question with a flag
+
+Pass flags after `sh -s --`, so the installer also runs unattended from cloud init, Ansible, or CI:
+
+<Code code={`curl -fsSL ${installScript} | sudo sh -s -- --domain orvano.example.com --email ops@example.com --yes`} lang="sh" />
+
+| Flag | Meaning |
+|---|---|
+| `--domain <host>` | Your domain, or `localhost` (plain HTTP on this server only, not for production). |
+| `--email <addr>` | The Let's Encrypt account email; empty is allowed. |
+| `--version <X.Y.Z>` | The version to install; defaults to the script's own ({version}). |
+| `--dir <path>` | The install folder; `/opt/orvano` by default. |
+| `--yes` | Answer yes to every question, and don't wait at the master key. |
+| `--no-pull` | Use only images already on the server, for servers without internet access. |
+| `--no-ip-lookup` | Skip asking a public service for the server's address in the DNS check. |
+| `--timeout <seconds>` | How long to wait for healthy services; 300 by default. |
+| `--help` | Show the flags. |
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Orvano is installed and answering. |
+| `2` | Refused, and nothing changed: a bad flag, a failed check, a downgrade, or a "no" to a question. The message says why. |
+| `3` | Orvano started, but a service isn't healthy or the domain doesn't answer. The installer shows the failing service's last log lines. |
+| `1` | Anything else, such as a failed Docker install or image download. |
+
+After a `3`, fix the cause and run the installer again: it continues from where it stopped and never removes anything.
+
+## Where the files live
+
+Everything is in `/opt/orvano`:
+
+| File | What it is |
+|---|---|
+| `.env` | Your settings and secrets, readable by root only. The installer keeps your own lines in it. |
+| `.env.previous` | The `.env` before the last run changed it. |
+| `docker-compose.yml`, `initdb/` | Written again by every run. Don't edit them. |
+| `docker-compose.override.yml` | Yours: the installer never touches it. See [Configuration](/docs/self-hosting/configuration/#your-own-changes). |
+| `install.log` | What each run did. It never holds a secret. |
+
+Data lives in Docker volumes: `orvano_orvano-pg` (the database), `orvano_orvano-storage`, and `orvano_orvano-caddy` (the HTTPS certificates). One server holds one install; for a second, use another `--dir` on another server.
+
+## Check on it
+
+From `/opt/orvano`:
+
+```sh
+docker compose ps --all
+docker compose logs api
+```
+
+The first shows every service and its health; the second shows one service's logs (also `worker`, `realtime`, `migrate`, `postgres`, and `gateway`). Each container keeps at most 30 MB of logs.
+
+## Next
+
+- [Set up email delivery](/docs/self-hosting/email-delivery/), so your apps can send verification and sign in emails.
+- [Upgrade and repair](/docs/self-hosting/upgrade/)
+- [Configuration](/docs/self-hosting/configuration/)
+
+Orvano never phones home. It reaches out only to GitHub's container registry for images, `get.docker.com` if you let it install Docker, Let's Encrypt, and `icanhazip.com` for the DNS check (skip it with `--no-ip-lookup`).

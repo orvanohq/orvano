@@ -1,0 +1,191 @@
+---
+title: Flutter quickstart
+description: "From an empty folder to a Flutter app on the web, iOS, and Android where you sign up, sign in, see your name and email, and sign out."
+---
+
+import { Code, Steps, TabItem, Tabs } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../components/ExampleCode.astro'
+import Screenshot from '../../../../components/Screenshot.astro'
+import { localStart, localUrl, version } from '../../../../lib/site'
+
+export const createApp = 'flutter create --org dev.orvano --project-name quickstart --platforms web,ios,android flutter_quickstart'
+export const addSdk = `cd flutter_quickstart\nflutter pub add orvano_flutter:${version}`
+
+You build a Flutter app where people sign up with an email and a password, sign in, see their name and email, and sign out. It uses `orvano_flutter` {version}, runs on the web, iOS, and Android from one codebase, and keeps the session in the platform's secure storage (the Keychain on iOS, the Keystore on Android). It takes about fifteen minutes.
+
+The finished app is [`examples/flutter-quickstart`](https://github.com/orvanohq/orvano/tree/main/examples/flutter-quickstart) in the Orvano repo. Every file below comes from it, and CI runs it on every change, on Chrome, and every night on the iOS simulator and the Android emulator.
+
+## 1. Start Orvano
+
+If Orvano isn't running on your machine yet, run these three commands. [Run Orvano locally](/docs/local/) explains each one.
+
+<Tabs syncKey="shell">
+  <TabItem label="macOS and Linux">
+    <Code code={localStart.unix} lang="sh" />
+  </TabItem>
+  <TabItem label="Windows PowerShell">
+    <Code code={localStart.powershell} lang="powershell" />
+  </TabItem>
+</Tabs>
+
+You should see every service report `Healthy`, and the console open at <code>{localUrl}</code>.
+
+## 2. Set up your project in the console
+
+<Steps>
+
+1. Open the setup link the installer printed and create the first admin. You land in your personal org.
+
+   <Screenshot name="setup" alt="The setup page with a name, email, and password filled in, above the Create the first admin button." />
+
+2. Select **Create project**, name it, and select **Create project** again. Setting it up takes a few seconds.
+
+   <Screenshot name="create-project" alt="The Create a project dialog with the name My app." />
+
+3. On the project's overview, copy the **Project ID**. Your app sends it with every request.
+
+   <Screenshot name="project-overview" alt="The project overview, showing the project ID with a copy button." />
+
+4. Open **Platforms** and add one platform for each place your app runs. Select **Add platform**, pick the type, name it, enter its ID, and select **Add platform**. This app's iOS bundle ID and Android package name are both `dev.orvano.quickstart`.
+
+   <Tabs syncKey="flutter-platform">
+     <TabItem label="Web">
+       Keep the type **Web** and enter `localhost` as the hostname. Browsers send the page's origin with every call, and Orvano answers only your Web platforms' origins. `localhost` covers every port, so it covers `flutter run` on 5050.
+
+       <Screenshot name="add-web-platform" alt="The Add a platform dialog with the type Web, the name Local web, and the hostname localhost." />
+     </TabItem>
+     <TabItem label="iOS">
+       Pick the type **iOS** and enter the bundle ID `dev.orvano.quickstart`.
+
+       <Screenshot name="add-ios-platform" alt="The Add a platform dialog with the type iOS, the name Quickstart iOS, and the bundle ID dev.orvano.quickstart." />
+     </TabItem>
+     <TabItem label="Android">
+       Pick the type **Android** and enter the package name `dev.orvano.quickstart`.
+
+       <Screenshot name="add-android-platform" alt="The Add a platform dialog with the type Android, the name Quickstart Android, and the package name dev.orvano.quickstart." />
+     </TabItem>
+   </Tabs>
+
+</Steps>
+
+## 3. Create the app
+
+Create the app with the same bundle ID and package name you registered, then add `orvano_flutter`, pinned to {version}, the version of the Orvano you're running:
+
+<Code code={`${createApp}\n${addSdk}`} lang="sh" />
+
+Your `pubspec.yaml` now has:
+
+<ExampleCode example="flutter-quickstart" file="pubspec.yaml" region="dependencies" title="pubspec.yaml" />
+
+If you start from your own app instead, register its own bundle ID and package name in step 2.
+
+## 4. Let the app reach your local Orvano
+
+Your local Orvano answers on `http://localhost:7700`, plain HTTP. Each platform needs a small change to reach it while you develop.
+
+<Tabs syncKey="flutter-platform">
+  <TabItem label="Web">
+    Nothing to change. Run the app on port 5050 (step 7), which the Web platform `localhost` covers.
+  </TabItem>
+  <TabItem label="iOS">
+    iOS allows only HTTPS unless you say otherwise. Add this to the `<dict>` in `ios/Runner/Info.plist`, which allows plain HTTP to local addresses only:
+
+    <ExampleCode example="flutter-quickstart" file="ios/Runner/Info.plist" region="ats" lang="xml" title="ios/Runner/Info.plist" />
+
+    The iOS simulator shares your Mac's network, so `localhost` reaches Orvano directly.
+  </TabItem>
+  <TabItem label="Android">
+    Android allows only HTTPS unless you say otherwise. Allow plain HTTP to `localhost` in debug builds only: add this file,
+
+    <ExampleCode example="flutter-quickstart" file="android/app/src/debug/res/xml/network_security_config.xml" lang="xml" />
+
+    and point the debug manifest at it:
+
+    <ExampleCode example="flutter-quickstart" file="android/app/src/debug/AndroidManifest.xml" region="cleartext" lang="xml" title="android/app/src/debug/AndroidManifest.xml" />
+
+    The emulator's own `localhost` is the emulator, not your computer. `adb reverse` forwards its port 7700 to yours, so the app reaches Orvano at the same `http://localhost:7700` as everywhere else. Run it once each time the emulator starts:
+
+    <Code code="adb reverse tcp:7700 tcp:7700" lang="sh" />
+
+    Don't use `10.0.2.2` instead: Orvano answers only on `localhost`.
+  </TabItem>
+</Tabs>
+
+## 5. Talk to Orvano
+
+The app reads its settings at build time, from `--dart-define` flags:
+
+<ExampleCode example="flutter-quickstart" file="lib/config.dart" />
+
+`main` makes one client for the whole app. `createClient` keeps the session in secure storage and refreshes it when the app comes back to the front, so a signed in user stays signed in:
+
+<ExampleCode example="flutter-quickstart" file="lib/main.dart" region="start" title="lib/main.dart" />
+
+<details>
+<summary>The whole `lib/main.dart`</summary>
+
+<ExampleCode example="flutter-quickstart" file="lib/main.dart" />
+
+</details>
+
+## 6. Sign up, sign in, and sign out
+
+The home screen loads the signed in user when it opens. `account.get` throws a 401 when nobody is signed in, so it shows the forms then:
+
+<ExampleCode example="flutter-quickstart" file="lib/home.dart" region="current-user" title="lib/home.dart" />
+
+`account.create` and `account.createPasswordSession` sign the user in, and the client stores the new session. `account.deleteCurrentSession` ends it on Orvano and forgets it on the device:
+
+<ExampleCode example="flutter-quickstart" file="lib/home.dart" region="actions" title="lib/home.dart" />
+
+When someone is signed in, the screen shows their name and email:
+
+<ExampleCode example="flutter-quickstart" file="lib/home.dart" region="signed-in" title="lib/home.dart" />
+
+The forms catch `OrvanoException` and show its message, like a taken email or a wrong password.
+
+<details>
+<summary>The whole `lib/home.dart`, with the forms</summary>
+
+<ExampleCode example="flutter-quickstart" file="lib/home.dart" />
+
+</details>
+
+## 7. Try it
+
+Run the app with your project ID:
+
+<Tabs syncKey="flutter-platform">
+  <TabItem label="Web">
+    <Code code="flutter run -d chrome --web-port 5050 --dart-define=ORVANO_PROJECT=your-project-id" lang="sh" />
+  </TabItem>
+  <TabItem label="iOS">
+    Open a simulator first (`open -a Simulator`), then:
+
+    <Code code="flutter run -d iPhone --dart-define=ORVANO_PROJECT=your-project-id" lang="sh" />
+  </TabItem>
+  <TabItem label="Android">
+    Start an emulator and run `adb reverse tcp:7700 tcp:7700` first, then:
+
+    <Code code="flutter run -d emulator --dart-define=ORVANO_PROJECT=your-project-id" lang="sh" />
+  </TabItem>
+</Tabs>
+
+<Steps>
+
+1. Fill in the **Sign up** form and select **Sign up**. You should see "You're signed in" with your name and email.
+2. Restart the app. You should still be signed in: the session is in secure storage.
+3. Select **Sign out**. You should see the two forms again.
+4. Fill in the **Sign in** form with the same email and password. You should see your name and email again.
+5. Try signing in with a wrong password. You should see Orvano's message under the form.
+
+</Steps>
+
+The new user is in the console too: open your project's **Users** page.
+
+## Next
+
+- Send a verification email and read it in the local inbox: [Email verification](/docs/auth/email-verification/).
+- Learn how the session is stored and refreshed: [Users and sessions](/docs/concepts/users-and-sessions/).
+- See everything `orvano_flutter` can do: [Flutter SDK](/docs/sdks/flutter/).

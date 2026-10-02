@@ -24,15 +24,20 @@ internal sealed class MessagingModule : IOrvanoModule
     public string Name => "messaging";
 
     /// <summary>
-    /// Validates <c>ORVANO_SMTP_ALLOW_PRIVATE_HOSTS</c> and <c>ORVANO_EMAIL_INSTALL_HOURLY_LIMIT</c> in every role
-    /// (AC-28). Unset or empty means the default, since Compose passes <c>${VAR:-}</c> as an empty string.
+    /// Validates <c>ORVANO_SMTP_ALLOW_PRIVATE_HOSTS</c> and <c>ORVANO_EMAIL_INSTALL_HOURLY_LIMIT</c> (AC-28), and
+    /// <c>ORVANO_INSTALL_SMTP_URL</c> with <c>ORVANO_INSTALL_SMTP_FROM</c> (spec 0011, AC-4), in every role. Unset or
+    /// empty means the default, since Compose passes <c>${VAR:-}</c> as an empty string.
     /// </summary>
     public void ConfigureServices(IServiceCollection services, IConfiguration config)
     {
+        var installSmtp = InstallSmtpSeed.Parse(config[InstallSmtpSeed.UrlSetting], config[InstallSmtpSeed.FromSetting], out var seedError);
+        if (seedError is not null) throw new OrvanoConfigException(seedError);
+
         services.AddSingleton(new MessagingSettings(
             OrvanoConfig.Bool(config, MessagingSettings.AllowPrivateHostsSetting, fallback: false),
             OrvanoConfig.IntInRange(
-                config, MessagingSettings.InstallHourlyLimitSetting, 1, MessagingSettings.MaxInstallHourlyLimit, MessagingSettings.DefaultInstallHourlyLimit)));
+                config, MessagingSettings.InstallHourlyLimitSetting, 1, MessagingSettings.MaxInstallHourlyLimit, MessagingSettings.DefaultInstallHourlyLimit),
+            installSmtp));
         services.AddSingleton<MessagingStore>();
         services.AddSingleton<IHostResolver, DnsHostResolver>();
         services.AddSingleton<SmtpConnector>();
@@ -50,7 +55,12 @@ internal sealed class MessagingModule : IOrvanoModule
         services.AddSingleton<IEmailQueue, AuthEmailQueue>();
         // Platform resolves this per request; without it invitations are created and never emailed.
         services.AddSingleton<IConsoleInvitationMailer, InvitationMailer>();
+        services.AddSingleton<InstallSmtpSeeder>();
     }
+
+    /// <summary>Seeds the install SMTP from configuration, once (spec 0011, AC-4).</summary>
+    public Task OnApiStartingAsync(IServiceProvider services, CancellationToken ct) =>
+        services.GetRequiredService<InstallSmtpSeeder>().SeedAsync(ct);
 
     public void MapApi(RouteGroupBuilder v1)
     {

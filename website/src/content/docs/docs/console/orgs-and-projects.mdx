@@ -1,0 +1,50 @@
+---
+title: Orgs and projects
+description: "Create and manage orgs and projects in the console."
+sidebar:
+  order: 2
+---
+
+import Screenshot from '../../../../components/Screenshot.astro'
+
+An org holds your team and its projects; a project is what one app talks to. [Orgs and projects](/docs/concepts/orgs-and-projects/) explains the model.
+
+## Create an org
+
+Open the org switcher at the top left and select **Create org**, or select **Create org** on the **Orgs** page. Give it a name; you become its owner. You also have a personal org from the day you signed up, which works like any other.
+
+## Create a project
+
+1. In an org, select **Create project** (on the **Projects** page or in the project switcher).
+2. Name it, and select **Create project**.
+
+   <Screenshot name="create-project" alt="The Create a project dialog with the name My app." />
+
+3. The project shows **Setting up** for a few seconds while Orvano creates its database schema, then its overview. If setup fails, owners and developers see **Retry setup**.
+
+The overview shows the **Project ID** with a copy button. Your app sends it with every call.
+
+<Screenshot name="project-overview" alt="The project overview, showing the project ID with a copy button." />
+
+Its **Connect your app** card lists the two next steps: [add a platform](/docs/console/platforms/) for an app that signs users in, or [create an API key](/docs/console/api-keys/) for a server.
+
+## The project's pages
+
+| Page | What it's for |
+|---|---|
+| **Overview** | The project ID, and what to set up next. |
+| **Users** | Search the project's users, see their sessions, and create, block, unblock, or delete them. |
+| **Email** | The project's email server, its email templates, and the log of what it sent. See [Email settings and templates](/docs/console/email/). |
+| **API keys** | Keys for your servers. See [API keys](/docs/console/api-keys/). |
+| **Platforms** | The apps allowed to use the project. See [Platforms](/docs/console/platforms/). |
+| **Settings** | Rename the project, rotate its token signing key, or delete it. |
+
+## Rotate the signing key
+
+In the project's **Settings**, owners can rotate the key that signs its access tokens, for example if you think it leaked. The old key keeps verifying tokens for 24 hours, so nobody is signed out; servers that [verify tokens](/docs/auth/verify-tokens/) pick up the new key on their own.
+
+## Delete and restore
+
+An owner deletes a project in its **Settings**, under **Danger zone**, by typing its name. The project stops answering at once, and can be restored with **Restore project** for 7 days (the install can change the grace period). After that, its users, keys, and data are removed for good.
+
+An org can be deleted once all its projects are, and restored the same way.

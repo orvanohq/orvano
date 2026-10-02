@@ -1,0 +1,7 @@
+## Why it happens
+
+A parameter or the request body is wrong: a required field is missing, a value has the wrong type or is too long, or the JSON doesn't parse. The `detail` in the response names the problem when the server can.
+
+## How to fix
+
+Read the error message, then compare your request with the operation's page in the [API reference](/docs/api/). The SDKs build the body for you, so with an SDK this usually means a value you passed is empty or out of range.

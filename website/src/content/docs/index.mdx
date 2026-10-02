@@ -1,0 +1,59 @@
+---
+title: Orvano
+description: "The open source backend you host yourself, run from one console."
+template: splash
+hero:
+  tagline: The open source backend you host yourself. Auth, Postgres, storage, functions, realtime, messaging, webhooks, jobs, and backups, run from one console.
+  actions:
+    - text: Run it locally
+      link: /docs/local/
+      icon: right-arrow
+    - text: GitHub
+      link: https://github.com/orvanohq/orvano
+      icon: external
+      variant: minimal
+---
+
+import { Badge, Card, CardGrid, LinkCard, TabItem, Tabs } from '@astrojs/starlight/components'
+import { Code } from '@astrojs/starlight/components'
+import { localStart } from '../../lib/site'
+
+## Start in a minute
+
+You need Docker with Compose 2.24.6 or later. These three commands start Orvano on your machine, with a local inbox for its emails.
+
+<Tabs syncKey="shell">
+  <TabItem label="macOS and Linux">
+    <Code code={localStart.unix} lang="sh" />
+  </TabItem>
+  <TabItem label="Windows PowerShell">
+    <Code code={localStart.powershell} lang="powershell" />
+  </TabItem>
+</Tabs>
+
+## Pick a quickstart
+
+<CardGrid>
+  <LinkCard title="Next.js" href="/docs/quickstarts/nextjs/" description="Sign up, sign in, and sign out with server actions." />
+  <LinkCard title="Flutter" href="/docs/quickstarts/flutter/" description="One app for web, iOS, and Android." />
+  <LinkCard title="JavaScript" href="/docs/quickstarts/js/" description="A Vite app with plain TypeScript." />
+  <LinkCard title="Dart server" href="/docs/quickstarts/dart/" description="Verify a user's token on a shelf server." />
+  <LinkCard title=".NET" href="/docs/quickstarts/dotnet/" description="Verify a user's token on ASP.NET Core." />
+</CardGrid>
+
+## What makes it different
+
+<CardGrid>
+  <Card title="Notification Center">
+    <Badge text="Planned" variant="note" /> In app inbox widgets, workflows, preferences, and digests.
+  </Card>
+  <Card title="Webhooks platform">
+    <Badge text="Planned" variant="note" /> Signed outbound webhooks with retries and replay, plus inbound webhooks.
+  </Card>
+  <Card title="Jobs, queues, and cron">
+    <Badge text="Planned" variant="note" /> Durable background jobs with dead letters and schedules.
+  </Card>
+  <Card title="Backups and environments">
+    <Badge text="Planned" variant="note" /> Free scheduled backups, point in time restore, and dev, staging, and prod.
+  </Card>
+</CardGrid>

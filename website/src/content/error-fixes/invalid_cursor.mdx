@@ -1,0 +1,7 @@
+## Why it happens
+
+A list call got a `cursor` the server can't read. Cursors are opaque: one that was edited, cut short, or taken from a different list fails.
+
+## How to fix
+
+Pass back exactly the `nextCursor` the previous page returned, or use the SDK's `listAll` helper, which pages for you. To start over, leave the cursor out.

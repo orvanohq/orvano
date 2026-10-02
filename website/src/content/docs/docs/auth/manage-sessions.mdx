@@ -1,0 +1,92 @@
+---
+title: Manage sessions
+description: "List and end a user's sessions."
+sidebar:
+  order: 7
+---
+
+import { TabItem, Tabs } from '@astrojs/starlight/components'
+
+Each sign in opens its own session, so a user signed in on a laptop and a phone has two. Let users see them and end the ones they don't recognize. [Users and sessions](/docs/concepts/users-and-sessions/) explains what a session is.
+
+## List the user's sessions
+
+[`account.listSessions`](/docs/api/operations/accountlistsessions/) answers with the user's active sessions, newest first, a page at a time. `listSessionsAll` walks every page for you.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+for await (const session of orvano.account.listSessionsAll()) {
+  console.log(session.userAgent, session.lastRefreshedAt, session.current)
+}
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+const { items } = await (await orvano()).account.listSessions()
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+await for (final session in orvano.account.listSessionsAll()) {
+  print('${session.userAgent} ${session.lastRefreshedAt} ${session.current}');
+}
+```
+
+  </TabItem>
+</Tabs>
+
+Each session has:
+
+| Field | What it holds |
+|---|---|
+| `id` | The session's ID. |
+| `current` | True for the session making this call: label it "This device". |
+| `method` | How it started: `password`, `sign_up`, `magic_link`, `email_code`, or `recovery`. |
+| `createdAt`, `lastRefreshedAt` | When it started, and was last used. |
+| `userAgent`, `ipAddress` | The device it started on. For a Next.js app, the user's browser, not your server. |
+| `sdk` | The SDK and version that started it. |
+
+## End sessions
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.account.deleteSession(sessionId) // one session
+await orvano.account.deleteOtherSessions() // every session but this one
+await orvano.account.deleteCurrentSession() // sign out here
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+'use server'
+const client = await orvano()
+await client.account.deleteSession(sessionId)
+await client.account.deleteOtherSessions()
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+await orvano.account.deleteSession(sessionId);
+await orvano.account.deleteOtherSessions();
+await orvano.account.deleteCurrentSession();
+```
+
+  </TabItem>
+</Tabs>
+
+[`account.deleteSession`](/docs/api/operations/accountdeletesession/) ends one session, [`account.deleteOtherSessions`](/docs/api/operations/accountdeleteothersessions/) every one but the current. An ended session's device is signed out at its next refresh. Its last access token keeps working with your own servers for up to 15 minutes, unless they use the [online check](/docs/auth/verify-tokens/#catch-ended-sessions-right-away).
+
+## From your server
+
+With an API key, your support tools can do the same for any user: [`users.listSessions`](/docs/api/operations/userslistsessions/) (`users.read`), [`users.deleteSession`](/docs/api/operations/usersdeletesession/) and [`users.deleteSessions`](/docs/api/operations/usersdeletesessions/) (`users.write`). To sign a user out everywhere and keep them out, [block them](/docs/auth/manage-users/#block-and-unblock).

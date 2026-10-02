@@ -1,0 +1,326 @@
+---
+title: Email verification
+description: "Send a verification email and gate features on a verified email."
+sidebar:
+  order: 2
+---
+
+import { TabItem, Tabs } from '@astrojs/starlight/components'
+
+A verified email proves the user can read mail sent to that address. Orvano emails the user a link; when they open it and select **Continue**, their `emailVerified` turns true. Orvano doesn't stop unverified users from signing in: you decide which features need a verified email.
+
+## Before you start
+
+This guide starts from a finished quickstart ([Next.js](/docs/quickstarts/nextjs/), [Flutter](/docs/quickstarts/flutter/), or [JavaScript](/docs/quickstarts/js/)) running against [Orvano on your machine](/docs/local/). The local stack delivers every email to its own inbox at `http://localhost:8025` (Mailpit), so you can follow along without a mail account. On a server, set up [email delivery](/docs/self-hosting/email-delivery/) first; without it, sending answers [`email_not_configured`](/errors/email_not_configured/).
+
+## Where the link opens
+
+Every email link in Orvano opens a page of your app, the `redirectUrl` you pass. Orvano adds two query parameters, `orvano_type` and `orvano_token`, and keeps the rest of your URL:
+
+```
+http://localhost:3000/auth/confirm?orvano_type=verification&orvano_token=orv_el_...
+```
+
+The URL must match one of the project's [platforms](/docs/concepts/platforms/#where-links-may-point): `https` on a web platform's host, or `http` on `localhost`. A verification link may also open your mobile app through a custom scheme equal to its registered bundle ID or package name, such as `dev.orvano.quickstart://auth`. Anything else gets [`redirect_url_not_allowed`](/errors/redirect_url_not_allowed/) before an email is sent.
+
+A verification link works once, for 24 hours. Sending a new one makes the older one stop working.
+
+## Send it at sign up
+
+Pass `verificationRedirectUrl` to [`account.create`](/docs/api/operations/accountcreate/). The answer's `verificationEmail` tells you what happened: `queued`, `not_configured` (no email server; the user is still created), or `rate_limited`.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const { verificationEmail } = await orvano.account.create({
+  email,
+  password,
+  verificationRedirectUrl: `${location.origin}/confirm.html`,
+})
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+'use server'
+import { appUrl } from '@/lib/config'
+
+await (await orvano()).account.create({
+  email,
+  password,
+  verificationRedirectUrl: `${appUrl}/auth/confirm`,
+})
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final result = await orvano.account.create(
+  CreateAccountRequest(
+    email: email,
+    password: password,
+    verificationRedirectUrl: 'https://app.example.com/auth/confirm',
+  ),
+);
+```
+
+  </TabItem>
+</Tabs>
+
+## Send it later
+
+A signed in user can ask for a new link with [`account.createVerification`](/docs/api/operations/accountcreateverification/). A user whose email is already verified gets [`email_already_verified`](/errors/email_already_verified/). Orvano sends at most one email a minute, and five an hour, per user and kind of email; more gets [`rate_limited`](/errors/rate_limited/).
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.account.createVerification({ redirectUrl: `${location.origin}/confirm.html` })
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+'use server'
+export async function sendVerification(): Promise<void> {
+  await (await orvano()).account.createVerification({ redirectUrl: `${appUrl}/auth/confirm` })
+}
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+await orvano.account.createVerification(
+  const CreateVerificationRequest(redirectUrl: 'https://app.example.com/auth/confirm'),
+);
+```
+
+  </TabItem>
+</Tabs>
+
+Now open `http://localhost:8025`. You should see the email, with a **Verify email** button that opens your page.
+
+## The landing page
+
+Every email link (verification, [password reset](/docs/auth/password-reset/), [magic link](/docs/auth/magic-links/), [email change](/docs/auth/change-email/)) lands on a page you build the same way:
+
+- **Show a Continue button, and finish the link only when it's selected.** Mail scanners open links to check them, and each link works once; a page that finished the link on load would let a scanner use it up.
+- **Send `Referrer-Policy: no-referrer`**, so the token in the address doesn't leak to other sites your page loads.
+
+`redeemLink` reads `orvano_type` and `orvano_token` from the address, finishes whichever kind of link it is, and removes both from the address bar.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```html title="confirm.html"
+<meta name="referrer" content="no-referrer" />
+<button id="continue" type="button">Continue</button>
+<p id="status" role="status"></p>
+<script type="module" src="/src/confirm.ts"></script>
+```
+
+```ts title="src/confirm.ts"
+import { OrvanoError } from '@orvano/js'
+import { orvano } from './orvano'
+
+const status = document.querySelector('#status')!
+document.querySelector('#continue')!.addEventListener('click', async () => {
+  try {
+    const result = await orvano.client.redeemLink()
+    status.textContent = result === null ? 'This link is incomplete.' : 'Your email is verified.'
+  } catch (error) {
+    if (!(error instanceof OrvanoError)) throw error
+    status.textContent = error.message
+  }
+})
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+The page is a client component. It uses `createBrowserClient`, which finishes the link through your app's [route handler](/docs/sdks/nextjs/#in-the-browser-createbrowserclient-and-the-route-handler), so mount that first.
+
+```tsx title="app/auth/confirm/page.tsx"
+'use client'
+import { createBrowserClient, OrvanoError } from '@orvano/nextjs'
+import { useState } from 'react'
+import { endpoint, project } from '@/lib/config'
+
+const orvano = createBrowserClient({ endpoint, project })
+
+export default function ConfirmPage() {
+  const [status, setStatus] = useState('')
+
+  async function onContinue() {
+    try {
+      const result = await orvano.client.redeemLink()
+      setStatus(result === null ? 'This link is incomplete.' : 'Your email is verified.')
+    } catch (error) {
+      if (!(error instanceof OrvanoError)) throw error
+      setStatus(error.message)
+    }
+  }
+
+  return (
+    <main>
+      <h1>Confirm your email</h1>
+      <button type="button" onClick={() => void onContinue()}>
+        Continue
+      </button>
+      <p role="status">{status}</p>
+    </main>
+  )
+}
+```
+
+```ts title="next.config.ts"
+import type { NextConfig } from 'next'
+
+const config: NextConfig = {
+  async headers() {
+    return [{ source: '/auth/:path*', headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }] }]
+  },
+}
+export default config
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+When your app opens from the link, pass the link to `handleLink`. On the web, `Uri.base` is the page's address.
+
+```dart
+Future<void> onContinue(Uri link) async {
+  try {
+    final result = await orvano.client.handleLink(link);
+    showMessage(result == null ? 'This link is incomplete.' : 'Your email is verified.');
+  } on OrvanoException catch (error) {
+    showMessage(error.message);
+  }
+}
+```
+
+How the app receives the link on iOS and Android is in [Flutter deep links](#flutter-deep-links) below.
+
+  </TabItem>
+</Tabs>
+
+A used, expired, or replaced link gets [`invalid_email_token`](/errors/invalid_email_token/): offer to send a new one.
+
+## Gate features on a verified email
+
+In your app, read `emailVerified` from the user:
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const user = await orvano.account.get()
+if (!user.emailVerified) showVerifyBanner()
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```tsx
+const user = await currentUser()
+if (user !== null && !user.emailVerified) return <VerifyBanner />
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final user = await orvano.account.get();
+if (!user.emailVerified) showVerifyBanner();
+```
+
+  </TabItem>
+</Tabs>
+
+On your own server, the access token carries the same fact. Check it there for anything that matters, because your app's own checks can be skipped:
+
+<Tabs syncKey="server-sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const token = await client.verifyAccessToken(accessToken)
+if (!token.emailVerified) return new Response('Verify your email first.', { status: 403 })
+```
+
+  </TabItem>
+  <TabItem label="Dart">
+
+```dart
+final token = await client.verifyAccessToken(accessToken);
+if (!token.emailVerified) return Response.forbidden('Verify your email first.');
+```
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+var token = await orvano.VerifyAccessTokenAsync(accessToken);
+if (!token.EmailVerified) return Results.Problem("Verify your email first.", statusCode: 403);
+```
+
+  </TabItem>
+</Tabs>
+
+The token's `email_verified` updates when the session next refreshes. The client SDKs refresh right after a verification on the same device, but a user who verifies on their phone while signed in on a laptop shows as unverified there for up to 15 minutes. When that matters, read the user with [`users.get`](/docs/api/operations/usersget/) instead.
+
+## Verify from your server
+
+With an API key that has `users.write`, your server can send a user the email with [`users.createVerification`](/docs/api/operations/userscreateverification/), or mark the email verified (or not) without an email, with [`users.updateEmailVerification`](/docs/api/operations/usersupdateemailverification/). [Manage users with an API key](/docs/auth/manage-users/) shows how.
+
+## Flutter deep links
+
+To open your Flutter app from an email link on iOS and Android, the link must lead into the app. There are two ways:
+
+| | https app links | Custom scheme |
+|---|---|---|
+| Link looks like | `https://app.example.com/auth/confirm?...` | `dev.orvano.quickstart://auth?...` |
+| Works for | every email link | verification and email change only |
+| Needs | a real domain you control, with two files on it | only app settings |
+| Opens in every mail app | yes, and falls back to your website | no: some, such as Gmail on the web, won't open it |
+
+Magic links and password reset links sign the user in, so Orvano allows only https for them: any app could claim a custom scheme and catch the token. **Use https app links in production.**
+
+### Set up https app links
+
+This part can't run against a local stack: Android and iOS check the files on a real https domain, so it's the one guide CI doesn't cover. During development, use a [custom scheme](#a-custom-scheme-for-development) for verification, and [email codes](/docs/auth/email-codes/) to sign in.
+
+1. Add your domain as a web platform of the project, so Orvano accepts `https://app.example.com/...` as a `redirectUrl`.
+2. **Android**: publish `https://app.example.com/.well-known/assetlinks.json` with your package name and your signing key's SHA-256 fingerprint, and add an intent filter to your activity in `AndroidManifest.xml`:
+
+   ```xml
+   <intent-filter android:autoVerify="true">
+     <action android:name="android.intent.action.VIEW" />
+     <category android:name="android.intent.category.DEFAULT" />
+     <category android:name="android.intent.category.BROWSABLE" />
+     <data android:scheme="https" android:host="app.example.com" android:pathPrefix="/auth" />
+   </intent-filter>
+   ```
+
+3. **iOS**: publish `https://app.example.com/.well-known/apple-app-site-association` naming your team ID and bundle ID with the path `/auth/*`, and add the Associated Domains capability with `applinks:app.example.com` in Xcode.
+4. Receive the link with a package such as [`app_links`](https://pub.dev/packages/app_links), and hand it to Orvano:
+
+   ```dart
+   final appLinks = AppLinks();
+   appLinks.uriLinkStream.listen((uri) {
+     if (uri.queryParameters.containsKey('orvano_token')) showContinueScreen(uri);
+   });
+   ```
+
+   The Continue screen calls `orvano.client.handleLink(uri)`, as on [the landing page](#the-landing-page).
+
+If the app isn't installed, the same link opens your website, so give `https://app.example.com/auth/confirm` a web landing page too.
+
+### A custom scheme for development
+
+For verification and email change only, you can skip the domain. Register the scheme `dev.orvano.quickstart` in the app (an intent filter with `android:scheme` on Android, `CFBundleURLTypes` in `Info.plist` on iOS), add the matching iOS or Android [platform](/docs/console/platforms/) to the project, and send `redirectUrl: 'dev.orvano.quickstart://auth'`. Then open the email in Mailpit on the same device or emulator, so the link opens your app there. On the Android emulator, `adb reverse tcp:8025 tcp:8025` lets it reach the inbox at `http://localhost:8025`, as the quickstart does for port 7700.

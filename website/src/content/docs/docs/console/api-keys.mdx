@@ -1,0 +1,30 @@
+---
+title: API keys
+description: "Create, scope, and delete server API keys."
+sidebar:
+  order: 3
+---
+
+import Screenshot from '../../../../components/Screenshot.astro'
+
+API keys let your servers manage a project's users. [API keys and scopes](/docs/concepts/api-keys/) explains what a key can do; this page shows the console steps. Owners and developers can create keys; viewers can only see them.
+
+## Create a key
+
+1. Open the project's **API keys** page and select **Create key**.
+2. Name it after the server that uses it, so you can tell keys apart later.
+3. Tick the scopes it needs. **Read** and **Write** are separate: a key that creates users and reads them needs both.
+4. Choose when it expires: **Never**, 30, 90, or 365 days, or a date of your choice.
+5. Select **Create key**.
+
+   <Screenshot name="create-api-key" alt="The Create an API key dialog with the name Quickstart server and the scopes Users read and Users write ticked." />
+
+6. Copy the key, which starts with `orv_sk_`, and store it in your server's secrets. **The console never shows it again.** Tick **I've copied this key and stored it safely**, then select **Done**.
+
+## The key list
+
+The list shows each key's name, the start of the key (such as `orv_sk_Xy3aB…`), its scopes, when it expires, when it was last used, and who created it. **Last used** helps you find keys nobody needs anymore.
+
+## Delete a key
+
+Select **Delete** on its row. Anything using the key stops working at once. Owners can delete any key; developers only the keys they created. Delete a leaked key right away, then create a new one for the server that needs it.

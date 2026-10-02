@@ -275,6 +275,13 @@ take_lock() {
 }
 
 # One install per host: the Compose project name is fixed (spec 0006, AC-2).
+# A folder made by `install --local` is never turned into a server install (spec 0011, AC-3).
+check_not_local() {
+  [ -f "$flag_dir/.env" ] || return 0
+  [ "$(env_value ORVANO_LOCAL)" != true ] ||
+    refuse "$flag_dir holds a local install (ORVANO_LOCAL=true in .env). Install the server in another folder with --dir."
+}
+
 check_one_install() {
   others=$(docker ps -a --filter "label=com.docker.compose.project=$PROJECT" \
     --format '{{.Label "com.docker.compose.project.working_dir"}}' 2>/dev/null | sort -u)
@@ -559,6 +566,7 @@ main() {
   take_lock
   log "install.sh started for $version on $distro (Docker $docker_version, Compose $compose_version)"
   [ "$docker_installed" = 0 ] || log "installed Docker with get.docker.com"
+  check_not_local
   check_one_install
   check_data
   check_ports

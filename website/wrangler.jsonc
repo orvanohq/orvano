@@ -1,0 +1,15 @@
+// orvano.dev on Cloudflare Workers static assets (spec 0011, AC-23). No Worker code: Cloudflare serves `dist/`,
+// applies `public/_headers`, and answers an unknown path with the site's 404 page.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "orvano-website",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash",
+  },
+  // Pull request previews are `wrangler versions upload --preview-alias pr-<number>` (AC-26).
+  "workers_dev": true,
+  "preview_urls": true,
+}

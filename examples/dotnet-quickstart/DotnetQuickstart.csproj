@@ -1,0 +1,14 @@
+<!-- The finished app of the Orvano .NET quickstart: https://orvano.dev/docs/quickstarts/dotnet/ -->
+<!-- #region project -->
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Orvano" Version="0.0.0" />
+  </ItemGroup>
+</Project>
+<!-- #endregion project -->

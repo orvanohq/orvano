@@ -1,0 +1,77 @@
+---
+title: Change email
+description: "Let a signed in user move to a new email address."
+sidebar:
+  order: 6
+---
+
+import { TabItem, Tabs } from '@astrojs/starlight/components'
+
+A signed in user can move their account to a new email address. Orvano emails a confirmation link to the **new** address, and the email changes only when they open it, so a typo can't lock anyone out.
+
+This guide starts from a finished quickstart running against [Orvano on your machine](/docs/local/); the confirmation lands in the local inbox at `http://localhost:8025`. It uses the same kind of landing page as [Email verification](/docs/auth/email-verification/#the-landing-page).
+
+## 1. Ask for the change
+
+[`account.updateEmail`](/docs/api/operations/accountupdateemail/) needs the user's password, so someone who borrows an unlocked laptop can't take over the account.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.account.updateEmail({
+  email: newEmail,
+  password,
+  redirectUrl: `${location.origin}/confirm.html`,
+})
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+'use server'
+await (await orvano()).account.updateEmail({
+  email: newEmail,
+  password,
+  redirectUrl: `${appUrl}/auth/confirm`,
+})
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+await orvano.account.updateEmail(
+  UpdateEmailRequest(
+    email: newEmail,
+    password: password,
+    redirectUrl: 'https://app.example.com/auth/confirm',
+  ),
+);
+```
+
+  </TabItem>
+</Tabs>
+
+| Answer | Why |
+|---|---|
+| [`invalid_credentials`](/errors/invalid_credentials/) | wrong password |
+| [`email_already_in_use`](/errors/email_already_in_use/) | another user of the project has that email |
+| [`reauthentication_required`](/errors/reauthentication_required/) | the user has no password and signed in more than 10 minutes ago: ask them to sign in again with a [magic link](/docs/auth/magic-links/) or an [email code](/docs/auth/email-codes/), then retry |
+
+The `redirectUrl` follows the same rules as a verification link, so a Flutter app may use its [custom scheme](/docs/auth/email-verification/#a-custom-scheme-for-development) here. The confirmation uses the project's Email verification template, and works once, for 1 hour.
+
+## 2. Confirm on the landing page
+
+When the user selects **Continue**, finish the link with `orvano.client.redeemLink()` (JavaScript and Next.js) or `orvano.client.handleLink(link)` (Flutter), exactly as on the [verification landing page](/docs/auth/email-verification/#the-landing-page). [`account.confirmEmailChange`](/docs/api/operations/accountconfirmemailchange/) needs no session, because the user may open the email on another device.
+
+After it:
+
+- the user's email is the new one, and verified;
+- every session stays signed in;
+- the old address no longer signs in.
+
+## Change it from your server
+
+Support tools can change a user's email at once, without a confirmation email, with [`users.updateEmail`](/docs/api/operations/usersupdateemail/) and an API key with `users.write`. Use it only when you've checked the person's identity some other way.

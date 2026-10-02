@@ -1,0 +1,7 @@
+## Why it happens
+
+A `/v1/console` call came without a valid console session cookie, or with an API key or an app user's token instead. Console operations are only for the Orvano console itself.
+
+## How to fix
+
+Sign in to the console again. If your own code made the call, use the public API instead: app users go through the client SDKs, and server work goes through an API key. Console operations are not part of the public SDKs.

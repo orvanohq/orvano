@@ -1,0 +1,30 @@
+---
+title: Overview
+description: "What Orvano is, and where to start."
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components'
+
+Orvano is an open source backend you host yourself. One install gives you a console that holds many projects, and each project gets auth, a Postgres database, storage, functions, realtime, messaging, webhooks, jobs, and backups. Today Orvano ships auth: sign up and sign in with a password, email verification, password reset, magic links, and email codes.
+
+You talk to a project through one of five SDKs, all generated from one API contract:
+
+- **Client SDKs** run where your users are: `@orvano/js` in the browser, `@orvano/nextjs` in Next.js, `orvano_flutter` in Flutter apps. They sign users in and act as them.
+- **Server SDKs** run on your own server with an API key: `orvano_dart` and the `Orvano` NuGet package. They manage users and verify the tokens your users send.
+
+## Start here
+
+<CardGrid>
+  <LinkCard title="Run Orvano locally" href="/docs/local/" description="Start Orvano on your machine with three commands." />
+  <LinkCard title="Next.js quickstart" href="/docs/quickstarts/nextjs/" description="From an empty folder to a signed in user." />
+  <LinkCard title="Flutter quickstart" href="/docs/quickstarts/flutter/" description="Sign in on web, iOS, and Android." />
+  <LinkCard title="JavaScript quickstart" href="/docs/quickstarts/js/" description="A Vite app with plain TypeScript." />
+  <LinkCard title="Dart server quickstart" href="/docs/quickstarts/dart/" description="Check your users' tokens on a Dart server." />
+  <LinkCard title=".NET quickstart" href="/docs/quickstarts/dotnet/" description="Check your users' tokens in ASP.NET Core." />
+</CardGrid>
+
+## Then
+
+- [Concepts](/docs/concepts/orgs-and-projects/) explain orgs, projects, keys, platforms, sessions, and errors.
+- [Auth guides](/docs/auth/email-and-password/) show every sign in flow, with a snippet for each SDK.
+- [Install on a server](/docs/self-hosting/install/) when you're ready to go live.

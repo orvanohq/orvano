@@ -1,0 +1,19 @@
+---
+// The site title plus the Orvano version every page documents (spec 0011, AC-8).
+import Default from '@astrojs/starlight/components/SiteTitle.astro'
+import { version } from '../lib/site'
+---
+
+<div class="sl-flex title-with-version">
+  <Default />
+  <span class="version-badge" title={`These docs are for Orvano ${version}`}>
+    v{version}
+  </span>
+</div>
+
+<style>
+  .title-with-version {
+    align-items: center;
+    gap: 0.5rem;
+  }
+</style>

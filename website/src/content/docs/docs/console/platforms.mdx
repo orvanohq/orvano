@@ -1,0 +1,34 @@
+---
+title: Platforms
+description: "Register the web origins and apps that use a project."
+sidebar:
+  order: 4
+---
+
+import Screenshot from '../../../../components/Screenshot.astro'
+
+Add a platform for each app that uses the project. A browser app whose site isn't listed gets [`origin_not_allowed`](/errors/origin_not_allowed/). [Platforms](/docs/concepts/platforms/) explains how matching works. Owners and developers can add, edit, and delete platforms.
+
+## Add a website
+
+1. Open the project's **Platforms** page and select **Add platform**.
+2. Keep the type **Web**, name it, and enter the **Hostname**: `app.example.com`, `*.example.com` for its subdomains, or `localhost` for development. If you paste a full address such as `https://app.example.com:3000/login`, the console keeps just the hostname.
+3. Select **Add platform**.
+
+<Screenshot name="add-web-platform" alt="The Add a platform dialog with the type Web, the name Local web, and the hostname localhost." />
+
+## Add a mobile or desktop app
+
+Choose the type, then the identifier:
+
+| Type | Identifier |
+|---|---|
+| Android | the package name, such as `com.example.app` |
+| iOS, macOS | the bundle ID, such as `com.example.app` |
+| Windows, Linux | a label of your choice |
+
+<Screenshot name="add-ios-platform" alt="The Add a platform dialog with the type iOS, the name Quickstart iOS, and the bundle ID dev.orvano.quickstart." />
+
+A Flutter app needs one platform for each target you ship: Web, Android, iOS, and so on.
+
+You can't change a platform's type after adding it; delete it and add another. While a project is being deleted, you can delete its platforms but not add or change them.

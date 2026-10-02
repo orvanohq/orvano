@@ -1,0 +1,7 @@
+## Why it happens
+
+The path does not exist, or the thing it names does not. This is the general code; the API uses a specific one (`user_not_found`, `project_not_found`) when it can.
+
+## How to fix
+
+Check the endpoint and the path. The endpoint is your Orvano URL without `/v1`; the SDKs add `/v1` themselves. If you call the API by hand, compare your path with the [API reference](/docs/api/).

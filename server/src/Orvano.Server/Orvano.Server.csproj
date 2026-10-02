@@ -12,6 +12,7 @@
     <!-- `orvano install` writes these into the install directory, so the compose file always
          matches the version of the image that wrote it (spec 0006). -->
     <EmbeddedResource Include="..\..\..\deploy\compose\docker-compose.yml" LogicalName="install/docker-compose.yml" />
+    <EmbeddedResource Include="..\..\..\deploy\compose\docker-compose.local.yml" LogicalName="install/docker-compose.local.yml" />
     <EmbeddedResource Include="..\..\..\deploy\compose\initdb\10-orvano-roles.sh" LogicalName="install/initdb/10-orvano-roles.sh" />
   </ItemGroup>
 

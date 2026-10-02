@@ -1,0 +1,41 @@
+---
+title: Client and server SDKs
+description: "Which SDK runs where, and what each one can call."
+sidebar:
+  order: 5
+---
+
+Orvano has two kinds of SDK, and every operation in the API is meant for one or both of them.
+
+| | Client SDKs | Server SDKs |
+|---|---|---|
+| Runs | where your users are: browsers, phones, desktops | on your own servers |
+| Credential | the signed in user's session | an [API key](/docs/concepts/api-keys/) |
+| Can call | the user's own account: sign up, sign in, profile, sessions, email flows | any user of the project, through `users` |
+| Packages | [`@orvano/js`](/docs/sdks/js/), [`@orvano/nextjs`](/docs/sdks/nextjs/), [`orvano_flutter`](/docs/sdks/flutter/) | [`@orvano/js/server`](/docs/sdks/js/#on-your-server), [`orvano_dart`](/docs/sdks/dart/), [`Orvano`](/docs/sdks/dotnet/) for .NET |
+
+Each SDK carries only the operations meant for it, so you can't call `users.block` from a browser by mistake: the method isn't there. A few operations work in both, such as reading the signed in user and fetching the project's public signing keys.
+
+Every operation's page in the [API reference](/docs/api/operations/accountcreate/) says which SDKs call it, with a snippet for each.
+
+## Why they're split
+
+A client SDK runs on a device you don't control, so anything in it can be read. It holds only the user's own session, which can do only what that user may do. A server SDK holds a key with more power, so it stays where nobody else can read it, and the server SDKs refuse to set a key in a browser.
+
+## Using both together
+
+A typical app uses a client SDK to sign users in and a server SDK on its backend:
+
+1. Your app signs the user in with a client SDK.
+2. It sends the user's access token to your backend, in `Authorization: Bearer <token>`.
+3. Your backend checks the token with the server SDK's `verifyAccessToken`, and now knows the user's ID.
+4. If it needs more, it calls `users.get` with its API key.
+
+The [Dart](/docs/quickstarts/dart/) and [.NET](/docs/quickstarts/dotnet/) quickstarts build exactly that backend. [Verify tokens on your server](/docs/auth/verify-tokens/) explains step 3.
+
+## What every SDK shares
+
+- Generated from one API contract, so the same operation has the same name everywhere: `users.get` in JavaScript and Dart is `Users.GetAsync` in .NET.
+- One error type per SDK with a stable `code`; see [Errors](/docs/concepts/errors/).
+- Reads are retried after a 429 or 503, waiting as long as `Retry-After` says. Calls that change something are retried only when Orvano marks them safe to repeat.
+- A 30 second timeout per call, and a warning when the SDK's version doesn't match the server's.

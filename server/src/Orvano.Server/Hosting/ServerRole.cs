@@ -89,6 +89,11 @@ internal static class ServerRole
         var appDb = app.Services.GetRequiredKeyedService<NpgsqlDataSource>(OrvanoDb.App);
         if (!await StartupChecks.SchemaMatchesAsync(appDb, logger, app.Lifetime.ApplicationStopping)) return 1;
         if (role == OrvanoRole.Api && !await StartupChecks.FirstAdminProtectedAsync(app.Environment, config, app.Services.GetRequiredService<IInstallSetupState>(), logger, app.Lifetime.ApplicationStopping)) return 1;
+        if (role == OrvanoRole.Api)
+        {
+            foreach (var module in modules) await module.OnApiStartingAsync(app.Services, app.Lifetime.ApplicationStopping);
+        }
+
         if (role == OrvanoRole.Api && fixtures.ConsoleUsers.Count > 0)
         {
             var stopping = app.Lifetime.ApplicationStopping;

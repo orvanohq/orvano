@@ -4,8 +4,8 @@ namespace Orvano.SdkGen.Rendering;
 
 /// <summary>
 /// Stamps the repo's <c>VERSION</c> into every package manifest (spec 0001, AC-11), so SDK packages
-/// always share the server's major.minor. The .NET projects read <c>VERSION</c> themselves
-/// (<c>Directory.Build.props</c>), and the contract's <c>@info</c> version is checked, not written,
+/// always share the server's major.minor. The repo's .NET projects read <c>VERSION</c> themselves
+/// (<c>Directory.Build.props</c>), the .NET quickstart example excepted, and the contract's <c>@info</c> version is checked, not written,
 /// because TypeSpec is only edited by people. Each published Dart package's CHANGELOG.md also gets a
 /// section for the version, which pub.dev requires.
 /// </summary>
@@ -19,6 +19,32 @@ internal static partial class ManifestStamper
         "sdks/js/package.json",
         "sdks/nextjs/package.json",
         "sdks/console-client/package.json",
+    ];
+
+    /// <summary>
+    /// The quickstart examples (spec 0011, AC-14): each pins its Orvano packages to exactly
+    /// <c>VERSION</c>, never a range, and its own version stays as it is.
+    /// </summary>
+    private static readonly string[] ExamplePackageJsons =
+    [
+        "examples/nextjs-quickstart/package.json",
+        "examples/js-quickstart/package.json",
+    ];
+
+    /// <summary>The Dart and Flutter quickstart examples; see <see cref="ExamplePackageJsons"/>.</summary>
+    private static readonly string[] ExamplePubspecs =
+    [
+        "examples/dart-quickstart/pubspec.yaml",
+        "examples/flutter-quickstart/pubspec.yaml",
+    ];
+
+    /// <summary>
+    /// The .NET quickstart example; see <see cref="ExamplePackageJsons"/>. It sits behind a
+    /// <c>Directory.Build.props</c> stop file, so it pins the <c>Orvano</c> package itself.
+    /// </summary>
+    private static readonly string[] ExampleProjects =
+    [
+        "examples/dotnet-quickstart/DotnetQuickstart.csproj",
     ];
 
     /// <summary>The published Dart packages; their <c>version</c> follows <c>VERSION</c>.</summary>
@@ -40,6 +66,12 @@ internal static partial class ManifestStamper
     [GeneratedRegex("^(  \"version\": )\"[^\"]*\"", RegexOptions.Multiline)]
     private static partial Regex PackageJsonVersion();
 
+    [GeneratedRegex("^(\\s+\"@orvano/[a-z-]+\": )\"[^\"]*\"", RegexOptions.Multiline)]
+    private static partial Regex OrvanoDependency();
+
+    [GeneratedRegex("(<PackageReference Include=\"Orvano\" Version=\")[^\"]*\"")]
+    private static partial Regex OrvanoPackageReference();
+
     [GeneratedRegex("^version: .*$", RegexOptions.Multiline)]
     private static partial Regex PubspecVersion();
 
@@ -50,6 +82,12 @@ internal static partial class ManifestStamper
     {
         foreach (var file in PackageJsons)
             await RewriteAsync(root, file, s => PackageJsonVersion().Replace(s, $"$1\"{version}\"", 1));
+        foreach (var file in ExamplePackageJsons)
+            await RewriteAsync(root, file, s => OrvanoDependency().Replace(s, $"$1\"{version}\""));
+        foreach (var file in ExamplePubspecs)
+            await RewriteAsync(root, file, s => PubspecDependency().Replace(s, $"${{1}}{version}"));
+        foreach (var file in ExampleProjects)
+            await RewriteAsync(root, file, s => OrvanoPackageReference().Replace(s, $"${{1}}{version}\""));
         foreach (var file in DartDependents)
         {
             var published = DartPackages.Contains(file, StringComparer.Ordinal);

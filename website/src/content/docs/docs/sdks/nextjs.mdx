@@ -1,0 +1,105 @@
+---
+title: Next.js
+description: "The @orvano/nextjs package: server components, server actions, and the proxy."
+sidebar:
+  order: 2
+---
+
+import { Code } from '@astrojs/starlight/components'
+import { version } from '../../../../lib/site'
+
+`@orvano/nextjs` connects a Next.js App Router app (Next.js 15 or later) to Orvano. It builds on [`@orvano/js`](/docs/sdks/js/) and keeps the user's session in two cookies, so server components, server actions, route handlers, and the browser all see the same signed in user.
+
+## Install
+
+<Code code={`npm install @orvano/nextjs@${version}`} lang="sh" />
+
+The [Next.js quickstart](/docs/quickstarts/nextjs/) builds a full app with it. This page explains the parts.
+
+## The session cookies
+
+| Cookie | Holds | Readable by script |
+|---|---|---|
+| `orvano_access` | the access token, until it expires (15 minutes) | yes, so client components can call Orvano |
+| `orvano_refresh` | the refresh token, until the session ends | no, it's `HttpOnly` |
+
+Both are `SameSite=Lax`, `Path=/`, and `Secure` everywhere except on `http://localhost`.
+
+## On the server: `createServerClient`
+
+Make one client per request, never a shared one:
+
+```ts
+import { createServerClient } from '@orvano/nextjs'
+import { cookies, headers } from 'next/headers'
+
+export async function orvano() {
+  return createServerClient({
+    endpoint: process.env.NEXT_PUBLIC_ORVANO_ENDPOINT!,
+    project: process.env.NEXT_PUBLIC_ORVANO_PROJECT!,
+    cookies: await cookies(),
+    requestHeaders: await headers(),
+  })
+}
+```
+
+It reads the session from the cookies. In a server action or a route handler it also writes them, so sign the user in there: `account.create` and `account.createPasswordSession` set both cookies, and `account.deleteCurrentSession` clears them. Server components can't set cookies, so there the session is read only.
+
+`requestHeaders` passes the browser's IP address and user agent on to Orvano, so the user's [session list](/docs/auth/manage-sessions/) shows their browser rather than your Next.js server.
+
+The server client is a client SDK: it acts as the signed in user and has no API key. To manage users from your Next.js server, also make an [`@orvano/js/server`](/docs/sdks/js/#on-your-server) client with an API key.
+
+## Keep the session fresh: `updateSession`
+
+Call `updateSession` from `proxy.ts` (`middleware.ts` before Next.js 16). It refreshes the session when the access token has less than a minute left, and clears both cookies when the session has ended:
+
+```ts title="proxy.ts"
+import { updateSession } from '@orvano/nextjs/server'
+import type { NextRequest } from 'next/server'
+
+export function proxy(request: NextRequest) {
+  return updateSession(request, {
+    endpoint: process.env.NEXT_PUBLIC_ORVANO_ENDPOINT!,
+    project: process.env.NEXT_PUBLIC_ORVANO_PROJECT!,
+  })
+}
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+}
+```
+
+## In the browser: `createBrowserClient` and the route handler
+
+Client components use `createBrowserClient`. It reads the access token from the `orvano_access` cookie, and it never sees the refresh token: it asks your app's own route handler to refresh, sign out, finish an emailed link, or sign in with an emailed code. Mount that handler once:
+
+```ts title="app/api/orvano/[...orvano]/route.ts"
+import { createOrvanoRouteHandler } from '@orvano/nextjs/server'
+
+export const { POST } = createOrvanoRouteHandler({
+  endpoint: process.env.NEXT_PUBLIC_ORVANO_ENDPOINT!,
+  project: process.env.NEXT_PUBLIC_ORVANO_PROJECT!,
+})
+```
+
+```tsx
+'use client'
+import { createBrowserClient } from '@orvano/nextjs'
+
+const orvano = createBrowserClient({
+  endpoint: process.env.NEXT_PUBLIC_ORVANO_ENDPOINT!,
+  project: process.env.NEXT_PUBLIC_ORVANO_PROJECT!,
+})
+```
+
+The handler answers only `POST` requests from your app's own origin. It has no `GET` action, so a mail scanner that opens a link can't use it up.
+
+Sign users in from a server action rather than the browser: a session started in the browser keeps only the access token, so it lasts 15 minutes.
+
+## Emailed links and codes
+
+The page an emailed link lands on is a client component with a **Continue** button that calls `orvano.client.redeemLink()`. A password reset link needs the new password: `redeemLink(undefined, { password })`. An emailed code signs in with `orvano.client.signInWithEmailCode(email, code)`. Send the emails themselves from a server action with `createServerClient`. Each [auth guide](/docs/auth/email-verification/) has the Next.js version of its flow.
+
+## Errors
+
+Refused calls throw `OrvanoError`, re-exported from this package with `ErrorCode`. See [Errors](/docs/concepts/errors/).

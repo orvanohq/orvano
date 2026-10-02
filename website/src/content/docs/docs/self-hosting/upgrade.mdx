@@ -1,0 +1,46 @@
+---
+title: Upgrade and repair
+description: "Upgrade to a new version, or repair an install."
+sidebar:
+  order: 2
+---
+
+import { Code } from '@astrojs/starlight/components'
+import { installScript, version } from '../../../../lib/site'
+
+You upgrade and repair Orvano with the same command you installed it with. The installer never changes a secret and never removes anything.
+
+## Upgrade
+
+Run the installer of the new version:
+
+<Code code={`curl -fsSL ${installScript} | sudo sh`} lang="sh" />
+
+It finds the existing install in `/opt/orvano` (pass `--dir` if you used another folder), keeps your domain, secrets, and own `.env` lines, pulls the new images, and restarts Orvano. Database migrations run first, before the new version serves anything. Expect a short outage while the containers restart.
+
+Each version's installer installs exactly that version ({version} for this one), so read the [changelog](/docs/changelog/) before you run a newer one. To pin a version from any installer, pass `--version X.Y.Z`.
+
+**Back up first.** Orvano has no backup command yet. Before an upgrade, copy `/opt/orvano/.env` and back up the `orvano_orvano-pg` volume, for example with your host's disk snapshots.
+
+## Repair
+
+Run the installer of the version you already have. It writes `docker-compose.yml` and `initdb/` again, fixes the settings it manages in `.env`, and starts every service. Use it after editing a managed file by mistake, or when a service won't start after a host change.
+
+## Downgrades
+
+The installer refuses an older version than the one installed, with exit code 2: a newer version may have changed the database in ways an older one can't read. To go back, restore the backup you took before the upgrade.
+
+## Change the domain
+
+Run the installer with `--domain <new domain>`. It warns that every signed in app user and console user must sign in again, because their tokens name the old address, and asks before it goes on. Point the new domain's DNS to the server first.
+
+## When the installer stops
+
+| Exit code | What to do |
+|---|---|
+| `2` | Nothing changed. Read the message: it names the failed check and the fix. |
+| `3` | Orvano started, but something isn't healthy. The installer printed the failing service's last 50 log lines. Fix the cause, often DNS, the firewall, or memory, and run it again. |
+
+Then, from `/opt/orvano`, `docker compose ps --all` and `docker compose logs <service>` show where things stand. The installer's `install.log` records what each run did.
+
+If the installer says `.env` is missing but the database volume exists, restore `.env` from your backup: without its passwords and master key, the existing data can't be opened.

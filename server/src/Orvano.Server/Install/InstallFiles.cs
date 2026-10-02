@@ -10,6 +10,7 @@ namespace Orvano.Server.Install;
 internal sealed class InstallFiles(string directory)
 {
     public const string ComposeFile = "docker-compose.yml";
+    public const string LocalComposeFile = "docker-compose.local.yml";
     public const string InitdbScript = "initdb/10-orvano-roles.sh";
     public const string Env = ".env";
     public const string PreviousEnv = ".env.previous";
@@ -24,14 +25,18 @@ internal sealed class InstallFiles(string directory)
 
     public string? ReadEnv() => File.Exists(PathOf(Env)) ? File.ReadAllText(PathOf(Env)) : null;
 
-    /// <summary>Rewrites the compose file and the init script from the copies embedded in this image (AC-10).</summary>
-    public async Task WriteManagedFilesAsync()
+    /// <summary>
+    /// Rewrites the compose file and the init script from the copies embedded in this image (AC-10), plus the local
+    /// overlay for a local install (spec 0011).
+    /// </summary>
+    public async Task WriteManagedFilesAsync(bool local = false)
     {
         var initdb = Path.GetDirectoryName(PathOf(InitdbScript))!;
         if (OperatingSystem.IsWindows()) Directory.CreateDirectory(initdb);
         else Directory.CreateDirectory(initdb, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
         await WriteAsync(ComposeFile, await ReadResourceAsync("install/docker-compose.yml"), Public);
         await WriteAsync(InitdbScript, await ReadResourceAsync("install/initdb/10-orvano-roles.sh"), Executable);
+        if (local) await WriteAsync(LocalComposeFile, await ReadResourceAsync("install/docker-compose.local.yml"), Public);
     }
 
     /// <summary>Writes <c>.env</c> (0600), keeping the file it replaces as <c>.env.previous</c>.</summary>

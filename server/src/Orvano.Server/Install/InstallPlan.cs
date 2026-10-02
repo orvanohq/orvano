@@ -26,6 +26,13 @@ internal static class InstallPlan
         "# and their order, and never changes a secret.",
     ];
 
+    private static readonly string[] LocalHeader =
+    [
+        "# Orvano on this machine, written by `orvano install --local` (spec 0011). It holds the master key;",
+        "# losing it makes stored secrets unrecoverable. Every run keeps your own keys, comments, and their",
+        "# order, and never changes a secret or COMPOSE_PROJECT_NAME.",
+    ];
+
     /// <summary>
     /// Step 8, before any question is asked: the version rule (AC-13) and the lost database password
     /// rule (AC-9).
@@ -52,8 +59,11 @@ internal static class InstallPlan
     /// True when a run on an existing install (one with <c>ORVANO_VERSION</c>) would move it to a
     /// different public URL, which signs every user out (AC-18).
     /// </summary>
-    public static bool ChangesPublicUrl(EnvFile? existing, string domain) =>
-        existing?.HasValue(Version) == true && existing.Get(PublicUrl) != DomainRule.PublicUrl(domain);
+    public static bool ChangesPublicUrl(EnvFile? existing, string domain) => ChangesPublicUrlTo(existing, DomainRule.PublicUrl(domain));
+
+    /// <summary>As <see cref="ChangesPublicUrl"/>, for a local install's <c>http://localhost:&lt;port&gt;</c> (spec 0011, AC-3).</summary>
+    public static bool ChangesPublicUrlTo(EnvFile? existing, string publicUrl) =>
+        existing?.HasValue(Version) == true && existing.Get(PublicUrl) != publicUrl;
 
     /// <summary>
     /// Steps 11 and 12: the new <c>.env</c>. Missing secrets are generated, managed keys are set, and
@@ -61,14 +71,40 @@ internal static class InstallPlan
     /// </summary>
     public static InstallResult Apply(EnvFile? existing, InstallInputs inputs)
     {
-        var before = existing?.ToString();
-        var env = existing ?? EnvFile.Create(Header);
-        var publicUrlChanged = ChangesPublicUrl(existing, inputs.Domain);
         var publicUrl = DomainRule.PublicUrl(inputs.Domain);
+        return Write(existing, Header, publicUrl, inputs.Version, inputs.MemTotalMib, inputs.Now, env => env.Set(AcmeEmail, inputs.AcmeEmail));
+    }
 
-        env.Set(Version, inputs.Version);
+    /// <summary>
+    /// The new <c>.env</c> of a local install (spec 0011, Local stack): spec 0006's secrets and tuning, plus the
+    /// compose files, a project name generated once and kept, the installer's own markers, and the SMTP seed that
+    /// points at the local Mailpit (AC-1, AC-3, AC-4).
+    /// </summary>
+    public static InstallResult ApplyLocal(EnvFile? existing, LocalInputs inputs)
+    {
+        var publicUrl = LocalRule.PublicUrl(inputs.Port);
+        return Write(existing, LocalHeader, publicUrl, inputs.Version, inputs.MemTotalMib, inputs.Now, env =>
+        {
+            env.Set(LocalRule.LocalKey, "true");
+            env.Set(LocalRule.LocalPortKey, inputs.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            env.Set(LocalRule.ComposeFileKey, LocalRule.ComposeFiles);
+            env.Set(LocalRule.ComposePathSeparatorKey, ":");
+            if (!env.HasValue(LocalRule.ComposeProjectNameKey)) env.Set(LocalRule.ComposeProjectNameKey, LocalRule.NewProjectName());
+            env.Set(LocalRule.SmtpUrlKey, LocalRule.SmtpUrl);
+            env.Set(LocalRule.SmtpFromKey, LocalRule.SmtpFrom);
+        });
+    }
+
+    private static InstallResult Write(
+        EnvFile? existing, string[] header, string publicUrl, string version, long memTotalMib, DateTimeOffset now, Action<EnvFile> setManaged)
+    {
+        var before = existing?.ToString();
+        var env = existing ?? EnvFile.Create(header);
+        var publicUrlChanged = ChangesPublicUrlTo(existing, publicUrl);
+
+        env.Set(Version, version);
         env.Set(PublicUrl, publicUrl);
-        env.Set(AcmeEmail, inputs.AcmeEmail);
+        setManaged(env);
 
         var generated = new List<string>();
         foreach (var key in Secrets)
@@ -76,7 +112,7 @@ internal static class InstallPlan
             if (env.HasValue(key)) continue;
             env.Set(key, key switch
             {
-                MasterKeys => InstallSecrets.NewMasterKey(inputs.Now),
+                MasterKeys => InstallSecrets.NewMasterKey(now),
                 SetupToken => InstallSecrets.NewSetupToken(),
                 _ => InstallSecrets.NewPassword(),
             });
@@ -86,7 +122,7 @@ internal static class InstallPlan
         var manualTuning = string.Equals(env.Get(PgTuning.ManualKey), "manual", StringComparison.Ordinal);
         if (!manualTuning)
         {
-            foreach (var (key, value) in PgTuning.For(inputs.MemTotalMib).EnvValues()) env.Set(key, value);
+            foreach (var (key, value) in PgTuning.For(memTotalMib).EnvValues()) env.Set(key, value);
         }
 
         var after = env.ToString();
@@ -103,6 +139,9 @@ internal static class InstallPlan
 
 /// <summary>The values one run settled on before writing anything.</summary>
 internal sealed record InstallInputs(string Version, string Domain, string AcmeEmail, long MemTotalMib, DateTimeOffset Now);
+
+/// <summary>The values one local run settled on before writing anything (spec 0011).</summary>
+internal sealed record LocalInputs(string Version, int Port, long MemTotalMib, DateTimeOffset Now);
 
 /// <summary>What <see cref="InstallPlan.Apply"/> decided.</summary>
 /// <param name="Env">The <c>.env</c> to write.</param>

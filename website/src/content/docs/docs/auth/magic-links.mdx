@@ -1,0 +1,90 @@
+---
+title: Magic links
+description: "Sign users in with an emailed link."
+sidebar:
+  order: 4
+---
+
+import { TabItem, Tabs } from '@astrojs/starlight/components'
+
+With a magic link, a user types only their email. Orvano emails them a link, and opening it signs them in, without a password. If the email has no account yet, the link creates one.
+
+This guide starts from a finished quickstart running against [Orvano on your machine](/docs/local/); the link lands in the local inbox at `http://localhost:8025`. It uses the same kind of landing page as [Email verification](/docs/auth/email-verification/#the-landing-page).
+
+## 1. Send the link
+
+[`account.createMagicLink`](/docs/api/operations/accountcreatemagiclink/) needs no session, and answers the same way whether or not the email has an account.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.account.createMagicLink({ email, redirectUrl: `${location.origin}/sign-in.html` })
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+'use server'
+await (await orvano()).account.createMagicLink({ email, redirectUrl: `${appUrl}/auth/sign-in` })
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+await orvano.account.createMagicLink(
+  CreateMagicLinkRequest(email: email, redirectUrl: 'https://app.example.com/auth/sign-in'),
+);
+```
+
+  </TabItem>
+</Tabs>
+
+- Pass `createUser: false` to send links only to existing users. An unknown email then gets no email, and the same answer.
+- The `redirectUrl` must be `https` on one of the project's web platforms, or `http` on `localhost`. A magic link signs the user in, so it never goes to a custom app scheme. A Flutter app on iOS or Android needs [https app links](/docs/auth/email-verification/#flutter-deep-links); during development, use [email codes](/docs/auth/email-codes/) there instead.
+- The link works once, for 15 minutes. Orvano sends at most one a minute, and five an hour, per email.
+
+Open `http://localhost:8025`: you should see "Sign in to" your project with a **Sign in** button.
+
+## 2. Sign in on the landing page
+
+When the user selects **Continue**, finish the link:
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const result = await orvano.client.redeemLink()
+if (result?.isNewUser) showWelcome()
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```tsx
+'use client'
+// app/auth/sign-in/page.tsx: the route handler sets the session cookies.
+const result = await orvano.client.redeemLink()
+router.push(result?.isNewUser ? '/welcome' : '/')
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final result = await orvano.client.handleLink(link);
+if (result?.isNewUser ?? false) showWelcome();
+```
+
+  </TabItem>
+</Tabs>
+
+The user is signed in, and their email is verified. `isNewUser` is true when the link created the account: a good moment to ask for their name with [`account.update`](/docs/api/operations/accountupdate/). A new account made this way has no password; the user can [set one](/docs/auth/email-and-password/#change-the-password) within 10 minutes of signing in.
+
+A used, expired, or replaced link gets [`invalid_email_token`](/errors/invalid_email_token/).
+
+## When an unverified account already exists
+
+Someone could sign up with another person's email and a password, before that person ever uses your app. When the real owner then signs in with a magic link, Orvano removes the unverified password and ends the other sessions, so the account is theirs alone.

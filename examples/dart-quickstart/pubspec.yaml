@@ -1,0 +1,16 @@
+# The finished app of the Orvano Dart server quickstart: https://orvano.dev/docs/quickstarts/dart/
+name: dart_quickstart
+description: An HTTP server that checks an Orvano user's access token and answers with the user.
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+# #region dependencies
+dependencies:
+  orvano_dart: 0.0.0
+  shelf: ^1.4.2
+# #endregion dependencies
+
+dev_dependencies:
+  lints: ^6.1.0

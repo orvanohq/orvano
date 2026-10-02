@@ -1,0 +1,7 @@
+## Why it happens
+
+Orvano could not reach the SMTP server: the host name didn't resolve, or the connection was refused or reset.
+
+## How to fix
+
+Check the host and port. Common ports are 587 (STARTTLS), 465 (TLS), and 25 (plain). Check that your server allows outgoing connections on that port; many cloud providers block port 25.

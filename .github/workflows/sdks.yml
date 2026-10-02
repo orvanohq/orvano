@@ -88,11 +88,11 @@ jobs:
       # Resolves the pub workspace, which also fixes the Dart language version dart format uses.
       - run: flutter pub get
       - run: pnpm --filter @orvano/contract build
-      - name: The compiled contract is committed (AC-1)
+      - name: The compiled contract and its error catalog are committed (AC-1; spec 0011, AC-16)
         run: |
           if [ -n "$(git status --porcelain -- contract)" ]; then
             git diff -- contract
-            echo "::error::contract/dist/openapi.json is stale. Run 'pnpm --filter @orvano/contract build' and commit it."
+            echo "::error::contract/dist/openapi.json or errors.json is stale. Run 'pnpm --filter @orvano/contract build' and commit it."
             exit 1
           fi
       - run: dotnet run --project tools/sdkgen

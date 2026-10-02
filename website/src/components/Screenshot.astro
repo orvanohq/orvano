@@ -1,0 +1,32 @@
+---
+/**
+ * A console screenshot in both themes; CSS shows the one matching the reader's theme (spec 0011,
+ * AC-21). `pnpm screenshots` writes `<name>-light.png` and `<name>-dark.png`; a missing one fails the build.
+ */
+import { Image } from 'astro:assets'
+import type { ImageMetadata } from 'astro'
+
+interface Props {
+  name: string
+  /** What the step shows, for people who can't see the image. */
+  alt: string
+}
+
+const shots = import.meta.glob<{ default: ImageMetadata }>('../assets/screenshots/*.png', {
+  eager: true,
+})
+const { name, alt } = Astro.props
+const pick = (theme: 'light' | 'dark'): ImageMetadata => {
+  const shot = shots[`../assets/screenshots/${name}-${theme}.png`]
+  if (shot === undefined)
+    throw new Error(
+      `The screenshot ${name}-${theme}.png is missing; run pnpm --filter @orvano/website screenshots.`,
+    )
+  return shot.default
+}
+---
+
+<figure>
+  <Image class="shot shot-light" src={pick('light')} alt={alt} />
+  <Image class="shot shot-dark" src={pick('dark')} alt={alt} />
+</figure>

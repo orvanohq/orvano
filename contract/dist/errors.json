@@ -1,0 +1,247 @@
+[
+  {
+    "code": "internal_error",
+    "status": 500,
+    "description": "Any failure the server did not expect."
+  },
+  {
+    "code": "not_found",
+    "status": 404,
+    "description": "No such route or resource."
+  },
+  {
+    "code": "invalid_request",
+    "status": 400,
+    "description": "A bad parameter or body."
+  },
+  {
+    "code": "invalid_cursor",
+    "status": 400,
+    "description": "A pagination cursor the server can't read."
+  },
+  {
+    "code": "console_session_required",
+    "status": 401,
+    "description": "A `/v1/console` call without a valid console session, or with an API key or app session."
+  },
+  {
+    "code": "project_not_found",
+    "status": 404,
+    "description": "The project is unknown, purged, being deleted, or not yours to see."
+  },
+  {
+    "code": "project_not_ready",
+    "status": 409,
+    "description": "The project is still provisioning, or provisioning failed."
+  },
+  {
+    "code": "forbidden",
+    "status": 403,
+    "description": "Your console role does not allow this action."
+  },
+  {
+    "code": "last_owner",
+    "status": 409,
+    "description": "The action would leave an org without an owner."
+  },
+  {
+    "code": "org_not_empty",
+    "status": 409,
+    "description": "The org still has projects that are not being deleted."
+  },
+  {
+    "code": "org_not_active",
+    "status": 409,
+    "description": "The org is being deleted, so it and its projects can't change until it is restored."
+  },
+  {
+    "code": "signup_closed",
+    "status": 403,
+    "description": "Console sign up is invite only and no valid invitation was given."
+  },
+  {
+    "code": "setup_token_invalid",
+    "status": 403,
+    "description": "The first console sign up on an install needs its setup token, and none or the wrong one was given."
+  },
+  {
+    "code": "invalid_password",
+    "status": 400,
+    "description": "The password is not 8 to 256 characters after Unicode NFKC normalization."
+  },
+  {
+    "code": "invalid_credentials",
+    "status": 401,
+    "description": "The email and password do not match a user, or the password given to confirm an action is wrong."
+  },
+  {
+    "code": "session_required",
+    "status": 401,
+    "description": "The operation needs a signed in user's access token in `Authorization: Bearer`."
+  },
+  {
+    "code": "invalid_token",
+    "status": 401,
+    "description": "The access token is malformed, signed by an unknown key, for another project, or its session has ended."
+  },
+  {
+    "code": "token_expired",
+    "status": 401,
+    "description": "The access token has expired; refresh the session and try again."
+  },
+  {
+    "code": "invalid_refresh_token",
+    "status": 401,
+    "description": "The refresh token is malformed, reused, or its session has ended or expired; sign in again."
+  },
+  {
+    "code": "invalid_api_key",
+    "status": 401,
+    "description": "The API key is unknown, expired, or belongs to another project."
+  },
+  {
+    "code": "user_blocked",
+    "status": 403,
+    "description": "The user is blocked."
+  },
+  {
+    "code": "insufficient_scope",
+    "status": 403,
+    "description": "The API key lacks the scope this operation needs."
+  },
+  {
+    "code": "origin_not_allowed",
+    "status": 403,
+    "description": "The browser origin matches none of the project's web platforms."
+  },
+  {
+    "code": "csrf_rejected",
+    "status": 403,
+    "description": "A console call that changes something came from another site."
+  },
+  {
+    "code": "user_not_found",
+    "status": 404,
+    "description": "No such user in the project."
+  },
+  {
+    "code": "session_not_found",
+    "status": 404,
+    "description": "No such session for this user."
+  },
+  {
+    "code": "user_already_exists",
+    "status": 409,
+    "description": "A user with this email already exists in the project."
+  },
+  {
+    "code": "invitation_not_found",
+    "status": 404,
+    "description": "The invite link is unknown, already used, replaced, or revoked."
+  },
+  {
+    "code": "invitation_expired",
+    "status": 410,
+    "description": "The invite link has expired; ask an org owner for a new one."
+  },
+  {
+    "code": "invitation_email_mismatch",
+    "status": 403,
+    "description": "The invitation is for another email than the console account using it."
+  },
+  {
+    "code": "already_member",
+    "status": 409,
+    "description": "That email's console account is already a member of the org."
+  },
+  {
+    "code": "invitation_limit",
+    "status": 409,
+    "description": "The org already holds 100 invitations; revoke some first."
+  },
+  {
+    "code": "smtp_host_not_allowed",
+    "status": 400,
+    "description": "A project's SMTP host is, or resolves to, an address outside the public internet."
+  },
+  {
+    "code": "smtp_unreachable",
+    "status": 502,
+    "description": "The SMTP server could not be reached: the name did not resolve, or the connection was refused or reset."
+  },
+  {
+    "code": "smtp_tls_failed",
+    "status": 502,
+    "description": "The secure connection to the SMTP server failed: a bad certificate, or STARTTLS is not offered."
+  },
+  {
+    "code": "smtp_auth_failed",
+    "status": 502,
+    "description": "The SMTP server refused the username or password."
+  },
+  {
+    "code": "smtp_rejected",
+    "status": 502,
+    "description": "The SMTP server refused the email; `detail` carries its reply."
+  },
+  {
+    "code": "smtp_timeout",
+    "status": 504,
+    "description": "The SMTP server did not answer in time."
+  },
+  {
+    "code": "template_invalid",
+    "status": 422,
+    "description": "An email template failed to parse, names an unknown variable or filter, or is too costly to render."
+  },
+  {
+    "code": "email_not_configured",
+    "status": 409,
+    "description": "Neither the project nor the install has an SMTP server set up."
+  },
+  {
+    "code": "email_rate_limited",
+    "status": 429,
+    "description": "The project sent too many emails through the install's SMTP server this hour; wait for `Retry-After`."
+  },
+  {
+    "code": "rate_limited",
+    "status": 429,
+    "description": "Too many requests; wait for the number of seconds in `Retry-After`."
+  },
+  {
+    "code": "redirect_url_not_allowed",
+    "status": 400,
+    "description": "The redirect URL is malformed, or its host or scheme is not a platform of the project."
+  },
+  {
+    "code": "invalid_email_token",
+    "status": 401,
+    "description": "The email link's token is unknown, already used, expired, or replaced by a newer email."
+  },
+  {
+    "code": "invalid_code",
+    "status": 401,
+    "description": "The email code is wrong, expired, or used up; ask for a new one after 5 wrong tries."
+  },
+  {
+    "code": "reauthentication_required",
+    "status": 403,
+    "description": "A user without a password must sign in again, by link or code, within 10 minutes before this action."
+  },
+  {
+    "code": "email_already_verified",
+    "status": 409,
+    "description": "The email is already verified."
+  },
+  {
+    "code": "email_already_in_use",
+    "status": 409,
+    "description": "Another user of the project has this email."
+  },
+  {
+    "code": "server_busy",
+    "status": 503,
+    "description": "The server is too busy to check a password right now; retry after `Retry-After`."
+  }
+]

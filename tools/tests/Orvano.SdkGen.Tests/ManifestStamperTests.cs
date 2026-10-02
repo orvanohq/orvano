@@ -9,6 +9,15 @@ public sealed class ManifestStamperTests : IDisposable
     private static readonly string[] PackageJsons =
         ["contract/package.json", "console/package.json", "sdks/js/package.json", "sdks/nextjs/package.json", "sdks/console-client/package.json"];
 
+    private static readonly string[] Examples =
+    [
+        "examples/nextjs-quickstart/package.json",
+        "examples/js-quickstart/package.json",
+        "examples/dart-quickstart/pubspec.yaml",
+        "examples/flutter-quickstart/pubspec.yaml",
+        "examples/dotnet-quickstart/DotnetQuickstart.csproj",
+    ];
+
     private static readonly string[] DartPackages = ["sdks/dart/core", "sdks/dart/flutter", "sdks/dart/server"];
 
     private static readonly string[] RunnerPubspecs = ["tests/scenarios/runners/dart/pubspec.yaml", "tests/scenarios/runners/flutter/pubspec.yaml"];
@@ -17,7 +26,7 @@ public sealed class ManifestStamperTests : IDisposable
 
     public ManifestStamperTests()
     {
-        foreach (var file in PackageJsons.Concat(RunnerPubspecs).Concat(DartPackages.SelectMany(d => new[] { $"{d}/pubspec.yaml", $"{d}/CHANGELOG.md" })))
+        foreach (var file in PackageJsons.Concat(Examples).Concat(RunnerPubspecs).Concat(DartPackages.SelectMany(d => new[] { $"{d}/pubspec.yaml", $"{d}/CHANGELOG.md" })))
         {
             var target = Path.Combine(_root, file);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
@@ -48,6 +57,24 @@ public sealed class ManifestStamperTests : IDisposable
         Assert.Contains("\"@orvano/js\": \"workspace:*\"", Read("sdks/nextjs/package.json"), StringComparison.Ordinal);
         Assert.Contains("\"typescript\": \"~6.0.3\"", before, StringComparison.Ordinal);
         Assert.Contains("\"typescript\": \"~6.0.3\"", Read("sdks/nextjs/package.json"), StringComparison.Ordinal);
+    }
+
+    // Spec 0011, AC-14: an example pins its Orvano packages to exactly the version, and keeps its own version.
+    [Fact]
+    public async Task Pins_each_example_to_exactly_the_version()
+    {
+        await ManifestStamper.StampAsync(_root, "0.4.2");
+
+        var example = Read("examples/nextjs-quickstart/package.json");
+        Assert.Contains("\"@orvano/nextjs\": \"0.4.2\"", example, StringComparison.Ordinal);
+        Assert.Contains("\n  \"version\": \"0.0.0\",", example, StringComparison.Ordinal);
+        Assert.Contains("\"next\": \"16.3.6\"", example, StringComparison.Ordinal);
+        Assert.Contains("\"@orvano/js\": \"0.4.2\"", Read("examples/js-quickstart/package.json"), StringComparison.Ordinal);
+        Assert.Contains("\n  orvano_dart: 0.4.2\n", Read("examples/dart-quickstart/pubspec.yaml"), StringComparison.Ordinal);
+        var flutter = Read("examples/flutter-quickstart/pubspec.yaml");
+        Assert.Contains("\n  orvano_flutter: 0.4.2\n", flutter, StringComparison.Ordinal);
+        Assert.Contains("\nversion: 1.0.0+1\n", flutter, StringComparison.Ordinal);
+        Assert.Contains("<PackageReference Include=\"Orvano\" Version=\"0.4.2\" />", Read("examples/dotnet-quickstart/DotnetQuickstart.csproj"), StringComparison.Ordinal);
     }
 
     [Fact]

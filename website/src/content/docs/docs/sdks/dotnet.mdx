@@ -1,0 +1,88 @@
+---
+title: .NET
+description: "The Orvano NuGet package for your .NET server."
+sidebar:
+  order: 5
+---
+
+import { Code } from '@astrojs/starlight/components'
+import { version } from '../../../../lib/site'
+
+The `Orvano` NuGet package is the server SDK for .NET. It targets `net10.0` and `netstandard2.0`, so it runs on .NET 10 and on older runtimes too. It runs on your own server with an API key: it manages your project's users and checks the access tokens your app's users send. It has no sign in methods of its own; your users sign in through a client SDK.
+
+## Install
+
+<Code code={`dotnet add package Orvano --version ${version}`} lang="sh" />
+
+The [.NET quickstart](/docs/quickstarts/dotnet/) builds an ASP.NET Core Minimal API with it.
+
+## Create the client
+
+```csharp
+using Orvano;
+
+var options = new OrvanoClientOptions(new Uri(Environment.GetEnvironmentVariable("ORVANO_ENDPOINT")!))
+{
+    Project = Environment.GetEnvironmentVariable("ORVANO_PROJECT"),
+    ApiKey = Environment.GetEnvironmentVariable("ORVANO_API_KEY"),
+};
+var orvano = new OrvanoClient(options);
+
+builder.Services.AddSingleton(orvano);
+```
+
+| Option | What it does |
+|---|---|
+| `Endpoint` | Your Orvano server, without `/v1`. Required, in the constructor. |
+| `Project` | Your project ID. Needed to verify tokens. |
+| `ApiKey` | A server [API key](/docs/concepts/api-keys/), sent as `X-Orvano-Key`. Keep it in configuration or a secret store, never in code. |
+| `Timeout`, `MaxRetries` | 30 seconds and 3 retries (of reads after a 429 or 503) by default. |
+| `Logger` | An `ILogger` for the version mismatch warning. |
+
+Make one client for the app and register it as a singleton. You can pass your own `HttpClient` (for example from `IHttpClientFactory`) as the second constructor argument; the client then leaves disposing it to you.
+
+## What it can call
+
+| Service | Methods |
+|---|---|
+| `Users` | `CreateAsync`, `GetAsync`, `ListAsync`, `ListAllAsync`, `DeleteAsync`, `BlockAsync`, `UnblockAsync`, `UpdateEmailAsync`, `UpdateEmailVerificationAsync`, `CreateVerificationAsync`, `CreateRecoveryAsync`, `ListSessionsAsync`, `ListSessionsAllAsync`, `DeleteSessionAsync`, `DeleteSessionsAsync` |
+| `Account` | `GetAsync` (for a user's own token) |
+| `Health` | `GetAsync` |
+| `Keys` | `GetJwksAsync`, `GetOpenIdConfigurationAsync` |
+
+Every method takes a `CancellationToken`. `ListAllAsync` gives you an `IAsyncEnumerable<User>` that walks every page:
+
+```csharp
+await foreach (var user in orvano.Users.ListAllAsync(emailVerified: false))
+{
+    Console.WriteLine(user.Email);
+}
+```
+
+[Manage users with an API key](/docs/auth/manage-users/) shows the common tasks.
+
+## Verify a user's token
+
+```csharp
+var token = await orvano.VerifyAccessTokenAsync(accessToken);
+// token.UserId, token.SessionId, token.ExpiresAt, token.EmailVerified
+```
+
+Pass the token without the `Bearer ` prefix. It checks the token against the project's public keys without a call to Orvano once the keys are cached. Pass `online: true` to also catch a session that ended in the last 15 minutes. [Verify tokens on your server](/docs/auth/verify-tokens/) explains both.
+
+## Errors
+
+Refused calls throw `OrvanoException` with `Status`, `Code`, `Message`, `RequestId`, and `RetryAfter`. Filter on `Code` with the `ErrorCode` constants:
+
+```csharp
+try
+{
+    await orvano.Users.GetAsync(userId);
+}
+catch (OrvanoException error) when (error.Code == ErrorCode.UserNotFound)
+{
+    // the user was deleted
+}
+```
+
+A timeout throws `TimeoutException`. See [Errors](/docs/concepts/errors/).

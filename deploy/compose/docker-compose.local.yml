@@ -1,0 +1,37 @@
+# Orvano on your own machine (spec 0011, Local stack). `orvano install --local` writes this overlay next to
+# docker-compose.yml, and COMPOSE_FILE in .env makes a plain `docker compose up -d --wait` merge both.
+#
+# Managed by the installer: every `install --local` run rewrites this file from the image it installs, so
+# your edits here are lost. Put changes in docker-compose.override.yml instead (add it to COMPOSE_FILE).
+#
+# Everything listens on 127.0.0.1 only: the console, the setup link, and the Mailpit inbox are never
+# reachable from your network. `!override` needs Docker Compose 2.24.6 or later.
+
+services:
+  gateway:
+    # Replaces 80, 443, and 443/udp. Caddy listens on the same port inside the container, because
+    # ORVANO_PUBLIC_URL (http://localhost:<port>) is its site address.
+    ports: !override
+      - "127.0.0.1:${ORVANO_LOCAL_PORT:?set in .env}:${ORVANO_LOCAL_PORT:?set in .env}"
+
+  # A local inbox: every email Orvano sends lands here, on http://localhost:8025. Its SMTP port (1025)
+  # stays on the compose network, where ORVANO_INSTALL_SMTP_URL points.
+  mailpit:
+    image: axllent/mailpit:v1.31.3
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    ports:
+      - "127.0.0.1:8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 128M

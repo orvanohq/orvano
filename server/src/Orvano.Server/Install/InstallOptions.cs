@@ -4,6 +4,7 @@ namespace Orvano.Server.Install;
 /// The flags of <c>orvano install</c> (spec 0006, Command line). <c>install.sh</c> passes every flag
 /// through untouched, so the flags only the script uses (<c>--dir</c>, <c>--no-pull</c>,
 /// <c>--timeout</c>) are accepted and ignored here. <c>--existing-data</c> comes from the script alone.
+/// <c>--local</c> and <c>--port</c> (spec 0011) are only given by hand, through <c>docker run</c>.
 /// </summary>
 internal sealed record InstallOptions(
     string? Domain,
@@ -11,10 +12,12 @@ internal sealed record InstallOptions(
     string? Version,
     bool Yes,
     bool NoIpLookup,
-    bool? ExistingData)
+    bool? ExistingData,
+    bool Local,
+    string? Port)
 {
-    private static readonly HashSet<string> ValueFlags = ["--domain", "--email", "--version", "--dir", "--timeout", "--existing-data"];
-    private static readonly HashSet<string> Switches = ["--yes", "--no-ip-lookup", "--no-pull"];
+    private static readonly HashSet<string> ValueFlags = ["--domain", "--email", "--version", "--dir", "--timeout", "--existing-data", "--port"];
+    private static readonly HashSet<string> Switches = ["--yes", "--no-ip-lookup", "--no-pull", "--local"];
 
     /// <summary>Parses <c>--flag value</c> and <c>--flag=value</c>; returns null and an error for anything else.</summary>
     public static InstallOptions? Parse(IReadOnlyList<string> args, out string? error)
@@ -73,6 +76,8 @@ internal sealed record InstallOptions(
             values.GetValueOrDefault("--version"),
             switches.Contains("--yes"),
             switches.Contains("--no-ip-lookup"),
-            existingData);
+            existingData,
+            switches.Contains("--local"),
+            values.GetValueOrDefault("--port"));
     }
 }

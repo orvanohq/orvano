@@ -1,0 +1,92 @@
+---
+title: Flutter
+description: "The orvano_flutter package for web, iOS, and Android."
+sidebar:
+  order: 3
+---
+
+import { Code } from '@astrojs/starlight/components'
+import { version } from '../../../../lib/site'
+
+`orvano_flutter` is the client SDK for Flutter apps on web, iOS, and Android (Flutter 3.32 or later). It signs users in, acts as them, and keeps their session in the platform's secure storage. It has no API key and can't manage other users; that's what the [Dart server SDK](/docs/sdks/dart/) is for.
+
+## Install
+
+<Code code={`flutter pub add orvano_flutter:${version}`} lang="sh" />
+
+The [Flutter quickstart](/docs/quickstarts/flutter/) builds a full app with it, including what each platform needs to reach a local Orvano.
+
+## Create the client
+
+```dart
+import 'package:flutter/widgets.dart';
+import 'package:orvano_flutter/orvano_flutter.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final orvano = Orvano(
+    createClient(endpoint: 'http://localhost:7700', project: 'your-project-id'),
+  );
+  // pass orvano to your app
+}
+```
+
+Make one client for the whole app, after `WidgetsFlutterBinding.ensureInitialized()`. `createClient` takes:
+
+| Option | What it does |
+|---|---|
+| `endpoint` | Your Orvano server, without `/v1`. Required. |
+| `project` | Your project ID. Required. |
+| `storage` | The `FlutterSecureStorage` to keep the session in, for your own platform options. |
+| `session` | Your own `SessionStore` instead of secure storage. |
+| `timeout`, `maxRetries` | 30 seconds and 3 retries (of reads after a 429 or 503) by default. |
+| `httpClient`, `headers`, `onWarning` | Your own `http.Client`, extra headers, and where warnings go. |
+
+Register your app as a [platform](/docs/concepts/platforms/) of the project: its hostname for web, its bundle ID for iOS, its package name for Android.
+
+## Sessions
+
+Signing in stores the session in secure storage (Keychain on iOS, Keystore on Android, encrypted storage on web) under `orvano.session.<projectId>`. Before each call the client refreshes the session when its access token has less than a minute left, and it checks the session again when the app comes back to the front.
+
+```dart
+final session = await orvano.client.getSession(); // null when signed out
+
+orvano.client.authStateChanges.listen((change) {
+  // change.event is signedIn, signedOut, tokenRefreshed, or userUpdated
+});
+```
+
+A session the server has ended (a password change elsewhere, or blocking the user) reads as `signedOut` on the next refresh.
+
+## What it can call
+
+| Service | Methods |
+|---|---|
+| `account` | `create`, `createPasswordSession`, `get`, `update`, `updatePassword`, `delete`, `deleteCurrentSession` (sign out), `listSessions`, `listSessionsAll`, `deleteSession`, `deleteOtherSessions`, `refreshSession`, and the email flows: `createVerification`, `verifyEmail`, `createRecovery`, `completeRecovery`, `createMagicLink`, `createMagicLinkSession`, `createEmailCode`, `createEmailCodeSession`, `updateEmail`, `confirmEmailChange` |
+| `health` | `get` |
+| `keys` | `getJwks`, `getOpenIdConfiguration` |
+
+Requests take a model, for example `orvano.account.createPasswordSession(CreatePasswordSessionRequest(email: email, password: password))`.
+
+## Emailed links
+
+When your app opens from an emailed link, pass the link to `orvano.client.handleLink(uri)`. It reads the link's type and finishes it: it verifies the email, confirms an email change, or signs the user in from a magic link. A password reset link needs the new password: `handleLink(uri, password: newPassword)`. It answers `null` for a link that isn't from Orvano.
+
+The SDK doesn't open links for you. Use a package such as `app_links` to receive them. Magic links and password reset links must be https links, so they need Android App Links and iOS Universal Links on a real domain; [Email verification](/docs/auth/email-verification/#flutter-deep-links) explains the setup. During development, sign in with an [emailed code](/docs/auth/email-codes/) instead: it needs no links.
+
+## Errors
+
+Refused calls throw `OrvanoException` with `status`, `code`, `message`, `requestId`, and `retryAfter`. Match on `code` with the `ErrorCode` constants:
+
+```dart
+try {
+  await orvano.account.createPasswordSession(
+    CreatePasswordSessionRequest(email: email, password: password),
+  );
+} on OrvanoException catch (error) {
+  if (error.code != ErrorCode.invalidCredentials) rethrow;
+  // show "Wrong email or password"
+}
+```
+
+A timeout throws `TimeoutException` instead. See [Errors](/docs/concepts/errors/).

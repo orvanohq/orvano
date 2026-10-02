@@ -1,0 +1,7 @@
+## Why it happens
+
+Too many requests of this kind in a short time, for example repeated sign in attempts for one email, or repeated email requests. Limits protect your users from guessing and spam.
+
+## How to fix
+
+Wait the number of seconds in `Retry-After` (the SDK error carries it as `retryAfter`) before trying again, and tell the person when they can retry. Don't retry in a loop.
