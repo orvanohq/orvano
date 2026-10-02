@@ -6,12 +6,13 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/prepare.ts && astro dev",
-    "build": "node scripts/prepare.ts && astro check && astro build && node scripts/markdown-copies.ts",
+    "build": "node scripts/prepare.ts && astro check && astro build && node scripts/markdown-copies.ts && node scripts/headers.ts",
     "preview": "astro preview",
     "screenshots": "node scripts/screenshots.ts",
     "check:web-quickstart": "node scripts/check-web-quickstart.ts",
     "prepare:content": "node scripts/prepare.ts",
-    "check:server-quickstart": "node scripts/check-server-quickstart.ts"
+    "check:server-quickstart": "node scripts/check-server-quickstart.ts",
+    "check:site": "node scripts/check-site.ts"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.5",
@@ -28,6 +29,7 @@
     "@astrojs/check": "^0.9.10",
     "@types/hast": "^3.0.5",
     "@types/node": "^24.13.3",
+    "axe-core": "^4.13.0",
     "hast-util-select": "^6.0.4",
     "playwright": "1.63.0",
     "rehype-parse": "^9.0.1",

@@ -1,5 +1,5 @@
-# Security headers on every response (spec 0011, AC-23). The Content Security Policy joins them with the
-# production deploy, once its script hashes are computed at build time.
+# Security headers on every response (spec 0011, AC-23). scripts/headers.ts adds the Content Security Policy to the
+# `/*` rule after the build, with the hashes of the inline scripts it finds in the built pages.
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin

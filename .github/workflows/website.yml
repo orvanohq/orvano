@@ -1,8 +1,10 @@
 # orvano.dev (spec 0011). `build` builds the site and fails on a broken link, a missing quickstart code region, or a
-# type error (AC-18); ESLint and Prettier for website/ run in ci.yml's lint job. `preview` deploys a same repo pull
-# request to its own Cloudflare preview URL (AC-26). `quickstarts` starts a local stack from this checkout and runs
-# all five quickstarts against it (AC-19); the nightly SDK workflow adds Flutter on Android and iOS (AC-20). A manual run can redeploy production from a chosen ref, behind the
-# `website-production` environment's approval (AC-25); release.yml owns the normal production deploy.
+# type error (AC-18), then runs axe and the Content Security Policy check on it (AC-7, AC-23); ESLint and Prettier
+# for website/ run in ci.yml's lint job. `preview` deploys a same repo pull request to its own Cloudflare preview URL
+# (AC-26). `quickstarts` starts a local stack from this checkout and runs all five quickstarts against it (AC-19); the
+# nightly SDK workflow adds Flutter on Android and iOS (AC-20). A manual run can redeploy production from a chosen
+# ref, behind the `website-production` environment's approval (AC-25); release.yml owns the normal production deploy,
+# and links.yml checks the external links weekly (AC-22).
 
 name: Website
 
@@ -69,6 +71,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node .github/scripts/check-example-pins.mjs
       - run: pnpm --filter @orvano/website build
+        env:
+          ORVANO_SITE_ENV: preview
+      # axe on five page types in both themes, under the Content Security Policy, search included (AC-7, AC-23).
+      - run: pnpm --filter @orvano/website exec playwright install --with-deps chromium
+      - run: pnpm --filter @orvano/website check:site
         env:
           ORVANO_SITE_ENV: preview
       - uses: actions/upload-artifact@v7
@@ -280,6 +287,10 @@ jobs:
         env:
           ORVANO_SITE_ENV: production
           PUBLIC_CF_BEACON_TOKEN: ${{ vars.PUBLIC_CF_BEACON_TOKEN }}
+      - run: pnpm --filter @orvano/website exec playwright install --with-deps chromium
+      - run: pnpm --filter @orvano/website check:site
+        env:
+          ORVANO_SITE_ENV: production
       - working-directory: website
         run: pnpm exec wrangler deploy
         env:

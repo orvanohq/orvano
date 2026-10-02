@@ -1,0 +1,77 @@
+# The weekly external link check for orvano.dev (spec 0011, AC-22). It builds the site, checks every http and https
+# link that leaves it, and keeps one open issue listing the dead ones: it opens the issue, updates it on later runs,
+# and closes it once every link works again. It never runs on a pull request, so it never fails one; internal links
+# are checked on every pull request by the site build (AC-18).
+
+name: Links
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: links
+  cancel-in-progress: true
+
+jobs:
+  external:
+    name: External links
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+      - run: corepack enable pnpm
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+      - run: pnpm install --frozen-lockfile --filter @orvano/website
+      - run: pnpm --filter @orvano/website build
+        env:
+          ORVANO_SITE_ENV: preview
+      # Links back to orvano.dev are the site's own (the build checks them); the edit links point at files of this
+      # checkout; localhost and example hosts are the reader's own machine and placeholders.
+      - id: lychee
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --no-progress
+            --scheme https --scheme http
+            --max-retries 3
+            --accept 200..=299,429
+            --exclude '^https://orvano\.dev'
+            --exclude '^https://github\.com/orvanohq/orvano/edit/'
+            --exclude '^https?://(localhost|127\.0\.0\.1|\[::1\])'
+            --exclude '^https?://([a-z0-9-]+\.)*example\.(com|net|org)'
+            'website/dist/**/*.html'
+          output: lychee/out.md
+          fail: false
+      - name: Open, update, or close the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # lychee exits 2 when it found dead links; any other failure is the check itself breaking.
+          EXIT: ${{ steps.lychee.outputs.exit_code }}
+        run: |
+          case "$EXIT" in
+            0 | 2) ;;
+            *) echo "::error::lychee failed with exit code $EXIT before it could report links."; exit 1 ;;
+          esac
+          title='Dead external links on orvano.dev'
+          number=$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
+            --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          if [ "$EXIT" = 2 ]; then
+            { printf 'The weekly link check (%s) found links on orvano.dev that no longer work.\n\n' "$run_url"
+              cat lychee/out.md; } > "$RUNNER_TEMP/body.md"
+            if [ -n "$number" ]; then gh issue edit "$number" --body-file "$RUNNER_TEMP/body.md"
+            else gh issue create --title "$title" --body-file "$RUNNER_TEMP/body.md"; fi
+          elif [ -n "$number" ]; then
+            gh issue close "$number" --comment "Every external link works again ($run_url)."
+          fi

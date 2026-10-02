@@ -35,6 +35,13 @@ const head =
 export default defineConfig({
   site: 'https://orvano.dev',
   trailingSlash: 'always',
+  vite: {
+    build: {
+      // Vite inlines small assets as `data:` URLs, which the policy's `font-src 'self'` blocks (AC-23). Fonts stay
+      // files; everything else keeps Vite's default.
+      assetsInlineLimit: (file) => (/\.woff2?$/.test(file) ? false : undefined),
+    },
+  },
   integrations: [
     starlight({
       title: 'Orvano',
@@ -54,10 +61,7 @@ export default defineConfig({
       components: {
         SiteTitle: './src/components/SiteTitle.astro',
       },
-      expressiveCode: {
-        themes: ['github-dark-default', 'github-light-default'],
-        styleOverrides: { codeFontFamily: 'var(--sl-font-mono)' },
-      },
+      // Code block themes and plugins: ec.config.mjs.
       // AC-6: these groups, in this order.
       sidebar: [
         {
