@@ -20,7 +20,7 @@ Public docs with a quickstart per SDK and the generated API reference. From here
 **Also:** move the README install section into the docs site · from spec 0006
 - [x] Design it (spec): `/architect docs site & quickstarts`
 - [ ] Build it: `/develop docs site & quickstarts`
-   - [ ] Local stack: `orvano install --local` with the compose overlay and Mailpit, plus the `ORVANO_INSTALL_SMTP_URL` seed (AC-1 to 4)
+   - [x] Local stack: `orvano install --local` with the compose overlay and Mailpit, plus the `ORVANO_INSTALL_SMTP_URL` seed (AC-1 to 4)
    - [ ] Thin thread: the Starlight site skeleton, the Next.js quickstart and example, the Playwright console journey, the `quickstarts` CI job, website CI and PR previews (AC-5 to 11, 13, 14, 18, 19, 21, 26, 27)
    - [ ] Remaining quickstarts (Flutter, JavaScript, Dart, .NET) and the generated API reference and error pages (AC-9, 11, 12, 14 to 17, 19, 20)
    - [ ] Content: concepts, auth guides, SDK, console, and self hosting pages, changelog, `llms.txt`, the docs rule (AC-6, 21, 28 to 30)

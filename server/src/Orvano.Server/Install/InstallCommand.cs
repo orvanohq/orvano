@@ -15,6 +15,8 @@ internal static class InstallCommand
     {
         var options = InstallOptions.Parse(args, out var error);
         if (options is null) return await RefuseAsync(host, error!);
+        if (options.Local) return await RunLocalAsync(options, host);
+        if (options.Port is not null) return await RefuseAsync(host, "--port works only with --local.");
         if (options.ExistingData is not { } existingData)
         {
             return await RefuseAsync(host, "--existing-data is missing. Run install.sh, which runs this command for you.");
@@ -35,6 +37,12 @@ internal static class InstallCommand
         var now = host.Clock.GetUtcNow();
         var existingText = files.ReadEnv();
         var existing = existingText is null ? null : EnvFile.Parse(existingText);
+        // Before anything is written, install.log included: a refused folder stays byte for byte (spec 0011, AC-3).
+        if (LocalRule.IsLocal(existing))
+        {
+            return await RefuseAsync(host,
+                "This folder holds a local install (ORVANO_LOCAL=true in .env). Run install --local on it, or install the server in another folder.");
+        }
 
         var (mode, refusal) = InstallPlan.Decide(existing, version, existingData);
         if (refusal is not null)
@@ -105,6 +113,86 @@ internal static class InstallCommand
 
         await host.Out.WriteLineAsync($"Orvano {version}: {mode.ToString().ToLowerInvariant()} at {result.PublicUrl}");
         await files.WriteResultAsync(result.GeneratedMasterKey);
+        return 0;
+    }
+
+    /// <summary>
+    /// <c>install --local</c> (spec 0011, AC-1 to AC-3): Orvano on your own machine. No domain, email, DNS check, or
+    /// <c>--existing-data</c>, and no <c>install.sh</c>, so this run prints the whole summary itself.
+    /// </summary>
+    private static async Task<int> RunLocalAsync(InstallOptions options, InstallHost host)
+    {
+        if (options.Domain is not null || options.Email is not null)
+        {
+            return await RefuseAsync(host, "--local runs on http://localhost and needs no domain or email. Leave out --domain and --email.");
+        }
+
+        var version = options.Version ?? host.ImageVersion;
+        if (version != host.ImageVersion)
+        {
+            return await RefuseAsync(host, $"This installer image is Orvano {host.ImageVersion}, so it installs only {host.ImageVersion}, not {version}.");
+        }
+
+        if (!Directory.Exists(host.TargetDir))
+        {
+            return await RefuseAsync(host, $"The install folder is not mounted at {host.TargetDir}. Pass -v \"<folder>:{host.TargetDir}\" to docker run.");
+        }
+
+        var files = new InstallFiles(host.TargetDir);
+        var now = host.Clock.GetUtcNow();
+        var existingText = files.ReadEnv();
+        var existing = existingText is null ? null : EnvFile.Parse(existingText);
+        if (LocalRule.IsServerInstall(existing))
+        {
+            return await RefuseAsync(host,
+                "This folder holds a server install, not a local one. Pick an empty folder for --local; a folder never changes from one kind to the other.");
+        }
+
+        if (LocalRule.Port(options.Port, existing, out var portError) is not { } port) return await RefuseAsync(host, portError!);
+
+        var (mode, refusal) = VersionRule.Decide(existing?.Get(InstallPlan.Version), version);
+        if (refusal is not null)
+        {
+            await files.LogAsync(now, $"refused: {refusal}");
+            return await RefuseAsync(host, refusal);
+        }
+
+        await files.LogAsync(now, $"local {mode.ToString().ToLowerInvariant()} of {version} on port {port} (installed: {existing?.Get(InstallPlan.Version) ?? "none"})");
+
+        var publicUrl = LocalRule.PublicUrl(port);
+        if (InstallPlan.ChangesPublicUrlTo(existing, publicUrl))
+        {
+            var questions = new InstallQuestions(host.Terminal, host.Out, options.Yes);
+            await host.Out.WriteLineAsync(
+                $"Warning: this moves Orvano from {existing!.Get(InstallPlan.PublicUrl)} to {publicUrl}. Every signed in app user and console user must sign in again.");
+            if (!questions.Confirm("Change the port?")) return await RefuseAsync(host, "Stopped: the port was not changed.");
+            await files.LogAsync(now, $"public URL changes to {publicUrl}");
+        }
+
+        var memTotal = PgTuning.ParseMemTotalMib(await File.ReadAllTextAsync(host.MeminfoPath))
+            ?? throw new InvalidOperationException($"No MemTotal in {host.MeminfoPath}.");
+
+        var result = InstallPlan.ApplyLocal(existing, new LocalInputs(version, port, memTotal, now));
+
+        await files.WriteManagedFilesAsync(local: true);
+        await files.LogAsync(now, $"wrote {InstallFiles.ComposeFile}, {InstallFiles.LocalComposeFile}, and {InstallFiles.InitdbScript}");
+
+        if (result.EnvChanged)
+        {
+            await files.WriteEnvAsync(result.Env.ToString(), result.PreviousEnv);
+            await files.LogAsync(now, result.PreviousEnv is null ? "wrote .env" : "updated .env, the old one is .env.previous");
+        }
+        else
+        {
+            await files.LogAsync(now, ".env unchanged");
+        }
+
+        if (result.Generated.Count > 0) await files.LogAsync(now, $"generated {string.Join(", ", result.Generated)}");
+        await files.LogAsync(now, result.ManualTuning
+            ? "Postgres tuning kept (ORVANO_PG_TUNING=manual)"
+            : $"Postgres tuning for {memTotal} MiB");
+
+        await LocalSummary.WriteAsync(host.Out, version, mode, result);
         return 0;
     }
 

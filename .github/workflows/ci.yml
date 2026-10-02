@@ -229,12 +229,52 @@ jobs:
             test -n "$first" && test "$first" = "$second" || { echo "$key changed"; exit 1; }
           done
           sudo cmp "$RUNNER_TEMP/env.first" /opt/orvano/.env
+      # Spec 0011, AC-1 to AC-4: `install --local` as the runner's own user, beside the server install above.
+      - name: Local install as a non root user
+        shell: bash
+        run: |
+          dir="$RUNNER_TEMP/local"
+          mkdir -p "$dir"
+          docker run --rm --user "$(id -u):$(id -g)" -v "$dir:/install" "ghcr.io/orvanohq/orvano:$V" install --local --yes | tee "$RUNNER_TEMP/local.out"
+          grep -q 'docker compose up -d --wait' "$RUNNER_TEMP/local.out"
+          grep -q 'http://localhost:7700/setup#ost_' "$RUNNER_TEMP/local.out"
+          grep -q 'http://localhost:8025' "$RUNNER_TEMP/local.out"
+          grep -q 'Back up your master key now' "$RUNNER_TEMP/local.out"
+          test "$(stat -c %U "$dir/.env")" = "$(id -un)"
+          test "$(stat -c %a "$dir/.env")" = 600
+          cp "$dir/.env" "$RUNNER_TEMP/local.env.first"
+          docker run --rm --user "$(id -u):$(id -g)" -v "$dir:/install" "ghcr.io/orvanohq/orvano:$V" install --local --yes >/dev/null
+          cmp "$RUNNER_TEMP/local.env.first" "$dir/.env"
+      - name: Local stack is healthy, on loopback only, with email out of the box
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/local"
+          docker compose up -d --wait
+          curl -fsS http://localhost:7700/v1/health
+          curl -fsS http://localhost:8025/readyz
+          published=$(docker compose ps --format json | jq -r '.Publishers[]? | select(.PublishedPort != 0) | "\(.URL):\(.PublishedPort)"' | sort -u | tr '\n' ' ')
+          test "$published" = "127.0.0.1:7700 127.0.0.1:8025 " || { echo "published: $published"; exit 1; }
+          test "$(docker compose exec -T postgres psql -U postgres -d orvano -tAc "SELECT host || ':' || port FROM orvano.messaging_smtp_settings WHERE project_id = 'console'")" = mailpit:1025
+          case "$(sed -n 's/^COMPOSE_PROJECT_NAME=//p' .env)" in orvano-local-??????) ;; *) echo "bad project name"; exit 1 ;; esac
+      - name: A folder never changes kind
+        shell: bash
+        run: |
+          sudo cp /opt/orvano/.env "$RUNNER_TEMP/server.env"
+          status=0; docker run --rm --user 0:0 -v /opt/orvano:/install "ghcr.io/orvanohq/orvano:$V" install --local --yes || status=$?
+          test "$status" = 2
+          sudo cmp "$RUNNER_TEMP/server.env" /opt/orvano/.env
+          status=0; sudo sh deploy/install/install.sh --dir "$RUNNER_TEMP/local" --version "$V" --domain localhost --yes --no-pull || status=$?
+          test "$status" = 2
+          cmp "$RUNNER_TEMP/local.env.first" "$RUNNER_TEMP/local/.env"
       - if: failure()
         run: |
           sudo cat /opt/orvano/install.log || true
           cd /opt/orvano && sudo docker compose ps --all && sudo docker compose logs
+          cd "$RUNNER_TEMP/local" 2>/dev/null && docker compose ps --all && docker compose logs || true
       - if: always()
-        run: cd /opt/orvano && sudo docker compose down -v || true
+        run: |
+          cd /opt/orvano && sudo docker compose down -v || true
+          cd "$RUNNER_TEMP/local" 2>/dev/null && docker compose down -v || true
 
   passed:
     name: CI passed

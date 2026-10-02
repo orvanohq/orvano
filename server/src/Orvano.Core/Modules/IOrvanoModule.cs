@@ -22,6 +22,12 @@ public interface IOrvanoModule
     /// </summary>
     void ConfigureApiServices(IServiceCollection services, IConfiguration config) { }
 
+    /// <summary>
+    /// One time startup work of the <c>api</c> role, such as seeding a row from configuration. Runs after the schema
+    /// check and before the api serves a request; an exception stops the role.
+    /// </summary>
+    Task OnApiStartingAsync(IServiceProvider services, CancellationToken ct) => Task.CompletedTask;
+
     /// <summary>Maps the module's endpoints under <c>/v1</c>. Runs in the <c>api</c> role.</summary>
     void MapApi(RouteGroupBuilder v1);
 
