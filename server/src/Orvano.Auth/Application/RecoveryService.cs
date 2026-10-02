@@ -12,7 +12,6 @@ namespace Orvano.Auth.Application;
 internal sealed class RecoveryService(
     AuthStore store,
     AuthMailer mailer,
-    EmailTokens tokens,
     PasswordHasher hasher,
     Sessions sessions,
     SessionChecks checks,
@@ -39,10 +38,8 @@ internal sealed class RecoveryService(
             // AC-8: only an active user gets a link; a blocked or unknown email gets nothing, and the same answer.
             if (await UserLocks.ByEmailAsync(uow, projectId, trimmed, token) is not { Status: UserStatuses.Active, Email: { } to } user) return default(Done);
 
-            var link = await tokens.CreateLinkAsync(uow, projectId, EmailTokenKind.Recovery, user.Id, to, token);
-            var url = LinkUrl.Build(redirect.Url, EmailTokenKind.Recovery, link);
-            if (await mailer.QueueLinkAsync(uow.Tx, projectId, projectName, EmailTokenKind.Recovery, to, user.Name, url, token) is { } notQueued) return notQueued;
-            await EmailEvents.TokenCreatedAsync(uow, projectId, EmailTokenKind.Recovery, user.Id, Actor.User(user.Id), token);
+            var target = new AuthEmailTarget(projectId, projectName, user.Id, to, user.Name);
+            if (await mailer.SendLinkAsync(uow, target, EmailTokenKind.Recovery, redirect, Actor.User(user.Id), token) is { } notQueued) return notQueued;
             return default(Done);
         }, ct);
 
@@ -68,10 +65,8 @@ internal sealed class RecoveryService(
             if (user.Email is not { } to) return Failure.Invalid("The user has no email.");
             if (mailer.TakeRecipientLimits(projectId, to, EmailTokenKind.Recovery) is { } limited) return limited;
 
-            var link = await tokens.CreateLinkAsync(uow, projectId, EmailTokenKind.Recovery, user.Id, to, token);
-            var url = LinkUrl.Build(redirect.Url, EmailTokenKind.Recovery, link);
-            if (await mailer.QueueLinkAsync(uow.Tx, projectId, projectName, EmailTokenKind.Recovery, to, user.Name, url, token) is { } refused) return refused;
-            await EmailEvents.TokenCreatedAsync(uow, projectId, EmailTokenKind.Recovery, user.Id, actor, token);
+            var target = new AuthEmailTarget(projectId, projectName, user.Id, to, user.Name);
+            if (await mailer.SendLinkAsync(uow, target, EmailTokenKind.Recovery, redirect, actor, token) is { } refused) return refused;
             return default(Done);
         }, ct);
     }

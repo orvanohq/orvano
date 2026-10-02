@@ -8,7 +8,7 @@ namespace Orvano.Auth.Application;
 /// Changing the signed in user's email (spec 0010, AC-17, AC-18): a confirmation link goes to the new address, and
 /// the email changes only when that link is opened.
 /// </summary>
-internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, EmailTokens tokens, AccountService accounts)
+internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, AccountService accounts)
 {
     /// <summary>
     /// <c>account.updateEmail</c> (AC-17). Checks run in this order: the body (the email rule, the redirect, and not
@@ -34,11 +34,8 @@ internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, Ema
             if (await EmailTakenAsync(uow, projectId, newEmail, userId, token)) return Failure.EmailAlreadyInUse;
             if (mailer.TakeRecipientLimits(projectId, newEmail, EmailTokenKind.EmailChange) is { } limited) return limited;
 
-            var link = await tokens.CreateLinkAsync(uow, projectId, EmailTokenKind.EmailChange, userId, newEmail, token);
-            var url = LinkUrl.Build(redirect.Url, EmailTokenKind.EmailChange, link);
-            if (await mailer.QueueLinkAsync(uow.Tx, projectId, projectName, EmailTokenKind.EmailChange, newEmail, user.Name, url, token) is { } refused)
-                return refused;
-            await EmailEvents.TokenCreatedAsync(uow, projectId, EmailTokenKind.EmailChange, userId, Actor.User(userId), token);
+            var target = new AuthEmailTarget(projectId, projectName, userId, newEmail, user.Name);
+            if (await mailer.SendLinkAsync(uow, target, EmailTokenKind.EmailChange, redirect, Actor.User(userId), token) is { } refused) return refused;
             return default(Done);
         }, ct);
     }

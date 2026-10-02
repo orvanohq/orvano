@@ -70,6 +70,8 @@ internal sealed class PasswordlessService(
 
         var outcome = await store.WriteDecidingAsync<Redeemed>(async (uow, token) =>
         {
+            // The user before the code rows: the order every send takes, so a redemption racing a send can't deadlock.
+            await UserLocks.ByEmailAsync(uow, projectId, trimmed, token);
             var rows = await EmailTokens.LockCodesAsync(uow, projectId, trimmed, token);
             if (rows.FirstOrDefault(row => tokens.CodeMatches(row, code!)) is not { } match)
             {
@@ -102,22 +104,12 @@ internal sealed class PasswordlessService(
             // AC-8: a blocked user, and an unknown email with createUser false, get nothing, and the same answer.
             if (user is { Status: not UserStatuses.Active } || user is null && !createUser) return default(Done);
 
-            var to = user?.Email ?? email;
-            Failure? notQueued;
-            if (kind == EmailTokenKind.EmailCode)
-            {
-                var code = await tokens.CreateCodeAsync(uow, projectId, user?.Id, to, token);
-                notQueued = await mailer.QueueCodeAsync(uow.Tx, projectId, projectName, to, user?.Name, code, token);
-            }
-            else
-            {
-                var link = await tokens.CreateLinkAsync(uow, projectId, kind, user?.Id, to, token);
-                notQueued = await mailer.QueueLinkAsync(uow.Tx, projectId, projectName, kind, to, user?.Name, LinkUrl.Build(redirect!.Url, kind, link), token);
-            }
-
-            if (notQueued is not null) return notQueued;
-            await EmailEvents.TokenCreatedAsync(uow, projectId, kind, user?.Id, user is null ? Actor.UnknownUser : Actor.User(user.Id), token);
-            return default(Done);
+            var target = new AuthEmailTarget(projectId, projectName, user?.Id, user?.Email ?? email, user?.Name);
+            var actor = user is null ? Actor.UnknownUser : Actor.User(user.Id);
+            var notQueued = kind == EmailTokenKind.EmailCode
+                ? await mailer.SendCodeAsync(uow, target, actor, token)
+                : await mailer.SendLinkAsync(uow, target, kind, redirect!, actor, token);
+            return notQueued is null ? default(Done) : notQueued;
         }, ct);
 
         if (!outcome.Succeeded)

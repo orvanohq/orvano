@@ -8,7 +8,7 @@ namespace Orvano.Auth.Application;
 /// Email verification (spec 0010, AC-12, AC-13): the signed in user asks for a link, and anyone holding the link
 /// verifies the email. Verification is data the app reads, never a gate the API enforces.
 /// </summary>
-internal sealed class VerificationService(AuthStore store, AuthMailer mailer, EmailTokens tokens)
+internal sealed class VerificationService(AuthStore store, AuthMailer mailer)
 {
     /// <summary>
     /// <c>account.createVerification</c> (AC-12): 409 <c>email_already_verified</c> for a verified user, then the two
@@ -27,10 +27,8 @@ internal sealed class VerificationService(AuthStore store, AuthMailer mailer, Em
             if (user.Email is not { } to) return Failure.Invalid("The user has no email to verify.");
             if (mailer.TakeRecipientLimits(projectId, to, EmailTokenKind.Verification) is { } limited) return limited;
 
-            var link = await tokens.CreateLinkAsync(uow, projectId, EmailTokenKind.Verification, user.Id, to, token);
-            var url = LinkUrl.Build(redirect.Url, EmailTokenKind.Verification, link);
-            if (await mailer.QueueLinkAsync(uow.Tx, projectId, projectName, EmailTokenKind.Verification, to, user.Name, url, token) is { } refused) return refused;
-            await EmailEvents.TokenCreatedAsync(uow, projectId, EmailTokenKind.Verification, user.Id, actor, token);
+            var target = new AuthEmailTarget(projectId, projectName, user.Id, to, user.Name);
+            if (await mailer.SendLinkAsync(uow, target, EmailTokenKind.Verification, redirect, actor, token) is { } refused) return refused;
             return default(Done);
         }, ct);
     }

@@ -87,6 +87,50 @@ public class EmailTokenStoreTests(PostgresFixture postgres)
         Assert.Single(results, r => r is not null);
     }
 
+    [Fact]
+    public async Task A_redemption_racing_a_new_send_for_the_same_user_waits_instead_of_deadlocking()
+    {
+        await using var database = await postgres.NewDatabaseAsync();
+        await database.MigrateAsync();
+        var store = new AuthStore(database.App);
+        var tokens = new EmailTokens(new SecretBox(MasterKeys.Parse(OrvanoProcess.MasterKeys)));
+        var user = await InsertUserAsync(database, "ada@x.com");
+        var older = await CreateAsync(store, tokens, EmailTokenKind.Recovery, user, "ada@x.com");
+
+        // A send locks the user first and holds it while the redemption starts.
+        var userLocked = new TaskCompletionSource();
+        var release = new TaskCompletionSource();
+        var send = Task.Run(() => store.WriteAsync<LinkToken>(async (uow, ct) =>
+        {
+            await UserLocks.ByIdAsync(uow, Project, user, ct);
+            userLocked.SetResult();
+            await release.Task.WaitAsync(ct);
+            return await tokens.CreateLinkAsync(uow, Project, EmailTokenKind.Recovery, user, "ada@x.com", ct);
+        }, Ct), Ct);
+        await userLocked.Task.WaitAsync(Ct);
+
+        // The redemption, as the services run it: consume the token, then lock its user.
+        var redeem = Task.Run(() => store.WriteAsync<ConsumedToken?>(async (uow, ct) =>
+        {
+            var consumed = await EmailTokens.ConsumeLinkAsync(uow, Project, EmailTokenKind.Recovery, older, ct);
+            await UserLocks.ByIdAsync(uow, Project, user, ct);
+            return consumed;
+        }, Ct), Ct);
+        await Eventually.TrueAsync(
+            async () => await TestDatabase.ScalarAsync<long>(database.Superuser,
+                "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") == 1,
+            TimeSpan.FromSeconds(10), "the redemption to wait on a lock");
+        release.SetResult();
+
+        // Neither is aborted with 40P01: the redemption waited for the user, and then the newer token had replaced its own.
+        var sent = await send;
+        var redeemed = await redeem;
+        Assert.True(sent.Succeeded);
+        Assert.True(redeemed.Succeeded);
+        Assert.Null(redeemed.Value);
+        Assert.NotNull(await ConsumeAsync(store, EmailTokenKind.Recovery, sent.Value!));
+    }
+
     private static Task<LinkToken> CreateAsync(AuthStore store, EmailTokens tokens, EmailTokenKind kind, Guid? user, string email) =>
         store.WriteAsync<LinkToken>(async (uow, ct) => await tokens.CreateLinkAsync(uow, Project, kind, user, email, ct), Ct).ContinueWith(t => t.Result.Value!, Ct);
 

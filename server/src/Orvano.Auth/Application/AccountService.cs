@@ -49,8 +49,7 @@ internal sealed class AccountService(
     SigningKeys keys,
     IConsoleSignupPolicy signupPolicy,
     IConsoleAccountCreated accountCreated,
-    AuthMailer mailer,
-    EmailTokens emailTokens)
+    AuthMailer mailer)
 {
     public const string EmailIndex = UserRecords.EmailIndex;
 
@@ -170,16 +169,14 @@ internal sealed class AccountService(
         if (mailer.TakeRecipientLimits(projectId, email, EmailTokenKind.Verification) is not null) return VerificationEmail.RateLimited;
 
         await uow.Tx.SaveAsync("verification_email", ct);
-        var link = await emailTokens.CreateLinkAsync(uow, projectId, EmailTokenKind.Verification, userId, email, ct);
-        var url = LinkUrl.Build(redirect.Url, EmailTokenKind.Verification, link);
-        if (await mailer.QueueLinkAsync(uow.Tx, projectId, projectName, EmailTokenKind.Verification, email, name, url, ct) is { } refused)
+        var target = new AuthEmailTarget(projectId, projectName, userId, email, name);
+        if (await mailer.SendLinkAsync(uow, target, EmailTokenKind.Verification, redirect, actor, ct) is { } refused)
         {
             await uow.Tx.RollbackAsync("verification_email", ct);
             return refused.Code == Orvano.Contract.ErrorCode.EmailNotConfigured ? VerificationEmail.NotConfigured : VerificationEmail.RateLimited;
         }
 
         await uow.Tx.ReleaseAsync("verification_email", ct);
-        await EmailEvents.TokenCreatedAsync(uow, projectId, EmailTokenKind.Verification, userId, actor, ct);
         return VerificationEmail.Queued;
     }
 
@@ -299,6 +296,9 @@ internal sealed class AccountService(
 
         var outcome = await store.WriteAsync<Guid[]>(async (uow, token) =>
         {
+            // The user first, the order a reset redemption takes, so the two can't deadlock over the password row.
+            await UserLocks.ByIdAsync(uow, projectId, userId, token);
+
             // Only over the hash just verified (or none at all): a racing change in between makes this one fail as a
             // wrong password.
             await using (var update = new NpgsqlCommand(

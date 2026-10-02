@@ -1,4 +1,3 @@
-using Npgsql;
 using Orvano.Auth.Domain;
 using Orvano.Core.RateLimiting;
 using Orvano.Messaging.Contracts;
@@ -6,11 +5,14 @@ using Orvano.Platform.Contracts;
 
 namespace Orvano.Auth.Application;
 
+/// <summary>Who an auth email goes to: the project, the user (null for an unknown email), the address, and the name.</summary>
+internal sealed record AuthEmailTarget(string ProjectId, string ProjectName, Guid? UserId, string Email, string? UserName);
+
 /// <summary>
 /// What every auth email shares (spec 0010): the redirect check, the send limits, Messaging's availability, and
 /// queueing the email in the caller's transaction. Use cases decide when; this decides how.
 /// </summary>
-internal sealed class AuthMailer(IEmailQueue queue, IProjectDirectory projects, IWebOriginPolicy origins, RateLimits limits)
+internal sealed class AuthMailer(IEmailQueue queue, IProjectDirectory projects, IWebOriginPolicy origins, RateLimits limits, EmailTokens tokens)
 {
     /// <summary>
     /// The redirect URL, when its shape passes <see cref="RedirectUrlRule"/> and the project's platforms allow it
@@ -50,18 +52,35 @@ internal sealed class AuthMailer(IEmailQueue queue, IProjectDirectory projects, 
         (await projects.GetAsync(projectId, ct))?.Name ?? throw new InvalidOperationException($"Project {projectId} vanished while sending an email.");
 
     /// <summary>
-    /// Queues a link email in <paramref name="tx"/>. Returns null when queued, else the refusal (AC-12's mapping:
-    /// 409 <c>email_not_configured</c>, 429 <c>email_rate_limited</c>); the caller's transaction then rolls back.
+    /// One link email inside the caller's unit of work: creates the token (replacing older ones, AC-4), builds the
+    /// URL on the checked <paramref name="redirect"/>, queues the email, then writes <c>auth.email_token.created</c>.
+    /// Returns null when queued, else the refusal (AC-12's mapping: 409 <c>email_not_configured</c>, 429
+    /// <c>email_rate_limited</c>), and the caller's transaction then rolls back.
     /// </summary>
-    public async Task<Failure?> QueueLinkAsync(
-        NpgsqlTransaction tx, string projectId, string projectName, EmailTokenKind kind, string to, string? userName, string actionUrl, CancellationToken ct) =>
-        Refused(await queue.QueueAuthEmailAsync(tx, new AuthEmail(projectId, projectName, TemplateOf(kind), to, userName, actionUrl, null, Minutes(kind)), ct));
+    public async Task<Failure?> SendLinkAsync(
+        AuthUnitOfWork uow, AuthEmailTarget target, EmailTokenKind kind, RedirectUrl redirect, Actor actor, CancellationToken ct)
+    {
+        var link = await tokens.CreateLinkAsync(uow, target.ProjectId, kind, target.UserId, target.Email, ct);
+        var url = LinkUrl.Build(redirect.Url, kind, link);
+        var email = new AuthEmail(target.ProjectId, target.ProjectName, TemplateOf(kind), target.Email, target.UserName, url, null, Minutes(kind));
+        return await QueueAsync(uow, target, kind, email, actor, ct);
+    }
 
-    /// <summary>Queues a code email in <paramref name="tx"/>; null when queued, else the refusal.</summary>
-    public async Task<Failure?> QueueCodeAsync(
-        NpgsqlTransaction tx, string projectId, string projectName, string to, string? userName, string code, CancellationToken ct) =>
-        Refused(await queue.QueueAuthEmailAsync(
-            tx, new AuthEmail(projectId, projectName, AuthEmailKind.EmailCode, to, userName, null, code, Minutes(EmailTokenKind.EmailCode)), ct));
+    /// <summary>One email code inside the caller's unit of work, like <see cref="SendLinkAsync"/>; null when queued, else the refusal.</summary>
+    public async Task<Failure?> SendCodeAsync(AuthUnitOfWork uow, AuthEmailTarget target, Actor actor, CancellationToken ct)
+    {
+        var code = await tokens.CreateCodeAsync(uow, target.ProjectId, target.UserId, target.Email, ct);
+        var email = new AuthEmail(
+            target.ProjectId, target.ProjectName, AuthEmailKind.EmailCode, target.Email, target.UserName, null, code, Minutes(EmailTokenKind.EmailCode));
+        return await QueueAsync(uow, target, EmailTokenKind.EmailCode, email, actor, ct);
+    }
+
+    private async Task<Failure?> QueueAsync(AuthUnitOfWork uow, AuthEmailTarget target, EmailTokenKind kind, AuthEmail email, Actor actor, CancellationToken ct)
+    {
+        if (Refused(await queue.QueueAuthEmailAsync(uow.Tx, email, ct)) is { } refused) return refused;
+        await EmailEvents.TokenCreatedAsync(uow, target.ProjectId, kind, target.UserId, actor, ct);
+        return null;
+    }
 
     /// <summary>The template each kind is sent with; an email change uses the verification template.</summary>
     public static AuthEmailKind TemplateOf(EmailTokenKind kind) => kind switch

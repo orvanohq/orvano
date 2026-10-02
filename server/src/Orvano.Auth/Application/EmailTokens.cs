@@ -46,8 +46,14 @@ internal sealed class EmailTokens(SecretBox secrets)
     /// Deletes the link token and returns its row, or null when no live row has that hash. The caller fails an
     /// <see cref="ConsumedToken.Expired"/> row, which rolls the delete back; the sweep removes it later.
     /// </summary>
+    /// <remarks>
+    /// Locks the token's user first (by ID, or by email for an unknown email's token), the order every send and
+    /// every other user write takes, so a redemption racing a new send for the same user can't deadlock.
+    /// </remarks>
     public static async Task<ConsumedToken?> ConsumeLinkAsync(AuthUnitOfWork uow, string projectId, EmailTokenKind kind, LinkToken token, CancellationToken ct)
     {
+        if (!await LockOwnerAsync(uow, projectId, kind, token, ct)) return null;
+
         // kind <> 'email_code' lets the planner use the partial unique index on secret_hash.
         await using var cmd = new NpgsqlCommand(
             """
@@ -61,6 +67,30 @@ internal sealed class EmailTokens(SecretBox secrets)
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         if (!await reader.ReadAsync(ct)) return null;
         return new ConsumedToken(reader.GetGuid(0), reader.IsDBNull(1) ? null : reader.GetGuid(1), reader.GetString(2), reader.GetBoolean(3));
+    }
+
+    /// <summary>Locks the user a link token belongs to (by ID, or by email for an unknown email); false when no row has that hash.</summary>
+    private static async Task<bool> LockOwnerAsync(AuthUnitOfWork uow, string projectId, EmailTokenKind kind, LinkToken token, CancellationToken ct)
+    {
+        Guid? owner;
+        string email;
+        await using (var cmd = new NpgsqlCommand(
+            """
+            SELECT user_id, email FROM orvano.auth_email_tokens
+            WHERE project_id = @project AND kind = @kind AND secret_hash = @hash AND kind <> 'email_code'
+            """, uow.Tx.Connection, uow.Tx))
+        {
+            cmd.Parameters.AddWithValue("project", projectId);
+            cmd.Parameters.AddWithValue("kind", EmailTokenKinds.Wire(kind));
+            cmd.Parameters.AddWithValue("hash", token.Hash);
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            if (!await reader.ReadAsync(ct)) return false;
+            owner = reader.IsDBNull(0) ? null : reader.GetGuid(0);
+            email = reader.GetString(1);
+        }
+
+        _ = owner is { } id ? await UserLocks.ByIdAsync(uow, projectId, id, ct) : await UserLocks.ByEmailAsync(uow, projectId, email, ct);
+        return true;
     }
 
     /// <summary>Whether a live, unexpired link token has this hash, read without a lock (AC-10's early check).</summary>
