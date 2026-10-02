@@ -204,6 +204,36 @@ describe('EmailCard (AC-23)', () => {
     await expect.element(dialog.getByText('Try again in 42 seconds.')).toBeVisible()
   })
 
+  it('says in words when the user is blocked or the email was verified meanwhile', async () => {
+    const onSendRecovery = vi
+      .fn()
+      .mockRejectedValueOnce(new OrvanoError(403, 'user_blocked', 'raw', null))
+    const onSendVerification = vi
+      .fn()
+      .mockRejectedValueOnce(new OrvanoError(409, 'email_already_verified', 'raw', null))
+    const { screen } = await renderInRouter(
+      card(unverified, { onSendRecovery, onSendVerification }),
+      { at, paths },
+    )
+
+    await screen.getByRole('button', { name: 'Send password reset email' }).click()
+    let dialog = screen.getByRole('dialog')
+    await dialog.getByLabelText('Link opens at').fill('https://app.example.com/auth')
+    await dialog.getByRole('button', { name: 'Send email' }).click()
+    await expect.element(dialog.getByText('This user is blocked.')).toBeVisible()
+    await expect
+      .element(dialog.getByText('Unblock them first, then send the password reset email.'))
+      .toBeVisible()
+    await noAxeViolations()
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+
+    await screen.getByRole('button', { name: 'Send verification email' }).click()
+    dialog = screen.getByRole('dialog')
+    await dialog.getByLabelText('Link opens at').fill('https://app.example.com/auth')
+    await dialog.getByRole('button', { name: 'Send email' }).click()
+    await expect.element(dialog.getByText('This email is already verified.')).toBeVisible()
+  })
+
   it('changes the email, unverified unless the box is checked, and shows a taken address under the field', async () => {
     const onChangeEmail = vi
       .fn()

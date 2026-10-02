@@ -125,6 +125,20 @@ function actionError(error: unknown, projectId: string): ActionError {
             body: `Try again ${retryIn(error.retryAfter)}.`,
           },
         }
+      case 'user_blocked':
+        return {
+          alert: {
+            title: 'This user is blocked.',
+            body: 'Unblock them first, then send the password reset email.',
+          },
+        }
+      case 'email_already_verified':
+        return {
+          alert: {
+            title: 'This email is already verified.',
+            body: 'Someone verified it since this page loaded. Reload to see the current state.',
+          },
+        }
       case 'rate_limited':
         return {
           alert: {
@@ -428,7 +442,7 @@ export function EmailCard({
     <Card>
       <CardHeader>
         <CardTitle>
-          <h2 id="email-heading">Email and verification</h2>
+          <h2>Email and verification</h2>
         </CardTitle>
         <CardDescription>
           Apps read whether the email is verified from the user and from the access token&apos;s{' '}
