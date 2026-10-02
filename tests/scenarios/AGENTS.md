@@ -26,10 +26,12 @@ One list of scenarios every SDK surface runs against a real Orvano (spec 0001, A
 - A runner fails when any scenario fails or none passed.
 - Server clients send the fixture API key for the scenario project, read from `fixtures.yaml` (none in a browser, where setting a key throws). Dart runners build both clients with `Surface.connect`; Flutter passes its own client from `orvano_flutter`.
 - The console client is bound to one project, and steps have no per step project, so project scoped console operations (keys, platforms) are covered by the server's HTTP tests, not scenarios.
+- Email scenarios (`auth-recovery`, `auth-verification`, `auth-magic-link`, `auth-email-code`, `auth-email-change`, `auth-users-email`) read real mail: save the runner only `now` before a send and pass it to `test.getLatestEmail` as `after`, which reads Mailpit at `ORVANO_TEST_MAILPIT_URL` (spec 0010). The runner only operations (`redeemLink`, `now`, `verifyAccessToken`, ...) are listed in `README.md`.
 - Quote substitutions in YAML (`'${version}'`); a bare `{` starts a flow map.
 
 ## Gotchas
 
+- The send limits live in memory in the `api` process, so rerunning the email scenarios several times within an hour against one long running server can hit the recipient or IP limits. Restart the `api` container, or wait.
 - Run the Dart runner as `dart run bin/run.dart` inside `runners/dart`. `dart run orvano_scenarios:run` runs from a snapshot, so the scenario folder isn't found and it reports 0 passed.
 - After changing the contract or `TestingModule`, start the server with `--build`, or the old image answers.
 - Flutter can't read the host's files: `tool/copy_scenarios.dart` copies the YAML into `assets/scenarios/` (gitignored) before a run. Android reaches the host at `10.0.2.2`; Chrome needs `--disable-web-security` because the app and server are on different ports.
@@ -42,5 +44,6 @@ One list of scenarios every SDK surface runs against a real Orvano (spec 0001, A
 
 - [0001 API contract and SDK pipeline](../../docs/specs/0001-api-contract-sdk-pipeline/index.md)
 - [0004 App user sign up, sign in, and sessions](../../docs/specs/0004-app-user-auth/index.md) (the `auth*.yaml` scenarios)
+- [0010 Email verification, recovery, and passwordless](../../docs/specs/0010-email-verification-recovery-passwordless/index.md) (the email scenarios and `test.getLatestEmail`)
 
 _Drafted by /sync from the introducing change, worth a quick human pass._

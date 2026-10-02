@@ -22,7 +22,7 @@ The Orvano console: a React SPA built with Vite and served as static files by Ca
 | `src/routes/setup.tsx`, `sign-in.tsx`, `-auth/auth-form.tsx` | First admin sign up and sign in (spec 0004, spec 0006), one shared form |
 | `src/routes/sign-up.tsx`, `invite.tsx`, `-invite/` | Open sign up and the public invite page, which reads its token from the URL fragment and clears it (spec 0008) |
 | `src/routes/_app/orgs/$orgId/members.tsx`, `-members/`; `src/routes/_app/install.tsx` | The Members page with invites and row actions, and the install settings page (spec 0008) |
-| `src/routes/_app/projects/$projectId/users/` | The project's Users page and user detail (spec 0004) |
+| `src/routes/_app/projects/$projectId/users/` | The project's Users page and user detail (spec 0004); `-users/email-parts.tsx` and `link-url.ts` hold the verified state, the email actions, and the send dialogs that remember the last link URL per project (spec 0010) |
 | `src/routes/_app/projects/$projectId/email/`, `-email/`; `src/email/` | The project's Email pages (templates, log, settings), the CodeMirror template editor, and the SMTP form and log table the install page shares (spec 0009) |
 | `public/frames/email-preview.html`, `email-preview-headers.ts` | The sandboxed email preview page, and the Vite plugin that serves it with the headers in `deploy/gateway/email-preview-headers.caddy` |
 | `design.md` | The design system: tokens, type, density, and the component inventory |
@@ -103,5 +103,6 @@ Declined: Base UI MCP, a11y MCP `ronantakizawa/a11ymcp`
 - [0007 Console screens for orgs, projects, API keys, and platforms](../docs/specs/0007-console-platform-screens/index.md) (create, rename, delete, and restore flows, the one time key secret, platform identifiers)
 - [0008 Console team members, invitations, and roles](../docs/specs/0008-console-team-members/index.md) (Members page, invite links, `/invite`, `/sign-up`, `/install`)
 - [0009 Transactional email](../docs/specs/0009-transactional-email/index.md) (the Email pages, the template editor, the preview frame and its policy)
+- [0010 Email verification, recovery, and passwordless](../docs/specs/0010-email-verification-recovery-passwordless/index.md) (the Users page verified state, email actions, and send dialogs)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

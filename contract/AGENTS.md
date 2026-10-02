@@ -57,5 +57,6 @@ Commit `dist/openapi.json` and the generated code together. The server's handler
 
 - [0001 API contract and SDK pipeline](../docs/specs/0001-api-contract-sdk-pipeline/index.md)
 - [0004 App user sign up, sign in, and sessions](../docs/specs/0004-app-user-auth/index.md) (auth schemes, scopes, session effects)
+- [0010 Email verification, recovery, and passwordless](../docs/specs/0010-email-verification-recovery-passwordless/index.md) (the email `account.*`, `users.*`, and `consoleUsers.*` operations, and `test.getLatestEmail`)
 
 _Drafted by /sync from the introducing change, worth a quick human pass._

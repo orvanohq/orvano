@@ -60,7 +60,7 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 - Every role refuses a request body over 1 MiB (`ServerRole.MaxRequestBodyBytes`) with 413 `invalid_request`. A route that needs more, such as an upload, raises the limit for itself (`IHttpMaxRequestBodySizeFeature`); never raise the server wide default.
 - Every event and job is written in the same transaction as the change it describes. Never write one outside that transaction.
 - Test only routes (`/v1/test/*`, `/v1/console/test/*`) exist only in `Test`, because `OrvanoModules` adds `TestingModule` only there.
-- In the `Test` environment a response that breaks the contract (extra, missing, or mistyped field, undeclared 2xx status, unnamed endpoint) becomes a 500 `contract_violation`. `ORVANO_TEST_FIXTURES` is refused outside `Test`.
+- In the `Test` environment a response that breaks the contract (extra, missing, or mistyped field, undeclared 2xx status, unnamed endpoint) becomes a 500 `contract_violation`. `ORVANO_TEST_FIXTURES` and `ORVANO_TEST_MAILPIT_URL` (`Hosting/TestMailpit.cs`, read by `test.getLatestEmail`) are refused outside `Test`.
 - `Orvano.Contract` embeds `contract/dist/openapi.json`, so `deploy/server.Dockerfile` copies that file too; a new server project also needs its csproj copied before restore there.
 - `Orvano.Server` embeds `deploy/compose/docker-compose.yml` and `deploy/compose/initdb/10-orvano-roles.sh`, which `orvano install` writes to every install, so editing either changes what the next release installs. `install`, `setup-status`, and `healthcheck` are checked before role selection in `OrvanoProgram`, so they run with no `ORVANO_ROLE`.
 - In `Production`, `api` refuses to start while no install admin exists and `ORVANO_SETUP_TOKEN` is unset; a malformed token is refused in every environment (spec 0006, AC-21).
@@ -89,5 +89,6 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 - [0004 App user sign up, sign in, and sessions](../docs/specs/0004-app-user-auth/index.md) (`Orvano.Auth`, tokens, sessions, signing keys)
 - [0006 Self host installer](../docs/specs/0006-self-host-installer/index.md) (`orvano install`, `setup-status`, the setup token)
 - [0009 Transactional email](../docs/specs/0009-transactional-email/index.md) (`Orvano.Messaging`, SMTP, templates, the send queue)
+- [0010 Email verification, recovery, and passwordless](../docs/specs/0010-email-verification-recovery-passwordless/index.md) (`auth_email_tokens`, the email flows, `IWebOriginPolicy.AllowsRedirectAsync`, `SecretBox.Mac`)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

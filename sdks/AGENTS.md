@@ -25,7 +25,8 @@ The five public SDK surfaces (spec 0001). Each is a thin handwritten runtime plu
 | `dotnet/src/Orvano/OrvanoClient.cs`, `OrvanoRequest.cs`, `OrvanoException.cs` | The .NET client, request shape, and exception |
 | `js/src/runtime/auth.ts`, `api-key.ts`, `server-client.ts`; `dart/core/lib/src/auth.dart`, `dart/server/lib/src/client.dart`; `dotnet/src/Orvano/OrvanoHeaders.cs` | Auth providers, session stores, refresh, and the auth names (`Authorization: Bearer`, `X-Orvano-Key`) |
 | `js/src/runtime/access-tokens.ts`, `dart/server/lib/src/access_tokens.dart`, `dotnet/src/Orvano/OrvanoAccessTokens.cs` | Server side access token verification against the project's JWKS, keys kept 10 minutes (spec 0004, AC-19) |
-| `nextjs/src/index.ts`, `nextjs/src/server.ts`; `dart/flutter/lib/src/secure_session_store.dart` | Cookie session stores and the Next.js middleware and route handler; the Flutter secure session store |
+| `nextjs/src/index.ts`, `nextjs/src/server.ts`; `dart/flutter/lib/src/secure_session_store.dart` | Cookie session stores and the Next.js middleware and route handler (whose `redeem` and `email-code` actions redeem emailed links and codes and set the cookies, spec 0010); the Flutter secure session store |
+| `js/src/runtime/links.ts`, `dart/core/lib/src/links.dart` | The email link helper (spec 0010): `readEmailLink`, plus `redeemLink` in JS and `handleLink` in Dart, which call the matching operation, store the session for `magic_link` and `recovery`, and refresh only when the `email_verified` claim is stale |
 | `js/src/runtime/version.ts`, `dart/core/lib/src/version.dart`, `dotnet/src/Orvano/OrvanoClient.cs` (`CheckVersion`) | `X-Orvano-SDK` on every request and the once per client major.minor mismatch warning |
 | `js/src/runtime/pagination.ts`, `events.ts`; `dart/core/lib/src/pagination.dart`, `events.dart`; `dotnet/src/Orvano/OrvanoPagination.cs`, `OrvanoEvents.cs` | The page iterator helper and the event decoder |
 | `*/generated/`, `*/Generated/` | SdkGen output; never edit by hand |
@@ -48,7 +49,7 @@ dotnet test --project sdks/dotnet/tests/Orvano.Tests     # net10.0 and net8.0 (t
 
 - One client pattern everywhere: one `Client` per language, generated service classes take it, and an `Orvano` aggregate groups them (`orvano.health.get()`). In .NET the services are properties on the partial `OrvanoClient`.
 - The endpoint is the server's base URL without `/v1`; generated paths carry `/v1`.
-- Every failure is one error type with status, stable `code` (`unknown` when absent), message, and request ID (problem body first, then `X-Request-Id`).
+- Every failure is one error type with status, stable `code` (`unknown` when absent), message, request ID (problem body first, then `X-Request-Id`), and the wait from `Retry-After` when sent (spec 0010): `retryAfter` in seconds in TS, a `Duration` in Dart, a `TimeSpan` (`RetryAfter`) in .NET, null when absent.
 - TS: `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `erasableSyntaxOnly`; bind `fetch` to `globalThis` (Workers reject it otherwise).
 - Dart: one pub workspace from the root `pubspec.yaml`. Members use `resolution: workspace` and depend on each other by version (`^0.0.0`), never by path, so they stay publishable. Shared lints in `dart/analysis_options.yaml`.
 - Auth is a pluggable provider on the `Client`: none, session, or API key. Each auth name (`Authorization`, `X-Orvano-Key`, the `orvano_access` and `orvano_refresh` cookies in `nextjs/`, the `orvano_console` cookie in `console-client/`) is defined once per runtime, never inline.
@@ -80,5 +81,6 @@ dotnet test --project sdks/dotnet/tests/Orvano.Tests     # net10.0 and net8.0 (t
 
 - [0001 API contract and SDK pipeline](../docs/specs/0001-api-contract-sdk-pipeline/index.md)
 - [0004 App user sign up, sign in, and sessions](../docs/specs/0004-app-user-auth/index.md) (session stores, refresh, and token verification in every SDK)
+- [0010 Email verification, recovery, and passwordless](../docs/specs/0010-email-verification-recovery-passwordless/index.md) (link helpers, Next.js email actions, `retryAfter`, the `emailVerified` claim)
 
 _Drafted by /sync from the introducing change, worth a quick human pass._
