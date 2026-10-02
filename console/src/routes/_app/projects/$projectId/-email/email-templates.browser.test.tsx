@@ -214,8 +214,9 @@ describe('the template editor', () => {
     api.failNext('PUT', templatePath, 422, 'template_invalid', 'html: line 2: unknown filter raw')
     await userEvent.click(button('Save') ?? document.body)
     await expect.poll(text).toContain('Line 2: unknown filter raw')
-    expect(editor('HTML')?.getAttribute('aria-invalid')).toBe('true')
-    expect(editor('Text')?.getAttribute('aria-invalid')).toBe('false')
+    // The code editor sets aria-invalid in an effect, a render after the error text shows.
+    await expect.poll(() => editor('HTML')?.getAttribute('aria-invalid')).toBe('true')
+    await expect.poll(() => editor('Text')?.getAttribute('aria-invalid')).toBe('false')
   })
 
   it('resets a custom template to the default after a confirmation that starts on Cancel', async () => {
