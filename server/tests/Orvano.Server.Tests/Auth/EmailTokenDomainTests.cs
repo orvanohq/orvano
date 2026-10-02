@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using Orvano.Auth.Application;
 using Orvano.Auth.Domain;
 
 namespace Orvano.Server.Tests.Auth;
@@ -127,10 +126,10 @@ public class EmailTokenDomainTests
     }
 
     [Fact]
-    public void Recovery_compares_the_token_email_with_the_user_email_ignoring_case()
+    public void A_token_email_matches_the_user_email_ignoring_case()
     {
-        Assert.True(RecoveryService.SameEmail("Ada@X.com", "ada@x.com"));
-        Assert.False(RecoveryService.SameEmail("ada@x.com", "eve@x.com"));
-        Assert.False(RecoveryService.SameEmail(null, "ada@x.com"));
+        Assert.True(EmailRule.SameAddress("Ada@X.com", "ada@x.com"));
+        Assert.False(EmailRule.SameAddress("ada@x.com", "eve@x.com"));
+        Assert.False(EmailRule.SameAddress(null, "ada@x.com"));
     }
 }

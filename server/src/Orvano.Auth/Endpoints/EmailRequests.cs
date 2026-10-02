@@ -15,6 +15,9 @@ namespace Orvano.Auth.Endpoints;
 /// <summary>What the email flow endpoints share (spec 0010): the open sends' time floor and the redemptions' failure limit.</summary>
 internal static class EmailRequests
 {
+    private const long OverFloorLogInterval = 60_000;
+    private static long _lastOverFloorLog = long.MinValue / 2;
+
     /// <summary>
     /// An open send's answer (AC-8): a refusal at once (it depends only on the input and the project), else 202 no
     /// sooner than <see cref="AuthTimings.OpenSendFloor"/> after <paramref name="started"/>, so a known and an
@@ -30,11 +33,19 @@ internal static class EmailRequests
         }
         else
         {
-            // Past the floor, a known and an unknown email may take different times; count it to notice.
-            http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(EmailRequests))
-                .LogWarning("An open email request took {Milliseconds} ms, past the {Floor} ms floor", (int)started.ElapsedMilliseconds,
-                    (int)AuthTimings.OpenSendFloor.TotalMilliseconds);
+            // Past the floor, a known and an unknown email may take different times. The counter notices every one;
+            // the log says it at most once a minute, so a slow spell under load can't flood it.
+            AuthTelemetry.RecordOverFloor();
+            var now = Environment.TickCount64;
+            var last = Interlocked.Read(ref _lastOverFloorLog);
+            if (now - last >= OverFloorLogInterval && Interlocked.CompareExchange(ref _lastOverFloorLog, now, last) == last)
+            {
+                http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(EmailRequests))
+                    .LogWarning("An open email request took {Milliseconds} ms, past the {Floor} ms floor; see orvano.auth.open_send.over_floor for how often",
+                        (int)started.ElapsedMilliseconds, (int)AuthTimings.OpenSendFloor.TotalMilliseconds);
+            }
         }
+
         return TypedResults.StatusCode(StatusCodes.Status202Accepted);
     }
 

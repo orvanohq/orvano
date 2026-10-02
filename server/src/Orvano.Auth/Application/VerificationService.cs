@@ -46,7 +46,7 @@ internal sealed class VerificationService(AuthStore store, AuthMailer mailer)
         {
             if (await EmailTokens.ConsumeLinkAsync(uow, projectId, EmailTokenKind.Verification, link, token) is not { Expired: false, UserId: { } userId } consumed)
                 return Failure.InvalidEmailToken;
-            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user || !RecoveryService.SameEmail(user.Email, consumed.Email))
+            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user || !EmailRule.SameAddress(user.Email, consumed.Email))
                 return Failure.InvalidEmailToken;
 
             if (user.EmailVerifiedAt is null)

@@ -131,7 +131,7 @@ internal sealed class PasswordlessService(
         {
             user = await UserLocks.ByIdAsync(uow, projectId, id, ct);
             // AC-3: the account's email moved since the token was sent.
-            if (user is null || !RecoveryService.SameEmail(user.Email, tokenEmail)) return invalid;
+            if (user is null || !EmailRule.SameAddress(user.Email, tokenEmail)) return invalid;
         }
         else
         {

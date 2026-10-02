@@ -22,7 +22,7 @@ internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, Acc
         if (await mailer.CheckRedirectAsync(projectId, redirectUrl, EmailTokenKind.EmailChange, ct) is not { } redirect) return Failure.RedirectUrlNotAllowed;
         var current = await store.ReadAsync((db, token) =>
             db.Users.AsNoTracking().Where(u => u.Id == userId && u.ProjectId == projectId).Select(u => u.Email).SingleOrDefaultAsync(token), ct);
-        if (RecoveryService.SameEmail(current, newEmail)) return Failure.Invalid("The new email is the current one.");
+        if (EmailRule.SameAddress(current, newEmail)) return Failure.Invalid("The new email is the current one.");
 
         var credential = await accounts.CheckCredentialAsync(projectId, userId, sessionId, password, ct);
         if (credential.Failure is not null) return credential.Failure;

@@ -92,7 +92,7 @@ internal sealed class RecoveryService(
         {
             if (await EmailTokens.ConsumeLinkAsync(uow, projectId, EmailTokenKind.Recovery, link, token) is not { Expired: false, UserId: { } userId } consumed)
                 return Failure.InvalidEmailToken;
-            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user || !SameEmail(user.Email, consumed.Email))
+            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user || !EmailRule.SameAddress(user.Email, consumed.Email))
                 return Failure.InvalidEmailToken;
             if (user.Status != UserStatuses.Active) return Failure.UserBlocked;
 
@@ -129,17 +129,4 @@ internal sealed class RecoveryService(
         var row = await store.ReadAsync((db, token) => db.Users.AsNoTracking().SingleAsync(u => u.Id == outcome.Value.UserId, token), ct);
         return await accounts.SignedInAsync(projectId, row, outcome.Value.Grant, ct);
     }
-
-    internal static bool SameEmail(string? userEmail, string tokenEmail) =>
-        userEmail is not null && string.Equals(userEmail.ToLowerInvariant(), tokenEmail.ToLowerInvariant(), StringComparison.Ordinal);
-}
-
-/// <summary>The events every email flow shares (AC-30).</summary>
-internal static class EmailEvents
-{
-    /// <summary><c>auth.email_token.created</c>: the kind, the user (null for an unknown email), and the actor; never the email.</summary>
-    public static Task TokenCreatedAsync(AuthUnitOfWork uow, string projectId, EmailTokenKind kind, Guid? userId, Actor actor, CancellationToken ct) =>
-        AuthEvents.WriteAsync(uow.Tx, AuthEvents.EmailTokenCreated, projectId, actor, userId?.ToString() ?? projectId,
-            new Dictionary<string, string>(),
-            fields: new Dictionary<string, string?> { ["kind"] = EmailTokenKinds.Wire(kind), ["userId"] = userId?.ToString() }, ct: ct);
 }
