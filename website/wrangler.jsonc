@@ -9,6 +9,10 @@
     "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash",
   },
+  // `wrangler deploy` (release.yml, or a manual website.yml run) attaches orvano.dev as a Custom Domain, which needs
+  // the zone on Cloudflare and no other A, AAAA, or CNAME record on the apex. `www` redirects to it through a
+  // Redirect Rule set in the dashboard (`_redirects` can't match a host).
+  "routes": [{ "pattern": "orvano.dev", "custom_domain": true }],
   // Pull request previews are `wrangler versions upload --preview-alias pr-<number>` (AC-26).
   "workers_dev": true,
   "preview_urls": true,

@@ -5,9 +5,13 @@
 # with install.sh (its version stamped in) and install.sh.sha256, marked latest, so
 # `releases/latest/download/install.sh` always serves the newest installer.
 #
-# Until Orvano reaches 0.1 every step is a dry run: packages are packed and validated, and mirror
-# commits are built, but nothing is uploaded or pushed. Running this workflow by hand is always a
-# dry run, so the pipeline can be tried from any branch.
+# Last, the docs site (spec 0011, AC-25): once every package and image is out, the `examples` job
+# builds the five quickstart apps from the real registries, and only then does `website` build
+# orvano.dev from the tag and deploy it.
+#
+# Until Orvano reaches 0.1 every step is a dry run: packages are packed and validated, mirror
+# commits and the site are built, but nothing is uploaded, pushed, or deployed. Running this
+# workflow by hand is always a dry run, so the pipeline can be tried from any branch.
 #
 # Private packages never publish: pnpm skips every package marked `"private": true` (so
 # @orvano/console-client never leaves the repo), and only the three named Dart packages and the one
@@ -303,3 +307,129 @@ jobs:
         if: env.DRY_RUN != 'true'
         working-directory: mirror
         run: git push origin HEAD:main "refs/tags/v${VERSION}"
+
+  # AC-25: before orvano.dev shows this version, all five examples build exactly as a reader gets them, from npm,
+  # pub.dev, and NuGet at the released version, each from a copy outside the repo. Only on a real release: a dry run
+  # publishes nothing to build from. A registry can take a few minutes to serve a version it just accepted, so each
+  # install retries for up to 15 minutes.
+  examples:
+    name: Examples from the registries
+    needs: [plan, npm, pub, nuget]
+    if: needs.plan.outputs.dry-run != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: node .github/scripts/check-example-pins.mjs
+      - name: Copy the examples
+        run: |
+          for example in nextjs js dart dotnet flutter; do cp -R "examples/$example-quickstart" "$RUNNER_TEMP/"; done
+          cat > "$RUNNER_TEMP/retry.sh" <<'SH'
+          retry() {
+            for _ in $(seq 1 30); do
+              "$@" && return 0
+              echo "Not on the registry yet; trying again in 30 seconds."
+              sleep 30
+            done
+            return 1
+          }
+          SH
+      - name: Next.js quickstart
+        working-directory: ${{ runner.temp }}/nextjs-quickstart
+        run: |
+          . "$RUNNER_TEMP/retry.sh"
+          retry npm install --no-audit --no-fund --prefer-online
+          NEXT_PUBLIC_ORVANO_PROJECT=smoke npm run build
+      - name: JavaScript quickstart
+        working-directory: ${{ runner.temp }}/js-quickstart
+        run: |
+          . "$RUNNER_TEMP/retry.sh"
+          retry npm install --no-audit --no-fund --prefer-online
+          npm run build
+      - name: Dart server quickstart
+        working-directory: ${{ runner.temp }}/dart-quickstart
+        run: |
+          . "$RUNNER_TEMP/retry.sh"
+          retry dart pub get
+          dart analyze --fatal-infos
+          dart compile exe bin/server.dart -o "$RUNNER_TEMP/dart-server"
+          dart compile exe bin/create_user.dart -o "$RUNNER_TEMP/dart-create-user"
+      - name: .NET quickstart
+        working-directory: ${{ runner.temp }}/dotnet-quickstart
+        run: |
+          . "$RUNNER_TEMP/retry.sh"
+          retry dotnet restore --no-http-cache
+          dotnet build -c Release -warnaserror --no-restore
+      - name: Flutter quickstart
+        working-directory: ${{ runner.temp }}/flutter-quickstart
+        run: |
+          . "$RUNNER_TEMP/retry.sh"
+          retry flutter pub get
+          flutter analyze --fatal-infos
+          flutter build web
+
+  # AC-25: a dry run (and so every manual run) builds the production site from this ref and checks it, then stops.
+  website-dry-run:
+    name: Build the site (dry run)
+    needs: [plan, npm, pub, nuget, images]
+    if: needs.plan.outputs.dry-run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+      - run: corepack enable pnpm
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @orvano/website build
+        env:
+          ORVANO_SITE_ENV: production
+      - run: pnpm --filter @orvano/website exec playwright install --with-deps chromium
+      - run: pnpm --filter @orvano/website check:site
+        env:
+          ORVANO_SITE_ENV: production
+
+  # AC-25: orvano.dev changes only here, from the release tag, once every package and image is published and the
+  # examples built from the registries. The `website-production` environment holds the Cloudflare token and the beacon
+  # token; if it requires a reviewer, this job waits for your approval too.
+  website:
+    name: Deploy orvano.dev
+    needs: [plan, examples, images, github-release]
+    if: needs.plan.outputs.dry-run != 'true'
+    runs-on: ubuntu-latest
+    environment: website-production
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+      - run: corepack enable pnpm
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @orvano/website build
+        env:
+          ORVANO_SITE_ENV: production
+          PUBLIC_CF_BEACON_TOKEN: ${{ vars.PUBLIC_CF_BEACON_TOKEN }}
+      - run: pnpm --filter @orvano/website exec playwright install --with-deps chromium
+      - run: pnpm --filter @orvano/website check:site
+        env:
+          ORVANO_SITE_ENV: production
+      - working-directory: website
+        run: pnpm exec wrangler deploy --message "Release v${{ needs.plan.outputs.version }}"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
