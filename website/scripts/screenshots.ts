@@ -37,6 +37,10 @@ try {
 
   // The first admin, from the setup link the installer printed.
   await page.goto(`${consoleUrl}/setup#${setupToken}`)
+  // The page removes the token from the address and loads the route again, which can remount the form; fill it only
+  // once that has settled, or the typed values are lost and the click submits an empty form.
+  await page.waitForURL((url) => url.hash === '')
+  await page.waitForLoadState('networkidle')
   await page.getByLabel('Name').fill('Ada Lovelace')
   await page.getByLabel('Email').fill('ada@example.com')
   await page.getByLabel('Password').fill(randomUUID())
