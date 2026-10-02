@@ -9,6 +9,7 @@ Start a real stack first: `docker compose -f tests/scenarios/compose.yml --profi
 - [x] Passwords `short` and 257 characters → 400 `invalid_password` → AC-2
 - [x] `POST /v1/account/sessions/password` with a wrong password, and with an unknown email → identical 401 `invalid_credentials` bodies (compare them without `requestId`) → AC-4
 - [x] Decode the access token: header `alg` ES256 and a `kid`; claims `iss` = `http://localhost:8080/v1/projects/<project>`, `aud`, `sub`, `sid`, `iat`, `exp = iat + 900`, and no email or name → AC-6
+  - Since spec 0010 (AC-14) the claims also include `email_verified`, a boolean that is not personal data.
 - [x] `GET /v1/account` with no bearer → 401 `session_required`; with another project's header → 401 `invalid_token` → AC-7, AC-12
 - [x] `GET /v1/projects/<project>/.well-known/jwks.json` → 200, `Cache-Control: public, max-age=300`, EC P-256 keys; for `console` → 404 → AC-20
 
