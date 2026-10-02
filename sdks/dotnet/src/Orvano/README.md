@@ -18,6 +18,8 @@ using var orvano = new OrvanoClient(new OrvanoClientOptions(new Uri("https://orv
 var health = await orvano.Health.GetAsync();
 ```
 
+`orvano.VerifyAccessTokenAsync(token)` checks a user's access token against the project's keys and returns the user, the session, and `EmailVerified` (the token's `email_verified` claim, up to 15 minutes old; pass `online: true` for the current state). Every failure is an `OrvanoException`; a limit's refusal carries `RetryAfter`.
+
 ## About
 
 Orvano is the open source backend you host yourself: auth, Postgres databases, storage, functions, realtime, messaging, webhooks, jobs, and backups, run from one console.

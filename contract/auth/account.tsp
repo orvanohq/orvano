@@ -105,6 +105,24 @@ enum VerificationEmailStatus {
   rate_limited,
 }
 
+@doc("""
+  What an emailed link is for: the `orvano_type` parameter Orvano adds to every link it emails, beside
+  `orvano_token`. The SDKs' link helpers (`redeemLink`, `handleLink`) read it to call the right operation.
+  """)
+enum EmailLinkType {
+  @doc("Verifies the email (`account.verifyEmail`).")
+  verification,
+
+  @doc("Resets the password and signs in (`account.completeRecovery`).")
+  recovery,
+
+  @doc("Signs in (`account.createMagicLinkSession`).")
+  magic_link,
+
+  @doc("Confirms an email change (`account.confirmEmailChange`).")
+  email_change,
+}
+
 @doc("A request to email a verification link to the signed in user.")
 model CreateVerificationRequest {
   @doc("""

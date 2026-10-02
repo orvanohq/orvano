@@ -8,7 +8,9 @@ namespace Orvano;
     RespectNullableAnnotations = true,
     RespectRequiredConstructorParameters = true,
     DefaultIgnoreCondition = JsonIgnoreCondition.Never)]
+[JsonSerializable(typeof(CreateUserRecoveryRequest))]
 [JsonSerializable(typeof(CreateUserRequest))]
+[JsonSerializable(typeof(CreateUserVerificationRequest))]
 [JsonSerializable(typeof(Health))]
 [JsonSerializable(typeof(Jwk))]
 [JsonSerializable(typeof(Jwks))]
@@ -16,6 +18,8 @@ namespace Orvano;
 [JsonSerializable(typeof(Session))]
 [JsonSerializable(typeof(SessionMethod))]
 [JsonSerializable(typeof(SessionPage))]
+[JsonSerializable(typeof(UpdateEmailVerificationRequest))]
+[JsonSerializable(typeof(UpdateUserEmailRequest))]
 [JsonSerializable(typeof(User))]
 [JsonSerializable(typeof(UserPage))]
 [JsonSerializable(typeof(UserStatus))]

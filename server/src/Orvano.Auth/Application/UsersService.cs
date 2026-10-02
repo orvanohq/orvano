@@ -6,14 +6,16 @@ using Orvano.Core.Paging;
 
 namespace Orvano.Auth.Application;
 
-/// <summary>Filters for listing a project's users (AC-17). Every one is optional.</summary>
-internal sealed record UserFilter(string? EmailPrefix, string? Status, DateTimeOffset? CreatedAfter, DateTimeOffset? CreatedBefore);
+/// <summary>Filters for listing a project's users (AC-17, spec 0010 AC-21). Every one is optional.</summary>
+internal sealed record UserFilter(string? EmailPrefix, string? Status, DateTimeOffset? CreatedAfter, DateTimeOffset? CreatedBefore, bool? EmailVerified = null);
 
 /// <summary>
 /// A project's users as a server (API key) or the console manages them (spec 0004, <c>users</c> service, AC-17,
 /// AC-18). The caller names the actor, so the same use cases serve <c>consoleUsers</c>.
 /// </summary>
-internal sealed class UsersService(AuthStore store, AccountService accounts, SessionService sessionService, Sessions sessions, SessionChecks checks)
+internal sealed class UsersService(
+    AuthStore store, AccountService accounts, SessionService sessionService, Sessions sessions, SessionChecks checks,
+    VerificationService verification, RecoveryService recovery)
 {
     /// <summary>The project's users, newest first, cursor paged, optionally filtered.</summary>
     public async Task<Outcome<Page<UserRow>>> ListAsync(string projectId, UserFilter filter, string? cursor, int? limit, CancellationToken ct)
@@ -41,6 +43,7 @@ internal sealed class UsersService(AuthStore store, AccountService accounts, Ses
             if (filter.Status is { } status) query = query.Where(u => u.Status == status);
             if (filter.CreatedAfter is { } createdAfter) query = query.Where(u => u.CreatedAt > createdAfter);
             if (filter.CreatedBefore is { } createdBefore) query = query.Where(u => u.CreatedAt < createdBefore);
+            if (filter.EmailVerified is { } verified) query = verified ? query.Where(u => u.EmailVerifiedAt != null) : query.Where(u => u.EmailVerifiedAt == null);
             if (after is not null)
                 query = query.Where(u => u.CreatedAt < after.CreatedAt || u.CreatedAt == after.CreatedAt && u.Id.CompareTo(afterId) < 0);
 
@@ -56,9 +59,82 @@ internal sealed class UsersService(AuthStore store, AccountService accounts, Ses
     public async Task<Outcome<UserRow>> GetAsync(string projectId, string userId, CancellationToken ct) =>
         Guid.TryParse(userId, out var id) && await FindAsync(projectId, id, ct) is { } user ? user : Failure.UserNotFound;
 
-    /// <summary>Creates a user without a session (AC-17).</summary>
-    public Task<Outcome<UserRow>> CreateAsync(string projectId, string? email, string? password, string? name, Actor actor, CancellationToken ct) =>
-        accounts.CreateUserAsync(projectId, email, password, name, actor, ct);
+    /// <summary>Creates a user without a session (AC-17), already verified when <paramref name="emailVerified"/> (spec 0010, AC-21).</summary>
+    public Task<Outcome<UserRow>> CreateAsync(
+        string projectId, string? email, string? password, string? name, Actor actor, CancellationToken ct, bool emailVerified = false) =>
+        accounts.CreateUserAsync(projectId, email, password, name, actor, ct, emailVerified);
+
+    /// <summary>
+    /// Marks the email verified or not (spec 0010, AC-21). True keeps an earlier date (else now) and deletes live
+    /// verification links; false clears it. A real change writes <c>auth.user.updated</c>.
+    /// </summary>
+    public async Task<Outcome<UserRow>> UpdateEmailVerificationAsync(string projectId, string userId, bool verified, Actor actor, CancellationToken ct)
+    {
+        if (!Guid.TryParse(userId, out var id)) return Failure.UserNotFound;
+        return await store.WriteAsync<UserRow>(async (uow, token) =>
+        {
+            if (await UserLocks.ByIdAsync(uow, projectId, id, token) is not { } user) return Failure.UserNotFound;
+            if ((user.EmailVerifiedAt is not null) != verified)
+            {
+                await using (var update = new NpgsqlCommand(
+                    "UPDATE orvano.auth_users SET email_verified_at = CASE WHEN @verified THEN now() END, updated_at = now() WHERE id = @id",
+                    uow.Tx.Connection, uow.Tx))
+                {
+                    update.Parameters.AddWithValue("verified", verified);
+                    update.Parameters.AddWithValue("id", id);
+                    await update.ExecuteNonQueryAsync(token);
+                }
+
+                await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserUpdated, projectId, actor, id.ToString(),
+                    new Dictionary<string, string> { ["userId"] = id.ToString() }, ["emailVerified"], ct: token);
+            }
+
+            if (verified) await EmailTokens.DeleteForUserAsync(uow, projectId, id, EmailTokenKind.Verification, token);
+            return await uow.Db.Users.AsNoTracking().SingleAsync(u => u.Id == id, token);
+        }, ct);
+    }
+
+    /// <summary>Emails the user a verification link (spec 0010, AC-21): 409 <c>email_already_verified</c> for a verified user.</summary>
+    public async Task<Outcome<Done>> CreateVerificationAsync(string projectId, string userId, string? redirectUrl, Actor actor, CancellationToken ct) =>
+        Guid.TryParse(userId, out var id) && await FindAsync(projectId, id, ct) is not null
+            ? await verification.RequestAsync(projectId, id, redirectUrl, actor, ct)
+            : Failure.UserNotFound;
+
+    /// <summary>Emails the user a password reset link (spec 0010, AC-21): 403 <c>user_blocked</c> for a blocked user.</summary>
+    public async Task<Outcome<Done>> CreateRecoveryAsync(string projectId, string userId, string? redirectUrl, Actor actor, CancellationToken ct) =>
+        Guid.TryParse(userId, out var id) && await FindAsync(projectId, id, ct) is not null
+            ? await recovery.SendForUserAsync(projectId, id, redirectUrl, actor, ct)
+            : Failure.UserNotFound;
+
+    /// <summary>
+    /// Changes the user's email at once (spec 0010, AC-21): verified only when <paramref name="emailVerified"/>. 409
+    /// <c>email_already_in_use</c> for a taken address; deletes the user's live tokens and keeps their sessions.
+    /// </summary>
+    public async Task<Outcome<UserRow>> UpdateEmailAsync(string projectId, string userId, string? email, bool emailVerified, Actor actor, CancellationToken ct)
+    {
+        if (!EmailRule.TryNormalize(email, out var trimmed)) return Failure.Invalid("The email must be an address of at most 320 characters.");
+        if (!Guid.TryParse(userId, out var id)) return Failure.UserNotFound;
+
+        return await store.WriteAsync<UserRow>(async (uow, token) =>
+        {
+            if (await UserLocks.ByIdAsync(uow, projectId, id, token) is not { } user) return Failure.UserNotFound;
+            if (await EmailChangeService.EmailTakenAsync(uow, projectId, trimmed, id, token)) return Failure.EmailAlreadyInUse;
+            if (!await EmailChangeService.SetEmailAsync(uow, id, trimmed, emailVerified, token)) return Failure.EmailAlreadyInUse;
+
+            await EmailTokens.DeleteForUserAsync(uow, projectId, id, kind: null, token);
+            var changed = new List<string>();
+            if (!string.Equals(user.Email, trimmed, StringComparison.Ordinal)) changed.Add("email");
+            // A new verified address gets a new date, so it changes even when it was verified before.
+            if (emailVerified || user.EmailVerifiedAt is not null) changed.Add("emailVerified");
+            if (changed.Count > 0)
+            {
+                await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserUpdated, projectId, actor, id.ToString(),
+                    new Dictionary<string, string> { ["userId"] = id.ToString() }, changed, ct: token);
+            }
+
+            return await uow.Db.Users.AsNoTracking().SingleAsync(u => u.Id == id, token);
+        }, ct);
+    }
 
     /// <summary>
     /// Blocks a user (AC-18): <c>status = blocked</c>, every session ended (<c>user_blocked</c>), and

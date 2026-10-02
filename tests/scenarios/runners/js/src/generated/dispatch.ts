@@ -10,13 +10,17 @@ import type {
   CreateMagicLinkSessionRequest,
   CreatePasswordSessionRequest,
   CreateRecoveryRequest,
+  CreateUserRecoveryRequest,
   CreateUserRequest,
+  CreateUserVerificationRequest,
   CreateVerificationRequest,
   DeleteAccountRequest,
   RefreshSessionRequest,
   UpdateAccountRequest,
   UpdateEmailRequest,
+  UpdateEmailVerificationRequest,
   UpdatePasswordRequest,
+  UpdateUserEmailRequest,
   VerifyEmailRequest,
 } from '@orvano/js'
 import type { DispatchTable } from '../dispatch-table.js'
@@ -169,6 +173,21 @@ export const dispatch: DispatchTable = {
     server: (o, input) => o.users.create(input.body as CreateUserRequest),
     scope: 'users.write',
   },
+  'users.createRecovery': {
+    status: 202,
+    server: (o, input) =>
+      o.users.createRecovery(input.userId as string, input.body as CreateUserRecoveryRequest),
+    scope: 'users.write',
+  },
+  'users.createVerification': {
+    status: 202,
+    server: (o, input) =>
+      o.users.createVerification(
+        input.userId as string,
+        input.body as CreateUserVerificationRequest,
+      ),
+    scope: 'users.write',
+  },
   'users.delete': {
     status: 204,
     server: (o, input) => o.users.delete(input.userId as string),
@@ -197,6 +216,7 @@ export const dispatch: DispatchTable = {
         status: input.status as string | undefined,
         createdAfter: input.createdAfter as string | undefined,
         createdBefore: input.createdBefore as string | undefined,
+        emailVerified: input.emailVerified as boolean | undefined,
         cursor: input.cursor as string | undefined,
         limit: input.limit as number | undefined,
       }),
@@ -206,6 +226,7 @@ export const dispatch: DispatchTable = {
         status: input.status as string | undefined,
         createdAfter: input.createdAfter as string | undefined,
         createdBefore: input.createdBefore as string | undefined,
+        emailVerified: input.emailVerified as boolean | undefined,
         limit: input.limit as number | undefined,
       }),
     scope: 'users.read',
@@ -224,6 +245,21 @@ export const dispatch: DispatchTable = {
   'users.unblock': {
     status: 200,
     server: (o, input) => o.users.unblock(input.userId as string),
+    scope: 'users.write',
+  },
+  'users.updateEmail': {
+    status: 200,
+    server: (o, input) =>
+      o.users.updateEmail(input.userId as string, input.body as UpdateUserEmailRequest),
+    scope: 'users.write',
+  },
+  'users.updateEmailVerification': {
+    status: 200,
+    server: (o, input) =>
+      o.users.updateEmailVerification(
+        input.userId as string,
+        input.body as UpdateEmailVerificationRequest,
+      ),
     scope: 'users.write',
   },
 }

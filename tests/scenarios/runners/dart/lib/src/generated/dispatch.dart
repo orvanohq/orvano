@@ -327,6 +327,32 @@ final Map<String, DispatchEntry> dispatch = {
     },
     scope: 'users.write',
   ),
+  'users.createRecovery': DispatchEntry(
+    status: 202,
+    server: (o, input) async {
+      await o.users.createRecovery(
+        input['userId'] as String,
+        CreateUserRecoveryRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return null;
+    },
+    scope: 'users.write',
+  ),
+  'users.createVerification': DispatchEntry(
+    status: 202,
+    server: (o, input) async {
+      await o.users.createVerification(
+        input['userId'] as String,
+        CreateUserVerificationRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return null;
+    },
+    scope: 'users.write',
+  ),
   'users.delete': DispatchEntry(
     status: 204,
     server: (o, input) async {
@@ -374,6 +400,9 @@ final Map<String, DispatchEntry> dispatch = {
         createdBefore: input['createdBefore'] == null
             ? null
             : DateTime.parse(input['createdBefore'] as String),
+        emailVerified: input['emailVerified'] == null
+            ? null
+            : input['emailVerified'] as bool,
         cursor: input['cursor'] == null ? null : input['cursor'] as String,
         limit: input['limit'] == null ? null : (input['limit'] as num).toInt(),
       );
@@ -389,6 +418,9 @@ final Map<String, DispatchEntry> dispatch = {
           createdBefore: input['createdBefore'] == null
               ? null
               : DateTime.parse(input['createdBefore'] as String),
+          emailVerified: input['emailVerified'] == null
+              ? null
+              : input['emailVerified'] as bool,
           limit: input['limit'] == null
               ? null
               : (input['limit'] as num).toInt(),
@@ -420,6 +452,30 @@ final Map<String, DispatchEntry> dispatch = {
     status: 200,
     server: (o, input) async {
       final r = await o.users.unblock(input['userId'] as String);
+      return r.toJson();
+    },
+    scope: 'users.write',
+  ),
+  'users.updateEmail': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.users.updateEmail(
+        input['userId'] as String,
+        UpdateUserEmailRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+    scope: 'users.write',
+  ),
+  'users.updateEmailVerification': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.users.updateEmailVerification(
+        input['userId'] as String,
+        UpdateEmailVerificationRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
       return r.toJson();
     },
     scope: 'users.write',

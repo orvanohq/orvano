@@ -198,6 +198,52 @@ public sealed class EmailFailureCodeJsonConverter : JsonConverter<EmailFailureCo
         });
 }
 
+/// <summary>What an emailed link is for: the <c>orvano_type</c> parameter Orvano adds to every link it emails, beside <c>orvano_token</c>. The SDKs' link helpers (<c>redeemLink</c>, <c>handleLink</c>) read it to call the right operation.</summary>
+[JsonConverter(typeof(EmailLinkTypeJsonConverter))]
+public enum EmailLinkType
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>verification</c>.</summary>
+    Verification,
+
+    /// <summary>The wire value <c>recovery</c>.</summary>
+    Recovery,
+
+    /// <summary>The wire value <c>magic_link</c>.</summary>
+    MagicLink,
+
+    /// <summary>The wire value <c>email_change</c>.</summary>
+    EmailChange,
+}
+
+/// <summary>Reads and writes <see cref="EmailLinkType"/> by wire value; unknown values read as <see cref="EmailLinkType.Unknown"/>.</summary>
+public sealed class EmailLinkTypeJsonConverter : JsonConverter<EmailLinkType>
+{
+    /// <inheritdoc/>
+    public override EmailLinkType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "verification" => EmailLinkType.Verification,
+            "recovery" => EmailLinkType.Recovery,
+            "magic_link" => EmailLinkType.MagicLink,
+            "email_change" => EmailLinkType.EmailChange,
+            _ => EmailLinkType.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, EmailLinkType value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            EmailLinkType.Verification => "verification",
+            EmailLinkType.Recovery => "recovery",
+            EmailLinkType.MagicLink => "magic_link",
+            EmailLinkType.EmailChange => "email_change",
+            _ => throw new JsonException($"EmailLinkType.{value} has no wire value"),
+        });
+}
+
 /// <summary>Where an email is in its delivery.</summary>
 [JsonConverter(typeof(EmailStatusJsonConverter))]
 public enum EmailStatus
@@ -985,14 +1031,26 @@ public sealed record CreateRecoveryRequest(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("redirectUrl")] string RedirectUrl);
 
+/// <summary>A request to email a user a password reset link.</summary>
+/// <param name="RedirectUrl">The page that receives the link, on a host that is one of the project's web platforms (<c>http</c> only on <c>localhost</c> or <c>127.0.0.1</c>). The link adds <c>orvano_type=recovery</c> and <c>orvano_token</c> to it.</param>
+public sealed record CreateUserRecoveryRequest(
+    [property: JsonPropertyName("redirectUrl")] string RedirectUrl);
+
 /// <summary>A new user with an email and password, created by a server. No session is created.</summary>
 /// <param name="Email">The email, trimmed, at most 320 characters. Unique in the project, ignoring case.</param>
 /// <param name="Password">8 to 256 characters after Unicode NFKC normalization.</param>
 /// <param name="Name">A display name, at most 256 characters.</param>
+/// <param name="EmailVerified">True to create the user with their email already verified, as when importing accounts. Defaults to false.</param>
 public sealed record CreateUserRequest(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("password")] string Password,
-    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null);
+    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null,
+    [property: JsonPropertyName("emailVerified"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? EmailVerified = null);
+
+/// <summary>A request to email a user a link that verifies their email.</summary>
+/// <param name="RedirectUrl">The page that receives the link: a host that is one of the project's web platforms (<c>http</c> only on <c>localhost</c> or <c>127.0.0.1</c>), or the app's own scheme. The link adds <c>orvano_type=verification</c> and <c>orvano_token</c> to it.</param>
+public sealed record CreateUserVerificationRequest(
+    [property: JsonPropertyName("redirectUrl")] string RedirectUrl);
 
 /// <summary>A request to email a verification link to the signed in user.</summary>
 /// <param name="RedirectUrl">Your page that receives the link: a host that is one of the project's web platforms (<c>http</c> only on <c>localhost</c> or <c>127.0.0.1</c>), or your app's own scheme (its iOS, Android, or macOS identifier). The link adds <c>orvano_type=verification</c> and <c>orvano_token</c> to it.</param>
@@ -1504,6 +1562,11 @@ public sealed record UpdateEmailRequest(
     [property: JsonPropertyName("redirectUrl")] string RedirectUrl,
     [property: JsonPropertyName("password"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Password = null);
 
+/// <summary>Sets whether a user's email is verified.</summary>
+/// <param name="Verified">True marks it verified (keeping an earlier date); false marks it unverified.</param>
+public sealed record UpdateEmailVerificationRequest(
+    [property: JsonPropertyName("verified")] bool Verified);
+
 /// <summary>Changes to the install settings.</summary>
 /// <param name="ConsoleSignup">Who may create a console account.</param>
 public sealed record UpdateInstallSettingsRequest(
@@ -1537,6 +1600,13 @@ public sealed record UpdatePlatformRequest(
 /// <param name="Name">The new project name; trimmed, 1 to 100 characters.</param>
 public sealed record UpdateProjectRequest(
     [property: JsonPropertyName("name")] string Name);
+
+/// <summary>Changes a user's email at once, without a confirmation email.</summary>
+/// <param name="Email">The new email, trimmed, at most 320 characters. Unique in the project, ignoring case.</param>
+/// <param name="EmailVerified">True marks the new email verified; it is unverified otherwise. Defaults to false.</param>
+public sealed record UpdateUserEmailRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("emailVerified"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? EmailVerified = null);
 
 /// <summary>A user of a project.</summary>
 /// <param name="Id">The user ID.</param>

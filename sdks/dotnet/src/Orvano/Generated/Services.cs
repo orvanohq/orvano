@@ -76,6 +76,20 @@ public sealed class UsersService
     public Task<User> CreateAsync(CreateUserRequest body, CancellationToken cancellationToken = default) =>
         _client.SendAsync(new OrvanoRequest("POST", "/v1/users", null, OrvanoRequest.Json(body, OrvanoJsonContext.Default.CreateUserRequest), false), OrvanoJsonContext.Default.User, cancellationToken);
 
+    /// <summary>Emails a user a password reset link.</summary>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="body">The request body.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task CreateRecoveryAsync(string userId, CreateUserRecoveryRequest body, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("POST", $"/v1/users/{Uri.EscapeDataString(userId)}/recovery", null, OrvanoRequest.Json(body, OrvanoJsonContext.Default.CreateUserRecoveryRequest), false), cancellationToken);
+
+    /// <summary>Emails a user a link that verifies their email.</summary>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="body">The request body.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task CreateVerificationAsync(string userId, CreateUserVerificationRequest body, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("POST", $"/v1/users/{Uri.EscapeDataString(userId)}/verification", null, OrvanoRequest.Json(body, OrvanoJsonContext.Default.CreateUserVerificationRequest), false), cancellationToken);
+
     /// <summary>Deletes a user with their password and sessions. It can't be undone.</summary>
     /// <param name="userId">The user ID.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
@@ -106,21 +120,23 @@ public sealed class UsersService
     /// <param name="status">Only users with this status: <c>active</c> or <c>blocked</c>.</param>
     /// <param name="createdAfter">Only users created after this time.</param>
     /// <param name="createdBefore">Only users created before this time.</param>
+    /// <param name="emailVerified">Only verified users (true) or unverified users (false).</param>
     /// <param name="cursor">The <c>nextCursor</c> of the previous page.</param>
     /// <param name="limit">Users per page, 1 to 100. Defaults to 25.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
-    public Task<UserPage> ListAsync(string? email = null, string? status = null, DateTimeOffset? createdAfter = null, DateTimeOffset? createdBefore = null, string? cursor = null, int? limit = null, CancellationToken cancellationToken = default) =>
-        _client.SendAsync(new OrvanoRequest("GET", "/v1/users", [new("email", email), new("status", status), new("createdAfter", createdAfter is null ? null : createdAfter.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)), new("createdBefore", createdBefore is null ? null : createdBefore.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)), new("cursor", cursor), new("limit", limit is null ? null : limit.Value.ToString(CultureInfo.InvariantCulture))], null, false), OrvanoJsonContext.Default.UserPage, cancellationToken);
+    public Task<UserPage> ListAsync(string? email = null, string? status = null, DateTimeOffset? createdAfter = null, DateTimeOffset? createdBefore = null, bool? emailVerified = null, string? cursor = null, int? limit = null, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("GET", "/v1/users", [new("email", email), new("status", status), new("createdAfter", createdAfter is null ? null : createdAfter.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)), new("createdBefore", createdBefore is null ? null : createdBefore.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)), new("emailVerified", emailVerified is null ? null : emailVerified.Value ? "true" : "false"), new("cursor", cursor), new("limit", limit is null ? null : limit.Value.ToString(CultureInfo.InvariantCulture))], null, false), OrvanoJsonContext.Default.UserPage, cancellationToken);
 
     /// <summary>Every item of <c>ListAsync</c>, walking all pages: <c>await foreach</c>.</summary>
     /// <param name="email">Only users whose email starts with this, ignoring case.</param>
     /// <param name="status">Only users with this status: <c>active</c> or <c>blocked</c>.</param>
     /// <param name="createdAfter">Only users created after this time.</param>
     /// <param name="createdBefore">Only users created before this time.</param>
+    /// <param name="emailVerified">Only verified users (true) or unverified users (false).</param>
     /// <param name="limit">Users per page, 1 to 100. Defaults to 25.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
-    public IAsyncEnumerable<User> ListAllAsync(string? email = null, string? status = null, DateTimeOffset? createdAfter = null, DateTimeOffset? createdBefore = null, int? limit = null, CancellationToken cancellationToken = default) =>
-        OrvanoPagination.IterateAsync((cursor, ct) => ListAsync(email: email, status: status, createdAfter: createdAfter, createdBefore: createdBefore, cursor: cursor, limit: limit, cancellationToken: ct), page => page.Items, page => page.NextCursor, cancellationToken);
+    public IAsyncEnumerable<User> ListAllAsync(string? email = null, string? status = null, DateTimeOffset? createdAfter = null, DateTimeOffset? createdBefore = null, bool? emailVerified = null, int? limit = null, CancellationToken cancellationToken = default) =>
+        OrvanoPagination.IterateAsync((cursor, ct) => ListAsync(email: email, status: status, createdAfter: createdAfter, createdBefore: createdBefore, emailVerified: emailVerified, cursor: cursor, limit: limit, cancellationToken: ct), page => page.Items, page => page.NextCursor, cancellationToken);
 
     /// <summary>Lists a user's active sessions, newest first. <c>current</c> is always false.</summary>
     /// <param name="userId">The user ID.</param>
@@ -142,6 +158,20 @@ public sealed class UsersService
     /// <param name="cancellationToken">Cancels the request.</param>
     public Task<User> UnblockAsync(string userId, CancellationToken cancellationToken = default) =>
         _client.SendAsync(new OrvanoRequest("POST", $"/v1/users/{Uri.EscapeDataString(userId)}/unblock", null, null, true), OrvanoJsonContext.Default.User, cancellationToken);
+
+    /// <summary>Changes a user's email at once, without a confirmation email. It deletes the user's live email links and codes, and keeps their sessions.</summary>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="body">The request body.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task<User> UpdateEmailAsync(string userId, UpdateUserEmailRequest body, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("PUT", $"/v1/users/{Uri.EscapeDataString(userId)}/email", null, OrvanoRequest.Json(body, OrvanoJsonContext.Default.UpdateUserEmailRequest), true), OrvanoJsonContext.Default.User, cancellationToken);
+
+    /// <summary>Marks a user's email verified or unverified. Marking it verified deletes any live verification links.</summary>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="body">The request body.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task<User> UpdateEmailVerificationAsync(string userId, UpdateEmailVerificationRequest body, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("PUT", $"/v1/users/{Uri.EscapeDataString(userId)}/email-verification", null, OrvanoRequest.Json(body, OrvanoJsonContext.Default.UpdateEmailVerificationRequest), true), OrvanoJsonContext.Default.User, cancellationToken);
 }
 
 public sealed partial class OrvanoClient

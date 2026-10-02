@@ -10,13 +10,25 @@ export class OrvanoError extends Error {
   readonly code: string
   /** The request ID to quote when reporting a problem, when the server sent one. */
   readonly requestId: string | null
+  /**
+   * How many seconds to wait before trying again, from the `Retry-After` header (a 429 or 503);
+   * null when the server sent none.
+   */
+  readonly retryAfter: number | null
 
-  constructor(status: number, code: string, message: string, requestId: string | null) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    requestId: string | null,
+    retryAfter: number | null = null,
+  ) {
     super(message)
     this.name = 'OrvanoError'
     this.status = status
     this.code = code
     this.requestId = requestId
+    this.retryAfter = retryAfter
   }
 
   /** Reads a failed response into an `OrvanoError`, whatever its body looks like. */
@@ -39,6 +51,16 @@ export class OrvanoError extends Error {
       text('code') ?? 'unknown',
       text('detail') ?? text('title') ?? `Request failed with status ${String(response.status)}`,
       text('requestId') ?? response.headers.get('X-Request-Id'),
+      retryAfterSeconds(response.headers.get('Retry-After')),
     )
   }
+}
+
+/** `Retry-After` as seconds: a number of seconds, or an HTTP date; null when absent or unreadable. */
+export function retryAfterSeconds(header: string | null): number | null {
+  if (header === null || header.trim() === '') return null
+  const seconds = Number(header)
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds
+  const date = Date.parse(header)
+  return Number.isNaN(date) ? null : Math.max(0, Math.ceil((date - Date.now()) / 1000))
 }

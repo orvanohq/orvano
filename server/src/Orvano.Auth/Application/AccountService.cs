@@ -78,10 +78,14 @@ internal sealed class AccountService(
         return outcome.Succeeded ? outcome.Value.User : outcome.Failure!;
     }
 
-    /// <summary>A server or console creates a user (AC-17): the same rules as sign up, and no session.</summary>
-    public async Task<Outcome<UserRow>> CreateUserAsync(string projectId, string? email, string? password, string? name, Actor actor, CancellationToken ct)
+    /// <summary>
+    /// A server or console creates a user (AC-17): the same rules as sign up, and no session. <paramref name="emailVerified"/>
+    /// creates them already verified, as when importing accounts (spec 0010, AC-21).
+    /// </summary>
+    public async Task<Outcome<UserRow>> CreateUserAsync(
+        string projectId, string? email, string? password, string? name, Actor actor, CancellationToken ct, bool emailVerified = false)
     {
-        var outcome = await CreateAsync(projectId, email, password, name, _ => actor, client: null, ct);
+        var outcome = await CreateAsync(projectId, email, password, name, _ => actor, client: null, ct, verified: emailVerified);
         return outcome.Succeeded ? outcome.Value.User : outcome.Failure!;
     }
 
@@ -92,7 +96,7 @@ internal sealed class AccountService(
     /// </summary>
     private async Task<Outcome<(UserRow User, SessionGrant? Grant, VerificationEmail? Verification)>> CreateAsync(
         string projectId, string? email, string? password, string? name, Func<Guid, Actor> actorOf, ClientInfo? client, CancellationToken ct,
-        ConsoleGate? gate = null, string? verificationRedirectUrl = null)
+        ConsoleGate? gate = null, string? verificationRedirectUrl = null, bool verified = false)
     {
         if (!EmailRule.TryNormalize(email, out var trimmed)) return Failure.Invalid("The email must be an address of at most 320 characters.");
         if (!UserName.IsValid(name)) return Failure.Invalid($"The name must be at most {UserName.MaxLength} characters.");
@@ -141,7 +145,7 @@ internal sealed class AccountService(
                 }
             }
 
-            if (await UserRecords.TryInsertAsync(uow, projectId, trimmed, name, verified: false, token) is not { } userId) return Failure.UserAlreadyExists;
+            if (await UserRecords.TryInsertAsync(uow, projectId, trimmed, name, verified, token) is not { } userId) return Failure.UserAlreadyExists;
 
             await InsertPasswordAsync(uow, userId, projectId, hash, token);
             if (admitted is not null) await accountCreated.OnCreatedAsync(uow.Tx, userId, name, trimmed, admitted, token);

@@ -56,6 +56,7 @@ const account = {
   id: '01a0e581-281d-72e8-b56a-55ef6b0e8c13',
   email: 'ada@example.com',
   emailVerified: false,
+  emailVerifiedAt: null,
   name: 'Ada',
   status: 'active',
   metadata: {},

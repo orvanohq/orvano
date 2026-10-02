@@ -1582,6 +1582,44 @@ public static class UsersOperations
         public const string Scope = "users.write";
     }
 
+    /// <summary>POST /v1/users/{userId}/recovery: Emails a user a password reset link.</summary>
+    public static class CreateRecovery
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.createRecovery";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/recovery";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
+    /// <summary>POST /v1/users/{userId}/verification: Emails a user a link that verifies their email.</summary>
+    public static class CreateVerification
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.createVerification";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/verification";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
     /// <summary>DELETE /v1/users/{userId}: Deletes a user with their password and sessions. It can't be undone.</summary>
     public static class Delete
     {
@@ -1707,6 +1745,44 @@ public static class UsersOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/users/{userId}/unblock";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
+    /// <summary>PUT /v1/users/{userId}/email: Changes a user's email at once, without a confirmation email. It deletes the user's live email links and codes,</summary>
+    public static class UpdateEmail
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.updateEmail";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PUT";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/email";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
+    /// <summary>PUT /v1/users/{userId}/email-verification: Marks a user's email verified or unverified. Marking it verified deletes any live verification links.</summary>
+    public static class UpdateEmailVerification
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.updateEmailVerification";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PUT";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/email-verification";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "server";

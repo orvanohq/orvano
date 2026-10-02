@@ -17,6 +17,7 @@ const session: Session = {
   sdk: 'orvano-js/0.1.0',
   ipAddress: '203.0.113.7',
   current: false,
+  method: 'password',
 }
 
 const signingKeys: SigningKey[] = [

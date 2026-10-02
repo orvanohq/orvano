@@ -1,4 +1,5 @@
-# Spec 0010, AC-3, AC-8, AC-15, AC-16, AC-27: a new email signs up by magic link, read from Mailpit.
+# Spec 0010, AC-3, AC-8, AC-15, AC-16, AC-24, AC-27: a new email signs up by magic link, read from
+# Mailpit and redeemed through the client SDK's link helper.
 name: a new email signs up by magic link, the link works once, and createUser false sends nothing
 requires: []
 steps:
@@ -22,13 +23,21 @@ steps:
       body: { type: magic_link }
     save:
       token: $.token
-  - op: account.createMagicLinkSession
+      link: $.url
+  # A URL without Orvano's parameters is not a link.
+  - op: redeemLink
     as: client
-    input:
-      body: { token: '${token}' }
+    input: { url: 'http://localhost:3000/auth/callback?next=home' }
+    expect: { status: 200, body: null }
+  - op: redeemLink
+    as: client
+    input: { url: '${link}' }
     expect:
-      status: 201
-      body: { isNewUser: true, user: { email: 'mia-${unique}@example.com', emailVerified: true } }
+      status: 200
+      body:
+        type: magic_link
+        isNewUser: true
+        user: { email: 'mia-${unique}@example.com', emailVerified: true }
   - op: account.get
     as: client
     input: {}

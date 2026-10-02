@@ -15,6 +15,8 @@ internal static class RunnerDispatch
     {
         ["now"] = new(200, (_, _, _) =>
             Task.FromResult<JsonNode?>(new JsonObject { ["now"] = DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture) }), null),
+        // The link helper is a client SDK feature; the .NET SDK has no client operations, so the scenario skips.
+        ["redeemLink"] = new(200, null, null),
         ["signIn"] = new(201, async (client, input, ct) =>
         {
             var body = Encoding.UTF8.GetBytes(input["body"]?.ToJsonString() ?? "{}");

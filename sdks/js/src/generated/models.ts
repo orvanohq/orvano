@@ -104,6 +104,15 @@ export interface CreateRecoveryRequest {
   redirectUrl: string
 }
 
+/** A request to email a user a password reset link. */
+export interface CreateUserRecoveryRequest {
+  /**
+   * The page that receives the link, on a host that is one of the project's web platforms (`http` only on `localhost`
+   * or `127.0.0.1`). The link adds `orvano_type=recovery` and `orvano_token` to it.
+   */
+  redirectUrl: string
+}
+
 /** A new user with an email and password, created by a server. No session is created. */
 export interface CreateUserRequest {
   /** The email, trimmed, at most 320 characters. Unique in the project, ignoring case. */
@@ -112,6 +121,17 @@ export interface CreateUserRequest {
   password: string
   /** A display name, at most 256 characters. */
   name?: string | null
+  /** True to create the user with their email already verified, as when importing accounts. Defaults to false. */
+  emailVerified?: boolean
+}
+
+/** A request to email a user a link that verifies their email. */
+export interface CreateUserVerificationRequest {
+  /**
+   * The page that receives the link: a host that is one of the project's web platforms (`http` only on `localhost` or
+   * `127.0.0.1`), or the app's own scheme. The link adds `orvano_type=verification` and `orvano_token` to it.
+   */
+  redirectUrl: string
 }
 
 /** A request to email a verification link to the signed in user. */
@@ -251,12 +271,26 @@ export interface UpdateEmailRequest {
   password?: string
 }
 
+/** Sets whether a user's email is verified. */
+export interface UpdateEmailVerificationRequest {
+  /** True marks it verified (keeping an earlier date); false marks it unverified. */
+  verified: boolean
+}
+
 /** A password change. */
 export interface UpdatePasswordRequest {
   /** The user's current password. A user without one leaves it out, and must have signed in within 10 minutes. */
   currentPassword?: string
   /** The new password: 8 to 256 characters after Unicode NFKC normalization. */
   newPassword: string
+}
+
+/** Changes a user's email at once, without a confirmation email. */
+export interface UpdateUserEmailRequest {
+  /** The new email, trimmed, at most 320 characters. Unique in the project, ignoring case. */
+  email: string
+  /** True marks the new email verified; it is unverified otherwise. Defaults to false. */
+  emailVerified?: boolean
 }
 
 /** A user of a project. */

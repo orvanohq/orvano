@@ -12,12 +12,14 @@ public sealed class OrvanoException : Exception
     /// <param name="code">Orvano's stable error code.</param>
     /// <param name="message">A human readable description of the problem.</param>
     /// <param name="requestId">The request ID, when the server sent one.</param>
-    public OrvanoException(int status, string code, string message, string? requestId)
+    /// <param name="retryAfter">How long to wait before trying again, from <c>Retry-After</c>, when the server sent it.</param>
+    public OrvanoException(int status, string code, string message, string? requestId, TimeSpan? retryAfter = null)
         : base(message)
     {
         Status = status;
         Code = code;
         RequestId = requestId;
+        RetryAfter = retryAfter;
     }
 
     /// <summary>The HTTP status code.</summary>
@@ -28,4 +30,10 @@ public sealed class OrvanoException : Exception
 
     /// <summary>The request ID to quote when reporting a problem, when the server sent one.</summary>
     public string? RequestId { get; }
+
+    /// <summary>
+    /// How long to wait before trying again, from the <c>Retry-After</c> header (a 429 or 503); null when the server
+    /// sent none.
+    /// </summary>
+    public TimeSpan? RetryAfter { get; }
 }

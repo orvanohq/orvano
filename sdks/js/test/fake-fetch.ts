@@ -3,6 +3,8 @@ export interface Sent {
   method: string
   url: string
   headers: Headers
+  /** The JSON body as sent, when there was one. */
+  body?: string
 }
 
 /** How the fake answers one request; `hang` waits until the call is cancelled. */
@@ -17,7 +19,12 @@ export function fakeFetch(...answers: Answer[]): { fetch: typeof fetch; sent: Se
   let next = 0
   const fetch = (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = input instanceof Request ? input.url : input.toString()
-    sent.push({ method: init?.method ?? 'GET', url, headers: new Headers(init?.headers) })
+    sent.push({
+      method: init?.method ?? 'GET',
+      url,
+      headers: new Headers(init?.headers),
+      ...(typeof init?.body === 'string' ? { body: init.body } : {}),
+    })
     const answer = answers[Math.min(next++, answers.length - 1)]
     if (answer === 'hang') {
       return new Promise((_, reject) => {
@@ -55,11 +62,12 @@ export function status(code: number, retryAfter?: string): () => Response {
     })
 }
 
-/** A problem details answer. */
+/** A problem details answer, optionally with `X-Request-Id` and `Retry-After`. */
 export function problem(
   code: number,
   body: Record<string, unknown>,
   requestId?: string,
+  retryAfter?: string,
 ): () => Response {
   return () =>
     new Response(JSON.stringify(body), {
@@ -67,6 +75,7 @@ export function problem(
       headers: {
         'Content-Type': 'application/problem+json',
         ...(requestId === undefined ? {} : { 'X-Request-Id': requestId }),
+        ...(retryAfter === undefined ? {} : { 'Retry-After': retryAfter }),
       },
     })
 }

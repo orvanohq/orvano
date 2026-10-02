@@ -202,8 +202,17 @@ public sealed partial class OrvanoClient : IDisposable
             status,
             NonEmpty(problem?.Code) ?? "unknown",
             NonEmpty(problem?.Detail) ?? NonEmpty(problem?.Title) ?? $"Request failed with status {status} ({(HttpStatusCode)status}).",
-            NonEmpty(problem?.RequestId) ?? RequestIdOf(response));
+            NonEmpty(problem?.RequestId) ?? RequestIdOf(response),
+            RetryAfterOf(response));
     }
+
+    /// <summary><c>Retry-After</c> as a span: seconds or an HTTP date; null when absent.</summary>
+    private static TimeSpan? RetryAfterOf(HttpResponseMessage response) => response.Headers.RetryAfter switch
+    {
+        { Delta: { } delta } => delta,
+        { Date: { } date } => date - DateTimeOffset.UtcNow is { Ticks: > 0 } wait ? wait : TimeSpan.Zero,
+        _ => null,
+    };
 
     private static string? RequestIdOf(HttpResponseMessage response) =>
         response.Headers.TryGetValues(OrvanoHeaders.RequestId, out var values) ? values.FirstOrDefault() : null;

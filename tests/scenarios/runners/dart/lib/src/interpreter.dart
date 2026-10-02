@@ -117,12 +117,29 @@ String? fixtureApiKey(String fixturesYaml) {
 /// session alone, so a runner without client operations (.NET) can get a
 /// token too; `verifyAccessToken` is the server SDK's own check; `now` is the
 /// runner's clock, saved before a send and passed to `test.getLatestEmail` as
-/// `after`. Their names have no dot, so they never collide with an operationId.
+/// `after`; `redeemLink` is the client SDK's link helper (spec 0010). Their
+/// names have no dot, so they never collide with an operationId.
 final Map<String, DispatchEntry> _runnerDispatch = {
   'now': DispatchEntry(
     status: 200,
     client: (o, input) async => {'now': _now()},
     server: (o, input) async => {'now': _now()},
+  ),
+  'redeemLink': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final result = await o.client.handleLink(
+        Uri.parse('${input['url']}'),
+        password: input['password'] as String?,
+      );
+      return result == null
+          ? null
+          : {
+              'type': result.type.wire,
+              'user': result.user.toJson(),
+              'isNewUser': result.isNewUser,
+            };
+    },
   ),
   'signIn': DispatchEntry(
     status: 201,

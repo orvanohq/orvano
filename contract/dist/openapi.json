@@ -4400,6 +4400,16 @@
             "explode": false
           },
           {
+            "name": "emailVerified",
+            "in": "query",
+            "required": false,
+            "description": "Only verified users (true) or unverified users (false).",
+            "schema": {
+              "type": "boolean"
+            },
+            "explode": false
+          },
+          {
             "name": "cursor",
             "in": "query",
             "required": false,
@@ -4646,6 +4656,181 @@
         "x-orvano-audience": "server"
       }
     },
+    "/v1/users/{userId}/email": {
+      "put": {
+        "operationId": "users.updateEmail",
+        "description": "Changes a user's email at once, without a confirmation email. It deletes the user's live email links and codes,\nand keeps their sessions.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserEmailRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/email-verification": {
+      "put": {
+        "operationId": "users.updateEmailVerification",
+        "description": "Marks a user's email verified or unverified. Marking it verified deletes any live verification links.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEmailVerificationRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/recovery": {
+      "post": {
+        "operationId": "users.createRecovery",
+        "description": "Emails a user a password reset link.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The request has been accepted for processing, but processing has not yet completed."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRecoveryRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
     "/v1/users/{userId}/sessions": {
       "get": {
         "operationId": "users.listSessions",
@@ -4856,6 +5041,59 @@
           }
         ],
         "x-orvano-idempotent": true,
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/verification": {
+      "post": {
+        "operationId": "users.createVerification",
+        "description": "Emails a user a link that verifies their email.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The request has been accepted for processing, but processing has not yet completed."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserVerificationRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
         "x-orvano-scope": "users.write",
         "x-orvano-service": "users",
         "x-orvano-audience": "server"
@@ -5639,6 +5877,22 @@
         },
         "description": "A request to email a password reset link."
       },
+      "CreateUserRecoveryRequest": {
+        "type": "object",
+        "required": [
+          "redirectUrl"
+        ],
+        "properties": {
+          "redirectUrl": {
+            "type": "string",
+            "description": "The page that receives the link, on a host that is one of the project's web platforms (`http` only on `localhost`\nor `127.0.0.1`). The link adds `orvano_type=recovery` and `orvano_token` to it.",
+            "examples": [
+              "https://app.example.com/auth/callback"
+            ]
+          }
+        },
+        "description": "A request to email a user a password reset link."
+      },
       "CreateUserRequest": {
         "type": "object",
         "required": [
@@ -5673,9 +5927,32 @@
             "examples": [
               "Ada Lovelace"
             ]
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "True to create the user with their email already verified, as when importing accounts. Defaults to false.",
+            "examples": [
+              false
+            ]
           }
         },
         "description": "A new user with an email and password, created by a server. No session is created."
+      },
+      "CreateUserVerificationRequest": {
+        "type": "object",
+        "required": [
+          "redirectUrl"
+        ],
+        "properties": {
+          "redirectUrl": {
+            "type": "string",
+            "description": "The page that receives the link: a host that is one of the project's web platforms (`http` only on `localhost` or\n`127.0.0.1`), or the app's own scheme. The link adds `orvano_type=verification` and `orvano_token` to it.",
+            "examples": [
+              "https://app.example.com/auth/callback"
+            ]
+          }
+        },
+        "description": "A request to email a user a link that verifies their email."
       },
       "CreateVerificationRequest": {
         "type": "object",
@@ -5771,6 +6048,16 @@
           "email_unreadable"
         ],
         "description": "Why an email was not sent."
+      },
+      "EmailLinkType": {
+        "type": "string",
+        "enum": [
+          "verification",
+          "recovery",
+          "magic_link",
+          "email_change"
+        ],
+        "description": "What an emailed link is for: the `orvano_type` parameter Orvano adds to every link it emails, beside\n`orvano_token`. The SDKs' link helpers (`redeemLink`, `handleLink`) read it to call the right operation."
       },
       "EmailLogEntry": {
         "type": "object",
@@ -7828,6 +8115,22 @@
         },
         "description": "A request to change the signed in user's email. It changes once the link sent to the new address is opened."
       },
+      "UpdateEmailVerificationRequest": {
+        "type": "object",
+        "required": [
+          "verified"
+        ],
+        "properties": {
+          "verified": {
+            "type": "boolean",
+            "description": "True marks it verified (keeping an earlier date); false marks it unverified.",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "description": "Sets whether a user's email is verified."
+      },
       "UpdateInstallSettingsRequest": {
         "type": "object",
         "required": [
@@ -7928,6 +8231,29 @@
           }
         },
         "description": "Changes to a project."
+      },
+      "UpdateUserEmailRequest": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The new email, trimmed, at most 320 characters. Unique in the project, ignoring case.",
+            "examples": [
+              "ada.king@example.com"
+            ]
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "True marks the new email verified; it is unverified otherwise. Defaults to false.",
+            "examples": [
+              false
+            ]
+          }
+        },
+        "description": "Changes a user's email at once, without a confirmation email."
       },
       "User": {
         "type": "object",

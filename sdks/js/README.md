@@ -17,6 +17,24 @@ const { version } = await orvano.health.get()
 
 App code imports `@orvano/js`, which has no way to set an API key. Trusted server code imports `@orvano/js/server` and passes `apiKey`.
 
+## Email links and codes
+
+Orvano emails verification, password reset, magic link, and email change links that open your own page, with `orvano_type` and `orvano_token` added to the URL. On that page, one call redeems any of them:
+
+```ts
+const result = await orvano.client.redeemLink() // reads location.href in a browser
+// { type: 'magic_link', user, isNewUser } or null when the URL is not an Orvano link
+```
+
+A magic link or reset signs the user in; pass `{ password }` for a reset. A verification or email change refreshes the session when the same user is signed in, so the access token's `email_verified` claim is current. After a success the two parameters are removed from the address bar. For a code, call `orvano.client.signInWithEmailCode(email, code)`.
+
+Make the landing page safe for links:
+
+- Show a Continue button that redeems the link, instead of redeeming on page load. Mail scanners open links to check them, and each link works only once.
+- Send `Referrer-Policy: no-referrer` on that page, so the token never leaks to another site in a `Referer` header.
+
+Every failure is an `OrvanoError`; a limit's refusal carries `retryAfter`, in seconds.
+
 ## About
 
 Orvano is the open source backend you host yourself: auth, Postgres databases, storage, functions, realtime, messaging, webhooks, jobs, and backups, run from one console.

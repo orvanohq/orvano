@@ -1,4 +1,5 @@
-# Spec 0010, AC-11 to AC-13, AC-27: verification at sign up, read from Mailpit, then a refused resend.
+# Spec 0010, AC-11 to AC-14, AC-24, AC-27: verification at sign up, read from Mailpit and redeemed
+# through the client SDK's link helper while signed in, then a refused resend.
 name: a user verifies their email from the sign up link, and a resend after that is refused
 requires: []
 steps:
@@ -26,13 +27,13 @@ steps:
       body: { type: verification }
     save:
       token: $.token
-  - op: account.verifyEmail
+      link: $.url
+  - op: redeemLink
     as: client
-    input:
-      body: { token: '${token}' }
+    input: { url: '${link}' }
     expect:
       status: 200
-      body: { emailVerified: true }
+      body: { type: verification, isNewUser: false, user: { emailVerified: true } }
   - op: account.get
     as: client
     input: {}

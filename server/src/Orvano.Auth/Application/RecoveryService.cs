@@ -53,6 +53,30 @@ internal sealed class RecoveryService(
     }
 
     /// <summary>
+    /// <c>users.createRecovery</c> and its console twin (AC-21): a reset link for a known user, so no privacy padding;
+    /// 403 <c>user_blocked</c> for a blocked user, then the two recipient limits and the queue's answer.
+    /// </summary>
+    public async Task<Outcome<Done>> SendForUserAsync(string projectId, Guid userId, string? redirectUrl, Actor actor, CancellationToken ct)
+    {
+        if (await mailer.CheckRedirectAsync(projectId, redirectUrl, EmailTokenKind.Recovery, ct) is not { } redirect) return Failure.RedirectUrlNotAllowed;
+        var projectName = await mailer.ProjectNameAsync(projectId, ct);
+
+        return await store.WriteAsync<Done>(async (uow, token) =>
+        {
+            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
+            if (user.Status != UserStatuses.Active) return Failure.UserBlocked;
+            if (user.Email is not { } to) return Failure.Invalid("The user has no email.");
+            if (mailer.TakeRecipientLimits(projectId, to, EmailTokenKind.Recovery) is { } limited) return limited;
+
+            var link = await tokens.CreateLinkAsync(uow, projectId, EmailTokenKind.Recovery, user.Id, to, token);
+            var url = LinkUrl.Build(redirect.Url, EmailTokenKind.Recovery, link);
+            if (await mailer.QueueLinkAsync(uow.Tx, projectId, projectName, EmailTokenKind.Recovery, to, user.Name, url, token) is { } refused) return refused;
+            await EmailEvents.TokenCreatedAsync(uow, projectId, EmailTokenKind.Recovery, user.Id, actor, token);
+            return default(Done);
+        }, ct);
+    }
+
+    /// <summary>
     /// <c>account.completeRecovery</c> (AC-10): checks the password, then the token without a lock (so junk tokens
     /// never take a hashing slot), hashes outside any transaction, and in one transaction consumes the token, sets the
     /// password, verifies the email, ends every session, and signs the user in.

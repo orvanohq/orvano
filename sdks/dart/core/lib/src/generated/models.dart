@@ -350,6 +350,23 @@ final class CreateRecoveryRequest {
   Map<String, dynamic> toJson() => {'email': email, 'redirectUrl': redirectUrl};
 }
 
+/// A request to email a user a password reset link.
+final class CreateUserRecoveryRequest {
+  /// Creates a [CreateUserRecoveryRequest].
+  const CreateUserRecoveryRequest({required this.redirectUrl});
+
+  /// Decodes a [CreateUserRecoveryRequest] from JSON.
+  factory CreateUserRecoveryRequest.fromJson(Map<String, dynamic> json) =>
+      CreateUserRecoveryRequest(redirectUrl: json['redirectUrl'] as String);
+
+  /// The page that receives the link, on a host that is one of the project's web platforms (`http` only on `localhost`
+  /// or `127.0.0.1`). The link adds `orvano_type=recovery` and `orvano_token` to it.
+  final String redirectUrl;
+
+  /// Encodes this [CreateUserRecoveryRequest] as JSON.
+  Map<String, dynamic> toJson() => {'redirectUrl': redirectUrl};
+}
+
 /// A new user with an email and password, created by a server. No session is created.
 final class CreateUserRequest {
   /// Creates a [CreateUserRequest].
@@ -357,6 +374,7 @@ final class CreateUserRequest {
     required this.email,
     required this.password,
     this.name,
+    this.emailVerified,
   });
 
   /// Decodes a [CreateUserRequest] from JSON.
@@ -365,6 +383,9 @@ final class CreateUserRequest {
         email: json['email'] as String,
         password: json['password'] as String,
         name: json['name'] == null ? null : json['name'] as String,
+        emailVerified: json['emailVerified'] == null
+            ? null
+            : json['emailVerified'] as bool,
       );
 
   /// The email, trimmed, at most 320 characters. Unique in the project, ignoring case.
@@ -376,12 +397,33 @@ final class CreateUserRequest {
   /// A display name, at most 256 characters.
   final String? name;
 
+  /// True to create the user with their email already verified, as when importing accounts. Defaults to false.
+  final bool? emailVerified;
+
   /// Encodes this [CreateUserRequest] as JSON.
   Map<String, dynamic> toJson() => {
     'email': email,
     'password': password,
     'name': ?name,
+    'emailVerified': ?emailVerified,
   };
+}
+
+/// A request to email a user a link that verifies their email.
+final class CreateUserVerificationRequest {
+  /// Creates a [CreateUserVerificationRequest].
+  const CreateUserVerificationRequest({required this.redirectUrl});
+
+  /// Decodes a [CreateUserVerificationRequest] from JSON.
+  factory CreateUserVerificationRequest.fromJson(Map<String, dynamic> json) =>
+      CreateUserVerificationRequest(redirectUrl: json['redirectUrl'] as String);
+
+  /// The page that receives the link: a host that is one of the project's web platforms (`http` only on `localhost` or
+  /// `127.0.0.1`), or the app's own scheme. The link adds `orvano_type=verification` and `orvano_token` to it.
+  final String redirectUrl;
+
+  /// Encodes this [CreateUserVerificationRequest] as JSON.
+  Map<String, dynamic> toJson() => {'redirectUrl': redirectUrl};
 }
 
 /// A request to email a verification link to the signed in user.
@@ -792,6 +834,22 @@ final class UpdateEmailRequest {
   };
 }
 
+/// Sets whether a user's email is verified.
+final class UpdateEmailVerificationRequest {
+  /// Creates a [UpdateEmailVerificationRequest].
+  const UpdateEmailVerificationRequest({required this.verified});
+
+  /// Decodes a [UpdateEmailVerificationRequest] from JSON.
+  factory UpdateEmailVerificationRequest.fromJson(Map<String, dynamic> json) =>
+      UpdateEmailVerificationRequest(verified: json['verified'] as bool);
+
+  /// True marks it verified (keeping an earlier date); false marks it unverified.
+  final bool verified;
+
+  /// Encodes this [UpdateEmailVerificationRequest] as JSON.
+  Map<String, dynamic> toJson() => {'verified': verified};
+}
+
 /// A password change.
 final class UpdatePasswordRequest {
   /// Creates a [UpdatePasswordRequest].
@@ -819,6 +877,33 @@ final class UpdatePasswordRequest {
   Map<String, dynamic> toJson() => {
     'currentPassword': ?currentPassword,
     'newPassword': newPassword,
+  };
+}
+
+/// Changes a user's email at once, without a confirmation email.
+final class UpdateUserEmailRequest {
+  /// Creates a [UpdateUserEmailRequest].
+  const UpdateUserEmailRequest({required this.email, this.emailVerified});
+
+  /// Decodes a [UpdateUserEmailRequest] from JSON.
+  factory UpdateUserEmailRequest.fromJson(Map<String, dynamic> json) =>
+      UpdateUserEmailRequest(
+        email: json['email'] as String,
+        emailVerified: json['emailVerified'] == null
+            ? null
+            : json['emailVerified'] as bool,
+      );
+
+  /// The new email, trimmed, at most 320 characters. Unique in the project, ignoring case.
+  final String email;
+
+  /// True marks the new email verified; it is unverified otherwise. Defaults to false.
+  final bool? emailVerified;
+
+  /// Encodes this [UpdateUserEmailRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'email': email,
+    'emailVerified': ?emailVerified,
   };
 }
 

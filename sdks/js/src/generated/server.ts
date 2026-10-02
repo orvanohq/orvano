@@ -2,12 +2,16 @@
 import type { Client, RequestOptions } from '../runtime/client.js'
 import { paginate } from '../runtime/pagination.js'
 import type {
+  CreateUserRecoveryRequest,
   CreateUserRequest,
+  CreateUserVerificationRequest,
   Health,
   Jwks,
   OpenIdConfiguration,
   Session,
   SessionPage,
+  UpdateEmailVerificationRequest,
+  UpdateUserEmailRequest,
   User,
   UserPage,
 } from './models.js'
@@ -95,6 +99,30 @@ export class UsersService {
     return this.#client.request<User>({ method: 'POST', path: '/v1/users', body }, options)
   }
 
+  /** Emails a user a password reset link. */
+  createRecovery(
+    userId: string,
+    body: CreateUserRecoveryRequest,
+    options?: RequestOptions,
+  ): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'POST', path: `/v1/users/${encodeURIComponent(userId)}/recovery`, body },
+      options,
+    )
+  }
+
+  /** Emails a user a link that verifies their email. */
+  createVerification(
+    userId: string,
+    body: CreateUserVerificationRequest,
+    options?: RequestOptions,
+  ): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'POST', path: `/v1/users/${encodeURIComponent(userId)}/verification`, body },
+      options,
+    )
+  }
+
   /** Deletes a user with their password and sessions. It can't be undone. */
   delete(userId: string, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
@@ -137,6 +165,7 @@ export class UsersService {
       status?: string | undefined
       createdAfter?: string | undefined
       createdBefore?: string | undefined
+      emailVerified?: boolean | undefined
       cursor?: string | undefined
       limit?: number | undefined
     },
@@ -152,6 +181,7 @@ export class UsersService {
       status?: string | undefined
       createdAfter?: string | undefined
       createdBefore?: string | undefined
+      emailVerified?: boolean | undefined
       limit?: number | undefined
     },
     options?: RequestOptions,
@@ -184,6 +214,43 @@ export class UsersService {
   unblock(userId: string, options?: RequestOptions): Promise<User> {
     return this.#client.request<User>(
       { method: 'POST', path: `/v1/users/${encodeURIComponent(userId)}/unblock`, idempotent: true },
+      options,
+    )
+  }
+
+  /**
+   * Changes a user's email at once, without a confirmation email. It deletes the user's live email links and codes,
+   * and keeps their sessions.
+   */
+  updateEmail(
+    userId: string,
+    body: UpdateUserEmailRequest,
+    options?: RequestOptions,
+  ): Promise<User> {
+    return this.#client.request<User>(
+      {
+        method: 'PUT',
+        path: `/v1/users/${encodeURIComponent(userId)}/email`,
+        body,
+        idempotent: true,
+      },
+      options,
+    )
+  }
+
+  /** Marks a user's email verified or unverified. Marking it verified deletes any live verification links. */
+  updateEmailVerification(
+    userId: string,
+    body: UpdateEmailVerificationRequest,
+    options?: RequestOptions,
+  ): Promise<User> {
+    return this.#client.request<User>(
+      {
+        method: 'PUT',
+        path: `/v1/users/${encodeURIComponent(userId)}/email-verification`,
+        body,
+        idempotent: true,
+      },
       options,
     )
   }

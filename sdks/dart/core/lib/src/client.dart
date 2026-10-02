@@ -333,6 +333,7 @@ base class Client {
           status,
           response.body,
           response.headers['x-request-id'],
+          retryAfterHeader: response.headers['retry-after'],
         );
       }
     } finally {
@@ -354,11 +355,53 @@ base class Client {
       case SessionChange.end:
         await _save(null, AuthEvent.signedOut);
       case SessionChange.user:
-        if (!_changes.isClosed) {
-          _changes.add(
-            AuthStateChange(AuthEvent.userUpdated, await session.read()),
-          );
-        }
+        await _userChanged(result);
+    }
+  }
+
+  /// A call changed a user (spec 0010, AC-14). When this client holds that
+  /// user's session, listeners hear [AuthEvent.userUpdated], after a refresh
+  /// when the token's `email_verified` claim no longer matches, so the next
+  /// call carries the new claim. A session for another user, or none, hears
+  /// nothing.
+  Future<void> _userChanged(Object? result) async {
+    final current = await session.read();
+    if (current == null) return;
+    final claims = _accessClaims(current.accessToken);
+    final user = result is Map<String, dynamic> ? result : null;
+    final id = user?['id'];
+    if (claims != null && id is String && claims.sub != id) return;
+    final verified = user?['emailVerified'];
+    if (claims != null && verified is bool && verified != claims.verified) {
+      try {
+        if (await _refresh(current) == null) return;
+      } on Object {
+        // A network error keeps the session; the claim updates at the next
+        // refresh.
+      }
+    }
+    if (!_changes.isClosed) {
+      _changes.add(
+        AuthStateChange(AuthEvent.userUpdated, await session.read()),
+      );
+    }
+  }
+
+  /// The `sub` and `email_verified` claims of an access token, read without
+  /// checking it; null when it is not a readable JWT.
+  static ({String sub, bool verified})? _accessClaims(String token) {
+    final parts = token.split('.');
+    if (parts.length < 2) return null;
+    try {
+      final json = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      );
+      if (json case {'sub': final String sub}) {
+        return (sub: sub, verified: json['email_verified'] == true);
+      }
+      return null;
+    } on FormatException {
+      return null;
     }
   }
 

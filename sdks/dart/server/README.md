@@ -15,6 +15,8 @@ final orvano = Orvano(
 final health = await orvano.health.get();
 ```
 
+`client.verifyAccessToken(token)` checks a user's access token against the project's keys and returns the user, the session, and `emailVerified` (the token's `email_verified` claim, up to 15 minutes old; pass `online: true` for the current state).
+
 ## About
 
 Orvano is the open source backend you host yourself: auth, Postgres databases, storage, functions, realtime, messaging, webhooks, jobs, and backups, run from one console.

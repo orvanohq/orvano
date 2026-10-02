@@ -19,9 +19,10 @@ internal static class UsersEndpoints
     public static void Map(RouteGroupBuilder v1)
     {
         v1.MapGet(Ops.List.Route, async (
-                HttpContext http, string? email, string? status, DateTimeOffset? createdAfter, DateTimeOffset? createdBefore, string? cursor, int? limit,
-                UsersService users, CancellationToken ct) =>
-            Ok(http, await users.ListAsync(PublicRequests.Project(http), new UserFilter(email, status, createdAfter, createdBefore), cursor, limit, ct), UserPage))
+                HttpContext http, string? email, string? status, DateTimeOffset? createdAfter, DateTimeOffset? createdBefore, bool? emailVerified,
+                string? cursor, int? limit, UsersService users, CancellationToken ct) =>
+            Ok(http, await users.ListAsync(
+                PublicRequests.Project(http), new UserFilter(email, status, createdAfter, createdBefore, emailVerified), cursor, limit, ct), UserPage))
             .WithName(Ops.List.Id)
             .RequireProject()
             .RequireApiKey(Ops.List.Scope);
@@ -37,7 +38,8 @@ internal static class UsersEndpoints
             var limit = limits.Acquire(RateLimitPolicies.SignUpPerIp, ConnectionIp.Key(http));
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
 
-            var outcome = await users.CreateAsync(PublicRequests.Project(http), request.Email, request.Password, request.Name, KeyActor(http), ct);
+            var outcome = await users.CreateAsync(
+                PublicRequests.Project(http), request.Email, request.Password, request.Name, KeyActor(http), ct, request.EmailVerified ?? false);
             return Created(http, outcome, User);
         })
             .WithName(Ops.Create.Id)
@@ -61,6 +63,30 @@ internal static class UsersEndpoints
             .WithName(Ops.Delete.Id)
             .RequireProject()
             .RequireApiKey(Ops.Delete.Scope);
+
+        v1.MapPut(Ops.UpdateEmailVerification.Route, async (HttpContext http, string userId, Api.UpdateEmailVerificationRequest request, UsersService users, CancellationToken ct) =>
+            Ok(http, await users.UpdateEmailVerificationAsync(PublicRequests.Project(http), userId, request.Verified, KeyActor(http), ct), User))
+            .WithName(Ops.UpdateEmailVerification.Id)
+            .RequireProject()
+            .RequireApiKey(Ops.UpdateEmailVerification.Scope);
+
+        v1.MapPost(Ops.CreateVerification.Route, async (HttpContext http, string userId, Api.CreateUserVerificationRequest request, UsersService users, CancellationToken ct) =>
+            Accepted(http, await users.CreateVerificationAsync(PublicRequests.Project(http), userId, request.RedirectUrl, KeyActor(http), ct)))
+            .WithName(Ops.CreateVerification.Id)
+            .RequireProject()
+            .RequireApiKey(Ops.CreateVerification.Scope);
+
+        v1.MapPost(Ops.CreateRecovery.Route, async (HttpContext http, string userId, Api.CreateUserRecoveryRequest request, UsersService users, CancellationToken ct) =>
+            Accepted(http, await users.CreateRecoveryAsync(PublicRequests.Project(http), userId, request.RedirectUrl, KeyActor(http), ct)))
+            .WithName(Ops.CreateRecovery.Id)
+            .RequireProject()
+            .RequireApiKey(Ops.CreateRecovery.Scope);
+
+        v1.MapPut(Ops.UpdateEmail.Route, async (HttpContext http, string userId, Api.UpdateUserEmailRequest request, UsersService users, CancellationToken ct) =>
+            Ok(http, await users.UpdateEmailAsync(PublicRequests.Project(http), userId, request.Email, request.EmailVerified ?? false, KeyActor(http), ct), User))
+            .WithName(Ops.UpdateEmail.Id)
+            .RequireProject()
+            .RequireApiKey(Ops.UpdateEmail.Scope);
 
         v1.MapGet(Ops.ListSessions.Route, async (HttpContext http, string userId, string? cursor, int? limit, UsersService users, CancellationToken ct) =>
             Ok(http, await users.ListSessionsAsync(PublicRequests.Project(http), userId, cursor, limit, ct), SessionPage))
