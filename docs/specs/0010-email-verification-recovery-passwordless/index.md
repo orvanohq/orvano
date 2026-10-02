@@ -366,8 +366,8 @@ Tracer Bullet: task 1 is a thin, real password reset thread from the contract th
 
 ## Follow-up
 
-- [ ] Spec 0004: amend AC-6 (the `email_verified` claim) and the session `end_reason` list; mark its row 10 "require verified email" follow up as decided against for now (row 14 may add an enforced switch), and its row 12 passwordless `account.delete` item as done here (AC-19).
-- [ ] Spec 0009: amend AC-14's `ActionUrl` rule and add `CheckAvailabilityAsync` to *Module seams*; tick its row 10 follow up when this row ships.
+- [x] Spec 0004: amend AC-6 (the `email_verified` claim) and the session `end_reason` list; mark its row 10 "require verified email" follow up as decided against for now (row 14 may add an enforced switch), and its row 12 passwordless `account.delete` item as done here (AC-19).
+- [x] Spec 0009: amend AC-14's `ActionUrl` rule and add `CheckAvailabilityAsync` to *Module seams*; tick its row 10 follow up when this row ships.
 - [ ] Row 14 (auth policies): an enforced per project "require verified email" switch, per project lifetimes and send limits (including the IP send limit for apps behind one server), and smarter lockouts that resist someone spending a victim's email allowance or killing their codes. A sign up that hides existence would make these flows' privacy complete.
 - [ ] Row 14 (auth policies): a stronger answer to a victim verifying a pre registered account, such as a verification landing step that asks "did you create this account?" and claims it on no, or a "require verified email" switch that refuses password sign in until verified.
 - [ ] Desktop deep links: `windows` and `linux` platforms have no custom scheme today; decide one if Flutter desktop apps ask for link based flows.

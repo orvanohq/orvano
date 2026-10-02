@@ -1,7 +1,7 @@
 # 0004. App user sign up, sign in, and sessions
 
 **Date**: 2026-09-26
-**Updated**: 2026-09-27 (`setupToken` on console sign up, `consoleInstall.getSetup` works without a session and has its own limit, spec 0006)
+**Updated**: 2026-10-02 (the `email_verified` claim, the session `method`, and the `password_reset` and `account_claimed` end reasons, spec 0010); 2026-09-27 (`setupToken` on console sign up, `consoleInstall.getSetup` works without a session and has its own limit, spec 0006)
 **Status**: Accepted
 
 ## Summary
@@ -27,7 +27,7 @@ Sign up and sign in
 - **AC-5**: A blocked user with the right password gets 403 `user_blocked`. With a wrong password they get 401 `invalid_credentials`, so block status never shows to someone without the password.
 
 Tokens and sessions
-- **AC-6**: An access token is an ES256 JWT with header `kid`, and claims `iss` = `<ORVANO_PUBLIC_URL>/v1/projects/<projectId>`, `aud` = `<projectId>`, `sub` = user ID, `sid` = session ID, `iat`, and `exp` = `iat` + 900 seconds. It carries no email, name, or other personal data.
+- **AC-6**: An access token is an ES256 JWT with header `kid`, and claims `iss` = `<ORVANO_PUBLIC_URL>/v1/projects/<projectId>`, `aud` = `<projectId>`, `sub` = user ID, `sid` = session ID, `email_verified` (a boolean read from the user row when the token is issued, at sign in and at every refresh; [spec 0010](../0010-email-verification-recovery-passwordless/index.md) AC-14), `iat`, and `exp` = `iat` + 900 seconds. It carries no email, name, or other personal data (`email_verified` is not personal data).
 - **AC-7**: The API reads the user from `Authorization: Bearer <access token>`. It accepts the token only if the signature checks against the header project's keys, `alg` is `ES256`, `aud` equals the `X-Orvano-Project` header, `exp` has not passed (30 seconds leeway), and the session is still active (cached for at most 30 seconds, evicted at once by the instance that ends it). An expired token gets 401 `token_expired`. Any other failure gets 401 `invalid_token`. An `account` operation called without a bearer token gets 401 `session_required`.
 - **AC-8**: `account.refreshSession` with the current refresh token returns a new access and refresh token pair, and the old refresh token becomes the previous one. The previous token, within 10 seconds of that rotation, returns the same current pair again (and a fresh access token). The previous token after 10 seconds ends the session with reason `reuse_detected` and gets 401 `invalid_refresh_token`. Any other token that names the session but matches neither the current nor the previous secret (an older token, or a made up one) gets 401 `invalid_refresh_token` and changes nothing, so knowing a session ID (it is the `sid` claim of every access token) is never enough to end a session. A refresh of an ended, idle expired, or absolutely expired session gets 401 `invalid_refresh_token`.
 - **AC-9**: A session ends 30 days after its last refresh (idle expiry) and 365 days after it was created (absolute expiry), whichever comes first. The idle expiry never moves past the absolute one.
@@ -35,16 +35,16 @@ Tokens and sessions
 - **AC-11**: A user may hold any number of active sessions at once, one per sign in.
 
 Self service (the signed in user, `account` service)
-- **AC-12**: `account.get` returns the current user: `id`, `email`, `emailVerified`, `name`, `status`, `metadata`, `createdAt`, `lastSignInAt`.
+- **AC-12**: `account.get` returns the current user: `id`, `email`, `emailVerified`, `emailVerifiedAt` (spec 0010, AC-20), `name`, `status`, `metadata`, `createdAt`, `lastSignInAt`.
 - **AC-13**: `account.update` changes `name` (at most 256 characters, or null) and `metadata` (a JSON object, at most 16 KB serialised), and writes `auth.user.updated` with the changed field names.
-- **AC-14**: `account.updatePassword` needs `currentPassword` (wrong: 401 `invalid_credentials`) and a `newPassword` that meets AC-2. It ends every other session of the user (`password_changed`), keeps the current one, and writes `auth.password.changed`.
-- **AC-15**: `account.delete` needs the current `password` (wrong: 401 `invalid_credentials`). It deletes the user, their password row, and all their sessions in one transaction, and writes `auth.user.deleted`. After that the Orvano API refuses every token of that user.
-- **AC-16**: `account.listSessions` lists the user's active sessions, newest first, cursor paged, with `id`, `createdAt`, `lastRefreshedAt`, `userAgent`, `sdk`, `ipAddress` (the last seen), and `current` (true for the caller's session). `account.deleteSession` ends one of the user's own sessions (`revoked`), and another user's session ID gets 404 `session_not_found`. `account.deleteOtherSessions` ends all but the current one.
+- **AC-14**: `account.updatePassword` needs `currentPassword` (wrong: 401 `invalid_credentials`) and a `newPassword` that meets AC-2. For a user with no password, `currentPassword` is optional and the caller's session must be at most 10 minutes old, else 403 `reauthentication_required` (spec 0010, AC-19). It ends every other session of the user (`password_changed`), keeps the current one, and writes `auth.password.changed`.
+- **AC-15**: `account.delete` needs the current `password` (wrong: 401 `invalid_credentials`). For a user with no password, `password` is optional and the caller's session must be at most 10 minutes old, else 403 `reauthentication_required` (spec 0010, AC-19). It deletes the user, their password row, and all their sessions in one transaction, and writes `auth.user.deleted`. After that the Orvano API refuses every token of that user.
+- **AC-16**: `account.listSessions` lists the user's active sessions, newest first, cursor paged, with `id`, `createdAt`, `lastRefreshedAt`, `userAgent`, `sdk`, `ipAddress` (the last seen), `method` (how the session began, spec 0010 AC-20), and `current` (true for the caller's session). `account.deleteSession` ends one of the user's own sessions (`revoked`), and another user's session ID gets 404 `session_not_found`. `account.deleteOtherSessions` ends all but the current one.
 
 Servers (API key, `users` service)
 - **AC-17**: With a key holding `users.read`: `users.list` (newest first, cursor paged, optional filters `email` as a case ignoring prefix, `status`, `createdAfter`, `createdBefore`), `users.get`, and `users.listSessions`. With `users.write`: `users.create` (same rules as AC-1 to AC-3, but no session is created), `users.block`, `users.unblock`, `users.delete`, `users.deleteSessions` (all of them), and `users.deleteSession` (one). An unknown user ID gets 404 `user_not_found`.
 - **AC-18**: Blocking a user sets `status = blocked`, ends all their sessions (`user_blocked`), and writes `auth.user.blocked`. Unblocking sets `active` and writes `auth.user.unblocked`, and old sessions stay ended. Blocking or unblocking a user already in that state succeeds and changes nothing.
-- **AC-19**: The .NET and Dart server SDKs (and `@orvano/js/server`) verify an access token locally against the project's JWKS with the same checks as AC-7 except the session check, caching the keys for 10 minutes and fetching again (at most once per 30 seconds) on an unknown `kid`. That refetch sends `Cache-Control: no-cache`, so no cache in between (the SDK's own or a CDN) can serve the key set from before a rotation. They return the user ID, session ID, and expiry, or a typed error. With `online: true` they also make one `GET /v1/account` of their own, carrying only `Authorization: Bearer <that token>` and the project header (never the client's API key), so a revoked session fails at once.
+- **AC-19**: The .NET and Dart server SDKs (and `@orvano/js/server`) verify an access token locally against the project's JWKS with the same checks as AC-7 except the session check, caching the keys for 10 minutes and fetching again (at most once per 30 seconds) on an unknown `kid`. That refetch sends `Cache-Control: no-cache`, so no cache in between (the SDK's own or a CDN) can serve the key set from before a rotation. They return the user ID, session ID, `emailVerified` (from the `email_verified` claim, spec 0010), and expiry, or a typed error. With `online: true` they also make one `GET /v1/account` of their own, carrying only `Authorization: Bearer <that token>` and the project header (never the client's API key), so a revoked session fails at once.
 
 Signing keys
 - **AC-20**: `GET /v1/projects/{projectId}/.well-known/jwks.json` and `.../openid-configuration` need no credentials, answer with `Cache-Control: public, max-age=300`, and list the project's `active` and `retiring` public keys. The project must be servable (spec 0003 AC-4), so `console` gets 404.
@@ -66,7 +66,7 @@ Limits, records, and data handling
 - **AC-30**: The built in limits in *Rate limits* apply, and a request over a limit gets 429 `rate_limited` with `Retry-After` in seconds.
 - **AC-31**: A session records the user agent (cut to 512 characters), the SDK (`X-Orvano-SDK`, cut to 100), and the IP address at creation and at the last refresh. When the request carries `X-Orvano-Client-IP` and `X-Orvano-Client-UA` (sent by `@orvano/nextjs` on the server), those are stored instead. They are shown only, and never used for limits or any security check.
 - **AC-32**: A session row is deleted 30 days after it ends, or 30 days after it expires, by an hourly schedule.
-- **AC-33**: These changes write an outbox event in the same transaction: `auth.user.created|updated|blocked|unblocked|deleted`, `auth.password.changed`, `auth.session.created|ended`, `auth.key.rotated`. Payloads carry IDs, changed field names, the end reason, and the actor, never an email, name, password, token, hash, IP address, or user agent.
+- **AC-33**: These changes write an outbox event in the same transaction: `auth.user.created|updated|blocked|unblocked|deleted`, `auth.password.changed`, `auth.session.created|ended`, `auth.key.rotated`. Spec 0010 (AC-30) adds `auth.email_token.created`, `auth.password.reset`, and `auth.password.removed`, and gives `auth.user.created` and `auth.session.created` a `method` field. Payloads carry IDs, changed field names, the end reason, and the actor, never an email, name, password, token, hash, IP address, or user agent.
 - **AC-34**: The database holds passwords only as Argon2id hashes, refresh tokens only as a SHA-256 hash plus an envelope encrypted copy (spec 0002), and private signing keys only envelope encrypted. No password, token, hash, key, or email reaches a log line, an event, or a problem details body.
 - **AC-35**: The contract defines the security schemes `bearer` (`Authorization: Bearer`), `apiKey` (`X-Orvano-Key`), and `consoleSession` (cookie `orvano_console`). `X-Orvano-Session`, the fixtures' `consoleSessions`, and the in memory console session check are removed.
 
@@ -117,12 +117,13 @@ All tables live in schema `orvano`, owned by `Orvano.Auth` (`AuthDbContext`), an
 | | `rotated_at` | timestamptz | yes | when the current token replaced the previous one |
 | | `user_agent` | text | yes | at most 512 chars |
 | | `sdk` | text | yes | at most 100 chars |
+| | `method` | text | no | how the session began: `password` \| `sign_up` \| `magic_link` \| `email_code` \| `recovery`, default `password` (spec 0010, AC-20) |
 | | `ip_created`, `ip_last` | inet | yes | |
 | | `created_at`, `last_refreshed_at` | timestamptz | no | |
 | | `idle_expires_at` | timestamptz | no | `least(last_refreshed_at + 30 days, expires_at)` |
 | | `expires_at` | timestamptz | no | `created_at + 365 days` |
 | | `ended_at` | timestamptz | yes | |
-| | `end_reason` | text | yes | `sign_out` \| `revoked` \| `password_changed` \| `user_blocked` \| `reuse_detected`; `CHECK ((ended_at IS NULL) = (end_reason IS NULL))` |
+| | `end_reason` | text | yes | `sign_out` \| `revoked` \| `password_changed` \| `user_blocked` \| `reuse_detected` \| `password_reset` \| `account_claimed` (the last two from spec 0010, AC-10 and AC-32); `CHECK ((ended_at IS NULL) = (end_reason IS NULL))` |
 | | | | | index (`least(coalesce(ended_at, 'infinity'), idle_expires_at)`) for the retention schedule |
 | `auth_signing_keys` | `id` | text | no | PK; the `kid`, 16 random bytes as base64url (22 chars) |
 | | `project_id` | text | no | |
@@ -155,7 +156,8 @@ The `console` project uses the same tables. Spec 0003's `auth.project.purge_user
                                │  │                                      │
                                │  └──────────────────────────────────────┘
                                │
-     sign out, revoke, password change (others), block, reuse detected
+     sign out, revoke, password change (others), block, reuse detected,
+     password reset, account claimed (spec 0010)
                                ▼
                              ended (ended_at, end_reason) ──── 30 days ───▶ (row deleted)
 
@@ -262,7 +264,7 @@ The discovery document exists only so standard JWT libraries (ASP.NET JwtBearer 
 
 The first four console account operations, plus spec 0006's `consoleInstall.getSetup` (GET `/console/install/setup`, answers only `setupRequired`), are the only console routes that work without a console session. Console account self service (password change, sessions, deletion through `IConsoleAccountGuard`) is left for a later row.
 
-**Models**: `User` (AC-12), `Session` (AC-16), `SessionTokens` (`accessToken`, `accessTokenExpiresAt`, `refreshToken`, `refreshTokenExpiresAt` = the session's `least(idle_expires_at, expires_at)`, `sessionId`), `AuthResult` (`user`, `session: SessionTokens`), `UserList`, `SessionList`, `Jwk`, `Jwks`, `OpenIdConfiguration`, and `enum UserStatus { active, blocked }`.
+**Models**: `User` (AC-12), `Session` (AC-16, plus `method` from spec 0010), `SessionTokens` (`accessToken`, `accessTokenExpiresAt`, `refreshToken`, `refreshTokenExpiresAt` = the session's `least(idle_expires_at, expires_at)`, `sessionId`), `AuthResult` (`user`, `session: SessionTokens`, plus `isNewUser` and `verificationEmail` from spec 0010), `UserList`, `SessionList`, `Jwk`, `Jwks`, `OpenIdConfiguration`, and `enum UserStatus { active, blocked }`.
 
 **New error codes** in `contract/errors.tsp`: `invalid_password` (400), `invalid_credentials` (401), `session_required` (401), `invalid_token` (401), `token_expired` (401), `invalid_refresh_token` (401), `user_blocked` (403), `csrf_rejected` (403), `user_not_found` (404), `session_not_found` (404), `user_already_exists` (409), `rate_limited` (429), `server_busy` (503). Spec 0003's `invalid_api_key`, `insufficient_scope`, and `origin_not_allowed` land here too. `console_session_required` stays for console routes. `consoleAccount.create` can also return spec 0006's `setup_token_invalid` (403), which that spec adds.
 
@@ -438,7 +440,7 @@ Tracer Bullet: task 3 is the thin thread (sign up, sign in, get the current user
 - The Next.js integration needs one route file mounted by the developer, one more setup step than a cookie only design.
 - `X-Orvano-Client-IP` is spoofable. It only feeds the device list, but a user can see a wrong IP there.
 - The per email sign in limit lets anyone lock a known email out of sign in for 15 minutes. Row 14 should add smarter lockouts.
-- v0.1 has no password recovery. A user who forgets their password needs the developer to delete and recreate them, until row 10 ships reset.
+- v0.1 had no password recovery: a user who forgot their password needed the developer to delete and recreate them. Row 10 shipped reset in [spec 0010](../0010-email-verification-recovery-passwordless/index.md) (AC-7 to AC-10).
 - A stolen refresh token that is two or more rotations old is refused but not treated as theft. That is safe (it cannot be used), and it is the price of never letting a made up token end a session.
 - A NativeAOT or trimmed build of `Orvano.Auth` is not a goal; `Microsoft.IdentityModel` uses reflection in places.
 
@@ -452,10 +454,10 @@ Tracer Bullet: task 3 is the thin thread (sign up, sign in, get the current user
 
 - [ ] Row 13 (MFA, passkeys & sessions): session listing and revoking moved into this spec; trim row 13 to MFA, recovery codes, and passkeys.
 - [ ] Row 14 (auth policies): make the token lifetimes, password rules, and limits per project settings; add failed attempt lockouts that resist lockout abuse, and a breached password check.
-- [ ] Row 10: add the per project "require verified email" switch (off by default) and email change with verification.
-- [ ] Row 10 (password reset): v0.1 has no password recovery, because it sends no email. Until row 10 ships, the only remedy for a forgotten password is for the developer to delete and recreate the user (server or console), which loses that user's ID. The v0.1 docs and release notes must say so.
+- [x] Row 10: add the per project "require verified email" switch (off by default) and email change with verification. Email change shipped in [spec 0010](../0010-email-verification-recovery-passwordless/index.md) (AC-17, AC-18). The switch was decided against for now: verification is data apps read (`emailVerified` and the claim), and row 14 may add an enforced switch.
+- [x] Row 10 (password reset): done in [spec 0010](../0010-email-verification-recovery-passwordless/index.md) (AC-7 to AC-10). Before it, v0.1 had no password recovery because it sent no email, so the only remedy for a forgotten password was to delete and recreate the user (server or console), which loses that user's ID, and the v0.1 docs and release notes had to say so.
 - [x] Spec 0003: amend its `x-orvano-scope` sentence to the rule in *Scope rule amendment* (scope required exactly on `apiKey` operations). Done in [spec 0003](../0003-platform-data-model/index.md) (*Scopes*).
-- [ ] Row 12: `account.delete` for users without a password needs a recent sign in check.
+- [x] Row 12: `account.delete` for users without a password needs a recent sign in check. Done in [spec 0010](../0010-email-verification-recovery-passwordless/index.md) (AC-19), since passwordless users arrived there.
 - [ ] Row 38: build the durable audit log from the `auth.*` events (required for this GA feature before 1.0).
 - [ ] A later console row: console account self service (password change, sessions, deletion through `IConsoleAccountGuard`).
 - [x] Row 6 (installer): generate `ORVANO_MASTER_KEYS`, set `ORVANO_PUBLIC_URL`, and document key backup; the API now refuses to start without them. Done in [spec 0006](../0006-self-host-installer/index.md) (AC-5, AC-8, AC-15).
