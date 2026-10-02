@@ -20,7 +20,7 @@ Start the scenario server with the console first: `docker compose -f tests/scena
 - [x] `cd tests/scenarios/runners/dart && ORVANO_ENDPOINT=http://localhost:8080 dart run bin/run.dart` → passes; `dotnet run --project tests/scenarios/runners/dotnet -f net10.0` and `-f net8.0` → the server scenario passes → AC-21, AC-27
 - [x] Flutter runner on Chrome or a simulator (see `tests/scenarios/runners/flutter/README.md`) → the email scenarios pass through `handleLink` → AC-24, AC-27
 - [x] `pnpm --filter @orvano/js --filter @orvano/nextjs test`, `(cd sdks/dart/core && dart test)`, `(cd sdks/dart/server && dart test)`, `dotnet test --project sdks/dotnet/tests/Orvano.Tests` → pass → AC-14, AC-24 to AC-26
-- [ ] `pnpm --filter @orvano/console test` and `pnpm --filter @orvano/console test:e2e` → pass, axe clean in both themes → AC-22, AC-23
+- [x] `pnpm --filter @orvano/console test` and `pnpm --filter @orvano/console test:e2e` → pass, axe clean in both themes → AC-22, AC-23
 - [x] `curl -s -X POST localhost:8080/v1/account/recovery -H 'X-Orvano-Project: scenarios0000000000a' -H 'Content-Type: application/json' -d '{"email":"nobody@example.com","redirectUrl":"http://localhost:3000/cb"}' -w '%{http_code} %{time_total}'` for a known and an unknown email → both `202` with an empty body, each at least 0.5 s → AC-7, AC-8
 
 ## Value sourcing checks

@@ -42,7 +42,7 @@ Verify email, reset password, magic link, and email one time code sign in.
    - [x] Console and hardening: the Users page verified column, filter, actions, and send dialogs; events, retention, purge, and the leak, timing, and race tests (AC-1, 22, 23, 29, 30)
 - [x] Verify it: `/check verify email verification, recovery & passwordless`
 - [x] Test it: `/test email verification, recovery & passwordless`
-- [ ] Review it (fresh model): `/check review email verification, recovery & passwordless`
+- [x] Review it (fresh model): `/check review email verification, recovery & passwordless`
 - [ ] Document it: `/document email verification, recovery & passwordless`
 Spec [0010](../specs/0010-email-verification-recovery-passwordless/index.md) · code in `server/src/Orvano.Auth/`, `server/src/Orvano.Messaging/`, `contract/auth/`, `sdks/`, `console/`, `tests/scenarios/`
 
