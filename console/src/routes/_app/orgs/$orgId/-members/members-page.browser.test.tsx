@@ -271,7 +271,8 @@ describe('pending invitations (AC-18)', () => {
     await expect.poll(text).toContain('new@example.com')
     await userEvent.click(button('Revoke the invite to new@example.com') ?? document.body)
     await expect.poll(alertDialog).not.toBeNull()
-    expect(document.activeElement?.textContent).toBe('Cancel')
+    // The dialog takes focus a moment after it mounts.
+    await expect.poll(() => document.activeElement?.textContent).toBe('Cancel')
     await userEvent.click(button('Revoke invite') ?? document.body)
     await expect.poll(() => rowOf('new@example.com')).toBeUndefined()
     expect(sent('DELETE', /\/invitations\/invm0000000000000001$/)).toHaveLength(1)

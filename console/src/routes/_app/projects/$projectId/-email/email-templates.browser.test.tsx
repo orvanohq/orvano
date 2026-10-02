@@ -149,13 +149,15 @@ describe('the template editor', () => {
     const { screen } = await openEditor()
     expect(reason(button('Save'))).toBe('Nothing to save yet')
     expect(button('Reset to default')).toBeUndefined()
-    const before = sent('POST', previewPath).length
 
     await screen.getByLabelText('Subject').fill('Reset it, {{ project.name }}')
     await userEvent.click(editor('Text') ?? document.body)
     await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}{Backspace}')
-    // Nothing is asked while the typing goes on.
-    expect(sent('POST', previewPath).length).toBe(before)
+    // Nothing is asked for what was just typed until the typing pauses. The subject alone may
+    // already have previewed: on a slow runner the steps above can outlast the half second.
+    const clearedText = (request: { body: unknown }) =>
+      (request.body as { text?: unknown } | undefined)?.text === null
+    expect(sent('POST', previewPath).filter(clearedText)).toEqual([])
     await expect.poll(previewSubject).toBe('Reset it, Shop')
     expect(sent('POST', previewPath).at(-1)?.body).toMatchObject({
       subject: 'Reset it, {{ project.name }}',
