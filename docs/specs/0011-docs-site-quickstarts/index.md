@@ -78,7 +78,7 @@ Build orvano.dev as one static Starlight site that generates its API reference a
 
 **Implementation skills**: `astro-starlight` (`fusengine/agents`, `.agents/skills/astro-starlight/`) · `astro` (`astrolicious/agent-skills`, `.agents/skills/astro/`) · `wrangler` (`cloudflare/skills`, `.agents/skills/wrangler/`) · `workers-best-practices` (`cloudflare/skills`, `.agents/skills/workers-best-practices/`) · `pnpm` (`antfu/skills`, `.claude/skills/pnpm/`) · `playwright-cli` (`microsoft/playwright-cli`, `.agents/skills/playwright-cli/`) · `accessibility` (`addyosmani/web-quality-skills`, `.claude/skills/accessibility/`) · `nextjs-app-router-patterns` (`wshobson/agents`, `.agents/skills/nextjs-app-router-patterns/`) · `flutter-add-integration-test` (`flutter/agent-plugins`, `.agents/skills/flutter-add-integration-test/`) · `dotnet-webapi` (`dotnet/skills`, `.claude/skills/dotnet-webapi/`) · `multi-stage-dockerfile` (`github/awesome-copilot`, `.claude/skills/multi-stage-dockerfile/`)
 
-The `astro-starlight` skill opens with a "MANDATORY" step that spawns agents named `fuse-ai-pilot:*`, which don't exist in this project. Skip that step and use only its reference pages. `withastro/astro@astro-developer` was installed too, but it is for working inside the Astro source repo, not for building sites with Astro, so don't use it here (see Follow-up).
+The `astro-starlight` skill opens with a "MANDATORY" step that spawns agents named `fuse-ai-pilot:*`, which don't exist in this project. Skip that step and use only its reference pages.
 
 ## Rationale
 
@@ -299,7 +299,7 @@ Tracer Bullet: first one thin thread from a laptop to a signed in user through e
 
 ## Follow-up
 
-- [ ] `withastro/astro@astro-developer` was installed but targets contributors to the Astro repo itself, not sites built with Astro. Recommend removing it (`npx skills remove astro-developer`) so it doesn't load during this build.
+- [x] `withastro/astro@astro-developer` was installed, then removed: it targets contributors to the Astro repo itself, not sites built with Astro. Record it under `Declined:` in root `AGENTS.md` so it isn't offered again.
 - [ ] Record in root `AGENTS.md` (`/sync` owns it): the new `website/` and `examples/` folders and their commands, the `astro`, `astro-starlight`, and `wrangler` skills under `## Agent skills`, the docs rule (AC-30) under `## Rules`, Cloudflare MCP noted as skipped for now, and a nested `website/AGENTS.md` context file.
 - [ ] Root `AGENTS.md` names spec storage as `docs/specs/`; because the docs site lives in `website/`, not `docs/`, the workflow's artifact base stays `docs/` (no move to `.workflow/`).
 - [ ] Consider having the console's "Connect your app" card link to the matching quickstart on orvano.dev (not part of this spec).
