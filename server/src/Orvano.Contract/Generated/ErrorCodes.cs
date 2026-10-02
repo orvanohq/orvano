@@ -16,6 +16,12 @@ public static class ErrorCode
     /// <summary>The <c>csrf_rejected</c> error code.</summary>
     public const string CsrfRejected = "csrf_rejected";
 
+    /// <summary>The <c>email_already_in_use</c> error code.</summary>
+    public const string EmailAlreadyInUse = "email_already_in_use";
+
+    /// <summary>The <c>email_already_verified</c> error code.</summary>
+    public const string EmailAlreadyVerified = "email_already_verified";
+
     /// <summary>The <c>email_not_configured</c> error code.</summary>
     public const string EmailNotConfigured = "email_not_configured";
 
@@ -34,11 +40,17 @@ public static class ErrorCode
     /// <summary>The <c>invalid_api_key</c> error code.</summary>
     public const string InvalidApiKey = "invalid_api_key";
 
+    /// <summary>The <c>invalid_code</c> error code.</summary>
+    public const string InvalidCode = "invalid_code";
+
     /// <summary>The <c>invalid_credentials</c> error code.</summary>
     public const string InvalidCredentials = "invalid_credentials";
 
     /// <summary>The <c>invalid_cursor</c> error code.</summary>
     public const string InvalidCursor = "invalid_cursor";
+
+    /// <summary>The <c>invalid_email_token</c> error code.</summary>
+    public const string InvalidEmailToken = "invalid_email_token";
 
     /// <summary>The <c>invalid_password</c> error code.</summary>
     public const string InvalidPassword = "invalid_password";
@@ -87,6 +99,12 @@ public static class ErrorCode
 
     /// <summary>The <c>rate_limited</c> error code.</summary>
     public const string RateLimited = "rate_limited";
+
+    /// <summary>The <c>reauthentication_required</c> error code.</summary>
+    public const string ReauthenticationRequired = "reauthentication_required";
+
+    /// <summary>The <c>redirect_url_not_allowed</c> error code.</summary>
+    public const string RedirectUrlNotAllowed = "redirect_url_not_allowed";
 
     /// <summary>The <c>server_busy</c> error code.</summary>
     public const string ServerBusy = "server_busy";

@@ -55,6 +55,14 @@ internal static class StartupChecks
         return false;
     }
 
+    /// <summary><c>ORVANO_TEST_MAILPIT_URL</c> is refused outside <c>Test</c> and must be an absolute http or https URL (spec 0010).</summary>
+    public static bool TestMailpitUsable(TestMailpit mailpit, ILogger logger)
+    {
+        if (mailpit.Problem is null) return true;
+        logger.LogCritical("Test Mailpit setting refused: {Problem}", mailpit.Problem);
+        return false;
+    }
+
     /// <summary>
     /// Waits briefly for Postgres, then refuses to start unless the database schema version equals
     /// the highest migration embedded in this binary.

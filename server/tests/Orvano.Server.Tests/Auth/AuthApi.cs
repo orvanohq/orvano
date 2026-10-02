@@ -52,7 +52,13 @@ public sealed class AuthApi : IAsyncDisposable
     /// Starts the api on a fresh database, with two active fixture projects owned by a fixture console account, or,
     /// with <paramref name="fixtures"/> false, with no fixtures at all (an install that waits for its first admin).
     /// </summary>
-    public static async Task<AuthApi> StartAsync(PostgresFixture postgres, IReadOnlyDictionary<string, string>? env = null, bool fixtures = true)
+    /// <remarks>
+    /// <paramref name="email"/> (spec 0010) adds platforms to <see cref="Project"/> (web <c>localhost</c> and
+    /// <c>app.example.com</c>, iOS <c>com.acme.app</c>), and <paramref name="smtp"/> an install SMTP server, so auth
+    /// emails queue. No worker runs, so they are never sent: <see cref="LatestEmailAsync"/> opens the queued row.
+    /// </remarks>
+    public static async Task<AuthApi> StartAsync(
+        PostgresFixture postgres, IReadOnlyDictionary<string, string>? env = null, bool fixtures = true, bool email = false, bool smtp = false)
     {
         var database = await postgres.NewDatabaseAsync();
         await database.MigrateAsync();
@@ -77,12 +83,12 @@ public sealed class AuthApi : IAsyncDisposable
               - project: {OtherProject}
                 type: web
                 identifier: localhost
-            users:
+            {(email ? EmailPlatforms : "")}users:
               - project: {OtherProject}
                 email: {FixtureUser}
                 password: fixture horse battery
                 name: Fixture User
-
+            {(smtp ? InstallSmtp : "")}
             """, Ct);
 
         var settings = new Dictionary<string, string>
@@ -109,6 +115,51 @@ public sealed class AuthApi : IAsyncDisposable
         await TestDatabase.ExecuteAsync(database.Superuser, "UPDATE orvano.platform_projects SET status = 'active' WHERE kind = 'app'");
         return new AuthApi(process, database);
     }
+
+    private const string EmailPlatforms = $"""
+          - project: {Project}
+            type: web
+            identifier: localhost
+          - project: {Project}
+            type: web
+            identifier: app.example.com
+          - project: {Project}
+            type: ios
+            identifier: com.acme.app
+
+        """;
+
+    private const string InstallSmtp = """
+        installSmtp:
+          host: smtp.example.com
+          port: 587
+          security: starttls
+          fromEmail: auth@example.com
+
+        """;
+
+    /// <summary>
+    /// The newest queued auth email to <paramref name="to"/>, opened with the test master key, or null when none was
+    /// queued. Only <c>messaging_emails</c> rows exist here, since no worker sends them.
+    /// </summary>
+    public async Task<SealedEmailView?> LatestEmailAsync(string to)
+    {
+        var secrets = new Orvano.Core.Secrets.SecretBox(Orvano.Core.Secrets.MasterKeys.Parse(OrvanoProcess.MasterKeys));
+        await using var conn = await Database.Superuser.OpenConnectionAsync(Ct);
+        await using var cmd = new Npgsql.NpgsqlCommand("SELECT id, template, content_ciphertext FROM orvano.messaging_emails ORDER BY created_at DESC, id DESC", conn);
+        await using var reader = await cmd.ExecuteReaderAsync(Ct);
+        while (await reader.ReadAsync(Ct))
+        {
+            var id = reader.GetGuid(0);
+            var email = Orvano.Messaging.Application.EmailSealer.Open(secrets, id, reader.GetFieldValue<byte[]>(2));
+            if (string.Equals(email.To, to, StringComparison.OrdinalIgnoreCase)) return SealedEmailView.From(reader.GetString(1), email.Subject, email.Text);
+        }
+
+        return null;
+    }
+
+    /// <summary>How many auth emails were queued in all.</summary>
+    public Task<long> QueuedEmailCountAsync() => TestDatabase.ScalarAsync<long>(Database.Superuser, "SELECT count(*) FROM orvano.messaging_emails");
 
     public async Task<Reply> SendAsync(
         HttpMethod method, string url, object? body = null, string? project = Project, string? bearer = null,
@@ -166,5 +217,23 @@ public sealed class AuthApi : IAsyncDisposable
         Http.Dispose();
         await Process.DisposeAsync();
         await Database.DisposeAsync();
+    }
+}
+
+/// <summary>A queued auth email as a test reads it: the template, subject, link (with its type and token), or code.</summary>
+public sealed record SealedEmailView(string Template, string Subject, string Text, string? Url, string? Type, string? Token, string? Code)
+{
+    public static SealedEmailView From(string template, string subject, string text)
+    {
+        var link = System.Text.RegularExpressions.Regex.Matches(text, @"[A-Za-z][A-Za-z0-9+.\-]*://\S+")
+            .Select(m => m.Value).FirstOrDefault(v => v.Contains("orvano_token", StringComparison.Ordinal));
+        if (link is null)
+        {
+            var code = System.Text.RegularExpressions.Regex.Match(text, @"(?<!\d)\d{6}(?!\d)");
+            return new SealedEmailView(template, subject, text, null, null, null, code.Success ? code.Value : null);
+        }
+
+        var query = System.Web.HttpUtility.ParseQueryString(new Uri(link).Query);
+        return new SealedEmailView(template, subject, text, link, query["orvano_type"], query["orvano_token"], null);
     }
 }

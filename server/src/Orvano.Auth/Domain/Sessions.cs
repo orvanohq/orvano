@@ -82,6 +82,22 @@ internal static class SessionEndReason
     public const string PasswordChanged = "password_changed";
     public const string UserBlocked = "user_blocked";
     public const string ReuseDetected = "reuse_detected";
+
+    /// <summary>A password reset ends every other session of the user (spec 0010, AC-10).</summary>
+    public const string PasswordReset = "password_reset";
+
+    /// <summary>The inbox owner signed in by link or code to an unverified account (spec 0010, AC-32).</summary>
+    public const string AccountClaimed = "account_claimed";
+}
+
+/// <summary>How a session began (spec 0010, the <c>method</c> column, AC-20).</summary>
+internal static class SessionMethod
+{
+    public const string Password = "password";
+    public const string SignUp = "sign_up";
+    public const string MagicLink = "magic_link";
+    public const string EmailCode = "email_code";
+    public const string Recovery = "recovery";
 }
 
 /// <summary>What a refresh does (spec 0004, refresh decision).</summary>

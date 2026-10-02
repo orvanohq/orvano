@@ -27,6 +27,23 @@ internal sealed class AuthStore([FromKeyedServices(OrvanoDb.App)] NpgsqlDataSour
         return outcome;
     }
 
+    /// <summary>
+    /// A unit of work that commits whatever its use case returns: the one place a refusal must still keep its writes,
+    /// the wrong email code whose attempt count stays counted (spec 0010, AC-5). Use <see cref="WriteAsync{T}"/>
+    /// everywhere else.
+    /// </summary>
+    public async Task<Outcome<T>> WriteAndCommitAsync<T>(Func<AuthUnitOfWork, CancellationToken, Task<Outcome<T>>> work, CancellationToken ct)
+    {
+        await using var conn = await db.OpenConnectionAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+        await using var context = AuthDbContext.On(conn);
+        await context.Database.UseTransactionAsync(tx, ct);
+
+        var outcome = await work(new AuthUnitOfWork(context, tx), ct);
+        await tx.CommitAsync(ct);
+        return outcome;
+    }
+
     public async Task<T> ReadAsync<T>(Func<AuthDbContext, CancellationToken, Task<T>> work, CancellationToken ct)
     {
         await using var conn = await db.OpenConnectionAsync(ct);

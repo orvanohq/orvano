@@ -18,10 +18,13 @@ public static class RateLimitPolicies
     /// <summary>Password sign in (app and console), keyed by connection IP.</summary>
     public static RateLimitPolicy SignInPerIp { get; } = new("auth.sign_in.ip", 300, TimeSpan.FromMinutes(15));
 
-    /// <summary><c>account.create</c>, <c>users.create</c>, and <c>consoleAccount.create</c>, keyed by connection IP.</summary>
+    /// <summary>
+    /// <c>account.create</c>, <c>users.create</c>, <c>consoleAccount.create</c>, and a magic link or email code that
+    /// creates a user (spec 0010, AC-15), keyed by connection IP.
+    /// </summary>
     public static RateLimitPolicy SignUpPerIp { get; } = new("auth.sign_up.ip", 60, TimeSpan.FromHours(1));
 
-    /// <summary><c>account.updatePassword</c> and <c>account.delete</c>, keyed by user ID.</summary>
+    /// <summary><c>account.updatePassword</c>, <c>account.delete</c>, and <c>account.updateEmail</c>, keyed by user ID.</summary>
     public static RateLimitPolicy PasswordCheckPerUser { get; } = new("auth.password_check.user", 10, TimeSpan.FromMinutes(15));
 
     /// <summary><c>account.refreshSession</c> and <c>consoleAccount.refreshSession</c>, keyed by session ID.</summary>
@@ -29,6 +32,27 @@ public static class RateLimitPolicies
 
     /// <summary>Refreshes answered 401, keyed by connection IP. Checked before, counted only after a 401.</summary>
     public static RateLimitPolicy FailedRefreshPerIp { get; } = new("auth.refresh_failed.ip", 60, TimeSpan.FromMinutes(15));
+
+    /// <summary>
+    /// The open email sends (<c>account.createRecovery</c>, <c>createMagicLink</c>, <c>createEmailCode</c>), keyed by
+    /// connection IP (spec 0010, AC-7). High, since one app server may send for all its users.
+    /// </summary>
+    public static RateLimitPolicy EmailSendPerIp { get; } = new("auth.email_send.ip", 300, TimeSpan.FromHours(1));
+
+    /// <summary>Every auth email, keyed by project, lowercased recipient, and kind: one a minute (spec 0010, AC-7).</summary>
+    public static RateLimitPolicy EmailSendPerRecipientShort { get; } = new("auth.email_send.recipient_short", 1, TimeSpan.FromSeconds(60));
+
+    /// <summary>Every auth email, keyed by project, lowercased recipient, and kind: five an hour (spec 0010, AC-7).</summary>
+    public static RateLimitPolicy EmailSendPerRecipient { get; } = new("auth.email_send.recipient", 5, TimeSpan.FromHours(1));
+
+    /// <summary><c>account.createEmailCodeSession</c>, keyed by project and lowercased email; every attempt counts (spec 0010, AC-28).</summary>
+    public static RateLimitPolicy EmailCodePerRecipient { get; } = new("auth.email_code.recipient", 10, TimeSpan.FromMinutes(15));
+
+    /// <summary>
+    /// The five email token redemptions answered 401, keyed by connection IP. Checked before, counted only after a 401
+    /// (spec 0010, AC-28).
+    /// </summary>
+    public static RateLimitPolicy FailedEmailRedeemPerIp { get; } = new("auth.email_redeem_failed.ip", 60, TimeSpan.FromMinutes(15));
 
     /// <summary><c>consoleInstall.getSetup</c>, keyed by connection IP (spec 0006, AC-22).</summary>
     public static RateLimitPolicy ConsoleSetupPerIp { get; } = new("console.setup.ip", 60, TimeSpan.FromMinutes(1));

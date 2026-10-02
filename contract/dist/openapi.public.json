@@ -235,6 +235,88 @@
         "x-orvano-audience": "client"
       }
     },
+    "/v1/account/recovery": {
+      "post": {
+        "operationId": "account.createRecovery",
+        "description": "Emails a password reset link, if the email belongs to an active user. The answer is the same 202 whether or not\nit does, so it never tells anyone which emails have accounts.",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "The request has been accepted for processing, but processing has not yet completed."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRecoveryRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/recovery/confirm": {
+      "post": {
+        "operationId": "account.completeRecovery",
+        "description": "Sets a new password with the token from a reset link, and signs the user in. Every other session of the user\nends, and the email counts as verified. The token works once.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteRecoveryRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-session": "start",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/account/sessions": {
       "get": {
         "operationId": "account.listSessions",
@@ -1130,7 +1212,8 @@
         "type": "object",
         "required": [
           "user",
-          "session"
+          "session",
+          "isNewUser"
         ],
         "properties": {
           "user": {
@@ -1140,9 +1223,40 @@
           "session": {
             "$ref": "#/components/schemas/SessionTokens",
             "description": "The new session's tokens."
+          },
+          "isNewUser": {
+            "type": "boolean",
+            "description": "Whether this call created the user: true from sign up, and from a magic link or email code for a new email.",
+            "examples": [
+              false
+            ]
           }
         },
         "description": "A signed in user and their new session."
+      },
+      "CompleteRecoveryRequest": {
+        "type": "object",
+        "required": [
+          "token",
+          "password"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The `orvano_token` parameter of the emailed link.",
+            "examples": [
+              "orv_el_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "description": "The new password: 8 to 256 characters after Unicode NFKC normalization.",
+            "examples": [
+              "another horse battery staple"
+            ]
+          }
+        },
+        "description": "A password reset, with the token from the emailed link."
       },
       "CreateAccountRequest": {
         "type": "object",
@@ -1205,6 +1319,30 @@
           }
         },
         "description": "A sign in with an email and password."
+      },
+      "CreateRecoveryRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "redirectUrl"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email of the account; case does not matter.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "redirectUrl": {
+            "type": "string",
+            "description": "Your page that receives the link, on a host that is one of the project's web platforms (`http` only on\n`localhost` or `127.0.0.1`). The link adds `orvano_type=recovery` and `orvano_token` to it.",
+            "examples": [
+              "https://app.example.com/auth/callback"
+            ]
+          }
+        },
+        "description": "A request to email a password reset link."
       },
       "CreateUserRequest": {
         "type": "object",
@@ -1306,6 +1444,12 @@
           "email_not_configured",
           "email_rate_limited",
           "rate_limited",
+          "redirect_url_not_allowed",
+          "invalid_email_token",
+          "invalid_code",
+          "reauthentication_required",
+          "email_already_verified",
+          "email_already_in_use",
           "server_busy"
         ],
         "description": "Every stable error code the server sends in `Problem.code`."
@@ -1541,7 +1685,8 @@
           "userAgent",
           "sdk",
           "ipAddress",
-          "current"
+          "current",
+          "method"
         ],
         "properties": {
           "id": {
@@ -1609,9 +1754,24 @@
             "examples": [
               true
             ]
+          },
+          "method": {
+            "$ref": "#/components/schemas/SessionMethod",
+            "description": "How the session began."
           }
         },
         "description": "An active session of a user: one signed in device or browser."
+      },
+      "SessionMethod": {
+        "type": "string",
+        "enum": [
+          "password",
+          "sign_up",
+          "magic_link",
+          "email_code",
+          "recovery"
+        ],
+        "description": "How a session began."
       },
       "SessionPage": {
         "type": "object",

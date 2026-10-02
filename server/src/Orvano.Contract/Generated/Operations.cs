@@ -4,6 +4,22 @@ namespace Orvano.Contract;
 /// <summary>Route constants for the <c>account</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class AccountOperations
 {
+    /// <summary>POST /v1/account/recovery/confirm: Sets a new password with the token from a reset link, and signs the user in. Every other session of the user</summary>
+    public static class CompleteRecovery
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.completeRecovery";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/recovery/confirm";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account: Signs a new user up with an email and password, and signs them in.</summary>
     public static class Create
     {
@@ -31,6 +47,22 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/sessions/password";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/recovery: Emails a password reset link, if the email belongs to an active user. The answer is the same 202 whether or not</summary>
+    public static class CreateRecovery
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createRecovery";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/recovery";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";
@@ -1346,6 +1378,22 @@ public static class TestOperations
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/test/emails/latest: Waits up to 15 seconds for the newest email to <c>to</c> that Mailpit caught after <c>after</c>, and reads it.</summary>
+    public static class GetLatestEmail
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "test.getLatestEmail";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/test/emails/latest";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "both";
     }
 
     /// <summary>GET /v1/test/items: Pages through five fixed items.</summary>

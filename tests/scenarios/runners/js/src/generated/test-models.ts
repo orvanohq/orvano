@@ -15,6 +15,20 @@ export interface TestConsolePing {
   status: string
 }
 
+/** The newest email Mailpit caught for an address, read from its text part. */
+export interface TestEmail {
+  /** The subject line. */
+  subject: string
+  /** The `orvano_type` of the first link carrying `orvano_token`; null when there is none. */
+  type: string | null
+  /** The `orvano_token` of that link; null when there is none. */
+  token: string | null
+  /** The first run of exactly 6 digits, when the email has no such link; null otherwise. */
+  code: string | null
+  /** That link in full; null when there is none. */
+  url: string | null
+}
+
 /** One fixed item in the `test.list` page. */
 export interface TestItem {
   /** `item-1` to `item-5`. */

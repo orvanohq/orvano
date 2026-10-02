@@ -17,8 +17,11 @@ internal enum FailureKind
     Gone,
 }
 
-/// <summary>A refusal with a stable error code from the contract's catalog and a short safe sentence.</summary>
-internal sealed record Failure(FailureKind Kind, string Code, string Detail)
+/// <summary>
+/// A refusal with a stable error code from the contract's catalog and a short safe sentence. A limit's refusal also
+/// says when to try again (<see cref="RetryAfter"/>, sent as <c>Retry-After</c>).
+/// </summary>
+internal sealed record Failure(FailureKind Kind, string Code, string Detail, TimeSpan? RetryAfter = null)
 {
     public static Failure Invalid(string detail) => new(FailureKind.Invalid, ErrorCode.InvalidRequest, detail);
 
@@ -59,6 +62,35 @@ internal sealed record Failure(FailureKind Kind, string Code, string Detail)
     public static Failure SessionNotFound { get; } = new(FailureKind.NotFound, ErrorCode.SessionNotFound, "No such session.");
 
     public static Failure InvalidCursor { get; } = new(FailureKind.Invalid, ErrorCode.InvalidCursor, "The cursor is not one this server issued.");
+
+    public static Failure RedirectUrlNotAllowed { get; } =
+        new(FailureKind.Invalid, ErrorCode.RedirectUrlNotAllowed, "The redirect URL must be an absolute URL on one of the project's platforms.");
+
+    public static Failure InvalidEmailToken { get; } =
+        new(FailureKind.Unauthorized, ErrorCode.InvalidEmailToken, "This link is not valid anymore. It may have been used, expired, or replaced by a newer email.");
+
+    public static Failure InvalidCode { get; } =
+        new(FailureKind.Unauthorized, ErrorCode.InvalidCode, "The code is wrong or has expired.");
+
+    public static Failure ReauthenticationRequired { get; } =
+        new(FailureKind.Forbidden, ErrorCode.ReauthenticationRequired, "Sign in again with a link or code first, then try within 10 minutes.");
+
+    public static Failure EmailAlreadyVerified { get; } =
+        new(FailureKind.Conflict, ErrorCode.EmailAlreadyVerified, "The email is already verified.");
+
+    public static Failure EmailAlreadyInUse { get; } =
+        new(FailureKind.Conflict, ErrorCode.EmailAlreadyInUse, "Another user has this email.");
+
+    public static Failure EmailNotConfigured { get; } =
+        new(FailureKind.Conflict, ErrorCode.EmailNotConfigured, "No email server is set up for this project.");
+
+    /// <summary>The project reached the install's hourly email limit (429 <c>email_rate_limited</c>).</summary>
+    public static Failure EmailRateLimited(TimeSpan retryAfter) =>
+        new(FailureKind.RateLimited, ErrorCode.EmailRateLimited, "The project sent too many emails this hour. Try again later.", retryAfter);
+
+    /// <summary>A named limit refused the call (429 <c>rate_limited</c>).</summary>
+    public static Failure RateLimited(TimeSpan retryAfter) =>
+        new(FailureKind.RateLimited, ErrorCode.RateLimited, "Too many requests. Try again later.", retryAfter);
 
     public static Failure Busy { get; } =
         new(FailureKind.Busy, ErrorCode.ServerBusy, "The server is busy checking passwords. Try again in a moment.");

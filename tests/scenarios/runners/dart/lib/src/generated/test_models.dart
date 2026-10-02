@@ -22,6 +22,51 @@ final class TestConsolePing {
   Map<String, dynamic> toJson() => {'status': status};
 }
 
+/// The newest email Mailpit caught for an address, read from its text part.
+final class TestEmail {
+  /// Creates a [TestEmail].
+  const TestEmail({
+    required this.subject,
+    this.type,
+    this.token,
+    this.code,
+    this.url,
+  });
+
+  /// Decodes a [TestEmail] from JSON.
+  factory TestEmail.fromJson(Map<String, dynamic> json) => TestEmail(
+    subject: json['subject'] as String,
+    type: json['type'] == null ? null : json['type'] as String,
+    token: json['token'] == null ? null : json['token'] as String,
+    code: json['code'] == null ? null : json['code'] as String,
+    url: json['url'] == null ? null : json['url'] as String,
+  );
+
+  /// The subject line.
+  final String subject;
+
+  /// The `orvano_type` of the first link carrying `orvano_token`; null when there is none.
+  final String? type;
+
+  /// The `orvano_token` of that link; null when there is none.
+  final String? token;
+
+  /// The first run of exactly 6 digits, when the email has no such link; null otherwise.
+  final String? code;
+
+  /// That link in full; null when there is none.
+  final String? url;
+
+  /// Encodes this [TestEmail] as JSON.
+  Map<String, dynamic> toJson() => {
+    'subject': subject,
+    'type': type,
+    'token': token,
+    'code': code,
+    'url': url,
+  };
+}
+
 /// One fixed item in the `test.list` page.
 final class TestItem {
   /// Creates a [TestItem].

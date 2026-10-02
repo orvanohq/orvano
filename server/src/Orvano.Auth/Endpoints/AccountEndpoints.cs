@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -43,6 +44,21 @@ internal static class AccountEndpoints
             return Created(http, outcome, AuthResult);
         })
             .WithName(Api.AccountOperations.CreatePasswordSession.Id)
+            .RequireProject();
+
+        v1.MapPost(Api.AccountOperations.CreateRecovery.Route, async (HttpContext http, Api.CreateRecoveryRequest request, RecoveryService recovery, CancellationToken ct) =>
+        {
+            var started = Stopwatch.StartNew();
+            var outcome = await recovery.RequestAsync(PublicRequests.Project(http), request.Email, request.RedirectUrl, ConnectionIp.Key(http), ct);
+            return await EmailRequests.OpenAcceptedAsync(http, outcome, started, ct);
+        })
+            .WithName(Api.AccountOperations.CreateRecovery.Id)
+            .RequireProject();
+
+        v1.MapPost(Api.AccountOperations.CompleteRecovery.Route, (HttpContext http, RecoveryService recovery, RateLimits limits, CancellationToken ct) =>
+            EmailRequests.RedeemAsync<Api.CompleteRecoveryRequest>(http, limits, ct, async request =>
+                Created(http, await recovery.CompleteAsync(PublicRequests.Project(http), request.Token, request.Password, PublicRequests.Client(http), ct), AuthResult)))
+            .WithName(Api.AccountOperations.CompleteRecovery.Id)
             .RequireProject();
 
         v1.MapGet(Api.AccountOperations.Get.Route, async (HttpContext http, AccountService accounts, CancellationToken ct) =>

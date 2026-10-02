@@ -81,6 +81,53 @@ model AuthResult {
 
   @doc("The new session's tokens.")
   session: SessionTokens;
+
+  @doc("Whether this call created the user: true from sign up, and from a magic link or email code for a new email.")
+  @example(false)
+  isNewUser: boolean;
+}
+
+@doc("How a session began.")
+enum SessionMethod {
+  @doc("A sign in with an email and password.")
+  password,
+
+  @doc("Sign up.")
+  sign_up,
+
+  @doc("A magic link.")
+  magic_link,
+
+  @doc("An email code.")
+  email_code,
+
+  @doc("A password reset.")
+  recovery,
+}
+
+@doc("A request to email a password reset link.")
+model CreateRecoveryRequest {
+  @doc("The email of the account; case does not matter.")
+  @example("ada@example.com")
+  email: string;
+
+  @doc("""
+    Your page that receives the link, on a host that is one of the project's web platforms (`http` only on
+    `localhost` or `127.0.0.1`). The link adds `orvano_type=recovery` and `orvano_token` to it.
+    """)
+  @example("https://app.example.com/auth/callback")
+  redirectUrl: string;
+}
+
+@doc("A password reset, with the token from the emailed link.")
+model CompleteRecoveryRequest {
+  @doc("The `orvano_token` parameter of the emailed link.")
+  @example("orv_el_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE")
+  token: string;
+
+  @doc("The new password: 8 to 256 characters after Unicode NFKC normalization.")
+  @example("another horse battery staple")
+  password: string;
 }
 
 @doc("A new user with an email and password.")
@@ -160,6 +207,9 @@ model Session {
   @doc("Whether this is the session making the call.")
   @example(true)
   current: boolean;
+
+  @doc("How the session began.")
+  method: SessionMethod;
 }
 
 @doc("One page of a user's active sessions, newest first.")
@@ -204,6 +254,34 @@ interface AccountApi {
   @route("/sessions/password")
   @post
   createPasswordSession(@body request: CreatePasswordSessionRequest): {
+    @statusCode statusCode: 201;
+    @body body: AuthResult;
+  } | Problem;
+
+  @doc("""
+    Emails a password reset link, if the email belongs to an active user. The answer is the same 202 whether or not
+    it does, so it never tells anyone which emails have accounts.
+    """)
+  @operationId("account.createRecovery")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @route("/recovery")
+  @post
+  createRecovery(@body request: CreateRecoveryRequest): {
+    @statusCode statusCode: 202;
+  } | Problem;
+
+  @doc("""
+    Sets a new password with the token from a reset link, and signs the user in. Every other session of the user
+    ends, and the email counts as verified. The token works once.
+    """)
+  @operationId("account.completeRecovery")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @extension("x-orvano-session", "start")
+  @route("/recovery/confirm")
+  @post
+  completeRecovery(@body request: CompleteRecoveryRequest): {
     @statusCode statusCode: 201;
     @body body: AuthResult;
   } | Problem;

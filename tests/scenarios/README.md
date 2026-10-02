@@ -24,12 +24,13 @@ send the first fixture project as `X-Orvano-Project`, and server steps send that
 fixture API key. A browser can't hold an API key, so there a server step whose operation needs a
 scope skips the scenario.
 
-Two runner operations are not in the contract. Their names have no dot, so they never collide
+Three runner operations are not in the contract. Their names have no dot, so they never collide
 with an operationId:
 
 | `op` | `as` | Input | Body |
 |---|---|---|---|
 | `signIn` | `client` | `body: { email, password }` | the sign in answer; the SDK's stored session is left alone, so a runner without client operations (.NET) gets a token too |
+| `now` | `client` or `server` | none | `{ now }`, the runner's clock as an ISO 8601 time; save it before a send and pass it to `test.getLatestEmail` as `after` |
 | `verifyAccessToken` | `server` | `token`, optional `online: true` | `{ userId, sessionId, expiresAt }` from the server SDK's own check, or its `token_expired` / `invalid_token` error |
 
 SdkGen writes a test only dispatch table per language (`operationId` to the generated method), so

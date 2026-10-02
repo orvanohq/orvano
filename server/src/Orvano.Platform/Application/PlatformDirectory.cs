@@ -70,6 +70,33 @@ internal sealed class PlatformDirectory(PlatformStore store, TimeProvider clock)
         return identifiers.Any(identifier => WebOriginPattern.TryParse(identifier, out var pattern, out _) && pattern.Matches(origin));
     }
 
+    public async Task<bool> AllowsRedirectAsync(string projectId, Uri redirectUrl, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(redirectUrl);
+        if (!redirectUrl.IsAbsoluteUri || redirectUrl.UserInfo.Length > 0) return false;
+        var host = redirectUrl.IdnHost.ToLowerInvariant();
+        if (host.Length == 0 || host.EndsWith('.')) return false;
+
+        var scheme = redirectUrl.Scheme;
+        var https = scheme == Uri.UriSchemeHttps;
+        var http = scheme == Uri.UriSchemeHttp;
+        if (http && host is not ("localhost" or "127.0.0.1")) return false;
+
+        var platforms = await store.ReadAsync((db, ct) =>
+            db.Platforms.AsNoTracking().Where(p => p.ProjectId == projectId).Select(p => new { p.Type, p.Identifier }).ToListAsync(ct), ct);
+
+        if (https || http)
+        {
+            if (redirectUrl.HostNameType is not (UriHostNameType.Dns or UriHostNameType.IPv4)) return false;
+            var web = PlatformIdentifiers.Wire(PlatformType.Web);
+            return platforms.Any(p => p.Type == web && WebOriginPattern.TryParse(p.Identifier, out var pattern, out _) && pattern.MatchesHost(host));
+        }
+
+        // A custom scheme names an app: its bundle ID or package name. Windows and Linux platforms have none.
+        string[] apps = [PlatformIdentifiers.Wire(PlatformType.Ios), PlatformIdentifiers.Wire(PlatformType.Android), PlatformIdentifiers.Wire(PlatformType.Macos)];
+        return platforms.Any(p => apps.Contains(p.Type) && string.Equals(p.Identifier, scheme, StringComparison.OrdinalIgnoreCase));
+    }
+
     public Task<OrgRole?> GetOrgRoleAsync(Guid userId, Guid orgId, CancellationToken ct) =>
         store.ReadAsync(async (db, ct) => await db.RoleInAsync(userId, orgId, ct) is { } role ? Roles.Parse(role) : (OrgRole?)null, ct);
 

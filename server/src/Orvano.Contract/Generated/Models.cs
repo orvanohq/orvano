@@ -541,6 +541,57 @@ public sealed class ProjectStatusJsonConverter : JsonConverter<ProjectStatus>
         });
 }
 
+/// <summary>How a session began.</summary>
+[JsonConverter(typeof(SessionMethodJsonConverter))]
+public enum SessionMethod
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>password</c>.</summary>
+    Password,
+
+    /// <summary>The wire value <c>sign_up</c>.</summary>
+    SignUp,
+
+    /// <summary>The wire value <c>magic_link</c>.</summary>
+    MagicLink,
+
+    /// <summary>The wire value <c>email_code</c>.</summary>
+    EmailCode,
+
+    /// <summary>The wire value <c>recovery</c>.</summary>
+    Recovery,
+}
+
+/// <summary>Reads and writes <see cref="SessionMethod"/> by wire value; unknown values read as <see cref="SessionMethod.Unknown"/>.</summary>
+public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
+{
+    /// <inheritdoc/>
+    public override SessionMethod Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "password" => SessionMethod.Password,
+            "sign_up" => SessionMethod.SignUp,
+            "magic_link" => SessionMethod.MagicLink,
+            "email_code" => SessionMethod.EmailCode,
+            "recovery" => SessionMethod.Recovery,
+            _ => SessionMethod.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, SessionMethod value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            SessionMethod.Password => "password",
+            SessionMethod.SignUp => "sign_up",
+            SessionMethod.MagicLink => "magic_link",
+            SessionMethod.EmailCode => "email_code",
+            SessionMethod.Recovery => "recovery",
+            _ => throw new JsonException($"SessionMethod.{value} has no wire value"),
+        });
+}
+
 /// <summary>What a signing key does.</summary>
 [JsonConverter(typeof(SigningKeyStatusJsonConverter))]
 public enum SigningKeyStatus
@@ -733,9 +784,18 @@ public sealed record ApiKeyPage(
 /// <summary>A signed in user and their new session.</summary>
 /// <param name="User">The user.</param>
 /// <param name="Session">The new session's tokens.</param>
+/// <param name="IsNewUser">Whether this call created the user: true from sign up, and from a magic link or email code for a new email.</param>
 public sealed record AuthResult(
     [property: JsonPropertyName("user")] User User,
-    [property: JsonPropertyName("session")] SessionTokens Session);
+    [property: JsonPropertyName("session")] SessionTokens Session,
+    [property: JsonPropertyName("isNewUser")] bool IsNewUser);
+
+/// <summary>A password reset, with the token from the emailed link.</summary>
+/// <param name="Token">The <c>orvano_token</c> parameter of the emailed link.</param>
+/// <param name="Password">The new password: 8 to 256 characters after Unicode NFKC normalization.</param>
+public sealed record CompleteRecoveryRequest(
+    [property: JsonPropertyName("token")] string Token,
+    [property: JsonPropertyName("password")] string Password);
 
 /// <summary>A console account: a user of the console, and whether it is an install admin.</summary>
 /// <param name="Id">The user ID.</param>
@@ -837,6 +897,13 @@ public sealed record CreatePlatformRequest(
 /// <param name="Name">The project name; trimmed, 1 to 100 characters.</param>
 public sealed record CreateProjectRequest(
     [property: JsonPropertyName("name")] string Name);
+
+/// <summary>A request to email a password reset link.</summary>
+/// <param name="Email">The email of the account; case does not matter.</param>
+/// <param name="RedirectUrl">Your page that receives the link, on a host that is one of the project's web platforms (<c>http</c> only on <c>localhost</c> or <c>127.0.0.1</c>). The link adds <c>orvano_type=recovery</c> and <c>orvano_token</c> to it.</param>
+public sealed record CreateRecoveryRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("redirectUrl")] string RedirectUrl);
 
 /// <summary>A new user with an email and password, created by a server. No session is created.</summary>
 /// <param name="Email">The email, trimmed, at most 320 characters. Unique in the project, ignoring case.</param>
@@ -1203,6 +1270,7 @@ public sealed record RenderedEmail(
 /// <param name="Sdk">The SDK that signed in, from <c>X-Orvano-SDK</c>; null when none was sent.</param>
 /// <param name="IpAddress">The IP address last seen for the session; null when unknown.</param>
 /// <param name="Current">Whether this is the session making the call.</param>
+/// <param name="Method">How the session began.</param>
 public sealed record Session(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
@@ -1210,7 +1278,8 @@ public sealed record Session(
     [property: JsonPropertyName("userAgent")] string? UserAgent,
     [property: JsonPropertyName("sdk")] string? Sdk,
     [property: JsonPropertyName("ipAddress")] string? IpAddress,
-    [property: JsonPropertyName("current")] bool Current);
+    [property: JsonPropertyName("current")] bool Current,
+    [property: JsonPropertyName("method")] SessionMethod Method);
 
 /// <summary>One page of a user's active sessions, newest first.</summary>
 /// <param name="Items">The sessions on this page.</param>
@@ -1301,6 +1370,19 @@ public sealed record TemplateVariable(
 /// <param name="Status">Always <c>ok</c>.</param>
 public sealed record TestConsolePing(
     [property: JsonPropertyName("status")] string Status);
+
+/// <summary>The newest email Mailpit caught for an address, read from its text part.</summary>
+/// <param name="Subject">The subject line.</param>
+/// <param name="Type">The <c>orvano_type</c> of the first link carrying <c>orvano_token</c>; null when there is none.</param>
+/// <param name="Token">The <c>orvano_token</c> of that link; null when there is none.</param>
+/// <param name="Code">The first run of exactly 6 digits, when the email has no such link; null otherwise.</param>
+/// <param name="Url">That link in full; null when there is none.</param>
+public sealed record TestEmail(
+    [property: JsonPropertyName("subject")] string Subject,
+    [property: JsonPropertyName("type")] string? Type,
+    [property: JsonPropertyName("token")] string? Token,
+    [property: JsonPropertyName("code")] string? Code,
+    [property: JsonPropertyName("url")] string? Url);
 
 /// <summary>One fixed item in the <c>test.list</c> page.</summary>
 /// <param name="Id"><c>item-1</c> to <c>item-5</c>.</param>

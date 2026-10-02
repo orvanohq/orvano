@@ -1,0 +1,58 @@
+# Spec 0010, AC-3, AC-10, AC-27: password reset from the emailed link, read from Mailpit.
+name: a user resets a forgotten password from the emailed link, which works once
+requires: []
+steps:
+  - op: account.create
+    as: client
+    input:
+      body: { email: 'rae-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }
+  - op: now
+    as: client
+    input: {}
+    expect: { status: 200 }
+    save:
+      beforeReset: $.now
+  - op: account.createRecovery
+    as: client
+    input:
+      body:
+        { email: 'rae-${unique}@example.com', redirectUrl: 'http://localhost:3000/auth/callback' }
+    expect: { status: 202 }
+  - op: test.getLatestEmail
+    as: client
+    input: { to: 'rae-${unique}@example.com', after: '${beforeReset}' }
+    expect:
+      status: 200
+      body: { type: recovery }
+    save:
+      token: $.token
+  - op: account.completeRecovery
+    as: client
+    input:
+      body: { token: '${token}', password: another horse battery staple }
+    expect:
+      status: 201
+      body: { user: { emailVerified: true }, isNewUser: false }
+  # The SDK now holds the session the reset created.
+  - op: account.get
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body: { emailVerified: true }
+  - op: account.completeRecovery
+    as: client
+    input:
+      body: { token: '${token}', password: another horse battery staple }
+    expect: { status: 401, code: invalid_email_token }
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'rae-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 401, code: invalid_credentials }
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'rae-${unique}@example.com', password: another horse battery staple }
+    expect: { status: 201 }

@@ -15,6 +15,21 @@ final class TestService {
     await _client.send('POST', '/v1/test/conflict', options: options);
   }
 
+  /// Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after`, and reads it.
+  Future<TestEmail> getLatestEmail({
+    required String to,
+    DateTime? after,
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/test/emails/latest',
+      query: {'to': to, 'after': after?.toUtc().toIso8601String()},
+      options: options,
+    );
+    return TestEmail.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Pages through five fixed items.
   Future<TestItemPage> list({
     String? cursor,

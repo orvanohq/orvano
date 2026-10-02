@@ -6,6 +6,15 @@ import '../dispatch_table.dart';
 
 /// Every non console operation; a missing `client` or `server` call means the SDK has none.
 final Map<String, DispatchEntry> dispatch = {
+  'account.completeRecovery': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.completeRecovery(
+        CompleteRecoveryRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+  ),
   'account.create': DispatchEntry(
     status: 201,
     client: (o, input) async {
@@ -24,6 +33,15 @@ final Map<String, DispatchEntry> dispatch = {
         ),
       );
       return r.toJson();
+    },
+  ),
+  'account.createRecovery': DispatchEntry(
+    status: 202,
+    client: (o, input) async {
+      await o.account.createRecovery(
+        CreateRecoveryRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return null;
     },
   ),
   'account.delete': DispatchEntry(
@@ -157,6 +175,27 @@ final Map<String, DispatchEntry> dispatch = {
     server: (o, input) async {
       await o.test.conflict();
       return null;
+    },
+  ),
+  'test.getLatestEmail': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.test.getLatestEmail(
+        to: input['to'] as String,
+        after: input['after'] == null
+            ? null
+            : DateTime.parse(input['after'] as String),
+      );
+      return r.toJson();
+    },
+    server: (o, input) async {
+      final r = await o.test.getLatestEmail(
+        to: input['to'] as String,
+        after: input['after'] == null
+            ? null
+            : DateTime.parse(input['after'] as String),
+      );
+      return r.toJson();
     },
   ),
   'test.list': DispatchEntry(

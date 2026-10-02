@@ -12,7 +12,7 @@ internal sealed record Page<T>(IReadOnlyList<T> Items, string? NextCursor);
 
 /// <summary>An active session as the list shows it (the contract's <c>Session</c>).</summary>
 internal sealed record SessionView(
-    Guid Id, DateTimeOffset CreatedAt, DateTimeOffset LastRefreshedAt, string? UserAgent, string? Sdk, IPAddress? IpAddress, bool Current);
+    Guid Id, DateTimeOffset CreatedAt, DateTimeOffset LastRefreshedAt, string? UserAgent, string? Sdk, IPAddress? IpAddress, bool Current, string Method);
 
 /// <summary>
 /// The signed in user's sessions (spec 0004, <c>account</c> service): refresh with rotation, grace, and reuse
@@ -125,7 +125,7 @@ internal sealed class SessionService(AuthStore store, Sessions sessions, Session
             var conn = (NpgsqlConnection)db.Database.GetDbConnection();
             await using var cmd = new NpgsqlCommand(
                 $"""
-                SELECT id, created_at, last_refreshed_at, user_agent, sdk, ip_last
+                SELECT id, created_at, last_refreshed_at, user_agent, sdk, ip_last, method
                 FROM orvano.auth_sessions
                 WHERE user_id = @user AND project_id = @project AND ended_at IS NULL AND now() < least(idle_expires_at, expires_at)
                 {(after is null ? "" : "AND (created_at, id) < (@afterCreated, @afterId)")}
@@ -153,7 +153,8 @@ internal sealed class SessionService(AuthStore store, Sessions sessions, Session
                     reader.IsDBNull(3) ? null : reader.GetString(3),
                     reader.IsDBNull(4) ? null : reader.GetString(4),
                     reader.IsDBNull(5) ? null : reader.GetFieldValue<IPAddress>(5),
-                    id == current));
+                    id == current,
+                    reader.GetString(6)));
             }
 
             return found;

@@ -10,6 +10,22 @@ final class AccountService {
 
   final Client _client;
 
+  /// Sets a new password with the token from a reset link, and signs the user in. Every other session of the user
+  /// ends, and the email counts as verified. The token works once.
+  Future<AuthResult> completeRecovery(
+    CompleteRecoveryRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/recovery/confirm',
+      body: body.toJson(),
+      session: SessionChange.start,
+      options: options,
+    );
+    return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Signs a new user up with an email and password, and signs them in.
   Future<AuthResult> create(
     CreateAccountRequest body, {
@@ -38,6 +54,20 @@ final class AccountService {
       options: options,
     );
     return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Emails a password reset link, if the email belongs to an active user. The answer is the same 202 whether or not
+  /// it does, so it never tells anyone which emails have accounts.
+  Future<void> createRecovery(
+    CreateRecoveryRequest body, {
+    RequestOptions? options,
+  }) async {
+    await _client.send(
+      'POST',
+      '/v1/account/recovery',
+      body: body.toJson(),
+      options: options,
+    );
   }
 
   /// Deletes the signed in user with all their sessions. It can't be undone.

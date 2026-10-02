@@ -3,8 +3,10 @@ import type { Client, RequestOptions } from '../runtime/client.js'
 import { paginate } from '../runtime/pagination.js'
 import type {
   AuthResult,
+  CompleteRecoveryRequest,
   CreateAccountRequest,
   CreatePasswordSessionRequest,
+  CreateRecoveryRequest,
   DeleteAccountRequest,
   Health,
   Jwks,
@@ -26,6 +28,17 @@ export class AccountService {
     this.#client = client
   }
 
+  /**
+   * Sets a new password with the token from a reset link, and signs the user in. Every other session of the user
+   * ends, and the email counts as verified. The token works once.
+   */
+  completeRecovery(body: CompleteRecoveryRequest, options?: RequestOptions): Promise<AuthResult> {
+    return this.#client.request<AuthResult>(
+      { method: 'POST', path: '/v1/account/recovery/confirm', body, session: 'start' },
+      options,
+    )
+  }
+
   /** Signs a new user up with an email and password, and signs them in. */
   create(body: CreateAccountRequest, options?: RequestOptions): Promise<AuthResult> {
     return this.#client.request<AuthResult>(
@@ -41,6 +54,17 @@ export class AccountService {
   ): Promise<AuthResult> {
     return this.#client.request<AuthResult>(
       { method: 'POST', path: '/v1/account/sessions/password', body, session: 'start' },
+      options,
+    )
+  }
+
+  /**
+   * Emails a password reset link, if the email belongs to an active user. The answer is the same 202 whether or not
+   * it does, so it never tells anyone which emails have accounts.
+   */
+  createRecovery(body: CreateRecoveryRequest, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'POST', path: '/v1/account/recovery', body },
       options,
     )
   }

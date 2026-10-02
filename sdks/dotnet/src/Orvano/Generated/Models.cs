@@ -4,6 +4,57 @@ using System.Text.Json.Serialization;
 
 namespace Orvano;
 
+/// <summary>How a session began.</summary>
+[JsonConverter(typeof(SessionMethodJsonConverter))]
+public enum SessionMethod
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>password</c>.</summary>
+    Password,
+
+    /// <summary>The wire value <c>sign_up</c>.</summary>
+    SignUp,
+
+    /// <summary>The wire value <c>magic_link</c>.</summary>
+    MagicLink,
+
+    /// <summary>The wire value <c>email_code</c>.</summary>
+    EmailCode,
+
+    /// <summary>The wire value <c>recovery</c>.</summary>
+    Recovery,
+}
+
+/// <summary>Reads and writes <see cref="SessionMethod"/> by wire value; unknown values read as <see cref="SessionMethod.Unknown"/>.</summary>
+public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
+{
+    /// <inheritdoc/>
+    public override SessionMethod Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "password" => SessionMethod.Password,
+            "sign_up" => SessionMethod.SignUp,
+            "magic_link" => SessionMethod.MagicLink,
+            "email_code" => SessionMethod.EmailCode,
+            "recovery" => SessionMethod.Recovery,
+            _ => SessionMethod.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, SessionMethod value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            SessionMethod.Password => "password",
+            SessionMethod.SignUp => "sign_up",
+            SessionMethod.MagicLink => "magic_link",
+            SessionMethod.EmailCode => "email_code",
+            SessionMethod.Recovery => "recovery",
+            _ => throw new JsonException($"SessionMethod.{value} has no wire value"),
+        });
+}
+
 /// <summary>Whether a user may sign in.</summary>
 [JsonConverter(typeof(UserStatusJsonConverter))]
 public enum UserStatus
@@ -99,6 +150,7 @@ public sealed record OpenIdConfiguration(
 /// <param name="Sdk">The SDK that signed in, from <c>X-Orvano-SDK</c>; null when none was sent.</param>
 /// <param name="IpAddress">The IP address last seen for the session; null when unknown.</param>
 /// <param name="Current">Whether this is the session making the call.</param>
+/// <param name="Method">How the session began.</param>
 public sealed record Session(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
@@ -106,7 +158,8 @@ public sealed record Session(
     [property: JsonPropertyName("userAgent")] string? UserAgent,
     [property: JsonPropertyName("sdk")] string? Sdk,
     [property: JsonPropertyName("ipAddress")] string? IpAddress,
-    [property: JsonPropertyName("current")] bool Current);
+    [property: JsonPropertyName("current")] bool Current,
+    [property: JsonPropertyName("method")] SessionMethod Method);
 
 /// <summary>One page of a user's active sessions, newest first.</summary>
 /// <param name="Items">The sessions on this page.</param>

@@ -10,6 +10,10 @@ export const ErrorCode = {
   contractViolation: 'contract_violation',
   /** `csrf_rejected` */
   csrfRejected: 'csrf_rejected',
+  /** `email_already_in_use` */
+  emailAlreadyInUse: 'email_already_in_use',
+  /** `email_already_verified` */
+  emailAlreadyVerified: 'email_already_verified',
   /** `email_not_configured` */
   emailNotConfigured: 'email_not_configured',
   /** `email_rate_limited` */
@@ -22,10 +26,14 @@ export const ErrorCode = {
   internalError: 'internal_error',
   /** `invalid_api_key` */
   invalidApiKey: 'invalid_api_key',
+  /** `invalid_code` */
+  invalidCode: 'invalid_code',
   /** `invalid_credentials` */
   invalidCredentials: 'invalid_credentials',
   /** `invalid_cursor` */
   invalidCursor: 'invalid_cursor',
+  /** `invalid_email_token` */
+  invalidEmailToken: 'invalid_email_token',
   /** `invalid_password` */
   invalidPassword: 'invalid_password',
   /** `invalid_refresh_token` */
@@ -58,6 +66,10 @@ export const ErrorCode = {
   projectNotReady: 'project_not_ready',
   /** `rate_limited` */
   rateLimited: 'rate_limited',
+  /** `reauthentication_required` */
+  reauthenticationRequired: 'reauthentication_required',
+  /** `redirect_url_not_allowed` */
+  redirectUrlNotAllowed: 'redirect_url_not_allowed',
   /** `server_busy` */
   serverBusy: 'server_busy',
   /** `session_not_found` */

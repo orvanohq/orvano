@@ -278,6 +278,17 @@ describe('session changes (spec 0004, x-orvano-session)', () => {
     expect(await orvano.client.session.get()).toEqual(tokens)
   })
 
+  it('answers undefined for an accepted call with no body (spec 0010, 202)', async () => {
+    const { fetch } = fakeFetch(() => new Response(null, { status: 202 }))
+
+    await expect(
+      new Client({ endpoint, fetch, logger: quiet }).request({
+        method: 'POST',
+        path: '/v1/account/recovery',
+      }),
+    ).resolves.toBeUndefined()
+  })
+
   it('clears the session after a sign out', async () => {
     const { fetch } = fakeFetch(() => new Response(null, { status: 204 }))
     const orvano = app(fetch, { session: new MemorySessionStore(signedIn) })

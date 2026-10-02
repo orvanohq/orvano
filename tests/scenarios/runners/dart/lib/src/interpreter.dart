@@ -115,9 +115,15 @@ String? fixtureApiKey(String fixturesYaml) {
 /// Runner operations: calls the scenarios make that are not contract
 /// operations. `signIn` is a plain sign in call that leaves the SDK's stored
 /// session alone, so a runner without client operations (.NET) can get a
-/// token too; `verifyAccessToken` is the server SDK's own check. Their names
-/// have no dot, so they never collide with an operationId.
+/// token too; `verifyAccessToken` is the server SDK's own check; `now` is the
+/// runner's clock, saved before a send and passed to `test.getLatestEmail` as
+/// `after`. Their names have no dot, so they never collide with an operationId.
 final Map<String, DispatchEntry> _runnerDispatch = {
+  'now': DispatchEntry(
+    status: 200,
+    client: (o, input) async => {'now': _now()},
+    server: (o, input) async => {'now': _now()},
+  ),
   'signIn': DispatchEntry(
     status: 201,
     client: (o, input) => o.client.send(
@@ -141,6 +147,8 @@ final Map<String, DispatchEntry> _runnerDispatch = {
     },
   ),
 };
+
+String _now() => DateTime.now().toUtc().toIso8601String();
 
 /// Parses one scenario file into plain JSON values.
 Map<String, Object?> parseScenario(String yamlText) =>

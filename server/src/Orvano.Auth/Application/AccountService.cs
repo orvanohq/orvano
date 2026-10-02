@@ -10,8 +10,8 @@ namespace Orvano.Auth.Application;
 /// <summary>A session's tokens as the API returns them (the contract's <c>SessionTokens</c>).</summary>
 internal sealed record SessionTokensView(string AccessToken, DateTimeOffset AccessTokenExpiresAt, string RefreshToken, DateTimeOffset RefreshTokenExpiresAt, Guid SessionId);
 
-/// <summary>A signed in user and their new session (the contract's <c>AuthResult</c>).</summary>
-internal sealed record SignedIn(UserRow User, SessionTokensView Session);
+/// <summary>A signed in user and their new session (the contract's <c>AuthResult</c>); <paramref name="IsNewUser"/> when this call created them.</summary>
+internal sealed record SignedIn(UserRow User, SessionTokensView Session, bool IsNewUser = false);
 
 /// <summary>
 /// Changes to the signed in user (AC-13). A null <see cref="Metadata"/> leaves the metadata alone; <see cref="SetName"/>
@@ -50,7 +50,7 @@ internal sealed class AccountService(
     {
         await keys.GetActiveAsync(projectId, ct); // the first token of a project creates its key, before any commit
         var outcome = await CreateAsync(projectId, email, password, name, userId => Actor.User(userId), client, ct, gate);
-        return outcome.Succeeded ? await SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant!, ct) : outcome.Failure!;
+        return outcome.Succeeded ? await SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant!, ct, isNewUser: true) : outcome.Failure!;
     }
 
     /// <summary>A console account created without signing it in: the <c>Test</c> fixtures' seeding.</summary>
@@ -121,8 +121,9 @@ internal sealed class AccountService(
             if (admitted is not null) await accountCreated.OnCreatedAsync(uow.Tx, userId, name, trimmed, admitted, token);
             var actor = actorOf(userId);
             await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserCreated, projectId, actor, userId.ToString(),
-                new Dictionary<string, string> { ["userId"] = userId.ToString() }, ct: token);
-            var grant = client is null ? null : await sessions.CreateAsync(uow, projectId, userId, client, actor, token);
+                new Dictionary<string, string> { ["userId"] = userId.ToString() },
+                fields: new Dictionary<string, string?> { ["method"] = client is null ? null : SessionMethod.SignUp }, ct: token);
+            var grant = client is null ? null : await sessions.CreateAsync(uow, projectId, userId, client, actor, SessionMethod.SignUp, token);
             return (await ReloadAsync(uow.Db, userId, token), grant);
         }, ct);
     }
@@ -159,7 +160,7 @@ internal sealed class AccountService(
                 await update.ExecuteNonQueryAsync(token);
             }
 
-            var grant = await sessions.CreateAsync(uow, projectId, account.Id, client, Actor.User(account.Id), token);
+            var grant = await sessions.CreateAsync(uow, projectId, account.Id, client, Actor.User(account.Id), SessionMethod.Password, token);
             return (await ReloadAsync(uow.Db, account.Id, token), grant);
         }, ct);
 
@@ -295,10 +296,11 @@ internal sealed class AccountService(
         return hash;
     }
 
-    private async Task<SignedIn> SignedInAsync(string projectId, UserRow user, SessionGrant grant, CancellationToken ct)
+    /// <summary>Issues the new session's access token and returns the <c>AuthResult</c> value.</summary>
+    public async Task<SignedIn> SignedInAsync(string projectId, UserRow user, SessionGrant grant, CancellationToken ct, bool isNewUser = false)
     {
         var access = await tokens.IssueAsync(projectId, user.Id, grant.SessionId, ct);
-        return new SignedIn(user, new SessionTokensView(access.Token, access.ExpiresAt, grant.RefreshToken.Value, grant.RefreshTokenExpiresAt, grant.SessionId));
+        return new SignedIn(user, new SessionTokensView(access.Token, access.ExpiresAt, grant.RefreshToken.Value, grant.RefreshTokenExpiresAt, grant.SessionId), isNewUser);
     }
 
     private sealed record Account(Guid Id, string Status, string? Hash);

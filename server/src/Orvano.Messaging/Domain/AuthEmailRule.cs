@@ -12,11 +12,18 @@ internal static class AuthEmailRule
     public const int MaxCodeLength = 12;
     public const int MaxExpiresInMinutes = 10_080;
 
+    /// <summary>Schemes a link must never use, since a mail client could run or read something local (spec 0010, AC-31).</summary>
+    private static readonly string[] RefusedSchemes = ["javascript", "data", "vbscript", "file", "blob", "about"];
+
     /// <summary>Checks <paramref name="email"/> and returns the values its template is rendered with.</summary>
     /// <param name="email">The email a module asked to queue.</param>
-    /// <param name="allowHttp">True when <c>ORVANO_PUBLIC_URL</c> is <c>http</c>, which lets the link be <c>http</c> too.</param>
     /// <exception cref="ArgumentException">A value breaks its rule.</exception>
-    public static TemplateValues Check(AuthEmail email, bool allowHttp)
+    /// <remarks>
+    /// The link is only checked to be an absolute URL with no user info and a scheme outside a deny list: the calling
+    /// module owns the real rule (Auth checks it against the project's platforms, spec 0010 AC-6), so an app's own
+    /// custom scheme passes here.
+    /// </remarks>
+    public static TemplateValues Check(AuthEmail email)
     {
         ArgumentNullException.ThrowIfNull(email);
         if (string.IsNullOrWhiteSpace(email.ProjectId)) throw Broken(nameof(email.ProjectId), "is empty");
@@ -37,9 +44,10 @@ internal static class AuthEmailRule
         {
             if (email.Code is not null) throw Broken(nameof(email.Code), "must be null for a link email");
             if (!Uri.TryCreate(email.ActionUrl, UriKind.Absolute, out var url)
-                || !(url.Scheme == Uri.UriSchemeHttps || allowHttp && url.Scheme == Uri.UriSchemeHttp))
+                || url.UserInfo.Length > 0
+                || RefusedSchemes.Contains(url.Scheme, StringComparer.OrdinalIgnoreCase))
             {
-                throw Broken(nameof(email.ActionUrl), allowHttp ? "must be an absolute http or https URL" : "must be an absolute https URL");
+                throw Broken(nameof(email.ActionUrl), "must be an absolute URL with no user info, and not a javascript, data, vbscript, file, blob, or about URL");
             }
         }
 

@@ -14,6 +14,12 @@ abstract final class ErrorCode {
   /// `csrf_rejected`
   static const csrfRejected = 'csrf_rejected';
 
+  /// `email_already_in_use`
+  static const emailAlreadyInUse = 'email_already_in_use';
+
+  /// `email_already_verified`
+  static const emailAlreadyVerified = 'email_already_verified';
+
   /// `email_not_configured`
   static const emailNotConfigured = 'email_not_configured';
 
@@ -32,11 +38,17 @@ abstract final class ErrorCode {
   /// `invalid_api_key`
   static const invalidApiKey = 'invalid_api_key';
 
+  /// `invalid_code`
+  static const invalidCode = 'invalid_code';
+
   /// `invalid_credentials`
   static const invalidCredentials = 'invalid_credentials';
 
   /// `invalid_cursor`
   static const invalidCursor = 'invalid_cursor';
+
+  /// `invalid_email_token`
+  static const invalidEmailToken = 'invalid_email_token';
 
   /// `invalid_password`
   static const invalidPassword = 'invalid_password';
@@ -85,6 +97,12 @@ abstract final class ErrorCode {
 
   /// `rate_limited`
   static const rateLimited = 'rate_limited';
+
+  /// `reauthentication_required`
+  static const reauthenticationRequired = 'reauthentication_required';
+
+  /// `redirect_url_not_allowed`
+  static const redirectUrlNotAllowed = 'redirect_url_not_allowed';
 
   /// `server_busy`
   static const serverBusy = 'server_busy';

@@ -14,6 +14,7 @@ namespace Orvano;
 [JsonSerializable(typeof(Jwks))]
 [JsonSerializable(typeof(OpenIdConfiguration))]
 [JsonSerializable(typeof(Session))]
+[JsonSerializable(typeof(SessionMethod))]
 [JsonSerializable(typeof(SessionPage))]
 [JsonSerializable(typeof(User))]
 [JsonSerializable(typeof(UserPage))]

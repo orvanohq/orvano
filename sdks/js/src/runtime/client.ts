@@ -255,8 +255,9 @@ export class Client {
       const response = await this.#fetch(url, init)
       this.#checkVersion(response)
       if (response.ok) {
-        const result: unknown =
-          response.status === 204 || spec.method === 'HEAD' ? undefined : await response.json()
+        // A 204, a HEAD, or an accepted call with no body (202) answers undefined.
+        const text = response.status === 204 || spec.method === 'HEAD' ? '' : await response.text()
+        const result: unknown = text === '' ? undefined : JSON.parse(text)
         await this.#applySession(spec.session, result)
         return result as T
       }
