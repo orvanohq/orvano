@@ -54,7 +54,7 @@ Every product feature ships in all of these layers in the same version, unless i
 | 8 | App user sign up & sign in | v0.1 | done |
 | 9 | Transactional email | v0.2 | done |
 | 10 | Email verification, recovery & passwordless | v0.2 | done |
-| 11 | Docs site & quickstarts | v0.2 | planned |
+| 11 | Docs site & quickstarts | v0.2 | in-progress |
 | 12 | OAuth & ID token sign in | v0.3 | planned |
 | 13 | MFA, passkeys & sessions | v0.3 | planned |
 | 14 | Auth policies & abuse protection | v0.3 | planned |
@@ -120,6 +120,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **RHEL family installs**: Rocky, Alma, and Fedora support once SELinux and firewalld are tested · from spec 0006
 - **Console account recovery**: password reset and email verification for console accounts, through the install SMTP · from spec 0010
 - **Security notice emails**: tell the old address when an email changes, and the user when their password is reset (a new template in Messaging) · from spec 0010
+- **Quickstart links in the console**: the project's "Connect your app" card links to the matching quickstart on orvano.dev · from spec 0011
 - **Localized email templates**: a version of each email template per language, picked from the user's locale (the `locale` column is already in the key) · from spec 0009
 
 ## Legend

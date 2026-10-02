@@ -14,11 +14,20 @@ The first console screens: an admin signs up, creates an org and a project, crea
 - [x] Test it: `/test console accounts, orgs & projects`
 Spec [0003](../specs/0003-platform-data-model/index.md) (model and API) · Spec [0007](../specs/0007-console-platform-screens/index.md) (console screens) · code in `server/src/Orvano.Platform/`, `contract/platform/`, `console/`
 
-### 11. Docs site & quickstarts · needs a decision
+### 11. Docs site & quickstarts · in-progress
 Public docs with a quickstart per SDK and the generated API reference. From here on, every feature adds its own docs page.
 **Done when:** a new developer can follow the Next.js or Flutter quickstart from install to a signed in user without help.
 **Also:** move the README install section into the docs site · from spec 0006
-- [ ] Design it (spec): `/architect docs site & quickstarts`
+- [x] Design it (spec): `/architect docs site & quickstarts`
+- [ ] Build it: `/develop docs site & quickstarts`
+   - [ ] Local stack: `orvano install --local` with the compose overlay and Mailpit, plus the `ORVANO_INSTALL_SMTP_URL` seed (AC-1 to 4)
+   - [ ] Thin thread: the Starlight site skeleton, the Next.js quickstart and example, the Playwright console journey, the `quickstarts` CI job, website CI and PR previews (AC-5 to 11, 13, 14, 18, 19, 21, 26, 27)
+   - [ ] Remaining quickstarts (Flutter, JavaScript, Dart, .NET) and the generated API reference and error pages (AC-9, 11, 12, 14 to 17, 19, 20)
+   - [ ] Content: concepts, auth guides, SDK, console, and self hosting pages, changelog, `llms.txt`, the docs rule (AC-6, 21, 28 to 30)
+   - [ ] Production: the release deploy and examples smoke job, CSP, analytics, `www` redirect, link checks, axe, then your Cloudflare prerequisites (AC-7, 22 to 25)
+- [ ] Verify it: `/check verify docs site & quickstarts`
+- [ ] Test it: `/test docs site & quickstarts`
+Spec [0011](../specs/0011-docs-site-quickstarts/index.md) · code in `website/`, `examples/`, `server/src/Orvano.Server/Install/`, `server/src/Orvano.Messaging/`, `deploy/compose/`
 
 ### 15. Console team members & roles · done
 Invite teammates into an org by email and give them roles (owner, developer, viewer) that control what they can do in the console.
