@@ -31,7 +31,7 @@ Send email from a project through SMTP you configure, with editable templates. A
 - [x] Test it: `/test transactional email`
 Spec [0009](../specs/0009-transactional-email/index.md) · code in `server/src/Orvano.Messaging/`, `contract/messaging/`, `console/`
 
-### 10. Email verification, recovery & passwordless · in-progress · GA
+### 10. Email verification, recovery & passwordless · done · GA
 Verify email, reset password, magic link, and email one time code sign in.
 **Done when:** each flow works from every client SDK, links and codes expire and work only once, and the console shows a user's verified state.
 - [x] Design it (spec): `/architect email verification, recovery & passwordless`
@@ -43,7 +43,7 @@ Verify email, reset password, magic link, and email one time code sign in.
 - [x] Verify it: `/check verify email verification, recovery & passwordless`
 - [x] Test it: `/test email verification, recovery & passwordless`
 - [x] Review it (fresh model): `/check review email verification, recovery & passwordless`
-- [ ] Document it: `/document email verification, recovery & passwordless`
+- [x] Document it: `/document email verification, recovery & passwordless`
 Spec [0010](../specs/0010-email-verification-recovery-passwordless/index.md) · code in `server/src/Orvano.Auth/`, `server/src/Orvano.Messaging/`, `contract/auth/`, `sdks/`, `console/`, `tests/scenarios/`
 
 ### 12. OAuth & ID token sign in · needs a decision · GA

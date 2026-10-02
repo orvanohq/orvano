@@ -1,7 +1,7 @@
 # 0010. Email verification, password reset, magic links, email codes, and email change
 
 **Date**: 2026-10-01
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
