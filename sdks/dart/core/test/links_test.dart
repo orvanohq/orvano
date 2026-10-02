@@ -180,6 +180,23 @@ void main() {
         expect(seen, [AuthEvent.tokenRefreshed, AuthEvent.userUpdated]);
       });
 
+      test('an email change whose claim is already current emits userUpdated '
+          'without a refresh', () async {
+        await serve([json(user('u1', true))], signedIn: session('u1', true));
+        final seen = <AuthEvent>[];
+        client.authStateChanges.listen((c) => seen.add(c.event));
+
+        await client.handleLink(
+          Uri.parse(
+            'https://a.example/?orvano_type=email_change&orvano_token=$token',
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(server.paths, ['/v1/account/email/confirm']);
+        expect(seen, [AuthEvent.userUpdated]);
+      });
+
       test('an email change of another user changes nothing here', () async {
         await serve([
           json(user('someone-else', true)),

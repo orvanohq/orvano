@@ -141,6 +141,17 @@ describe('redeeming a link (AC-24)', () => {
     expect(seen).toEqual(['tokenRefreshed', 'userUpdated'])
   })
 
+  it('an email change whose claim is already current says userUpdated without a refresh', async () => {
+    const { fetch, sent } = fakeFetch(() => Response.json(user('u1', true)))
+    const c = client(fetch, { session: new MemorySessionStore(session('u1', true)) })
+    const seen = events(c)
+
+    await c.redeemLink(`https://a.example/?orvano_type=email_change&orvano_token=${token}`)
+
+    expect(sent.map((s) => new URL(s.url).pathname)).toEqual(['/v1/account/email/confirm'])
+    expect(seen).toEqual(['userUpdated'])
+  })
+
   it('an email change of another user, or with no session, changes nothing here', async () => {
     const { fetch, sent } = fakeFetch(() => Response.json(user('someone-else', true)))
     const signedIn = client(fetch, { session: new MemorySessionStore(session('u1', false)) })
