@@ -1304,6 +1304,38 @@ public static class ConsoleUsersOperations
         public const string Audience = "console";
     }
 
+    /// <summary>POST /v1/console/project/users/{userId}/recovery: Emails a user a password reset link. Owners and developers.</summary>
+    public static class CreateRecovery
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.createRecovery";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/recovery";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/project/users/{userId}/verification: Emails a user a link that verifies their email. Owners and developers.</summary>
+    public static class CreateVerification
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.createVerification";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/verification";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>DELETE /v1/console/project/users/{userId}: Deletes a user with their password and sessions. It can't be undone.</summary>
     public static class Delete
     {
@@ -1411,6 +1443,38 @@ public static class ConsoleUsersOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/console/project/users/{userId}/unblock";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>PUT /v1/console/project/users/{userId}/email: Changes a user's email at once, without a confirmation email. Owners and developers.</summary>
+    public static class UpdateEmail
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.updateEmail";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PUT";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/email";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>PUT /v1/console/project/users/{userId}/email-verification: Marks a user's email verified or unverified. Owners and developers.</summary>
+    public static class UpdateEmailVerification
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.updateEmailVerification";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PUT";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/email-verification";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "console";

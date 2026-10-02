@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orvano.Auth.Application;
 using Orvano.Auth.Domain;
 using Orvano.Core.Http;
@@ -22,7 +24,17 @@ internal static class EmailRequests
     {
         if (!outcome.Succeeded) return Problem(http, outcome.Failure!);
         var remaining = AuthTimings.OpenSendFloor - started.Elapsed;
-        if (remaining > TimeSpan.Zero) await Task.Delay(remaining, ct);
+        if (remaining > TimeSpan.Zero)
+        {
+            await Task.Delay(remaining, ct);
+        }
+        else
+        {
+            // Past the floor, a known and an unknown email may take different times; count it to notice.
+            http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(EmailRequests))
+                .LogWarning("An open email request took {Milliseconds} ms, past the {Floor} ms floor", (int)started.ElapsedMilliseconds,
+                    (int)AuthTimings.OpenSendFloor.TotalMilliseconds);
+        }
         return TypedResults.StatusCode(StatusCodes.Status202Accepted);
     }
 

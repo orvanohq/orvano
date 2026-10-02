@@ -379,9 +379,17 @@ public class SessionTests(PostgresFixture postgres)
         await InsertKeyAsync(database, "activeKeyAAAAAAAAAAAAA", "active", "NULL");
 
         await using var app = Npgsql.NpgsqlDataSource.Create(database.AppUrl);
-        var (sessions, keys) = await AuthRetention.RunAsync(app, Ct);
+        // Spec 0010 AC-29: email tokens go once past their expiry.
+        await TestDatabase.ExecuteAsync(database.Superuser,
+            """
+            INSERT INTO orvano.auth_email_tokens (project_id, kind, email, secret_hash, mac_key_id, expires_at)
+            VALUES ('shop', 'email_code', 'old@x.com', decode(repeat('aa', 32), 'hex'), 'k', now() - interval '1 second'),
+                   ('shop', 'email_code', 'new@x.com', decode(repeat('bb', 32), 'hex'), 'k', now() + interval '10 minutes')
+            """);
+        var (sessions, keys, tokens) = await AuthRetention.RunAsync(app, Ct);
 
-        Assert.Equal((2, 1), (sessions, keys));
+        Assert.Equal((2, 1, 1), (sessions, keys, tokens));
+        Assert.Equal(["new@x.com"], await TestDatabase.ScalarAsync<string[]>(database.Superuser, "SELECT array_agg(email) FROM orvano.auth_email_tokens"));
         var left = await TestDatabase.ScalarAsync<Guid[]>(database.Superuser, "SELECT array_agg(id) FROM orvano.auth_sessions");
         Assert.Equal(new[] { endedRecently, expiredRecently, active }.Order(), left.Order());
         Assert.DoesNotContain(endedLongAgo, left);

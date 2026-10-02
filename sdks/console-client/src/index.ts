@@ -15,6 +15,7 @@ export type { ClientConfig, RequestOptions } from '@orvano/js'
 export type {
   CreateUserRequest,
   Session,
+  SessionMethod,
   SessionPage,
   User,
   UserPage,

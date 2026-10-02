@@ -17,7 +17,13 @@ import type {
   UpdatePlatformRequest,
   UpdateProjectRequest,
 } from '@orvano/console-client'
-import type { CreateUserRequest } from '@orvano/js'
+import type {
+  CreateUserRecoveryRequest,
+  CreateUserRequest,
+  CreateUserVerificationRequest,
+  UpdateEmailVerificationRequest,
+  UpdateUserEmailRequest,
+} from '@orvano/js'
 import type { DispatchTable } from '../dispatch-table.js'
 
 /** Every console operation, called through `@orvano/console-client`. */
@@ -315,6 +321,22 @@ export const consoleDispatch: DispatchTable = {
     status: 201,
     console: (o, input) => o.consoleUsers.create(input.body as CreateUserRequest),
   },
+  'consoleUsers.createRecovery': {
+    status: 202,
+    console: (o, input) =>
+      o.consoleUsers.createRecovery(
+        input.userId as string,
+        input.body as CreateUserRecoveryRequest,
+      ),
+  },
+  'consoleUsers.createVerification': {
+    status: 202,
+    console: (o, input) =>
+      o.consoleUsers.createVerification(
+        input.userId as string,
+        input.body as CreateUserVerificationRequest,
+      ),
+  },
   'consoleUsers.delete': {
     status: 204,
     console: (o, input) => o.consoleUsers.delete(input.userId as string),
@@ -340,6 +362,7 @@ export const consoleDispatch: DispatchTable = {
         status: input.status as string | undefined,
         createdAfter: input.createdAfter as string | undefined,
         createdBefore: input.createdBefore as string | undefined,
+        emailVerified: input.emailVerified as boolean | undefined,
         cursor: input.cursor as string | undefined,
         limit: input.limit as number | undefined,
       }),
@@ -349,6 +372,7 @@ export const consoleDispatch: DispatchTable = {
         status: input.status as string | undefined,
         createdAfter: input.createdAfter as string | undefined,
         createdBefore: input.createdBefore as string | undefined,
+        emailVerified: input.emailVerified as boolean | undefined,
         limit: input.limit as number | undefined,
       }),
   },
@@ -367,6 +391,19 @@ export const consoleDispatch: DispatchTable = {
   'consoleUsers.unblock': {
     status: 200,
     console: (o, input) => o.consoleUsers.unblock(input.userId as string),
+  },
+  'consoleUsers.updateEmail': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleUsers.updateEmail(input.userId as string, input.body as UpdateUserEmailRequest),
+  },
+  'consoleUsers.updateEmailVerification': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleUsers.updateEmailVerification(
+        input.userId as string,
+        input.body as UpdateEmailVerificationRequest,
+      ),
   },
   'test.consolePing': {
     status: 200,

@@ -35,11 +35,11 @@ Spec [0009](../specs/0009-transactional-email/index.md) · code in `server/src/O
 Verify email, reset password, magic link, and email one time code sign in.
 **Done when:** each flow works from every client SDK, links and codes expire and work only once, and the console shows a user's verified state.
 - [x] Design it (spec): `/architect email verification, recovery & passwordless`
-- [ ] Build it: `/develop email verification, recovery & passwordless`
+- [x] Build it: `/develop email verification, recovery & passwordless`
    - [x] Thin thread, password reset: the token table and session method, the redirect rule, Messaging's availability check, the open request privacy rules, reset end to end, and the Mailpit test operation with a scenario in every client runner (AC-2 to 4, 6 to 10, 20, 27, 31)
    - [x] Verification, passwordless, and email change: verify at sign up and on resend, the `email_verified` claim, magic link and code sign in with HMAC codes and attempts, account claiming, email change, and passwordless self service (AC-1, 5, 11 to 19, 28, 29, 32)
    - [x] Servers and SDK helpers: the new `users.*` operations, `redeemLink` and `handleLink`, the Next.js `redeem` and `email-code` actions, and `retryAfter` on every SDK error (AC-21, 24 to 27)
-   - [ ] Console and hardening: the Users page verified column, filter, actions, and send dialogs; events, retention, purge, and the leak, timing, and race tests (AC-1, 22, 23, 29, 30)
+   - [x] Console and hardening: the Users page verified column, filter, actions, and send dialogs; events, retention, purge, and the leak, timing, and race tests (AC-1, 22, 23, 29, 30)
 - [ ] Verify it: `/check verify email verification, recovery & passwordless`
 - [ ] Test it: `/test email verification, recovery & passwordless`
 - [ ] Review it (fresh model): `/check review email verification, recovery & passwordless`

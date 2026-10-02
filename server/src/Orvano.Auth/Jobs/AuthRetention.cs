@@ -7,8 +7,10 @@ using Orvano.Core.Data;
 namespace Orvano.Auth.Jobs;
 
 /// <summary>
-/// The hourly cleanup on the leader worker: session rows 30 days after they end or expire (AC-32), and retiring
-/// signing keys once their 24 hour overlap has passed (AC-22). Rows go in batches, so one run never holds a long lock.
+/// The hourly cleanup on the leader worker: session rows 30 days after they end or expire (AC-32), retiring signing
+/// keys once their 24 hour overlap has passed (AC-22), and email tokens past their expiry (spec 0010, AC-29), so an
+/// email address sits in a token row at most its lifetime plus an hour. Rows go in batches, so one run never holds a
+/// long lock.
 /// </summary>
 internal static class AuthRetention
 {
@@ -16,8 +18,8 @@ internal static class AuthRetention
     public static readonly TimeSpan Interval = TimeSpan.FromHours(1);
     public const int BatchSize = 1000;
 
-    /// <summary>Runs one cleanup; <c>Sessions</c> and <c>Keys</c> are how many rows it deleted.</summary>
-    public static async Task<(int Sessions, int Keys)> RunAsync(NpgsqlDataSource db, CancellationToken ct)
+    /// <summary>Runs one cleanup; <c>Sessions</c>, <c>Keys</c>, and <c>Tokens</c> are how many rows it deleted.</summary>
+    public static async Task<(int Sessions, int Keys, int Tokens)> RunAsync(NpgsqlDataSource db, CancellationToken ct)
     {
         var sessions = 0;
         int batch;
@@ -40,17 +42,35 @@ internal static class AuthRetention
         while (batch == BatchSize);
 
         await using var keys = db.CreateCommand("DELETE FROM orvano.auth_signing_keys WHERE status = 'retiring' AND retire_after <= now()");
-        return (sessions, await keys.ExecuteNonQueryAsync(ct));
+        var retired = await keys.ExecuteNonQueryAsync(ct);
+
+        var tokens = 0;
+        do
+        {
+            // Matches auth_email_tokens_expires_at_idx.
+            await using var cmd = db.CreateCommand(
+                """
+                DELETE FROM orvano.auth_email_tokens
+                WHERE id IN (SELECT id FROM orvano.auth_email_tokens WHERE expires_at < now() LIMIT @batch)
+                """);
+            cmd.Parameters.AddWithValue("batch", BatchSize);
+            batch = await cmd.ExecuteNonQueryAsync(ct);
+            tokens += batch;
+        }
+        while (batch == BatchSize);
+
+        return (sessions, retired, tokens);
     }
 
     /// <summary>The schedule's body: resolves the app data source and logs the counts.</summary>
     public static async Task RunScheduledAsync(IServiceProvider services, CancellationToken ct)
     {
-        var (sessions, keys) = await RunAsync(services.GetRequiredKeyedService<NpgsqlDataSource>(OrvanoDb.App), ct);
-        if (sessions + keys > 0)
+        var (sessions, keys, tokens) = await RunAsync(services.GetRequiredKeyedService<NpgsqlDataSource>(OrvanoDb.App), ct);
+        if (sessions + keys + tokens > 0)
         {
             services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(AuthRetention))
-                .LogInformation("Deleted {Sessions} old session(s) and {Keys} retired signing key(s)", sessions, keys);
+                .LogInformation(
+                    "Deleted {Sessions} old session(s), {Keys} retired signing key(s), and {Tokens} expired email token(s)", sessions, keys, tokens);
         }
     }
 }

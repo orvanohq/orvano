@@ -47,10 +47,14 @@ import type {
 } from './models.js'
 import type {
   Client,
+  CreateUserRecoveryRequest,
   CreateUserRequest,
+  CreateUserVerificationRequest,
   RequestOptions,
   Session,
   SessionPage,
+  UpdateEmailVerificationRequest,
+  UpdateUserEmailRequest,
   User,
   UserPage,
 } from '@orvano/js'
@@ -850,6 +854,38 @@ export class ConsoleUsersService {
     )
   }
 
+  /** Emails a user a password reset link. Owners and developers. */
+  createRecovery(
+    userId: string,
+    body: CreateUserRecoveryRequest,
+    options?: RequestOptions,
+  ): Promise<void> {
+    return this.#client.request<undefined>(
+      {
+        method: 'POST',
+        path: `/v1/console/project/users/${encodeURIComponent(userId)}/recovery`,
+        body,
+      },
+      options,
+    )
+  }
+
+  /** Emails a user a link that verifies their email. Owners and developers. */
+  createVerification(
+    userId: string,
+    body: CreateUserVerificationRequest,
+    options?: RequestOptions,
+  ): Promise<void> {
+    return this.#client.request<undefined>(
+      {
+        method: 'POST',
+        path: `/v1/console/project/users/${encodeURIComponent(userId)}/verification`,
+        body,
+      },
+      options,
+    )
+  }
+
   /** Deletes a user with their password and sessions. It can't be undone. */
   delete(userId: string, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
@@ -895,6 +931,7 @@ export class ConsoleUsersService {
       status?: string | undefined
       createdAfter?: string | undefined
       createdBefore?: string | undefined
+      emailVerified?: boolean | undefined
       cursor?: string | undefined
       limit?: number | undefined
     },
@@ -913,6 +950,7 @@ export class ConsoleUsersService {
       status?: string | undefined
       createdAfter?: string | undefined
       createdBefore?: string | undefined
+      emailVerified?: boolean | undefined
       limit?: number | undefined
     },
     options?: RequestOptions,
@@ -951,6 +989,40 @@ export class ConsoleUsersService {
       {
         method: 'POST',
         path: `/v1/console/project/users/${encodeURIComponent(userId)}/unblock`,
+        idempotent: true,
+      },
+      options,
+    )
+  }
+
+  /** Changes a user's email at once, without a confirmation email. Owners and developers. */
+  updateEmail(
+    userId: string,
+    body: UpdateUserEmailRequest,
+    options?: RequestOptions,
+  ): Promise<User> {
+    return this.#client.request<User>(
+      {
+        method: 'PUT',
+        path: `/v1/console/project/users/${encodeURIComponent(userId)}/email`,
+        body,
+        idempotent: true,
+      },
+      options,
+    )
+  }
+
+  /** Marks a user's email verified or unverified. Owners and developers. */
+  updateEmailVerification(
+    userId: string,
+    body: UpdateEmailVerificationRequest,
+    options?: RequestOptions,
+  ): Promise<User> {
+    return this.#client.request<User>(
+      {
+        method: 'PUT',
+        path: `/v1/console/project/users/${encodeURIComponent(userId)}/email-verification`,
+        body,
         idempotent: true,
       },
       options,

@@ -92,6 +92,10 @@ interface ConsoleUsersApi {
     @query
     createdBefore?: utcDateTime,
 
+    @doc("Only verified users (true) or unverified users (false).")
+    @query
+    emailVerified?: boolean,
+
     @doc("The `nextCursor` of the previous page.")
     @query
     cursor?: string,
@@ -160,6 +164,68 @@ interface ConsoleUsersApi {
     @path
     userId: string,
   ): NoContentResponse | Problem;
+
+  @doc("Marks a user's email verified or unverified. Owners and developers.")
+  @operationId("consoleUsers.updateEmailVerification")
+  @extension("x-orvano-audience", "console")
+  @extension("x-orvano-service", "consoleUsers")
+  @extension("x-orvano-idempotent", true)
+  @route("/{userId}/email-verification")
+  @put
+  updateEmailVerification(
+    @doc("The user ID.")
+    @path
+    userId: string,
+
+    @body request: UpdateEmailVerificationRequest,
+  ): User | Problem;
+
+  @doc("Emails a user a link that verifies their email. Owners and developers.")
+  @operationId("consoleUsers.createVerification")
+  @extension("x-orvano-audience", "console")
+  @extension("x-orvano-service", "consoleUsers")
+  @route("/{userId}/verification")
+  @post
+  createVerification(
+    @doc("The user ID.")
+    @path
+    userId: string,
+
+    @body request: CreateUserVerificationRequest,
+  ): {
+    @statusCode statusCode: 202;
+  } | Problem;
+
+  @doc("Emails a user a password reset link. Owners and developers.")
+  @operationId("consoleUsers.createRecovery")
+  @extension("x-orvano-audience", "console")
+  @extension("x-orvano-service", "consoleUsers")
+  @route("/{userId}/recovery")
+  @post
+  createRecovery(
+    @doc("The user ID.")
+    @path
+    userId: string,
+
+    @body request: CreateUserRecoveryRequest,
+  ): {
+    @statusCode statusCode: 202;
+  } | Problem;
+
+  @doc("Changes a user's email at once, without a confirmation email. Owners and developers.")
+  @operationId("consoleUsers.updateEmail")
+  @extension("x-orvano-audience", "console")
+  @extension("x-orvano-service", "consoleUsers")
+  @extension("x-orvano-idempotent", true)
+  @route("/{userId}/email")
+  @put
+  updateEmail(
+    @doc("The user ID.")
+    @path
+    userId: string,
+
+    @body request: UpdateUserEmailRequest,
+  ): User | Problem;
 
   @doc("Lists a user's active sessions, newest first. `current` is always false.")
   @operationId("consoleUsers.listSessions")

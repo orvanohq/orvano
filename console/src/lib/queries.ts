@@ -194,12 +194,12 @@ export function projectQuery(projectId: string) {
 }
 
 /** A project's users, newest first, paged by cursor; `email` narrows to a prefix (spec 0004, AC-29). */
-export function usersQuery(projectId: string, email: string, limit = 25) {
+export function usersQuery(projectId: string, email: string, emailVerified?: boolean, limit = 25) {
   return infiniteQueryOptions({
-    queryKey: [...keys.users(projectId), { email, limit }] as const,
+    queryKey: [...keys.users(projectId), { email, emailVerified, limit }] as const,
     queryFn: ({ pageParam, signal }) =>
       projectClient(projectId).consoleUsers.list(
-        { email: email === '' ? undefined : email, cursor: pageParam, limit },
+        { email: email === '' ? undefined : email, emailVerified, cursor: pageParam, limit },
         { signal },
       ),
     initialPageParam: undefined as string | undefined,

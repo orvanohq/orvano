@@ -3596,6 +3596,16 @@
             "explode": false
           },
           {
+            "name": "emailVerified",
+            "in": "query",
+            "required": false,
+            "description": "Only verified users (true) or unverified users (false).",
+            "schema": {
+              "type": "boolean"
+            },
+            "explode": false
+          },
+          {
             "name": "cursor",
             "in": "query",
             "required": false,
@@ -3837,6 +3847,178 @@
         "x-orvano-audience": "console"
       }
     },
+    "/v1/console/project/users/{userId}/email": {
+      "put": {
+        "operationId": "consoleUsers.updateEmail",
+        "description": "Changes a user's email at once, without a confirmation email. Owners and developers.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserEmailRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/users/{userId}/email-verification": {
+      "put": {
+        "operationId": "consoleUsers.updateEmailVerification",
+        "description": "Marks a user's email verified or unverified. Owners and developers.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEmailVerificationRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/users/{userId}/recovery": {
+      "post": {
+        "operationId": "consoleUsers.createRecovery",
+        "description": "Emails a user a password reset link. Owners and developers.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The request has been accepted for processing, but processing has not yet completed."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRecoveryRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
     "/v1/console/project/users/{userId}/sessions": {
       "get": {
         "operationId": "consoleUsers.listSessions",
@@ -4044,6 +4226,58 @@
           }
         ],
         "x-orvano-idempotent": true,
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/users/{userId}/verification": {
+      "post": {
+        "operationId": "consoleUsers.createVerification",
+        "description": "Emails a user a link that verifies their email. Owners and developers.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The request has been accepted for processing, but processing has not yet completed."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserVerificationRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
         "x-orvano-service": "consoleUsers",
         "x-orvano-audience": "console"
       }
