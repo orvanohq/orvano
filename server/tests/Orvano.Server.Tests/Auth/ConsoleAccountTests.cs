@@ -80,6 +80,22 @@ public class ConsoleAccountTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task The_access_cookie_outlives_the_access_token_so_an_expired_token_is_refreshed_not_a_missing_cookie_signed_out()
+    {
+        await using var api = await StartAsync(publicUrl: "https://console.example.com");
+        using var http = api.Process.Http();
+        await SeedAdminAsync(http, "https://console.example.com");
+
+        using var signIn = await SendAsync(http, HttpMethod.Post, "/v1/console/account/session", new { email = "ADA@x.com", password = Password },
+            origin: "https://console.example.com");
+
+        // A browser deletes an expired cookie, and a request without one answers console_session_required, which the console never refreshes.
+        var access = Expires(SetCookie(signIn, OrvanoHeaders.ConsoleCookie));
+        Assert.InRange(access - DateTimeOffset.UtcNow, TimeSpan.FromDays(29), TimeSpan.FromDays(31));
+        Assert.Equal(Expires(SetCookie(signIn, OrvanoHeaders.ConsoleRefreshCookie)), access);
+    }
+
+    [Fact]
     public async Task Cookies_skip_Secure_only_when_the_public_url_is_http_localhost()
     {
         await using var api = await StartAsync();
@@ -276,6 +292,9 @@ public class ConsoleAccountTests(PostgresFixture postgres)
 
     private static string SetCookie(Reply reply, string name) =>
         reply.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith(name + "=", StringComparison.Ordinal));
+
+    private static DateTimeOffset Expires(string setCookie) => DateTimeOffset.Parse(
+        setCookie.Split(';').Single(part => part.Trim().StartsWith("expires=", StringComparison.OrdinalIgnoreCase)).Split('=', 2)[1].Trim());
 
     private static string Value(string setCookie) => setCookie.Split(';')[0].Split('=', 2)[1];
 

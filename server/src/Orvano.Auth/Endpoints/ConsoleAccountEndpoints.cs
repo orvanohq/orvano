@@ -112,14 +112,17 @@ internal static class ConsoleAccountEndpoints
 /// The console's two session cookies (AC-27): <c>orvano_console</c> (the access token, <c>Path=/</c>) and
 /// <c>orvano_console_refresh</c> (<c>Path=/v1/console/account/session</c>), both <c>HttpOnly</c>,
 /// <c>SameSite=Strict</c>, and host only. <c>Secure</c> is left off only when <c>ORVANO_PUBLIC_URL</c> is plain
-/// <c>http://localhost</c> (local development), where some browsers drop secure cookies.
+/// <c>http://localhost</c> (local development), where some browsers drop secure cookies. Both cookies expire with the
+/// session, not with the access token: a browser deletes an expired cookie, and a request with no cookie answers
+/// <c>console_session_required</c>, which the console client never refreshes. The token's own <c>exp</c> ends the
+/// access, so an expired one answers <c>token_expired</c> and the client refreshes.
 /// </summary>
 internal static class ConsoleCookies
 {
     public static void Set(HttpContext http, SessionTokensView session, PublicUrl publicUrl)
     {
         var secure = Secure(publicUrl);
-        http.Response.Cookies.Append(OrvanoHeaders.ConsoleCookie, session.AccessToken, Options("/", session.AccessTokenExpiresAt, secure));
+        http.Response.Cookies.Append(OrvanoHeaders.ConsoleCookie, session.AccessToken, Options("/", session.RefreshTokenExpiresAt, secure));
         http.Response.Cookies.Append(OrvanoHeaders.ConsoleRefreshCookie, session.RefreshToken,
             Options(OrvanoHeaders.ConsoleRefreshPath, session.RefreshTokenExpiresAt, secure));
     }
