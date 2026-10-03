@@ -23,17 +23,17 @@ void main() {
     await tester.enterText(find.byKey(const Key('Sign up name')), name);
     await tester.enterText(find.byKey(const Key('Sign up email')), email);
     await tester.enterText(find.byKey(const Key('Sign up password')), password);
-    await tester.tap(find.byKey(const Key('Sign up button')));
+    await tapVisible(tester, find.byKey(const Key('Sign up button')));
     await expectSignedIn(tester, name, email);
 
-    await tester.tap(find.text('Sign out'));
+    await tapVisible(tester, find.text('Sign out'));
     await settle(tester, find.byKey(const Key('Sign in button')));
     await tester.enterText(find.byKey(const Key('Sign in email')), email);
     await tester.enterText(find.byKey(const Key('Sign in password')), password);
-    await tester.tap(find.byKey(const Key('Sign in button')));
+    await tapVisible(tester, find.byKey(const Key('Sign in button')));
     await expectSignedIn(tester, name, email);
 
-    await tester.tap(find.text('Sign out'));
+    await tapVisible(tester, find.text('Sign out'));
     await settle(tester, find.byKey(const Key('Sign in button')));
   });
 }
@@ -46,6 +46,14 @@ Future<void> expectSignedIn(
   await settle(tester, find.text("You're signed in"));
   expect(find.text('Name: $name'), findsOneWidget);
   expect(find.text('Email: $email'), findsOneWidget);
+}
+
+/// Scrolls [finder] into view, then taps it: on a phone the Sign in form sits
+/// below the fold, the more so with the keyboard up, and a tap there misses.
+Future<void> tapVisible(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pump();
+  await tester.tap(finder);
 }
 
 /// Pumps until [finder] shows up, for at most 20 seconds: the calls go to a real
