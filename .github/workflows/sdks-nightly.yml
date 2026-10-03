@@ -105,16 +105,14 @@ jobs:
           # bootstatus -b boots it and returns only once it has finished booting; `simctl boot` returns before that.
           xcrun simctl bootstatus "$UDID" -b
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
-      # The app runs in about a minute once built; a run that hangs (it has, after `Xcode build done`) fails at the
-      # timeout instead of after six hours, and the last step prints the verbose log of where it stopped.
+      # The app runs in about a minute once built; a run that hangs (it has, after installing the app) fails at the
+      # timeout instead of after six hours, and its verbose log shows where it stopped.
       - name: Run the scenarios
         timeout-minutes: 30
         working-directory: tests/scenarios/runners/flutter
         run: |
           dart run tool/copy_scenarios.dart
-          flutter test integration_test -d ${{ steps.simulator.outputs.udid }} --dart-define=ORVANO_ENDPOINT=http://localhost:8080 \
-            --verbose > "$RUNNER_TEMP/flutter-scenarios.log" 2>&1
-          grep -E '(passed|failed|skipped)  ' "$RUNNER_TEMP/flutter-scenarios.log" || true
+          flutter test integration_test -d ${{ steps.simulator.outputs.udid }} --dart-define=ORVANO_ENDPOINT=http://localhost:8080 --verbose
       # The quickstart app's own integration test, against this job's stack and its fixture project. Native apps send
       # no Origin, so the project needs no platform for them to call it.
       - name: Flutter quickstart on iOS
@@ -127,9 +125,7 @@ jobs:
           flutter test integration_test -d ${{ steps.simulator.outputs.udid }} \
             --dart-define=ORVANO_ENDPOINT=http://localhost:8080 --dart-define=ORVANO_PROJECT=scenarios0000000000a
       - if: failure()
-        run: |
-          tail -n 300 "$RUNNER_TEMP/flutter-scenarios.log" || true
-          cat "$RUNNER_TEMP/api.log" "$RUNNER_TEMP/worker.log" "$RUNNER_TEMP/pg.log" || true
+        run: cat "$RUNNER_TEMP/api.log" "$RUNNER_TEMP/worker.log" "$RUNNER_TEMP/pg.log" || true
 
   flutter-android-quickstart:
     name: Flutter quickstart on Android
