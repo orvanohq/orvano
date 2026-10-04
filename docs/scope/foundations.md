@@ -59,7 +59,7 @@ Visual language, layout, and base components for the console, plus the empty she
 - [x] Test it: `/test design system & console shell`
 Spec [0005](../specs/0005-console-design-system-shell/index.md) · code in `console/`, `deploy/gateway/Caddyfile`, `dev/Orvano.AppHost/`, `tests/scenarios/compose.yml`
 
-### 6. Self host installer · in-progress
+### 6. Self host installer · done
 A one command install on a single server that sets secrets, pulls containers, and starts Orvano. Designed so later versions upgrade in place.
 **Done when:** on a clean Linux server, one command brings up a working Orvano reachable at your domain, and running it again is safe.
 - [x] Design it (spec): `/architect self host installer`
@@ -68,6 +68,6 @@ A one command install on a single server that sets secrets, pulls containers, an
    - [x] Interactive and preflight depth: prompts, domain and email checks, DNS check, Docker install offer, warnings, master key confirmation, the gateway's ACME email and HSTS (AC-1 to 7, 15, 18, 26, 28)
    - [x] First admin gate: setup token on the server, `consoleInstall.getSetup`, `setup-status`, then the console `/setup` route and sign in notice once console sign up exists (AC-19 to 24)
    - [x] Publishing: images to GHCR, the GitHub Release with `install.sh` and its checksum, the README install section (AC-1, 29)
-- [ ] Verify it: `/check verify self host installer`
+- [x] Verify it: `/check verify self host installer`
 - [x] Test it: `/test self host installer`
 Spec [0006](../specs/0006-self-host-installer/index.md) · code in `deploy/`, `server/src/Orvano.Server/`, `server/src/Orvano.Platform/`, `contract/platform/install.tsp`, `console/`, `.github/workflows/`

@@ -56,7 +56,7 @@ Run the host steps on a throwaway Linux server or VM (Ubuntu 24.04), or in a `do
 
 ## Release
 - [x] Run `release.yml` by hand (always a dry run) → both images build for amd64 and arm64, `install.sh` stamped with `<V>` and its `.sha256` uploaded as an artifact, nothing pushed → AC-29
-- [ ] After the first real release: `releases/latest/download/install.sh` serves the stamped script and `sha256sum -c install.sh.sha256` passes → AC-1, AC-29
+- [x] After the first real release: `releases/latest/download/install.sh` serves the stamped script and `sha256sum -c install.sh.sha256` passes → AC-1, AC-29
 
 ## Value sourcing
 - [x] Rerun with a different server memory (or edit `/proc/meminfo` in a test) → Postgres values follow `MemTotal`; exactly 4096 MiB gives `512MB, 1536MB, 8MB, 128MB, 1280M` → Postgres values
