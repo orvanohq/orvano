@@ -1,7 +1,7 @@
 # 0011. Docs site at orvano.dev with five tested quickstarts
 
 **Date**: 2026-10-02
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 

@@ -37,12 +37,14 @@ jobs:
         env:
           ORVANO_SITE_ENV: preview
       # Links back to orvano.dev are the site's own (the build checks them); the edit links point at files of this
-      # checkout; localhost and example hosts are the reader's own machine and placeholders.
+      # checkout; localhost and example hosts are the reader's own machine and placeholders. `--root-dir` lets lychee
+      # resolve the site's own `/docs/...` links to files, which `--scheme` then skips; without it each one is an error.
       - id: lychee
         uses: lycheeverse/lychee-action@v2
         with:
           args: >-
             --no-progress
+            --root-dir ${{ github.workspace }}/website/dist
             --scheme https --scheme http
             --max-retries 3
             --accept 200..=299,429

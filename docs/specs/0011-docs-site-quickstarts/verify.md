@@ -1,4 +1,4 @@
-# Verify: Docs site & quickstarts · spec 0011 · updated 2026-10-02 (milestone 4)
+# Verify: Docs site & quickstarts · spec 0011 · updated 2026-10-04 (milestone 5, the release)
 _Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones. Covers milestones 1 (local stack), 2 (thin thread), 3 (remaining quickstarts and the generated reference), and 4 (content); later milestones append here._
 
 ## Commands
@@ -90,9 +90,16 @@ _Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `
 - [x] Install command: change `VERSION`, rebuild → Install on a server, Upgrade and repair, and every SDK install command follow it (`releases/download/v<new>/install.sh`, `@orvano/js@<new>`) → install and image command version
 - [x] Changelog entries: the Changelog page shows `CHANGELOG.md` and nothing else → changelog page entries
 
+## Release (milestone 5, v0.2.0 on 2026-10-04)
+- [x] Push `v0.2.0` → `release.yml` publishes npm, NuGet, and the images, skips pub.dev (uploaded by hand first), and `Examples from the registries` builds all five quickstarts from npm, pub.dev, and NuGet at 0.2.0 before `Deploy orvano.dev` waits for approval in `website-production` → AC-25
+- [x] `https://orvano.dev/docs/` answers 200 with `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, HSTS, and the CSP with its script hashes; the page shows `v0.2.0`, loads the beacon, and has no `noindex` → AC-23, AC-24
+- [x] `https://www.orvano.dev/docs/` answers 301 to `https://orvano.dev/docs/`; an unknown path and an unknown `/errors/<code>` answer 404 with the 404 page, the second linking to `/errors/` → AC-23
+- [x] With no GitHub credentials, `docker run ghcr.io/orvanohq/orvano:0.2.0 install --local --yes` then `docker compose up -d --wait` → healthy, `/v1/health` answers version 0.2.0 → AC-1, AC-2, AC-8
+- [ ] A manual run of `links.yml` checks every external link and opens, updates, or closes its one issue → AC-22
+
 ## Acceptance-criteria coverage
 - AC-1 to AC-4: the Commands steps above, plus `LocalInstallTests`, `InstallSmtpSeedRuleTests`, and `InstallSmtpSeedTests`
 - AC-5 to AC-11, AC-13, AC-14, AC-18, AC-19, AC-21, AC-24 (noindex part), AC-26, AC-27: the steps above
 - AC-9 to AC-12, AC-14 to AC-20: the milestone 3 steps above, plus `ManifestStamperTests`
 - AC-5 (llms.txt, Markdown copies), AC-6, AC-21, AC-28 to AC-30: the milestone 4 steps above
-- AC-22, AC-23, AC-25: later milestones
+- AC-22, AC-23, AC-25: the release steps above
