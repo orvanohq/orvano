@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-04
+
+The first published release: the server images, `install.sh`, the five SDKs on npm, pub.dev, and NuGet, and the docs at orvano.dev.
+
 ### Added
 - Email and password sign up and sign in for every project's users. Each sign in opens its own session, and a user can hold many at once (see spec 0004).
 - Sessions with two tokens: an access token that any server can check on its own (an ES256 JWT, valid for 15 minutes) and a refresh token that is replaced every time it is used. Reusing an old refresh token ends the session. Sessions end after 30 idle days, or 365 days at most.

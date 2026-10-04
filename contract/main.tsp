@@ -34,6 +34,6 @@ using Http;
 using OpenAPI;
 
 @service(#{ title: "Orvano" })
-@info(#{ version: "0.0.0" })
+@info(#{ version: "0.2.0" })
 @doc("The Orvano API. Every path lives under /v1.")
 namespace Orvano;

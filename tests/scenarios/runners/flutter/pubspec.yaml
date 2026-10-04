@@ -10,9 +10,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  orvano_core: ^0.0.0
-  orvano_dart: ^0.0.0
-  orvano_flutter: ^0.0.0
+  orvano_core: ^0.2.0
+  orvano_dart: ^0.2.0
+  orvano_flutter: ^0.2.0
   orvano_scenarios: ^0.0.0
 
 dev_dependencies:

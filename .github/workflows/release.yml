@@ -126,14 +126,25 @@ jobs:
           echo "::add-mask::$token"
           echo "PUB_TOKEN=$token" >> "$GITHUB_ENV"
           dart pub token add https://pub.dev --env-var PUB_TOKEN
-      # orvano_core first: the other two depend on it.
+      # orvano_core first: the other two depend on it. A version already on pub.dev is skipped, as pnpm and NuGet skip
+      # theirs: a brand new package's first version is uploaded by hand (pub.dev allows GitHub publishing only for a
+      # package that exists), and a rerun after a partial release must not fail on what already went out.
       - name: Publish
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
         run: |
           flag=--force
           if [ "$DRY_RUN" = true ]; then flag=--dry-run; fi
-          (cd sdks/dart/core && dart pub publish $flag)
-          (cd sdks/dart/server && dart pub publish $flag)
-          (cd sdks/dart/flutter && flutter pub publish $flag)
+          publish() {
+            if curl -sf -o /dev/null "https://pub.dev/api/packages/$1/versions/$VERSION"; then
+              echo "$1 $VERSION is already on pub.dev; skipping it."
+            else
+              (cd "$2" && $3 pub publish $flag)
+            fi
+          }
+          publish orvano_core sdks/dart/core dart
+          publish orvano_dart sdks/dart/server dart
+          publish orvano_flutter sdks/dart/flutter flutter
 
   nuget:
     name: Publish to NuGet

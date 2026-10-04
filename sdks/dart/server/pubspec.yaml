@@ -3,7 +3,7 @@ description: >-
   The Orvano SDK for Dart servers, CLIs, and backend code. It carries the
   server and both operations of Orvano, the open source backend you host
   yourself.
-version: 0.0.0
+version: 0.2.0
 homepage: https://orvano.dev
 repository: https://github.com/orvanohq/orvano-dart
 
@@ -15,7 +15,7 @@ environment:
 dependencies:
   clock: ^1.1.2
   dart_jsonwebtoken: ^3.4.1
-  orvano_core: ^0.0.0
+  orvano_core: ^0.2.0
 
 dev_dependencies:
   http: ^1.6.0

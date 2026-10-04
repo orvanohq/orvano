@@ -2,7 +2,7 @@ name: orvano_flutter
 description: >-
   Orvano for Flutter apps on iOS, Android, and the web, built on orvano_core.
   Orvano is the open source backend you host yourself.
-version: 0.0.0
+version: 0.2.0
 homepage: https://orvano.dev
 repository: https://github.com/orvanohq/orvano-dart
 
@@ -17,7 +17,7 @@ dependencies:
     sdk: flutter
   flutter_secure_storage: ^11.2.0
   http: ^1.6.0
-  orvano_core: ^0.0.0
+  orvano_core: ^0.2.0
 
 dev_dependencies:
   flutter_test:

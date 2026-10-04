@@ -1,11 +1,12 @@
 {
   "name": "@orvano/nextjs",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "description": "Orvano for Next.js: server components, route handlers, server actions, and middleware.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/orvanohq/orvano-js.git"
+    "url": "git+https://github.com/orvanohq/orvano.git",
+    "directory": "sdks/nextjs"
   },
   "type": "module",
   "sideEffects": false,
