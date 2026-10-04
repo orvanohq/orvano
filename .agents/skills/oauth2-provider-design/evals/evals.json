@@ -1,0 +1,536 @@
+{
+  "skill_name": "oauth2-provider-design",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm the platform lead at Tessaract Cloud, a B2B log-analytics SaaS. We're building \"Connect with Tessaract\" so third-party apps can pull a customer's dashboards, plus a `tsq` CLI our users run on headless build servers with no browser. Greenfield, nothing built yet. Our security review doc has to name the specification we conform to and legal wants the RFC number in writing. Separately, our frontend team wants the redirect URI to accept `https://*.preview.acme-partner.dev` so partner preview deployments keep working, and asked whether the access token can just ride in the query string for their SPA since the Authorization header is awkward in their fetch wrapper. Give me the grant list, the redirect rules, and what to write in the doc.",
+      "expected_output": "A protocol-core design naming the four grants to implement (authorization_code + PKCE S256 for every client, client_credentials, refresh_token, device_authorization), exact redirect-URI matching with the localhost-port carve-out, a refusal of the query-string token, code single-use/10-minute limits, and a precise statement of what is actually citable as a ratified document.",
+      "files": [],
+      "expectations": [
+        "States that RFC 9700 (BCP 240, January 2025) is final and ratified, and is the document the security doc can cite as published.",
+        "States that the consolidated OAuth 2.1 document (draft-ietf-oauth-v2-1) is still a draft, and never describes OAuth 2.1 itself as a published RFC.",
+        "Advises confirming the OAuth 2.1 draft's current publication status before citing it.",
+        "Recommends the grant list authorization_code, client_credentials, refresh_token, and device_authorization (RFC 8628).",
+        "Names the RFC 8628 device authorization grant specifically as the answer for the browserless `tsq` CLI.",
+        "Requires PKCE with S256 for every client, confidential clients included, not only public ones.",
+        "Excludes both the implicit grant and the resource-owner password credentials grant from the design.",
+        "Rejects the `https://*.preview.acme-partner.dev` wildcard redirect and requires exact string matching of redirect URIs.",
+        "Names the port number in native-app localhost redirects as the single standard exception to exact matching.",
+        "Justifies exact matching by pattern-matching implementations being error-prone with attacks observed in the wild, per RFC 9700.",
+        "Refuses the query-string access token and restricts bearer tokens to the Authorization header or the POST body.",
+        "Specifies authorization codes as single-use with a maximum lifetime of 10 minutes."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Northwind Signal, B2B customer-messaging SaaS. I need to write our token policy before the security team reviews it Friday. Three client kinds today: a React SPA our own customers embed in their admin panel, server-side integrations built by partners that hold a client secret, and a Python worker one large customer runs on their own infrastructure. Our infra lead wants every token SHA-256 hashed in the database and I agree with him. I've read that refresh tokens should rotate on every use and that presenting a used one should kill the session. Give me concrete TTLs and rotation rules per client kind, and tell me what the storage layer has to support.",
+      "expected_output": "Per-client-kind TTL and rotation policy: ~1h access tokens, rotation with token-family reuse detection plus a short grace window as the default, a much harder refresh lifetime cap for the SPA, the confidential-client carve-out for the partner backends, and an explicit resolution of the hash-at-rest versus grace-window storage tension.",
+      "files": [],
+      "expectations": [
+        "Sets access-token TTL at roughly 1 hour and identifies ~1 hour as the cross-provider convergence point rather than an invented number.",
+        "Makes refresh-token rotation with token-family reuse detection the default posture.",
+        "States that a reused refresh token revokes the entire token family, not only the token presented.",
+        "Requires a reuse grace window from day one, with a starting value in the range of roughly 10 to 30 seconds.",
+        "Justifies the grace window by legitimate concurrent refreshes (multi-tab SPAs, retries, reconnects) otherwise reading as attacks and logging real users out.",
+        "Names the tension between hashing refresh tokens at rest and having to recognize a just-consumed token inside the grace window.",
+        "Resolves that tension deliberately (for example by retaining the predecessor's hash with a validity timestamp) instead of abandoning hash-at-rest.",
+        "Caps the SPA's refresh-token lifetime far harder than the others, citing something like a 24-hour SPA lifetime against ~90-day inactivity elsewhere.",
+        "Treats the partner server-side clients as confidential clients whose client authentication already sender-constrains redemption, making non-rotating refresh tokens defensible there.",
+        "States that OAuth 2.1 mandates sender-constrained or rotated refresh tokens specifically for public clients.",
+        "Rules out an indefinitely reusable refresh token for the public SPA client entirely, rather than offering it as a weaker option.",
+        "Ties JWT access-token TTL to the fact that a JWT cannot be revoked mid-lifetime the way an opaque database-backed token can."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Kestrel HR, an HRIS for mid-market companies, about 450 customers. We store employee directory and time-off data only, no payments and no health records. We're opening a partner app directory in roughly eight weeks. Our new CISO wants DPoP sender-constrained tokens on everything before launch because, quoting him, \"bearer tokens are a solved problem and we should be ahead of the curve.\" We run an authorization server we wrote ourselves in Node. Our partners are mostly small ATS and payroll vendors using off-the-shelf OAuth client libraries. Is that the right call, and what do we ship instead if not?",
+      "expected_output": "A recommendation against DPoP as the launch baseline for this platform, with rotation plus reuse detection shipped instead, the ecosystem-support evidence behind the call, the named conditions that would reverse it, and an explicit note that runtime cost is not the argument.",
+      "files": [],
+      "expectations": [
+        "Recommends against making DPoP the launch baseline for this platform.",
+        "Recommends rotation with token-family reuse detection as what ships instead.",
+        "Cites the issuer-survey evidence that zero of 18 surveyed mainstream issuers with a working discovery document advertised DPoP support.",
+        "Identifies absent client-library and ecosystem support, not performance, as the blocker.",
+        "States that DPoP's runtime cost is small (roughly single-digit milliseconds per request), so performance is not the argument against it.",
+        "Names the conditions that would promote DPoP: tokens guarding financial or health data, FAPI-adjacent sensitivity, or long-lived AI-agent tokens widening the theft blast radius.",
+        "Applies those conditions to the stated data sensitivity (employee directory and time-off, no payments or health records) and concludes they are not met.",
+        "Places DPoP in an advanced-hardening stage rather than in the protocol core.",
+        "Acknowledges DPoP is production-viable at scale (for example Bluesky's mandatory deployment), so the objection is ecosystem readiness rather than feasibility.",
+        "States the ranking is a default that flips if the build substrate ships DPoP as configuration rather than custom work.",
+        "Never claims DPoP is required by OAuth 2.1."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Orrery, B2B project-management SaaS. Today every OAuth app gets one scope, `full_access`, and roughly 120 apps hold it. We want to fix that. The plan: keep the string `full_access` but redefine it to mean read-only, then add `full_write` for the apps that need mutations. That way we don't have to touch the 120 existing registrations. We also have two token flavours, apps posting as themselves (we call those \"integrations\") and apps acting as a signed-in person, and we figured we'd sort out which scopes belong to which flavour after we see how people actually use them. Our API resources are `projects`, `tasks`, `comments`, and `timesheets`. Draft the taxonomy.",
+      "expected_output": "A resource:action taxonomy with read/write split over the four existing resource nouns, an explicit refusal to redefine `full_access`, per-scope token-type binding decided now rather than later, and the broad catch-all scope removed rather than retained as a coarse tier.",
+      "files": [],
+      "expectations": [
+        "Rejects redefining `full_access` and states scopes are additive-only, never repurposed.",
+        "Explains that repurposing silently changes what already-granted consents authorize.",
+        "Notes that scope-set changes invalidate refresh tokens and force re-consent, so the redefinition does not actually avoid touching the existing registrations.",
+        "Rejects deferring the token-type binding and requires every scope bound to a token type (app identity versus user delegation) on day one.",
+        "States the documented cost of deferring it: changing a scope's token-type binding later requires reauthorization from every user.",
+        "Recommends `resource:action` naming as the default granularity rung.",
+        "Requires a read/write split with read-only as the default.",
+        "Names scopes after the same resource nouns the API already uses (`projects`, `tasks`, `comments`, `timesheets`).",
+        "Treats the single broad catch-all scope as a deleted anti-pattern rather than a coarse tier worth keeping in the menu.",
+        "Positions fine-grained per-resource permissions as the starved option, promoted only on named conditions such as admin approval policies, a compliance regime, or scopes reaching org-wide data.",
+        "Warns that a migration to fine-grained permissions is lossy in edge-case coverage, so the coarser tier stays alive during the transition instead of a hard cutover.",
+        "Accepts scope proliferation where resource types genuinely differ in sensitivity instead of collapsing them for tidiness."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Marlowe Analytics. Our install funnel is bleeding: workspace admins reject roughly a third of install requests and we can't tell why. The current consent screen shows three grouped headers (\"Read access\", \"Write access\", \"Admin\") with the raw scope strings listed underneath each, and it's all-or-nothing, approve everything or cancel. Our VP of Product is presenting to the board Thursday and asked me for the industry figure on how much conversion an over-scoped consent screen costs you. I've seen 50% quoted somewhere. Redesign the screen and give me the number for the deck.",
+      "expected_output": "A consent-screen redesign built on per-scope plain-language copy, partial grants with a server-side diff, and incremental authorization showing only the delta, plus an explicit refusal to supply the requested drop-off percentage and an explanation of why no such measured figure exists.",
+      "files": [],
+      "expectations": [
+        "Refuses to supply a consent drop-off conversion figure as measured fact.",
+        "States that no rigorous public study of consent-screen conversion exists and that circulating percentages trace to vendor blog posts rather than measurements.",
+        "Addresses the specific 50% figure the user raised instead of silently omitting it.",
+        "Argues the redesign on security and UX grounds rather than on a conversion number.",
+        "Replaces the grouped buckets with one plain-language sentence per individual scope.",
+        "Forbids showing the raw scope string to the user.",
+        "Replaces all-or-nothing consent with support for partial grants.",
+        "Requires the server to diff the granted scope set against the requested one on every authorization response.",
+        "Warns that the granted set can differ from the requested set even when the user appears to approve everything, and that assuming they match ships a silent capability mismatch into every integrating app.",
+        "Recommends incremental authorization, requesting a scope when the feature needs it rather than upfront.",
+        "Requires the re-consent screen to show only the net-new scope rather than re-displaying everything already granted."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Verity Ops. We're shipping a remote MCP server so agents can query our incident data, and we are the authorization server behind it. The MCP folks on my team want RFC 7591 dynamic client registration wide open at `/register` so any agent can self-register with no human in the loop. That's what the spec pointed at when we started and it's the only way agents discover us at runtime anyway. We'd validate the metadata they submit (client name, logo URI, redirect URIs) and rate-limit the endpoint hard. Sound design?",
+      "expected_output": "A rejection of open DCR in favour of gated DCR behind an initial access token with untrusted-metadata handling, correcting the user's belief about the MCP spec's current position, plus manual portal registration with review as the default for every non-agent client.",
+      "files": [],
+      "expectations": [
+        "Rejects open, ungated dynamic client registration outright rather than accepting it with mitigations.",
+        "Recommends gated DCR instead: RFC 7591 behind an initial access token, rate-limited.",
+        "Requires all submitted registration metadata to be treated as untrusted input.",
+        "Warns that self-asserted metadata such as client name and logo can impersonate a legitimate app unless cryptographically attested, making an open endpoint a phishing vector.",
+        "Cites the finding that a study of 119 OAuth-enabled remote MCP servers found DCR flaws in roughly 96-97% of them.",
+        "States that the MCP specification moved DCR from SHOULD to MAY to deprecated across its revisions, correcting the user's belief that the spec points at open DCR.",
+        "Confirms that an MCP/AI-agent ecosystem is the one client population that legitimately justifies DCR at all, since those clients cannot pre-register.",
+        "States that rate limiting plus metadata validation alone do not make an open registration endpoint acceptable.",
+        "Notes that no major B2B SaaS platform offers ungated public dynamic client registration.",
+        "Names manual developer-portal registration with a review step as the default posture for every client population outside the agent case."
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Ledgerline, B2B spend-management SaaS. We're opening an integrations directory with about 60 apps at launch. The plan so far: one \"Verified\" badge shown on every listing, earned by filling in a security questionnaire once at submission, same bar for every app because we don't want to look like we play favourites. Some of these apps will read a customer's entire vendor list and every employee's expense reports, not just the installing admin's own records. Unverified apps get a warning banner on the install screen. Sign off on this or tell me what's wrong with it.",
+      "expected_output": "A tiered verification program replacing the single uniform bar: identity verification as the floor, self-attestation as the middle rung, mandatory third-party assessment triggered by scopes reaching other users' data, three visually distinct signals instead of one badge, a real enforced unverified lane, and runtime subset-of-declared enforcement.",
+      "files": [],
+      "expectations": [
+        "Rejects one uniform review bar and requires review depth scaled to data sensitivity.",
+        "Names the bright line: the moment a scope reaches other users' data or PII rather than only the requesting user's own, mandatory independent third-party security assessment applies.",
+        "Applies that line to the described apps (full vendor list, every employee's expense reports) and places them above the questionnaire tier.",
+        "Rejects one 'Verified' badge conflating identity verification, self-attestation, and independent audit, and requires the signals to stay visually distinct on the listing surface.",
+        "States that publisher identity verification proves continuity of identity, not quality.",
+        "Recommends publisher identity verification (verified domain plus verified partner account, no fee) as the default rung for every listed app.",
+        "Places self-attestation as the middle rung and states it is explicitly not independently verified by the platform.",
+        "States that the developer, not the platform, pays the third-party assessor fee.",
+        "Notes the full manual pentest tier costs roughly an order of magnitude more than the automated scan tier.",
+        "Requires the assessment to recur on an annual / 12-month cadence rather than being one-time at submission.",
+        "Rejects a warning banner as the entire unverified lane and requires a hard enforced ceiling, such as a lifetime cap on test users plus short-lived test tokens.",
+        "Requires runtime enforcement that any requested scope is a subset of what was declared and approved at registration, because declarations drift."
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Chatterbox Systems, nine-year-old B2B SaaS. Live today: the implicit grant (our own dashboard uses it), resource-owner password credentials for an old iOS app that roughly 400 customers still run, redirect matching by prefix, refresh tokens that never expire and never rotate, about 3,100 registered third-party apps, and one scope tier. A large enterprise customer's security team has given us seven months to \"be OAuth 2.1 compliant\" or they churn. My instinct is one big cutover release. Tell me how to sequence this and how we prove compliance to their auditor.",
+      "expected_output": "A staged retrofit sequence rather than a cutover, with compliance modelled as independently toggleable per-requirement gates, the banned grants and prefix matching removed first, the rotation rollout re-ranked against 3,100 live integrations, and the token-family relationship designed into newly issued grants.",
+      "files": [],
+      "expectations": [
+        "Rejects the single big-cutover release in favour of a staged sequence.",
+        "Gives the build order: protocol core first, then scope taxonomy and consent screen, then registration and verification, then advanced hardening.",
+        "Recommends modelling compliance as separately named, independently toggleable boolean gates per requirement (PKCE enforcement, exact redirect matching, rotation, and so on) rather than a single 'OAuth 2.1 mode' flag.",
+        "Justifies the per-requirement gates by auditability: a partial rollout can point at exactly which requirements are and are not enforced yet.",
+        "Requires removing the implicit grant and the resource-owner password grant, migrating the dashboard and the iOS app to authorization_code with PKCE.",
+        "Replaces prefix redirect matching with exact string matching.",
+        "States that a non-rotating, never-expiring refresh token held by a public client is banned under OAuth 2.1, not merely a weaker option.",
+        "Notes that 3,100 live integrations shift the effort ranking, so the rotation rollout is re-ranked against the retrofit scale instead of applying the greenfield default unexamined.",
+        "Requires designing the refresh-token family relationship into newly issued grants, noting that retrofitting family grouping onto an already-issued ungrouped population is materially harder.",
+        "Cites the forced-retrofit precedent: a 2025 OAuth-token campaign against a connected app hit more than 700 organizations and led a major platform to mandate PKCE and refresh-token rotation on all connected apps, with de-listing as the penalty.",
+        "States that what the auditor gets shown is a discovery document plus a conformance pass verified by test, not an assertion of compliance."
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Palisade Grid. Launch of our authorization server is in five weeks and I need two things from you. First, the go/no-go checklist QA signs off before we ship. Second, the four or five dashboard metrics we watch afterwards, with the industry benchmark next to each one so the on-call engineer knows when a number is off. Our stack: refresh rotation with reuse detection, granular consent, an app review queue, and roughly 30 launch partners.",
+      "expected_output": "A gate checklist verified by test (conformance pass, staging reuse-detection demo, concurrent-refresh test, partial-grant integration test, per-scope consent copy, tier classification and runtime subset enforcement), plus named trends to baseline from launch and an explicit refusal to attach industry benchmark numbers.",
+      "files": [],
+      "expectations": [
+        "States that no industry thresholds exist for these metrics and declines to attach benchmark numbers to them.",
+        "Prescribes baselining the metrics as trends from launch instead of comparing against an external benchmark.",
+        "Names median app-review turnaround as a trend to baseline.",
+        "Names the share of apps requesting scopes their traffic never uses as a trend to baseline.",
+        "Names reuse-detection trip rate as a trend to baseline.",
+        "States that reuse-detection trip rate is ambiguous, proxying both real attacks and a grace window set too tight.",
+        "Requires a gate proving by test, not assertion, that the discovery document and a conformance pass show no implicit or password grant, PKCE rejected-if-absent for every client, and exact redirect matching.",
+        "Requires a staging demonstration that a replayed refresh token revokes the whole family.",
+        "Requires a concurrent-refresh test that passes without a false-positive logout.",
+        "Requires a gate that every scope has per-scope plain-language consent copy and that a partial-grant integration test exercises the server-side diff.",
+        "Requires gates that every scope is classified into a verification tier with a named review requirement, that runtime subset-of-approved enforcement is live, and that the unverified-lane cap is enforced rather than merely documented."
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Hollowpine, B2B knowledge-base SaaS sold per workspace. Our OAuth design assumes exactly one person clicks Allow: the individual who installs the app. We're moving upmarket and the last three enterprise deals all asked how their IT team controls which apps employees can connect. We also want to ship \"workspace bots\" that read and post as themselves with no human behind them. What changes in the design?",
+      "expected_output": "A two-consent-surface design: end-user consent plus an org-admin approval and org-wide grant review surface built into the scope and consent work, an app-identity permission tier that only an admin can consent to, and per-scope token-type binding for the bot versus user case.",
+      "files": [],
+      "expectations": [
+        "States that B2B org-owned workspaces have two consent surfaces, the end user's and an org admin's, not one.",
+        "Requires an admin approval gate (approval queue or admin-approved apps) designed as a first-class part of the scope and consent work rather than bolted on when the first enterprise customer asks.",
+        "Includes org-wide grant review as part of the admin surface.",
+        "Introduces an app-identity permission tier for the workspace bots, distinct from user-delegated permissions.",
+        "States that app-identity / application permissions can only ever be consented by an admin, never by an end user.",
+        "Notes the protocol core, token lifecycle, and consent-copy rules stay identical to the B2C case, so only the approval topology and the app-identity tier change.",
+        "States that over-scoping is a conversion risk at the admin gate, which the end user's approval cannot pass on the app's behalf.",
+        "Binds each scope to a token type (bot/app identity versus user) rather than reusing one scope name across both undeclared.",
+        "Warns that the same scope name means different things on a bot token and on a user token, so the binding must be decided per scope up front."
+      ]
+    }
+  ],
+  "trigger_queries": [
+    {
+      "query": "design the OAuth provider side of our new third-party app directory",
+      "should_trigger": true
+    },
+    {
+      "query": "we're adding \"Sign in with Loomis\" to our product - what do we actually have to build",
+      "should_trigger": true
+    },
+    {
+      "query": "how long should our access tokens live and should refresh tokens rotate",
+      "should_trigger": true
+    },
+    {
+      "query": "define the scope taxonomy for our public API's OAuth apps",
+      "should_trigger": true
+    },
+    {
+      "query": "we only have one full_access scope and it's starting to scare me",
+      "should_trigger": true
+    },
+    {
+      "query": "our consent screen is a wall of scary permissions and admins keep rejecting installs",
+      "should_trigger": true
+    },
+    { "query": "should we support dynamic client registration", "should_trigger": true },
+    {
+      "query": "design the app verification program before we open the integrations directory",
+      "should_trigger": true
+    },
+    {
+      "query": "do we need PKCE for our confidential clients too or just the public ones",
+      "should_trigger": true
+    },
+    {
+      "query": "what should the lifetime of an authorization code be on our server",
+      "should_trigger": true
+    },
+    {
+      "query": "third-party apps need to act on behalf of our customers - how do we let them do that safely",
+      "should_trigger": true
+    },
+    { "query": "should we implement DPoP", "should_trigger": true },
+    {
+      "query": "we're building an authorization server - which grant types do we support",
+      "should_trigger": true
+    },
+    {
+      "query": "partners keep asking for an API that acts as the logged-in user, not a service account",
+      "should_trigger": true
+    },
+    { "query": "help me write the refresh token rotation policy", "should_trigger": true },
+    {
+      "query": "what should happen on our side if someone replays a refresh token we already consumed",
+      "should_trigger": true
+    },
+    {
+      "query": "we want apps to ask for fewer permissions up front and more later as features need them",
+      "should_trigger": true
+    },
+    {
+      "query": "our users get logged out when they have two tabs open since we turned on token rotation",
+      "should_trigger": true
+    },
+    {
+      "query": "can we let apps register a redirect URI with a wildcard subdomain",
+      "should_trigger": true
+    },
+    {
+      "query": "how do other platforms decide which apps earn a verified badge",
+      "should_trigger": true
+    },
+    {
+      "query": "we need an admin approval flow before employees can connect apps to their workspace",
+      "should_trigger": true
+    },
+    {
+      "query": "design the permissions model for the apps listed on our platform",
+      "should_trigger": true
+    },
+    {
+      "query": "our bot tokens and user tokens share scope names and it's getting confusing",
+      "should_trigger": true
+    },
+    {
+      "query": "planning the connect-your-account flow for partners building on top of us",
+      "should_trigger": true
+    },
+    {
+      "query": "is it ok to reuse an existing scope name for a slightly different meaning",
+      "should_trigger": true
+    },
+    {
+      "query": "we're shipping a remote MCP server and we're the auth server behind it - how do agents get tokens",
+      "should_trigger": true
+    },
+    { "query": "what exactly do we put on the consent screen", "should_trigger": true },
+    {
+      "query": "an enterprise customer wants us to be OAuth 2.1 compliant within six months",
+      "should_trigger": true
+    },
+    {
+      "query": "how do we make sure a leaked token from one integration isn't a company-ending event",
+      "should_trigger": true
+    },
+    { "query": "review our authorization server design before we ship it", "should_trigger": true },
+    {
+      "query": "we're the identity provider for our own ecosystem now - what's the checklist",
+      "should_trigger": true
+    },
+    {
+      "query": "how should we tier app reviews by how sensitive the data an app can reach is",
+      "should_trigger": true
+    },
+    {
+      "query": "what should happen when a user only approves some of the permissions we asked for",
+      "should_trigger": true
+    },
+    {
+      "query": "should the refresh token for our browser app live as long as the one for a backend integration",
+      "should_trigger": true
+    },
+    {
+      "query": "our CLI runs on headless servers with no browser - how do users authorize it",
+      "should_trigger": true
+    },
+    { "query": "write the token policy document for our platform", "should_trigger": true },
+    {
+      "query": "how many refresh tokens should one app be allowed to hold per user account",
+      "should_trigger": true
+    },
+    {
+      "query": "right now anyone can self-register an OAuth client with us and I'm nervous about it",
+      "should_trigger": true
+    },
+    { "query": "what's a sane default TTL for the tokens we issue", "should_trigger": true },
+    {
+      "query": "customers want to restrict which third-party apps their staff can install",
+      "should_trigger": true
+    },
+    {
+      "query": "designing permissions for apps that read other users' data, not just the installer's own",
+      "should_trigger": true
+    },
+    {
+      "query": "our app review is a one-time questionnaire at submission - is that enough",
+      "should_trigger": true
+    },
+    {
+      "query": "plan the security review program for apps listed in our directory",
+      "should_trigger": true
+    },
+    {
+      "query": "how do we let developers test their integration before they've been approved",
+      "should_trigger": true
+    },
+    {
+      "query": "decide between broad scopes and fine-grained permissions for our platform",
+      "should_trigger": true
+    },
+    {
+      "query": "our security team says the bearer tokens we hand out are too weak - what are the options",
+      "should_trigger": true
+    },
+    {
+      "query": "we're opening our API to third-party apps for the first time - what's the auth design",
+      "should_trigger": true
+    },
+    {
+      "query": "how do we stop an app from requesting more access at runtime than it declared to us",
+      "should_trigger": true
+    },
+    {
+      "query": "set up the authorization endpoints and discovery document for our platform",
+      "should_trigger": true
+    },
+    {
+      "query": "design the API key format and rotation policy for our public API",
+      "should_trigger": false
+    },
+    { "query": "should we store API keys hashed or encrypted at rest", "should_trigger": false },
+    {
+      "query": "build a self-service dashboard where customers can create and revoke their own API keys",
+      "should_trigger": false
+    },
+    { "query": "how do I add Google OAuth login to my Next.js app", "should_trigger": false },
+    { "query": "set up Auth0 for my SaaS signup flow", "should_trigger": false },
+    {
+      "query": "configure Firebase Authentication with email and password",
+      "should_trigger": false
+    },
+    {
+      "query": "we're consuming Salesforce's OAuth API - where should we store their refresh token",
+      "should_trigger": false
+    },
+    {
+      "query": "find the OAuth misconfigurations in this third-party authorization server",
+      "should_trigger": false
+    },
+    {
+      "query": "audit our JWT validation code for algorithm confusion attacks",
+      "should_trigger": false
+    },
+    {
+      "query": "write a pentest report on the token handling in this mobile app",
+      "should_trigger": false
+    },
+    {
+      "query": "our SAML assertions aren't validating against the customer's IdP",
+      "should_trigger": false
+    },
+    { "query": "add two-factor authentication to our login page", "should_trigger": false },
+    {
+      "query": "users can read another tenant's records just by changing the ID in the URL - fix it",
+      "should_trigger": false
+    },
+    {
+      "query": "design the rate limit tiers and response headers for our public API",
+      "should_trigger": false
+    },
+    {
+      "query": "write the deprecation and sunset policy for v1 of our REST API",
+      "should_trigger": false
+    },
+    {
+      "query": "design our outbound webhook signing scheme and retry policy",
+      "should_trigger": false
+    },
+    {
+      "query": "review our REST resource naming and pagination conventions",
+      "should_trigger": false
+    },
+    {
+      "query": "design the machine-readable error code taxonomy for our API",
+      "should_trigger": false
+    },
+    { "query": "how should idempotency keys be scoped per caller", "should_trigger": false },
+    { "query": "plan the sandbox and test mode for our API", "should_trigger": false },
+    {
+      "query": "what should our developer portal's information architecture look like",
+      "should_trigger": false
+    },
+    {
+      "query": "design the partner developer onboarding journey from signup to first submitted app",
+      "should_trigger": false
+    },
+    {
+      "query": "write the listing content standards every app in our marketplace has to meet",
+      "should_trigger": false
+    },
+    {
+      "query": "design the ongoing re-review pipeline and revocation policy for apps already listed on our marketplace",
+      "should_trigger": false
+    },
+    {
+      "query": "how much revenue share should we take from marketplace apps",
+      "should_trigger": false
+    },
+    {
+      "query": "should we build our own app marketplace or just join HubSpot's",
+      "should_trigger": false
+    },
+    {
+      "query": "optimize our AppExchange listing's view-to-install conversion",
+      "should_trigger": false
+    },
+    { "query": "which languages should get official SDKs first", "should_trigger": false },
+    {
+      "query": "design our public GraphQL schema's pagination and error result types",
+      "should_trigger": false
+    },
+    {
+      "query": "should we publish gRPC externally or transcode it to JSON",
+      "should_trigger": false
+    },
+    {
+      "query": "plan bulk Parquet exports into our customers' object storage",
+      "should_trigger": false
+    },
+    {
+      "query": "design customer-facing JDBC access to our product's data",
+      "should_trigger": false
+    },
+    {
+      "query": "curate the tool surface for our MCP server - which workflows become tools",
+      "should_trigger": false
+    },
+    {
+      "query": "what should our status page show during a partial outage",
+      "should_trigger": false
+    },
+    {
+      "query": "surface delivery logs and replay to partners whose integrations keep failing",
+      "should_trigger": false
+    },
+    {
+      "query": "which integration surface do we build first, REST or GraphQL",
+      "should_trigger": false
+    },
+    {
+      "query": "audit whether every endpoint in our API reference has request and response examples",
+      "should_trigger": false
+    },
+    { "query": "design the interview loop for an API product manager", "should_trigger": false },
+    {
+      "query": "how do I move from backend engineer into a platform engineering role",
+      "should_trigger": false
+    },
+    {
+      "query": "which technology partners should we integrate with next quarter",
+      "should_trigger": false
+    },
+    {
+      "query": "build a source connector for Fivetran so customers can sync our data",
+      "should_trigger": false
+    },
+    {
+      "query": "implement session cookies and CSRF protection for our web app",
+      "should_trigger": false
+    },
+    { "query": "set up SSO with Okta for our employees' internal tools", "should_trigger": false },
+    {
+      "query": "configure row-level security in Postgres for our multi-tenant app",
+      "should_trigger": false
+    },
+    {
+      "query": "our OAuth client library keeps failing the token exchange with invalid_grant - debug it",
+      "should_trigger": false
+    },
+    { "query": "add GitHub and Google login buttons to our signup page", "should_trigger": false },
+    {
+      "query": "harden the Kubernetes service account tokens in our cluster",
+      "should_trigger": false
+    },
+    {
+      "query": "write our answers to a customer's vendor security questionnaire",
+      "should_trigger": false
+    },
+    { "query": "encrypt the secrets our CI pipeline uses at rest", "should_trigger": false }
+  ]
+}

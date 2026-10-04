@@ -37,6 +37,12 @@
       "skillPath": "plugins/astro-expert/skills/astro-starlight/SKILL.md",
       "computedHash": "cdb9067bed1b7465196e1d22c8d8bc8c885f592d645a7d05359a1bdd25aabf93"
     },
+    "authentication": {
+      "source": "dpearson2699/swift-ios-skills",
+      "sourceType": "github",
+      "skillPath": "skills/authentication/SKILL.md",
+      "computedHash": "68deff933b0d74b8065756bcfaa0bee3415785c1fb27bf8ccfe0e47b0c56b405"
+    },
     "codemirror": {
       "source": "solanabettercall/skills",
       "sourceType": "github",
@@ -121,6 +127,12 @@
       "skillPath": "SKILL.md",
       "computedHash": "b236488b93e04b475def12bedbf8b1cfce348b88acf67d03341724032c87af8d"
     },
+    "entra-app-registration": {
+      "source": "microsoft/azure-skills",
+      "sourceType": "github",
+      "skillPath": "skills/entra-app-registration/SKILL.md",
+      "computedHash": "f78cb4466fa387b9f13c63a3e0ed8eb11fe7bb62740663d8bd21cd0f09927bee"
+    },
     "flutter-add-integration-test": {
       "source": "flutter/agent-plugins",
       "sourceType": "github",
@@ -174,6 +186,18 @@
       "sourceType": "github",
       "skillPath": "plugins/developer-kit-typescript/skills/nextjs-authentication/SKILL.md",
       "computedHash": "f237aeab71b4ca34699c91d83d82505c7db0d003997e4bdd3dc99ed10c564cbc"
+    },
+    "oauth-oidc-misconfiguration": {
+      "source": "yaklang/hack-skills",
+      "sourceType": "github",
+      "skillPath": "skills/oauth-oidc-misconfiguration/SKILL.md",
+      "computedHash": "75c5eba1ae75e7b46e1b16621040257f1347913d049c0a5c6b51af30c493d0f8"
+    },
+    "oauth2-provider-design": {
+      "source": "samber/developer-platform-skills",
+      "sourceType": "github",
+      "skillPath": "skills/oauth2-provider-design/SKILL.md",
+      "computedHash": "54f6435c687431ca304f3ce0627d526ce7eb111612082e9511d397bd833e79c4"
     },
     "optimizing-ef-core-queries": {
       "source": "dotnet/skills",
