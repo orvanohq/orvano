@@ -8,7 +8,7 @@ environment:
 
 # #region dependencies
 dependencies:
-  orvano_dart: 0.0.0
+  orvano_dart: 0.2.0
   shelf: ^1.4.2
 # #endregion dependencies
 

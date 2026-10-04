@@ -7,5 +7,5 @@ internal static class SdkInfo
     public const string Name = "Orvano";
 
     /// <summary>The SDK version, from the repo's VERSION file. It shares the server's major.minor.</summary>
-    public const string Version = "0.0.0";
+    public const string Version = "0.2.0";
 }
