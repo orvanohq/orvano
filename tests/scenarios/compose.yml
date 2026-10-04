@@ -96,6 +96,9 @@ services:
       ORVANO_MASTER_KEYS: kscenarios:b3J2YW5vLXNjZW5hcmlvcy10ZXN0LW1hc3Rlci1rZXk=
       ORVANO_SMTP_ALLOW_PRIVATE_HOSTS: 'true'
       ASPNETCORE_ENVIRONMENT: Test
+      # Apple revoke jobs (spec 0012, AC-15) go to the api's fake too, never to the real Apple, so
+      # test.listAppleRevocations sees them. The worker reaches the api by its service name.
+      ORVANO_TEST_OAUTH_PROVIDER_URL: http://api:8080/v1/test/oauth
     healthcheck:
       test: ['CMD', '/app/orvano', 'healthcheck']
       interval: 2s

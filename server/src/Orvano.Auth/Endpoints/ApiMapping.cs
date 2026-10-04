@@ -91,7 +91,7 @@ internal static class ApiMapping
             config.AppleTeamId,
             config.AppleKeyId,
             config.ApplePrivateKeySet,
-            config.MicrosoftTenant,
+            config.EffectiveMicrosoftTenant,
             config.RedirectReady,
             config.NativeReady,
             callbackUrl,

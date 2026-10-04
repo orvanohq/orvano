@@ -40,6 +40,9 @@ internal sealed record ProviderConfig(
         _ => false,
     };
 
+    /// <summary>Microsoft's tenant as reads report it (AC-1): the stored one, or <c>common</c> when none is set; null for the other providers.</summary>
+    public string? EffectiveMicrosoftTenant => Provider == OAuthProvider.Microsoft ? Domain.MicrosoftTenant.OrDefault(MicrosoftTenant) : null;
+
     /// <summary>The audiences a native ID token may carry (AC-9): Google's client ID and native IDs, Apple's bundle IDs only.</summary>
     public IReadOnlyList<string> NativeAudiences => Provider == OAuthProvider.Google && ClientId is { } web ? [web, .. ClientIdsExtra] : ClientIdsExtra;
 
@@ -169,7 +172,8 @@ internal static class ProviderSettingsRules
         if (before.AppleTeamId != after.AppleTeamId) changed.Add("appleTeamId");
         if (before.AppleKeyId != after.AppleKeyId) changed.Add("appleKeyId");
         if (update.ApplePrivateKey is SecretChange.SetSecret || before.ApplePrivateKeySet != after.ApplePrivateKeySet) changed.Add("applePrivateKey");
-        if (before.MicrosoftTenant != after.MicrosoftTenant) changed.Add("microsoftTenant");
+        // Unset and `common` are the same tenant, so saving the `common` a read showed changes nothing.
+        if (before.EffectiveMicrosoftTenant != after.EffectiveMicrosoftTenant) changed.Add("microsoftTenant");
         return changed;
     }
 
