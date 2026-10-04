@@ -1,7 +1,7 @@
 # 0006. Self host installer
 
 **Date**: 2026-09-26
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
