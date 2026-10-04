@@ -83,7 +83,7 @@ _Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `
 - [x] Error page contents: change a member's `@doc` in `contract/errors.tsp`, rebuild the contract and the site → that error page's description and status follow → error page code, status, description
 - [x] SDK snippets: the tabs on an operation page match `contract/dist/examples/<sdk>/<operationId>.*` byte for byte, without the generated header → API reference SDK snippets
 - [x] Audience and scope: an operation's labels follow its `x-orvano-audience` and `x-orvano-scope` in `openapi.public.json` → API reference audience, scope
-- [ ] Example settings: the JS app refuses to start without `VITE_ORVANO_PROJECT`; the Flutter app without `--dart-define=ORVANO_PROJECT`; the Dart and .NET servers without `ORVANO_PROJECT` or `ORVANO_API_KEY` → example endpoint and project
+- [x] Example settings: the JS app refuses to start without `VITE_ORVANO_PROJECT`; the Flutter app without `--dart-define=ORVANO_PROJECT`; the Dart and .NET servers without `ORVANO_PROJECT` or `ORVANO_API_KEY` → example endpoint and project
 - [x] Dev ports: Vite 5173, Flutter web 5050, Dart 3001, .NET 3002 → example dev ports
 - [x] App IDs: the Flutter iOS bundle ID and Android `applicationId` equal `appId` in `website/scripts/screenshots.ts` → iOS bundle ID, Android package name
 
