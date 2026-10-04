@@ -28,6 +28,7 @@ import { Route as AppProjectsProjectIdEmailRouteRouteImport } from './routes/_ap
 import { Route as AppProjectsProjectIdKeysRouteImport } from './routes/_app/projects/$projectId/keys'
 import { Route as AppProjectsProjectIdPlatformsRouteImport } from './routes/_app/projects/$projectId/platforms'
 import { Route as AppProjectsProjectIdSettingsRouteImport } from './routes/_app/projects/$projectId/settings'
+import { Route as AppProjectsProjectIdSignInMethodsRouteImport } from './routes/_app/projects/$projectId/sign-in-methods'
 import { Route as AppProjectsProjectIdEmailIndexRouteImport } from './routes/_app/projects/$projectId/email/index'
 import { Route as AppProjectsProjectIdEmailLogRouteImport } from './routes/_app/projects/$projectId/email/log'
 import { Route as AppProjectsProjectIdEmailSettingsRouteImport } from './routes/_app/projects/$projectId/email/settings'
@@ -136,6 +137,12 @@ const AppProjectsProjectIdSettingsRoute =
     path: '/settings',
     getParentRoute: () => AppProjectsProjectIdRouteRoute,
   } as any)
+const AppProjectsProjectIdSignInMethodsRoute =
+  AppProjectsProjectIdSignInMethodsRouteImport.update({
+    id: '/sign-in-methods',
+    path: '/sign-in-methods',
+    getParentRoute: () => AppProjectsProjectIdRouteRoute,
+  } as any)
 const AppProjectsProjectIdEmailIndexRoute =
   AppProjectsProjectIdEmailIndexRouteImport.update({
     id: '/',
@@ -196,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/keys': typeof AppProjectsProjectIdKeysRoute
   '/projects/$projectId/platforms': typeof AppProjectsProjectIdPlatformsRoute
   '/projects/$projectId/settings': typeof AppProjectsProjectIdSettingsRoute
+  '/projects/$projectId/sign-in-methods': typeof AppProjectsProjectIdSignInMethodsRoute
   '/orgs/$orgId/': typeof AppOrgsOrgIdIndexRoute
   '/projects/$projectId/': typeof AppProjectsProjectIdIndexRoute
   '/projects/$projectId/email/log': typeof AppProjectsProjectIdEmailLogRoute
@@ -220,6 +228,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId/keys': typeof AppProjectsProjectIdKeysRoute
   '/projects/$projectId/platforms': typeof AppProjectsProjectIdPlatformsRoute
   '/projects/$projectId/settings': typeof AppProjectsProjectIdSettingsRoute
+  '/projects/$projectId/sign-in-methods': typeof AppProjectsProjectIdSignInMethodsRoute
   '/orgs/$orgId': typeof AppOrgsOrgIdIndexRoute
   '/projects/$projectId': typeof AppProjectsProjectIdIndexRoute
   '/projects/$projectId/email/log': typeof AppProjectsProjectIdEmailLogRoute
@@ -249,6 +258,7 @@ export interface FileRoutesById {
   '/_app/projects/$projectId/keys': typeof AppProjectsProjectIdKeysRoute
   '/_app/projects/$projectId/platforms': typeof AppProjectsProjectIdPlatformsRoute
   '/_app/projects/$projectId/settings': typeof AppProjectsProjectIdSettingsRoute
+  '/_app/projects/$projectId/sign-in-methods': typeof AppProjectsProjectIdSignInMethodsRoute
   '/_app/orgs/$orgId/': typeof AppOrgsOrgIdIndexRoute
   '/_app/projects/$projectId/': typeof AppProjectsProjectIdIndexRoute
   '/_app/projects/$projectId/email/log': typeof AppProjectsProjectIdEmailLogRoute
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/keys'
     | '/projects/$projectId/platforms'
     | '/projects/$projectId/settings'
+    | '/projects/$projectId/sign-in-methods'
     | '/orgs/$orgId/'
     | '/projects/$projectId/'
     | '/projects/$projectId/email/log'
@@ -302,6 +313,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/keys'
     | '/projects/$projectId/platforms'
     | '/projects/$projectId/settings'
+    | '/projects/$projectId/sign-in-methods'
     | '/orgs/$orgId'
     | '/projects/$projectId'
     | '/projects/$projectId/email/log'
@@ -330,6 +342,7 @@ export interface FileRouteTypes {
     | '/_app/projects/$projectId/keys'
     | '/_app/projects/$projectId/platforms'
     | '/_app/projects/$projectId/settings'
+    | '/_app/projects/$projectId/sign-in-methods'
     | '/_app/orgs/$orgId/'
     | '/_app/projects/$projectId/'
     | '/_app/projects/$projectId/email/log'
@@ -485,6 +498,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectsProjectIdSettingsRouteImport
       parentRoute: typeof AppProjectsProjectIdRouteRoute
     }
+    '/_app/projects/$projectId/sign-in-methods': {
+      id: '/_app/projects/$projectId/sign-in-methods'
+      path: '/sign-in-methods'
+      fullPath: '/projects/$projectId/sign-in-methods'
+      preLoaderRoute: typeof AppProjectsProjectIdSignInMethodsRouteImport
+      parentRoute: typeof AppProjectsProjectIdRouteRoute
+    }
     '/_app/projects/$projectId/email/': {
       id: '/_app/projects/$projectId/email/'
       path: '/'
@@ -582,6 +602,7 @@ interface AppProjectsProjectIdRouteRouteChildren {
   AppProjectsProjectIdKeysRoute: typeof AppProjectsProjectIdKeysRoute
   AppProjectsProjectIdPlatformsRoute: typeof AppProjectsProjectIdPlatformsRoute
   AppProjectsProjectIdSettingsRoute: typeof AppProjectsProjectIdSettingsRoute
+  AppProjectsProjectIdSignInMethodsRoute: typeof AppProjectsProjectIdSignInMethodsRoute
   AppProjectsProjectIdIndexRoute: typeof AppProjectsProjectIdIndexRoute
   AppProjectsProjectIdUsersUserIdRoute: typeof AppProjectsProjectIdUsersUserIdRoute
   AppProjectsProjectIdUsersIndexRoute: typeof AppProjectsProjectIdUsersIndexRoute
@@ -594,6 +615,8 @@ const AppProjectsProjectIdRouteRouteChildren: AppProjectsProjectIdRouteRouteChil
     AppProjectsProjectIdKeysRoute: AppProjectsProjectIdKeysRoute,
     AppProjectsProjectIdPlatformsRoute: AppProjectsProjectIdPlatformsRoute,
     AppProjectsProjectIdSettingsRoute: AppProjectsProjectIdSettingsRoute,
+    AppProjectsProjectIdSignInMethodsRoute:
+      AppProjectsProjectIdSignInMethodsRoute,
     AppProjectsProjectIdIndexRoute: AppProjectsProjectIdIndexRoute,
     AppProjectsProjectIdUsersUserIdRoute: AppProjectsProjectIdUsersUserIdRoute,
     AppProjectsProjectIdUsersIndexRoute: AppProjectsProjectIdUsersIndexRoute,

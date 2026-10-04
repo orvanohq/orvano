@@ -3,6 +3,7 @@ import {
   FolderKanban,
   KeyRound,
   LayoutDashboard,
+  LogIn,
   Mail,
   MonitorSmartphone,
   Settings,
@@ -53,6 +54,12 @@ export const projectNav: readonly NavEntry[] = [
     exact: true,
   },
   { id: 'users', label: 'Users', icon: UsersRound, to: '/projects/$projectId/users' },
+  {
+    id: 'sign-in-methods',
+    label: 'Sign in methods',
+    icon: LogIn,
+    to: '/projects/$projectId/sign-in-methods',
+  },
   { id: 'email', label: 'Email', icon: Mail, to: '/projects/$projectId/email' },
   { id: 'keys', label: 'API keys', icon: KeyRound, to: '/projects/$projectId/keys' },
   {

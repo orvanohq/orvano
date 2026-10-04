@@ -101,33 +101,33 @@ internal static class ProviderSettingsRules
         var native = OAuthProviders.SupportsNative(provider);
 
         if (update.ClientId is { } id && !IsIdentifier(id))
-            return Fail($"The clientId must be 1 to {MaxClientId} characters with no whitespace.", out error);
+            return Fail($"clientId: Enter 1 to {MaxClientId} characters with no spaces.", out error);
 
         if (apple && update.ClientSecret is not SecretChange.KeepSecret and not SecretChange.ClearSecret)
-            return Fail("Apple has no clientSecret: Orvano makes it from the private key.", out error);
+            return Fail("clientSecret: Apple has no client secret; Orvano makes it from the private key.", out error);
         if (update.ClientSecret is SecretChange.SetSecret { Value: var secret } && secret.Length is < MinSecret or > MaxSecret)
-            return Fail($"The clientSecret must be {MinSecret} to {MaxSecret} characters.", out error);
+            return Fail($"clientSecret: Enter {MinSecret} to {MaxSecret} characters.", out error);
 
         var extra = update.ClientIdsExtra ?? [];
-        if (!native && extra.Count > 0) return Fail($"Only Google and Apple take clientIdsExtra, not {name}.", out error);
+        if (!native && extra.Count > 0) return Fail($"clientIdsExtra: Only Google and Apple take native client IDs, not {name}.", out error);
         if (extra.Count > MaxExtraIds || extra.Any(e => !IsIdentifier(e)))
-            return Fail($"The clientIdsExtra are at most {MaxExtraIds} IDs of 1 to {MaxClientId} characters with no whitespace.", out error);
+            return Fail($"clientIdsExtra: Enter at most {MaxExtraIds} IDs, each 1 to {MaxClientId} characters with no spaces.", out error);
 
         if (!apple && (update.AppleTeamId is not null || update.AppleKeyId is not null || update.ApplePrivateKey is SecretChange.SetSecret))
-            return Fail($"The Apple fields are only for Apple, not {name}.", out error);
+            return Fail($"appleTeamId: The Apple fields are only for Apple, not {name}.", out error);
         if (update.AppleTeamId is { } team && !AppleKey.IsKeyOrTeamId(team))
-            return Fail("The appleTeamId must be exactly 10 capital letters or digits.", out error);
+            return Fail("appleTeamId: Enter exactly 10 capital letters or digits.", out error);
         if (update.AppleKeyId is { } kid && !AppleKey.IsKeyOrTeamId(kid))
-            return Fail("The appleKeyId must be exactly 10 capital letters or digits.", out error);
+            return Fail("appleKeyId: Enter exactly 10 capital letters or digits.", out error);
         if (update.ApplePrivateKey is SecretChange.SetSecret { Value: var pem } && !AppleKey.IsValidPem(pem))
-            return Fail("The applePrivateKey must be the .p8 file's PEM: a PKCS#8 EC P-256 private key of at most 8 KB.", out error);
+            return Fail("applePrivateKey: Paste the whole .p8 file: a PKCS#8 EC P-256 private key of at most 8 KB.", out error);
 
         string? tenant = null;
         if (update.MicrosoftTenant is { } rawTenant)
         {
-            if (provider != OAuthProvider.Microsoft) return Fail($"The microsoftTenant is only for Microsoft, not {name}.", out error);
+            if (provider != OAuthProvider.Microsoft) return Fail($"microsoftTenant: The tenant is only for Microsoft, not {name}.", out error);
             if (!MicrosoftTenant.TryNormalize(rawTenant, out var normalized))
-                return Fail("The microsoftTenant must be common, organizations, consumers, or a tenant GUID.", out error);
+                return Fail("microsoftTenant: Enter common, organizations, consumers, or a tenant ID (a GUID).", out error);
             tenant = normalized;
         }
 
@@ -143,7 +143,7 @@ internal static class ProviderSettingsRules
             tenant);
 
         if (next.Enabled && !next.RedirectReady && !next.NativeReady)
-            return Fail($"An enabled {name} needs the settings of the redirect flow or of native sign in. Fill them in, or save with enabled false.", out error);
+            return Fail($"enabled: Turning {name} on needs the settings for redirect sign in or native sign in. Fill them in, or turn it off.", out error);
 
         change = new ProviderChange(next, update.ClientSecret, update.ApplePrivateKey, Changed(current, next, update));
         error = "";
