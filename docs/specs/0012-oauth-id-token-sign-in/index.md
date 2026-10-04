@@ -1,7 +1,7 @@
 # 0012. OAuth and ID token sign in with Google, Apple, GitHub, and Microsoft
 
 **Date**: 2026-10-04
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 

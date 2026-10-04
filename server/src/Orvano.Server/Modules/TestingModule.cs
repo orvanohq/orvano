@@ -22,7 +22,11 @@ internal sealed class TestingModule : IOrvanoModule
 
     public string Name => "testing";
 
-    public void ConfigureServices(IServiceCollection services, IConfiguration config) => services.AddSingleton<TestEmails>();
+    public void ConfigureServices(IServiceCollection services, IConfiguration config)
+    {
+        services.AddSingleton<TestEmails>();
+        services.AddSingleton<FakeOAuthProvider>();
+    }
 
     public void MapApi(RouteGroupBuilder v1)
     {
@@ -43,6 +47,8 @@ internal sealed class TestingModule : IOrvanoModule
 
         v1.MapGet(TestOperations.ConsolePing.Route, () => TypedResults.Ok(new TestConsolePing("ok")))
             .WithName(TestOperations.ConsolePing.Id);
+
+        ((IEndpointRouteBuilder)v1).ServiceProvider.GetRequiredService<FakeOAuthProvider>().Map(v1);
     }
 
     public void RegisterWork(IWorkRegistry work) { }

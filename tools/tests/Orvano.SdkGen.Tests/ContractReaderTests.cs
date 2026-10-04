@@ -34,6 +34,20 @@ public class ContractReaderTests
     }
 
     [Fact]
+    public async Task Leaves_a_browser_route_out_of_every_sdk_and_refuses_one_with_a_scope() // covers: spec 0012 AC-5
+    {
+        var (contract, errors) = await Repo.ReadAsync(Repo.OpenApi());
+        Assert.Empty(errors);
+        Assert.DoesNotContain(contract!.Operations, o => o.Service == "oauth");
+
+        var doc = Repo.OpenApi();
+        Repo.Operation(doc, "/v1/projects/{projectId}/oauth/{provider}/callback", "get")["x-orvano-scope"] = "users.read";
+        var (refused, scopeErrors) = await Repo.ReadAsync(doc);
+        Assert.Null(refused);
+        Assert.Contains(scopeErrors, e => e.Contains("'oauth.callback'", StringComparison.Ordinal) && e.Contains("'browser' operation takes no credential", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Refuses_an_operation_without_a_service_group() // covers: AC-2
     {
         var doc = Repo.OpenApi();

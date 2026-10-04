@@ -14,6 +14,8 @@ internal static class Dispatch
         ["account.createEmailCodeSession"] = new(201, null, null),
         ["account.createMagicLink"] = new(202, null, null),
         ["account.createMagicLinkSession"] = new(201, null, null),
+        ["account.createOAuthFlow"] = new(200, null, null),
+        ["account.createOAuthSession"] = new(201, null, null),
         ["account.createPasswordSession"] = new(201, null, null),
         ["account.createRecovery"] = new(202, null, null),
         ["account.createVerification"] = new(202, null, null),

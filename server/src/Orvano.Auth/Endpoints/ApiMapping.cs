@@ -29,6 +29,8 @@ internal static class ApiMapping
             FailureKind.RateLimited => StatusCodes.Status429TooManyRequests,
             FailureKind.Busy => StatusCodes.Status503ServiceUnavailable,
             FailureKind.Gone => StatusCodes.Status410Gone,
+            FailureKind.BadGateway => StatusCodes.Status502BadGateway,
+            FailureKind.Unavailable => StatusCodes.Status503ServiceUnavailable,
             _ => throw new ArgumentOutOfRangeException(nameof(failure), failure.Kind, null),
         }, failure.Code, failure.Detail);
     }
@@ -77,7 +79,8 @@ internal static class ApiMapping
         view.Sdk,
         view.IpAddress?.ToString(),
         view.Current,
-        SessionMethodOf(view.Method));
+        SessionMethodOf(view.Method),
+        view.Provider is null ? null : ProviderOf(view.Provider));
 
     public static Api.SessionMethod SessionMethodOf(string method) => method switch
     {
@@ -86,7 +89,31 @@ internal static class ApiMapping
         SessionMethod.MagicLink => Api.SessionMethod.MagicLink,
         SessionMethod.EmailCode => Api.SessionMethod.EmailCode,
         SessionMethod.Recovery => Api.SessionMethod.Recovery,
+        SessionMethod.OAuth => Api.SessionMethod.Oauth,
+        SessionMethod.IdToken => Api.SessionMethod.IdToken,
         _ => throw new ArgumentOutOfRangeException(nameof(method), method, "Unknown session method."),
+    };
+
+    public static Api.OAuthProvider ProviderOf(string provider) => OAuthProviders.TryParse(provider, out var parsed)
+        ? ProviderOf(parsed)
+        : throw new ArgumentOutOfRangeException(nameof(provider), provider, "Unknown provider.");
+
+    public static Api.OAuthProvider ProviderOf(OAuthProvider provider) => provider switch
+    {
+        OAuthProvider.Google => Api.OAuthProvider.Google,
+        OAuthProvider.Apple => Api.OAuthProvider.Apple,
+        OAuthProvider.GitHub => Api.OAuthProvider.Github,
+        OAuthProvider.Microsoft => Api.OAuthProvider.Microsoft,
+        _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, null),
+    };
+
+    public static OAuthProvider ProviderOf(Api.OAuthProvider provider) => provider switch
+    {
+        Api.OAuthProvider.Google => OAuthProvider.Google,
+        Api.OAuthProvider.Apple => OAuthProvider.Apple,
+        Api.OAuthProvider.Github => OAuthProvider.GitHub,
+        Api.OAuthProvider.Microsoft => OAuthProvider.Microsoft,
+        _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, null),
     };
 
     public static Api.SessionPage SessionPage(Page<SessionView> page) => new([.. page.Items.Select(Session)], page.NextCursor);

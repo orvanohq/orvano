@@ -116,6 +116,38 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>POST /v1/account/oauth/flows: Starts signing in with a provider: answers the provider's sign in page to send the browser to. After the user</summary>
+    public static class CreateOAuthFlow
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createOAuthFlow";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/oauth/flows";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/sessions/oauth: Signs a user in with the code a provider flow returned and the flow's PKCE verifier. It finds the user by the</summary>
+    public static class CreateOAuthSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createOAuthSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/oauth";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account/sessions/password: Signs a user in with their email and password.</summary>
     public static class CreatePasswordSession
     {

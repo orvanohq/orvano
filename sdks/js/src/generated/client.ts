@@ -10,12 +10,15 @@ import type {
   CreateEmailCodeSessionRequest,
   CreateMagicLinkRequest,
   CreateMagicLinkSessionRequest,
+  CreateOAuthFlowRequest,
+  CreateOAuthSessionRequest,
   CreatePasswordSessionRequest,
   CreateRecoveryRequest,
   CreateVerificationRequest,
   DeleteAccountRequest,
   Health,
   Jwks,
+  OAuthFlow,
   OpenIdConfiguration,
   RefreshSessionRequest,
   Session,
@@ -106,6 +109,32 @@ export class AccountService {
   ): Promise<AuthResult> {
     return this.#client.request<AuthResult>(
       { method: 'POST', path: '/v1/account/sessions/magic-link', body, session: 'start' },
+      options,
+    )
+  }
+
+  /**
+   * Starts signing in with a provider: answers the provider's sign in page to send the browser to. After the user
+   * agrees, Orvano sends the browser back to `redirectUrl` with a code that only your verifier redeems. The SDKs'
+   * `signInWithOAuth` does all of it.
+   */
+  createOAuthFlow(body: CreateOAuthFlowRequest, options?: RequestOptions): Promise<OAuthFlow> {
+    return this.#client.request<OAuthFlow>(
+      { method: 'POST', path: '/v1/account/oauth/flows', body },
+      options,
+    )
+  }
+
+  /**
+   * Signs a user in with the code a provider flow returned and the flow's PKCE verifier. It finds the user by the
+   * provider account, else by the provider's verified email, else creates them. The code works once.
+   */
+  createOAuthSession(
+    body: CreateOAuthSessionRequest,
+    options?: RequestOptions,
+  ): Promise<AuthResult> {
+    return this.#client.request<AuthResult>(
+      { method: 'POST', path: '/v1/account/sessions/oauth', body, session: 'start' },
       options,
     )
   }

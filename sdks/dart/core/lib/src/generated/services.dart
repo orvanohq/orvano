@@ -115,6 +115,38 @@ final class AccountService {
     return AuthResult.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Starts signing in with a provider: answers the provider's sign in page to send the browser to. After the user
+  /// agrees, Orvano sends the browser back to `redirectUrl` with a code that only your verifier redeems. The SDKs'
+  /// `signInWithOAuth` does all of it.
+  Future<OAuthFlow> createOAuthFlow(
+    CreateOAuthFlowRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/oauth/flows',
+      body: body.toJson(),
+      options: options,
+    );
+    return OAuthFlow.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Signs a user in with the code a provider flow returned and the flow's PKCE verifier. It finds the user by the
+  /// provider account, else by the provider's verified email, else creates them. The code works once.
+  Future<AuthResult> createOAuthSession(
+    CreateOAuthSessionRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/sessions/oauth',
+      body: body.toJson(),
+      session: SessionChange.start,
+      options: options,
+    );
+    return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Signs a user in with their email and password.
   Future<AuthResult> createPasswordSession(
     CreatePasswordSessionRequest body, {

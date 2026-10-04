@@ -4,6 +4,52 @@ using System.Text.Json.Serialization;
 
 namespace Orvano;
 
+/// <summary>A sign in provider.</summary>
+[JsonConverter(typeof(OAuthProviderJsonConverter))]
+public enum OAuthProvider
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>google</c>.</summary>
+    Google,
+
+    /// <summary>The wire value <c>apple</c>.</summary>
+    Apple,
+
+    /// <summary>The wire value <c>github</c>.</summary>
+    Github,
+
+    /// <summary>The wire value <c>microsoft</c>.</summary>
+    Microsoft,
+}
+
+/// <summary>Reads and writes <see cref="OAuthProvider"/> by wire value; unknown values read as <see cref="OAuthProvider.Unknown"/>.</summary>
+public sealed class OAuthProviderJsonConverter : JsonConverter<OAuthProvider>
+{
+    /// <inheritdoc/>
+    public override OAuthProvider Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "google" => OAuthProvider.Google,
+            "apple" => OAuthProvider.Apple,
+            "github" => OAuthProvider.Github,
+            "microsoft" => OAuthProvider.Microsoft,
+            _ => OAuthProvider.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, OAuthProvider value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            OAuthProvider.Google => "google",
+            OAuthProvider.Apple => "apple",
+            OAuthProvider.Github => "github",
+            OAuthProvider.Microsoft => "microsoft",
+            _ => throw new JsonException($"OAuthProvider.{value} has no wire value"),
+        });
+}
+
 /// <summary>How a session began.</summary>
 [JsonConverter(typeof(SessionMethodJsonConverter))]
 public enum SessionMethod
@@ -25,6 +71,12 @@ public enum SessionMethod
 
     /// <summary>The wire value <c>recovery</c>.</summary>
     Recovery,
+
+    /// <summary>The wire value <c>oauth</c>.</summary>
+    Oauth,
+
+    /// <summary>The wire value <c>id_token</c>.</summary>
+    IdToken,
 }
 
 /// <summary>Reads and writes <see cref="SessionMethod"/> by wire value; unknown values read as <see cref="SessionMethod.Unknown"/>.</summary>
@@ -39,6 +91,8 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             "magic_link" => SessionMethod.MagicLink,
             "email_code" => SessionMethod.EmailCode,
             "recovery" => SessionMethod.Recovery,
+            "oauth" => SessionMethod.Oauth,
+            "id_token" => SessionMethod.IdToken,
             _ => SessionMethod.Unknown,
         };
 
@@ -51,6 +105,8 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             SessionMethod.MagicLink => "magic_link",
             SessionMethod.EmailCode => "email_code",
             SessionMethod.Recovery => "recovery",
+            SessionMethod.Oauth => "oauth",
+            SessionMethod.IdToken => "id_token",
             _ => throw new JsonException($"SessionMethod.{value} has no wire value"),
         });
 }
@@ -163,6 +219,7 @@ public sealed record OpenIdConfiguration(
 /// <param name="IpAddress">The IP address last seen for the session; null when unknown.</param>
 /// <param name="Current">Whether this is the session making the call.</param>
 /// <param name="Method">How the session began.</param>
+/// <param name="Provider">The provider of an <c>oauth</c> or <c>id_token</c> session; null for every other method.</param>
 public sealed record Session(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
@@ -171,7 +228,8 @@ public sealed record Session(
     [property: JsonPropertyName("sdk")] string? Sdk,
     [property: JsonPropertyName("ipAddress")] string? IpAddress,
     [property: JsonPropertyName("current")] bool Current,
-    [property: JsonPropertyName("method")] SessionMethod Method);
+    [property: JsonPropertyName("method")] SessionMethod Method,
+    [property: JsonPropertyName("provider")] OAuthProvider? Provider);
 
 /// <summary>One page of a user's active sessions, newest first.</summary>
 /// <param name="Items">The sessions on this page.</param>

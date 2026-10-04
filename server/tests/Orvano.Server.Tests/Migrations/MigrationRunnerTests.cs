@@ -34,7 +34,7 @@ public class MigrationRunnerTests(PostgresFixture postgres)
         Assert.Equal("orvano_admin", owner);
         Assert.Equal(
         [
-            "auth_email_tokens", "auth_passwords", "auth_sessions", "auth_signing_keys", "auth_users",
+            "auth_email_tokens", "auth_id_token_uses", "auth_identities", "auth_oauth_flows", "auth_oauth_providers", "auth_passwords", "auth_sessions", "auth_signing_keys", "auth_users",
             "events", "jobs", "messaging_email_templates", "messaging_emails", "messaging_smtp_settings",
             "platform_api_keys", "platform_install_admins", "platform_install_settings", "platform_invitations",
             "platform_memberships", "platform_orgs", "platform_platforms", "platform_projects", "schema_migrations",

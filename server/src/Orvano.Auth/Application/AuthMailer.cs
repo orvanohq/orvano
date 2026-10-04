@@ -19,7 +19,8 @@ internal sealed class AuthMailer(IEmailQueue queue, IProjectDirectory projects, 
     /// (AC-6); else null, for 400 <c>redirect_url_not_allowed</c>.
     /// </summary>
     public async Task<RedirectUrl?> CheckRedirectAsync(string projectId, string? redirectUrl, EmailTokenKind kind, CancellationToken ct) =>
-        RedirectUrlRule.TryCheck(redirectUrl, kind, out var redirect) && await origins.AllowsRedirectAsync(projectId, redirect.Url, ct)
+        RedirectUrlRule.TryCheck(redirectUrl, kind, out var redirect)
+        && await origins.AllowsRedirectAsync(projectId, redirect.Url, allowCustomScheme: !EmailTokenKinds.GrantsSession(kind), ct)
             ? redirect
             : null;
 

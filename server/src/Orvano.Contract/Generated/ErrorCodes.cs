@@ -31,6 +31,12 @@ public static class ErrorCode
     /// <summary>The <c>forbidden</c> error code.</summary>
     public const string Forbidden = "forbidden";
 
+    /// <summary>The <c>identity_already_linked</c> error code.</summary>
+    public const string IdentityAlreadyLinked = "identity_already_linked";
+
+    /// <summary>The <c>identity_not_found</c> error code.</summary>
+    public const string IdentityNotFound = "identity_not_found";
+
     /// <summary>The <c>insufficient_scope</c> error code.</summary>
     public const string InsufficientScope = "insufficient_scope";
 
@@ -51,6 +57,12 @@ public static class ErrorCode
 
     /// <summary>The <c>invalid_email_token</c> error code.</summary>
     public const string InvalidEmailToken = "invalid_email_token";
+
+    /// <summary>The <c>invalid_id_token</c> error code.</summary>
+    public const string InvalidIdToken = "invalid_id_token";
+
+    /// <summary>The <c>invalid_oauth_code</c> error code.</summary>
+    public const string InvalidOauthCode = "invalid_oauth_code";
 
     /// <summary>The <c>invalid_password</c> error code.</summary>
     public const string InvalidPassword = "invalid_password";
@@ -79,8 +91,14 @@ public static class ErrorCode
     /// <summary>The <c>last_owner</c> error code.</summary>
     public const string LastOwner = "last_owner";
 
+    /// <summary>The <c>last_sign_in_method</c> error code.</summary>
+    public const string LastSignInMethod = "last_sign_in_method";
+
     /// <summary>The <c>not_found</c> error code.</summary>
     public const string NotFound = "not_found";
+
+    /// <summary>The <c>oauth_access_denied</c> error code.</summary>
+    public const string OauthAccessDenied = "oauth_access_denied";
 
     /// <summary>The <c>org_not_active</c> error code.</summary>
     public const string OrgNotActive = "org_not_active";
@@ -96,6 +114,21 @@ public static class ErrorCode
 
     /// <summary>The <c>project_not_ready</c> error code.</summary>
     public const string ProjectNotReady = "project_not_ready";
+
+    /// <summary>The <c>provider_already_linked</c> error code.</summary>
+    public const string ProviderAlreadyLinked = "provider_already_linked";
+
+    /// <summary>The <c>provider_error</c> error code.</summary>
+    public const string ProviderError = "provider_error";
+
+    /// <summary>The <c>provider_not_configured</c> error code.</summary>
+    public const string ProviderNotConfigured = "provider_not_configured";
+
+    /// <summary>The <c>provider_not_enabled</c> error code.</summary>
+    public const string ProviderNotEnabled = "provider_not_enabled";
+
+    /// <summary>The <c>provider_unavailable</c> error code.</summary>
+    public const string ProviderUnavailable = "provider_unavailable";
 
     /// <summary>The <c>rate_limited</c> error code.</summary>
     public const string RateLimited = "rate_limited";

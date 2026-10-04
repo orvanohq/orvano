@@ -336,6 +336,42 @@ public sealed class EmailTemplateNameJsonConverter : JsonConverter<EmailTemplate
         });
 }
 
+/// <summary>A provider a native app can sign in with by its ID token.</summary>
+[JsonConverter(typeof(IdTokenProviderJsonConverter))]
+public enum IdTokenProvider
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>google</c>.</summary>
+    Google,
+
+    /// <summary>The wire value <c>apple</c>.</summary>
+    Apple,
+}
+
+/// <summary>Reads and writes <see cref="IdTokenProvider"/> by wire value; unknown values read as <see cref="IdTokenProvider.Unknown"/>.</summary>
+public sealed class IdTokenProviderJsonConverter : JsonConverter<IdTokenProvider>
+{
+    /// <inheritdoc/>
+    public override IdTokenProvider Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "google" => IdTokenProvider.Google,
+            "apple" => IdTokenProvider.Apple,
+            _ => IdTokenProvider.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, IdTokenProvider value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            IdTokenProvider.Google => "google",
+            IdTokenProvider.Apple => "apple",
+            _ => throw new JsonException($"IdTokenProvider.{value} has no wire value"),
+        });
+}
+
 /// <summary>Whether an invitation can still be accepted.</summary>
 [JsonConverter(typeof(InvitationStatusJsonConverter))]
 public enum InvitationStatus
@@ -405,6 +441,88 @@ public sealed class MemberStatusJsonConverter : JsonConverter<MemberStatus>
             MemberStatus.Active => "active",
             MemberStatus.Blocked => "blocked",
             _ => throw new JsonException($"MemberStatus.{value} has no wire value"),
+        });
+}
+
+/// <summary>What a provider redirect came back for: the <c>orvano_type</c> parameter Orvano adds when it sends the browser back to your <c>redirectUrl</c>, beside <c>orvano_code</c> or <c>orvano_error</c>. The SDKs' link helpers read it.</summary>
+[JsonConverter(typeof(OAuthLinkTypeJsonConverter))]
+public enum OAuthLinkType
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>oauth</c>.</summary>
+    Oauth,
+
+    /// <summary>The wire value <c>oauth_link</c>.</summary>
+    OauthLink,
+}
+
+/// <summary>Reads and writes <see cref="OAuthLinkType"/> by wire value; unknown values read as <see cref="OAuthLinkType.Unknown"/>.</summary>
+public sealed class OAuthLinkTypeJsonConverter : JsonConverter<OAuthLinkType>
+{
+    /// <inheritdoc/>
+    public override OAuthLinkType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "oauth" => OAuthLinkType.Oauth,
+            "oauth_link" => OAuthLinkType.OauthLink,
+            _ => OAuthLinkType.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, OAuthLinkType value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            OAuthLinkType.Oauth => "oauth",
+            OAuthLinkType.OauthLink => "oauth_link",
+            _ => throw new JsonException($"OAuthLinkType.{value} has no wire value"),
+        });
+}
+
+/// <summary>A sign in provider.</summary>
+[JsonConverter(typeof(OAuthProviderJsonConverter))]
+public enum OAuthProvider
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>google</c>.</summary>
+    Google,
+
+    /// <summary>The wire value <c>apple</c>.</summary>
+    Apple,
+
+    /// <summary>The wire value <c>github</c>.</summary>
+    Github,
+
+    /// <summary>The wire value <c>microsoft</c>.</summary>
+    Microsoft,
+}
+
+/// <summary>Reads and writes <see cref="OAuthProvider"/> by wire value; unknown values read as <see cref="OAuthProvider.Unknown"/>.</summary>
+public sealed class OAuthProviderJsonConverter : JsonConverter<OAuthProvider>
+{
+    /// <inheritdoc/>
+    public override OAuthProvider Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "google" => OAuthProvider.Google,
+            "apple" => OAuthProvider.Apple,
+            "github" => OAuthProvider.Github,
+            "microsoft" => OAuthProvider.Microsoft,
+            _ => OAuthProvider.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, OAuthProvider value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            OAuthProvider.Google => "google",
+            OAuthProvider.Apple => "apple",
+            OAuthProvider.Github => "github",
+            OAuthProvider.Microsoft => "microsoft",
+            _ => throw new JsonException($"OAuthProvider.{value} has no wire value"),
         });
 }
 
@@ -608,6 +726,12 @@ public enum SessionMethod
 
     /// <summary>The wire value <c>recovery</c>.</summary>
     Recovery,
+
+    /// <summary>The wire value <c>oauth</c>.</summary>
+    Oauth,
+
+    /// <summary>The wire value <c>id_token</c>.</summary>
+    IdToken,
 }
 
 /// <summary>Reads and writes <see cref="SessionMethod"/> by wire value; unknown values read as <see cref="SessionMethod.Unknown"/>.</summary>
@@ -622,6 +746,8 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             "magic_link" => SessionMethod.MagicLink,
             "email_code" => SessionMethod.EmailCode,
             "recovery" => SessionMethod.Recovery,
+            "oauth" => SessionMethod.Oauth,
+            "id_token" => SessionMethod.IdToken,
             _ => SessionMethod.Unknown,
         };
 
@@ -634,6 +760,8 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             SessionMethod.MagicLink => "magic_link",
             SessionMethod.EmailCode => "email_code",
             SessionMethod.Recovery => "recovery",
+            SessionMethod.Oauth => "oauth",
+            SessionMethod.IdToken => "id_token",
             _ => throw new JsonException($"SessionMethod.{value} has no wire value"),
         });
 }
@@ -871,7 +999,7 @@ public sealed record ApiKeyPage(
 /// <summary>A signed in user and their new session.</summary>
 /// <param name="User">The user.</param>
 /// <param name="Session">The new session's tokens.</param>
-/// <param name="IsNewUser">Whether this call created the user: true from sign up, and from a magic link or email code for a new email.</param>
+/// <param name="IsNewUser">Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user.</param>
 /// <param name="VerificationEmail">What happened to the verification email sign up was asked to send; null when none was asked for.</param>
 public sealed record AuthResult(
     [property: JsonPropertyName("user")] User User,
@@ -997,6 +1125,22 @@ public sealed record CreateMagicLinkRequest(
 /// <param name="Token">The <c>orvano_token</c> parameter of the emailed link.</param>
 public sealed record CreateMagicLinkSessionRequest(
     [property: JsonPropertyName("token")] string Token);
+
+/// <summary>A request to start signing in with a provider.</summary>
+/// <param name="Provider">The provider to sign in with.</param>
+/// <param name="RedirectUrl">Your page or app that receives the result: a host that is one of the project's web platforms (<c>http</c> only on <c>localhost</c> or <c>127.0.0.1</c>), or your app's own scheme (its iOS, Android, or macOS identifier). Orvano adds <c>orvano_type</c> and then <c>orvano_code</c> or <c>orvano_error</c> to it.</param>
+/// <param name="CodeChallenge">The S256 PKCE challenge: base64url(SHA-256(verifier)), 43 characters. Keep the verifier; only it redeems the code. The SDKs make both.</param>
+public sealed record CreateOAuthFlowRequest(
+    [property: JsonPropertyName("provider")] OAuthProvider Provider,
+    [property: JsonPropertyName("redirectUrl")] string RedirectUrl,
+    [property: JsonPropertyName("codeChallenge")] string CodeChallenge);
+
+/// <summary>A sign in with the code a provider flow returned.</summary>
+/// <param name="Code">The <c>orvano_code</c> parameter Orvano added to your redirect URL. It works once, for 2 minutes.</param>
+/// <param name="CodeVerifier">The PKCE verifier whose challenge started the flow: 43 to 128 characters of <c>[A-Za-z0-9-._~]</c>.</param>
+public sealed record CreateOAuthSessionRequest(
+    [property: JsonPropertyName("code")] string Code,
+    [property: JsonPropertyName("codeVerifier")] string CodeVerifier);
 
 /// <summary>A new org. The caller becomes its owner.</summary>
 /// <param name="Name">The org name; trimmed, 1 to 100 characters.</param>
@@ -1278,6 +1422,22 @@ public sealed record MemberPage(
     [property: JsonPropertyName("items")] IReadOnlyList<Member> Items,
     [property: JsonPropertyName("nextCursor")] string? NextCursor);
 
+/// <summary>Apple's form post.</summary>
+/// <param name="State">The flow's state.</param>
+/// <param name="Code">The provider's authorization code.</param>
+/// <param name="User">Apple's JSON with the user's name, sent only on the first authorization.</param>
+/// <param name="Error">The provider's error, such as <c>user_cancelled_authorize</c>.</param>
+public sealed record OAuthCallbackForm(
+    [property: JsonPropertyName("state"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? State = null,
+    [property: JsonPropertyName("code"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Code = null,
+    [property: JsonPropertyName("user"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? User = null,
+    [property: JsonPropertyName("error"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Error = null);
+
+/// <summary>A started provider flow.</summary>
+/// <param name="Url">Send the browser here: the provider's sign in page.</param>
+public sealed record OAuthFlow(
+    [property: JsonPropertyName("url")] string Url);
+
 /// <summary>The discovery document standard JWT libraries configure themselves from. Orvano is not an OpenID provider; this exists so tools that take an issuer URL find the keys. Its names are the standard snake case ones.</summary>
 /// <param name="Issuer">The issuer, the <c>iss</c> of every access token of the project.</param>
 /// <param name="JwksUri">Where the project's JWKS lives.</param>
@@ -1414,6 +1574,7 @@ public sealed record RenderedEmail(
 /// <param name="IpAddress">The IP address last seen for the session; null when unknown.</param>
 /// <param name="Current">Whether this is the session making the call.</param>
 /// <param name="Method">How the session began.</param>
+/// <param name="Provider">The provider of an <c>oauth</c> or <c>id_token</c> session; null for every other method.</param>
 public sealed record Session(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
@@ -1422,7 +1583,8 @@ public sealed record Session(
     [property: JsonPropertyName("sdk")] string? Sdk,
     [property: JsonPropertyName("ipAddress")] string? IpAddress,
     [property: JsonPropertyName("current")] bool Current,
-    [property: JsonPropertyName("method")] SessionMethod Method);
+    [property: JsonPropertyName("method")] SessionMethod Method,
+    [property: JsonPropertyName("provider")] OAuthProvider? Provider);
 
 /// <summary>One page of a user's active sessions, newest first.</summary>
 /// <param name="Items">The sessions on this page.</param>

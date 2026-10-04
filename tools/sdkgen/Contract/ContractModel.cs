@@ -9,6 +9,9 @@ internal enum Audience
     Server,
     Both,
     Console,
+
+    /// <summary>A route a person's browser reaches by navigation (spec 0012); SdkGen generates nothing for it.</summary>
+    Browser,
 }
 
 internal enum ParamLocation

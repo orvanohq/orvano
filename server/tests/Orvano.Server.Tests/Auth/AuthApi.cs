@@ -57,9 +57,16 @@ public sealed class AuthApi : IAsyncDisposable
     /// <c>app.example.com</c>, iOS <c>com.acme.app</c>), and <paramref name="smtp"/> an install SMTP server, so auth
     /// emails queue. No worker runs, so they are never sent: <see cref="LatestEmailAsync"/> opens the queued row.
     /// </remarks>
+    /// <remarks>
+    /// <paramref name="oauth"/> (spec 0012) also turns on the fake sign in provider under the process's own
+    /// <c>/v1/test/oauth</c>, makes the public URL the process's address so the provider's callback reaches it, adds
+    /// <paramref name="email"/>'s platforms, and seeds all four providers for <see cref="Project"/> (<see cref="OAuthFixtures"/>).
+    /// </remarks>
     public static async Task<AuthApi> StartAsync(
-        PostgresFixture postgres, IReadOnlyDictionary<string, string>? env = null, bool fixtures = true, bool email = false, bool smtp = false)
+        PostgresFixture postgres, IReadOnlyDictionary<string, string>? env = null, bool fixtures = true, bool email = false, bool smtp = false,
+        bool oauth = false)
     {
+        email |= oauth;
         var database = await postgres.NewDatabaseAsync();
         await database.MigrateAsync();
         var fixturesPath = Path.Combine(Path.GetTempPath(), $"orvano-auth-fixtures-{Guid.NewGuid():N}.yaml");
@@ -89,6 +96,7 @@ public sealed class AuthApi : IAsyncDisposable
                 password: fixture horse battery
                 name: Fixture User
             {(smtp ? InstallSmtp : "")}
+            {(oauth ? OAuthFixtures : "")}
             """, Ct);
 
         var settings = new Dictionary<string, string>
@@ -97,9 +105,17 @@ public sealed class AuthApi : IAsyncDisposable
             ["ASPNETCORE_ENVIRONMENT"] = "Test",
         };
         if (fixtures) settings["ORVANO_TEST_FIXTURES"] = fixturesPath;
-        foreach (var (key, value) in env ?? new Dictionary<string, string>()) settings[key] = value;
 
-        var process = OrvanoProcess.Start(["api"], settings, listen: true);
+        int? port = null;
+        if (oauth)
+        {
+            port = OrvanoProcess.FreePort();
+            settings["ORVANO_PUBLIC_URL"] = $"http://127.0.0.1:{port}";
+            settings["ORVANO_TEST_OAUTH_PROVIDER_URL"] = $"http://127.0.0.1:{port}/v1/test/oauth";
+        }
+
+        foreach (var (key, value) in env ?? new Dictionary<string, string>()) settings[key] = value;
+        var process = OrvanoProcess.Start(["api"], settings, listen: true, port: port);
         try
         {
             await process.WaitUntilListeningAsync();
@@ -126,6 +142,55 @@ public sealed class AuthApi : IAsyncDisposable
           - project: {Project}
             type: ios
             identifier: com.acme.app
+
+        """;
+
+    /// <summary>The Google web client ID of the OAuth fixtures; its native one is <see cref="GoogleNativeClient"/>.</summary>
+    public const string GoogleWebClient = "google-web-client";
+    public const string GoogleNativeClient = "google-ios-client";
+    public const string AppleServicesId = "com.acme.app.web";
+    public const string AppleBundleId = "com.acme.app";
+
+    /// <summary>A throwaway Sign in with Apple key: an EC P-256 PKCS#8 PEM made for these tests only.</summary>
+    public const string ApplePrivateKey = """
+        -----BEGIN PRIVATE KEY-----
+        MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg7h8OMosJFfkuDZUw
+        uypojpDZR8j94JL8++F84SXKmkqhRANCAASj9wKnLhJvcOx0l5eonieys8K0DKhy
+        gL94OCq2BNXGvQqVSPln9CgpoQc0KRMmWCJsrVzsiOG0tIPdF/9WTisT
+        -----END PRIVATE KEY-----
+        """;
+
+    private const string OAuthFixtures = $"""
+        oauthProviders:
+          - project: {Project}
+            provider: google
+            enabled: true
+            clientId: {GoogleWebClient}
+            clientSecret: google-secret-0001
+            clientIdsExtra: [{GoogleNativeClient}]
+          - project: {Project}
+            provider: apple
+            enabled: true
+            clientId: {AppleServicesId}
+            clientIdsExtra: [{AppleBundleId}]
+            appleTeamId: TEAM123456
+            appleKeyId: KEY1234567
+            applePrivateKey: |
+              -----BEGIN PRIVATE KEY-----
+              MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg7h8OMosJFfkuDZUw
+              uypojpDZR8j94JL8++F84SXKmkqhRANCAASj9wKnLhJvcOx0l5eonieys8K0DKhy
+              gL94OCq2BNXGvQqVSPln9CgpoQc0KRMmWCJsrVzsiOG0tIPdF/9WTisT
+              -----END PRIVATE KEY-----
+          - project: {Project}
+            provider: github
+            enabled: true
+            clientId: github-client
+            clientSecret: github-secret-0001
+          - project: {Project}
+            provider: microsoft
+            enabled: true
+            clientId: microsoft-client
+            clientSecret: microsoft-secret-0001
 
         """;
 

@@ -98,6 +98,12 @@ internal static class SessionMethod
     public const string MagicLink = "magic_link";
     public const string EmailCode = "email_code";
     public const string Recovery = "recovery";
+
+    /// <summary>A provider's redirect flow (spec 0012, AC-7); the session also records the provider.</summary>
+    public const string OAuth = "oauth";
+
+    /// <summary>A provider's ID token from a native app (spec 0012, AC-9); the session also records the provider.</summary>
+    public const string IdToken = "id_token";
 }
 
 /// <summary>What a refresh does (spec 0004, refresh decision).</summary>

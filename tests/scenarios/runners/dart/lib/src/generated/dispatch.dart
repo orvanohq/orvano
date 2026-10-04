@@ -75,6 +75,26 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.createOAuthFlow': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.createOAuthFlow(
+        CreateOAuthFlowRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.createOAuthSession': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createOAuthSession(
+        CreateOAuthSessionRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
   'account.createPasswordSession': DispatchEntry(
     status: 201,
     client: (o, input) async {

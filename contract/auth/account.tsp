@@ -85,7 +85,7 @@ model AuthResult {
   @doc("The new session's tokens.")
   session: SessionTokens;
 
-  @doc("Whether this call created the user: true from sign up, and from a magic link or email code for a new email.")
+  @doc("Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user.")
   @example(false)
   isNewUser: boolean;
 
@@ -229,6 +229,87 @@ enum SessionMethod {
 
   @doc("A password reset.")
   recovery,
+
+  @doc("A provider's redirect flow (`account.createOAuthSession`); `Session.provider` names the provider.")
+  oauth,
+
+  @doc("A provider's ID token from a native app (`account.createIdTokenSession`); `Session.provider` names the provider.")
+  id_token,
+}
+
+@doc("A sign in provider.")
+enum OAuthProvider {
+  @doc("Sign in with Google.")
+  google,
+
+  @doc("Sign in with Apple.")
+  apple,
+
+  @doc("Sign in with GitHub.")
+  github,
+
+  @doc("Sign in with Microsoft: personal, work, and school accounts.")
+  microsoft,
+}
+
+@doc("A provider a native app can sign in with by its ID token.")
+enum IdTokenProvider {
+  @doc("Google's ID token, from Google sign in on Android or iOS.")
+  google,
+
+  @doc("Apple's identity token, from Sign in with Apple.")
+  apple,
+}
+
+@doc("""
+  What a provider redirect came back for: the `orvano_type` parameter Orvano adds when it sends the browser back to
+  your `redirectUrl`, beside `orvano_code` or `orvano_error`. The SDKs' link helpers read it.
+  """)
+enum OAuthLinkType {
+  @doc("A sign in: redeem `orvano_code` with `account.createOAuthSession`.")
+  oauth,
+
+  @doc("Linking a provider to the signed in user: redeem `orvano_code` with `account.completeOAuthLink`.")
+  oauth_link,
+}
+
+@doc("A request to start signing in with a provider.")
+model CreateOAuthFlowRequest {
+  @doc("The provider to sign in with.")
+  provider: OAuthProvider;
+
+  @doc("""
+    Your page or app that receives the result: a host that is one of the project's web platforms (`http` only on
+    `localhost` or `127.0.0.1`), or your app's own scheme (its iOS, Android, or macOS identifier). Orvano adds
+    `orvano_type` and then `orvano_code` or `orvano_error` to it.
+    """)
+  @example("https://app.example.com/auth/callback")
+  redirectUrl: string;
+
+  @doc("""
+    The S256 PKCE challenge: base64url(SHA-256(verifier)), 43 characters. Keep the verifier; only it redeems the
+    code. The SDKs make both.
+    """)
+  @example("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
+  codeChallenge: string;
+}
+
+@doc("A started provider flow.")
+model OAuthFlow {
+  @doc("Send the browser here: the provider's sign in page.")
+  @example("https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=...")
+  url: string;
+}
+
+@doc("A sign in with the code a provider flow returned.")
+model CreateOAuthSessionRequest {
+  @doc("The `orvano_code` parameter Orvano added to your redirect URL. It works once, for 2 minutes.")
+  @example("orv_oc_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE")
+  code: string;
+
+  @doc("The PKCE verifier whose challenge started the flow: 43 to 128 characters of `[A-Za-z0-9-._~]`.")
+  @example("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk")
+  codeVerifier: string;
 }
 
 @doc("A request to email a password reset link.")
@@ -343,6 +424,9 @@ model Session {
 
   @doc("How the session began.")
   method: SessionMethod;
+
+  @doc("The provider of an `oauth` or `id_token` session; null for every other method.")
+  provider: OAuthProvider | null;
 }
 
 @doc("One page of a user's active sessions, newest first.")
@@ -387,6 +471,33 @@ interface AccountApi {
   @route("/sessions/password")
   @post
   createPasswordSession(@body request: CreatePasswordSessionRequest): {
+    @statusCode statusCode: 201;
+    @body body: AuthResult;
+  } | Problem;
+
+  @doc("""
+    Starts signing in with a provider: answers the provider's sign in page to send the browser to. After the user
+    agrees, Orvano sends the browser back to `redirectUrl` with a code that only your verifier redeems. The SDKs'
+    `signInWithOAuth` does all of it.
+    """)
+  @operationId("account.createOAuthFlow")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @route("/oauth/flows")
+  @post
+  createOAuthFlow(@body request: CreateOAuthFlowRequest): OAuthFlow | Problem;
+
+  @doc("""
+    Signs a user in with the code a provider flow returned and the flow's PKCE verifier. It finds the user by the
+    provider account, else by the provider's verified email, else creates them. The code works once.
+    """)
+  @operationId("account.createOAuthSession")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @extension("x-orvano-session", "start")
+  @route("/sessions/oauth")
+  @post
+  createOAuthSession(@body request: CreateOAuthSessionRequest): {
     @statusCode statusCode: 201;
     @body body: AuthResult;
   } | Problem;

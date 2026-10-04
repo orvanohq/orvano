@@ -51,6 +51,24 @@ internal static class AuthTimings
     /// <summary>A user without a password must call from a session at most this old to change sensitive things (AC-17, AC-19).</summary>
     public static readonly TimeSpan Reauthentication = TimeSpan.FromMinutes(10);
 
+    /// <summary>How long an OAuth flow waits for the provider's callback (spec 0012, AC-4).</summary>
+    public static readonly TimeSpan OAuthFlow = TimeSpan.FromMinutes(10);
+
+    /// <summary>How long the handoff code of a finished callback works (spec 0012, AC-6).</summary>
+    public static readonly TimeSpan OAuthHandoff = TimeSpan.FromMinutes(2);
+
+    /// <summary>How long Orvano's own Apple client secret JWT is valid (spec 0012, AC-3).</summary>
+    public static readonly TimeSpan AppleClientSecret = TimeSpan.FromHours(1);
+
+    /// <summary>How long a made Apple client secret is reused, well inside its validity (spec 0012, AC-3).</summary>
+    public static readonly TimeSpan AppleClientSecretCache = TimeSpan.FromMinutes(50);
+
+    /// <summary>How long a provider's discovery document and keys are cached (spec 0012, AC-8).</summary>
+    public static readonly TimeSpan ProviderKeysCache = TimeSpan.FromHours(12);
+
+    /// <summary>The soonest a provider's keys are fetched again for an unknown <c>kid</c> (spec 0012, AC-8).</summary>
+    public static readonly TimeSpan ProviderKeysRefresh = TimeSpan.FromMinutes(5);
+
     /// <summary>The open email requests answer no sooner than this after they start, whether or not the account exists (AC-8).</summary>
     public static readonly TimeSpan OpenSendFloor = TimeSpan.FromMilliseconds(500);
 }

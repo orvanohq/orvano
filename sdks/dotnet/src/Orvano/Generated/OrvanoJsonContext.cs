@@ -14,6 +14,7 @@ namespace Orvano;
 [JsonSerializable(typeof(Health))]
 [JsonSerializable(typeof(Jwk))]
 [JsonSerializable(typeof(Jwks))]
+[JsonSerializable(typeof(OAuthProvider))]
 [JsonSerializable(typeof(OpenIdConfiguration))]
 [JsonSerializable(typeof(Session))]
 [JsonSerializable(typeof(SessionMethod))]

@@ -135,7 +135,14 @@ internal static class RedirectUrlRule
 {
     public const int MaxLength = 2048;
 
-    public static bool TryCheck(string? raw, EmailTokenKind kind, out RedirectUrl redirect)
+    public static bool TryCheck(string? raw, EmailTokenKind kind, out RedirectUrl redirect) =>
+        TryCheck(raw, allowAppScheme: !EmailTokenKinds.GrantsSession(kind), out redirect);
+
+    /// <summary>
+    /// The same shape rule with the scheme choice made by the caller: the OAuth flows (spec 0012, AC-4) allow a custom
+    /// scheme, because PKCE binds their code to the app that started the flow.
+    /// </summary>
+    public static bool TryCheck(string? raw, bool allowAppScheme, out RedirectUrl redirect)
     {
         redirect = null!;
         if (raw is null || raw.Length is 0 or > MaxLength) return false;
@@ -155,7 +162,7 @@ internal static class RedirectUrlRule
         if (host.Length == 0 || host.EndsWith('.')) return false;
 
         var web = url.Scheme == Uri.UriSchemeHttps || url.Scheme == Uri.UriSchemeHttp;
-        if (!web && EmailTokenKinds.GrantsSession(kind)) return false;
+        if (!web && !allowAppScheme) return false;
         redirect = new RedirectUrl(url, web ? RedirectScheme.Web : RedirectScheme.App);
         return true;
     }
@@ -170,14 +177,22 @@ internal static class LinkUrl
     public const string TypeParameter = "orvano_type";
     public const string TokenParameter = "orvano_token";
 
-    public static string Build(Uri redirect, EmailTokenKind kind, LinkToken token)
+    public static string Build(Uri redirect, EmailTokenKind kind, LinkToken token) =>
+        With(redirect, [TypeParameter, TokenParameter], [(TypeParameter, EmailTokenKinds.Wire(kind)), (TokenParameter, token.Value)]);
+
+    /// <summary>
+    /// The redirect URL's normalized form with every parameter named in <paramref name="strip"/> removed and
+    /// <paramref name="added"/> appended in order, keeping the rest of the query and the fragment. The added values
+    /// are escaped; the names are plain ASCII.
+    /// </summary>
+    public static string With(Uri redirect, IReadOnlyCollection<string> strip, IEnumerable<(string Name, string Value)> added)
     {
         var kept = redirect.Query.TrimStart('?')
             .Split('&', StringSplitOptions.RemoveEmptyEntries)
-            .Where(pair => Name(pair) is not (TypeParameter or TokenParameter));
+            .Where(pair => !strip.Contains(Name(pair)));
         var builder = new UriBuilder(redirect)
         {
-            Query = string.Join('&', kept.Append($"{TypeParameter}={EmailTokenKinds.Wire(kind)}").Append($"{TokenParameter}={token.Value}")),
+            Query = string.Join('&', kept.Concat(added.Select(p => $"{p.Name}={Uri.EscapeDataString(p.Value)}"))),
         };
         return builder.Uri.AbsoluteUri;
     }

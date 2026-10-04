@@ -29,6 +29,12 @@ abstract final class ErrorCode {
   /// `forbidden`
   static const forbidden = 'forbidden';
 
+  /// `identity_already_linked`
+  static const identityAlreadyLinked = 'identity_already_linked';
+
+  /// `identity_not_found`
+  static const identityNotFound = 'identity_not_found';
+
   /// `insufficient_scope`
   static const insufficientScope = 'insufficient_scope';
 
@@ -49,6 +55,12 @@ abstract final class ErrorCode {
 
   /// `invalid_email_token`
   static const invalidEmailToken = 'invalid_email_token';
+
+  /// `invalid_id_token`
+  static const invalidIdToken = 'invalid_id_token';
+
+  /// `invalid_oauth_code`
+  static const invalidOauthCode = 'invalid_oauth_code';
 
   /// `invalid_password`
   static const invalidPassword = 'invalid_password';
@@ -77,8 +89,14 @@ abstract final class ErrorCode {
   /// `last_owner`
   static const lastOwner = 'last_owner';
 
+  /// `last_sign_in_method`
+  static const lastSignInMethod = 'last_sign_in_method';
+
   /// `not_found`
   static const notFound = 'not_found';
+
+  /// `oauth_access_denied`
+  static const oauthAccessDenied = 'oauth_access_denied';
 
   /// `org_not_active`
   static const orgNotActive = 'org_not_active';
@@ -94,6 +112,21 @@ abstract final class ErrorCode {
 
   /// `project_not_ready`
   static const projectNotReady = 'project_not_ready';
+
+  /// `provider_already_linked`
+  static const providerAlreadyLinked = 'provider_already_linked';
+
+  /// `provider_error`
+  static const providerError = 'provider_error';
+
+  /// `provider_not_configured`
+  static const providerNotConfigured = 'provider_not_configured';
+
+  /// `provider_not_enabled`
+  static const providerNotEnabled = 'provider_not_enabled';
+
+  /// `provider_unavailable`
+  static const providerUnavailable = 'provider_unavailable';
 
   /// `rate_limited`
   static const rateLimited = 'rate_limited';

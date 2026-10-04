@@ -21,6 +21,7 @@ namespace Orvano.Server.Hosting;
 /// <param name="Platforms">Platforms to seed; a web one lets browsers of that host call the project.</param>
 /// <param name="Users">App users to seed with known passwords.</param>
 /// <param name="InstallSmtp">The install's SMTP server to seed, if any: a mail catcher that needs no sign in.</param>
+/// <param name="OAuthProviders">Sign in provider settings to seed (spec 0012), through the console's own settings code.</param>
 /// <param name="Problem">Why the fixtures can't be used; the role refuses to start when set.</param>
 internal sealed record TestFixtures(
     IReadOnlyList<FixtureConsoleUser> ConsoleUsers,
@@ -29,6 +30,7 @@ internal sealed record TestFixtures(
     IReadOnlyList<FixturePlatform> Platforms,
     IReadOnlyList<FixtureUser> Users,
     FixtureInstallSmtp? InstallSmtp = null,
+    IReadOnlyList<FixtureOAuthProvider>? OAuthProviders = null,
     string? Problem = null)
 {
     public const string Setting = "ORVANO_TEST_FIXTURES";
@@ -120,7 +122,20 @@ internal sealed record TestFixtures(
             installSmtp = new FixtureInstallSmtp(valid.Host, valid.Port, valid.Security, valid.FromEmail);
         }
 
-        return new TestFixtures(consoleUsers, projects, keys, platforms, users, installSmtp);
+        var providers = new List<FixtureOAuthProvider>();
+        foreach (var o in file?.OAuthProviders ?? [])
+        {
+            if (!projects.Any(project => project.Id == o.Project)) return Fail($"{Setting}: oauthProviders project '{o.Project}' is not one of the fixture projects");
+            if (!Auth.Domain.OAuthProviders.TryParse(o.Provider, out var provider)) return Fail($"{Setting}: oauthProviders provider '{o.Provider}' is not google, apple, github, or microsoft");
+            var update = new ProviderUpdate(
+                o.Enabled, o.ClientId, o.ClientSecret is null ? SecretChange.Keep : SecretChange.Set(o.ClientSecret), o.ClientIdsExtra,
+                o.AppleTeamId, o.AppleKeyId, o.ApplePrivateKey is null ? SecretChange.Keep : SecretChange.Set(o.ApplePrivateKey), o.MicrosoftTenant);
+            if (!ProviderSettingsRules.TryApply(ProviderConfig.Empty(provider), update, out _, out var problem))
+                return Fail($"{Setting}: oauthProviders {o.Provider} of '{o.Project}': {problem}");
+            providers.Add(new FixtureOAuthProvider(o.Project!, provider, update));
+        }
+
+        return new TestFixtures(consoleUsers, projects, keys, platforms, users, installSmtp, providers);
     }
 
     private static TestFixtures Fail(string problem) => None with { Problem = problem };
@@ -148,6 +163,42 @@ internal sealed record TestFixtures(
 
         [YamlMember(Alias = "installSmtp")]
         public InstallSmtpEntry? InstallSmtp { get; set; }
+
+        [YamlMember(Alias = "oauthProviders")]
+        public List<OAuthProviderEntry>? OAuthProviders { get; set; }
+    }
+
+    private sealed class OAuthProviderEntry
+    {
+        [YamlMember(Alias = "project")]
+        public string? Project { get; set; }
+
+        [YamlMember(Alias = "provider")]
+        public string? Provider { get; set; }
+
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
+
+        [YamlMember(Alias = "clientId")]
+        public string? ClientId { get; set; }
+
+        [YamlMember(Alias = "clientSecret")]
+        public string? ClientSecret { get; set; }
+
+        [YamlMember(Alias = "clientIdsExtra")]
+        public List<string>? ClientIdsExtra { get; set; }
+
+        [YamlMember(Alias = "appleTeamId")]
+        public string? AppleTeamId { get; set; }
+
+        [YamlMember(Alias = "appleKeyId")]
+        public string? AppleKeyId { get; set; }
+
+        [YamlMember(Alias = "applePrivateKey")]
+        public string? ApplePrivateKey { get; set; }
+
+        [YamlMember(Alias = "microsoftTenant")]
+        public string? MicrosoftTenant { get; set; }
     }
 
     private sealed class InstallSmtpEntry

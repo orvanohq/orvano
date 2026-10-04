@@ -22,6 +22,9 @@
       "name": "users"
     },
     {
+      "name": "oauth"
+    },
+    {
       "name": "test"
     }
   ],
@@ -360,6 +363,50 @@
         "x-orvano-audience": "client"
       }
     },
+    "/v1/account/oauth/flows": {
+      "post": {
+        "operationId": "account.createOAuthFlow",
+        "description": "Starts signing in with a provider: answers the provider's sign in page to send the browser to. After the user\nagrees, Orvano sends the browser back to `redirectUrl` with a code that only your verifier redeems. The SDKs'\n`signInWithOAuth` does all of it.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthFlow"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOAuthFlowRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/account/password": {
       "put": {
         "operationId": "account.updatePassword",
@@ -689,6 +736,51 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreateMagicLinkSessionRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-session": "start",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/sessions/oauth": {
+      "post": {
+        "operationId": "account.createOAuthSession",
+        "description": "Signs a user in with the code a provider flow returned and the flow's PKCE verifier. It finds the user by the\nprovider account, else by the provider's verified email, else creates them. The code works once.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOAuthSessionRequest"
               }
             }
           }
@@ -4444,6 +4536,218 @@
         "x-orvano-audience": "both"
       }
     },
+    "/v1/projects/{projectId}/oauth/{provider}/callback": {
+      "get": {
+        "operationId": "oauth.callback",
+        "description": "The provider's redirect back, with a query (Google, GitHub, Microsoft).",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "description": "The project the flow belongs to.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "description": "The provider the flow belongs to.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "description": "The flow's state.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "description": "The provider's authorization code.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "description": "The provider's error, such as `access_denied`.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "The provider sent the browser back: on to the app's redirect URL with `orvano_code` or `orvano_error`.",
+            "headers": {
+              "location": {
+                "required": true,
+                "description": "The app's redirect URL with `orvano_type` and `orvano_code` or `orvano_error`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "The provider sent the browser back: on to the app's redirect URL with `orvano_code` or `orvano_error`.",
+            "headers": {
+              "location": {
+                "required": true,
+                "description": "The app's redirect URL with `orvano_type` and `orvano_code` or `orvano_error`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The flow is unknown, used, or expired (400), or the callback limit was reached (429): a static page saying to go back to the app.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The flow is unknown, used, or expired (400), or the callback limit was reached (429): a static page saying to go back to the app.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "oauth"
+        ],
+        "x-orvano-service": "oauth",
+        "x-orvano-audience": "browser"
+      },
+      "post": {
+        "operationId": "oauth.callbackForm",
+        "description": "The provider's redirect back as a form post (Apple).",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "description": "The project the flow belongs to.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "description": "The provider the flow belongs to.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "The provider sent the browser back: on to the app's redirect URL with `orvano_code` or `orvano_error`.",
+            "headers": {
+              "location": {
+                "required": true,
+                "description": "The app's redirect URL with `orvano_type` and `orvano_code` or `orvano_error`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "The provider sent the browser back: on to the app's redirect URL with `orvano_code` or `orvano_error`.",
+            "headers": {
+              "location": {
+                "required": true,
+                "description": "The app's redirect URL with `orvano_type` and `orvano_code` or `orvano_error`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The flow is unknown, used, or expired (400), or the callback limit was reached (429): a static page saying to go back to the app.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The flow is unknown, used, or expired (400), or the callback limit was reached (429): a static page saying to go back to the app.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "oauth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthCallbackForm"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "oauth",
+        "x-orvano-audience": "browser"
+      }
+    },
     "/v1/test/conflict": {
       "post": {
         "operationId": "test.conflict",
@@ -5511,7 +5815,7 @@
           },
           "isNewUser": {
             "type": "boolean",
-            "description": "Whether this call created the user: true from sign up, and from a magic link or email code for a new email.",
+            "description": "Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user.",
             "examples": [
               false
             ]
@@ -6001,6 +6305,59 @@
           }
         },
         "description": "A sign in with the token from a magic link."
+      },
+      "CreateOAuthFlowRequest": {
+        "type": "object",
+        "required": [
+          "provider",
+          "redirectUrl",
+          "codeChallenge"
+        ],
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/OAuthProvider",
+            "description": "The provider to sign in with."
+          },
+          "redirectUrl": {
+            "type": "string",
+            "description": "Your page or app that receives the result: a host that is one of the project's web platforms (`http` only on\n`localhost` or `127.0.0.1`), or your app's own scheme (its iOS, Android, or macOS identifier). Orvano adds\n`orvano_type` and then `orvano_code` or `orvano_error` to it.",
+            "examples": [
+              "https://app.example.com/auth/callback"
+            ]
+          },
+          "codeChallenge": {
+            "type": "string",
+            "description": "The S256 PKCE challenge: base64url(SHA-256(verifier)), 43 characters. Keep the verifier; only it redeems the\ncode. The SDKs make both.",
+            "examples": [
+              "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+            ]
+          }
+        },
+        "description": "A request to start signing in with a provider."
+      },
+      "CreateOAuthSessionRequest": {
+        "type": "object",
+        "required": [
+          "code",
+          "codeVerifier"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The `orvano_code` parameter Orvano added to your redirect URL. It works once, for 2 minutes.",
+            "examples": [
+              "orv_oc_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          },
+          "codeVerifier": {
+            "type": "string",
+            "description": "The PKCE verifier whose challenge started the flow: 43 to 128 characters of `[A-Za-z0-9-._~]`.",
+            "examples": [
+              "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+            ]
+          }
+        },
+        "description": "A sign in with the code a provider flow returned."
       },
       "CreateOrgRequest": {
         "type": "object",
@@ -6703,7 +7060,18 @@
           "reauthentication_required",
           "email_already_verified",
           "email_already_in_use",
-          "server_busy"
+          "server_busy",
+          "invalid_oauth_code",
+          "invalid_id_token",
+          "oauth_access_denied",
+          "identity_not_found",
+          "provider_not_enabled",
+          "provider_not_configured",
+          "provider_already_linked",
+          "identity_already_linked",
+          "last_sign_in_method",
+          "provider_error",
+          "provider_unavailable"
         ],
         "description": "Every stable error code the server sends in `Problem.code`."
       },
@@ -6730,6 +7098,14 @@
           }
         },
         "description": "Whether the server is up, and which Orvano version it runs."
+      },
+      "IdTokenProvider": {
+        "type": "string",
+        "enum": [
+          "google",
+          "apple"
+        ],
+        "description": "A provider a native app can sign in with by its ID token."
       },
       "InstallSettings": {
         "type": "object",
@@ -7132,6 +7508,62 @@
           "blocked"
         ],
         "description": "Whether a member's console account may sign in."
+      },
+      "OAuthCallbackForm": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "The flow's state."
+          },
+          "code": {
+            "type": "string",
+            "description": "The provider's authorization code."
+          },
+          "user": {
+            "type": "string",
+            "description": "Apple's JSON with the user's name, sent only on the first authorization."
+          },
+          "error": {
+            "type": "string",
+            "description": "The provider's error, such as `user_cancelled_authorize`."
+          }
+        },
+        "description": "Apple's form post."
+      },
+      "OAuthFlow": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Send the browser here: the provider's sign in page.",
+            "examples": [
+              "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=..."
+            ]
+          }
+        },
+        "description": "A started provider flow."
+      },
+      "OAuthLinkType": {
+        "type": "string",
+        "enum": [
+          "oauth",
+          "oauth_link"
+        ],
+        "description": "What a provider redirect came back for: the `orvano_type` parameter Orvano adds when it sends the browser back to\nyour `redirectUrl`, beside `orvano_code` or `orvano_error`. The SDKs' link helpers read it."
+      },
+      "OAuthProvider": {
+        "type": "string",
+        "enum": [
+          "google",
+          "apple",
+          "github",
+          "microsoft"
+        ],
+        "description": "A sign in provider."
       },
       "OpenIdConfiguration": {
         "type": "object",
@@ -7656,7 +8088,8 @@
           "sdk",
           "ipAddress",
           "current",
-          "method"
+          "method",
+          "provider"
         ],
         "properties": {
           "id": {
@@ -7728,6 +8161,17 @@
           "method": {
             "$ref": "#/components/schemas/SessionMethod",
             "description": "How the session began."
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OAuthProvider"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The provider of an `oauth` or `id_token` session; null for every other method."
           }
         },
         "description": "An active session of a user: one signed in device or browser."
@@ -7739,7 +8183,9 @@
           "sign_up",
           "magic_link",
           "email_code",
-          "recovery"
+          "recovery",
+          "oauth",
+          "id_token"
         ],
         "description": "How a session began."
       },

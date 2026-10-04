@@ -18,6 +18,7 @@ const session: Session = {
   ipAddress: '203.0.113.7',
   current: false,
   method: 'password',
+  provider: null,
 }
 
 const signingKeys: SigningKey[] = [

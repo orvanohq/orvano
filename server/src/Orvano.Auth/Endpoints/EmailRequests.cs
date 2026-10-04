@@ -54,11 +54,14 @@ internal static class EmailRequests
     /// token; otherwise reads the body, runs <paramref name="redeem"/>, and counts the answer against the IP only
     /// when it is a 401.
     /// </summary>
-    public static async Task<IResult> RedeemAsync<TRequest>(HttpContext http, RateLimits limits, CancellationToken ct, Func<TRequest, Task<IResult>> redeem)
+    /// <remarks>The OAuth redemptions (spec 0012, AC-7, AC-9) pass their own <paramref name="failedPolicy"/>, <c>auth.oauth_failed.ip</c>.</remarks>
+    public static async Task<IResult> RedeemAsync<TRequest>(
+        HttpContext http, RateLimits limits, CancellationToken ct, Func<TRequest, Task<IResult>> redeem, RateLimitPolicy? failedPolicy = null)
         where TRequest : class
     {
+        var policy = failedPolicy ?? RateLimitPolicies.FailedEmailRedeemPerIp;
         var ip = ConnectionIp.Key(http);
-        var failures = limits.Check(RateLimitPolicies.FailedEmailRedeemPerIp, ip);
+        var failures = limits.Check(policy, ip);
         if (!failures.Allowed) return ApiProblem.RateLimited(http, failures, Api.ErrorCode.RateLimited);
 
         TRequest? request;
@@ -74,7 +77,7 @@ internal static class EmailRequests
         if (request is null) return ApiProblem.Result(StatusCodes.Status400BadRequest, Api.ErrorCode.InvalidRequest, "Send a JSON object as the body.");
 
         var result = await redeem(request);
-        if (result is IStatusCodeHttpResult { StatusCode: StatusCodes.Status401Unauthorized }) limits.Acquire(RateLimitPolicies.FailedEmailRedeemPerIp, ip);
+        if (result is IStatusCodeHttpResult { StatusCode: StatusCodes.Status401Unauthorized }) limits.Acquire(policy, ip);
         return result;
     }
 }

@@ -8,6 +8,8 @@ import type {
   CreateEmailCodeSessionRequest,
   CreateMagicLinkRequest,
   CreateMagicLinkSessionRequest,
+  CreateOAuthFlowRequest,
+  CreateOAuthSessionRequest,
   CreatePasswordSessionRequest,
   CreateRecoveryRequest,
   CreateUserRecoveryRequest,
@@ -56,6 +58,14 @@ export const dispatch: DispatchTable = {
     status: 201,
     client: (o, input) =>
       o.account.createMagicLinkSession(input.body as CreateMagicLinkSessionRequest),
+  },
+  'account.createOAuthFlow': {
+    status: 200,
+    client: (o, input) => o.account.createOAuthFlow(input.body as CreateOAuthFlowRequest),
+  },
+  'account.createOAuthSession': {
+    status: 201,
+    client: (o, input) => o.account.createOAuthSession(input.body as CreateOAuthSessionRequest),
   },
   'account.createPasswordSession': {
     status: 201,
