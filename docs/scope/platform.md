@@ -28,7 +28,7 @@ Public docs with a quickstart per SDK and the generated API reference. From here
    - [x] Your Cloudflare prerequisites (zone, `www` Redirect Rule, token, environments, Web Analytics)
    - [ ] The first real release, which attaches `orvano.dev` to the Worker (AC-23, 25)
 - [ ] Verify it: `/check verify docs site & quickstarts`
-- [ ] Test it: `/test docs site & quickstarts`
+- [x] Test it: `/test docs site & quickstarts`
 Spec [0011](../specs/0011-docs-site-quickstarts/index.md) · code in `website/`, `examples/`, `server/src/Orvano.Server/Install/`, `server/src/Orvano.Messaging/`, `deploy/compose/`
 
 ### 15. Console team members & roles · done
