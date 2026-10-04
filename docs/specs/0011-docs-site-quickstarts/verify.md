@@ -95,7 +95,7 @@ _Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `
 - [x] `https://orvano.dev/docs/` answers 200 with `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, HSTS, and the CSP with its script hashes; the page shows `v0.2.0`, loads the beacon, and has no `noindex` → AC-23, AC-24
 - [x] `https://www.orvano.dev/docs/` answers 301 to `https://orvano.dev/docs/`; an unknown path and an unknown `/errors/<code>` answer 404 with the 404 page, the second linking to `/errors/` → AC-23
 - [x] With no GitHub credentials, `docker run ghcr.io/orvanohq/orvano:0.2.0 install --local --yes` then `docker compose up -d --wait` → healthy, `/v1/health` answers version 0.2.0 → AC-1, AC-2, AC-8
-- [ ] A manual run of `links.yml` checks every external link and opens, updates, or closes its one issue → AC-22
+- [x] A manual run of `links.yml` checks every external link (0 errors on 2026-10-04, so no issue opened); a dead link opens or updates its one issue, and a clean run closes it → AC-22
 
 ## Acceptance-criteria coverage
 - AC-1 to AC-4: the Commands steps above, plus `LocalInstallTests`, `InstallSmtpSeedRuleTests`, and `InstallSmtpSeedTests`
