@@ -30,6 +30,17 @@ A magic link or reset signs the user in (pass `password:` for a reset). A verifi
 
 Magic links and resets sign someone in, so Orvano sends them only to `https` pages on the project's web platforms: use https app links (Android App Links, iOS Universal Links) for them, or sign in with an emailed code instead. Your app's own scheme (its bundle ID or package name, such as `com.acme.app://auth`) works only for verification and email change links, and some email clients won't open it.
 
+## Sign in with a provider
+
+```dart
+final result = await orvano.client.signInWithOAuth(
+  OAuthProvider.github,
+  redirectUrl: Uri.parse('com.acme.shop://auth'), // your app's scheme, registered as a platform
+);
+```
+
+The system's sign in sheet opens through `flutter_web_auth_2` and closes when the provider is done. For Google and Apple, prefer native sign in: add `google_sign_in` or `sign_in_with_apple`, make a nonce with `OrvanoNonce.create()`, and call `signInWithIdToken`. Guide: https://orvano.dev/docs/auth/native-sign-in/
+
 ## About
 
 Orvano is the open source backend you host yourself: auth, Postgres databases, storage, functions, realtime, messaging, webhooks, jobs, and backups, run from one console.

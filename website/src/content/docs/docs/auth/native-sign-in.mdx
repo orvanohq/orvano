@@ -1,0 +1,68 @@
+---
+title: Native sign in
+description: "Sign users in with Google and Apple natively in a Flutter app, with no browser."
+sidebar:
+  order: 14
+---
+
+On iOS and Android, a Flutter app can sign users in with the platform's own Google and Apple sheets instead of a browser. The plugin gets an ID token (a note from Google or Apple, signed by them, saying who the user is), and Orvano checks it and starts a session. It feels like the platform, and it's what App Store review expects.
+
+Orvano doesn't bundle the plugins: add [`google_sign_in`](https://pub.dev/packages/google_sign_in) and [`sign_in_with_apple`](https://pub.dev/packages/sign_in_with_apple) to your app. Set up the providers first: [Google](/docs/auth/sign-in-with-google/#native-client-ids) needs your iOS client ID under **Native client IDs**, and [Apple](/docs/auth/sign-in-with-apple/) needs your bundle ID under **Bundle IDs** plus its key.
+
+## The nonce
+
+Each sign in carries a nonce, a one time random value that ties the token to this sign in, so a token copied from elsewhere is refused. `OrvanoNonce.create()` makes one: give the provider its `hashed` form, and Orvano its `raw` form.
+
+## Google
+
+```dart
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:orvano_flutter/orvano_flutter.dart';
+
+final nonce = OrvanoNonce.create();
+await GoogleSignIn.instance.initialize(
+  serverClientId: googleWebClientId, // Android: the token then carries the web client ID
+  nonce: nonce.hashed,
+);
+final account = await GoogleSignIn.instance.authenticate();
+final result = await orvano.client.signInWithIdToken(
+  provider: IdTokenProvider.google,
+  idToken: account.authentication.idToken!,
+  nonce: nonce.raw,
+);
+```
+
+## Apple
+
+Apple also returns an authorization code. Orvano trades it with Apple once, which proves the sign in is fresh and gives Orvano the token it needs to [revoke the sign in](/docs/auth/sign-in-with-apple/#when-a-user-leaves) when the user deletes their account. The user's name comes only the first time; pass it along.
+
+```dart
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+
+final nonce = OrvanoNonce.create();
+final credential = await SignInWithApple.getAppleIDCredential(
+  scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
+  nonce: nonce.hashed,
+);
+final name = [credential.givenName, credential.familyName].whereType<String>().join(' ');
+final result = await orvano.client.signInWithIdToken(
+  provider: IdTokenProvider.apple,
+  idToken: credential.identityToken!,
+  nonce: nonce.raw,
+  authorizationCode: credential.authorizationCode,
+  name: name.isEmpty ? null : name,
+);
+```
+
+## From JavaScript
+
+The same call exists in `@orvano/js`, for a native wrapper (Capacitor, React Native) that gets the token itself:
+
+```ts
+import { createNonce } from '@orvano/js'
+
+const nonce = await createNonce() // give the plugin nonce.hashed
+const result = await orvano.client.signInWithIdToken({ provider: 'google', idToken, nonce: nonce.raw })
+```
+
+[`account.createIdTokenSession`](/docs/api/operations/accountcreateidtokensession/) finds or creates the user by the same rules as [redirect sign in](/docs/auth/sign-in-with-google/#who-the-user-is). Each token works once. A token for another app, with the wrong nonce, expired, or used before gets [`invalid_id_token`](/errors/invalid_id_token/); a provider that is off gets [`provider_not_enabled`](/errors/provider_not_enabled/), and one without its native settings [`provider_not_configured`](/errors/provider_not_configured/).

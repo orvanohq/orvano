@@ -262,6 +262,49 @@ public class OAuthTests(PostgresFixture postgres)
         foreach (var reply in both) reply.Dispose();
     }
 
+    [Fact]
+    public async Task A_slow_provider_is_unavailable_and_an_error_in_a_200_is_a_provider_error()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, oauth: true);
+
+        var (slow, _) = await OAuthDriver.StartAsync(api, "google");
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var hung = await OAuthDriver.FollowAsync(api, slow.Body.GetProperty("url").GetString()!, new { sub = "slow", hang = "token" });
+        Assert.Equal("provider_unavailable", OAuthDriver.Param(hung, "orvano_error"));
+        Assert.InRange(clock.Elapsed, TimeSpan.FromSeconds(9), TimeSpan.FromSeconds(16));
+        slow.Dispose();
+
+        var (bad, _) = await OAuthDriver.StartAsync(api, "github");
+        var refused = await OAuthDriver.FollowAsync(api, bad.Body.GetProperty("url").GetString()!, new { sub = "1", tokenError = "bad_verification_code" });
+        Assert.Equal("provider_error", OAuthDriver.Param(refused, "orvano_error"));
+        Assert.Equal("oauth", OAuthDriver.Param(refused, "orvano_type"));
+        bad.Dispose();
+
+        // A failed flow row is gone.
+        Assert.Equal(0L, await Count(api, "SELECT count(*) FROM orvano.auth_oauth_flows"));
+    }
+
+    [Fact]
+    public async Task Sixty_failed_redemptions_from_one_ip_refuse_even_a_valid_code()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, oauth: true);
+        var (start, verifier) = await OAuthDriver.StartAsync(api, "github");
+        var back = await OAuthDriver.FollowAsync(api, start.Body.GetProperty("url").GetString()!, new { sub = "60", email = "limit@x.com", emailVerified = true });
+        start.Dispose();
+
+        for (var i = 0; i < 60; i++)
+        {
+            using var wrong = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/oauth",
+                new { code = "orv_oc_" + new string((char)('A' + (i % 26)), 43), codeVerifier = verifier });
+            Assert.Equal("invalid_oauth_code", wrong.Code);
+        }
+
+        using var limited = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/oauth", new { code = OAuthDriver.Param(back, "orvano_code"), codeVerifier = verifier });
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.Status);
+        Assert.Equal("rate_limited", limited.Code);
+        Assert.NotNull(limited.Headers.RetryAfter);
+    }
+
     private static Task<long> Count(AuthApi api, string sql) => TestDatabase.ScalarAsync<long>(api.Database.Superuser, sql);
 
     private static async Task<string[]> Strings(AuthApi api, string sql)

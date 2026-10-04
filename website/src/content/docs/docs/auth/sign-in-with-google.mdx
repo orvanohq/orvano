@@ -1,0 +1,93 @@
+---
+title: Sign in with Google
+description: "Let users sign in with their Google account, by redirect on the web and natively in Flutter."
+sidebar:
+  order: 10
+---
+
+import { TabItem, Tabs } from '@astrojs/starlight/components'
+
+Users sign in with their Google account and skip the password. On the web, the SDK sends the browser to Google; Google sends it back to Orvano, and Orvano sends it on to your app with a one time code that only the browser that started can redeem. In a Flutter app, Google sign in can also run natively, with no browser: see [Native sign in](/docs/auth/native-sign-in/).
+
+The same flow works for [Apple](/docs/auth/sign-in-with-apple/), [GitHub](/docs/auth/sign-in-with-github/), and [Microsoft](/docs/auth/sign-in-with-microsoft/); only the setup at the provider differs.
+
+## 1. Create the Google OAuth client
+
+1. In the Google Cloud console, open **APIs and services**, then **Credentials**, and select **Create credentials**, then **OAuth client ID**.
+2. Choose **Web application**.
+3. In the Orvano console, open your project's **Sign in methods** page and select **Edit** on Google. Copy the **Callback URL**: `https://<your Orvano>/v1/projects/<project ID>/oauth/google/callback`.
+4. Back at Google, add that URL under **Authorized redirect URIs**, and create the client.
+5. Copy the **Client ID** and **Client secret** into the Google dialog in Orvano, turn on **Enabled**, and select **Save**. The card now says **Ready: Redirect**.
+
+The secret is stored encrypted and never shown again: the dialog shows only its last 4 characters. To change it, select **Replace**.
+
+### Native client IDs
+
+For native sign in from a Flutter app, Google gives each platform its own client ID. Put them in **Native client IDs**, one per line:
+
+- **Android**: none needed here. Android's Credential Manager puts your web client ID in the token when your app passes it as the server client ID, and the web client ID is already in **Web client ID**.
+- **iOS**: the iOS client ID. iOS tokens carry it.
+
+## 2. Send the user to Google
+
+The `redirectUrl` is where the user lands when it's done: a page on one of the project's [web platforms](/docs/console/platforms/), or your app's own scheme (its bundle ID or package name) in a mobile or desktop app.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.client.signInWithOAuth('google', {
+  redirectUrl: `${location.origin}/auth/callback.html`,
+})
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```tsx
+'use client'
+// The route handler (app/api/orvano/[...orvano]/route.ts) must export GET and POST.
+await orvano.client.signInWithOAuth('google', { redirectUrl: '/account' })
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final result = await orvano.client.signInWithOAuth(
+  OAuthProvider.google,
+  redirectUrl: Uri.parse('com.acme.shop://auth'),
+);
+```
+
+  </TabItem>
+</Tabs>
+
+[`account.createOAuthFlow`](/docs/api/operations/accountcreateoauthflow/) starts the flow. The SDK makes a PKCE verifier (a secret only this browser or app knows), sends Orvano its hash, and keeps the verifier until the user comes back.
+
+- **JavaScript**: the page goes to Google, so `signInWithOAuth` never returns. The verifier waits in `sessionStorage`.
+- **Next.js**: your route handler keeps the verifier in an `HttpOnly` cookie, finishes the sign in at `/api/orvano/oauth-callback`, sets the session cookies, and redirects to `redirectUrl`, a path in your app.
+- **Flutter**: the system's sign in sheet opens (through `flutter_web_auth_2`) and closes again when Google is done, so `signInWithOAuth` returns the result. Register your app's scheme as the project's iOS or Android platform.
+
+## 3. Finish on the callback page
+
+In plain JavaScript, the page at `redirectUrl` finishes the sign in:
+
+```ts
+const result = await orvano.client.redeemLink()
+if (result?.type === 'oauth' && result.isNewUser) showWelcome()
+```
+
+`redeemLink` reads `orvano_type=oauth` and `orvano_code`, calls [`account.createOAuthSession`](/docs/api/operations/accountcreateoauthsession/) with the stored verifier, stores the session, and removes the parameters from the address bar. The code works once, for 2 minutes.
+
+If the user cancelled at Google, the redirect carries `orvano_error` instead, and `redeemLink` throws [`oauth_access_denied`](/errors/oauth_access_denied/). Other errors: [`provider_error`](/errors/provider_error/), [`provider_unavailable`](/errors/provider_unavailable/), [`invalid_oauth_code`](/errors/invalid_oauth_code/).
+
+## Who the user is
+
+Orvano finds the user in this order:
+
+1. The Google account signed in before: that user.
+2. Otherwise, a user whose email equals the one Google verified: Google is linked to that user. When that user's own email isn't verified yet, the account is claimed: its password, other providers, and sessions go, so whoever signed up with someone else's email loses it.
+3. Otherwise, a new user with Google's verified email, and `isNewUser` true.
+
+An email Google doesn't vouch for never finds or creates a user. A user who already has a different Google account linked gets [`provider_already_linked`](/errors/provider_already_linked/): the email alone never moves a link. Users can add and remove providers themselves; see [Link providers](/docs/auth/link-identities/).

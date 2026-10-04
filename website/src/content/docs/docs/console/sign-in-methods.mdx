@@ -1,0 +1,25 @@
+---
+title: Sign in methods
+description: "Turn on Google, Apple, GitHub, and Microsoft sign in for a project."
+sidebar:
+  order: 5
+---
+
+The project's **Sign in methods** page lists the four providers: Google, Apple, GitHub, and Microsoft. Each card says whether it is **On** or **Off**, and which ways of signing in are ready: **Redirect** (the browser goes to the provider) and **Native** (Google and Apple in a mobile app). Owners and developers change them; viewers see everything, with the fields turned off.
+
+## Set up a provider
+
+1. Select **Set up** (or **Edit**) on the provider's card.
+2. Copy the **Callback URL** with its copy button, and register it at the provider. Each provider's guide says where: [Google](/docs/auth/sign-in-with-google/), [Apple](/docs/auth/sign-in-with-apple/), [GitHub](/docs/auth/sign-in-with-github/), [Microsoft](/docs/auth/sign-in-with-microsoft/).
+3. Fill in the IDs and the secret the provider gave you.
+4. Turn on **Enabled** and select **Save**. A provider can be on only once one way of signing in is ready.
+
+A field the server refuses shows its message under that field.
+
+## Secrets
+
+Client secrets and Apple's private key are stored encrypted and never shown again. A set secret shows as **Set, ends in** and its last 4 characters. **Replace** lets you type a new one; **Clear** removes it when you save; leaving it alone keeps it.
+
+## On the Users pages
+
+The Users list has a **Sign in** column: a mark for each linked provider, then **Password** for a user with a password, or **Email** for a user with neither. A user's page lists their **Identities** (the provider, the email at the provider, and when it was linked and last used) with **Unlink**. Unlinking a user's only way in is refused: "This is the user's only way to sign in." The sessions table names the provider beside the method.

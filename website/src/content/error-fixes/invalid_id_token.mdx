@@ -1,0 +1,7 @@
+## Why it happens
+
+The provider's ID token failed a check: its signature, its issuer, its audience (not one of the project's client IDs or bundle IDs), its expiry, its nonce, or it was used before. For Apple, the authorization code may also have been refused.
+
+## How to fix
+
+Get a fresh token from Google or Apple and send it once, with the raw nonce whose SHA-256 you gave the provider. Check that the project's **Sign in methods** settings list the client ID or bundle ID the token was made for.

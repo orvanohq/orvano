@@ -1,0 +1,97 @@
+---
+title: Link providers
+description: "Let users add and remove the providers they sign in with, and manage them from a server."
+sidebar:
+  order: 15
+---
+
+import { TabItem, Tabs } from '@astrojs/starlight/components'
+
+Each provider a user signs in with is an identity on their account: at most one per provider. A user can link more providers, so their Google and GitHub accounts lead to the same place, and remove the ones they no longer use.
+
+## Link a provider
+
+Linking needs a session at most 10 minutes old; otherwise the user signs in again first ([`reauthentication_required`](/errors/reauthentication_required/)).
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.client.linkIdentity('github', { redirectUrl: `${location.origin}/auth/callback.html` })
+// On the callback page, redeemLink finishes it:
+const result = await orvano.client.redeemLink() // { type: 'oauth_link', identity }
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```tsx
+'use client'
+await orvano.client.linkIdentity('github', { redirectUrl: '/account' })
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final linked = await orvano.client.linkIdentity(
+  OAuthProvider.github,
+  redirectUrl: Uri.parse('com.acme.shop://auth'),
+);
+// Natively, with a Google or Apple ID token:
+await orvano.client.linkIdentityWithIdToken(
+  provider: IdTokenProvider.apple,
+  idToken: idToken,
+  nonce: nonce.raw,
+  authorizationCode: authorizationCode,
+);
+```
+
+  </TabItem>
+</Tabs>
+
+[`account.createOAuthLinkFlow`](/docs/api/operations/accountcreateoauthlinkflow/) starts it and [`account.completeOAuthLink`](/docs/api/operations/accountcompleteoauthlink/) finishes it; only the user who started can finish. A provider account already linked to someone else gets [`identity_already_linked`](/errors/identity_already_linked/), and a provider the user already has gets [`provider_already_linked`](/errors/provider_already_linked/). Linking never looks at the provider's email.
+
+## List and remove
+
+[`account.listIdentities`](/docs/api/operations/accountlistidentities/) lists the user's identities, oldest first. [`account.deleteIdentity`](/docs/api/operations/accountdeleteidentity/) removes one; the user's sessions stay.
+
+```ts
+const { items } = await orvano.account.listIdentities()
+await orvano.account.deleteIdentity(items[0].id)
+```
+
+A user must always keep a way in. Removing an identity is refused with [`last_sign_in_method`](/errors/last_sign_in_method/) when the user would be left with no other identity, and no verified email or email with a password.
+
+## From your server
+
+A server with an API key does the same with [`users.listIdentities`](/docs/api/operations/userslistidentities/) (scope `users.read`) and [`users.deleteIdentity`](/docs/api/operations/usersdeleteidentity/) (scope `users.write`):
+
+<Tabs syncKey="server-sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const { items } = await orvano.users.listIdentities(userId)
+await orvano.users.deleteIdentity(userId, items[0].id)
+```
+
+  </TabItem>
+  <TabItem label="Dart">
+
+```dart
+final identities = await orvano.users.listIdentities(userId);
+await orvano.users.deleteIdentity(userId, identities.items.first.id);
+```
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+var identities = await orvano.Users.ListIdentitiesAsync(userId);
+await orvano.Users.DeleteIdentityAsync(userId, identities.Items[0].Id);
+```
+
+  </TabItem>
+</Tabs>
+
+Each user shows the providers they linked as `providers`, and `hasPassword` says whether they have a password. In the console, the user's page lists their identities with **Unlink**.

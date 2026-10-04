@@ -1,0 +1,7 @@
+## Why it happens
+
+The `orvano_code` from a provider redirect is unknown, already used, more than 2 minutes old, or was redeemed without the PKCE verifier of the flow that started it. A sign in code also doesn't work for linking, nor a link code for signing in.
+
+## How to fix
+
+Start the sign in again with `signInWithOAuth` (or `linkIdentity`) in the same browser or app that will redeem the code, and redeem it right away. Each code works once. In Next.js, keep the route handler's `GET` export, which finishes the flow.
