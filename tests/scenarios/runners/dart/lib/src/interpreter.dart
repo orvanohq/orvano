@@ -284,7 +284,10 @@ Future<Uri> _followOAuth(
       final target = local
           ? next.replace(host: server.host, port: server.port)
           : next;
-      final request = http.Request(method, target)..followRedirects = false;
+      // A browser can't hand back a redirect (the fetch fails), so there it
+      // follows them and reports the final URL; elsewhere each hop is read.
+      final request = http.Request(method, target)
+        ..followRedirects = _inBrowser;
       if (body != null) {
         request.headers['content-type'] = 'application/x-www-form-urlencoded';
         request.body = body;
