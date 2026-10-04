@@ -24,8 +24,10 @@
 # Lint, as CI does (ShellCheck in a container if it is not installed)
 docker run --rm -v "$PWD/deploy/install:/mnt:ro" koalaman/shellcheck:stable --shell=sh /mnt/install.sh
 
-# Try it without touching this machine: a throwaway docker:28-dind container (Alpine warns; --yes continues)
+# Try it without touching this machine: a throwaway docker:28-dind container (Alpine warns; --yes continues).
+# Alpine has no curl (the installer refuses without it) and no ss (the port check is skipped), so add both.
 docker run -d --privileged --name orv-try -v "$PWD/deploy/install:/src:ro" docker:28-dind
+docker exec orv-try apk add curl iproute2
 docker exec orv-try sh /src/install.sh --version <V> --domain localhost --yes
 ```
 

@@ -20,6 +20,7 @@ Run the host steps on a throwaway Linux server or VM (Ubuntu 24.04), or in a `do
 ## Commands: refusals and warnings
 - [x] Run as a non root user → exit 2 "Run the installer as root" → AC-2
 - [x] Run as a non root user on a host where root owned `/opt/orvano/install.log` exists → only the "Run the installer as root" line prints, no "Permission denied" → AC-2
+- [x] On a host without `curl` (the `docker:28-dind` container before `apk add curl`) → exit 2 naming curl, before any image is pulled; with curl → continues → AC-2
 - [x] Remove `.env` while `orvano_orvano-pg` exists, rerun → exit 2 naming the volume and `.env` → AC-2
 - [x] Hold port 80 with another program (for example `nc -lk -p 80`), rerun → exit 2 naming it; with only Orvano's own gateway on 80 and 443 → passes → AC-2
 - [x] Start a second run while one holds `/opt/orvano/.install.lock` → exit 2 "Another install is running" → AC-25
