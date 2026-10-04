@@ -25,6 +25,7 @@ import {
   Client,
   MemorySessionStore,
   OrvanoError,
+  createPkce,
   directEmailAuth,
   emailLinkTypes,
   refreshMarginMs,
@@ -39,6 +40,7 @@ import {
   accessCookie,
   cookieOptions,
   forwardedClientHeaders,
+  oauthCookie,
   refreshCookie,
   secureCookies,
 } from './index.js'
@@ -263,6 +265,193 @@ async function emailCode(
   return response
 }
 
+/** How long the `orvano_oauth` cookie lives: the flow's 10 minutes plus the code's 2 (AC-21). */
+const oauthCookieSeconds = 720
+
+const oauthProviders = ['google', 'apple', 'github', 'microsoft'] as const
+
+/** What the `orvano_oauth` cookie holds while a provider flow runs. */
+interface OAuthCookie {
+  /** The PKCE verifier. */
+  v: string
+  /** The app path to land on. */
+  n: string
+  /** `oauth` or `oauth_link`. */
+  t: 'oauth' | 'oauth_link'
+}
+
+/** A path in the app: one leading `/`, never `//` or `/\`, which a browser reads as another host. */
+export function safeNext(next: unknown): string {
+  return typeof next === 'string' &&
+    next.startsWith('/') &&
+    !next.startsWith('//') &&
+    !next.startsWith('/\\')
+    ? next
+    : '/'
+}
+
+function encodeCookie(value: OAuthCookie): string {
+  return btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function decodeCookie(value: string | undefined): OAuthCookie | null {
+  if (value === undefined || value === '') return null
+  try {
+    const parsed = JSON.parse(
+      atob(value.replace(/-/g, '+').replace(/_/g, '/')),
+    ) as Partial<OAuthCookie>
+    return typeof parsed.v === 'string' &&
+      typeof parsed.n === 'string' &&
+      (parsed.t === 'oauth' || parsed.t === 'oauth_link')
+      ? { v: parsed.v, n: parsed.n, t: parsed.t }
+      : null
+  } catch {
+    return null
+  }
+}
+
+/** The handler's own base path: the request path without its last segment (the action). */
+function handlerBase(request: NextRequest): string {
+  return request.nextUrl.pathname.replace(/\/[^/]*\/?$/, '')
+}
+
+/**
+ * The signed in user's access token for a link (AC-21): the access cookie, or a fresh session from
+ * the refresh cookie when it is missing or under a minute from expiring, since a link flow can
+ * outlast the 15 minute access token. Null when nobody is signed in.
+ */
+async function linkSession(
+  request: NextRequest,
+  client: Client,
+): Promise<{ access: string; fresh: AuthSession | null } | null> {
+  const access = request.cookies.get(accessCookie)?.value
+  const claims = access === undefined ? null : accessClaims(access)
+  if (access !== undefined && claims !== null && claims.exp * 1000 - Date.now() > refreshMarginMs)
+    return { access, fresh: null }
+  const refreshToken = request.cookies.get(refreshCookie)?.value
+  if (refreshToken === undefined || refreshToken === '') return null
+  const fresh = await refreshWith(client, refreshToken)
+  return fresh === null ? null : { access: fresh.accessToken, fresh }
+}
+
+/**
+ * `POST .../oauth` (spec 0012, AC-21): `{ provider, next?, link? }`. Makes the PKCE verifier, keeps
+ * it with `next` and the purpose in the `orvano_oauth` cookie, starts the flow with Orvano as the
+ * browser (for a link, as the signed in user), with the handler's own `.../oauth-callback` as the
+ * redirect URL, and answers `{ url }`.
+ */
+async function oauthStart(
+  request: NextRequest,
+  client: Client,
+  secure: boolean,
+): Promise<NextResponse> {
+  const body = await jsonBody(request)
+  const provider = body?.provider
+  if (
+    body === null ||
+    typeof provider !== 'string' ||
+    !(oauthProviders as readonly string[]).includes(provider)
+  )
+    return problem(400, 'invalid_request', 'Send { provider, next?, link? }.')
+  const link = body.link === true
+  const { verifier, challenge } = await createPkce()
+  const redirectUrl = `${request.nextUrl.origin}${handlerBase(request)}/oauth-callback`
+
+  let session: { access: string; fresh: AuthSession | null } | null = null
+  let url: string
+  try {
+    if (link) {
+      session = await linkSession(request, client)
+      if (session === null) return problem(401, 'session_required', 'Sign in first.')
+    }
+    const flow = await client.request<{ url: string }>({
+      method: 'POST',
+      path: link ? '/v1/account/identities/oauth/flows' : '/v1/account/oauth/flows',
+      body: { provider, redirectUrl, codeChallenge: challenge },
+      ...(session === null ? {} : { bearer: session.access }),
+    })
+    url = flow.url
+  } catch (error) {
+    if (error instanceof OrvanoError) return passThrough(error)
+    throw error
+  }
+
+  const response = NextResponse.json({ url })
+  if (session?.fresh != null) writeResponse(response, session.fresh, secure)
+  response.cookies.set(
+    oauthCookie,
+    encodeCookie({ v: verifier, n: safeNext(body.next), t: link ? 'oauth_link' : 'oauth' }),
+    {
+      httpOnly: true,
+      secure,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: oauthCookieSeconds,
+    },
+  )
+  return response
+}
+
+/**
+ * `GET .../oauth-callback` (spec 0012, AC-21): where the provider flow comes back. Reads the
+ * `orvano_oauth` cookie, redeems `orvano_code` with its verifier, sets both session cookies (for a
+ * link, refreshing first when the access cookie is missing or nearly expired), clears the cookie,
+ * and answers 303 to `next`. A provider error, a missing cookie, or a refused redemption goes to
+ * `next` with `orvano_error`. It needs no `Origin`: the cookie's verifier binds it to this browser.
+ */
+async function oauthCallback(
+  request: NextRequest,
+  client: Client,
+  secure: boolean,
+): Promise<NextResponse> {
+  const state = decodeCookie(request.cookies.get(oauthCookie)?.value)
+  const next = safeNext(state?.n)
+  const target = (error?: string): URL => {
+    const url = new URL(next, request.nextUrl.origin)
+    if (error !== undefined) url.searchParams.set('orvano_error', error)
+    return url
+  }
+  const done = (url: URL, session?: AuthSession | null): NextResponse => {
+    const response = NextResponse.redirect(url, 303)
+    response.headers.set('Cache-Control', 'no-store')
+    response.headers.set('Referrer-Policy', 'no-referrer')
+    if (session !== undefined && session !== null) writeResponse(response, session, secure)
+    response.cookies.delete(oauthCookie)
+    return response
+  }
+
+  const params = request.nextUrl.searchParams
+  const providerError = params.get('orvano_error')
+  if (providerError !== null) return done(target(providerError))
+  const code = params.get('orvano_code')
+  if (state === null || code === null || code === '') return done(target('invalid_oauth_code'))
+
+  try {
+    if (state.t === 'oauth') {
+      await client.request({
+        method: 'POST',
+        path: '/v1/account/sessions/oauth',
+        body: { code, codeVerifier: state.v },
+        session: 'start',
+      })
+      return done(target(), await client.session.get())
+    }
+
+    const session = await linkSession(request, client)
+    if (session === null) return done(target('session_required'))
+    await client.request({
+      method: 'POST',
+      path: '/v1/account/identities/oauth',
+      body: { code, codeVerifier: state.v },
+      bearer: session.access,
+    })
+    return done(target(), session.fresh)
+  } catch (error) {
+    if (error instanceof OrvanoError) return done(target(error.code))
+    throw error
+  }
+}
+
 /**
  * The route handler the browser client refreshes, signs out, and redeems emailed links and codes
  * through. Mount it once, at `app/api/orvano/[...orvano]/route.ts`: `POST .../refresh` trades the
@@ -272,11 +461,29 @@ async function emailCode(
  * and set both cookies, answering `{ type, user, isNewUser }`. A request whose `Origin` is missing
  * or is not the app's own gets 403 before any cookie is read. There is no GET action, so a mail
  * scanner that opens a link never uses it up.
+ *
+ * Provider sign in (spec 0012, AC-21): `POST .../oauth` (`{ provider, next?, link? }`) starts a flow
+ * and answers `{ url }`, and `GET .../oauth-callback` finishes it and redirects to `next`. Export
+ * both methods: `export const { GET, POST } = createOrvanoRouteHandler(...)`.
  */
 export function createOrvanoRouteHandler(config: OrvanoNextConfig): {
+  GET: (request: NextRequest) => Promise<NextResponse>
   POST: (request: NextRequest) => Promise<NextResponse>
 } {
   return {
+    async GET(request: NextRequest): Promise<NextResponse> {
+      const action = request.nextUrl.pathname
+        .split('/')
+        .filter((part: string) => part !== '')
+        .at(-1)
+      if (action !== 'oauth-callback') return problem(404, 'not_found', 'Unknown Orvano action.')
+      return oauthCallback(
+        request,
+        clientFor(config, request),
+        secureCookies(request.nextUrl.origin),
+      )
+    },
+
     async POST(request: NextRequest): Promise<NextResponse> {
       if (request.headers.get('origin') !== request.nextUrl.origin)
         return problem(403, 'origin_not_allowed', 'This handler only answers the app itself.')
@@ -336,6 +543,7 @@ export function createOrvanoRouteHandler(config: OrvanoNextConfig): {
 
       if (action === 'redeem') return redeem(request, client, secure)
       if (action === 'email-code') return emailCode(request, client, secure)
+      if (action === 'oauth') return oauthStart(request, client, secure)
 
       return problem(404, 'not_found', 'Unknown Orvano action.')
     },

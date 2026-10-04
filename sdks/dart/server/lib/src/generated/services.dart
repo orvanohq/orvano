@@ -81,6 +81,19 @@ final class UsersService {
     );
   }
 
+  /// Unlinks one of a user's identities. The user's last way to sign in can't be removed. Sessions stay.
+  Future<void> deleteIdentity(
+    String userId,
+    String identityId, {
+    RequestOptions? options,
+  }) async {
+    await _client.send(
+      'DELETE',
+      '/v1/users/${Uri.encodeComponent(userId)}/identities/${Uri.encodeComponent(identityId)}',
+      options: options,
+    );
+  }
+
   /// Ends one session of a user.
   Future<void> deleteSession(
     String userId,
@@ -163,6 +176,19 @@ final class UsersService {
     ),
     (page) => (page.items, page.nextCursor),
   );
+
+  /// Lists a user's identities, oldest first.
+  Future<IdentityList> listIdentities(
+    String userId, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/users/${Uri.encodeComponent(userId)}/identities',
+      options: options,
+    );
+    return IdentityList.fromJson(json as Map<String, dynamic>);
+  }
 
   /// Lists a user's active sessions, newest first. `current` is always false.
   Future<SessionPage> listSessions(

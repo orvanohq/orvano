@@ -71,12 +71,12 @@ export const config = {
 
 ## In the browser: `createBrowserClient` and the route handler
 
-Client components use `createBrowserClient`. It reads the access token from the `orvano_access` cookie, and it never sees the refresh token: it asks your app's own route handler to refresh, sign out, finish an emailed link, or sign in with an emailed code. Mount that handler once:
+Client components use `createBrowserClient`. It reads the access token from the `orvano_access` cookie, and it never sees the refresh token: it asks your app's own route handler to refresh, sign out, finish an emailed link, sign in with an emailed code, or sign in with a provider. Mount that handler once:
 
 ```ts title="app/api/orvano/[...orvano]/route.ts"
 import { createOrvanoRouteHandler } from '@orvano/nextjs/server'
 
-export const { POST } = createOrvanoRouteHandler({
+export const { GET, POST } = createOrvanoRouteHandler({
   endpoint: process.env.NEXT_PUBLIC_ORVANO_ENDPOINT!,
   project: process.env.NEXT_PUBLIC_ORVANO_PROJECT!,
 })
@@ -92,7 +92,7 @@ const orvano = createBrowserClient({
 })
 ```
 
-The handler answers only `POST` requests from your app's own origin. It has no `GET` action, so a mail scanner that opens a link can't use it up.
+The handler answers `POST` requests only from your app's own origin. Its one `GET` action, `.../oauth-callback`, is where a provider sends the browser back after [provider sign in](/docs/auth/sign-in-with-google/); a cookie only that browser holds binds it, so nobody else can finish the sign in. No action finishes an emailed link on `GET`, so a mail scanner that opens a link can't use it up.
 
 Sign users in from a server action rather than the browser: a session started in the browser keeps only the access token, so it lasts 15 minutes.
 

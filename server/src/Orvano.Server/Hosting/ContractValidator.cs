@@ -84,6 +84,8 @@ internal sealed class ContractValidator
 
         if (contentType is null || !MediaTypeOf(contentType).Equals(declared.MediaType, StringComparison.OrdinalIgnoreCase))
             return $"{operationId} {status} has content type '{contentType}', expected {declared.MediaType}";
+        // A page, such as the OAuth callback's (spec 0012), has only its media type checked.
+        if (!IsJson(declared.MediaType)) return null;
         var schema = declared.Schema;
 
         JsonDocument json;
@@ -109,6 +111,9 @@ internal sealed class ContractValidator
             return $"{operationId} {status} body does not match the contract at {string.Join(", ", problems)}";
         }
     }
+
+    private static bool IsJson(string? mediaType) =>
+        mediaType is not null && (mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase) || mediaType.EndsWith("+json", StringComparison.OrdinalIgnoreCase));
 
     private static string MediaTypeOf(string contentType) =>
         contentType.Split(';', 2)[0].Trim();

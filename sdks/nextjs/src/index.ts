@@ -31,6 +31,7 @@ import type {
   EmailAuthTransport,
   EmailCodeResult,
   LinkResult,
+  OAuthTransport,
   RequestOptions,
   SessionRefresher,
   SessionStore,
@@ -385,6 +386,48 @@ export function emailAuthThroughHandler(handlerPath = defaultHandlerPath): Email
   }
 }
 
+/** The `HttpOnly` cookie that holds a provider flow's PKCE verifier, `next`, and purpose (spec 0012, AC-21). */
+export const oauthCookie = 'orvano_oauth'
+
+/**
+ * The browser client's {@link OAuthTransport} (spec 0012, AC-21): `signInWithOAuth` and
+ * `linkIdentity` post `{ provider, next, link }` to the app's route handler (`.../oauth`), which
+ * keeps the verifier in an `HttpOnly` cookie and answers the provider's URL, and the browser goes
+ * there. The provider comes back to the handler's `.../oauth-callback`, which sets the session
+ * cookies and redirects to `next`: the `redirectUrl` option, a path in the app. Both helpers
+ * resolve null, since the page navigates away.
+ */
+export function oauthThroughHandler(handlerPath = defaultHandlerPath): OAuthTransport {
+  return {
+    async start(purpose, provider, options): Promise<null> {
+      const init: RequestInit = {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider,
+          next: options.redirectUrl,
+          link: purpose === 'oauth_link',
+        }),
+      }
+      if (options.signal !== undefined) init.signal = options.signal
+      const response = await globalThis.fetch(`${handlerPath}/oauth`, init)
+      if (!response.ok) throw await OrvanoError.fromResponse(response)
+      const { url } = (await response.json()) as { url: string }
+      if (options.open !== undefined) await options.open(url)
+      else (globalThis as { location?: { assign(url: string): void } }).location?.assign(url)
+      return null
+    },
+    redeem(): Promise<never> {
+      return Promise.reject(
+        new TypeError(
+          'Orvano: in Next.js the route handler redeems provider redirects at .../oauth-callback.',
+        ),
+      )
+    },
+  }
+}
+
 /** Settings for {@link createBrowserClient}. */
 export interface BrowserClientConfig extends Omit<ClientConfig, 'session' | 'refresh'> {
   /** Where the app mounts `createOrvanoRouteHandler`. Defaults to `/api/orvano`. */
@@ -415,6 +458,7 @@ export function createBrowserClient(config: BrowserClientConfig): Orvano {
           : new MemorySessionStore(),
         refresh: refreshThroughHandler(handlerPath),
         emailAuth: emailAuthThroughHandler(handlerPath),
+        oauth: oauthThroughHandler(handlerPath),
       }),
     )
     browserClients.set(key, orvano)

@@ -336,6 +336,42 @@ public sealed class EmailTemplateNameJsonConverter : JsonConverter<EmailTemplate
         });
 }
 
+/// <summary>A provider a native app can sign in with by its ID token.</summary>
+[JsonConverter(typeof(IdTokenProviderJsonConverter))]
+public enum IdTokenProvider
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>google</c>.</summary>
+    Google,
+
+    /// <summary>The wire value <c>apple</c>.</summary>
+    Apple,
+}
+
+/// <summary>Reads and writes <see cref="IdTokenProvider"/> by wire value; unknown values read as <see cref="IdTokenProvider.Unknown"/>.</summary>
+public sealed class IdTokenProviderJsonConverter : JsonConverter<IdTokenProvider>
+{
+    /// <inheritdoc/>
+    public override IdTokenProvider Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "google" => IdTokenProvider.Google,
+            "apple" => IdTokenProvider.Apple,
+            _ => IdTokenProvider.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, IdTokenProvider value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            IdTokenProvider.Google => "google",
+            IdTokenProvider.Apple => "apple",
+            _ => throw new JsonException($"IdTokenProvider.{value} has no wire value"),
+        });
+}
+
 /// <summary>Whether an invitation can still be accepted.</summary>
 [JsonConverter(typeof(InvitationStatusJsonConverter))]
 public enum InvitationStatus
@@ -405,6 +441,88 @@ public sealed class MemberStatusJsonConverter : JsonConverter<MemberStatus>
             MemberStatus.Active => "active",
             MemberStatus.Blocked => "blocked",
             _ => throw new JsonException($"MemberStatus.{value} has no wire value"),
+        });
+}
+
+/// <summary>What a provider redirect came back for: the <c>orvano_type</c> parameter Orvano adds when it sends the browser back to your <c>redirectUrl</c>, beside <c>orvano_code</c> or <c>orvano_error</c>. The SDKs' link helpers read it.</summary>
+[JsonConverter(typeof(OAuthLinkTypeJsonConverter))]
+public enum OAuthLinkType
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>oauth</c>.</summary>
+    Oauth,
+
+    /// <summary>The wire value <c>oauth_link</c>.</summary>
+    OauthLink,
+}
+
+/// <summary>Reads and writes <see cref="OAuthLinkType"/> by wire value; unknown values read as <see cref="OAuthLinkType.Unknown"/>.</summary>
+public sealed class OAuthLinkTypeJsonConverter : JsonConverter<OAuthLinkType>
+{
+    /// <inheritdoc/>
+    public override OAuthLinkType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "oauth" => OAuthLinkType.Oauth,
+            "oauth_link" => OAuthLinkType.OauthLink,
+            _ => OAuthLinkType.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, OAuthLinkType value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            OAuthLinkType.Oauth => "oauth",
+            OAuthLinkType.OauthLink => "oauth_link",
+            _ => throw new JsonException($"OAuthLinkType.{value} has no wire value"),
+        });
+}
+
+/// <summary>A sign in provider.</summary>
+[JsonConverter(typeof(OAuthProviderJsonConverter))]
+public enum OAuthProvider
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>google</c>.</summary>
+    Google,
+
+    /// <summary>The wire value <c>apple</c>.</summary>
+    Apple,
+
+    /// <summary>The wire value <c>github</c>.</summary>
+    Github,
+
+    /// <summary>The wire value <c>microsoft</c>.</summary>
+    Microsoft,
+}
+
+/// <summary>Reads and writes <see cref="OAuthProvider"/> by wire value; unknown values read as <see cref="OAuthProvider.Unknown"/>.</summary>
+public sealed class OAuthProviderJsonConverter : JsonConverter<OAuthProvider>
+{
+    /// <inheritdoc/>
+    public override OAuthProvider Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "google" => OAuthProvider.Google,
+            "apple" => OAuthProvider.Apple,
+            "github" => OAuthProvider.Github,
+            "microsoft" => OAuthProvider.Microsoft,
+            _ => OAuthProvider.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, OAuthProvider value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            OAuthProvider.Google => "google",
+            OAuthProvider.Apple => "apple",
+            OAuthProvider.Github => "github",
+            OAuthProvider.Microsoft => "microsoft",
+            _ => throw new JsonException($"OAuthProvider.{value} has no wire value"),
         });
 }
 
@@ -608,6 +726,12 @@ public enum SessionMethod
 
     /// <summary>The wire value <c>recovery</c>.</summary>
     Recovery,
+
+    /// <summary>The wire value <c>oauth</c>.</summary>
+    Oauth,
+
+    /// <summary>The wire value <c>id_token</c>.</summary>
+    IdToken,
 }
 
 /// <summary>Reads and writes <see cref="SessionMethod"/> by wire value; unknown values read as <see cref="SessionMethod.Unknown"/>.</summary>
@@ -622,6 +746,8 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             "magic_link" => SessionMethod.MagicLink,
             "email_code" => SessionMethod.EmailCode,
             "recovery" => SessionMethod.Recovery,
+            "oauth" => SessionMethod.Oauth,
+            "id_token" => SessionMethod.IdToken,
             _ => SessionMethod.Unknown,
         };
 
@@ -634,6 +760,8 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             SessionMethod.MagicLink => "magic_link",
             SessionMethod.EmailCode => "email_code",
             SessionMethod.Recovery => "recovery",
+            SessionMethod.Oauth => "oauth",
+            SessionMethod.IdToken => "id_token",
             _ => throw new JsonException($"SessionMethod.{value} has no wire value"),
         });
 }
@@ -871,13 +999,20 @@ public sealed record ApiKeyPage(
 /// <summary>A signed in user and their new session.</summary>
 /// <param name="User">The user.</param>
 /// <param name="Session">The new session's tokens.</param>
-/// <param name="IsNewUser">Whether this call created the user: true from sign up, and from a magic link or email code for a new email.</param>
+/// <param name="IsNewUser">Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user.</param>
 /// <param name="VerificationEmail">What happened to the verification email sign up was asked to send; null when none was asked for.</param>
 public sealed record AuthResult(
     [property: JsonPropertyName("user")] User User,
     [property: JsonPropertyName("session")] SessionTokens Session,
     [property: JsonPropertyName("isNewUser")] bool IsNewUser,
     [property: JsonPropertyName("verificationEmail")] VerificationEmailStatus? VerificationEmail);
+
+/// <summary>A link of a provider to the signed in user, with the code a link flow returned.</summary>
+/// <param name="Code">The <c>orvano_code</c> parameter Orvano added to your redirect URL. It works once, for 2 minutes.</param>
+/// <param name="CodeVerifier">The PKCE verifier whose challenge started the link flow.</param>
+public sealed record CompleteOAuthLinkRequest(
+    [property: JsonPropertyName("code")] string Code,
+    [property: JsonPropertyName("codeVerifier")] string CodeVerifier);
 
 /// <summary>A password reset, with the token from the emailed link.</summary>
 /// <param name="Token">The <c>orvano_token</c> parameter of the emailed link.</param>
@@ -901,6 +1036,8 @@ public sealed record ConfirmEmailChangeRequest(
 /// <param name="Metadata">Your own data about the user: a JSON object of at most 16 KB.</param>
 /// <param name="CreatedAt">When the user signed up.</param>
 /// <param name="LastSignInAt">When the user last signed in; null if never.</param>
+/// <param name="Providers">The providers linked to the user, sorted by name.</param>
+/// <param name="HasPassword">Whether the user has a password.</param>
 /// <param name="IsInstallAdmin">True when the account is an install admin, who may change the install settings.</param>
 public sealed record ConsoleAccount(
     [property: JsonPropertyName("id")] string Id,
@@ -912,6 +1049,8 @@ public sealed record ConsoleAccount(
     [property: JsonPropertyName("metadata")] IReadOnlyDictionary<string, JsonElement> Metadata,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
     [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt,
+    [property: JsonPropertyName("providers")] IReadOnlyList<OAuthProvider> Providers,
+    [property: JsonPropertyName("hasPassword")] bool HasPassword,
     [property: JsonPropertyName("isInstallAdmin")] bool IsInstallAdmin);
 
 /// <summary>A console account and the name and email it goes by, for showing who did something.</summary>
@@ -977,6 +1116,19 @@ public sealed record CreateEmailCodeSessionRequest(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("code")] string Code);
 
+/// <summary>A sign in with a provider's ID token from a native app.</summary>
+/// <param name="Provider">The provider that issued the token.</param>
+/// <param name="IdToken">The provider's ID token, at most 8 KB.</param>
+/// <param name="Nonce">The raw nonce, 16 to 128 characters. Give the provider its lowercase hex SHA-256 (the SDKs' <c>createNonce</c> makes both), so the token carries that hash.</param>
+/// <param name="AuthorizationCode">Apple only, and required for Apple: the authorization code Sign in with Apple returned with the token.</param>
+/// <param name="Name">Apple only: the name Sign in with Apple returned on the first authorization, at most 256 characters.</param>
+public sealed record CreateIdTokenSessionRequest(
+    [property: JsonPropertyName("provider")] IdTokenProvider Provider,
+    [property: JsonPropertyName("idToken")] string IdToken,
+    [property: JsonPropertyName("nonce")] string Nonce,
+    [property: JsonPropertyName("authorizationCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? AuthorizationCode = null,
+    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null);
+
 /// <summary>A new invitation.</summary>
 /// <param name="Email">The email to invite; trimmed, at most 320 characters. Inviting an email again replaces its old invitation.</param>
 /// <param name="Role">The role the invitation grants.</param>
@@ -997,6 +1149,22 @@ public sealed record CreateMagicLinkRequest(
 /// <param name="Token">The <c>orvano_token</c> parameter of the emailed link.</param>
 public sealed record CreateMagicLinkSessionRequest(
     [property: JsonPropertyName("token")] string Token);
+
+/// <summary>A request to start signing in with a provider.</summary>
+/// <param name="Provider">The provider to sign in with.</param>
+/// <param name="RedirectUrl">Your page or app that receives the result: a host that is one of the project's web platforms (<c>http</c> only on <c>localhost</c> or <c>127.0.0.1</c>), or your app's own scheme (its iOS, Android, or macOS identifier). Orvano adds <c>orvano_type</c> and then <c>orvano_code</c> or <c>orvano_error</c> to it.</param>
+/// <param name="CodeChallenge">The S256 PKCE challenge: base64url(SHA-256(verifier)), 43 characters. Keep the verifier; only it redeems the code. The SDKs make both.</param>
+public sealed record CreateOAuthFlowRequest(
+    [property: JsonPropertyName("provider")] OAuthProvider Provider,
+    [property: JsonPropertyName("redirectUrl")] string RedirectUrl,
+    [property: JsonPropertyName("codeChallenge")] string CodeChallenge);
+
+/// <summary>A sign in with the code a provider flow returned.</summary>
+/// <param name="Code">The <c>orvano_code</c> parameter Orvano added to your redirect URL. It works once, for 2 minutes.</param>
+/// <param name="CodeVerifier">The PKCE verifier whose challenge started the flow: 43 to 128 characters of <c>[A-Za-z0-9-._~]</c>.</param>
+public sealed record CreateOAuthSessionRequest(
+    [property: JsonPropertyName("code")] string Code,
+    [property: JsonPropertyName("codeVerifier")] string CodeVerifier);
 
 /// <summary>A new org. The caller becomes its owner.</summary>
 /// <param name="Name">The org name; trimmed, 1 to 100 characters.</param>
@@ -1171,6 +1339,28 @@ public sealed record Health(
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("version")] string Version);
 
+/// <summary>A provider account linked to a user: one way the user signs in.</summary>
+/// <param name="Id">The identity ID.</param>
+/// <param name="Provider">The provider.</param>
+/// <param name="Subject">The provider's ID for the account: Google's and Apple's <c>sub</c>, GitHub's user ID, Microsoft's <c>&lt;tid&gt;:&lt;oid&gt;</c>.</param>
+/// <param name="Email">The email the provider gave, verified or not; null when it gave none.</param>
+/// <param name="EmailVerified">Whether the provider vouches for that email.</param>
+/// <param name="CreatedAt">When the provider was linked.</param>
+/// <param name="LastSignInAt">When the user last signed in with it; null if never.</param>
+public sealed record Identity(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("provider")] OAuthProvider Provider,
+    [property: JsonPropertyName("subject")] string Subject,
+    [property: JsonPropertyName("email")] string? Email,
+    [property: JsonPropertyName("emailVerified")] bool EmailVerified,
+    [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt);
+
+/// <summary>A user's identities, oldest first: at most one per provider.</summary>
+/// <param name="Items">The identities.</param>
+public sealed record IdentityList(
+    [property: JsonPropertyName("items")] IReadOnlyList<Identity> Items);
+
 /// <summary>Settings for the whole install.</summary>
 /// <param name="ConsoleSignup">Who may create a console account.</param>
 /// <param name="UpdatedAt">When the settings last changed.</param>
@@ -1277,6 +1467,58 @@ public sealed record Member(
 public sealed record MemberPage(
     [property: JsonPropertyName("items")] IReadOnlyList<Member> Items,
     [property: JsonPropertyName("nextCursor")] string? NextCursor);
+
+/// <summary>Apple's form post.</summary>
+/// <param name="State">The flow's state.</param>
+/// <param name="Code">The provider's authorization code.</param>
+/// <param name="User">Apple's JSON with the user's name, sent only on the first authorization.</param>
+/// <param name="Error">The provider's error, such as <c>user_cancelled_authorize</c>.</param>
+public sealed record OAuthCallbackForm(
+    [property: JsonPropertyName("state"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? State = null,
+    [property: JsonPropertyName("code"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Code = null,
+    [property: JsonPropertyName("user"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? User = null,
+    [property: JsonPropertyName("error"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Error = null);
+
+/// <summary>A started provider flow.</summary>
+/// <param name="Url">Send the browser here: the provider's sign in page.</param>
+public sealed record OAuthFlow(
+    [property: JsonPropertyName("url")] string Url);
+
+/// <summary>One provider's settings for the project. Secrets are write only: only whether they are set, and a hint, come back.</summary>
+/// <param name="Provider">The provider.</param>
+/// <param name="Enabled">Whether users may sign in with it.</param>
+/// <param name="ClientId">Google's web client ID, Apple's Services ID, GitHub's client ID, or Microsoft's application ID; null when not set.</param>
+/// <param name="ClientSecretSet">Whether the client secret is set (Google, GitHub, Microsoft).</param>
+/// <param name="ClientSecretHint">The client secret's last 4 characters; null when it is not set.</param>
+/// <param name="ClientIdsExtra">Google and Apple: the client IDs native apps sign in with (Android and iOS client IDs, bundle IDs).</param>
+/// <param name="AppleTeamId">Apple: the team ID; null when not set.</param>
+/// <param name="AppleKeyId">Apple: the Sign in with Apple key's ID; null when not set.</param>
+/// <param name="ApplePrivateKeySet">Apple: whether the private key (.p8) is set.</param>
+/// <param name="MicrosoftTenant">Microsoft: <c>common</c>, <c>organizations</c>, <c>consumers</c>, or a tenant GUID; null for the other providers.</param>
+/// <param name="RedirectReady">Whether everything the browser redirect flow needs is set.</param>
+/// <param name="NativeReady">Whether everything native ID token sign in needs is set (Google and Apple only).</param>
+/// <param name="CallbackUrl">The callback URL to register at the provider.</param>
+/// <param name="UpdatedAt">When the settings last changed; null when never saved.</param>
+public sealed record OAuthProviderSettings(
+    [property: JsonPropertyName("provider")] OAuthProvider Provider,
+    [property: JsonPropertyName("enabled")] bool Enabled,
+    [property: JsonPropertyName("clientId")] string? ClientId,
+    [property: JsonPropertyName("clientSecretSet")] bool ClientSecretSet,
+    [property: JsonPropertyName("clientSecretHint")] string? ClientSecretHint,
+    [property: JsonPropertyName("clientIdsExtra")] IReadOnlyList<string> ClientIdsExtra,
+    [property: JsonPropertyName("appleTeamId")] string? AppleTeamId,
+    [property: JsonPropertyName("appleKeyId")] string? AppleKeyId,
+    [property: JsonPropertyName("applePrivateKeySet")] bool ApplePrivateKeySet,
+    [property: JsonPropertyName("microsoftTenant")] string? MicrosoftTenant,
+    [property: JsonPropertyName("redirectReady")] bool RedirectReady,
+    [property: JsonPropertyName("nativeReady")] bool NativeReady,
+    [property: JsonPropertyName("callbackUrl")] string CallbackUrl,
+    [property: JsonPropertyName("updatedAt")] DateTimeOffset? UpdatedAt);
+
+/// <summary>The four providers' settings, in the order the console shows them.</summary>
+/// <param name="Items">Google, Apple, GitHub, and Microsoft.</param>
+public sealed record OAuthProviderSettingsList(
+    [property: JsonPropertyName("items")] IReadOnlyList<OAuthProviderSettings> Items);
 
 /// <summary>The discovery document standard JWT libraries configure themselves from. Orvano is not an OpenID provider; this exists so tools that take an issuer URL find the keys. Its names are the standard snake case ones.</summary>
 /// <param name="Issuer">The issuer, the <c>iss</c> of every access token of the project.</param>
@@ -1414,6 +1656,7 @@ public sealed record RenderedEmail(
 /// <param name="IpAddress">The IP address last seen for the session; null when unknown.</param>
 /// <param name="Current">Whether this is the session making the call.</param>
 /// <param name="Method">How the session began.</param>
+/// <param name="Provider">The provider of an <c>oauth</c> or <c>id_token</c> session; null for every other method.</param>
 public sealed record Session(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
@@ -1422,7 +1665,8 @@ public sealed record Session(
     [property: JsonPropertyName("sdk")] string? Sdk,
     [property: JsonPropertyName("ipAddress")] string? IpAddress,
     [property: JsonPropertyName("current")] bool Current,
-    [property: JsonPropertyName("method")] SessionMethod Method);
+    [property: JsonPropertyName("method")] SessionMethod Method,
+    [property: JsonPropertyName("provider")] OAuthProvider? Provider);
 
 /// <summary>One page of a user's active sessions, newest first.</summary>
 /// <param name="Items">The sessions on this page.</param>
@@ -1509,10 +1753,41 @@ public sealed record TemplateVariable(
     [property: JsonPropertyName("description")] string Description,
     [property: JsonPropertyName("sample")] string Sample);
 
+/// <summary>One call the fake Apple revoke endpoint received.</summary>
+/// <param name="ClientId">The client ID the token was issued to.</param>
+/// <param name="TokenHint">The first 16 hex characters of the token's SHA-256, never the token.</param>
+/// <param name="ReceivedAt">When the call arrived.</param>
+public sealed record TestAppleRevocation(
+    [property: JsonPropertyName("clientId")] string ClientId,
+    [property: JsonPropertyName("tokenHint")] string TokenHint,
+    [property: JsonPropertyName("receivedAt")] DateTimeOffset ReceivedAt);
+
+/// <summary>The fake Apple revoke endpoint's calls, oldest first.</summary>
+/// <param name="Items">The calls.</param>
+public sealed record TestAppleRevocationList(
+    [property: JsonPropertyName("items")] IReadOnlyList<TestAppleRevocation> Items);
+
 /// <summary>The answer to <c>test.consolePing</c>.</summary>
 /// <param name="Status">Always <c>ok</c>.</param>
 public sealed record TestConsolePing(
     [property: JsonPropertyName("status")] string Status);
+
+/// <summary>A request for a native ID token from the fake sign in provider (spec 0012).</summary>
+/// <param name="Provider"><c>google</c> or <c>apple</c>.</param>
+/// <param name="Aud">The token's audience: a client ID or bundle ID.</param>
+/// <param name="Sub">The provider account's subject.</param>
+/// <param name="Nonce">The nonce claim: the hashed nonce, as the app gives it to the provider.</param>
+/// <param name="Email">The email claim.</param>
+/// <param name="EmailVerified">The email_verified claim.</param>
+/// <param name="ExpiresIn">Seconds until the token expires; negative for one already expired. Defaults to 600.</param>
+public sealed record TestCreateIdTokenRequest(
+    [property: JsonPropertyName("provider")] string Provider,
+    [property: JsonPropertyName("aud")] string Aud,
+    [property: JsonPropertyName("sub")] string Sub,
+    [property: JsonPropertyName("nonce")] string Nonce,
+    [property: JsonPropertyName("email"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Email = null,
+    [property: JsonPropertyName("emailVerified"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? EmailVerified = null,
+    [property: JsonPropertyName("expiresIn"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? ExpiresIn = null);
 
 /// <summary>The newest email Mailpit caught for an address, read from its text part.</summary>
 /// <param name="Subject">The subject line.</param>
@@ -1526,6 +1801,13 @@ public sealed record TestEmail(
     [property: JsonPropertyName("token")] string? Token,
     [property: JsonPropertyName("code")] string? Code,
     [property: JsonPropertyName("url")] string? Url);
+
+/// <summary>A native ID token from the fake sign in provider.</summary>
+/// <param name="IdToken">The signed ID token.</param>
+/// <param name="AuthorizationCode">Apple only: an authorization code the fake token endpoint accepts for this user; null for Google.</param>
+public sealed record TestIdToken(
+    [property: JsonPropertyName("idToken")] string IdToken,
+    [property: JsonPropertyName("authorizationCode")] string? AuthorizationCode);
 
 /// <summary>One fixed item in the <c>test.list</c> page.</summary>
 /// <param name="Id"><c>item-1</c> to <c>item-5</c>.</param>
@@ -1577,6 +1859,25 @@ public sealed record UpdateInstallSettingsRequest(
 public sealed record UpdateMemberRequest(
     [property: JsonPropertyName("role")] OrgRole Role);
 
+/// <summary>One provider's whole settings. A secret field left out keeps the stored secret, null clears it, and a string replaces it. Every other field left out is cleared.</summary>
+/// <param name="Enabled">Whether users may sign in with it. An enabled provider needs the settings of at least one way to sign in.</param>
+/// <param name="ClientId">1 to 255 characters with no whitespace.</param>
+/// <param name="ClientSecret">Google, GitHub, Microsoft: 8 to 1,024 characters. Write only.</param>
+/// <param name="ClientIdsExtra">Google and Apple: at most 10 native client IDs.</param>
+/// <param name="AppleTeamId">Apple: exactly 10 capital letters or digits.</param>
+/// <param name="AppleKeyId">Apple: exactly 10 capital letters or digits.</param>
+/// <param name="ApplePrivateKey">Apple: the .p8 file's contents, a PKCS#8 EC P-256 key of at most 8 KB. Write only.</param>
+/// <param name="MicrosoftTenant">Microsoft: <c>common</c> (the default), <c>organizations</c>, <c>consumers</c>, or a tenant GUID.</param>
+public sealed record UpdateOAuthProviderRequest(
+    [property: JsonPropertyName("enabled")] bool Enabled,
+    [property: JsonPropertyName("clientId"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ClientId = null,
+    [property: JsonPropertyName("clientSecret"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ClientSecret = null,
+    [property: JsonPropertyName("clientIdsExtra"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? ClientIdsExtra = null,
+    [property: JsonPropertyName("appleTeamId"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? AppleTeamId = null,
+    [property: JsonPropertyName("appleKeyId"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? AppleKeyId = null,
+    [property: JsonPropertyName("applePrivateKey"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ApplePrivateKey = null,
+    [property: JsonPropertyName("microsoftTenant"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? MicrosoftTenant = null);
+
 /// <summary>Changes to an org.</summary>
 /// <param name="Name">The new org name; trimmed, 1 to 100 characters.</param>
 public sealed record UpdateOrgRequest(
@@ -1618,6 +1919,8 @@ public sealed record UpdateUserEmailRequest(
 /// <param name="Metadata">Your own data about the user: a JSON object of at most 16 KB.</param>
 /// <param name="CreatedAt">When the user signed up.</param>
 /// <param name="LastSignInAt">When the user last signed in; null if never.</param>
+/// <param name="Providers">The providers linked to the user, sorted by name.</param>
+/// <param name="HasPassword">Whether the user has a password.</param>
 public sealed record User(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("email")] string? Email,
@@ -1627,7 +1930,9 @@ public sealed record User(
     [property: JsonPropertyName("status")] UserStatus Status,
     [property: JsonPropertyName("metadata")] IReadOnlyDictionary<string, JsonElement> Metadata,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
-    [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt);
+    [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt,
+    [property: JsonPropertyName("providers")] IReadOnlyList<OAuthProvider> Providers,
+    [property: JsonPropertyName("hasPassword")] bool HasPassword);
 
 /// <summary>One page of a project's users, newest first.</summary>
 /// <param name="Items">The users on this page.</param>

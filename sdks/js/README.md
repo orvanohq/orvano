@@ -35,6 +35,18 @@ Make the landing page safe for links:
 
 Every failure is an `OrvanoError`; a limit's refusal carries `retryAfter`, in seconds.
 
+## Sign in with a provider
+
+Google, Apple, GitHub, and Microsoft, once the project turns them on in the console:
+
+```ts
+await orvano.client.signInWithOAuth('google', { redirectUrl: `${location.origin}/auth/callback.html` })
+// On the callback page, the same redeemLink() finishes it (orvano_type=oauth):
+const result = await orvano.client.redeemLink()
+```
+
+The PKCE verifier waits in `sessionStorage` until the user comes back, so only this browser can finish. `linkIdentity` adds a provider to the signed in user. A native wrapper that gets a Google or Apple ID token itself calls `signInWithIdToken` with a nonce from `createNonce()`. Guides: https://orvano.dev/docs/auth/sign-in-with-google/
+
 ## About
 
 Orvano is the open source backend you host yourself: auth, Postgres databases, storage, functions, realtime, messaging, webhooks, jobs, and backups, run from one console.

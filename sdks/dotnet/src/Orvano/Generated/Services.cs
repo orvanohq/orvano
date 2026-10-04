@@ -96,6 +96,13 @@ public sealed class UsersService
     public Task DeleteAsync(string userId, CancellationToken cancellationToken = default) =>
         _client.SendAsync(new OrvanoRequest("DELETE", $"/v1/users/{Uri.EscapeDataString(userId)}", null, null, false), cancellationToken);
 
+    /// <summary>Unlinks one of a user's identities. The user's last way to sign in can't be removed. Sessions stay.</summary>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="identityId">The identity to unlink.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task DeleteIdentityAsync(string userId, string identityId, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("DELETE", $"/v1/users/{Uri.EscapeDataString(userId)}/identities/{Uri.EscapeDataString(identityId)}", null, null, false), cancellationToken);
+
     /// <summary>Ends one session of a user.</summary>
     /// <param name="userId">The user ID.</param>
     /// <param name="sessionId">The session to end.</param>
@@ -137,6 +144,12 @@ public sealed class UsersService
     /// <param name="cancellationToken">Cancels the request.</param>
     public IAsyncEnumerable<User> ListAllAsync(string? email = null, string? status = null, DateTimeOffset? createdAfter = null, DateTimeOffset? createdBefore = null, bool? emailVerified = null, int? limit = null, CancellationToken cancellationToken = default) =>
         OrvanoPagination.IterateAsync((cursor, ct) => ListAsync(email: email, status: status, createdAfter: createdAfter, createdBefore: createdBefore, emailVerified: emailVerified, cursor: cursor, limit: limit, cancellationToken: ct), page => page.Items, page => page.NextCursor, cancellationToken);
+
+    /// <summary>Lists a user's identities, oldest first.</summary>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task<IdentityList> ListIdentitiesAsync(string userId, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("GET", $"/v1/users/{Uri.EscapeDataString(userId)}/identities", null, null, false), OrvanoJsonContext.Default.IdentityList, cancellationToken);
 
     /// <summary>Lists a user's active sessions, newest first. <c>current</c> is always false.</summary>
     /// <param name="userId">The user ID.</param>

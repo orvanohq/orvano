@@ -15,6 +15,12 @@ internal enum FailureKind
 
     /// <summary>The thing existed but is gone for good (410), such as an expired invitation.</summary>
     Gone,
+
+    /// <summary>An outside service answered wrong (502), such as a sign in provider.</summary>
+    BadGateway,
+
+    /// <summary>An outside service did not answer in time (503), with no <c>Retry-After</c>.</summary>
+    Unavailable,
 }
 
 /// <summary>
@@ -91,6 +97,35 @@ internal sealed record Failure(FailureKind Kind, string Code, string Detail, Tim
     /// <summary>A named limit refused the call (429 <c>rate_limited</c>).</summary>
     public static Failure RateLimited(TimeSpan retryAfter) =>
         new(FailureKind.RateLimited, ErrorCode.RateLimited, "Too many requests. Try again later.", retryAfter);
+
+    public static Failure InvalidOAuthCode { get; } =
+        new(FailureKind.Unauthorized, ErrorCode.InvalidOauthCode, "The code is not valid anymore, or the verifier does not match the flow that started it. Start again.");
+
+    public static Failure InvalidIdToken { get; } =
+        new(FailureKind.Unauthorized, ErrorCode.InvalidIdToken, "The ID token is not valid for this project, or was used before.");
+
+    public static Failure ProviderNotEnabled { get; } =
+        new(FailureKind.Conflict, ErrorCode.ProviderNotEnabled, "This sign in provider is not turned on for the project.");
+
+    public static Failure ProviderNotConfigured { get; } =
+        new(FailureKind.Conflict, ErrorCode.ProviderNotConfigured, "This sign in provider's settings for this kind of sign in are missing.");
+
+    public static Failure ProviderAlreadyLinked { get; } =
+        new(FailureKind.Conflict, ErrorCode.ProviderAlreadyLinked, "The user already has an identity of this provider with another provider account.");
+
+    public static Failure IdentityAlreadyLinked { get; } =
+        new(FailureKind.Conflict, ErrorCode.IdentityAlreadyLinked, "This provider account is linked to another user.");
+
+    public static Failure IdentityNotFound { get; } = new(FailureKind.NotFound, ErrorCode.IdentityNotFound, "No such identity.");
+
+    public static Failure LastSignInMethod { get; } =
+        new(FailureKind.Conflict, ErrorCode.LastSignInMethod, "This is the user's only way to sign in.");
+
+    public static Failure ProviderError { get; } =
+        new(FailureKind.BadGateway, ErrorCode.ProviderError, "The sign in provider answered with an error.");
+
+    public static Failure ProviderUnavailable { get; } =
+        new(FailureKind.Unavailable, ErrorCode.ProviderUnavailable, "The sign in provider did not answer in time. Try again.");
 
     public static Failure Busy { get; } =
         new(FailureKind.Busy, ErrorCode.ServerBusy, "The server is busy checking passwords. Try again in a moment.");

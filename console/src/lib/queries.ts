@@ -28,6 +28,10 @@ export const keys = {
   users: (projectId: string) => ['console', 'projects', projectId, 'users'] as const,
   user: (projectId: string, userId: string) =>
     ['console', 'projects', projectId, 'users', userId] as const,
+  userIdentities: (projectId: string, userId: string) =>
+    ['console', 'projects', projectId, 'users', userId, 'identities'] as const,
+  authProviders: (projectId: string) =>
+    ['console', 'projects', projectId, 'auth-providers'] as const,
   userSessions: (projectId: string, userId: string) =>
     ['console', 'projects', projectId, 'users', userId, 'sessions'] as const,
   signingKeys: (projectId: string) => ['console', 'projects', projectId, 'signing-keys'] as const,
@@ -212,6 +216,23 @@ export function userQuery(projectId: string, userId: string) {
   return queryOptions({
     queryKey: keys.user(projectId, userId),
     queryFn: ({ signal }) => projectClient(projectId).consoleUsers.get(userId, { signal }),
+  })
+}
+
+/** A user's identities, oldest first (spec 0012, AC-26). */
+export function userIdentitiesQuery(projectId: string, userId: string) {
+  return queryOptions({
+    queryKey: keys.userIdentities(projectId, userId),
+    queryFn: ({ signal }) =>
+      projectClient(projectId).consoleUsers.listIdentities(userId, { signal }),
+  })
+}
+
+/** The project's settings for the four sign in providers (spec 0012, AC-25). */
+export function authProvidersQuery(projectId: string) {
+  return queryOptions({
+    queryKey: keys.authProviders(projectId),
+    queryFn: ({ signal }) => projectClient(projectId).consoleAuthProviders.list({ signal }),
   })
 }
 

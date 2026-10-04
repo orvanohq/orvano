@@ -23,6 +23,8 @@ const unverified: User = {
   metadata: {},
   createdAt: '2026-09-27T00:00:00Z',
   lastSignInAt: null,
+  providers: [],
+  hasPassword: true,
 }
 const verified: User = {
   ...unverified,

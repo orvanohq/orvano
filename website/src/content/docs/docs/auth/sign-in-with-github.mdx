@@ -1,0 +1,56 @@
+---
+title: Sign in with GitHub
+description: "Let users sign in with their GitHub account."
+sidebar:
+  order: 12
+---
+
+import { TabItem, Tabs } from '@astrojs/starlight/components'
+
+Sign in with GitHub works like [Sign in with Google](/docs/auth/sign-in-with-google/), by redirect only: GitHub has no native sign in for apps.
+
+## 1. Create a GitHub App
+
+1. On GitHub, open **Settings**, then **Developer settings**, then **GitHub Apps**, and select **New GitHub App**.
+2. As the **Callback URL**, paste the one from the GitHub dialog on the project's **Sign in methods** page.
+3. Under **Permissions**, then **Account permissions**, set **Email addresses** to **Read only** (GitHub names it "Email addresses: read"). Without it Orvano can't read the user's email, and sign in fails with [`provider_error`](/errors/provider_error/).
+4. Create the app, then generate a client secret.
+5. Copy the **Client ID** and the secret into the GitHub dialog, turn on **Enabled**, and select **Save**.
+
+A classic OAuth app works too: give it the same callback URL. Orvano asks for the `read:user` and `user:email` scopes.
+
+## 2. Sign in
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.client.signInWithOAuth('github', { redirectUrl: `${location.origin}/auth/callback.html` })
+// On the callback page:
+const result = await orvano.client.redeemLink()
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```tsx
+'use client'
+await orvano.client.signInWithOAuth('github', { redirectUrl: '/account' })
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final result = await orvano.client.signInWithOAuth(
+  OAuthProvider.github,
+  redirectUrl: Uri.parse('com.acme.shop://auth'),
+);
+```
+
+  </TabItem>
+</Tabs>
+
+## The user's email
+
+Orvano uses the email that is both **primary** and **verified** on the user's GitHub account, even when they keep it private. A GitHub account without one gets a user with no email: they can sign in with GitHub, and add an email later.

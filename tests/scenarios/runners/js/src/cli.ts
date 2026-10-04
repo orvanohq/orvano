@@ -133,6 +133,7 @@ async function inBrowser(scenarios: Scenario[]): Promise<ScenarioResult[]> {
         const upstream = await fetch(endpoint + url, {
           method,
           headers,
+          redirect: 'manual',
           ...(method === 'GET' || method === 'HEAD' ? {} : { body: Buffer.concat(chunks) }),
         })
         // Every Set-Cookie separately: a plain object would keep only the last one.
@@ -140,6 +141,18 @@ async function inBrowser(scenarios: Scenario[]): Promise<ScenarioResult[]> {
           ([name]) => name !== 'set-cookie',
         )
         for (const cookie of upstream.headers.getSetCookie()) forwarded.push(['set-cookie', cookie])
+        // A page can't read a redirect (spec 0012's provider flows): the runner's fetch asks for
+        // it as a 200 with the target in a header instead.
+        const location = upstream.headers.get('location')
+        if (location !== null && req.headers['x-orvano-test-manual-redirect'] === '1') {
+          res.writeHead(200, [
+            ...forwarded.filter(([name]) => name !== 'location').flat(),
+            'x-orvano-test-location',
+            location,
+          ])
+          res.end()
+          return
+        }
         res.writeHead(upstream.status, forwarded.flat())
         res.end(Buffer.from(await upstream.arrayBuffer()))
       } else if (url === '/browser.js') {

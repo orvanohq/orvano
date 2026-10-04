@@ -6,6 +6,62 @@ abstract final class TestErrorCode {
   static const testConflict = 'test_conflict';
 }
 
+/// One call the fake Apple revoke endpoint received.
+final class TestAppleRevocation {
+  /// Creates a [TestAppleRevocation].
+  const TestAppleRevocation({
+    required this.clientId,
+    required this.tokenHint,
+    required this.receivedAt,
+  });
+
+  /// Decodes a [TestAppleRevocation] from JSON.
+  factory TestAppleRevocation.fromJson(Map<String, dynamic> json) =>
+      TestAppleRevocation(
+        clientId: json['clientId'] as String,
+        tokenHint: json['tokenHint'] as String,
+        receivedAt: DateTime.parse(json['receivedAt'] as String),
+      );
+
+  /// The client ID the token was issued to.
+  final String clientId;
+
+  /// The first 16 hex characters of the token's SHA-256, never the token.
+  final String tokenHint;
+
+  /// When the call arrived.
+  final DateTime receivedAt;
+
+  /// Encodes this [TestAppleRevocation] as JSON.
+  Map<String, dynamic> toJson() => {
+    'clientId': clientId,
+    'tokenHint': tokenHint,
+    'receivedAt': receivedAt.toUtc().toIso8601String(),
+  };
+}
+
+/// The fake Apple revoke endpoint's calls, oldest first.
+final class TestAppleRevocationList {
+  /// Creates a [TestAppleRevocationList].
+  const TestAppleRevocationList({required this.items});
+
+  /// Decodes a [TestAppleRevocationList] from JSON.
+  factory TestAppleRevocationList.fromJson(Map<String, dynamic> json) =>
+      TestAppleRevocationList(
+        items: (json['items'] as List<dynamic>)
+            .map((e) => TestAppleRevocation.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+
+  /// The calls.
+  final List<TestAppleRevocation> items;
+
+  /// Encodes this [TestAppleRevocationList] as JSON.
+  Map<String, dynamic> toJson() => {
+    'items': items.map((e) => e.toJson()).toList(),
+  };
+}
+
 /// The answer to `test.consolePing`.
 final class TestConsolePing {
   /// Creates a [TestConsolePing].
@@ -20,6 +76,68 @@ final class TestConsolePing {
 
   /// Encodes this [TestConsolePing] as JSON.
   Map<String, dynamic> toJson() => {'status': status};
+}
+
+/// A request for a native ID token from the fake sign in provider (spec 0012).
+final class TestCreateIdTokenRequest {
+  /// Creates a [TestCreateIdTokenRequest].
+  const TestCreateIdTokenRequest({
+    required this.provider,
+    required this.aud,
+    required this.sub,
+    this.email,
+    this.emailVerified,
+    required this.nonce,
+    this.expiresIn,
+  });
+
+  /// Decodes a [TestCreateIdTokenRequest] from JSON.
+  factory TestCreateIdTokenRequest.fromJson(Map<String, dynamic> json) =>
+      TestCreateIdTokenRequest(
+        provider: json['provider'] as String,
+        aud: json['aud'] as String,
+        sub: json['sub'] as String,
+        email: json['email'] == null ? null : json['email'] as String,
+        emailVerified: json['emailVerified'] == null
+            ? null
+            : json['emailVerified'] as bool,
+        nonce: json['nonce'] as String,
+        expiresIn: json['expiresIn'] == null
+            ? null
+            : (json['expiresIn'] as num).toInt(),
+      );
+
+  /// `google` or `apple`.
+  final String provider;
+
+  /// The token's audience: a client ID or bundle ID.
+  final String aud;
+
+  /// The provider account's subject.
+  final String sub;
+
+  /// The email claim.
+  final String? email;
+
+  /// The email_verified claim.
+  final bool? emailVerified;
+
+  /// The nonce claim: the hashed nonce, as the app gives it to the provider.
+  final String nonce;
+
+  /// Seconds until the token expires; negative for one already expired. Defaults to 600.
+  final int? expiresIn;
+
+  /// Encodes this [TestCreateIdTokenRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'provider': provider,
+    'aud': aud,
+    'sub': sub,
+    'email': ?email,
+    'emailVerified': ?emailVerified,
+    'nonce': nonce,
+    'expiresIn': ?expiresIn,
+  };
 }
 
 /// The newest email Mailpit caught for an address, read from its text part.
@@ -64,6 +182,32 @@ final class TestEmail {
     'token': token,
     'code': code,
     'url': url,
+  };
+}
+
+/// A native ID token from the fake sign in provider.
+final class TestIdToken {
+  /// Creates a [TestIdToken].
+  const TestIdToken({required this.idToken, this.authorizationCode});
+
+  /// Decodes a [TestIdToken] from JSON.
+  factory TestIdToken.fromJson(Map<String, dynamic> json) => TestIdToken(
+    idToken: json['idToken'] as String,
+    authorizationCode: json['authorizationCode'] == null
+        ? null
+        : json['authorizationCode'] as String,
+  );
+
+  /// The signed ID token.
+  final String idToken;
+
+  /// Apple only: an authorization code the fake token endpoint accepts for this user; null for Google.
+  final String? authorizationCode;
+
+  /// Encodes this [TestIdToken] as JSON.
+  Map<String, dynamic> toJson() => {
+    'idToken': idToken,
+    'authorizationCode': authorizationCode,
   };
 }
 

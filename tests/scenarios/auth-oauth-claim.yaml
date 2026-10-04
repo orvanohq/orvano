@@ -1,0 +1,29 @@
+# Spec 0012, AC-10, AC-12, AC-24: an unverified password account is claimed by the first verified
+# provider sign in for its email: same user, the password gone.
+name: a verified provider sign in claims an unverified account with the same email
+requires: []
+steps:
+  - op: account.create
+    as: client
+    input:
+      body: { email: 'claim-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201, body: { user: { emailVerified: false, hasPassword: true } } }
+    save:
+      userId: $.user.id
+  - op: oauthSignIn
+    as: client
+    input:
+      provider: google
+      testUser:
+        { sub: 'claim-${unique}', email: 'Claim-${unique}@example.com', emailVerified: true }
+    expect:
+      status: 200
+      body:
+        type: oauth
+        isNewUser: false
+        user: { id: '${userId}', emailVerified: true, hasPassword: false, providers: [google] }
+  - op: signIn
+    as: client
+    input:
+      body: { email: 'claim-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 401, code: invalid_credentials }

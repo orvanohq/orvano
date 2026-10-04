@@ -1,0 +1,65 @@
+---
+title: Sign in with Microsoft
+description: "Let users sign in with a personal Microsoft account or a work or school account."
+sidebar:
+  order: 13
+---
+
+import { TabItem, Tabs } from '@astrojs/starlight/components'
+
+Sign in with Microsoft works like [Sign in with Google](/docs/auth/sign-in-with-google/), by redirect, for personal Microsoft accounts and for work and school accounts (Microsoft Entra ID).
+
+## 1. Register the app
+
+1. In the Microsoft Entra admin center, open **App registrations** and select **New registration**.
+2. Choose who may sign in. This matches the **Tenant** field in Orvano:
+
+   | Supported account types | Tenant in Orvano |
+   |---|---|
+   | Any organization and personal accounts | `common` (the default) |
+   | Any organization only | `organizations` |
+   | Personal accounts only | `consumers` |
+   | This organization only | your tenant ID |
+
+3. Under **Redirect URI**, choose **Web** and paste the **Callback URL** from the Microsoft dialog on the **Sign in methods** page.
+4. Under **Certificates and secrets**, create a client secret.
+5. Under **Token configuration**, select **Add optional claim**, choose **ID**, and add `email` and `xms_edov`.
+6. Copy the **Application (client) ID** and the secret into the Microsoft dialog, set the tenant, turn on **Enabled**, and select **Save**.
+
+### Why `xms_edov` matters
+
+Microsoft lets an organization put any email on an account, verified or not. The `xms_edov` claim says whether Microsoft verified the email's domain. Orvano counts a Microsoft email as verified only when `xms_edov` is true. Without it, Microsoft users get no email in Orvano, and they never sign in to an existing account by email.
+
+## 2. Sign in
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.client.signInWithOAuth('microsoft', { redirectUrl: `${location.origin}/auth/callback.html` })
+// On the callback page:
+const result = await orvano.client.redeemLink()
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```tsx
+'use client'
+await orvano.client.signInWithOAuth('microsoft', { redirectUrl: '/account' })
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final result = await orvano.client.signInWithOAuth(
+  OAuthProvider.microsoft,
+  redirectUrl: Uri.parse('com.acme.shop://auth'),
+);
+```
+
+  </TabItem>
+</Tabs>
+
+An account outside the tenant you set (a work account when the tenant is `consumers`, say) fails with [`provider_error`](/errors/provider_error/).

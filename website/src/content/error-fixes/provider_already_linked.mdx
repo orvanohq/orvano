@@ -1,0 +1,7 @@
+## Why it happens
+
+The user already has an identity of this provider, with another provider account. One user has at most one identity per provider, and an email alone never moves a link.
+
+## How to fix
+
+Unlink the old identity first (the user in their settings, a server with `users.deleteIdentity`, or the console), then sign in or link with the new provider account.

@@ -1,0 +1,31 @@
+# Spec 0012, AC-7, AC-24: the handoff code works once, and only with the verifier of the flow that
+# started it.
+name: a provider's handoff code works once and only with its verifier
+requires: []
+steps:
+  - op: oauthCode
+    as: client
+    input:
+      provider: github
+      testUser: { sub: '7${unique}', email: 'code-${unique}@example.com', emailVerified: true }
+    expect: { status: 200, body: { type: oauth, error: null } }
+    save:
+      code: $.code
+      verifier: $.codeVerifier
+  - op: account.createOAuthSession
+    as: client
+    input:
+      body: { code: '${code}', codeVerifier: dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk }
+    expect: { status: 401, code: invalid_oauth_code }
+  - op: account.createOAuthSession
+    as: client
+    input:
+      body: { code: '${code}', codeVerifier: '${verifier}' }
+    expect:
+      status: 201
+      body: { isNewUser: true, user: { email: 'code-${unique}@example.com' } }
+  - op: account.createOAuthSession
+    as: client
+    input:
+      body: { code: '${code}', codeVerifier: '${verifier}' }
+    expect: { status: 401, code: invalid_oauth_code }

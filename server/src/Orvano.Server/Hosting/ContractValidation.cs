@@ -9,6 +9,13 @@ namespace Orvano.Server.Hosting;
 /// </summary>
 internal static class ContractValidation
 {
+    /// <summary>
+    /// Endpoint metadata for a <c>Test</c> only route that stands in for another service and is no Orvano operation:
+    /// the fake OAuth provider (spec 0012, AC-27). Its responses are not checked.
+    /// </summary>
+    public static TBuilder OutsideContract<TBuilder>(this TBuilder builder) where TBuilder : IEndpointConventionBuilder =>
+        builder.WithMetadata(new OutsideContractMetadata());
+
     public static IApplicationBuilder UseContractValidation(this IApplicationBuilder app)
     {
         ContractValidator validator;
@@ -37,7 +44,7 @@ internal static class ContractValidation
 
             // No endpoint matched (a 404 from routing): nothing the contract promises.
             var endpoint = context.GetEndpoint();
-            var violation = endpoint is null
+            var violation = endpoint is null || endpoint.Metadata.GetMetadata<OutsideContractMetadata>() is not null
                 ? null
                 : validator.Check(
                     endpoint.Metadata.GetMetadata<IEndpointNameMetadata>()?.EndpointName,
@@ -58,3 +65,6 @@ internal static class ContractValidation
         });
     }
 }
+
+/// <summary>Marks an endpoint whose responses the contract validation skips; see <see cref="ContractValidation.OutsideContract{TBuilder}"/>.</summary>
+internal sealed class OutsideContractMetadata;

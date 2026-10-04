@@ -46,7 +46,7 @@ export function VerifiedBadge({ verified }: { verified: boolean }) {
   )
 }
 
-/** How a session began, in words (spec 0010, AC-22). */
+/** How a session began, in words (spec 0010, AC-22; spec 0012 adds the provider methods). */
 export function sessionMethodLabel(method: SessionMethod): string {
   switch (method) {
     case 'password':
@@ -59,6 +59,10 @@ export function sessionMethodLabel(method: SessionMethod): string {
       return 'Email code'
     case 'recovery':
       return 'Password reset'
+    case 'oauth':
+      return 'Provider sign in'
+    case 'id_token':
+      return 'Native provider sign in'
   }
 }
 

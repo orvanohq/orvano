@@ -57,6 +57,10 @@ export function Continue() {
 
 Redeem on a click, not on page load: mail scanners open links to check them, and each link works only once. The handler has no GET action for the same reason. Send `Referrer-Policy: no-referrer` on the landing page (in `next.config.ts` headers), so the token never leaks in a `Referer` header.
 
+## Sign in with a provider
+
+Export both methods of the route handler (`export const { GET, POST } = createOrvanoRouteHandler(...)`). In a client component, `orvano.client.signInWithOAuth('github', { redirectUrl: '/account' })` posts to the handler's `oauth` action, which keeps the PKCE verifier in an `HttpOnly` cookie and sends the browser to the provider; the provider comes back to `oauth-callback`, which sets the session cookies and redirects to `redirectUrl`, a path in your app. Guides: https://orvano.dev/docs/auth/sign-in-with-google/
+
 ## About
 
 Orvano is the open source backend you host yourself: auth, Postgres databases, storage, functions, realtime, messaging, webhooks, jobs, and backups, run from one console.

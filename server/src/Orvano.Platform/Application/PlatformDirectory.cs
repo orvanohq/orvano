@@ -70,7 +70,7 @@ internal sealed class PlatformDirectory(PlatformStore store, TimeProvider clock)
         return identifiers.Any(identifier => WebOriginPattern.TryParse(identifier, out var pattern, out _) && pattern.Matches(origin));
     }
 
-    public async Task<bool> AllowsRedirectAsync(string projectId, Uri redirectUrl, CancellationToken ct)
+    public async Task<bool> AllowsRedirectAsync(string projectId, Uri redirectUrl, bool allowCustomScheme, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(redirectUrl);
         if (!redirectUrl.IsAbsoluteUri || redirectUrl.UserInfo.Length > 0) return false;
@@ -81,6 +81,7 @@ internal sealed class PlatformDirectory(PlatformStore store, TimeProvider clock)
         var https = scheme == Uri.UriSchemeHttps;
         var http = scheme == Uri.UriSchemeHttp;
         if (http && host is not ("localhost" or "127.0.0.1")) return false;
+        if (!https && !http && !allowCustomScheme) return false;
 
         var platforms = await store.ReadAsync((db, ct) =>
             db.Platforms.AsNoTracking().Where(p => p.ProjectId == projectId).Select(p => new { p.Type, p.Identifier }).ToListAsync(ct), ct);

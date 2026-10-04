@@ -273,6 +273,17 @@ internal static partial class ContractReader
                     else if (id is not null && !id.StartsWith(service + ".", StringComparison.Ordinal))
                         errors.Add($"{where}: operationId must start with its service '{service}.'");
 
+                    // spec 0012: a browser route (the OAuth callback) is reached by navigation, and no SDK calls it.
+                    // It answers redirects and HTML, so only its naming rules apply, and it is left out of every SDK.
+                    if (audience is Audience.Browser)
+                    {
+                        if (op.Extensions?.ContainsKey(ScopeExtension) == true || (op.Security?.Count ?? 0) > 0)
+                            errors.Add($"{where}: a {AudienceExtension} 'browser' operation takes no credential and no {ScopeExtension}");
+                        if (IsTest(op.Extensions, where) || op.Extensions?.ContainsKey(SessionExtension) == true)
+                            errors.Add($"{where}: a {AudienceExtension} 'browser' operation is neither a test operation nor a session change");
+                        continue;
+                    }
+
                     var test = IsTest(op.Extensions, where);
                     var testPath = path.StartsWith("/v1/test/", StringComparison.Ordinal) || path.StartsWith("/v1/console/test/", StringComparison.Ordinal);
                     if (test != testPath)
@@ -399,8 +410,9 @@ internal static partial class ContractReader
                 case "server": return Audience.Server;
                 case "both": return Audience.Both;
                 case "console": return Audience.Console;
+                case "browser": return Audience.Browser;
                 default:
-                    errors.Add($"{where}: {AudienceExtension} is '{value}', expected client, server, both, or console");
+                    errors.Add($"{where}: {AudienceExtension} is '{value}', expected client, server, both, console, or browser");
                     return null;
             }
         }

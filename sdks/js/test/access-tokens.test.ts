@@ -174,6 +174,8 @@ describe('verifyAccessToken', () => {
           metadata: {},
           createdAt: '2026-01-01T00:00:00Z',
           lastSignInAt: null,
+          providers: [],
+          hasPassword: false,
         }),
         { headers: { 'Content-Type': 'application/json' } },
       )

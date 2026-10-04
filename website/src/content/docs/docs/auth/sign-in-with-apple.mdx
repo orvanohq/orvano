@@ -1,0 +1,71 @@
+---
+title: Sign in with Apple
+description: "Let users sign in with their Apple ID, by redirect on the web and natively on iOS and macOS."
+sidebar:
+  order: 11
+---
+
+import { TabItem, Tabs } from '@astrojs/starlight/components'
+
+Sign in with Apple works like [Sign in with Google](/docs/auth/sign-in-with-google/): the SDK sends the browser to Apple, and Orvano finishes the exchange. On iOS and macOS, a Flutter app signs in natively instead; see [Native sign in](/docs/auth/native-sign-in/). Apps on the App Store that offer another provider must offer Apple too.
+
+Apple has no client secret to copy: Orvano makes a fresh one from your Sign in with Apple key whenever it needs one.
+
+## 1. Set up Apple
+
+In the Apple Developer site, under **Certificates, Identifiers and Profiles**:
+
+1. **App ID**: on your app's identifier, turn on **Sign in with Apple**. Its bundle ID is what native sign in uses.
+2. **Services ID**: create one (for example `com.acme.shop.web`) for sign in on the web, and turn on **Sign in with Apple** for it. Under **Configure**, add your Orvano's domain, and as a **Return URL** the **Callback URL** from the Apple dialog on the **Sign in methods** page. Apple needs a real https domain, not `localhost`.
+3. **Key**: create a key with **Sign in with Apple** turned on, and download the `.p8` file. Apple lets you download it once. Note its **Key ID**, and your **Team ID** (top right of the site).
+
+## 2. Fill in the Apple dialog
+
+| Field | What goes in it |
+|---|---|
+| **Services ID** | The Services ID, for sign in by redirect |
+| **Bundle IDs** | Your app's bundle IDs, one per line, for native sign in |
+| **Team ID** | Your 10 character Team ID |
+| **Key ID** | The key's 10 character ID |
+| **Private key (.p8)** | The whole `.p8` file, pasted |
+
+Turn on **Enabled** and select **Save**. The card says **Ready: Redirect** once the Services ID, Team ID, key ID, and key are set, and **Native** once a bundle ID is too.
+
+## 3. Sign in
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.client.signInWithOAuth('apple', { redirectUrl: `${location.origin}/auth/callback.html` })
+// On the callback page:
+const result = await orvano.client.redeemLink()
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```tsx
+'use client'
+await orvano.client.signInWithOAuth('apple', { redirectUrl: '/account' })
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+// On iOS and macOS, prefer native sign in: see Native sign in.
+final result = await orvano.client.signInWithOAuth(
+  OAuthProvider.apple,
+  redirectUrl: Uri.parse('com.acme.shop://auth'),
+);
+```
+
+  </TabItem>
+</Tabs>
+
+Apple sends back the user's name only the first time they sign in to your app, and Orvano keeps it as the user's name. Users may hide their email; Apple then gives a private relay address (`…@privaterelay.appleid.com`), which counts as verified and forwards to them.
+
+## When a user leaves
+
+Apple requires apps to revoke a user's Sign in with Apple when they delete their account. Orvano does it for you: deleting the user, unlinking Apple, or claiming the account queues a job that tells Apple, with a client secret made for the client ID the user signed in with. Deletion never waits for Apple, and the job retries while Apple is down.

@@ -13,6 +13,8 @@ final health = await orvano.health.get();
 
 `orvano.client.handleLink(uri)` redeems any link Orvano emails (verification, password reset, magic link, email change); see `orvano_flutter` for wiring deep links. Every failure is an `OrvanoException`; a limit's refusal carries `retryAfter`.
 
+Provider sign in: `signInWithOAuth` and `linkIdentity` take an `OAuthLauncher` that opens the provider's page and returns the URL it came back to (`orvano_flutter` gives a default one); `signInWithIdToken` takes a Google or Apple ID token with a nonce from `OrvanoNonce.create()`.
+
 ## About
 
 Orvano is the open source backend you host yourself: auth, Postgres databases, storage, functions, realtime, messaging, webhooks, jobs, and backups, run from one console.

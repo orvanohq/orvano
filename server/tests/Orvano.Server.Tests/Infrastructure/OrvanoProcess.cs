@@ -83,10 +83,14 @@ public sealed class OrvanoProcess : IAsyncDisposable
 
     public int ExitCode => _process.ExitCode;
 
-    public static OrvanoProcess Start(string[] args, IReadOnlyDictionary<string, string>? env = null, bool listen = false)
+    /// <remarks>
+    /// <paramref name="port"/> picks the port to listen on, from <see cref="FreePort"/>, for a test whose settings must
+    /// name it before the process starts (the OAuth tests' public URL).
+    /// </remarks>
+    public static OrvanoProcess Start(string[] args, IReadOnlyDictionary<string, string>? env = null, bool listen = false, int? port = null)
     {
         if (!File.Exists(ServerDll)) throw new FileNotFoundException("Build the server first.", ServerDll);
-        var process = new OrvanoProcess(args, env ?? new Dictionary<string, string>(), listen ? FreePort() : null);
+        var process = new OrvanoProcess(args, env ?? new Dictionary<string, string>(), listen ? port ?? FreePort() : null);
         process._process.Start();
         process._process.BeginOutputReadLine();
         process._process.BeginErrorReadLine();

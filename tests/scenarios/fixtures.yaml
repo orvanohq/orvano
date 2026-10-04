@@ -12,6 +12,9 @@
 # users: app users with known passwords, hashed at load like any sign up.
 # installSmtp: the install's SMTP server (spec 0009), the `mailpit` service of compose.yml, so invite
 #   emails arrive there and tests read them from http://localhost:8025.
+# oauthProviders: all four sign in providers (spec 0012), saved through the console's settings code. In
+#   Test, ORVANO_TEST_OAUTH_PROVIDER_URL points them at the api's own fake provider, which accepts any
+#   client ID and secret. The Apple key is a throwaway made for these scenarios only.
 consoleUsers:
   - email: fixture-admin@example.com
     password: fixture console password
@@ -40,3 +43,33 @@ installSmtp:
   port: 1025
   security: none
   fromEmail: orvano@scenarios.test
+oauthProviders:
+  - project: scenarios0000000000a
+    provider: google
+    enabled: true
+    clientId: scenarios-google-web
+    clientSecret: scenarios-google-secret
+    clientIdsExtra: [scenarios-google-ios]
+  - project: scenarios0000000000a
+    provider: apple
+    enabled: true
+    clientId: dev.orvano.scenarios.web
+    clientIdsExtra: [dev.orvano.scenarios]
+    appleTeamId: SCENARIOS1
+    appleKeyId: SCENARIOKY
+    applePrivateKey: |
+      -----BEGIN PRIVATE KEY-----
+      MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg7h8OMosJFfkuDZUw
+      uypojpDZR8j94JL8++F84SXKmkqhRANCAASj9wKnLhJvcOx0l5eonieys8K0DKhy
+      gL94OCq2BNXGvQqVSPln9CgpoQc0KRMmWCJsrVzsiOG0tIPdF/9WTisT
+      -----END PRIVATE KEY-----
+  - project: scenarios0000000000a
+    provider: github
+    enabled: true
+    clientId: scenarios-github
+    clientSecret: scenarios-github-secret
+  - project: scenarios0000000000a
+    provider: microsoft
+    enabled: true
+    clientId: scenarios-microsoft
+    clientSecret: scenarios-microsoft-secret

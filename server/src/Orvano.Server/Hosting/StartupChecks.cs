@@ -63,6 +63,14 @@ internal static class StartupChecks
         return false;
     }
 
+    /// <summary><c>ORVANO_TEST_OAUTH_PROVIDER_URL</c> is refused outside <c>Test</c> and must be an absolute http or https URL (spec 0012, AC-27).</summary>
+    public static bool TestOAuthProviderUsable(TestOAuthProvider provider, ILogger logger)
+    {
+        if (provider.Problem is null) return true;
+        logger.LogCritical("Test OAuth provider setting refused: {Problem}", provider.Problem);
+        return false;
+    }
+
     /// <summary>
     /// Waits briefly for Postgres, then refuses to start unless the database schema version equals
     /// the highest migration embedded in this binary.

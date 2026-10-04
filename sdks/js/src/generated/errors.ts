@@ -20,6 +20,10 @@ export const ErrorCode = {
   emailRateLimited: 'email_rate_limited',
   /** `forbidden` */
   forbidden: 'forbidden',
+  /** `identity_already_linked` */
+  identityAlreadyLinked: 'identity_already_linked',
+  /** `identity_not_found` */
+  identityNotFound: 'identity_not_found',
   /** `insufficient_scope` */
   insufficientScope: 'insufficient_scope',
   /** `internal_error` */
@@ -34,6 +38,10 @@ export const ErrorCode = {
   invalidCursor: 'invalid_cursor',
   /** `invalid_email_token` */
   invalidEmailToken: 'invalid_email_token',
+  /** `invalid_id_token` */
+  invalidIdToken: 'invalid_id_token',
+  /** `invalid_oauth_code` */
+  invalidOauthCode: 'invalid_oauth_code',
   /** `invalid_password` */
   invalidPassword: 'invalid_password',
   /** `invalid_refresh_token` */
@@ -52,8 +60,12 @@ export const ErrorCode = {
   invitationNotFound: 'invitation_not_found',
   /** `last_owner` */
   lastOwner: 'last_owner',
+  /** `last_sign_in_method` */
+  lastSignInMethod: 'last_sign_in_method',
   /** `not_found` */
   notFound: 'not_found',
+  /** `oauth_access_denied` */
+  oauthAccessDenied: 'oauth_access_denied',
   /** `org_not_active` */
   orgNotActive: 'org_not_active',
   /** `org_not_empty` */
@@ -64,6 +76,16 @@ export const ErrorCode = {
   projectNotFound: 'project_not_found',
   /** `project_not_ready` */
   projectNotReady: 'project_not_ready',
+  /** `provider_already_linked` */
+  providerAlreadyLinked: 'provider_already_linked',
+  /** `provider_error` */
+  providerError: 'provider_error',
+  /** `provider_not_configured` */
+  providerNotConfigured: 'provider_not_configured',
+  /** `provider_not_enabled` */
+  providerNotEnabled: 'provider_not_enabled',
+  /** `provider_unavailable` */
+  providerUnavailable: 'provider_unavailable',
   /** `rate_limited` */
   rateLimited: 'rate_limited',
   /** `reauthentication_required` */

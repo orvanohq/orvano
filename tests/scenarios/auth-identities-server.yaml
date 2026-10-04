@@ -1,0 +1,56 @@
+# Spec 0012, AC-14, AC-23, AC-24: a server lists and unlinks a user's identities with an API key;
+# a verified email is a way in, and a user with only one identity and no email keeps it.
+name: a server lists and unlinks a user's identities
+requires: []
+steps:
+  - op: oauthSignIn
+    as: client
+    input:
+      provider: google
+      testUser: { sub: 's-${unique}', email: 's-${unique}@example.com', emailVerified: true }
+    expect: { status: 200 }
+    save:
+      userId: $.user.id
+  - op: users.listIdentities
+    as: server
+    input: { userId: '${userId}' }
+    expect:
+      status: 200
+      body:
+        items:
+          [
+            {
+              provider: google,
+              subject: 's-${unique}',
+              email: 's-${unique}@example.com',
+              emailVerified: true,
+            },
+          ]
+    save:
+      identityId: $.items.0.id
+  - op: users.deleteIdentity
+    as: server
+    input: { userId: '${userId}', identityId: '${identityId}' }
+    expect: { status: 204 }
+  - op: users.listIdentities
+    as: server
+    input: { userId: '${userId}' }
+    expect: { status: 200, body: { items: [] } }
+  - op: oauthSignIn
+    as: client
+    input:
+      provider: github
+      testUser: { sub: '3${unique}' }
+    expect: { status: 200, body: { user: { email: null } } }
+    save:
+      lonelyId: $.user.id
+  - op: users.listIdentities
+    as: server
+    input: { userId: '${lonelyId}' }
+    expect: { status: 200 }
+    save:
+      lonelyIdentity: $.items.0.id
+  - op: users.deleteIdentity
+    as: server
+    input: { userId: '${lonelyId}', identityId: '${lonelyIdentity}' }
+    expect: { status: 409, code: last_sign_in_method }

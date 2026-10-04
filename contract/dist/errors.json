@@ -227,7 +227,7 @@
   {
     "code": "reauthentication_required",
     "status": 403,
-    "description": "A user without a password must sign in again, by link or code, within 10 minutes before this action."
+    "description": "Sign in again within 10 minutes before this action: a user without a password, or anyone linking a provider."
   },
   {
     "code": "email_already_verified",
@@ -243,5 +243,60 @@
     "code": "server_busy",
     "status": 503,
     "description": "The server is too busy to check a password right now; retry after `Retry-After`."
+  },
+  {
+    "code": "invalid_oauth_code",
+    "status": 401,
+    "description": "The OAuth handoff code is unknown, already used, expired, or was redeemed without the verifier of the flow that started it."
+  },
+  {
+    "code": "invalid_id_token",
+    "status": 401,
+    "description": "The provider's ID token failed a check: signature, issuer, audience, expiry, nonce, or it was used before."
+  },
+  {
+    "code": "oauth_access_denied",
+    "status": 403,
+    "description": "The user cancelled at the provider's consent screen."
+  },
+  {
+    "code": "identity_not_found",
+    "status": 404,
+    "description": "No such identity for this user."
+  },
+  {
+    "code": "provider_not_enabled",
+    "status": 409,
+    "description": "The provider is not turned on for the project."
+  },
+  {
+    "code": "provider_not_configured",
+    "status": 409,
+    "description": "The provider is on, but its settings for this kind of sign in are missing."
+  },
+  {
+    "code": "provider_already_linked",
+    "status": 409,
+    "description": "The user already has an identity of this provider, with another provider account."
+  },
+  {
+    "code": "identity_already_linked",
+    "status": 409,
+    "description": "This provider account is linked to another user."
+  },
+  {
+    "code": "last_sign_in_method",
+    "status": 409,
+    "description": "Removing this identity would leave the user with no way to sign in."
+  },
+  {
+    "code": "provider_error",
+    "status": 502,
+    "description": "The provider answered with an error, or its answer failed a check."
+  },
+  {
+    "code": "provider_unavailable",
+    "status": 503,
+    "description": "The provider did not answer in time, or answered with a server error; try again."
   }
 ]

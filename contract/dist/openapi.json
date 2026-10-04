@@ -22,6 +22,9 @@
       "name": "users"
     },
     {
+      "name": "oauth"
+    },
+    {
       "name": "test"
     }
   ],
@@ -323,6 +326,234 @@
         "x-orvano-audience": "client"
       }
     },
+    "/v1/account/identities": {
+      "get": {
+        "operationId": "account.listIdentities",
+        "description": "Lists the signed in user's identities, oldest first.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/identities/id-token": {
+      "post": {
+        "operationId": "account.createIdTokenIdentity",
+        "description": "Links a provider to the signed in user with its ID token from a native app. The session must be at most 10 minutes old.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Identity"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIdTokenSessionRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/identities/oauth": {
+      "post": {
+        "operationId": "account.completeOAuthLink",
+        "description": "Links the provider with the code a link flow returned and its verifier. Only the user who started the flow can finish it.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Identity"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteOAuthLinkRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/identities/oauth/flows": {
+      "post": {
+        "operationId": "account.createOAuthLinkFlow",
+        "description": "Starts linking a provider to the signed in user, like `createOAuthFlow`. The session must be at most 10 minutes\nold. The SDKs' `linkIdentity` does all of it.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthFlow"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOAuthFlowRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/identities/{identityId}": {
+      "delete": {
+        "operationId": "account.deleteIdentity",
+        "description": "Unlinks one of the signed in user's identities. The last way to sign in can't be removed. Sessions stay.",
+        "parameters": [
+          {
+            "name": "identityId",
+            "in": "path",
+            "required": true,
+            "description": "The identity to unlink.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/account/magic-link": {
       "post": {
         "operationId": "account.createMagicLink",
@@ -352,6 +583,50 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreateMagicLinkRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/oauth/flows": {
+      "post": {
+        "operationId": "account.createOAuthFlow",
+        "description": "Starts signing in with a provider: answers the provider's sign in page to send the browser to. After the user\nagrees, Orvano sends the browser back to `redirectUrl` with a code that only your verifier redeems. The SDKs'\n`signInWithOAuth` does all of it.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthFlow"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOAuthFlowRequest"
               }
             }
           }
@@ -653,6 +928,51 @@
         "x-orvano-audience": "client"
       }
     },
+    "/v1/account/sessions/id-token": {
+      "post": {
+        "operationId": "account.createIdTokenSession",
+        "description": "Signs a user in with a provider's ID token from a native app (Google or Apple sign in), and with Apple's\nauthorization code. It finds the user by the provider account, else by the provider's verified email, else\ncreates them. Each token works once.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIdTokenSessionRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-session": "start",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/account/sessions/magic-link": {
       "post": {
         "operationId": "account.createMagicLinkSession",
@@ -689,6 +1009,51 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreateMagicLinkSessionRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-session": "start",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/sessions/oauth": {
+      "post": {
+        "operationId": "account.createOAuthSession",
+        "description": "Signs a user in with the code a provider flow returned and the flow's PKCE verifier. It finds the user by the\nprovider account, else by the provider's verified email, else creates them. The code works once.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOAuthSessionRequest"
               }
             }
           }
@@ -2541,6 +2906,144 @@
         "x-orvano-audience": "console"
       }
     },
+    "/v1/console/project/auth/providers": {
+      "get": {
+        "operationId": "consoleAuthProviders.list",
+        "description": "Lists the project's settings for all four providers.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthProviderSettingsList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAuthProviders",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/auth/providers/{provider}": {
+      "put": {
+        "operationId": "consoleAuthProviders.update",
+        "description": "Saves one provider's settings; owners and developers only.",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "description": "The provider: `google`, `apple`, `github`, or `microsoft`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthProviderSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOAuthProviderRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAuthProviders",
+        "x-orvano-audience": "console"
+      },
+      "delete": {
+        "operationId": "consoleAuthProviders.delete",
+        "description": "Removes one provider's settings and secrets; owners and developers only.",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "description": "The provider: `google`, `apple`, `github`, or `microsoft`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAuthProviders",
+        "x-orvano-audience": "console"
+      }
+    },
     "/v1/console/project/email/smtp": {
       "get": {
         "operationId": "consoleSmtp.get",
@@ -3967,6 +4470,106 @@
         "x-orvano-audience": "console"
       }
     },
+    "/v1/console/project/users/{userId}/identities": {
+      "get": {
+        "operationId": "consoleUsers.listIdentities",
+        "description": "Lists a user's identities, oldest first.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/users/{userId}/identities/{identityId}": {
+      "delete": {
+        "operationId": "consoleUsers.deleteIdentity",
+        "description": "Unlinks one of a user's identities; owners and developers only. The user's last way to sign in can't be removed.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "identityId",
+            "in": "path",
+            "required": true,
+            "description": "The identity to unlink.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
     "/v1/console/project/users/{userId}/recovery": {
       "post": {
         "operationId": "consoleUsers.createRecovery",
@@ -4444,6 +5047,218 @@
         "x-orvano-audience": "both"
       }
     },
+    "/v1/projects/{projectId}/oauth/{provider}/callback": {
+      "get": {
+        "operationId": "oauth.callback",
+        "description": "The provider's redirect back, with a query (Google, GitHub, Microsoft).",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "description": "The project the flow belongs to.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "description": "The provider the flow belongs to.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "description": "The flow's state.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "description": "The provider's authorization code.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "description": "The provider's error, such as `access_denied`.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "The provider sent the browser back: on to the app's redirect URL with `orvano_code` or `orvano_error`.",
+            "headers": {
+              "location": {
+                "required": true,
+                "description": "The app's redirect URL with `orvano_type` and `orvano_code` or `orvano_error`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "The provider sent the browser back: on to the app's redirect URL with `orvano_code` or `orvano_error`.",
+            "headers": {
+              "location": {
+                "required": true,
+                "description": "The app's redirect URL with `orvano_type` and `orvano_code` or `orvano_error`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The flow is unknown, used, or expired (400), or the callback limit was reached (429): a static page saying to go back to the app.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The flow is unknown, used, or expired (400), or the callback limit was reached (429): a static page saying to go back to the app.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "oauth"
+        ],
+        "x-orvano-service": "oauth",
+        "x-orvano-audience": "browser"
+      },
+      "post": {
+        "operationId": "oauth.callbackForm",
+        "description": "The provider's redirect back as a form post (Apple).",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "description": "The project the flow belongs to.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "description": "The provider the flow belongs to.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "The provider sent the browser back: on to the app's redirect URL with `orvano_code` or `orvano_error`.",
+            "headers": {
+              "location": {
+                "required": true,
+                "description": "The app's redirect URL with `orvano_type` and `orvano_code` or `orvano_error`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "The provider sent the browser back: on to the app's redirect URL with `orvano_code` or `orvano_error`.",
+            "headers": {
+              "location": {
+                "required": true,
+                "description": "The app's redirect URL with `orvano_type` and `orvano_code` or `orvano_error`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The flow is unknown, used, or expired (400), or the callback limit was reached (429): a static page saying to go back to the app.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The flow is unknown, used, or expired (400), or the callback limit was reached (429): a static page saying to go back to the app.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "oauth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthCallbackForm"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "oauth",
+        "x-orvano-audience": "browser"
+      }
+    },
     "/v1/test/conflict": {
       "post": {
         "operationId": "test.conflict",
@@ -4581,6 +5396,98 @@
         "tags": [
           "test"
         ],
+        "x-orvano-test": true,
+        "x-orvano-service": "test",
+        "x-orvano-audience": "both"
+      }
+    },
+    "/v1/test/oauth/apple/revocations": {
+      "get": {
+        "operationId": "test.listAppleRevocations",
+        "description": "Lists the calls the fake Apple revoke endpoint received after `after`.",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Only calls received after this time.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestAppleRevocationList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "test"
+        ],
+        "x-orvano-test": true,
+        "x-orvano-service": "test",
+        "x-orvano-audience": "both"
+      }
+    },
+    "/v1/test/oauth/id-tokens": {
+      "post": {
+        "operationId": "test.createIdToken",
+        "description": "Signs a native ID token as Google or Apple would, with the fake provider's key.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestIdToken"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "test"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestCreateIdTokenRequest"
+              }
+            }
+          }
+        },
         "x-orvano-test": true,
         "x-orvano-service": "test",
         "x-orvano-audience": "both"
@@ -5007,6 +5914,108 @@
           }
         ],
         "x-orvano-idempotent": true,
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/identities": {
+      "get": {
+        "operationId": "users.listIdentities",
+        "description": "Lists a user's identities, oldest first.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.read",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/identities/{identityId}": {
+      "delete": {
+        "operationId": "users.deleteIdentity",
+        "description": "Unlinks one of a user's identities. The user's last way to sign in can't be removed. Sessions stay.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "identityId",
+            "in": "path",
+            "required": true,
+            "description": "The identity to unlink.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
         "x-orvano-scope": "users.write",
         "x-orvano-service": "users",
         "x-orvano-audience": "server"
@@ -5511,7 +6520,7 @@
           },
           "isNewUser": {
             "type": "boolean",
-            "description": "Whether this call created the user: true from sign up, and from a magic link or email code for a new email.",
+            "description": "Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user.",
             "examples": [
               false
             ]
@@ -5529,6 +6538,30 @@
           }
         },
         "description": "A signed in user and their new session."
+      },
+      "CompleteOAuthLinkRequest": {
+        "type": "object",
+        "required": [
+          "code",
+          "codeVerifier"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The `orvano_code` parameter Orvano added to your redirect URL. It works once, for 2 minutes.",
+            "examples": [
+              "orv_oc_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          },
+          "codeVerifier": {
+            "type": "string",
+            "description": "The PKCE verifier whose challenge started the link flow.",
+            "examples": [
+              "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+            ]
+          }
+        },
+        "description": "A link of a provider to the signed in user, with the code a link flow returned."
       },
       "CompleteRecoveryRequest": {
         "type": "object",
@@ -5582,6 +6615,8 @@
           "metadata",
           "createdAt",
           "lastSignInAt",
+          "providers",
+          "hasPassword",
           "isInstallAdmin"
         ],
         "properties": {
@@ -5664,6 +6699,20 @@
               }
             ],
             "description": "When the user last signed in; null if never."
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OAuthProvider"
+            },
+            "description": "The providers linked to the user, sorted by name."
+          },
+          "hasPassword": {
+            "type": "boolean",
+            "description": "Whether the user has a password.",
+            "examples": [
+              true
+            ]
           },
           "isInstallAdmin": {
             "type": "boolean",
@@ -5934,6 +6983,56 @@
         },
         "description": "A sign in with an emailed code."
       },
+      "CreateIdTokenSessionRequest": {
+        "type": "object",
+        "required": [
+          "provider",
+          "idToken",
+          "nonce"
+        ],
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/IdTokenProvider",
+            "description": "The provider that issued the token."
+          },
+          "idToken": {
+            "type": "string",
+            "description": "The provider's ID token, at most 8 KB.",
+            "examples": [
+              "eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9.e30.c2ln"
+            ]
+          },
+          "nonce": {
+            "type": "string",
+            "description": "The raw nonce, 16 to 128 characters. Give the provider its lowercase hex SHA-256 (the SDKs' `createNonce` makes\nboth), so the token carries that hash.",
+            "examples": [
+              "q2lV7l3o0W9nE5w6Xk0wq1JmYp8tVb3Z"
+            ]
+          },
+          "authorizationCode": {
+            "type": "string",
+            "description": "Apple only, and required for Apple: the authorization code Sign in with Apple returned with the token.",
+            "examples": [
+              "c1f2e3d4..."
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Apple only: the name Sign in with Apple returned on the first authorization, at most 256 characters.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          }
+        },
+        "description": "A sign in with a provider's ID token from a native app."
+      },
       "CreateInvitationRequest": {
         "type": "object",
         "required": [
@@ -6001,6 +7100,59 @@
           }
         },
         "description": "A sign in with the token from a magic link."
+      },
+      "CreateOAuthFlowRequest": {
+        "type": "object",
+        "required": [
+          "provider",
+          "redirectUrl",
+          "codeChallenge"
+        ],
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/OAuthProvider",
+            "description": "The provider to sign in with."
+          },
+          "redirectUrl": {
+            "type": "string",
+            "description": "Your page or app that receives the result: a host that is one of the project's web platforms (`http` only on\n`localhost` or `127.0.0.1`), or your app's own scheme (its iOS, Android, or macOS identifier). Orvano adds\n`orvano_type` and then `orvano_code` or `orvano_error` to it.",
+            "examples": [
+              "https://app.example.com/auth/callback"
+            ]
+          },
+          "codeChallenge": {
+            "type": "string",
+            "description": "The S256 PKCE challenge: base64url(SHA-256(verifier)), 43 characters. Keep the verifier; only it redeems the\ncode. The SDKs make both.",
+            "examples": [
+              "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+            ]
+          }
+        },
+        "description": "A request to start signing in with a provider."
+      },
+      "CreateOAuthSessionRequest": {
+        "type": "object",
+        "required": [
+          "code",
+          "codeVerifier"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The `orvano_code` parameter Orvano added to your redirect URL. It works once, for 2 minutes.",
+            "examples": [
+              "orv_oc_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          },
+          "codeVerifier": {
+            "type": "string",
+            "description": "The PKCE verifier whose challenge started the flow: 43 to 128 characters of `[A-Za-z0-9-._~]`.",
+            "examples": [
+              "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+            ]
+          }
+        },
+        "description": "A sign in with the code a provider flow returned."
       },
       "CreateOrgRequest": {
         "type": "object",
@@ -6703,7 +7855,18 @@
           "reauthentication_required",
           "email_already_verified",
           "email_already_in_use",
-          "server_busy"
+          "server_busy",
+          "invalid_oauth_code",
+          "invalid_id_token",
+          "oauth_access_denied",
+          "identity_not_found",
+          "provider_not_enabled",
+          "provider_not_configured",
+          "provider_already_linked",
+          "identity_already_linked",
+          "last_sign_in_method",
+          "provider_error",
+          "provider_unavailable"
         ],
         "description": "Every stable error code the server sends in `Problem.code`."
       },
@@ -6730,6 +7893,101 @@
           }
         },
         "description": "Whether the server is up, and which Orvano version it runs."
+      },
+      "IdTokenProvider": {
+        "type": "string",
+        "enum": [
+          "google",
+          "apple"
+        ],
+        "description": "A provider a native app can sign in with by its ID token."
+      },
+      "Identity": {
+        "type": "object",
+        "required": [
+          "id",
+          "provider",
+          "subject",
+          "email",
+          "emailVerified",
+          "createdAt",
+          "lastSignInAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The identity ID.",
+            "examples": [
+              "01924f5e-aa1b-7c4d-8e21-3d5e6f7a8b9c"
+            ]
+          },
+          "provider": {
+            "$ref": "#/components/schemas/OAuthProvider",
+            "description": "The provider."
+          },
+          "subject": {
+            "type": "string",
+            "description": "The provider's ID for the account: Google's and Apple's `sub`, GitHub's user ID, Microsoft's `<tid>:<oid>`.",
+            "examples": [
+              "109876543210987654321"
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The email the provider gave, verified or not; null when it gave none.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Whether the provider vouches for that email.",
+            "examples": [
+              true
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the provider was linked."
+          },
+          "lastSignInAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the user last signed in with it; null if never."
+          }
+        },
+        "description": "A provider account linked to a user: one way the user signs in."
+      },
+      "IdentityList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Identity"
+            },
+            "description": "The identities."
+          }
+        },
+        "description": "A user's identities, oldest first: at most one per provider."
       },
       "InstallSettings": {
         "type": "object",
@@ -7132,6 +8390,235 @@
           "blocked"
         ],
         "description": "Whether a member's console account may sign in."
+      },
+      "OAuthCallbackForm": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "The flow's state."
+          },
+          "code": {
+            "type": "string",
+            "description": "The provider's authorization code."
+          },
+          "user": {
+            "type": "string",
+            "description": "Apple's JSON with the user's name, sent only on the first authorization."
+          },
+          "error": {
+            "type": "string",
+            "description": "The provider's error, such as `user_cancelled_authorize`."
+          }
+        },
+        "description": "Apple's form post."
+      },
+      "OAuthFlow": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Send the browser here: the provider's sign in page.",
+            "examples": [
+              "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=..."
+            ]
+          }
+        },
+        "description": "A started provider flow."
+      },
+      "OAuthLinkType": {
+        "type": "string",
+        "enum": [
+          "oauth",
+          "oauth_link"
+        ],
+        "description": "What a provider redirect came back for: the `orvano_type` parameter Orvano adds when it sends the browser back to\nyour `redirectUrl`, beside `orvano_code` or `orvano_error`. The SDKs' link helpers read it."
+      },
+      "OAuthProvider": {
+        "type": "string",
+        "enum": [
+          "google",
+          "apple",
+          "github",
+          "microsoft"
+        ],
+        "description": "A sign in provider."
+      },
+      "OAuthProviderSettings": {
+        "type": "object",
+        "required": [
+          "provider",
+          "enabled",
+          "clientId",
+          "clientSecretSet",
+          "clientSecretHint",
+          "clientIdsExtra",
+          "appleTeamId",
+          "appleKeyId",
+          "applePrivateKeySet",
+          "microsoftTenant",
+          "redirectReady",
+          "nativeReady",
+          "callbackUrl",
+          "updatedAt"
+        ],
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/OAuthProvider",
+            "description": "The provider."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether users may sign in with it.",
+            "examples": [
+              true
+            ]
+          },
+          "clientId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Google's web client ID, Apple's Services ID, GitHub's client ID, or Microsoft's application ID; null when not set.",
+            "examples": [
+              "1234567890-abc.apps.googleusercontent.com"
+            ]
+          },
+          "clientSecretSet": {
+            "type": "boolean",
+            "description": "Whether the client secret is set (Google, GitHub, Microsoft).",
+            "examples": [
+              true
+            ]
+          },
+          "clientSecretHint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The client secret's last 4 characters; null when it is not set.",
+            "examples": [
+              "1a2b"
+            ]
+          },
+          "clientIdsExtra": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Google and Apple: the client IDs native apps sign in with (Android and iOS client IDs, bundle IDs)."
+          },
+          "appleTeamId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Apple: the team ID; null when not set.",
+            "examples": [
+              "ABCDE12345"
+            ]
+          },
+          "appleKeyId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Apple: the Sign in with Apple key's ID; null when not set.",
+            "examples": [
+              "KEY1234567"
+            ]
+          },
+          "applePrivateKeySet": {
+            "type": "boolean",
+            "description": "Apple: whether the private key (.p8) is set.",
+            "examples": [
+              true
+            ]
+          },
+          "microsoftTenant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Microsoft: `common`, `organizations`, `consumers`, or a tenant GUID; null for the other providers.",
+            "examples": [
+              "common"
+            ]
+          },
+          "redirectReady": {
+            "type": "boolean",
+            "description": "Whether everything the browser redirect flow needs is set.",
+            "examples": [
+              true
+            ]
+          },
+          "nativeReady": {
+            "type": "boolean",
+            "description": "Whether everything native ID token sign in needs is set (Google and Apple only).",
+            "examples": [
+              false
+            ]
+          },
+          "callbackUrl": {
+            "type": "string",
+            "description": "The callback URL to register at the provider.",
+            "examples": [
+              "https://orvano.example.com/v1/projects/my-project/oauth/google/callback"
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the settings last changed; null when never saved."
+          }
+        },
+        "description": "One provider's settings for the project. Secrets are write only: only whether they are set, and a hint, come back."
+      },
+      "OAuthProviderSettingsList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OAuthProviderSettings"
+            },
+            "description": "Google, Apple, GitHub, and Microsoft."
+          }
+        },
+        "description": "The four providers' settings, in the order the console shows them."
       },
       "OpenIdConfiguration": {
         "type": "object",
@@ -7656,7 +9143,8 @@
           "sdk",
           "ipAddress",
           "current",
-          "method"
+          "method",
+          "provider"
         ],
         "properties": {
           "id": {
@@ -7728,6 +9216,17 @@
           "method": {
             "$ref": "#/components/schemas/SessionMethod",
             "description": "How the session began."
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OAuthProvider"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The provider of an `oauth` or `id_token` session; null for every other method."
           }
         },
         "description": "An active session of a user: one signed in device or browser."
@@ -7739,7 +9238,9 @@
           "sign_up",
           "magic_link",
           "email_code",
-          "recovery"
+          "recovery",
+          "oauth",
+          "id_token"
         ],
         "description": "How a session began."
       },
@@ -8121,6 +9622,54 @@
         },
         "description": "A value a template can use."
       },
+      "TestAppleRevocation": {
+        "type": "object",
+        "required": [
+          "clientId",
+          "tokenHint",
+          "receivedAt"
+        ],
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "description": "The client ID the token was issued to.",
+            "examples": [
+              "com.acme.app"
+            ]
+          },
+          "tokenHint": {
+            "type": "string",
+            "description": "The first 16 hex characters of the token's SHA-256, never the token.",
+            "examples": [
+              "9f86d081884c7d65"
+            ]
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the call arrived."
+          }
+        },
+        "description": "One call the fake Apple revoke endpoint received.",
+        "x-orvano-test": true
+      },
+      "TestAppleRevocationList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestAppleRevocation"
+            },
+            "description": "The calls."
+          }
+        },
+        "description": "The fake Apple revoke endpoint's calls, oldest first.",
+        "x-orvano-test": true
+      },
       "TestConsolePing": {
         "type": "object",
         "required": [
@@ -8136,6 +9685,69 @@
           }
         },
         "description": "The answer to `test.consolePing`.",
+        "x-orvano-test": true
+      },
+      "TestCreateIdTokenRequest": {
+        "type": "object",
+        "required": [
+          "provider",
+          "aud",
+          "sub",
+          "nonce"
+        ],
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "`google` or `apple`.",
+            "examples": [
+              "apple"
+            ]
+          },
+          "aud": {
+            "type": "string",
+            "description": "The token's audience: a client ID or bundle ID.",
+            "examples": [
+              "com.acme.app"
+            ]
+          },
+          "sub": {
+            "type": "string",
+            "description": "The provider account's subject.",
+            "examples": [
+              "apple-001"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "description": "The email claim.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "The email_verified claim.",
+            "examples": [
+              true
+            ]
+          },
+          "nonce": {
+            "type": "string",
+            "description": "The nonce claim: the hashed nonce, as the app gives it to the provider.",
+            "examples": [
+              "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+            ]
+          },
+          "expiresIn": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Seconds until the token expires; negative for one already expired. Defaults to 600.",
+            "examples": [
+              600
+            ]
+          }
+        },
+        "description": "A request for a native ID token from the fake sign in provider (spec 0012).",
         "x-orvano-test": true
       },
       "TestEmail": {
@@ -8221,6 +9833,32 @@
           "test_conflict"
         ],
         "description": "Error codes only the test operations send. Generated only into the scenario runners.",
+        "x-orvano-test": true
+      },
+      "TestIdToken": {
+        "type": "object",
+        "required": [
+          "idToken",
+          "authorizationCode"
+        ],
+        "properties": {
+          "idToken": {
+            "type": "string",
+            "description": "The signed ID token."
+          },
+          "authorizationCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Apple only: an authorization code the fake token endpoint accepts for this user; null for Google."
+          }
+        },
+        "description": "A native ID token from the fake sign in provider.",
         "x-orvano-test": true
       },
       "TestItem": {
@@ -8391,6 +10029,110 @@
         },
         "description": "Changes to a member."
       },
+      "UpdateOAuthProviderRequest": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether users may sign in with it. An enabled provider needs the settings of at least one way to sign in.",
+            "examples": [
+              true
+            ]
+          },
+          "clientId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "1 to 255 characters with no whitespace.",
+            "examples": [
+              "1234567890-abc.apps.googleusercontent.com"
+            ]
+          },
+          "clientSecret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Google, GitHub, Microsoft: 8 to 1,024 characters. Write only.",
+            "examples": [
+              "GOCSPX-abcdefghijklmnop"
+            ]
+          },
+          "clientIdsExtra": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Google and Apple: at most 10 native client IDs."
+          },
+          "appleTeamId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Apple: exactly 10 capital letters or digits.",
+            "examples": [
+              "ABCDE12345"
+            ]
+          },
+          "appleKeyId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Apple: exactly 10 capital letters or digits.",
+            "examples": [
+              "KEY1234567"
+            ]
+          },
+          "applePrivateKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Apple: the .p8 file's contents, a PKCS#8 EC P-256 key of at most 8 KB. Write only."
+          },
+          "microsoftTenant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Microsoft: `common` (the default), `organizations`, `consumers`, or a tenant GUID.",
+            "examples": [
+              "common"
+            ]
+          }
+        },
+        "description": "One provider's whole settings. A secret field left out keeps the stored secret, null clears it, and a string\nreplaces it. Every other field left out is cleared."
+      },
       "UpdateOrgRequest": {
         "type": "object",
         "required": [
@@ -8500,7 +10242,9 @@
           "status",
           "metadata",
           "createdAt",
-          "lastSignInAt"
+          "lastSignInAt",
+          "providers",
+          "hasPassword"
         ],
         "properties": {
           "id": {
@@ -8582,6 +10326,20 @@
               }
             ],
             "description": "When the user last signed in; null if never."
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OAuthProvider"
+            },
+            "description": "The providers linked to the user, sorted by name."
+          },
+          "hasPassword": {
+            "type": "boolean",
+            "description": "Whether the user has a password.",
+            "examples": [
+              true
+            ]
           }
         },
         "description": "A user of a project."

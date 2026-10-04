@@ -22,7 +22,11 @@ internal sealed class TestingModule : IOrvanoModule
 
     public string Name => "testing";
 
-    public void ConfigureServices(IServiceCollection services, IConfiguration config) => services.AddSingleton<TestEmails>();
+    public void ConfigureServices(IServiceCollection services, IConfiguration config)
+    {
+        services.AddSingleton<TestEmails>();
+        services.AddSingleton<FakeOAuthProvider>();
+    }
 
     public void MapApi(RouteGroupBuilder v1)
     {
@@ -43,6 +47,25 @@ internal sealed class TestingModule : IOrvanoModule
 
         v1.MapGet(TestOperations.ConsolePing.Route, () => TypedResults.Ok(new TestConsolePing("ok")))
             .WithName(TestOperations.ConsolePing.Id);
+
+        var fake = ((IEndpointRouteBuilder)v1).ServiceProvider.GetRequiredService<FakeOAuthProvider>();
+        fake.Map(v1);
+
+        v1.MapPost(TestOperations.CreateIdToken.Route, Results<Ok<TestIdToken>, ProblemHttpResult> (TestCreateIdTokenRequest request) =>
+        {
+            var provider = request.Provider is "google" or "apple" ? request.Provider : null;
+            if (provider is null) return Problems.Result(StatusCodes.Status400BadRequest, ErrorCode.InvalidRequest, "The provider must be google or apple.");
+            var user = new FakeOAuthProvider.TestUser(request.Sub, request.Email, request.EmailVerified, null, null, null, null, null, null);
+            var (idToken, code) = fake.MintNative(provider, request.Aud, user, request.Nonce, request.ExpiresIn is { } seconds ? TimeSpan.FromSeconds(seconds) : null);
+            return TypedResults.Ok(new TestIdToken(idToken, code));
+        })
+            .WithName(TestOperations.CreateIdToken.Id);
+
+        v1.MapGet(TestOperations.ListAppleRevocations.Route, (DateTimeOffset? after) =>
+            TypedResults.Ok(new TestAppleRevocationList([.. fake.Revocations
+                .Where(r => after is null || r.ReceivedAt > after)
+                .Select(r => new TestAppleRevocation(r.ClientId, r.TokenHint, r.ReceivedAt))])))
+            .WithName(TestOperations.ListAppleRevocations.Id);
     }
 
     public void RegisterWork(IWorkRegistry work) { }

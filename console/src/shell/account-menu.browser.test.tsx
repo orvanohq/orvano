@@ -62,6 +62,8 @@ const account = {
   metadata: {},
   createdAt: '2026-09-27T00:00:00Z',
   lastSignInAt: '2026-09-27T00:00:00Z',
+  providers: [],
+  hasPassword: true,
 }
 
 /**

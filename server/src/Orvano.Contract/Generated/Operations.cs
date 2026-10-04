@@ -4,6 +4,22 @@ namespace Orvano.Contract;
 /// <summary>Route constants for the <c>account</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class AccountOperations
 {
+    /// <summary>POST /v1/account/identities/oauth: Links the provider with the code a link flow returned and its verifier. Only the user who started the flow can finish it.</summary>
+    public static class CompleteOAuthLink
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.completeOAuthLink";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/identities/oauth";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account/recovery/confirm: Sets a new password with the token from a reset link, and signs the user in. Every other session of the user</summary>
     public static class CompleteRecovery
     {
@@ -84,6 +100,38 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>POST /v1/account/identities/id-token: Links a provider to the signed in user with its ID token from a native app. The session must be at most 10 minutes old.</summary>
+    public static class CreateIdTokenIdentity
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createIdTokenIdentity";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/identities/id-token";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/sessions/id-token: Signs a user in with a provider's ID token from a native app (Google or Apple sign in), and with Apple's</summary>
+    public static class CreateIdTokenSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createIdTokenSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/id-token";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account/magic-link: Emails a sign in link. An email without a user gets one that creates the user, unless <c>createUser</c> is false. The</summary>
     public static class CreateMagicLink
     {
@@ -111,6 +159,54 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/sessions/magic-link";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/oauth/flows: Starts signing in with a provider: answers the provider's sign in page to send the browser to. After the user</summary>
+    public static class CreateOAuthFlow
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createOAuthFlow";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/oauth/flows";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/identities/oauth/flows: Starts linking a provider to the signed in user, like <c>createOAuthFlow</c>. The session must be at most 10 minutes</summary>
+    public static class CreateOAuthLinkFlow
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createOAuthLinkFlow";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/identities/oauth/flows";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/sessions/oauth: Signs a user in with the code a provider flow returned and the flow's PKCE verifier. It finds the user by the</summary>
+    public static class CreateOAuthSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createOAuthSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/oauth";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";
@@ -196,6 +292,22 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>DELETE /v1/account/identities/{identityId}: Unlinks one of the signed in user's identities. The last way to sign in can't be removed. Sessions stay.</summary>
+    public static class DeleteIdentity
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.deleteIdentity";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/identities/{identityId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>DELETE /v1/account/sessions: Ends every session of the signed in user except the current one.</summary>
     public static class DeleteOtherSessions
     {
@@ -242,6 +354,22 @@ public static class AccountOperations
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "both";
+    }
+
+    /// <summary>GET /v1/account/identities: Lists the signed in user's identities, oldest first.</summary>
+    public static class ListIdentities
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.listIdentities";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/identities";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
     }
 
     /// <summary>GET /v1/account/sessions: Lists the signed in user's active sessions, newest first.</summary>
@@ -507,6 +635,58 @@ public static class ConsoleAuthKeysOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/console/project/auth/keys/rotate";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
+/// <summary>Route constants for the <c>consoleAuthProviders</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleAuthProvidersOperations
+{
+    /// <summary>DELETE /v1/console/project/auth/providers/{provider}: Removes one provider's settings and secrets; owners and developers only.</summary>
+    public static class Delete
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAuthProviders.delete";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/auth/providers/{provider}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/console/project/auth/providers: Lists the project's settings for all four providers.</summary>
+    public static class List
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAuthProviders.list";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/auth/providers";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>PUT /v1/console/project/auth/providers/{provider}: Saves one provider's settings; owners and developers only.</summary>
+    public static class Update
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAuthProviders.update";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PUT";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/auth/providers/{provider}";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "console";
@@ -1352,6 +1532,22 @@ public static class ConsoleUsersOperations
         public const string Audience = "console";
     }
 
+    /// <summary>DELETE /v1/console/project/users/{userId}/identities/{identityId}: Unlinks one of a user's identities; owners and developers only. The user's last way to sign in can't be removed.</summary>
+    public static class DeleteIdentity
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.deleteIdentity";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/identities/{identityId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>DELETE /v1/console/project/users/{userId}/sessions/{sessionId}: Ends one session of a user.</summary>
     public static class DeleteSession
     {
@@ -1411,6 +1607,22 @@ public static class ConsoleUsersOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/console/project/users";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/console/project/users/{userId}/identities: Lists a user's identities, oldest first.</summary>
+    public static class ListIdentities
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.listIdentities";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/identities";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "console";
@@ -1572,6 +1784,22 @@ public static class TestOperations
         public const string Audience = "console";
     }
 
+    /// <summary>POST /v1/test/oauth/id-tokens: Signs a native ID token as Google or Apple would, with the fake provider's key.</summary>
+    public static class CreateIdToken
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "test.createIdToken";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/test/oauth/id-tokens";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "both";
+    }
+
     /// <summary>GET /v1/test/emails/latest: Waits up to 15 seconds for the newest email to <c>to</c> that Mailpit caught after <c>after</c>, and reads it.</summary>
     public static class GetLatestEmail
     {
@@ -1599,6 +1827,22 @@ public static class TestOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/test/items";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "both";
+    }
+
+    /// <summary>GET /v1/test/oauth/apple/revocations: Lists the calls the fake Apple revoke endpoint received after <c>after</c>.</summary>
+    public static class ListAppleRevocations
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "test.listAppleRevocations";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/test/oauth/apple/revocations";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "both";
@@ -1703,6 +1947,25 @@ public static class UsersOperations
         public const string Scope = "users.write";
     }
 
+    /// <summary>DELETE /v1/users/{userId}/identities/{identityId}: Unlinks one of a user's identities. The user's last way to sign in can't be removed. Sessions stay.</summary>
+    public static class DeleteIdentity
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.deleteIdentity";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/identities/{identityId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
     /// <summary>DELETE /v1/users/{userId}/sessions/{sessionId}: Ends one session of a user.</summary>
     public static class DeleteSession
     {
@@ -1771,6 +2034,25 @@ public static class UsersOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/users";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.read";
+    }
+
+    /// <summary>GET /v1/users/{userId}/identities: Lists a user's identities, oldest first.</summary>
+    public static class ListIdentities
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.listIdentities";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/identities";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "server";

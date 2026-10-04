@@ -31,6 +31,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { FormAlert } from '@/components/ui/form-alert'
 import { Input } from '@/components/ui/input'
+import { ProviderMark, providerInfo } from '@/auth/providers'
 import { RelativeTime } from '@/shell/relative-time'
 import { authErrorMessage } from '@/routes/-auth/auth-form'
 import type { Session, SigningKey, User, UserStatus } from '@orvano/console-client'
@@ -69,6 +70,11 @@ export function userColumns(projectId: string): ColumnDef<User>[] {
       cell: ({ row }) => <VerifiedBadge verified={row.original.emailVerified} />,
     },
     {
+      id: 'signIn',
+      header: 'Sign in',
+      cell: ({ row }) => <SignInMethods user={row.original} />,
+    },
+    {
       accessorKey: 'status',
       header: 'Status',
       cell: ({ row }) => <UserStatusBadge status={row.original.status} />,
@@ -89,6 +95,22 @@ export function userColumns(projectId: string): ColumnDef<User>[] {
         ),
     },
   ]
+}
+
+/**
+ * How a user signs in (spec 0012, AC-26): a mark per linked provider, named for screen readers, then
+ * "Password" when they have one, and "Email" for a user with neither.
+ */
+export function SignInMethods({ user }: { user: Pick<User, 'providers' | 'hasPassword'> }) {
+  return (
+    <span className="flex flex-wrap items-center gap-1.5">
+      {user.providers.map((provider) => (
+        <ProviderMark key={provider} provider={provider} />
+      ))}
+      {user.hasPassword ? <span>Password</span> : null}
+      {user.providers.length === 0 && !user.hasPassword ? <span>Email</span> : null}
+    </span>
+  )
 }
 
 /** The empty Users table: nobody has signed up yet, or nobody matches the search. */
@@ -147,7 +169,10 @@ export function SessionsTable({
     {
       accessorKey: 'method',
       header: 'Method',
-      cell: ({ row }) => sessionMethodLabel(row.original.method),
+      cell: ({ row }) =>
+        row.original.provider === null
+          ? sessionMethodLabel(row.original.method)
+          : `${sessionMethodLabel(row.original.method)}, ${providerInfo(row.original.provider).label}`,
     },
     {
       accessorKey: 'userAgent',

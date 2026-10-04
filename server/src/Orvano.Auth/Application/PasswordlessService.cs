@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Npgsql;
 using Orvano.Auth.Domain;
 using Orvano.Core.RateLimiting;
 
@@ -120,7 +119,7 @@ internal sealed class PasswordlessService(
     /// <summary>
     /// AC-15 and AC-32 inside the redeeming transaction: resolves the user (the token's, else the one with the email
     /// now, else a new verified user under the sign up limit), refuses a blocked user, claims an unverified account
-    /// that has a password, marks the email verified, and creates the session.
+    /// that has a password or a provider identity, marks the email verified, and creates the session.
     /// </summary>
     private async Task<Outcome<Redeemed>> SignInAsync(
         AuthUnitOfWork uow, string projectId, Guid? tokenUserId, string tokenEmail, string method, Failure invalid, ClientInfo client, string ipKey,
@@ -161,20 +160,9 @@ internal sealed class PasswordlessService(
         Guid[] ended = [];
         if (!created && user.EmailVerifiedAt is null)
         {
-            // AC-32: the inbox owner just proved the email, so a password and sessions made before that proof go.
-            if (user.HasPassword)
-            {
-                await using (var remove = new NpgsqlCommand("DELETE FROM orvano.auth_passwords WHERE user_id = @user", uow.Tx.Connection, uow.Tx))
-                {
-                    remove.Parameters.AddWithValue("user", user.Id);
-                    await remove.ExecuteNonQueryAsync(ct);
-                }
-
-                ended = [.. await sessions.EndAllAsync(uow, projectId, user.Id, SessionEndReason.AccountClaimed, actor, keep: null, ct)];
-                await AuthEvents.WriteAsync(uow.Tx, AuthEvents.PasswordRemoved, projectId, actor, user.Id.ToString(),
-                    new Dictionary<string, string> { ["userId"] = user.Id.ToString() }, ct: ct);
-            }
-
+            // AC-32 (amended by spec 0012, AC-12): the inbox owner just proved the email, so a password, provider
+            // identities, and the sessions made before that proof go.
+            ended = (await AccountClaims.ClaimAsync(uow, sessions, projectId, user, actor, endSessions: false, ct)).EndedSessions;
             await VerificationService.MarkVerifiedAsync(uow, user.Id, ct);
             await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserUpdated, projectId, actor, user.Id.ToString(),
                 new Dictionary<string, string> { ["userId"] = user.Id.ToString() }, ["emailVerified"], ct: ct);

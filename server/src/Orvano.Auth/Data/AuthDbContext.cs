@@ -21,6 +21,14 @@ internal sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : D
 
     public DbSet<EmailTokenRow> EmailTokens => Set<EmailTokenRow>();
 
+    public DbSet<OAuthProviderRow> OAuthProviders => Set<OAuthProviderRow>();
+
+    public DbSet<IdentityRow> Identities => Set<IdentityRow>();
+
+    public DbSet<OAuthFlowRow> OAuthFlows => Set<OAuthFlowRow>();
+
+    public DbSet<IdTokenUseRow> IdTokenUses => Set<IdTokenUseRow>();
+
     /// <summary>A context on an open connection the caller owns; it never opens or closes it.</summary>
     public static AuthDbContext On(NpgsqlConnection connection) =>
         new(new DbContextOptionsBuilder<AuthDbContext>().UseNpgsql(connection).Options);
@@ -81,6 +89,7 @@ internal sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : D
             e.Property(x => x.EndedAt).HasColumnName("ended_at");
             e.Property(x => x.EndReason).HasColumnName("end_reason");
             e.Property(x => x.Method).HasColumnName("method").HasDefaultValueSql("'password'");
+            e.Property(x => x.Provider).HasColumnName("provider");
             e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -99,6 +108,71 @@ internal sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : D
             e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
             e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        model.Entity<OAuthProviderRow>(e =>
+        {
+            e.ToTable("auth_oauth_providers");
+            e.HasKey(x => new { x.ProjectId, x.Provider });
+            e.Property(x => x.ProjectId).HasColumnName("project_id");
+            e.Property(x => x.Provider).HasColumnName("provider");
+            e.Property(x => x.Enabled).HasColumnName("enabled");
+            e.Property(x => x.ClientId).HasColumnName("client_id");
+            e.Property(x => x.ClientSecretCiphertext).HasColumnName("client_secret_ciphertext");
+            e.Property(x => x.ClientIdsExtra).HasColumnName("client_ids_extra");
+            e.Property(x => x.AppleTeamId).HasColumnName("apple_team_id");
+            e.Property(x => x.AppleKeyId).HasColumnName("apple_key_id");
+            e.Property(x => x.ApplePrivateKeyCiphertext).HasColumnName("apple_private_key_ciphertext");
+            e.Property(x => x.MicrosoftTenant).HasColumnName("microsoft_tenant");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+        });
+
+        model.Entity<IdentityRow>(e =>
+        {
+            e.ToTable("auth_identities");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasDefaultValueSql("uuidv7()");
+            e.Property(x => x.ProjectId).HasColumnName("project_id");
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.Provider).HasColumnName("provider");
+            e.Property(x => x.Subject).HasColumnName("subject");
+            e.Property(x => x.Email).HasColumnName("email");
+            e.Property(x => x.EmailVerified).HasColumnName("email_verified");
+            e.Property(x => x.ProviderRefreshCiphertext).HasColumnName("provider_refresh_ciphertext");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            e.Property(x => x.LastSignInAt).HasColumnName("last_sign_in_at");
+            e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        model.Entity<OAuthFlowRow>(e =>
+        {
+            e.ToTable("auth_oauth_flows");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+            e.Property(x => x.ProjectId).HasColumnName("project_id");
+            e.Property(x => x.Provider).HasColumnName("provider");
+            e.Property(x => x.Purpose).HasColumnName("purpose");
+            e.Property(x => x.LinkUserId).HasColumnName("link_user_id");
+            e.Property(x => x.StateHash).HasColumnName("state_hash");
+            e.Property(x => x.RedirectUrl).HasColumnName("redirect_url");
+            e.Property(x => x.CodeChallenge).HasColumnName("code_challenge");
+            e.Property(x => x.ProviderVerifierCiphertext).HasColumnName("provider_verifier_ciphertext");
+            e.Property(x => x.NonceHash).HasColumnName("nonce_hash");
+            e.Property(x => x.ResultCiphertext).HasColumnName("result_ciphertext");
+            e.Property(x => x.CodeHash).HasColumnName("code_hash");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
+            e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.LinkUserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        model.Entity<IdTokenUseRow>(e =>
+        {
+            e.ToTable("auth_id_token_uses");
+            e.HasKey(x => x.TokenHash);
+            e.Property(x => x.TokenHash).HasColumnName("token_hash");
+            e.Property(x => x.ProjectId).HasColumnName("project_id");
+            e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
         });
 
         model.Entity<SigningKeyRow>(e =>
@@ -202,6 +276,9 @@ internal sealed class SessionRow
 
     /// <summary>How the session began, one of <see cref="Domain.SessionMethod"/>.</summary>
     public required string Method { get; set; }
+
+    /// <summary>The provider of an <c>oauth</c> or <c>id_token</c> session (spec 0012); null for every other method.</summary>
+    public string? Provider { get; set; }
 }
 
 /// <summary>
@@ -256,4 +333,105 @@ internal sealed class SigningKeyRow
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset? RetireAfter { get; set; }
+}
+
+/// <summary><c>auth_oauth_providers</c> (spec 0012): one project's settings for one provider, its secrets sealed.</summary>
+internal sealed class OAuthProviderRow
+{
+    public required string ProjectId { get; set; }
+
+    /// <summary>One of <see cref="Domain.OAuthProviders"/>.</summary>
+    public required string Provider { get; set; }
+
+    public bool Enabled { get; set; }
+
+    public string? ClientId { get; set; }
+
+    /// <summary>Sealed with associated data <c>auth_oauth_providers:&lt;project&gt;:&lt;provider&gt;:client_secret_ciphertext</c>.</summary>
+    public byte[]? ClientSecretCiphertext { get; set; }
+
+    public required string[] ClientIdsExtra { get; set; }
+
+    public string? AppleTeamId { get; set; }
+
+    public string? AppleKeyId { get; set; }
+
+    /// <summary>Sealed PKCS#8 PEM.</summary>
+    public byte[]? ApplePrivateKeyCiphertext { get; set; }
+
+    public string? MicrosoftTenant { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
+/// <summary><c>auth_identities</c> (spec 0012): a provider account linked to a user.</summary>
+internal sealed class IdentityRow
+{
+    public Guid Id { get; set; }
+
+    public required string ProjectId { get; set; }
+
+    public Guid UserId { get; set; }
+
+    public required string Provider { get; set; }
+
+    /// <summary>The provider's subject. Personal data: never log it.</summary>
+    public required string Subject { get; set; }
+
+    /// <summary>The provider's email. Personal data: never log it.</summary>
+    public string? Email { get; set; }
+
+    public bool EmailVerified { get; set; }
+
+    /// <summary>Apple only: the sealed <see cref="Domain.AppleGrant"/>.</summary>
+    public byte[]? ProviderRefreshCiphertext { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset? LastSignInAt { get; set; }
+}
+
+/// <summary><c>auth_oauth_flows</c> (spec 0012): one redirect flow, from start to redemption.</summary>
+internal sealed class OAuthFlowRow
+{
+    public Guid Id { get; set; }
+
+    public required string ProjectId { get; set; }
+
+    public required string Provider { get; set; }
+
+    /// <summary>One of <see cref="Domain.FlowPurposes"/>.</summary>
+    public required string Purpose { get; set; }
+
+    public Guid? LinkUserId { get; set; }
+
+    public byte[]? StateHash { get; set; }
+
+    public required string RedirectUrl { get; set; }
+
+    public required string CodeChallenge { get; set; }
+
+    public byte[]? ProviderVerifierCiphertext { get; set; }
+
+    public byte[]? NonceHash { get; set; }
+
+    public byte[]? ResultCiphertext { get; set; }
+
+    public byte[]? CodeHash { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset ExpiresAt { get; set; }
+}
+
+/// <summary><c>auth_id_token_uses</c> (spec 0012, AC-9): an ID token that already signed in, as its SHA-256.</summary>
+internal sealed class IdTokenUseRow
+{
+    public required byte[] TokenHash { get; set; }
+
+    public required string ProjectId { get; set; }
+
+    public DateTimeOffset ExpiresAt { get; set; }
 }

@@ -178,7 +178,7 @@ enum ErrorCode {
   @doc("The email code is wrong, expired, or used up; ask for a new one after 5 wrong tries (401).")
   invalid_code,
 
-  @doc("A user without a password must sign in again, by link or code, within 10 minutes before this action (403).")
+  @doc("Sign in again within 10 minutes before this action: a user without a password, or anyone linking a provider (403).")
   reauthentication_required,
 
   @doc("The email is already verified (409).")
@@ -189,6 +189,39 @@ enum ErrorCode {
 
   @doc("The server is too busy to check a password right now; retry after `Retry-After` (503).")
   server_busy,
+
+  @doc("The OAuth handoff code is unknown, already used, expired, or was redeemed without the verifier of the flow that started it (401).")
+  invalid_oauth_code,
+
+  @doc("The provider's ID token failed a check: signature, issuer, audience, expiry, nonce, or it was used before (401).")
+  invalid_id_token,
+
+  @doc("The user cancelled at the provider's consent screen (403).")
+  oauth_access_denied,
+
+  @doc("No such identity for this user (404).")
+  identity_not_found,
+
+  @doc("The provider is not turned on for the project (409).")
+  provider_not_enabled,
+
+  @doc("The provider is on, but its settings for this kind of sign in are missing (409).")
+  provider_not_configured,
+
+  @doc("The user already has an identity of this provider, with another provider account (409).")
+  provider_already_linked,
+
+  @doc("This provider account is linked to another user (409).")
+  identity_already_linked,
+
+  @doc("Removing this identity would leave the user with no way to sign in (409).")
+  last_sign_in_method,
+
+  @doc("The provider answered with an error, or its answer failed a check (502).")
+  provider_error,
+
+  @doc("The provider did not answer in time, or answered with a server error; try again (503).")
+  provider_unavailable,
 }
 
 @doc("Error codes only the test operations send. Generated only into the scenario runners.")

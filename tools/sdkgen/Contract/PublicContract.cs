@@ -71,7 +71,7 @@ internal static class PublicContract
     }
 
     private static bool IsPublic(JsonNode op) =>
-        op["x-orvano-audience"]?.GetValue<string>() != "console" && !IsTest(op);
+        op["x-orvano-audience"]?.GetValue<string>() is not ("console" or "browser") && !IsTest(op);
 
     private static bool IsTest(JsonNode? node) =>
         node?["x-orvano-test"] is JsonValue v && v.TryGetValue<bool>(out var test) && test;

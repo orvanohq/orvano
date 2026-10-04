@@ -7,6 +7,9 @@ namespace Orvano.Auth.Fixtures;
 /// <summary>A user to seed: their project, email, password (hashed at load, like any sign up), and optional name.</summary>
 internal sealed record FixtureUser(string Project, string Email, string Password, string? Name);
 
+/// <summary>Sign in provider settings to seed (spec 0012): the project, the provider, and the whole update.</summary>
+internal sealed record FixtureOAuthProvider(string Project, Domain.OAuthProvider Provider, Domain.ProviderUpdate Settings);
+
 /// <summary>A console account to seed: its email, password, and optional name.</summary>
 internal sealed record FixtureConsoleUser(string Email, string Password, string? Name);
 
@@ -54,6 +57,22 @@ internal static class AuthFixtures
         var lower = email.Trim().ToLowerInvariant();
         return store.ReadAsync(async (db, token) =>
             await db.Users.Where(u => u.ProjectId == projectId && u.Email!.ToLower() == lower).Select(u => (Guid?)u.Id).SingleOrDefaultAsync(token), ct);
+    }
+
+    /// <summary>
+    /// Saves the providers' settings through the console's own settings code (spec 0012, AC-27), replacing whatever
+    /// the project had, so a restarted server matches the file.
+    /// </summary>
+    public static async Task SeedOAuthProvidersAsync(ProviderSettings settings, IReadOnlyList<FixtureOAuthProvider> providers, ILogger logger, CancellationToken ct)
+    {
+        foreach (var provider in providers)
+        {
+            var outcome = await settings.UpdateAsync(provider.Project, provider.Provider, provider.Settings, Actor.System, ct);
+            if (!outcome.Succeeded)
+                throw new InvalidOperationException($"Fixture provider settings of project {provider.Project} could not be saved: {outcome.Failure!.Detail}");
+        }
+
+        logger.LogInformation("Seeded {Count} fixture sign in provider(s)", providers.Count);
     }
 
     public static async Task SeedAsync(AuthStore store, AccountService accounts, IReadOnlyList<FixtureUser> users, ILogger logger, CancellationToken ct)

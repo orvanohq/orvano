@@ -252,6 +252,14 @@ base class Client {
     }
   }
 
+  /// Reads the session store again and emits [event] with it: for helpers
+  /// whose call changed the signed in user without a new session, such as
+  /// linking a provider (spec 0012).
+  Future<void> reloadSession(AuthEvent event) async {
+    final current = await session.read();
+    if (!_changes.isClosed) _changes.add(AuthStateChange(event, current));
+  }
+
   Future<void> _save(AuthSession? next, AuthEvent event) async {
     await session.write(next);
     if (!_changes.isClosed) _changes.add(AuthStateChange(event, next));

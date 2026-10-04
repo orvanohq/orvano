@@ -1,0 +1,50 @@
+# Spec 0012, AC-4 to AC-7, AC-10, AC-16, AC-20, AC-24: redirect sign in through the client SDK's
+# signInWithOAuth, with an open that follows the fake provider; a second sign in finds the same user.
+name: a new user signs in with Google by redirect, and again finds the same user
+requires: []
+steps:
+  - op: oauthSignIn
+    as: client
+    input:
+      provider: google
+      testUser:
+        { sub: 'g-${unique}', email: 'ada-${unique}@example.com', emailVerified: true, name: Ada }
+    expect:
+      status: 200
+      body:
+        type: oauth
+        isNewUser: true
+        user:
+          {
+            email: 'ada-${unique}@example.com',
+            emailVerified: true,
+            name: Ada,
+            providers: [google],
+            hasPassword: false,
+          }
+    save:
+      userId: $.user.id
+  - op: account.listSessions
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body:
+        items: [{ method: oauth, provider: google }]
+  - op: oauthSignIn
+    as: client
+    input:
+      provider: google
+      testUser: { sub: 'g-${unique}', email: 'ada-${unique}@example.com', emailVerified: true }
+    expect:
+      status: 200
+      body: { type: oauth, isNewUser: false, user: { id: '${userId}' } }
+  # A provider that is not set up for the redirect page's project answers before any redirect.
+  - op: account.createOAuthFlow
+    as: client
+    input:
+      body:
+        provider: google
+        redirectUrl: 'https://evil.example/callback'
+        codeChallenge: E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+    expect: { status: 400, code: redirect_url_not_allowed }

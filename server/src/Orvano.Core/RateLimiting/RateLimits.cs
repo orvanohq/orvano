@@ -54,6 +54,18 @@ public static class RateLimitPolicies
     /// </summary>
     public static RateLimitPolicy FailedEmailRedeemPerIp { get; } = new("auth.email_redeem_failed.ip", 60, TimeSpan.FromMinutes(15));
 
+    /// <summary><c>account.createOAuthFlow</c> and <c>account.createOAuthLinkFlow</c>, keyed by connection IP (spec 0012, AC-4).</summary>
+    public static RateLimitPolicy OAuthStartPerIp { get; } = new("auth.oauth_start.ip", 300, TimeSpan.FromMinutes(15));
+
+    /// <summary>Both OAuth callback routes, keyed by connection IP (spec 0012, rate limits).</summary>
+    public static RateLimitPolicy OAuthCallbackPerIp { get; } = new("auth.oauth_callback.ip", 300, TimeSpan.FromMinutes(15));
+
+    /// <summary>
+    /// The OAuth code and ID token redemptions answered 401, keyed by connection IP. Checked first, counted only after a
+    /// 401, so over it even a valid request is refused (spec 0012, AC-7, AC-9).
+    /// </summary>
+    public static RateLimitPolicy FailedOAuthRedeemPerIp { get; } = new("auth.oauth_failed.ip", 60, TimeSpan.FromMinutes(15));
+
     /// <summary><c>consoleInstall.getSetup</c>, keyed by connection IP (spec 0006, AC-22).</summary>
     public static RateLimitPolicy ConsoleSetupPerIp { get; } = new("console.setup.ip", 60, TimeSpan.FromMinutes(1));
 

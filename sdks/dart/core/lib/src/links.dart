@@ -1,6 +1,7 @@
 import 'client.dart';
 import 'generated/models.dart';
 import 'generated/services.dart';
+import 'oauth.dart' show OAuthSignIn;
 
 /// What an emailed link is for: its `orvano_type` parameter (spec 0010). The
 /// link also carries the secret as `orvano_token`.
@@ -44,9 +45,42 @@ final class EmailLink {
   final String? password;
 }
 
+/// A link `handleLink` finished: an emailed link, a provider sign in, or a
+/// provider link.
+sealed class HandledLink {
+  const HandledLink();
+
+  /// True only when the call created the user.
+  bool get isNewUser;
+}
+
+/// A finished provider sign in: the user, and whether it created them.
+final class OAuthSignInResult extends HandledLink {
+  /// Creates a result.
+  const OAuthSignInResult({required this.user, required this.isNewUser});
+
+  /// The signed in user.
+  final User user;
+
+  @override
+  final bool isNewUser;
+}
+
+/// A finished link of a provider to the signed in user.
+final class IdentityLinkResult extends HandledLink {
+  /// Creates a result.
+  const IdentityLinkResult({required this.identity});
+
+  /// The new identity.
+  final Identity identity;
+
+  @override
+  bool get isNewUser => false;
+}
+
 /// What a redeemed link did: its type, the user, and whether the call created
 /// them.
-final class LinkResult {
+final class LinkResult extends HandledLink {
   /// Creates a result.
   const LinkResult({
     required this.type,
@@ -61,6 +95,7 @@ final class LinkResult {
   final User user;
 
   /// True only when a magic link created the user.
+  @override
   final bool isNewUser;
 }
 
@@ -105,15 +140,23 @@ extension EmailLinks on Client {
   /// [AuthEvent.signedIn]; a verification or email change refreshes and emits
   /// [AuthEvent.userUpdated] when this client holds that user's session.
   ///
+  /// It also finishes a provider redirect (spec 0012): `orvano_type`
+  /// `oauth` signs in ([OAuthSignInResult]) and `oauth_link` links the
+  /// provider ([IdentityLinkResult]), with the verifier `signInWithOAuth` or
+  /// `linkIdentity` kept; an `orvano_error` throws an [OrvanoException] with
+  /// that code.
+  ///
   /// Wire your app's deep links (`app_links`, `go_router`) to pass the [Uri].
   /// Throws an [ArgumentError], before any call, for an unknown type or a
   /// recovery link without [password], and an [OrvanoException] when Orvano
   /// refuses the link (for example `invalid_email_token`).
-  Future<LinkResult?> handleLink(
+  Future<HandledLink?> handleLink(
     Uri uri, {
     String? password,
     RequestOptions? options,
   }) async {
+    final redirect = await handleOAuthRedirect(uri, options: options);
+    if (redirect != null) return redirect;
     final link = readEmailLink(uri, password: password);
     if (link == null) return null;
     final account = AccountService(this);

@@ -29,6 +29,10 @@ internal sealed class AuthModule : IOrvanoModule
         services.AddSingleton<IUserDirectory>(sp => sp.GetRequiredService<UserDirectory>());
         services.AddSingleton<IConsoleUserDirectory, ConsoleUserDirectory>();
         services.AddSingleton<SessionChecks>();
+        services.AddOAuthHttp();
+        services.AddSingleton(_ => new ProviderCatalog(TestProviderUrl(config)));
+        services.AddSingleton<ProviderKeys>();
+        services.AddSingleton<AppleSecrets>();
     }
 
     /// <summary>
@@ -50,21 +54,42 @@ internal sealed class AuthModule : IOrvanoModule
         services.AddSingleton<PasswordlessService>();
         services.AddSingleton<EmailChangeService>();
         services.AddSingleton<IConsoleSessions, ConsoleSessionChecks>();
+        services.AddSingleton<OAuthCallbacks>();
+        services.AddSingleton<ProviderSettings>();
+        services.AddSingleton<IdTokens>();
+        services.AddSingleton<ProviderExchange>();
+        services.AddSingleton<Identities>();
+        services.AddSingleton<SignInResolution>();
+        services.AddSingleton<OAuthService>();
+        services.AddSingleton<IdentityService>();
     }
+
+    /// <summary>
+    /// <c>ORVANO_TEST_OAUTH_PROVIDER_URL</c> (spec 0012, AC-27): the fake provider every provider endpoint and issuer
+    /// moves to. The host refuses it outside <c>Test</c> and checks its shape at startup, before this is built.
+    /// </summary>
+    public const string TestProviderSetting = "ORVANO_TEST_OAUTH_PROVIDER_URL";
+
+    private static Uri? TestProviderUrl(IConfiguration config) =>
+        config[TestProviderSetting] is { Length: > 0 } value && Uri.TryCreate(value, UriKind.Absolute, out var url) ? url : null;
 
     public void MapApi(RouteGroupBuilder v1)
     {
-        AccountEndpoints.Map(v1);
-        KeysEndpoints.Map(v1);
-        UsersEndpoints.Map(v1);
-        ConsoleAccountEndpoints.Map(v1);
-        ConsoleUsersEndpoints.Map(v1);
+        var auth = v1.WithUserExtras();
+        AccountEndpoints.Map(auth);
+        OAuthEndpoints.Map(auth);
+        IdentityEndpoints.Map(auth);
+        KeysEndpoints.Map(auth);
+        UsersEndpoints.Map(auth);
+        ConsoleAccountEndpoints.Map(auth);
+        ConsoleUsersEndpoints.Map(auth);
     }
 
     public void RegisterWork(IWorkRegistry work)
     {
         work.AddInternalSchedule(AuthRetention.Name, AuthRetention.Interval, AuthRetention.RunScheduledAsync);
         work.HandleJob(AuthJobs.PurgeUsers, AuthJobs.Queue, AuthJobs.PurgeUsersAsync);
+        work.HandleJob(AppleRevoke.Kind, AppleRevoke.Queue, AppleRevokeJob.RunAsync);
         work.OnEvent(AuthJobs.ProjectPurgedEvent, AuthJobs.PurgeConsumer, AuthJobs.OnProjectPurged);
     }
 

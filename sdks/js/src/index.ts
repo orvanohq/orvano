@@ -46,6 +46,28 @@ export type {
   LinkResult,
   RedeemLinkOptions,
 } from './runtime/links.js'
+export {
+  codeParameter,
+  createNonce,
+  createPkce,
+  directOAuth,
+  errorParameter,
+  oauthRedirectError,
+  readOAuthRedirect,
+  removeOAuthFromAddressBar,
+  verifierStorageKey,
+} from './runtime/oauth.js'
+export type {
+  IdTokenCredentials,
+  IdTokenSignInResult,
+  IdentityLinkResult,
+  Nonce,
+  OAuthLinkType,
+  OAuthOpener,
+  OAuthOptions,
+  OAuthSignInResult,
+  OAuthTransport,
+} from './runtime/oauth.js'
 export { paginate } from './runtime/pagination.js'
 export type { Page } from './runtime/pagination.js'
 export { decodeEvent } from './runtime/events.js'

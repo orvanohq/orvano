@@ -46,6 +46,8 @@ internal static class ServerRole
         var fixtures = TestFixtures.Load(builder.Environment, config);
         var mailpit = TestMailpit.Load(builder.Environment, config);
         builder.Services.AddSingleton(mailpit);
+        var oauthProvider = TestOAuthProvider.Load(builder.Environment, config);
+        builder.Services.AddSingleton(oauthProvider);
 
         var appUrl = OrvanoConfig.Required(config, "ORVANO_DB_URL");
         var appPool = role switch
@@ -85,6 +87,7 @@ internal static class ServerRole
         if (!StartupChecks.TimeZonesAvailable(logger)) return 1;
         if (!StartupChecks.TestFixturesUsable(fixtures, logger)) return 1;
         if (!StartupChecks.TestMailpitUsable(mailpit, logger)) return 1;
+        if (!StartupChecks.TestOAuthProviderUsable(oauthProvider, logger)) return 1;
         if (role == OrvanoRole.Api && !StartupChecks.PasswordHashingAvailable(app.Services, logger)) return 1;
         var appDb = app.Services.GetRequiredKeyedService<NpgsqlDataSource>(OrvanoDb.App);
         if (!await StartupChecks.SchemaMatchesAsync(appDb, logger, app.Lifetime.ApplicationStopping)) return 1;
@@ -103,6 +106,8 @@ internal static class ServerRole
             await PlatformFixtures.SeedAsync(
                 app.Services.GetRequiredService<PlatformStore>(), owner!.Value, fixtures.Projects, fixtures.ApiKeys, fixtures.Platforms, logger, stopping);
             await AuthFixtures.SeedAsync(authStore, accounts, fixtures.Users, logger, stopping);
+            if (fixtures.OAuthProviders is { Count: > 0 } providers)
+                await AuthFixtures.SeedOAuthProvidersAsync(app.Services.GetRequiredService<ProviderSettings>(), providers, logger, stopping);
             if (fixtures.InstallSmtp is { } installSmtp)
                 await MessagingFixtures.SeedInstallSmtpAsync(app.Services.GetRequiredService<MessagingStore>(), owner.Value, installSmtp, logger, stopping);
         }

@@ -1,0 +1,73 @@
+# Spec 0012, AC-13, AC-14, AC-24: a signed in user links GitHub by redirect and Apple natively,
+# lists them, unlinks down to one, and can't remove the last way in.
+name: a user links and unlinks providers and keeps a way in
+requires: []
+steps:
+  - op: oauthSignIn
+    as: client
+    input:
+      provider: google
+      testUser: { sub: 'l-${unique}', email: 'l-${unique}@example.com', emailVerified: false }
+    expect: { status: 200, body: { isNewUser: true, user: { email: null } } }
+  - op: oauthSignIn
+    as: client
+    input:
+      provider: github
+      link: true
+      testUser: { sub: '5${unique}', email: 'lg-${unique}@example.com', emailVerified: true }
+    expect:
+      status: 200
+      body: { type: oauth_link, identity: { provider: github, email: 'lg-${unique}@example.com' } }
+  - op: createNonce
+    as: client
+    input: {}
+    expect: { status: 200 }
+    save:
+      raw: $.raw
+      hashed: $.hashed
+  - op: test.createIdToken
+    as: client
+    input:
+      body: { provider: apple, aud: dev.orvano.scenarios, sub: 'la-${unique}', nonce: '${hashed}' }
+    expect: { status: 200 }
+    save:
+      appleToken: $.idToken
+      appleCode: $.authorizationCode
+  - op: account.createIdTokenIdentity
+    as: client
+    input:
+      body:
+        {
+          provider: apple,
+          idToken: '${appleToken}',
+          nonce: '${raw}',
+          authorizationCode: '${appleCode}',
+        }
+    expect: { status: 201, body: { provider: apple } }
+  - op: account.listIdentities
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body:
+        items: [{ provider: google }, { provider: github }, { provider: apple }]
+    save:
+      googleId: $.items.0.id
+      githubId: $.items.1.id
+      appleId: $.items.2.id
+  - op: account.deleteIdentity
+    as: client
+    input: { identityId: '${googleId}' }
+    expect: { status: 204 }
+  - op: account.deleteIdentity
+    as: client
+    input: { identityId: '${githubId}' }
+    expect: { status: 204 }
+  - op: account.deleteIdentity
+    as: client
+    input: { identityId: '${appleId}' }
+    expect: { status: 409, code: last_sign_in_method }
+  - op: account.get
+    as: client
+    input: {}
+    expect: { status: 200, body: { providers: [apple] } }

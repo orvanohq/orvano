@@ -6,11 +6,15 @@ import 'package:http/http.dart' as http;
 import 'package:orvano_core/orvano_core.dart';
 
 import 'secure_session_store.dart';
+import 'web_auth_launcher.dart';
 
 /// Creates a client for a Flutter app (spec 0004, AC-25): the session lives
 /// in secure storage under `orvano.session.<projectId>`, and each time the
 /// app resumes the client checks it, refreshing when under a minute of the
-/// access token is left. Nothing refreshes on a timer. Call it after
+/// access token is left. Nothing refreshes on a timer. Provider sign in
+/// (`signInWithOAuth`, `linkIdentity`) opens the system's auth session
+/// through [webAuthLauncher] unless [oauthLauncher] says otherwise
+/// (spec 0012). Call it after
 /// `WidgetsFlutterBinding.ensureInitialized()`; the resume check lasts as long
 /// as the app.
 ///
@@ -29,6 +33,7 @@ Client createClient({
   int maxRetries = 3,
   http.Client? httpClient,
   void Function(String message)? onWarning,
+  OAuthLauncher? oauthLauncher,
 }) {
   final client = Client(
     endpoint: endpoint,
@@ -40,6 +45,7 @@ Client createClient({
     httpClient: httpClient,
     onWarning: onWarning,
   );
+  setDefaultOAuthLauncher(client, oauthLauncher ?? webAuthLauncher);
   watchResume(client);
   return client;
 }

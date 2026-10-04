@@ -1,7 +1,7 @@
 // The Orvano API contract (spec 0001). TypeSpec is the only thing people edit; SdkGen reads the
 // compiled dist/openapi.json. Every operation carries an audience and a service group:
 //
-//   @extension("x-orvano-audience", "client" | "server" | "both" | "console")
+//   @extension("x-orvano-audience", "client" | "server" | "both" | "console" | "browser")
 //   @extension("x-orvano-service", "<service>")
 //   @operationId("<service>.<method>")
 //
@@ -27,6 +27,8 @@ import "./auth/keys.tsp";
 import "./auth/users.tsp";
 import "./auth/console-account.tsp";
 import "./auth/console-users.tsp";
+import "./auth/oauth.tsp";
+import "./auth/identities.tsp";
 import "./messaging/email.tsp";
 import "./test/test.tsp";
 
