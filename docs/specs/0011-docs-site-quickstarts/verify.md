@@ -10,10 +10,10 @@ _Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `
 - [x] Rerun the same `install --local` → `.env` is byte for byte the same, and the summary shows the backup reminder instead of the key → AC-3
 - [x] Rerun with `--port 7701` and no `--yes` → exit 2, `.env` unchanged; with `--yes` → `ORVANO_PUBLIC_URL=http://localhost:7701` → AC-3
 - [x] `install --local` on a server install folder (`--domain localhost`) → exit 2, and every file, `install.log` included, is unchanged → AC-3
-- [ ] `install --domain localhost --existing-data=yes`, and `install.sh --dir <local folder>`, on a local folder → both exit 2, `.env` unchanged → AC-3
+- [x] `install --domain localhost --existing-data=yes`, and `install.sh --dir <local folder>`, on a local folder → both exit 2, `.env` unchanged → AC-3
 - [x] On the local stack, the console SMTP row is `mailpit:1025`, security `none`, From `orvano@local.test`, `updated_by_user_id` all zeros → AC-4
-- [ ] Create the first admin from the setup link, create an org, and invite someone → the invite lands in Mailpit at `http://localhost:8025` within 30 seconds → AC-4
-- [ ] Change the install SMTP in the console, then restart `api` → the row keeps the console's values → AC-4
+- [x] Create the first admin from the setup link, create an org, and invite someone → the invite lands in Mailpit at `http://localhost:8025` within 30 seconds → AC-4
+- [x] Change the install SMTP in the console, then restart `api` → the row keeps the console's values → AC-4
 - [x] Start `api`, `worker`, and `realtime` with `ORVANO_INSTALL_SMTP_URL=smtp://user:secret@host` → each exits 1 with a message naming the setting; `secret` and `host` appear nowhere in the output → AC-4
 - [x] `ORVANO_INSTALL_SMTP_URL=smtps://user:p%40ss@smtp.example.com` → the seeded row has port 465, security `tls`, username `user`, and a sealed password (not the plain text) → AC-4
 - [x] `pnpm --filter @orvano/website build` without `ORVANO_SITE_ENV` → fails with a message asking for it; with `preview` → builds `website/dist/` with `/`, `/docs/`, `/errors/`, `/docs/api/`, the Pagefind index, the sitemap, and `404.html` → AC-5
@@ -31,14 +31,14 @@ _Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `
 - [x] Delete `src/content/error-fixes/user_not_found.mdx`, or add `not_a_code.mdx`, or drop its `## How to fix` heading → `node website/scripts/prepare.ts` fails naming the file → AC-17
 - [x] `dist/docs/api/operations/` has one page per operation in `openapi.public.json` (37 today) and nothing under `/v1/console/` or `/v1/test/` (`grep -r "/v1/console/\|/v1/test/" website/dist/docs/api` finds nothing) → AC-15
 - [x] Remove every link to a `users.*` operation from the guides → prepare fails with "No guide links to the API reference for the users tag"; link to `/docs/api/operations/usersfoo/` → prepare fails naming the bad link → AC-18
-- [ ] `node .github/scripts/check-example-pins.mjs` passes; change the `orvano_dart` pin to `^0.0.0`, or the `Orvano` `PackageReference` version, or the Android `applicationId` → it fails naming the file → AC-10, AC-14
+- [x] `node .github/scripts/check-example-pins.mjs` passes; change the `orvano_dart` pin to `^0.0.0`, or the `Orvano` `PackageReference` version, or the Android `applicationId` → it fails naming the file → AC-10, AC-14
 - [x] `dotnet test --project tools/tests/Orvano.SdkGen.Tests` passes, including `Pins_each_example_to_exactly_the_version` for all five examples → AC-14
 - [x] With a local stack and `quickstart.env` from `pnpm --filter @orvano/website screenshots`: copy `examples/js-quickstart` out of the repo, `node .github/scripts/use-local-sdks.mjs <copy> <packs>`, write `.env.local`, `npm install && npm run build && npm run preview` → `check:web-quickstart http://localhost:5173` passes → AC-11, AC-19
 - [x] Copy `examples/dart-quickstart`, point it at the checkout, `dart run bin/create_user.dart a@example.com 'a long password' 'Ada'`, `dart run bin/server.dart` → `check:server-quickstart http://localhost:3001 a@example.com 'a long password'` passes (200 with the user, 401 with no token and with a bad token) → AC-12, AC-19
 - [x] Same for `examples/dotnet-quickstart` with `dotnet run -- create-user ...` and `dotnet run`, on port 3002 → AC-12, AC-19
-- [ ] Copy `examples/flutter-quickstart`, point it at the checkout, run chromedriver on 4444, then `flutter drive -d web-server --browser-name=chrome --web-port 5050 ... --dart-define=ORVANO_PROJECT=<id>` → All tests passed, with no `--disable-web-security` → AC-11, AC-19
-- [ ] On a Mac, `flutter test integration_test -d <iPhone simulator> --dart-define=ORVANO_PROJECT=<id>` against the local stack → passes → AC-11, AC-20
-- [ ] On PR orvanohq/orvano#93, `Quickstarts against a local stack` runs all five quickstarts and passes; a manual run of `SDKs nightly` passes `Scenarios, Flutter on iOS` (with the quickstart step) and `Flutter quickstart on Android` → AC-19, AC-20
+- [x] Copy `examples/flutter-quickstart`, point it at the checkout, run chromedriver on 4444, then `flutter drive -d web-server --browser-name=chrome --web-port 5050 ... --dart-define=ORVANO_PROJECT=<id>` → All tests passed, with no `--disable-web-security` → AC-11, AC-19
+- [x] On a Mac, `flutter test integration_test -d <iPhone simulator> --dart-define=ORVANO_PROJECT=<id>` against the local stack → passes → AC-11, AC-20
+- [x] On PR orvanohq/orvano#93, `Quickstarts against a local stack` runs all five quickstarts and passes; a manual run of `SDKs nightly` passes `Scenarios, Flutter on iOS` (with the quickstart step) and `Flutter quickstart on Android` → AC-19, AC-20
 
 ## UI / manual
 - [x] Open `/` → the tagline, the macOS and Linux and PowerShell tabs with the three commands at the exact version, five quickstart cards, the four differentiators each marked Planned, and a GitHub link → AC-5, AC-8, AC-13
@@ -51,7 +51,7 @@ _Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `
 - [x] Open `/errors/user_blocked/` → the status 403, the description, "Why it happens", "How to fix", and a tab each for JavaScript and Next.js, Dart and Flutter, and .NET matching on `ErrorCode.userBlocked` / `ErrorCode.UserBlocked` → AC-17
 - [x] Open `/docs/api/operations/usersget/` → method, path, parameters, response schema, the default problem response, "Server SDKs", "API key scope: `users.read`", and tabs JavaScript, Dart server, .NET; `/docs/api/operations/accountcreate/` shows "Client SDKs" and tabs JavaScript, Next.js, Flutter → AC-15
 - [x] The sidebar's API reference group shows the operations grouped by tag (account, health, keys, users) → AC-15
-- [ ] The JavaScript, Flutter, Dart, and .NET quickstart pages each start from the three local commands, walk the console steps with screenshots (Flutter: Web, iOS, Android tabs; Dart and .NET: the API key), and show only code pulled from their example → AC-9, AC-10, AC-13
+- [x] The JavaScript, Flutter, Dart, and .NET quickstart pages each start from the three local commands, walk the console steps with screenshots (Flutter: Web, iOS, Android tabs; Dart and .NET: the API key), and show only code pulled from their example → AC-9, AC-10, AC-13
 - [x] The Flutter page shows `adb reverse tcp:7700 tcp:7700`, the debug only `network_security_config.xml` for `localhost`, the iOS `NSAllowsLocalNetworking` key, and `flutter run -d chrome --web-port 5050` → AC-11
 - [x] The Dart and .NET pages show the settings and the token call in macOS and Linux and Windows PowerShell tabs, and the API key only as an environment variable → AC-12, AC-13
 
@@ -65,29 +65,29 @@ _Steps derived from spec 0011 acceptance criteria. `/check verify` runs these; `
 
 ## UI / manual: milestone 4
 - [x] Every page in Concepts, Auth guides, SDKs, Console, and Self hosting has real content, in the order AC-6 lists, and Changelog renders `CHANGELOG.md` → AC-6, AC-28
-- [ ] Each auth guide has a tab per SDK: JavaScript, Next.js, and Flutter for the user's own account; JavaScript, Dart, and .NET for the server parts; the tab choice sticks across pages → AC-29
+- [x] Each auth guide has a tab per SDK: JavaScript, Next.js, and Flutter for the user's own account; JavaScript, Dart, and .NET for the server parts; the tab choice sticks across pages → AC-29
 - [x] Email verification shows the landing page pattern (a Continue button that posts through `redeemLink` or `handleLink`, and `Referrer-Policy: no-referrer`), gating on `emailVerified` in the app and on the server, and Flutter deep links with https app links, saying that part can't run against a local stack → AC-29
-- [ ] Each email guide (verification, password reset, magic links, email codes, change email) starts from a finished quickstart and the local inbox at `http://localhost:8025` → AC-29
-- [ ] On a local stack with the Next.js quickstart, follow Email verification: the email shows in Mailpit with a Verify email button; Continue on `/auth/confirm` verifies the user, and the console's Users page shows them verified → AC-29
-- [ ] The console pages show their screenshots in the reader's theme, each with alt text that describes the step → AC-21
+- [x] Each email guide (verification, password reset, magic links, email codes, change email) starts from a finished quickstart and the local inbox at `http://localhost:8025` → AC-29
+- [x] On a local stack with the Next.js quickstart, follow Email verification: the email shows in Mailpit with a Verify email button; Continue on `/auth/confirm` verifies the user, and the console's Users page shows them verified → AC-29
+- [x] The console pages show their screenshots in the reader's theme, each with alt text that describes the step → AC-21
 - [x] Install on a server and Upgrade and repair hold everything the README's install section said, with the install command at `releases/download/v<VERSION>/install.sh` (never `latest`); the README keeps a two line summary that links to them → AC-8, AC-28
 - [x] `CONTRIBUTING.md` says a pull request that adds a public operation, an error code, or a console screen updates its guide, concept, or console page in the same pull request, and which of those the build enforces → AC-30
 
 ## Value sourcing
 - [x] Port: no flag on a fresh folder gives 7700; on a rerun with no flag it keeps the `.env` port; `--port` wins → local install port
-- [ ] Setup link: the token in the printed link equals `ORVANO_SETUP_TOKEN` in `.env` → printed setup link
+- [x] Setup link: the token in the printed link equals `ORVANO_SETUP_TOKEN` in `.env` → printed setup link
 - [x] Project name: generated on the first run, then kept byte for byte on every rerun → compose project name
 - [x] SMTP seed: `smtp://`, `smtp+starttls://`, and `smtps://` give security `none`, `starttls`, and `tls`, with default ports 25, 587, and 465 → seed host, port, and security
-- [ ] Docs version: change `VERSION`, rebuild, and the badge and every command follow it; SdkGen moves the example pin to match → documented version, example package versions
-- [ ] Example settings: the app reads `NEXT_PUBLIC_ORVANO_ENDPOINT` and `NEXT_PUBLIC_ORVANO_PROJECT` only, and refuses to start without the project → example endpoint and project
-- [ ] Error page contents: change a member's `@doc` in `contract/errors.tsp`, rebuild the contract and the site → that error page's description and status follow → error page code, status, description
+- [x] Docs version: change `VERSION`, rebuild, and the badge and every command follow it; SdkGen moves the example pin to match → documented version, example package versions
+- [x] Example settings: the app reads `NEXT_PUBLIC_ORVANO_ENDPOINT` and `NEXT_PUBLIC_ORVANO_PROJECT` only, and refuses to start without the project → example endpoint and project
+- [x] Error page contents: change a member's `@doc` in `contract/errors.tsp`, rebuild the contract and the site → that error page's description and status follow → error page code, status, description
 - [x] SDK snippets: the tabs on an operation page match `contract/dist/examples/<sdk>/<operationId>.*` byte for byte, without the generated header → API reference SDK snippets
 - [x] Audience and scope: an operation's labels follow its `x-orvano-audience` and `x-orvano-scope` in `openapi.public.json` → API reference audience, scope
 - [ ] Example settings: the JS app refuses to start without `VITE_ORVANO_PROJECT`; the Flutter app without `--dart-define=ORVANO_PROJECT`; the Dart and .NET servers without `ORVANO_PROJECT` or `ORVANO_API_KEY` → example endpoint and project
 - [x] Dev ports: Vite 5173, Flutter web 5050, Dart 3001, .NET 3002 → example dev ports
 - [x] App IDs: the Flutter iOS bundle ID and Android `applicationId` equal `appId` in `website/scripts/screenshots.ts` → iOS bundle ID, Android package name
 
-- [ ] Install command: change `VERSION`, rebuild → Install on a server, Upgrade and repair, and every SDK install command follow it (`releases/download/v<new>/install.sh`, `@orvano/js@<new>`) → install and image command version
+- [x] Install command: change `VERSION`, rebuild → Install on a server, Upgrade and repair, and every SDK install command follow it (`releases/download/v<new>/install.sh`, `@orvano/js@<new>`) → install and image command version
 - [x] Changelog entries: the Changelog page shows `CHANGELOG.md` and nothing else → changelog page entries
 
 ## Acceptance-criteria coverage
