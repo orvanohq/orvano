@@ -7,6 +7,9 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
 Future<void> main() async {
+  // Dart creates `client` the first time it's used. Using it here reads the
+  // settings now, so a missing one stops the server before it listens.
+  print('Orvano project: ${client.project}');
   final server = await shelf_io.serve(
     _route,
     InternetAddress.loopbackIPv4,
