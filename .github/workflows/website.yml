@@ -52,7 +52,7 @@ jobs:
           # AC-27: what the site reads, plus the console for its screenshots.
           website      website/* examples/* contract/* sdks/* deploy/* server/src/Orvano.Server/Install/* console/* CHANGELOG.md VERSION package.json pnpm-lock.yaml pnpm-workspace.yaml .tool-versions
           # AC-19: what a quickstart runs on, never a content only change.
-          quickstarts  examples/* sdks/* contract/* deploy/* console/* server/src/Orvano.Server/Install/* website/scripts/* .github/scripts/use-local-sdks.mjs global.json !*.md
+          quickstarts  examples/* sdks/* contract/* deploy/* console/* server/src/Orvano.Server/Install/* website/scripts/* .github/scripts/use-local-sdks.mjs .github/scripts/expect-refusal.mjs global.json !*.md
           RULES
 
   build:
@@ -211,8 +211,10 @@ jobs:
         run: |
           . "$RUNNER_TEMP/quickstart.env"
           cd "$RUNNER_TEMP/nextjs-quickstart"
+          npm install --no-audit --no-fund
+          node "$GITHUB_WORKSPACE/.github/scripts/expect-refusal.mjs" 300 'Set NEXT_PUBLIC_ORVANO_PROJECT in .env.local.' -- npm run build
           printf 'NEXT_PUBLIC_ORVANO_ENDPOINT=%s\nNEXT_PUBLIC_ORVANO_PROJECT=%s\n' "$ORVANO_ENDPOINT" "$ORVANO_PROJECT" > .env.local
-          npm install --no-audit --no-fund && npm run build
+          npm run build
           npm start > "$RUNNER_TEMP/nextjs.log" 2>&1 &
           for _ in $(seq 1 30); do curl -fsS -o /dev/null http://localhost:3000 && break; sleep 1; done
           cd "$GITHUB_WORKSPACE" && pnpm --filter @orvano/website check:web-quickstart http://localhost:3000
@@ -225,7 +227,8 @@ jobs:
           npm run preview > "$RUNNER_TEMP/js.log" 2>&1 &
           for _ in $(seq 1 30); do curl -fsS -o /dev/null http://localhost:5173 && break; sleep 1; done
           cd "$GITHUB_WORKSPACE" && pnpm --filter @orvano/website check:web-quickstart http://localhost:5173
-      # AC-12: create a user with the API key, sign in as them with the quickstart's call, then GET /me.
+      # AC-12: the server refuses to start without each setting; then create a user with the API key, sign in as them
+      # with the quickstart's call, and GET /me.
       - name: Dart server quickstart
         run: |
           set -a; . "$RUNNER_TEMP/quickstart.env"; set +a
@@ -233,16 +236,23 @@ jobs:
           dart pub get
           dart format --output=none --set-exit-if-changed .
           dart analyze --fatal-infos
+          refuses="node $GITHUB_WORKSPACE/.github/scripts/expect-refusal.mjs 120"
+          $refuses 'Set the ORVANO_PROJECT environment variable.' -- env -u ORVANO_PROJECT -u ORVANO_API_KEY dart run bin/server.dart
+          $refuses 'Set the ORVANO_API_KEY environment variable.' -- env -u ORVANO_API_KEY dart run bin/server.dart
           dart run bin/create_user.dart dart@example.com 'a long password' 'Ada Lovelace'
           dart run bin/server.dart > "$RUNNER_TEMP/dart.log" 2>&1 &
           for _ in $(seq 1 60); do [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/me)" = 401 ] && break; sleep 1; done
           cd "$GITHUB_WORKSPACE" && pnpm --filter @orvano/website check:server-quickstart http://localhost:3001 dart@example.com 'a long password'
+      # AC-12, as for Dart.
       - name: .NET quickstart
         run: |
           set -a; . "$RUNNER_TEMP/quickstart.env"; set +a
           dotnet format whitespace examples/dotnet-quickstart --folder --verify-no-changes
           cd "$RUNNER_TEMP/dotnet-quickstart"
           dotnet build -c Release -warnaserror
+          refuses="node $GITHUB_WORKSPACE/.github/scripts/expect-refusal.mjs 120"
+          $refuses 'Set the ORVANO_PROJECT environment variable.' -- env -u ORVANO_PROJECT -u ORVANO_API_KEY dotnet run -c Release --no-build
+          $refuses 'Set the ORVANO_API_KEY environment variable.' -- env -u ORVANO_API_KEY dotnet run -c Release --no-build
           dotnet run -c Release --no-build -- create-user dotnet@example.com 'a long password' 'Grace Hopper'
           dotnet run -c Release --no-build > "$RUNNER_TEMP/dotnet.log" 2>&1 &
           for _ in $(seq 1 60); do [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3002/me)" = 401 ] && break; sleep 1; done

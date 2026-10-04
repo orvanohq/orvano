@@ -269,8 +269,11 @@ jobs:
           status=0; docker run --rm --user 0:0 -v /opt/orvano:/install "ghcr.io/orvanohq/orvano:$V" install --local --yes || status=$?
           test "$status" = 2
           sudo cmp "$RUNNER_TEMP/server.env" /opt/orvano/.env
-          status=0; sudo sh deploy/install/install.sh --dir "$RUNNER_TEMP/local" --version "$V" --domain localhost --yes --no-pull || status=$?
+          # The message proves the local folder guard refused, not the one install per machine check behind it.
+          status=0; sudo sh deploy/install/install.sh --dir "$RUNNER_TEMP/local" --version "$V" --domain localhost --yes --no-pull > "$RUNNER_TEMP/kind.out" 2>&1 || status=$?
+          cat "$RUNNER_TEMP/kind.out"
           test "$status" = 2
+          grep -q 'holds a local install (ORVANO_LOCAL=true in .env)' "$RUNNER_TEMP/kind.out"
           cmp "$RUNNER_TEMP/local.env.first" "$RUNNER_TEMP/local/.env"
       - if: failure()
         run: |

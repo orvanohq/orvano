@@ -9,7 +9,8 @@
  *   from `contract/dist/examples/`, and each operation's audience and API key scope in its description (AC-15).
  *
  * It fails when a code has no fix file, a fix file has no code or lacks its two sections, or an API reference tag has
- * no guide page linking to one of its operations (AC-17, AC-18). The contract files are never edited.
+ * no guide page linking to one of its operations (AC-17, AC-18), or an auth guide has a tab group other than the
+ * client SDKs (`sdk`) or the server SDKs (`server-sdk`), in their order (AC-29). The contract files are never edited.
  *
  *   node scripts/prepare.ts
  */
@@ -309,10 +310,40 @@ ${body}
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// Auth guide tabs (AC-29)
+
+/** The tab groups an auth guide may use: the SDK a reader picks follows them to every other guide. */
+const authTabGroups: Record<string, string[]> = {
+  sdk: ['JavaScript', 'Next.js', 'Flutter'],
+  'server-sdk': ['JavaScript', 'Dart', '.NET'],
+}
+
+async function checkAuthGuideTabs(): Promise<void> {
+  const allowed = Object.entries(authTabGroups)
+    .map(([key, labels]) => `syncKey="${key}" with ${labels.join(', ')}`)
+    .join(', or ')
+  for (const file of await listPages(join(docsDir, 'docs/auth'))) {
+    const page = await readFile(file, 'utf8')
+    for (const [, attributes = '', body = ''] of page.matchAll(
+      /<Tabs\b([^>]*)>([\s\S]*?)<\/Tabs>/g,
+    )) {
+      const key = /syncKey="([^"]*)"/.exec(attributes)?.[1]
+      const labels = [...body.matchAll(/<TabItem\s+label="([^"]*)"/g)].map((match) => match[1])
+      const expected = key === undefined ? undefined : authTabGroups[key]
+      if (expected?.join('|') !== labels.join('|'))
+        problems.push(
+          `${relative(website, file)} has a tab group with syncKey="${key ?? ''}" and tabs ${labels.join(', ')}; use ${allowed}.`,
+        )
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 
 await writeErrorPages()
 await writeChangelog()
 await writeDocsOpenApi()
+await checkAuthGuideTabs()
 
 if (problems.length > 0) {
   for (const problem of problems) console.error(`✗ ${problem}`)
