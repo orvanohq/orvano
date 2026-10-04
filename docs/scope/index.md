@@ -55,7 +55,7 @@ Every product feature ships in all of these layers in the same version, unless i
 | 9 | Transactional email | v0.2 | done |
 | 10 | Email verification, recovery & passwordless | v0.2 | done |
 | 11 | Docs site & quickstarts | v0.2 | done |
-| 12 | OAuth & ID token sign in | v0.3 | planned |
+| 12 | OAuth & ID token sign in | v0.3 | in-progress |
 | 13 | MFA, passkeys & sessions | v0.3 | planned |
 | 14 | Auth policies & abuse protection | v0.3 | planned |
 | 15 | Console team members & roles | v0.3 | done |
@@ -122,6 +122,8 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Security notice emails**: tell the old address when an email changes, and the user when their password is reset (a new template in Messaging) · from spec 0010
 - **Quickstart links in the console**: the project's "Connect your app" card links to the matching quickstart on orvano.dev · from spec 0011
 - **Localized email templates**: a version of each email template per language, picked from the user's locale (the `locale` column is already in the key) · from spec 0009
+- **Apple sign in notifications**: handle Apple's server to server notices (consent revoked, Apple account deleted) by ending sessions or unlinking · from spec 0012
+- **Provider tokens for apps**: return or keep the provider's access token and extra scopes, so apps can call Google or GitHub APIs for the user · from spec 0012
 
 ## Legend
 

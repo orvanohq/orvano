@@ -46,10 +46,21 @@ Verify email, reset password, magic link, and email one time code sign in.
 - [x] Document it: `/document email verification, recovery & passwordless`
 Spec [0010](../specs/0010-email-verification-recovery-passwordless/index.md) · code in `server/src/Orvano.Auth/`, `server/src/Orvano.Messaging/`, `contract/auth/`, `sdks/`, `console/`, `tests/scenarios/`
 
-### 12. OAuth & ID token sign in · needs a decision · GA
+### 12. OAuth & ID token sign in · in-progress · GA
 Sign in with Google, Apple, GitHub, and Microsoft through a browser redirect, plus native ID token sign in for mobile (Flutter Google and Apple sign in without a web view).
 **Done when:** you enable a provider in the console, and users sign in through it from Next.js (redirect) and Flutter (native); identities link to one user.
-- [ ] Design it (spec): `/architect OAuth & ID token sign in`
+- [x] Design it (spec): `/architect OAuth & ID token sign in`
+- [ ] Build it: `/develop OAuth & ID token sign in`
+   - [ ] Thin thread and providers: the migration, Google redirect sign in end to end through the fake provider, then Apple, Microsoft, and GitHub with the verified email rules and claiming (AC-3 to 8, 10 to 12, 16, 24, 27)
+   - [ ] Native ID tokens: Google and Apple ID token sign in with the nonce, single use tokens, and Apple's code exchange, after checking `google_sign_in`'s Android nonce (AC-8, 9, 24, 27)
+   - [ ] Identities: link by redirect and natively, list and unlink with the last method rule, `users.*` identity operations, and Apple revoke on delete (AC-13 to 16, 23, 24)
+   - [ ] SDK helpers and console: JS, Next.js, and Flutter helpers, the Sign in methods page, and identities on the Users pages (AC-1, 2, 20 to 26)
+   - [ ] Hardening and docs: events, limits, retention, the leak scan, docs pages and fix pages, then the real provider checks in verify.md (AC-17 to 19, 28)
+- [ ] Verify it: `/check verify OAuth & ID token sign in`
+- [ ] Test it: `/test OAuth & ID token sign in`
+- [ ] Review it (fresh model): `/check review OAuth & ID token sign in`
+- [ ] Document it: `/document OAuth & ID token sign in`
+Spec [0012](../specs/0012-oauth-id-token-sign-in/index.md)
 
 ### 13. MFA, passkeys & sessions · needs a decision · GA
 Authenticator app codes, recovery codes, passkeys, and letting users see and revoke their sessions and devices.
