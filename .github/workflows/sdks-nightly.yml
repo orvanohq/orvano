@@ -1,7 +1,8 @@
 # Flutter scenarios on the iOS simulator (spec 0001, AC-13), and the Flutter quickstart on the iOS simulator and the
 # Android emulator (spec 0011, AC-20): nightly, on release tags, and on demand, to keep costly macOS and emulator
-# minutes off every pull request. macOS runners have no Docker, so Postgres comes from Homebrew and the api role runs
-# from source in the Test environment; the Android job starts a real local stack with `install --local`.
+# minutes off every pull request. macOS runners have no Docker, so Postgres comes from Homebrew, Mailpit from its
+# release, and the api and worker roles run from source in the Test environment; the Android job starts a real local
+# stack with `install --local`.
 
 name: SDKs nightly
 
@@ -38,6 +39,18 @@ jobs:
           "$PG/initdb" -D "$RUNNER_TEMP/pg" -U postgres --auth=trust
           "$PG/pg_ctl" -D "$RUNNER_TEMP/pg" -l "$RUNNER_TEMP/pg.log" -o "-p 5432" start
           POSTGRES_USER=postgres PATH="$PG:$PATH" sh deploy/compose/initdb/10-orvano-roles.sh
+      # The same Mailpit as tests/scenarios/compose.yml: the fixtures' install SMTP names the host `mailpit`, and the
+      # email scenarios read what arrived through its API (spec 0009, spec 0010).
+      - name: Start Mailpit
+        run: |
+          curl -fsSL https://github.com/axllent/mailpit/releases/download/v1.31.3/mailpit-darwin-arm64.tar.gz | tar -xz -C "$RUNNER_TEMP" mailpit
+          echo '127.0.0.1 mailpit' | sudo tee -a /etc/hosts
+          "$RUNNER_TEMP/mailpit" --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025 > "$RUNNER_TEMP/mailpit.log" 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8025/readyz && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/mailpit.log"; exit 1
       - name: Migrate
         run: dotnet run --project server/src/Orvano.Server -c Release -- migrate
         env:
@@ -57,6 +70,27 @@ jobs:
           ORVANO_PUBLIC_URL: http://localhost:8080
           ORVANO_MASTER_KEYS: kscenarios:b3J2YW5vLXNjZW5hcmlvcy10ZXN0LW1hc3Rlci1rZXk=
           ORVANO_TEST_FIXTURES: ${{ github.workspace }}/tests/scenarios/fixtures.yaml
+          ORVANO_SMTP_ALLOW_PRIVATE_HOSTS: 'true'
+          ORVANO_TEST_MAILPIT_URL: http://localhost:8025
+      # The worker provisions the fixture projects the api seeded; until then every project call is 409
+      # project_not_ready. It sends the queued emails to Mailpit too.
+      - name: Start the worker role and wait for the fixture projects
+        run: |
+          dotnet run --project server/src/Orvano.Server -c Release --no-build -- worker > "$RUNNER_TEMP/worker.log" 2>&1 &
+          for i in $(seq 1 60); do
+            left=$(psql -U postgres -d orvano -tAc "select count(*) from orvano.platform_projects where status <> 'active'")
+            [ "$left" = 0 ] && exit 0
+            sleep 2
+          done
+          psql -U postgres -d orvano -c "select id, status from orvano.platform_projects"
+          cat "$RUNNER_TEMP/worker.log"; exit 1
+        env:
+          ASPNETCORE_ENVIRONMENT: Test
+          ASPNETCORE_URLS: http://localhost:8081
+          ORVANO_DB_URL: Host=localhost;Port=5432;Username=orvano_app;Password=${{ env.ORVANO_APP_PASSWORD }};Database=orvano
+          ORVANO_DB_ADMIN_URL: Host=localhost;Port=5432;Username=orvano_admin;Password=${{ env.ORVANO_ADMIN_PASSWORD }};Database=orvano
+          ORVANO_MASTER_KEYS: kscenarios:b3J2YW5vLXNjZW5hcmlvcy10ZXN0LW1hc3Rlci1rZXk=
+          ORVANO_SMTP_ALLOW_PRIVATE_HOSTS: 'true'
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -68,16 +102,21 @@ jobs:
         run: |
           UDID=$(xcrun simctl list devices available --json \
             | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for r in sorted(d, reverse=True) if 'iOS' in r for x in d[r] if x['name'].startswith('iPhone')))")
-          xcrun simctl boot "$UDID"
+          # bootstatus -b boots it and returns only once it has finished booting; `simctl boot` returns before that.
+          xcrun simctl bootstatus "$UDID" -b
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+      # The app runs in about a minute once built; a run that hangs (it has, after installing the app) fails at the
+      # timeout instead of after six hours, and its verbose log shows where it stopped.
       - name: Run the scenarios
+        timeout-minutes: 30
         working-directory: tests/scenarios/runners/flutter
         run: |
           dart run tool/copy_scenarios.dart
-          flutter test integration_test -d ${{ steps.simulator.outputs.udid }} --dart-define=ORVANO_ENDPOINT=http://localhost:8080
+          flutter test integration_test -d ${{ steps.simulator.outputs.udid }} --dart-define=ORVANO_ENDPOINT=http://localhost:8080 --verbose
       # The quickstart app's own integration test, against this job's stack and its fixture project. Native apps send
       # no Origin, so the project needs no platform for them to call it.
       - name: Flutter quickstart on iOS
+        timeout-minutes: 30
         run: |
           cp -R examples/flutter-quickstart "$RUNNER_TEMP/flutter-quickstart"
           node .github/scripts/use-local-sdks.mjs "$RUNNER_TEMP/flutter-quickstart" "$RUNNER_TEMP"
@@ -86,7 +125,7 @@ jobs:
           flutter test integration_test -d ${{ steps.simulator.outputs.udid }} \
             --dart-define=ORVANO_ENDPOINT=http://localhost:8080 --dart-define=ORVANO_PROJECT=scenarios0000000000a
       - if: failure()
-        run: cat "$RUNNER_TEMP/api.log" "$RUNNER_TEMP/pg.log" || true
+        run: cat "$RUNNER_TEMP/api.log" "$RUNNER_TEMP/worker.log" "$RUNNER_TEMP/pg.log" || true
 
   flutter-android-quickstart:
     name: Flutter quickstart on Android
