@@ -28,13 +28,24 @@ const takeShots = process.env.SCREENSHOTS !== '0'
 const shotDir = resolve('src/assets/screenshots')
 
 const browser = await chromium.launch()
+const page = await browser.newPage({
+  viewport: { width: 1280, height: 800 },
+  colorScheme: 'dark',
+})
+page.setDefaultTimeout(30_000)
+// What the page itself reports, so a step that times out in CI shows why (the setup wait has, now and then).
+page.on('console', (message) => {
+  if (message.type() === 'error') console.log(`[page console] ${message.text()}`)
+})
+page.on('pageerror', (error) => {
+  console.log(`[page error] ${error.message}`)
+})
+page.on('requestfailed', (request) => {
+  console.log(
+    `[request failed] ${request.method()} ${request.url()}: ${request.failure()?.errorText ?? ''}`,
+  )
+})
 try {
-  const page = await browser.newPage({
-    viewport: { width: 1280, height: 800 },
-    colorScheme: 'dark',
-  })
-  page.setDefaultTimeout(30_000)
-
   // The first admin, from the setup link the installer printed.
   await page.goto(`${consoleUrl}/setup#${setupToken}`)
   // The page removes the token from the address and loads the route again, which can remount the form; fill it only
@@ -108,6 +119,15 @@ try {
 
   // The console guides' screenshots: email, team members, and the install's email server. CI skips them.
   if (takeShots) await consoleGuideShots(page, nav, orgUrl)
+} catch (error) {
+  // Where the journey stopped: the address without its fragment (it may hold the setup token), and what showed.
+  const body = await page
+    .locator('body')
+    .innerText({ timeout: 5_000 })
+    .catch(() => '')
+  console.log(`[journey stopped] at ${page.url().replace(/#.*$/, '#…')}`)
+  console.log(`[journey stopped] the page showed: ${body.slice(0, 2_000) || '(nothing)'}`)
+  throw error
 } finally {
   await browser.close()
 }

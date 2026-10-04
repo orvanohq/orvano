@@ -25,9 +25,10 @@ Public docs with a quickstart per SDK and the generated API reference. From here
    - [x] Remaining quickstarts (Flutter, JavaScript, Dart, .NET) and the generated API reference and error pages (AC-9, 11, 12, 14 to 17, 19, 20)
    - [x] Content: concepts, auth guides, SDK, console, and self hosting pages, changelog, `llms.txt`, the docs rule (AC-6, 21, 28 to 30)
    - [x] Production code: the release deploy and examples smoke job, CSP with build time hashes, analytics, the 404 page, the weekly link check, axe in both themes (AC-7, 22 to 25)
-   - [ ] Your Cloudflare prerequisites (zone, `www` Redirect Rule, token, environments, Web Analytics), then the first real release (AC-23, 25)
+   - [x] Your Cloudflare prerequisites (zone, `www` Redirect Rule, token, environments, Web Analytics)
+   - [ ] The first real release, which attaches `orvano.dev` to the Worker (AC-23, 25)
 - [ ] Verify it: `/check verify docs site & quickstarts`
-- [ ] Test it: `/test docs site & quickstarts`
+- [x] Test it: `/test docs site & quickstarts`
 Spec [0011](../specs/0011-docs-site-quickstarts/index.md) · code in `website/`, `examples/`, `server/src/Orvano.Server/Install/`, `server/src/Orvano.Messaging/`, `deploy/compose/`
 
 ### 15. Console team members & roles · done
