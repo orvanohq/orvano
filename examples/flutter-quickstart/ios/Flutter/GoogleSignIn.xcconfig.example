@@ -1,0 +1,3 @@
+// Your iOS OAuth client ID from Google Cloud, reversed: 123-abc.apps.googleusercontent.com becomes
+// com.googleusercontent.apps.123-abc. Native Google sign in returns to the app on this scheme.
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.your-ios-client-id

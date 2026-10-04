@@ -66,6 +66,18 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Native Google sign in returns on the reversed iOS client ID; set it in Flutter/GoogleSignIn.xcconfig. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
+			</array>
+		</dict>
+	</array>
 	<!-- #region ats -->
 	<!-- Lets the app call the local Orvano stack at http://localhost; every other host still needs HTTPS. -->
 	<key>NSAppTransportSecurity</key>

@@ -11,3 +11,9 @@ npm run dev
 ```
 
 Open http://localhost:3000.
+
+## Sign in with a provider
+
+The app also has a page for Google, Apple, GitHub, and Microsoft sign in at http://localhost:3000/providers, built on the route handler in `app/api/orvano/[...orvano]/route.ts`. Signed in, it lists your linked providers with **Unlink**, and a **Link** button for the others.
+
+Turn each provider on first, in your project's **Sign in methods** page in the console: [Sign in with Google](https://orvano.dev/docs/auth/sign-in-with-google/) shows the setup, and the Apple, GitHub, and Microsoft pages work the same way. The providers send the browser back to Orvano's callback URL, so the app itself can stay on `localhost`.

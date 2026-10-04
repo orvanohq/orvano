@@ -1,1 +1,5 @@
 #include "Generated.xcconfig"
+
+// Native Google sign in: copy GoogleSignIn.xcconfig.example to GoogleSignIn.xcconfig and set your reversed iOS client ID.
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.not-set
+#include? "GoogleSignIn.xcconfig"
