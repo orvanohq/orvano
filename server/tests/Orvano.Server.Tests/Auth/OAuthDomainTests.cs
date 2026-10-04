@@ -87,6 +87,19 @@ public class OAuthDomainTests
     }
 
     [Fact]
+    public void An_unset_Microsoft_tenant_reads_as_common_and_saving_common_changes_nothing()
+    {
+        var unset = ProviderConfig.Empty(OAuthProvider.Microsoft) with { ClientId = "ms-app", ClientSecretSet = true };
+        Assert.Equal("common", unset.EffectiveMicrosoftTenant);
+        Assert.Null(ProviderConfig.Empty(OAuthProvider.Google).EffectiveMicrosoftTenant);
+
+        Assert.True(Apply(unset, Update(clientId: "ms-app", tenant: "common"), out var same, out _));
+        Assert.DoesNotContain("microsoftTenant", same.Changed);
+        Assert.True(Apply(unset, Update(clientId: "ms-app", tenant: "consumers"), out var moved, out _));
+        Assert.Contains("microsoftTenant", moved.Changed);
+    }
+
+    [Fact]
     public void Microsoft_tenants_admit_their_own_accounts_and_issuers_name_the_token_tenant()
     {
         var work = Guid.NewGuid();
