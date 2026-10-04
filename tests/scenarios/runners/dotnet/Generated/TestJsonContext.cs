@@ -8,7 +8,6 @@ namespace Orvano.Scenarios.Generated;
     RespectNullableAnnotations = true,
     RespectRequiredConstructorParameters = true,
     DefaultIgnoreCondition = JsonIgnoreCondition.Never)]
-[JsonSerializable(typeof(IdTokenProvider))]
 [JsonSerializable(typeof(TestAppleRevocation))]
 [JsonSerializable(typeof(TestAppleRevocationList))]
 [JsonSerializable(typeof(TestCreateIdTokenRequest))]

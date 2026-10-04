@@ -10,7 +10,25 @@ import type { AuthEvent, AuthSession, AuthStateListener, SessionStore } from './
 import { OrvanoError } from './error.js'
 import { directEmailAuth, readEmailLink, removeLinkFromAddressBar } from './links.js'
 import type { EmailAuthTransport, EmailCodeResult, LinkResult, RedeemLinkOptions } from './links.js'
+import {
+  clearVerifier,
+  directOAuth,
+  linkIdentityWithIdToken,
+  oauthRedirectError,
+  readOAuthRedirect,
+  removeOAuthFromAddressBar,
+  signInWithIdToken,
+} from './oauth.js'
+import type {
+  IdTokenCredentials,
+  IdTokenSignInResult,
+  IdentityLinkResult,
+  OAuthOptions,
+  OAuthSignInResult,
+  OAuthTransport,
+} from './oauth.js'
 import { sdkHeader, sdkName, serverVersionHeader, versionMismatch } from './version.js'
+import type { Identity, OAuthProvider } from '../generated/models.js'
 import type { Logger } from './version.js'
 import { sdkVersion } from '../generated/version.js'
 
@@ -41,6 +59,11 @@ export interface ClientConfig {
    * operation; `@orvano/nextjs` posts them to the app's route handler instead.
    */
   emailAuth?: EmailAuthTransport
+  /**
+   * How provider sign in flows start and finish (spec 0012). Defaults to the `account` operations
+   * with the PKCE verifier in `sessionStorage`; `@orvano/nextjs` posts to the app's route handler.
+   */
+  oauth?: OAuthTransport
   /** A custom `fetch`, for tests or runtimes without a global one. */
   fetch?: typeof fetch
   /**
@@ -136,6 +159,7 @@ export class Client {
   readonly #logger: Logger
   readonly #refresher: SessionRefresher
   readonly #emailAuth: EmailAuthTransport
+  readonly #oauth: OAuthTransport
   readonly #listeners = new Set<AuthStateListener>()
   #known: AuthSession | null | undefined
   #refreshing: Promise<AuthSession | null> | undefined
@@ -166,6 +190,7 @@ export class Client {
       (hasLocalStorage() ? new LocalStorageSessionStore(config.project) : new MemorySessionStore())
     this.#refresher = config.refresh ?? refreshWithToken
     this.#emailAuth = config.emailAuth ?? directEmailAuth
+    this.#oauth = config.oauth ?? directOAuth
     this.#timeoutMs = config.timeoutMs ?? defaultTimeoutMs
     this.#maxRetries = config.maxRetries ?? defaultMaxRetries
     // Bound, because some runtimes (Cloudflare Workers) reject a fetch called on another `this`.
@@ -217,18 +242,91 @@ export class Client {
   async redeemLink(
     url?: string | URL | URLSearchParams,
     options: RedeemLinkOptions = {},
-  ): Promise<LinkResult | null> {
+  ): Promise<LinkResult | OAuthSignInResult | IdentityLinkResult | null> {
     const location = (globalThis as { location?: { href: string } }).location
     const source = url ?? location?.href
     if (source === undefined)
       throw new TypeError('Orvano: pass the link URL; this runtime has no location.')
     const fromAddressBar = String(source) === location?.href
     const { password, ...request } = options
+
+    // Spec 0012, AC-20: a provider redirect carries orvano_type oauth or oauth_link.
+    const redirect = readOAuthRedirect(
+      source instanceof URLSearchParams
+        ? source
+        : source instanceof URL
+          ? source.searchParams
+          : new URL(source, location?.href ?? 'http://localhost').searchParams,
+    )
+    if (redirect !== null) {
+      if (redirect.error !== null) {
+        clearVerifier(this)
+        if (fromAddressBar) removeOAuthFromAddressBar()
+        throw oauthRedirectError(redirect.error)
+      }
+      if (redirect.code === null || redirect.code === '')
+        throw new TypeError('Orvano: the provider redirect has no orvano_code.')
+      const result = await this.#oauth.redeem(redirect.type, redirect.code, this, request)
+      if (fromAddressBar) removeOAuthFromAddressBar()
+      return result
+    }
+
     const link = readEmailLink(source, password)
     if (link === null) return null
     const result = await this.#emailAuth.redeemLink(link, this, request)
     if (fromAddressBar) removeLinkFromAddressBar()
     return result
+  }
+
+  /**
+   * Signs in with a provider by redirect (spec 0012, AC-20): makes a PKCE verifier, keeps it in
+   * `sessionStorage` (memory outside a browser), starts the flow, and opens the provider's page.
+   * In a browser the page navigates away and this resolves null; call `redeemLink` on the page at
+   * `redirectUrl`. An `open` that resolves with the final redirect URL gets the result at once.
+   *
+   * @throws TypeError, before any call, outside a browser without `open`.
+   * @throws {@link OrvanoError} for a refused start (`provider_not_enabled`, ...) or redemption.
+   */
+  async signInWithOAuth(
+    provider: OAuthProvider,
+    options: OAuthOptions,
+  ): Promise<OAuthSignInResult | null> {
+    return (await this.#oauth.start('oauth', provider, options, this)) as OAuthSignInResult | null
+  }
+
+  /**
+   * Links a provider to the signed in user by redirect, like {@link signInWithOAuth}. The session
+   * must be at most 10 minutes old (`reauthentication_required`).
+   */
+  async linkIdentity(
+    provider: OAuthProvider,
+    options: OAuthOptions,
+  ): Promise<IdentityLinkResult | null> {
+    return (await this.#oauth.start(
+      'oauth_link',
+      provider,
+      options,
+      this,
+    )) as IdentityLinkResult | null
+  }
+
+  /**
+   * Signs in with a provider's ID token from native Google or Apple sign in, with the raw nonce
+   * from `createNonce` (spec 0012, AC-9). Stores the session and says `signedIn`.
+   */
+  signInWithIdToken(
+    credentials: IdTokenCredentials,
+    options?: RequestOptions,
+  ): Promise<IdTokenSignInResult> {
+    return signInWithIdToken(this, credentials, options)
+  }
+
+  /** Links a provider to the signed in user with its native ID token, and says `userUpdated`. */
+  linkIdentityWithIdToken(
+    credentials: IdTokenCredentials,
+    options?: RequestOptions,
+  ): Promise<Identity> {
+    return linkIdentityWithIdToken(this, credentials, options)
   }
 
   /**

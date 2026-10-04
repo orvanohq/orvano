@@ -18,7 +18,7 @@ public sealed record TestAppleRevocationList(
     [property: JsonPropertyName("items")] IReadOnlyList<TestAppleRevocation> Items);
 
 /// <summary>A request for a native ID token from the fake sign in provider (spec 0012).</summary>
-/// <param name="Provider">Google or Apple.</param>
+/// <param name="Provider"><c>google</c> or <c>apple</c>.</param>
 /// <param name="Aud">The token's audience: a client ID or bundle ID.</param>
 /// <param name="Sub">The provider account's subject.</param>
 /// <param name="Nonce">The nonce claim: the hashed nonce, as the app gives it to the provider.</param>
@@ -26,7 +26,7 @@ public sealed record TestAppleRevocationList(
 /// <param name="EmailVerified">The email_verified claim.</param>
 /// <param name="ExpiresIn">Seconds until the token expires; negative for one already expired. Defaults to 600.</param>
 public sealed record TestCreateIdTokenRequest(
-    [property: JsonPropertyName("provider")] IdTokenProvider Provider,
+    [property: JsonPropertyName("provider")] string Provider,
     [property: JsonPropertyName("aud")] string Aud,
     [property: JsonPropertyName("sub")] string Sub,
     [property: JsonPropertyName("nonce")] string Nonce,

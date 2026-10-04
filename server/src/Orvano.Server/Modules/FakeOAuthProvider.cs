@@ -234,7 +234,10 @@ internal sealed class FakeOAuthProvider(TestOAuthProvider setting, TimeProvider 
         if (user.Error == "no_email_permission") return Results.Json(new { message = "Resource not accessible by integration" }, statusCode: 403);
         if (!emails)
         {
-            var id = long.TryParse(user.Sub, NumberStyles.None, CultureInfo.InvariantCulture, out var numeric) ? numeric : Math.Abs((long)(uint)(user.Sub ?? "").GetHashCode(StringComparison.Ordinal));
+            // GitHub's ids are numbers: a sub that isn't one becomes a stable number made from it.
+            var id = long.TryParse(user.Sub, NumberStyles.None, CultureInfo.InvariantCulture, out var numeric)
+                ? numeric
+                : (long)(BitConverter.ToUInt64(SHA256.HashData(Encoding.UTF8.GetBytes(user.Sub ?? ""))) >> 12);
             return Results.Json(new { id, login = "fake-" + id.ToString(CultureInfo.InvariantCulture), name = user.Name });
         }
 

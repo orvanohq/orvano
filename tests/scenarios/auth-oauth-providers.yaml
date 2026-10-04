@@ -1,0 +1,59 @@
+# Spec 0012, AC-5, AC-6, AC-8, AC-10, AC-11, AC-24: Apple's form post with its first name, GitHub
+# with no verified email (a user with no email), and Microsoft, whose email counts only with xms_edov.
+name: Apple, GitHub, and Microsoft sign in by redirect, each by its own email rule
+requires: []
+steps:
+  - op: oauthSignIn
+    as: client
+    input:
+      provider: apple
+      testUser:
+        {
+          sub: 'a-${unique}',
+          email: 'relay-${unique}@privaterelay.appleid.com',
+          emailVerified: true,
+          name: Grace Hopper,
+        }
+    expect:
+      status: 200
+      body:
+        type: oauth
+        isNewUser: true
+        user:
+          {
+            email: 'relay-${unique}@privaterelay.appleid.com',
+            name: Grace Hopper,
+            providers: [apple],
+          }
+  - op: oauthSignIn
+    as: client
+    input:
+      provider: github
+      testUser:
+        { sub: '9${unique}', email: 'gh-${unique}@example.com', emailVerified: false, name: Octo }
+    expect:
+      status: 200
+      body: { type: oauth, isNewUser: true, user: { email: null, name: Octo, providers: [github] } }
+  - op: oauthSignIn
+    as: client
+    input:
+      provider: microsoft
+      testUser: { sub: 'm-${unique}', email: 'ms-${unique}@example.com', xmsEdov: true }
+    expect:
+      status: 200
+      body: { type: oauth, user: { email: 'ms-${unique}@example.com', emailVerified: true } }
+  - op: oauthSignIn
+    as: client
+    input:
+      provider: microsoft
+      testUser: { sub: 'm2-${unique}', email: 'ms2-${unique}@example.com' }
+    expect:
+      status: 200
+      body: { type: oauth, user: { email: null } }
+  # Cancelling at the provider comes back as the typed error.
+  - op: oauthSignIn
+    as: client
+    input:
+      provider: google
+      testUser: { error: access_denied }
+    expect: { status: 403, code: oauth_access_denied }

@@ -67,6 +67,9 @@ services:
       ORVANO_SMTP_ALLOW_PRIVATE_HOSTS: 'true'
       # test.getLatestEmail reads the emails the scenarios trigger from Mailpit's API (spec 0010).
       ORVANO_TEST_MAILPIT_URL: http://mailpit:8025
+      # Every sign in provider is the api's own fake (spec 0012): the api calls itself on 8080, and
+      # runners reach the same address through the published port.
+      ORVANO_TEST_OAUTH_PROVIDER_URL: http://localhost:8080/v1/test/oauth
     volumes:
       - ./fixtures.yaml:/fixtures/fixtures.yaml:ro
     ports:

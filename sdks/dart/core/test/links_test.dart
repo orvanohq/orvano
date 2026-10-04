@@ -43,6 +43,8 @@ Map<String, Object?> user(String id, bool verified) => {
   'metadata': <String, Object?>{},
   'createdAt': '2026-10-01T12:00:00Z',
   'lastSignInAt': null,
+  'providers': <String>[],
+  'hasPassword': true,
 };
 
 Answer json(Object body, {int code = 200}) => (response) async {
@@ -141,11 +143,13 @@ void main() {
         final seen = <AuthEvent>[];
         client.authStateChanges.listen((c) => seen.add(c.event));
 
-        final result = await client.handleLink(
-          Uri.parse(
-            'https://a.example/cb?orvano_type=magic_link&orvano_token=$token',
-          ),
-        );
+        final result =
+            await client.handleLink(
+                  Uri.parse(
+                    'https://a.example/cb?orvano_type=magic_link&orvano_token=$token',
+                  ),
+                )
+                as LinkResult?;
         await Future<void>.delayed(Duration.zero);
 
         expect(result?.type, EmailLinkType.magicLink);
@@ -165,11 +169,13 @@ void main() {
         final seen = <AuthEvent>[];
         client.authStateChanges.listen((c) => seen.add(c.event));
 
-        final result = await client.handleLink(
-          Uri.parse(
-            'https://a.example/?orvano_type=verification&orvano_token=$token',
-          ),
-        );
+        final result =
+            await client.handleLink(
+                  Uri.parse(
+                    'https://a.example/?orvano_type=verification&orvano_token=$token',
+                  ),
+                )
+                as LinkResult?;
         await Future<void>.delayed(Duration.zero);
 
         expect(result?.type, EmailLinkType.verification);

@@ -9697,8 +9697,11 @@
         ],
         "properties": {
           "provider": {
-            "$ref": "#/components/schemas/IdTokenProvider",
-            "description": "Google or Apple."
+            "type": "string",
+            "description": "`google` or `apple`.",
+            "examples": [
+              "apple"
+            ]
           },
           "aud": {
             "type": "string",

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
+import 'package:http/http.dart' as http;
 import 'package:orvano_core/orvano_core.dart' as core;
 import 'package:orvano_dart/orvano_dart.dart' as srv;
 import 'package:yaml/yaml.dart';
@@ -117,8 +119,11 @@ String? fixtureApiKey(String fixturesYaml) {
 /// session alone, so a runner without client operations (.NET) can get a
 /// token too; `verifyAccessToken` is the server SDK's own check; `now` is the
 /// runner's clock, saved before a send and passed to `test.getLatestEmail` as
-/// `after`; `redeemLink` is the client SDK's link helper (spec 0010). Their
-/// names have no dot, so they never collide with an operationId.
+/// `after`; `redeemLink` is the client SDK's link helper (spec 0010);
+/// `oauthSignIn` runs `signInWithOAuth` or `linkIdentity` with a launcher
+/// that follows the fake provider over HTTP, `oauthCode` stops at the code,
+/// and `createNonce` is `OrvanoNonce.create` (spec 0012). Their names have no
+/// dot, so they never collide with an operationId.
 final Map<String, DispatchEntry> _runnerDispatch = {
   'now': DispatchEntry(
     status: 200,
@@ -132,13 +137,64 @@ final Map<String, DispatchEntry> _runnerDispatch = {
         Uri.parse('${input['url']}'),
         password: input['password'] as String?,
       );
-      return result == null
-          ? null
-          : {
-              'type': result.type.wire,
-              'user': result.user.toJson(),
-              'isNewUser': result.isNewUser,
-            };
+      return _handled(result);
+    },
+  ),
+  'createNonce': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final nonce = core.OrvanoNonce.create();
+      return {'raw': nonce.raw, 'hashed': nonce.hashed};
+    },
+  ),
+  'oauthSignIn': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final redirectUrl = _redirectUrl(input, o.client.endpoint);
+      final provider = core.OAuthProvider.fromJson('${input['provider']}');
+      Future<Uri> launcher(Uri url, Uri back) =>
+          _followOAuth(url, input['testUser'], back, o.client.endpoint);
+      return _handled(
+        input['link'] == true
+            ? await o.client.linkIdentity(
+                provider,
+                redirectUrl: redirectUrl,
+                launcher: launcher,
+              )
+            : await o.client.signInWithOAuth(
+                provider,
+                redirectUrl: redirectUrl,
+                launcher: launcher,
+              ),
+      );
+    },
+  ),
+  'oauthCode': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final redirectUrl = _redirectUrl(input, o.client.endpoint);
+      final verifier = _base64Url(
+        List<int>.generate(32, (_) => Random.secure().nextInt(256)),
+      );
+      final flow = await core.AccountService(o.client).createOAuthFlow(
+        core.CreateOAuthFlowRequest(
+          provider: core.OAuthProvider.fromJson('${input['provider']}'),
+          redirectUrl: redirectUrl.toString(),
+          codeChallenge: _s256(verifier),
+        ),
+      );
+      final back = await _followOAuth(
+        Uri.parse(flow.url),
+        input['testUser'],
+        redirectUrl,
+        o.client.endpoint,
+      );
+      return {
+        'type': back.queryParameters['orvano_type'],
+        'code': back.queryParameters['orvano_code'],
+        'error': back.queryParameters['orvano_error'],
+        'codeVerifier': verifier,
+      };
     },
   ),
   'signIn': DispatchEntry(
@@ -167,6 +223,112 @@ final Map<String, DispatchEntry> _runnerDispatch = {
 };
 
 String _now() => DateTime.now().toUtc().toIso8601String();
+
+/// What `handleLink`, `signInWithOAuth`, or `linkIdentity` did, as the JS
+/// runner reports it.
+Map<String, Object?>? _handled(core.HandledLink? result) => switch (result) {
+  null => null,
+  core.LinkResult(:final type, :final user, :final isNewUser) => {
+    'type': type.wire,
+    'user': user.toJson(),
+    'isNewUser': isNewUser,
+  },
+  core.OAuthSignInResult(:final user, :final isNewUser) => {
+    'type': 'oauth',
+    'user': user.toJson(),
+    'isNewUser': isNewUser,
+  },
+  core.IdentityLinkResult(:final identity) => {
+    'type': 'oauth_link',
+    'identity': identity.toJson(),
+  },
+};
+
+/// Where the fake provider's flows send the browser back (spec 0012). Outside
+/// a browser nothing loads it; in a browser the last hop is fetched, so it is
+/// the server's own health route on `localhost` (a web platform of the
+/// fixture project), whose final URL the response reports.
+Uri _redirectUrl(Map<String, Object?> input, String endpoint) {
+  if (input['redirectUrl'] case final String url) return Uri.parse(url);
+  if (!_inBrowser) return Uri.parse('http://localhost:3000/auth/callback');
+  final server = Uri.parse(endpoint);
+  return Uri.parse('http://localhost:${server.port}/v1/health');
+}
+
+/// Follows the fake provider the way a browser would, over HTTP (spec 0012,
+/// AC-24): adds `test_user`, follows redirects and Apple's form post, and
+/// returns the URL that leaves for [redirectUrl]. URLs on the server's own
+/// port at `localhost` are reached through [endpoint] (`10.0.2.2` on
+/// Android).
+Future<Uri> _followOAuth(
+  Uri url,
+  Object? testUser,
+  Uri redirectUrl,
+  String endpoint,
+) async {
+  final server = Uri.parse(endpoint);
+  final client = http.Client();
+  try {
+    var next = url.replace(
+      queryParameters: {
+        ...url.queryParameters,
+        'test_user': _base64Url(utf8.encode(jsonEncode(testUser))),
+      },
+    );
+    var method = 'GET';
+    String? body;
+    for (var hop = 0; hop < 10; hop++) {
+      final local =
+          (next.host == 'localhost' || next.host == '127.0.0.1') &&
+          next.port == server.port;
+      final target = local
+          ? next.replace(host: server.host, port: server.port)
+          : next;
+      final request = http.Request(method, target)..followRedirects = false;
+      if (body != null) {
+        request.headers['content-type'] = 'application/x-www-form-urlencoded';
+        request.body = body;
+      }
+      final response = await client.send(request);
+      await response.stream.drain<void>();
+      if (response case http.BaseResponseWithUrl(
+        :final url,
+      ) when _inBrowser && url.toString().startsWith('$redirectUrl')) {
+        return url;
+      }
+      final location = response.headers['location'];
+      if (location != null &&
+          response.statusCode >= 300 &&
+          response.statusCode < 400) {
+        final to = next.resolve(location);
+        if (to.toString().startsWith('$redirectUrl')) return to;
+        next = to;
+        method = 'GET';
+        body = null;
+        continue;
+      }
+      final action = response.headers['x-orvano-test-form-action'];
+      final form = response.headers['x-orvano-test-form-body'];
+      if (action != null && form != null) {
+        next = next.resolve(action);
+        method = 'POST';
+        body = form;
+        continue;
+      }
+      throw _StepFailure('the provider flow stopped at ${response.statusCode}');
+    }
+    throw _StepFailure('the provider flow redirected more than 10 times');
+  } finally {
+    client.close();
+  }
+}
+
+String _base64Url(List<int> bytes) =>
+    base64Url.encode(bytes).replaceAll('=', '');
+
+/// PKCE's S256 challenge of [verifier].
+String _s256(String verifier) =>
+    _base64Url(sha256.convert(ascii.encode(verifier)).bytes);
 
 /// Parses one scenario file into plain JSON values.
 Map<String, Object?> parseScenario(String yamlText) =>
@@ -355,10 +517,18 @@ Object? _select(Object? body, String path) {
   }
   var current = body;
   for (final key in path.substring(1).split('.').where((k) => k.isNotEmpty)) {
-    if (current is! Map<String, Object?>) {
+    final index = int.tryParse(key);
+    if (current is Map<String, Object?>) {
+      current = current[key];
+    } else if (current is List<Object?> &&
+        index != null &&
+        index >= 0 &&
+        index < current.length) {
+      // A number picks an item of a list (spec 0012's identity scenarios).
+      current = current[index];
+    } else {
       throw _StepFailure('save path $path not found');
     }
-    current = current[key];
   }
   return current;
 }

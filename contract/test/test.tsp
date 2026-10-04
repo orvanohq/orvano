@@ -5,7 +5,6 @@ import "@typespec/http";
 import "@typespec/openapi";
 import "../errors.tsp";
 import "../auth/security.tsp";
-import "../auth/account.tsp";
 
 using Http;
 using OpenAPI;
@@ -77,8 +76,9 @@ model TestEmail {
 @doc("A request for a native ID token from the fake sign in provider (spec 0012).")
 @extension("x-orvano-test", true)
 model TestCreateIdTokenRequest {
-  @doc("Google or Apple.")
-  provider: IdTokenProvider;
+  @doc("`google` or `apple`.")
+  @example("apple")
+  provider: string;
 
   @doc("The token's audience: a client ID or bundle ID.")
   @example("com.acme.app")

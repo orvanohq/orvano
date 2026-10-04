@@ -165,7 +165,13 @@ internal static partial class Interpreter
         if (!path.StartsWith('$')) throw new ScenarioFailure($"save path {path} must start with $");
         var current = body;
         foreach (var key in path[1..].Split('.', StringSplitOptions.RemoveEmptyEntries))
-            current = current is JsonObject o ? o[key] : throw new ScenarioFailure($"save path {path} not found");
+            current = current switch
+            {
+                JsonObject o => o[key],
+                // A number picks an item of a list (spec 0012's identity scenarios).
+                JsonArray a when int.TryParse(key, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var i) && i < a.Count => a[i],
+                _ => throw new ScenarioFailure($"save path {path} not found"),
+            };
         return current;
     }
 

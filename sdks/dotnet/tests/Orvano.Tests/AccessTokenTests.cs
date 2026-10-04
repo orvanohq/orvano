@@ -147,7 +147,7 @@ public class AccessTokenTests
     }
 
     private const string UserJson = """
-        {"id":"user-1","email":null,"emailVerified":false,"name":null,"status":"active","metadata":{},"createdAt":"2026-01-01T00:00:00Z","lastSignInAt":null}
+        {"id":"user-1","email":null,"emailVerified":false,"name":null,"status":"active","metadata":{},"createdAt":"2026-01-01T00:00:00Z","lastSignInAt":null,"providers":[],"hasPassword":false}
         """;
 
     private static ECDsaSecurityKey NewKey(string kid) => new(ECDsa.Create(ECCurve.NamedCurves.nistP256)) { KeyId = kid };

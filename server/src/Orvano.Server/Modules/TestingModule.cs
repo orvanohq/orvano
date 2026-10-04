@@ -53,12 +53,7 @@ internal sealed class TestingModule : IOrvanoModule
 
         v1.MapPost(TestOperations.CreateIdToken.Route, Results<Ok<TestIdToken>, ProblemHttpResult> (TestCreateIdTokenRequest request) =>
         {
-            var provider = request.Provider switch
-            {
-                IdTokenProvider.Google => "google",
-                IdTokenProvider.Apple => "apple",
-                _ => null,
-            };
+            var provider = request.Provider is "google" or "apple" ? request.Provider : null;
             if (provider is null) return Problems.Result(StatusCodes.Status400BadRequest, ErrorCode.InvalidRequest, "The provider must be google or apple.");
             var user = new FakeOAuthProvider.TestUser(request.Sub, request.Email, request.EmailVerified, null, null, null, null, null, null);
             var (idToken, code) = fake.MintNative(provider, request.Aud, user, request.Nonce, request.ExpiresIn is { } seconds ? TimeSpan.FromSeconds(seconds) : null);

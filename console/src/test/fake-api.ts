@@ -232,6 +232,8 @@ export function installFakeApi(): FakeApi {
       metadata: {},
       createdAt: now,
       lastSignInAt: now,
+      providers: [],
+      hasPassword: true,
       isInstallAdmin: false,
     },
     signedIn: true,
