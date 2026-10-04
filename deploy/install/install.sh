@@ -162,6 +162,13 @@ check_arch() {
   esac
 }
 
+# The Docker install offer and the public health check both use curl. Without it, a healthy install
+# would end in exit 3 blaming DNS, so this refuses before anything starts.
+check_curl() {
+  command -v curl >/dev/null 2>&1 ||
+    refuse "curl is not installed, and the installer needs it to install Docker and to check that Orvano answers. Install curl (for example: apt-get install -y curl), then run the installer again."
+}
+
 # Sets `distro` and `supported` from /etc/os-release: Ubuntu 22.04 or 24.04, Debian 12 or 13.
 check_distro() {
   distro_id=$(sed -n 's/^ID=//p' /etc/os-release 2>/dev/null | tr -d '"')
@@ -557,6 +564,7 @@ main() {
 
   check_root
   check_arch
+  check_curl
   check_distro
   check_memory
   check_firewall
