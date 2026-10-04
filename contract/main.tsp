@@ -28,6 +28,7 @@ import "./auth/users.tsp";
 import "./auth/console-account.tsp";
 import "./auth/console-users.tsp";
 import "./auth/oauth.tsp";
+import "./auth/identities.tsp";
 import "./messaging/email.tsp";
 import "./test/test.tsp";
 

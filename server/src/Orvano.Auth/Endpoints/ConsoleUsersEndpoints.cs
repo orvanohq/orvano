@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -11,6 +12,7 @@ using static Orvano.Auth.Endpoints.ApiMapping;
 using Api = Orvano.Contract;
 using Keys = Orvano.Contract.ConsoleAuthKeysOperations;
 using Ops = Orvano.Contract.ConsoleUsersOperations;
+using Providers = Orvano.Contract.ConsoleAuthProvidersOperations;
 
 namespace Orvano.Auth.Endpoints;
 
@@ -102,6 +104,44 @@ internal static class ConsoleUsersEndpoints
             .WithName(Ops.DeleteSession.Id)
             .RequireRole(Need.Write);
 
+        v1.MapGet(Ops.ListIdentities.Route, async (HttpContext http, string userId, IdentityService identities, CancellationToken ct) =>
+            Ok(http, await identities.ListAsync(Project(http), userId, ct), IdentityList))
+            .WithName(Ops.ListIdentities.Id)
+            .RequireRole(Need.Read);
+
+        v1.MapDelete(Ops.DeleteIdentity.Route, async (HttpContext http, string userId, string identityId, IdentityService identities, CancellationToken ct) =>
+            NoContent(http, await identities.DeleteAsync(Project(http), userId, identityId, Identities.UnlinkReason.Console, Me(http), ct)))
+            .WithName(Ops.DeleteIdentity.Id)
+            .RequireRole(Need.Write);
+
+        v1.MapGet(Providers.List.Route, async (HttpContext http, ProviderSettings settings, OAuthCallbacks callbacks, CancellationToken ct) =>
+        {
+            var project = Project(http);
+            var views = await settings.ListAsync(project, ct);
+            return TypedResults.Ok(new Api.OAuthProviderSettingsList([.. views.Select(v => ProviderSettings(v, callbacks.UrlFor(project, v.Stored.Config.Provider)))]));
+        })
+            .WithName(Providers.List.Id)
+            .RequireRole(Need.Read);
+
+        v1.MapPut(Providers.Update.Route, async (HttpContext http, string provider, JsonElement body, ProviderSettings settings, OAuthCallbacks callbacks, CancellationToken ct) =>
+        {
+            if (!Domain.OAuthProviders.TryParse(provider, out var chosen))
+                return ApiProblem.Result(StatusCodes.Status400BadRequest, Api.ErrorCode.InvalidRequest, "The provider must be google, apple, github, or microsoft.");
+            if (!TryReadUpdate(body, out var update))
+                return ApiProblem.Result(StatusCodes.Status400BadRequest, Api.ErrorCode.InvalidRequest, "Send a JSON object with enabled and the provider's fields.");
+            var project = Project(http);
+            return Ok(http, await settings.UpdateAsync(project, chosen, update, Me(http), ct), v => ProviderSettings(v, callbacks.UrlFor(project, chosen)));
+        })
+            .WithName(Providers.Update.Id)
+            .RequireRole(Need.Write);
+
+        v1.MapDelete(Providers.Delete.Route, async (HttpContext http, string provider, ProviderSettings settings, CancellationToken ct) =>
+            Domain.OAuthProviders.TryParse(provider, out var chosen)
+                ? NoContent(http, await settings.DeleteAsync(Project(http), chosen, Me(http), ct))
+                : ApiProblem.Result(StatusCodes.Status400BadRequest, Api.ErrorCode.InvalidRequest, "The provider must be google, apple, github, or microsoft."))
+            .WithName(Providers.Delete.Id)
+            .RequireRole(Need.Write);
+
         v1.MapGet(Keys.List.Route, async (HttpContext http, SigningKeys keys, CancellationToken ct) =>
             TypedResults.Ok(SigningKeysView(await keys.ListAsync(Project(http), ct))))
             .WithName(Keys.List.Id)
@@ -115,6 +155,44 @@ internal static class ConsoleUsersEndpoints
             .WithName(Keys.Rotate.Id)
             .RequireRole(Need.Owner);
     }
+
+    /// <summary>
+    /// Reads <c>consoleAuthProviders.update</c>'s body (spec 0012, AC-2): bound as JSON first, so a secret left out
+    /// keeps the stored one while <c>null</c> clears it.
+    /// </summary>
+    private static bool TryReadUpdate(JsonElement body, out Domain.ProviderUpdate update)
+    {
+        update = null!;
+        if (body.ValueKind != JsonValueKind.Object || !body.TryGetProperty("enabled", out var enabled) || enabled.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            return false;
+
+        Api.UpdateOAuthProviderRequest? request;
+        try
+        {
+            request = body.Deserialize<Api.UpdateOAuthProviderRequest>(JsonSerializerOptions.Web);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+
+        if (request is null) return false;
+        update = new Domain.ProviderUpdate(
+            request.Enabled,
+            request.ClientId,
+            Secret(body, "clientSecret", request.ClientSecret),
+            request.ClientIdsExtra,
+            request.AppleTeamId,
+            request.AppleKeyId,
+            Secret(body, "applePrivateKey", request.ApplePrivateKey),
+            request.MicrosoftTenant);
+        return true;
+    }
+
+    private static Domain.SecretChange Secret(JsonElement body, string name, string? value) =>
+        !body.TryGetProperty(name, out _) ? Domain.SecretChange.Keep
+        : value is null ? Domain.SecretChange.Clear
+        : Domain.SecretChange.Set(value);
 
     private static readonly object ProjectKey = new();
 

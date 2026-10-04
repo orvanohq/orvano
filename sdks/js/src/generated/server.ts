@@ -6,6 +6,7 @@ import type {
   CreateUserRequest,
   CreateUserVerificationRequest,
   Health,
+  IdentityList,
   Jwks,
   OpenIdConfiguration,
   Session,
@@ -131,6 +132,17 @@ export class UsersService {
     )
   }
 
+  /** Unlinks one of a user's identities. The user's last way to sign in can't be removed. Sessions stay. */
+  deleteIdentity(userId: string, identityId: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      {
+        method: 'DELETE',
+        path: `/v1/users/${encodeURIComponent(userId)}/identities/${encodeURIComponent(identityId)}`,
+      },
+      options,
+    )
+  }
+
   /** Ends one session of a user. */
   deleteSession(userId: string, sessionId: string, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
@@ -187,6 +199,14 @@ export class UsersService {
     options?: RequestOptions,
   ): AsyncGenerator<User> {
     return paginate((cursor) => this.list({ ...query, cursor }, options))
+  }
+
+  /** Lists a user's identities, oldest first. */
+  listIdentities(userId: string, options?: RequestOptions): Promise<IdentityList> {
+    return this.#client.request<IdentityList>(
+      { method: 'GET', path: `/v1/users/${encodeURIComponent(userId)}/identities` },
+      options,
+    )
   }
 
   /** Lists a user's active sessions, newest first. `current` is always false. */

@@ -12,16 +12,16 @@ namespace Orvano.Auth.Application;
 internal sealed record StoredProvider(string ProjectId, ProviderConfig Config, byte[]? ClientSecretCiphertext, byte[]? ApplePrivateKeyCiphertext, DateTimeOffset? UpdatedAt);
 
 /// <summary>
-/// What the console reads about a provider (AC-2): the settings, the last 4 characters of the client secret (from
-/// decrypting at read time), and the callback URL. Never a secret's value.
+/// What the console reads about a provider (AC-2): the settings and the last 4 characters of the client secret (from
+/// decrypting at read time). Never a secret's value. The endpoint adds the callback URL.
 /// </summary>
-internal sealed record ProviderView(StoredProvider Stored, string? ClientSecretHint, string CallbackUrl);
+internal sealed record ProviderView(StoredProvider Stored, string? ClientSecretHint);
 
 /// <summary>
 /// The project's provider settings (spec 0012, AC-1 to AC-3): reads, sealing, and changes with their events. Secrets
 /// are sealed with associated data <c>auth_oauth_providers:&lt;projectId&gt;:&lt;provider&gt;:&lt;column&gt;</c> and never returned.
 /// </summary>
-internal sealed class ProviderSettings(AuthStore store, SecretBox secrets, AppleSecrets appleSecrets, OAuthCallbacks callbacks)
+internal sealed class ProviderSettings(AuthStore store, SecretBox secrets, AppleSecrets appleSecrets)
 {
     public const string Table = "auth_oauth_providers";
     public const string ClientSecretColumn = "client_secret_ciphertext";
@@ -50,7 +50,7 @@ internal sealed class ProviderSettings(AuthStore store, SecretBox secrets, Apple
             hint = secret.Length >= 4 ? secret[^4..] : secret;
         }
 
-        return new ProviderView(stored, hint, callbacks.UrlFor(stored.ProjectId, stored.Config.Provider));
+        return new ProviderView(stored, hint);
     }
 
     /// <summary>

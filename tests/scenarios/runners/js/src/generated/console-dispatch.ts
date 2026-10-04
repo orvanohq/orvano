@@ -13,6 +13,7 @@ import type {
   SmtpSettingsInput,
   UpdateInstallSettingsRequest,
   UpdateMemberRequest,
+  UpdateOAuthProviderRequest,
   UpdateOrgRequest,
   UpdatePlatformRequest,
   UpdateProjectRequest,
@@ -74,6 +75,22 @@ export const consoleDispatch: DispatchTable = {
   'consoleAuthKeys.rotate': {
     status: 200,
     console: (o, _input) => o.consoleAuthKeys.rotate(),
+  },
+  'consoleAuthProviders.delete': {
+    status: 204,
+    console: (o, input) => o.consoleAuthProviders.delete(input.provider as string),
+  },
+  'consoleAuthProviders.list': {
+    status: 200,
+    console: (o, _input) => o.consoleAuthProviders.list(),
+  },
+  'consoleAuthProviders.update': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleAuthProviders.update(
+        input.provider as string,
+        input.body as UpdateOAuthProviderRequest,
+      ),
   },
   'consoleEmailTemplates.get': {
     status: 200,
@@ -341,6 +358,11 @@ export const consoleDispatch: DispatchTable = {
     status: 204,
     console: (o, input) => o.consoleUsers.delete(input.userId as string),
   },
+  'consoleUsers.deleteIdentity': {
+    status: 204,
+    console: (o, input) =>
+      o.consoleUsers.deleteIdentity(input.userId as string, input.identityId as string),
+  },
   'consoleUsers.deleteSession': {
     status: 204,
     console: (o, input) =>
@@ -375,6 +397,10 @@ export const consoleDispatch: DispatchTable = {
         emailVerified: input.emailVerified as boolean | undefined,
         limit: input.limit as number | undefined,
       }),
+  },
+  'consoleUsers.listIdentities': {
+    status: 200,
+    console: (o, input) => o.consoleUsers.listIdentities(input.userId as string),
   },
   'consoleUsers.listSessions': {
     status: 200,

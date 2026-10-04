@@ -3,11 +3,13 @@ import type { Client, RequestOptions } from '../runtime/client.js'
 import { paginate } from '../runtime/pagination.js'
 import type {
   AuthResult,
+  CompleteOAuthLinkRequest,
   CompleteRecoveryRequest,
   ConfirmEmailChangeRequest,
   CreateAccountRequest,
   CreateEmailCodeRequest,
   CreateEmailCodeSessionRequest,
+  CreateIdTokenSessionRequest,
   CreateMagicLinkRequest,
   CreateMagicLinkSessionRequest,
   CreateOAuthFlowRequest,
@@ -17,6 +19,8 @@ import type {
   CreateVerificationRequest,
   DeleteAccountRequest,
   Health,
+  Identity,
+  IdentityList,
   Jwks,
   OAuthFlow,
   OpenIdConfiguration,
@@ -37,6 +41,14 @@ export class AccountService {
 
   constructor(client: Client) {
     this.#client = client
+  }
+
+  /** Links the provider with the code a link flow returned and its verifier. Only the user who started the flow can finish it. */
+  completeOAuthLink(body: CompleteOAuthLinkRequest, options?: RequestOptions): Promise<Identity> {
+    return this.#client.request<Identity>(
+      { method: 'POST', path: '/v1/account/identities/oauth', body },
+      options,
+    )
   }
 
   /**
@@ -91,6 +103,32 @@ export class AccountService {
     )
   }
 
+  /** Links a provider to the signed in user with its ID token from a native app. The session must be at most 10 minutes old. */
+  createIdTokenIdentity(
+    body: CreateIdTokenSessionRequest,
+    options?: RequestOptions,
+  ): Promise<Identity> {
+    return this.#client.request<Identity>(
+      { method: 'POST', path: '/v1/account/identities/id-token', body },
+      options,
+    )
+  }
+
+  /**
+   * Signs a user in with a provider's ID token from a native app (Google or Apple sign in), and with Apple's
+   * authorization code. It finds the user by the provider account, else by the provider's verified email, else
+   * creates them. Each token works once.
+   */
+  createIdTokenSession(
+    body: CreateIdTokenSessionRequest,
+    options?: RequestOptions,
+  ): Promise<AuthResult> {
+    return this.#client.request<AuthResult>(
+      { method: 'POST', path: '/v1/account/sessions/id-token', body, session: 'start' },
+      options,
+    )
+  }
+
   /**
    * Emails a sign in link. An email without a user gets one that creates the user, unless `createUser` is false. The
    * answer is the same 202 either way, so it never tells anyone which emails have accounts.
@@ -121,6 +159,17 @@ export class AccountService {
   createOAuthFlow(body: CreateOAuthFlowRequest, options?: RequestOptions): Promise<OAuthFlow> {
     return this.#client.request<OAuthFlow>(
       { method: 'POST', path: '/v1/account/oauth/flows', body },
+      options,
+    )
+  }
+
+  /**
+   * Starts linking a provider to the signed in user, like `createOAuthFlow`. The session must be at most 10 minutes
+   * old. The SDKs' `linkIdentity` does all of it.
+   */
+  createOAuthLinkFlow(body: CreateOAuthFlowRequest, options?: RequestOptions): Promise<OAuthFlow> {
+    return this.#client.request<OAuthFlow>(
+      { method: 'POST', path: '/v1/account/identities/oauth/flows', body },
       options,
     )
   }
@@ -185,6 +234,14 @@ export class AccountService {
     )
   }
 
+  /** Unlinks one of the signed in user's identities. The last way to sign in can't be removed. Sessions stay. */
+  deleteIdentity(identityId: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'DELETE', path: `/v1/account/identities/${encodeURIComponent(identityId)}` },
+      options,
+    )
+  }
+
   /** Ends every session of the signed in user except the current one. */
   deleteOtherSessions(options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
@@ -204,6 +261,14 @@ export class AccountService {
   /** Gets the signed in user. A server can call it with a user's access token to check that the session is still active. */
   get(options?: RequestOptions): Promise<User> {
     return this.#client.request<User>({ method: 'GET', path: '/v1/account' }, options)
+  }
+
+  /** Lists the signed in user's identities, oldest first. */
+  listIdentities(options?: RequestOptions): Promise<IdentityList> {
+    return this.#client.request<IdentityList>(
+      { method: 'GET', path: '/v1/account/identities' },
+      options,
+    )
   }
 
   /** Lists the signed in user's active sessions, newest first. */

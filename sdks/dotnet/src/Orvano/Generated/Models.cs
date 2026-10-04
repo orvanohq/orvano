@@ -175,6 +175,28 @@ public sealed record Health(
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("version")] string Version);
 
+/// <summary>A provider account linked to a user: one way the user signs in.</summary>
+/// <param name="Id">The identity ID.</param>
+/// <param name="Provider">The provider.</param>
+/// <param name="Subject">The provider's ID for the account: Google's and Apple's <c>sub</c>, GitHub's user ID, Microsoft's <c>&lt;tid&gt;:&lt;oid&gt;</c>.</param>
+/// <param name="Email">The email the provider gave, verified or not; null when it gave none.</param>
+/// <param name="EmailVerified">Whether the provider vouches for that email.</param>
+/// <param name="CreatedAt">When the provider was linked.</param>
+/// <param name="LastSignInAt">When the user last signed in with it; null if never.</param>
+public sealed record Identity(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("provider")] OAuthProvider Provider,
+    [property: JsonPropertyName("subject")] string Subject,
+    [property: JsonPropertyName("email")] string? Email,
+    [property: JsonPropertyName("emailVerified")] bool EmailVerified,
+    [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt);
+
+/// <summary>A user's identities, oldest first: at most one per provider.</summary>
+/// <param name="Items">The identities.</param>
+public sealed record IdentityList(
+    [property: JsonPropertyName("items")] IReadOnlyList<Identity> Items);
+
 /// <summary>One public signing key, as a JSON Web Key (RFC 7517).</summary>
 /// <param name="Kty">The key type, <c>EC</c>.</param>
 /// <param name="Crv">The curve, <c>P-256</c>.</param>
@@ -260,6 +282,8 @@ public sealed record UpdateUserEmailRequest(
 /// <param name="Metadata">Your own data about the user: a JSON object of at most 16 KB.</param>
 /// <param name="CreatedAt">When the user signed up.</param>
 /// <param name="LastSignInAt">When the user last signed in; null if never.</param>
+/// <param name="Providers">The providers linked to the user, sorted by name.</param>
+/// <param name="HasPassword">Whether the user has a password.</param>
 public sealed record User(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("email")] string? Email,
@@ -269,7 +293,9 @@ public sealed record User(
     [property: JsonPropertyName("status")] UserStatus Status,
     [property: JsonPropertyName("metadata")] IReadOnlyDictionary<string, JsonElement> Metadata,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
-    [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt);
+    [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt,
+    [property: JsonPropertyName("providers")] IReadOnlyList<OAuthProvider> Providers,
+    [property: JsonPropertyName("hasPassword")] bool HasPassword);
 
 /// <summary>One page of a project's users, newest first.</summary>
 /// <param name="Items">The users on this page.</param>

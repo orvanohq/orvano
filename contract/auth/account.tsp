@@ -51,6 +51,13 @@ model User {
 
   @doc("When the user last signed in; null if never.")
   lastSignInAt: utcDateTime | null;
+
+  @doc("The providers linked to the user, sorted by name.")
+  providers: OAuthProvider[];
+
+  @doc("Whether the user has a password.")
+  @example(true)
+  hasPassword: boolean;
 }
 
 @doc("""

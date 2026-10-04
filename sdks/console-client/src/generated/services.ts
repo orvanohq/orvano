@@ -28,6 +28,8 @@ import type {
   InvitationTokenRequest,
   Member,
   MemberPage,
+  OAuthProviderSettings,
+  OAuthProviderSettingsList,
   Org,
   OrgPage,
   Platform,
@@ -41,6 +43,7 @@ import type {
   SmtpSettingsInput,
   UpdateInstallSettingsRequest,
   UpdateMemberRequest,
+  UpdateOAuthProviderRequest,
   UpdateOrgRequest,
   UpdatePlatformRequest,
   UpdateProjectRequest,
@@ -50,6 +53,7 @@ import type {
   CreateUserRecoveryRequest,
   CreateUserRequest,
   CreateUserVerificationRequest,
+  IdentityList,
   RequestOptions,
   Session,
   SessionPage,
@@ -189,6 +193,50 @@ export class ConsoleAuthKeysService {
   rotate(options?: RequestOptions): Promise<SigningKeys> {
     return this.#client.request<SigningKeys>(
       { method: 'POST', path: '/v1/console/project/auth/keys/rotate' },
+      options,
+    )
+  }
+}
+
+/** Operations in the `consoleAuthProviders` service. */
+export class ConsoleAuthProvidersService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /** Removes one provider's settings and secrets; owners and developers only. */
+  delete(provider: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      {
+        method: 'DELETE',
+        path: `/v1/console/project/auth/providers/${encodeURIComponent(provider)}`,
+      },
+      options,
+    )
+  }
+
+  /** Lists the project's settings for all four providers. */
+  list(options?: RequestOptions): Promise<OAuthProviderSettingsList> {
+    return this.#client.request<OAuthProviderSettingsList>(
+      { method: 'GET', path: '/v1/console/project/auth/providers' },
+      options,
+    )
+  }
+
+  /** Saves one provider's settings; owners and developers only. */
+  update(
+    provider: string,
+    body: UpdateOAuthProviderRequest,
+    options?: RequestOptions,
+  ): Promise<OAuthProviderSettings> {
+    return this.#client.request<OAuthProviderSettings>(
+      {
+        method: 'PUT',
+        path: `/v1/console/project/auth/providers/${encodeURIComponent(provider)}`,
+        body,
+      },
       options,
     )
   }
@@ -894,6 +942,17 @@ export class ConsoleUsersService {
     )
   }
 
+  /** Unlinks one of a user's identities; owners and developers only. The user's last way to sign in can't be removed. */
+  deleteIdentity(userId: string, identityId: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      {
+        method: 'DELETE',
+        path: `/v1/console/project/users/${encodeURIComponent(userId)}/identities/${encodeURIComponent(identityId)}`,
+      },
+      options,
+    )
+  }
+
   /** Ends one session of a user. */
   deleteSession(userId: string, sessionId: string, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
@@ -956,6 +1015,14 @@ export class ConsoleUsersService {
     options?: RequestOptions,
   ): AsyncGenerator<User> {
     return paginate((cursor) => this.list({ ...query, cursor }, options))
+  }
+
+  /** Lists a user's identities, oldest first. */
+  listIdentities(userId: string, options?: RequestOptions): Promise<IdentityList> {
+    return this.#client.request<IdentityList>(
+      { method: 'GET', path: `/v1/console/project/users/${encodeURIComponent(userId)}/identities` },
+      options,
+    )
   }
 
   /** Lists a user's active sessions, newest first. `current` is always false. */
@@ -1040,6 +1107,8 @@ export class Orvano {
   readonly consoleApiKeys: ConsoleApiKeysService
   /** Operations in the `consoleAuthKeys` service. */
   readonly consoleAuthKeys: ConsoleAuthKeysService
+  /** Operations in the `consoleAuthProviders` service. */
+  readonly consoleAuthProviders: ConsoleAuthProvidersService
   /** Operations in the `consoleEmailTemplates` service. */
   readonly consoleEmailTemplates: ConsoleEmailTemplatesService
   /** Operations in the `consoleEmails` service. */
@@ -1066,6 +1135,7 @@ export class Orvano {
     this.consoleAccount = new ConsoleAccountService(client)
     this.consoleApiKeys = new ConsoleApiKeysService(client)
     this.consoleAuthKeys = new ConsoleAuthKeysService(client)
+    this.consoleAuthProviders = new ConsoleAuthProvidersService(client)
     this.consoleEmailTemplates = new ConsoleEmailTemplatesService(client)
     this.consoleEmails = new ConsoleEmailsService(client)
     this.consoleInstall = new ConsoleInstallService(client)

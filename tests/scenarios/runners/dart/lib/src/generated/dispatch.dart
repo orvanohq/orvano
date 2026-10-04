@@ -2,10 +2,22 @@
 // Test only: maps each operationId to its SDK call for the scenario interpreter. Never published.
 // ignore_for_file: unnecessary_cast, prefer_expression_function_bodies
 import 'package:orvano_core/orvano_core.dart';
+import 'test_models.dart';
 import '../dispatch_table.dart';
 
 /// Every non console operation; a missing `client` or `server` call means the SDK has none.
 final Map<String, DispatchEntry> dispatch = {
+  'account.completeOAuthLink': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.completeOAuthLink(
+        CompleteOAuthLinkRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
   'account.completeRecovery': DispatchEntry(
     status: 201,
     client: (o, input) async {
@@ -55,6 +67,28 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.createIdTokenIdentity': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createIdTokenIdentity(
+        CreateIdTokenSessionRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.createIdTokenSession': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createIdTokenSession(
+        CreateIdTokenSessionRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
   'account.createMagicLink': DispatchEntry(
     status: 202,
     client: (o, input) async {
@@ -79,6 +113,15 @@ final Map<String, DispatchEntry> dispatch = {
     status: 200,
     client: (o, input) async {
       final r = await o.account.createOAuthFlow(
+        CreateOAuthFlowRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.createOAuthLinkFlow': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.createOAuthLinkFlow(
         CreateOAuthFlowRequest.fromJson(input['body'] as Map<String, dynamic>),
       );
       return r.toJson();
@@ -142,6 +185,13 @@ final Map<String, DispatchEntry> dispatch = {
       return null;
     },
   ),
+  'account.deleteIdentity': DispatchEntry(
+    status: 204,
+    client: (o, input) async {
+      await o.account.deleteIdentity(input['identityId'] as String);
+      return null;
+    },
+  ),
   'account.deleteOtherSessions': DispatchEntry(
     status: 204,
     client: (o, input) async {
@@ -164,6 +214,13 @@ final Map<String, DispatchEntry> dispatch = {
     },
     server: (o, input) async {
       final r = await o.account.get();
+      return r.toJson();
+    },
+  ),
+  'account.listIdentities': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.listIdentities();
       return r.toJson();
     },
   ),
@@ -277,6 +334,25 @@ final Map<String, DispatchEntry> dispatch = {
       return null;
     },
   ),
+  'test.createIdToken': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.test.createIdToken(
+        TestCreateIdTokenRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+    server: (o, input) async {
+      final r = await o.test.createIdToken(
+        TestCreateIdTokenRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
   'test.getLatestEmail': DispatchEntry(
     status: 200,
     client: (o, input) async {
@@ -329,6 +405,25 @@ final Map<String, DispatchEntry> dispatch = {
         )
         .map((e) => e.toJson()),
   ),
+  'test.listAppleRevocations': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.test.listAppleRevocations(
+        after: input['after'] == null
+            ? null
+            : DateTime.parse(input['after'] as String),
+      );
+      return r.toJson();
+    },
+    server: (o, input) async {
+      final r = await o.test.listAppleRevocations(
+        after: input['after'] == null
+            ? null
+            : DateTime.parse(input['after'] as String),
+      );
+      return r.toJson();
+    },
+  ),
   'users.block': DispatchEntry(
     status: 200,
     server: (o, input) async {
@@ -377,6 +472,17 @@ final Map<String, DispatchEntry> dispatch = {
     status: 204,
     server: (o, input) async {
       await o.users.delete(input['userId'] as String);
+      return null;
+    },
+    scope: 'users.write',
+  ),
+  'users.deleteIdentity': DispatchEntry(
+    status: 204,
+    server: (o, input) async {
+      await o.users.deleteIdentity(
+        input['userId'] as String,
+        input['identityId'] as String,
+      );
       return null;
     },
     scope: 'users.write',
@@ -446,6 +552,14 @@ final Map<String, DispatchEntry> dispatch = {
               : (input['limit'] as num).toInt(),
         )
         .map((e) => e.toJson()),
+    scope: 'users.read',
+  ),
+  'users.listIdentities': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.users.listIdentities(input['userId'] as String);
+      return r.toJson();
+    },
     scope: 'users.read',
   ),
   'users.listSessions': DispatchEntry(

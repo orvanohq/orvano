@@ -5,6 +5,7 @@ import "@typespec/http";
 import "@typespec/openapi";
 import "../errors.tsp";
 import "../auth/security.tsp";
+import "../auth/account.tsp";
 
 using Http;
 using OpenAPI;
@@ -73,9 +74,94 @@ model TestEmail {
   url: string | null;
 }
 
+@doc("A request for a native ID token from the fake sign in provider (spec 0012).")
+@extension("x-orvano-test", true)
+model TestCreateIdTokenRequest {
+  @doc("Google or Apple.")
+  provider: IdTokenProvider;
+
+  @doc("The token's audience: a client ID or bundle ID.")
+  @example("com.acme.app")
+  aud: string;
+
+  @doc("The provider account's subject.")
+  @example("apple-001")
+  sub: string;
+
+  @doc("The email claim.")
+  @example("ada@example.com")
+  email?: string;
+
+  @doc("The email_verified claim.")
+  @example(true)
+  emailVerified?: boolean;
+
+  @doc("The nonce claim: the hashed nonce, as the app gives it to the provider.")
+  @example("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
+  nonce: string;
+
+  @doc("Seconds until the token expires; negative for one already expired. Defaults to 600.")
+  @example(600)
+  expiresIn?: int32;
+}
+
+@doc("A native ID token from the fake sign in provider.")
+@extension("x-orvano-test", true)
+model TestIdToken {
+  @doc("The signed ID token.")
+  idToken: string;
+
+  @doc("Apple only: an authorization code the fake token endpoint accepts for this user; null for Google.")
+  authorizationCode: string | null;
+}
+
+@doc("One call the fake Apple revoke endpoint received.")
+@extension("x-orvano-test", true)
+model TestAppleRevocation {
+  @doc("The client ID the token was issued to.")
+  @example("com.acme.app")
+  clientId: string;
+
+  @doc("The first 16 hex characters of the token's SHA-256, never the token.")
+  @example("9f86d081884c7d65")
+  tokenHint: string;
+
+  @doc("When the call arrived.")
+  receivedAt: utcDateTime;
+}
+
+@doc("The fake Apple revoke endpoint's calls, oldest first.")
+@extension("x-orvano-test", true)
+model TestAppleRevocationList {
+  @doc("The calls.")
+  items: TestAppleRevocation[];
+}
+
 @route("/v1/test")
 @tag("test")
 interface TestApi {
+  @doc("Signs a native ID token as Google or Apple would, with the fake provider's key.")
+  @operationId("test.createIdToken")
+  @extension("x-orvano-audience", "both")
+  @extension("x-orvano-service", "test")
+  @extension("x-orvano-test", true)
+  @post
+  @route("/oauth/id-tokens")
+  createIdToken(@body request: TestCreateIdTokenRequest): TestIdToken | Problem;
+
+  @doc("Lists the calls the fake Apple revoke endpoint received after `after`.")
+  @operationId("test.listAppleRevocations")
+  @extension("x-orvano-audience", "both")
+  @extension("x-orvano-service", "test")
+  @extension("x-orvano-test", true)
+  @get
+  @route("/oauth/apple/revocations")
+  listAppleRevocations(
+    @doc("Only calls received after this time.")
+    @query
+    after?: utcDateTime,
+  ): TestAppleRevocationList | Problem;
+
   @doc("Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after`, and reads it.")
   @operationId("test.getLatestEmail")
   @extension("x-orvano-audience", "both")

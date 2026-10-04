@@ -317,6 +317,234 @@
         "x-orvano-audience": "client"
       }
     },
+    "/v1/account/identities": {
+      "get": {
+        "operationId": "account.listIdentities",
+        "description": "Lists the signed in user's identities, oldest first.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/identities/id-token": {
+      "post": {
+        "operationId": "account.createIdTokenIdentity",
+        "description": "Links a provider to the signed in user with its ID token from a native app. The session must be at most 10 minutes old.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Identity"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIdTokenSessionRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/identities/oauth": {
+      "post": {
+        "operationId": "account.completeOAuthLink",
+        "description": "Links the provider with the code a link flow returned and its verifier. Only the user who started the flow can finish it.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Identity"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteOAuthLinkRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/identities/oauth/flows": {
+      "post": {
+        "operationId": "account.createOAuthLinkFlow",
+        "description": "Starts linking a provider to the signed in user, like `createOAuthFlow`. The session must be at most 10 minutes\nold. The SDKs' `linkIdentity` does all of it.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthFlow"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOAuthFlowRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/identities/{identityId}": {
+      "delete": {
+        "operationId": "account.deleteIdentity",
+        "description": "Unlinks one of the signed in user's identities. The last way to sign in can't be removed. Sessions stay.",
+        "parameters": [
+          {
+            "name": "identityId",
+            "in": "path",
+            "required": true,
+            "description": "The identity to unlink.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/account/magic-link": {
       "post": {
         "operationId": "account.createMagicLink",
@@ -682,6 +910,51 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreateEmailCodeSessionRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-session": "start",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/sessions/id-token": {
+      "post": {
+        "operationId": "account.createIdTokenSession",
+        "description": "Signs a user in with a provider's ID token from a native app (Google or Apple sign in), and with Apple's\nauthorization code. It finds the user by the provider account, else by the provider's verified email, else\ncreates them. Each token works once.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIdTokenSessionRequest"
               }
             }
           }
@@ -1549,6 +1822,108 @@
         "x-orvano-audience": "server"
       }
     },
+    "/v1/users/{userId}/identities": {
+      "get": {
+        "operationId": "users.listIdentities",
+        "description": "Lists a user's identities, oldest first.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.read",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/identities/{identityId}": {
+      "delete": {
+        "operationId": "users.deleteIdentity",
+        "description": "Unlinks one of a user's identities. The user's last way to sign in can't be removed. Sessions stay.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "identityId",
+            "in": "path",
+            "required": true,
+            "description": "The identity to unlink.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
     "/v1/users/{userId}/recovery": {
       "post": {
         "operationId": "users.createRecovery",
@@ -1911,6 +2286,30 @@
         },
         "description": "A signed in user and their new session."
       },
+      "CompleteOAuthLinkRequest": {
+        "type": "object",
+        "required": [
+          "code",
+          "codeVerifier"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The `orvano_code` parameter Orvano added to your redirect URL. It works once, for 2 minutes.",
+            "examples": [
+              "orv_oc_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          },
+          "codeVerifier": {
+            "type": "string",
+            "description": "The PKCE verifier whose challenge started the link flow.",
+            "examples": [
+              "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+            ]
+          }
+        },
+        "description": "A link of a provider to the signed in user, with the code a link flow returned."
+      },
       "CompleteRecoveryRequest": {
         "type": "object",
         "required": [
@@ -2042,6 +2441,56 @@
           }
         },
         "description": "A sign in with an emailed code."
+      },
+      "CreateIdTokenSessionRequest": {
+        "type": "object",
+        "required": [
+          "provider",
+          "idToken",
+          "nonce"
+        ],
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/IdTokenProvider",
+            "description": "The provider that issued the token."
+          },
+          "idToken": {
+            "type": "string",
+            "description": "The provider's ID token, at most 8 KB.",
+            "examples": [
+              "eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9.e30.c2ln"
+            ]
+          },
+          "nonce": {
+            "type": "string",
+            "description": "The raw nonce, 16 to 128 characters. Give the provider its lowercase hex SHA-256 (the SDKs' `createNonce` makes\nboth), so the token carries that hash.",
+            "examples": [
+              "q2lV7l3o0W9nE5w6Xk0wq1JmYp8tVb3Z"
+            ]
+          },
+          "authorizationCode": {
+            "type": "string",
+            "description": "Apple only, and required for Apple: the authorization code Sign in with Apple returned with the token.",
+            "examples": [
+              "c1f2e3d4..."
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Apple only: the name Sign in with Apple returned on the first authorization, at most 256 characters.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          }
+        },
+        "description": "A sign in with a provider's ID token from a native app."
       },
       "CreateMagicLinkRequest": {
         "type": "object",
@@ -2405,6 +2854,93 @@
           "apple"
         ],
         "description": "A provider a native app can sign in with by its ID token."
+      },
+      "Identity": {
+        "type": "object",
+        "required": [
+          "id",
+          "provider",
+          "subject",
+          "email",
+          "emailVerified",
+          "createdAt",
+          "lastSignInAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The identity ID.",
+            "examples": [
+              "01924f5e-aa1b-7c4d-8e21-3d5e6f7a8b9c"
+            ]
+          },
+          "provider": {
+            "$ref": "#/components/schemas/OAuthProvider",
+            "description": "The provider."
+          },
+          "subject": {
+            "type": "string",
+            "description": "The provider's ID for the account: Google's and Apple's `sub`, GitHub's user ID, Microsoft's `<tid>:<oid>`.",
+            "examples": [
+              "109876543210987654321"
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The email the provider gave, verified or not; null when it gave none.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Whether the provider vouches for that email.",
+            "examples": [
+              true
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the provider was linked."
+          },
+          "lastSignInAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the user last signed in with it; null if never."
+          }
+        },
+        "description": "A provider account linked to a user: one way the user signs in."
+      },
+      "IdentityList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Identity"
+            },
+            "description": "The identities."
+          }
+        },
+        "description": "A user's identities, oldest first: at most one per provider."
       },
       "Jwk": {
         "type": "object",
@@ -2950,7 +3486,9 @@
           "status",
           "metadata",
           "createdAt",
-          "lastSignInAt"
+          "lastSignInAt",
+          "providers",
+          "hasPassword"
         ],
         "properties": {
           "id": {
@@ -3032,6 +3570,20 @@
               }
             ],
             "description": "When the user last signed in; null if never."
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OAuthProvider"
+            },
+            "description": "The providers linked to the user, sorted by name."
+          },
+          "hasPassword": {
+            "type": "boolean",
+            "description": "Whether the user has a password.",
+            "examples": [
+              true
+            ]
           }
         },
         "description": "A user of a project."

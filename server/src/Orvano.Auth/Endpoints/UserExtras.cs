@@ -1,0 +1,78 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
+using Orvano.Auth.Application;
+using Api = Orvano.Contract;
+
+namespace Orvano.Auth.Endpoints;
+
+/// <summary>
+/// <c>User.providers</c> and <c>User.hasPassword</c> (spec 0012, AC-16) on every user the Auth module answers with,
+/// read in one grouped query per response: an endpoint filter on the module's routes fills them into a <c>User</c>,
+/// <c>ConsoleAccount</c>, <c>AuthResult</c>, or <c>UserPage</c> body, so no use case has to remember them.
+/// </summary>
+internal static class UserExtras
+{
+    /// <summary>A group with the filter, for every Auth route.</summary>
+    public static RouteGroupBuilder WithUserExtras(this RouteGroupBuilder v1)
+    {
+        var group = v1.MapGroup("");
+        group.AddEndpointFilter(async (context, next) =>
+        {
+            var result = await next(context);
+            if (result is not IValueHttpResult { Value: { } value } || result is not IStatusCodeHttpResult status) return result;
+
+            var ids = value switch
+            {
+                Api.User user => [user.Id],
+                Api.ConsoleAccount account => [account.Id],
+                Api.AuthResult signedIn => [signedIn.User.Id],
+                Api.UserPage page => page.Items.Select(u => u.Id).ToArray(),
+                _ => (string[]?)null,
+            };
+            if (ids is null || ids.Length == 0) return result;
+
+            var extras = await ReadAsync(context.HttpContext.RequestServices.GetRequiredService<AuthStore>(), ids, context.HttpContext.RequestAborted);
+            var filled = value switch
+            {
+                Api.User user => (object)Fill(user, extras),
+                Api.ConsoleAccount account => extras.TryGetValue(account.Id, out var e) ? account with { Providers = e.Providers, HasPassword = e.HasPassword } : account,
+                Api.AuthResult signedIn => signedIn with { User = Fill(signedIn.User, extras) },
+                Api.UserPage page => page with { Items = [.. page.Items.Select(u => Fill(u, extras))] },
+                _ => value,
+            };
+
+            return status.StatusCode == StatusCodes.Status201Created ? TypedResults.Created((string?)null, filled) : TypedResults.Ok(filled);
+        });
+        return group;
+    }
+
+    private static Api.User Fill(Api.User user, IReadOnlyDictionary<string, (Api.OAuthProvider[] Providers, bool HasPassword)> extras) =>
+        extras.TryGetValue(user.Id, out var e) ? user with { Providers = e.Providers, HasPassword = e.HasPassword } : user;
+
+    private static Task<Dictionary<string, (Api.OAuthProvider[] Providers, bool HasPassword)>> ReadAsync(AuthStore store, string[] ids, CancellationToken ct) =>
+        store.ReadAsync<Dictionary<string, (Api.OAuthProvider[] Providers, bool HasPassword)>>(async (db, token) =>
+        {
+            var found = new Dictionary<string, (Api.OAuthProvider[] Providers, bool HasPassword)>();
+            var guids = ids.Select(id => Guid.TryParse(id, out var g) ? g : Guid.Empty).Where(g => g != Guid.Empty).ToArray();
+            await using var cmd = new NpgsqlCommand(
+                """
+                SELECT u.id,
+                       coalesce((SELECT array_agg(i.provider ORDER BY i.provider) FROM orvano.auth_identities i WHERE i.user_id = u.id), '{}'),
+                       EXISTS (SELECT 1 FROM orvano.auth_passwords p WHERE p.user_id = u.id)
+                FROM orvano.auth_users u
+                WHERE u.id = ANY(@ids)
+                """, (NpgsqlConnection)Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.GetDbConnection(db.Database));
+            cmd.Parameters.AddWithValue("ids", guids);
+            await using var reader = await cmd.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+            {
+                var providers = reader.GetFieldValue<string[]>(1).Select(ApiMapping.ProviderOf).ToArray();
+                found[reader.GetGuid(0).ToString()] = (providers, reader.GetBoolean(2));
+            }
+
+            return found;
+        }, ct);
+}

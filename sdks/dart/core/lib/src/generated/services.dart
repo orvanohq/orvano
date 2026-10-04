@@ -10,6 +10,20 @@ final class AccountService {
 
   final Client _client;
 
+  /// Links the provider with the code a link flow returned and its verifier. Only the user who started the flow can finish it.
+  Future<Identity> completeOAuthLink(
+    CompleteOAuthLinkRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/identities/oauth',
+      body: body.toJson(),
+      options: options,
+    );
+    return Identity.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Sets a new password with the token from a reset link, and signs the user in. Every other session of the user
   /// ends, and the email counts as verified. The token works once.
   Future<AuthResult> completeRecovery(
@@ -86,6 +100,37 @@ final class AccountService {
     return AuthResult.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Links a provider to the signed in user with its ID token from a native app. The session must be at most 10 minutes old.
+  Future<Identity> createIdTokenIdentity(
+    CreateIdTokenSessionRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/identities/id-token',
+      body: body.toJson(),
+      options: options,
+    );
+    return Identity.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Signs a user in with a provider's ID token from a native app (Google or Apple sign in), and with Apple's
+  /// authorization code. It finds the user by the provider account, else by the provider's verified email, else
+  /// creates them. Each token works once.
+  Future<AuthResult> createIdTokenSession(
+    CreateIdTokenSessionRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/sessions/id-token',
+      body: body.toJson(),
+      session: SessionChange.start,
+      options: options,
+    );
+    return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Emails a sign in link. An email without a user gets one that creates the user, unless `createUser` is false. The
   /// answer is the same 202 either way, so it never tells anyone which emails have accounts.
   Future<void> createMagicLink(
@@ -125,6 +170,21 @@ final class AccountService {
     final json = await _client.send(
       'POST',
       '/v1/account/oauth/flows',
+      body: body.toJson(),
+      options: options,
+    );
+    return OAuthFlow.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Starts linking a provider to the signed in user, like `createOAuthFlow`. The session must be at most 10 minutes
+  /// old. The SDKs' `linkIdentity` does all of it.
+  Future<OAuthFlow> createOAuthLinkFlow(
+    CreateOAuthFlowRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/identities/oauth/flows',
       body: body.toJson(),
       options: options,
     );
@@ -213,6 +273,18 @@ final class AccountService {
     );
   }
 
+  /// Unlinks one of the signed in user's identities. The last way to sign in can't be removed. Sessions stay.
+  Future<void> deleteIdentity(
+    String identityId, {
+    RequestOptions? options,
+  }) async {
+    await _client.send(
+      'DELETE',
+      '/v1/account/identities/${Uri.encodeComponent(identityId)}',
+      options: options,
+    );
+  }
+
   /// Ends every session of the signed in user except the current one.
   Future<void> deleteOtherSessions({RequestOptions? options}) async {
     await _client.send('DELETE', '/v1/account/sessions', options: options);
@@ -234,6 +306,16 @@ final class AccountService {
   Future<User> get({RequestOptions? options}) async {
     final json = await _client.send('GET', '/v1/account', options: options);
     return User.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Lists the signed in user's identities, oldest first.
+  Future<IdentityList> listIdentities({RequestOptions? options}) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/account/identities',
+      options: options,
+    );
+    return IdentityList.fromJson(json as Map<String, dynamic>);
   }
 
   /// Lists the signed in user's active sessions, newest first.

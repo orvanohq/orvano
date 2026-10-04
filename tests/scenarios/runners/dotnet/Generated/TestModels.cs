@@ -3,6 +3,37 @@ using System.Text.Json.Serialization;
 
 namespace Orvano.Scenarios.Generated;
 
+/// <summary>One call the fake Apple revoke endpoint received.</summary>
+/// <param name="ClientId">The client ID the token was issued to.</param>
+/// <param name="TokenHint">The first 16 hex characters of the token's SHA-256, never the token.</param>
+/// <param name="ReceivedAt">When the call arrived.</param>
+public sealed record TestAppleRevocation(
+    [property: JsonPropertyName("clientId")] string ClientId,
+    [property: JsonPropertyName("tokenHint")] string TokenHint,
+    [property: JsonPropertyName("receivedAt")] DateTimeOffset ReceivedAt);
+
+/// <summary>The fake Apple revoke endpoint's calls, oldest first.</summary>
+/// <param name="Items">The calls.</param>
+public sealed record TestAppleRevocationList(
+    [property: JsonPropertyName("items")] IReadOnlyList<TestAppleRevocation> Items);
+
+/// <summary>A request for a native ID token from the fake sign in provider (spec 0012).</summary>
+/// <param name="Provider">Google or Apple.</param>
+/// <param name="Aud">The token's audience: a client ID or bundle ID.</param>
+/// <param name="Sub">The provider account's subject.</param>
+/// <param name="Nonce">The nonce claim: the hashed nonce, as the app gives it to the provider.</param>
+/// <param name="Email">The email claim.</param>
+/// <param name="EmailVerified">The email_verified claim.</param>
+/// <param name="ExpiresIn">Seconds until the token expires; negative for one already expired. Defaults to 600.</param>
+public sealed record TestCreateIdTokenRequest(
+    [property: JsonPropertyName("provider")] IdTokenProvider Provider,
+    [property: JsonPropertyName("aud")] string Aud,
+    [property: JsonPropertyName("sub")] string Sub,
+    [property: JsonPropertyName("nonce")] string Nonce,
+    [property: JsonPropertyName("email"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Email = null,
+    [property: JsonPropertyName("emailVerified"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? EmailVerified = null,
+    [property: JsonPropertyName("expiresIn"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? ExpiresIn = null);
+
 /// <summary>The newest email Mailpit caught for an address, read from its text part.</summary>
 /// <param name="Subject">The subject line.</param>
 /// <param name="Type">The <c>orvano_type</c> of the first link carrying <c>orvano_token</c>; null when there is none.</param>
@@ -15,6 +46,13 @@ public sealed record TestEmail(
     [property: JsonPropertyName("token")] string? Token,
     [property: JsonPropertyName("code")] string? Code,
     [property: JsonPropertyName("url")] string? Url);
+
+/// <summary>A native ID token from the fake sign in provider.</summary>
+/// <param name="IdToken">The signed ID token.</param>
+/// <param name="AuthorizationCode">Apple only: an authorization code the fake token endpoint accepts for this user; null for Google.</param>
+public sealed record TestIdToken(
+    [property: JsonPropertyName("idToken")] string IdToken,
+    [property: JsonPropertyName("authorizationCode")] string? AuthorizationCode);
 
 /// <summary>One fixed item in the <c>test.list</c> page.</summary>
 /// <param name="Id"><c>item-1</c> to <c>item-5</c>.</param>

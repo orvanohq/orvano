@@ -258,7 +258,8 @@ internal sealed class OAuthService(
         }
     }
 
-    private async Task<Outcome<SignedIn>> FinishAsync(string projectId, Outcome<OAuthRedeemed> outcome, CancellationToken ct)
+    /// <summary>After a redeeming commit: evicts sessions a claim ended, then issues the new session's access token.</summary>
+    public async Task<Outcome<SignedIn>> FinishAsync(string projectId, Outcome<OAuthRedeemed> outcome, CancellationToken ct)
     {
         if (!outcome.Succeeded) return outcome.Failure!;
         var redeemed = outcome.Value!;

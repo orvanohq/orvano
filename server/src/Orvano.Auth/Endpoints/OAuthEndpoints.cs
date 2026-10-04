@@ -34,8 +34,7 @@ internal static class OAuthEndpoints
     {
         v1.MapPost(Api.AccountOperations.CreateOAuthFlow.Route, async (HttpContext http, Api.CreateOAuthFlowRequest request, OAuthService oauth, CancellationToken ct) =>
         {
-            var provider = request.Provider == Api.OAuthProvider.Unknown ? (Domain.OAuthProvider?)null : ProviderOf(request.Provider);
-            var outcome = await oauth.StartAsync(PublicRequests.Project(http), provider, request.RedirectUrl, request.CodeChallenge, ConnectionIp.Key(http), ct);
+            var outcome = await oauth.StartAsync(PublicRequests.Project(http), ProviderOrNull(request.Provider), request.RedirectUrl, request.CodeChallenge, ConnectionIp.Key(http), ct);
             return Ok(http, outcome, url => new Api.OAuthFlow(url));
         })
             .WithName(Api.AccountOperations.CreateOAuthFlow.Id)

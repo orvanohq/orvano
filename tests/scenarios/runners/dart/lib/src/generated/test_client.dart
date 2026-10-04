@@ -14,6 +14,20 @@ final class TestService {
     await _client.send('POST', '/v1/test/conflict', options: options);
   }
 
+  /// Signs a native ID token as Google or Apple would, with the fake provider's key.
+  Future<TestIdToken> createIdToken(
+    TestCreateIdTokenRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/test/oauth/id-tokens',
+      body: body.toJson(),
+      options: options,
+    );
+    return TestIdToken.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after`, and reads it.
   Future<TestEmail> getLatestEmail({
     required String to,
@@ -49,6 +63,20 @@ final class TestService {
     (cursor) => list(cursor: cursor, limit: limit, options: options),
     (page) => (page.items, page.nextCursor),
   );
+
+  /// Lists the calls the fake Apple revoke endpoint received after `after`.
+  Future<TestAppleRevocationList> listAppleRevocations({
+    DateTime? after,
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/test/oauth/apple/revocations',
+      query: {'after': after?.toUtc().toIso8601String()},
+      options: options,
+    );
+    return TestAppleRevocationList.fromJson(json as Map<String, dynamic>);
+  }
 }
 
 /// `orvano_core` plus the test services, as the scenarios call them.
