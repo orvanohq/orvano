@@ -29,13 +29,18 @@ const providerNames = {
 
 /// Whether this build signs in with providers: the redirect flow opens the
 /// system's auth session and comes back on the app's scheme, which this
-/// quickstart sets up on iOS and Android only.
+/// quickstart sets up on iOS, Android, and macOS.
 bool get providersSupported =>
     !kIsWeb &&
     (defaultTargetPlatform == TargetPlatform.iOS ||
-        defaultTargetPlatform == TargetPlatform.android);
+        defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.macOS);
 
 bool get _onIos => defaultTargetPlatform == TargetPlatform.iOS;
+
+/// Native Google sign in runs on iOS and Android; macOS uses the redirect.
+bool get _nativeGoogle =>
+    _onIos || defaultTargetPlatform == TargetPlatform.android;
 
 // #region google
 /// Native Google sign in: Google's own sheet, with no browser. A new nonce ties
@@ -95,7 +100,7 @@ Future<void> signInByRedirect(Orvano orvano, OAuthProvider provider) async {
 // #endregion redirect
 
 /// A button per provider. Google signs in natively on iOS and Android, Apple
-/// natively on iOS, and the rest by redirect. With [link], each links the
+/// natively on iOS, and the rest (and every provider on macOS) by redirect. With [link], each links the
 /// provider to the signed in user by redirect instead.
 class ProviderButtons extends StatefulWidget {
   /// Creates the buttons.
@@ -136,7 +141,7 @@ class _ProviderButtonsState extends State<ProviderButtons> {
       final orvano = widget.orvano;
       if (widget.link) {
         await orvano.client.linkIdentity(provider, redirectUrl: redirectUrl);
-      } else if (provider == OAuthProvider.google) {
+      } else if (provider == OAuthProvider.google && _nativeGoogle) {
         await signInWithGoogle(orvano);
       } else if (provider == OAuthProvider.apple && _onIos) {
         await signInWithApple(orvano);
@@ -274,7 +279,7 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
                 padding: const EdgeInsets.all(24),
                 children: [
                   if (!providersSupported)
-                    const Text('Run this app on iOS or Android.')
+                    const Text('Run this app on iOS, Android, or macOS.')
                   else if (user == null)
                     ProviderButtons(orvano: widget.orvano, onDone: _refresh)
                   else ...[
