@@ -30,6 +30,8 @@ Sign in with Microsoft works like [Sign in with Google](/docs/auth/sign-in-with-
 
 Microsoft lets an organization put any email on an account, verified or not. The `xms_edov` claim says whether Microsoft verified the email's domain. Orvano counts a Microsoft email as verified only when `xms_edov` is true. Without it, Microsoft users get no email in Orvano, and they never sign in to an existing account by email.
 
+Even with `xms_edov` set, a personal Microsoft account whose sign in name is an address at another provider (`someone@gmail.com`, say) gets no email in Orvano: Microsoft doesn't own that domain, so `xms_edov` is never true for it. The user still signs in; the address stays on their Microsoft [identity](/docs/auth/link-identities/), marked unverified.
+
 ## 2. Sign in
 
 <Tabs syncKey="sdk">
