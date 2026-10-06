@@ -50,12 +50,12 @@ Spec [0010](../specs/0010-email-verification-recovery-passwordless/index.md) · 
 Sign in with Google, Apple, GitHub, and Microsoft through a browser redirect, plus native ID token sign in for mobile (Flutter Google and Apple sign in without a web view).
 **Done when:** you enable a provider in the console, and users sign in through it from Next.js (redirect) and Flutter (native); identities link to one user.
 - [x] Design it (spec): `/architect OAuth & ID token sign in`
-- [ ] Build it: `/develop OAuth & ID token sign in`
+- [x] Build it: `/develop OAuth & ID token sign in`
    - [x] Thin thread and providers: the migration, Google redirect sign in end to end through the fake provider, then Apple, Microsoft, and GitHub with the verified email rules and claiming (AC-3 to 8, 10 to 12, 16, 24, 27)
    - [x] Native ID tokens: Google and Apple ID token sign in with the nonce, single use tokens, and Apple's code exchange, after checking `google_sign_in`'s Android nonce (AC-8, 9, 24, 27)
    - [x] Identities: link by redirect and natively, list and unlink with the last method rule, `users.*` identity operations, and Apple revoke on delete (AC-13 to 16, 23, 24)
    - [x] SDK helpers and console: JS, Next.js, and Flutter helpers, the Sign in methods page, and identities on the Users pages (AC-1, 2, 20 to 26)
-   - [ ] Hardening and docs: events, limits, retention, the leak scan, docs pages and fix pages, then the real provider checks in verify.md (AC-17 to 19, 28)
+   - [x] Hardening and docs: events, limits, retention, the leak scan, docs pages and fix pages, then the real provider checks in verify.md (AC-17 to 19, 28)
 - [x] Verify it: `/check verify OAuth & ID token sign in`
 - [x] Test it: `/test OAuth & ID token sign in`
 - [x] Review it (fresh model): `/check review OAuth & ID token sign in`
