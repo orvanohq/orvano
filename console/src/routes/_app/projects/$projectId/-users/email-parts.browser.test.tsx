@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 
 import { renderInRouter } from '@/test/router'
+import { settleStyles } from '@/test/settle'
 
 import { EmailCard, VerifiedBadge, sessionMethodLabel, verifiedLine } from './email-parts'
 import { linkUrlKey, suggestedLinkUrls } from './link-url'
@@ -38,8 +39,8 @@ async function noAxeViolations(): Promise<void> {
   for (const theme of ['dark', 'light']) {
     document.documentElement.dataset.theme = theme
     document.documentElement.style.colorScheme = theme
-    // Overlays fade in over 150 ms; axe reads colors, so let them settle first.
-    await new Promise((resolve) => setTimeout(resolve, 300))
+    // The theme change animates colors and overlays fade in; axe reads colors, so let them finish first.
+    await settleStyles()
     const results = await axe.run(document.body, { rules: { region: { enabled: false } } })
     expect(
       results.violations.map(

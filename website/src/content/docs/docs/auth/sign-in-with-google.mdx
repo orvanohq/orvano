@@ -91,3 +91,13 @@ Orvano finds the user in this order:
 3. Otherwise, a new user with Google's verified email, and `isNewUser` true.
 
 An email Google doesn't vouch for never finds or creates a user. A user who already has a different Google account linked gets [`provider_already_linked`](/errors/provider_already_linked/): the email alone never moves a link. Users can add and remove providers themselves; see [Link providers](/docs/auth/link-identities/).
+
+## Limits
+
+Orvano counts requests per IP address over 15 minutes. Over a limit, the API answers [`rate_limited`](/errors/rate_limited/) with `Retry-After`, the seconds to wait.
+
+- Starting a sign in or a link: 300.
+- Arriving at the callback from the provider: 300. Over it, the browser gets the "go back to the app" page with status 429 instead of a redirect.
+- Codes and ID tokens that fail to redeem: 60. After that, even a valid code or token is refused until the window passes, so nobody can guess codes.
+
+Signing in also counts toward the IP's general sign in limit (300 in 15 minutes), and creating a new user toward its sign up limit (60 an hour).

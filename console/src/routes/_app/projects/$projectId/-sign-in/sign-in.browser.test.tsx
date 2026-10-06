@@ -4,6 +4,8 @@ import axe from 'axe-core'
 import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 
+import { settleStyles } from '@/test/settle'
+
 import { IdentitiesTable } from '../-users/identities'
 import { SessionsTable, SignInMethods } from '../-users/parts'
 import { ProviderCard } from './provider-card'
@@ -39,11 +41,9 @@ const identity: Identity = {
   lastSignInAt: null,
 }
 
-/** Lets a dialog finish fading in, so axe measures its real colors. */
-const settle = () => new Promise((resolve) => setTimeout(resolve, 300))
-
 async function noAxeViolations(): Promise<void> {
-  await settle()
+  // Lets a dialog finish fading in, so axe measures its real colors.
+  await settleStyles()
   const results = await axe.run(document.body, { rules: { region: { enabled: false } } })
   expect(results.violations.map((violation) => violation.id)).toEqual([])
 }

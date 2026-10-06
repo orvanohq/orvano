@@ -72,6 +72,8 @@ jobs:
           ORVANO_TEST_FIXTURES: ${{ github.workspace }}/tests/scenarios/fixtures.yaml
           ORVANO_SMTP_ALLOW_PRIVATE_HOSTS: 'true'
           ORVANO_TEST_MAILPIT_URL: http://localhost:8025
+          # The fake sign in provider (spec 0012, AC-27), served by this api; as in tests/scenarios/compose.yml.
+          ORVANO_TEST_OAUTH_PROVIDER_URL: http://localhost:8080/v1/test/oauth
       # The worker provisions the fixture projects the api seeded; until then every project call is 409
       # project_not_ready. It sends the queued emails to Mailpit too.
       - name: Start the worker role and wait for the fixture projects
@@ -91,6 +93,8 @@ jobs:
           ORVANO_DB_ADMIN_URL: Host=localhost;Port=5432;Username=orvano_admin;Password=${{ env.ORVANO_ADMIN_PASSWORD }};Database=orvano
           ORVANO_MASTER_KEYS: kscenarios:b3J2YW5vLXNjZW5hcmlvcy10ZXN0LW1hc3Rlci1rZXk=
           ORVANO_SMTP_ALLOW_PRIVATE_HOSTS: 'true'
+          # Apple's revoke job calls the fake provider too.
+          ORVANO_TEST_OAUTH_PROVIDER_URL: http://localhost:8080/v1/test/oauth
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}

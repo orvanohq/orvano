@@ -274,6 +274,94 @@ public class OAuthIdentityTests(PostgresFixture postgres)
         Assert.Equal(0L, await Count(api, "SELECT count(*) FROM orvano.auth_oauth_providers WHERE position('secret'::bytea in coalesce(client_secret_ciphertext, ''::bytea)) > 0 OR position('PRIVATE'::bytea in coalesce(apple_private_key_ciphertext, ''::bytea)) > 0"));
     }
 
+    [Fact]
+    public async Task A_provider_ready_only_one_way_is_not_configured_for_the_other()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, oauth: true);
+
+        // Google with its web client ID and no secret: native ready, not redirect ready.
+        using (var google = await api.AsConsoleAsync(HttpMethod.Put, "/v1/console/project/auth/providers/google",
+                   new { enabled = true, clientId = AuthApi.GoogleWebClient, clientSecret = (string?)null, clientIdsExtra = Array.Empty<string>() }))
+        {
+            Assert.False(google.Body.GetProperty("redirectReady").GetBoolean());
+            Assert.True(google.Body.GetProperty("nativeReady").GetBoolean());
+        }
+
+        var (start, _) = await OAuthDriver.StartAsync(api, "google");
+        using (start)
+        {
+            Assert.Equal(HttpStatusCode.Conflict, start.Status);
+            Assert.Equal("provider_not_configured", start.Code);
+        }
+
+        var web = await MintAsync(api, "google", AuthApi.GoogleWebClient, "g-web-only", "web-only@x.com");
+        using (var native = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/id-token", new { provider = "google", idToken = web.IdToken, nonce = Nonce }))
+            Assert.Equal(HttpStatusCode.Created, native.Status);
+
+        // Apple with its Services ID and key but no bundle ID: redirect ready, not native ready.
+        using (var apple = await api.AsConsoleAsync(HttpMethod.Put, "/v1/console/project/auth/providers/apple",
+                   new { enabled = true, clientId = AuthApi.AppleServicesId, clientIdsExtra = Array.Empty<string>(), appleTeamId = "TEAM123456", appleKeyId = "KEY1234567" }))
+        {
+            Assert.True(apple.Body.GetProperty("redirectReady").GetBoolean());
+            Assert.False(apple.Body.GetProperty("nativeReady").GetBoolean());
+        }
+
+        var token = await MintAsync(api, "apple", AuthApi.AppleBundleId, "a-no-bundle", "no-bundle@x.com");
+        using var refused = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/id-token",
+            new { provider = "apple", idToken = token.IdToken, nonce = Nonce, authorizationCode = token.Code });
+        Assert.Equal(HttpStatusCode.Conflict, refused.Status);
+        Assert.Equal("provider_not_configured", refused.Code);
+
+        var (appleStart, _) = await OAuthDriver.StartAsync(api, "apple");
+        using (appleStart) Assert.Equal(HttpStatusCode.OK, appleStart.Status);
+    }
+
+    [Fact]
+    public async Task A_redirect_and_a_native_first_sign_in_for_one_new_email_at_once_give_one_user_with_two_identities()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, oauth: true);
+
+        for (var round = 0; round < 3; round++)
+        {
+            var email = $"both-{round}@x.com";
+            var apple = await MintAsync(api, "apple", AuthApi.AppleBundleId, $"a-both-{round}", email);
+            var replies = await Task.WhenAll(
+                OAuthDriver.SignInAsync(api, "google", new { sub = $"g-both-{round}", email, emailVerified = true }),
+                api.SendAsync(HttpMethod.Post, "/v1/account/sessions/id-token",
+                    new { provider = "apple", idToken = apple.IdToken, nonce = Nonce, authorizationCode = apple.Code }));
+
+            Assert.All(replies, r => Assert.Equal(HttpStatusCode.Created, r.Status));
+            Assert.Equal(AuthApi.UserId(replies[0]), AuthApi.UserId(replies[1]));
+            Assert.Single(replies, r => r.Body.GetProperty("isNewUser").GetBoolean());
+            Assert.Equal(1L, await Count(api, $"SELECT count(*) FROM orvano.auth_users WHERE lower(email) = '{email}'"));
+            Assert.Equal(2L, await Count(api, $"SELECT count(*) FROM orvano.auth_identities i JOIN orvano.auth_users u ON u.id = i.user_id WHERE lower(u.email) = '{email}'"));
+            foreach (var reply in replies) reply.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task A_key_set_that_hangs_makes_native_sign_in_unavailable_within_the_timeout()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, oauth: true);
+        using (var hang = await api.SendAsync(HttpMethod.Post, "/v1/test/oauth/keys/hang")) Assert.Equal(HttpStatusCode.NoContent, hang.Status);
+
+        var google = await MintAsync(api, "google", AuthApi.GoogleNativeClient, "g-slow", "slow@x.com");
+        // The shared client gives up after 5 seconds, so this call waits on its own.
+        using var http = new HttpClient { BaseAddress = api.Http.BaseAddress, Timeout = TimeSpan.FromSeconds(30) };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/account/sessions/id-token")
+        {
+            Content = System.Net.Http.Json.JsonContent.Create(new { provider = "google", idToken = google.IdToken, nonce = Nonce }),
+        };
+        request.Headers.Add("X-Orvano-Project", AuthApi.Project);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        using var slow = await http.SendAsync(request, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, slow.StatusCode);
+        using var problem = JsonDocument.Parse(await slow.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("provider_unavailable", problem.RootElement.GetProperty("code").GetString());
+        Assert.InRange(clock.Elapsed, TimeSpan.FromSeconds(9), TimeSpan.FromSeconds(16));
+        Assert.Equal(0L, await Count(api, "SELECT count(*) FROM orvano.auth_users WHERE email = 'slow@x.com'"));
+    }
+
     /// <summary>A user whose only way in is a Google identity, with an unverified email unless <paramref name="emailVerified"/>.</summary>
     private static Task<Reply> OAuthOnlyUserAsync(AuthApi api, string sub, bool emailVerified) =>
         OAuthDriver.SignInAsync(api, "google", new { sub, email = $"{sub}@x.com", emailVerified });

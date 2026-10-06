@@ -361,6 +361,40 @@ public class OAuthTests(PostgresFixture postgres)
         Assert.NotNull(limited.Headers.RetryAfter);
     }
 
+    [Fact]
+    public async Task The_301st_start_and_the_301st_callback_from_one_ip_get_429_with_retry_after()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, oauth: true);
+        var (_, challenge) = OAuthDriver.Pkce();
+
+        for (var i = 0; i < 300; i++)
+        {
+            using var started = await api.SendAsync(HttpMethod.Post, "/v1/account/oauth/flows", new { provider = "github", redirectUrl = OAuthDriver.Redirect, codeChallenge = challenge });
+            Assert.Equal(HttpStatusCode.OK, started.Status);
+        }
+
+        using var limited = await api.SendAsync(HttpMethod.Post, "/v1/account/oauth/flows", new { provider = "github", redirectUrl = OAuthDriver.Redirect, codeChallenge = challenge });
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.Status);
+        Assert.Equal("rate_limited", limited.Code);
+        Assert.InRange(limited.Headers.RetryAfter!.Delta!.Value.TotalSeconds, 1, 15 * 60);
+
+        // The callback has its own limit; over it, the static page says 429 and when to come back.
+        using var http = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false }) { BaseAddress = api.Http.BaseAddress };
+        var callback = $"/v1/projects/{AuthApi.Project}/oauth/github/callback?state=unknown&code=x";
+        for (var i = 0; i < 300; i++)
+        {
+            using var page = await http.GetAsync(callback, Ct);
+            Assert.Equal(HttpStatusCode.BadRequest, page.StatusCode);
+        }
+
+        using var over = await http.GetAsync(callback, Ct);
+        Assert.Equal(HttpStatusCode.TooManyRequests, over.StatusCode);
+        Assert.Null(over.Headers.Location);
+        Assert.InRange(over.Headers.RetryAfter!.Delta!.Value.TotalSeconds, 1, 15 * 60);
+        Assert.Equal("default-src 'none'; style-src 'unsafe-inline'", over.Headers.GetValues("Content-Security-Policy").Single());
+        Assert.Contains("Go back to the app", await over.Content.ReadAsStringAsync(Ct), StringComparison.Ordinal);
+    }
+
     private static Task<long> Count(AuthApi api, string sql) => TestDatabase.ScalarAsync<long>(api.Database.Superuser, sql);
 
     private static async Task<string[]> Strings(AuthApi api, string sql)

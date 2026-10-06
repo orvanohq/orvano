@@ -34,6 +34,11 @@ internal sealed class FakeOAuthProvider(TestOAuthProvider setting, TimeProvider 
 
     public const string KeyId = "orvano-test-oauth-1";
 
+    // Set by POST /v1/test/oauth/keys/hang: every discovery document after it points at a key set that hangs, so a
+    // test can prove a slow key fetch gives provider_unavailable (spec 0012, critical test scenarios). Keys are cached
+    // per process, so it takes effect for a provider whose keys this process hasn't fetched yet.
+    private volatile bool hangKeys;
+
     // A fixed RSA key for the Test environment only; it signs nothing anywhere else.
     private const string PrivateKeyPem =
         """
@@ -111,6 +116,11 @@ internal sealed class FakeOAuthProvider(TestOAuthProvider setting, TimeProvider 
         fake.MapGet("/github/api/user", (HttpContext http, CancellationToken ct) => GitHubAsync(http, emails: false)).OutsideContract();
         fake.MapGet("/github/api/user/emails", (HttpContext http, CancellationToken ct) => GitHubAsync(http, emails: true)).OutsideContract();
         fake.MapPost("/apple/revoke", (HttpContext http, CancellationToken ct) => RevokeAsync(http)).OutsideContract();
+        fake.MapPost("/keys/hang", () =>
+        {
+            hangKeys = true;
+            return Results.NoContent();
+        }).OutsideContract();
     }
 
     /// <summary>
@@ -207,7 +217,7 @@ internal sealed class FakeOAuthProvider(TestOAuthProvider setting, TimeProvider 
             ["issuer"] = issuer,
             ["authorization_endpoint"] = $"{path}/authorize",
             ["token_endpoint"] = $"{path}/token",
-            ["jwks_uri"] = $"{path}/jwks",
+            ["jwks_uri"] = hangKeys ? $"{path}/jwks?hang=1" : $"{path}/jwks",
             ["id_token_signing_alg_values_supported"] = new JsonArray("RS256"),
         });
     }

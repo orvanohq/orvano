@@ -66,3 +66,7 @@ const result = await orvano.client.signInWithIdToken({ provider: 'google', idTok
 ```
 
 [`account.createIdTokenSession`](/docs/api/operations/accountcreateidtokensession/) finds or creates the user by the same rules as [redirect sign in](/docs/auth/sign-in-with-google/#who-the-user-is). Each token works once. A token for another app, with the wrong nonce, expired, or used before gets [`invalid_id_token`](/errors/invalid_id_token/); a provider that is off gets [`provider_not_enabled`](/errors/provider_not_enabled/), and one without its native settings [`provider_not_configured`](/errors/provider_not_configured/).
+
+## Limits
+
+A token that fails counts toward the limit of 60 failed redemptions per IP in 15 minutes; past it, even a valid token gets [`rate_limited`](/errors/rate_limited/) until the window passes. See [Limits](/docs/auth/sign-in-with-google/#limits).
