@@ -32,3 +32,19 @@ The shared scenarios run against a fake provider (AC-27), so they can't prove th
 | Date | Orvano version | Who | Deviations |
 |---|---|---|---|
 | 2026-10-04 to 05 | 0.2.0 (`38eede6`), on the Netcup test server | Ateyib, with Claude | All 14 pass, on the Next.js quickstart's `/providers` page and the Flutter quickstart's `lib/main_providers.dart` (iPhone 15 on iOS 26, an Android 15 emulator, macOS). (1) Check 12: unlinking the last provider of a user with a verified email is allowed, as AC-14 says; the refusal applies only to a user with no verified email (seen on the local stack). (2) Check 4: a personal Microsoft account signed in as a Gmail address never has `xms_edov` true, so it gets no email even with the claim on; an `onmicrosoft.com` account got a verified email with the claim and none without it. The Microsoft docs page now says so. (3) Check 2: Apple's Hide My Email gave an `@icloud.com` address, not `@privaterelay.appleid.com`. (4) Check 8: `google_sign_in` passes the nonce on Android (Credential Manager), so index.md's follow up is moot; it needs a current Google Play services (22.26 fails with `providerConfigurationError`). (5) Check 9: on Chrome 124 `flutter_web_auth_2` falls back to a Custom Tab that stays open after the redirect (the sign in still completes); Chrome 154 uses Auth Tab and returns cleanly. (6) Check 11: Apple's revoke answered 200 and the app left the Apple ID's Sign in with Apple list. |
+
+# Verify: hardening and docs slice · spec 0012 · updated 2026-10-06
+_Steps derived from spec 0012 AC-17 to AC-19 and AC-28. `/check verify` runs these; `/test` locks the durable ones._
+
+## Commands
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "Orvano.Server.Tests.Auth.OAuthTests"` → the 301st start gets 429 `rate_limited` with `Retry-After`; the 301st callback gets the static page with 429 and `Retry-After`; the 61st failed redemption refuses even a valid code → AC-17
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "Orvano.Server.Tests.Auth.OAuthIdentityTests"` → a provider ready only one way gets 409 `provider_not_configured` the other way; a redirect and a native first sign in for one new email give one user with two identities; a key set that hangs gives 503 `provider_unavailable` in 9 to 16 seconds → AC-1, AC-9, AC-10
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "Orvano.Server.Tests.Auth.OAuthLeakTests"` → no state, nonce, verifier, code, token, secret, key, or email in logs, events, jobs, or problems; the four tables hold only hashes and ciphertext → AC-18, AC-19
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "Orvano.Server.Tests.Auth.OAuthJobsTests"` → retention deletes expired flows and used tokens past one batch of 1,000 and keeps live ones → AC-19
+- [ ] `ORVANO_SITE_ENV=preview pnpm --filter @orvano/website build` → builds with no broken links; the four provider pages, native sign in, and linking pages exist, each provider and the native page has a Limits section, and every new error code has a fix page → AC-28
+
+## UI / manual
+- [ ] Open the built Google page's Limits section → it lists 300 starts, 300 callbacks, and 60 failed redemptions per IP in 15 minutes, and the 429 page → AC-17, AC-28
+
+## Acceptance-criteria coverage
+- AC-17 by commands 1 and 2 and the manual step · AC-18 by command 3 · AC-19 by commands 3 and 4 · AC-28 by command 5 and the manual step
