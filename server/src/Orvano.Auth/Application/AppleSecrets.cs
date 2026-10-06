@@ -45,9 +45,16 @@ internal sealed class AppleSecrets(TimeProvider clock)
             Claims = new Dictionary<string, object> { [JwtRegisteredClaimNames.Sub] = clientId },
             SigningCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.EcdsaSha256),
         });
+        // Drop what no longer serves: this key's older settings, and anything past the reuse window.
+        foreach (var old in _cache.Where(e => now - e.Value.MadeAt >= AuthTimings.AppleClientSecretCache
+                     || (e.Key.ProjectId == apple.ProjectId && e.Key.ClientId == clientId && e.Key.UpdatedAt < updatedAt)).Select(e => e.Key))
+            _cache.TryRemove(old, out _);
         _cache[key] = (jwt, now);
         return jwt;
     }
+
+    /// <summary>How many secrets are cached; for tests.</summary>
+    internal int CachedCount => _cache.Count;
 
     /// <summary>Forgets every secret made for the project, after its Apple settings changed or went.</summary>
     public void Evict(string projectId)

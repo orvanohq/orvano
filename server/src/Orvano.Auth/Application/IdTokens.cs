@@ -43,13 +43,15 @@ internal sealed class ProviderKeys(IHttpClientFactory httpFactory, ProviderCatal
             }
         }
 
-        return [.. entry.Config!.SigningKeys];
+        // Nothing cached and the last try failed moments ago: fail fast instead of fetching again.
+        if (entry.Config is not { } config) throw new ProviderCallException(ProviderFailure.Unavailable, "The provider's discovery document or keys could not be read");
+        return [.. config.SigningKeys];
     }
 
     private bool NeedsFetch(Entry entry, string? kid)
     {
-        if (entry.Config is not { } config) return true;
         var now = clock.GetUtcNow();
+        if (entry.Config is not { } config) return now - entry.LastAttempt >= AuthTimings.ProviderKeysRetry;
         var expired = now - entry.FetchedAt >= AuthTimings.ProviderKeysCache && now - entry.LastAttempt >= AuthTimings.ProviderKeysRefresh;
         return expired || UnknownKidMayFetch(entry, config, kid, now);
     }
@@ -73,6 +75,8 @@ internal sealed class ProviderKeys(IHttpClientFactory httpFactory, ProviderCatal
             var failure = OAuthHttp.IsUnavailable(ex) ? ProviderFailure.Unavailable : ProviderFailure.Error;
             if (entry.Config is null)
                 throw new ProviderCallException(failure, "The provider's discovery document or keys could not be read");
+            // A failed fetch for an unknown kid must not block the retry for the full window: try again soon.
+            if (entry.LastKidFetch == now) entry.LastKidFetch = now - (AuthTimings.ProviderKeysRefresh - AuthTimings.ProviderKeysRetry);
             logger.LogWarning("The keys at {Discovery} could not be fetched again ({Failure}); the cached keys stay in use", discovery, failure);
         }
     }
@@ -84,13 +88,31 @@ internal sealed class ProviderKeys(IHttpClientFactory httpFactory, ProviderCatal
 
         public OpenIdConnectConfiguration? Config { get; set; }
 
-        public DateTimeOffset FetchedAt { get; set; }
+        // Ticks behind volatile reads and writes: a DateTimeOffset is 16 bytes and could tear between a reader
+        // outside the lock and the writer inside it.
+        private long _fetchedAt;
+        private long _lastAttempt;
+        private long _lastKidFetch;
 
-        /// <summary>When any fetch last started; a failing refresh of expired keys waits 5 minutes between tries.</summary>
-        public DateTimeOffset LastAttempt { get; set; } = DateTimeOffset.MinValue;
+        public DateTimeOffset FetchedAt
+        {
+            get => new(Volatile.Read(ref _fetchedAt), TimeSpan.Zero);
+            set => Volatile.Write(ref _fetchedAt, value.UtcTicks);
+        }
+
+        /// <summary>When any fetch last started; a failing refresh of expired keys waits 5 minutes between tries, a failing first fetch 30 seconds.</summary>
+        public DateTimeOffset LastAttempt
+        {
+            get => new(Volatile.Read(ref _lastAttempt), TimeSpan.Zero);
+            set => Volatile.Write(ref _lastAttempt, value.UtcTicks);
+        }
 
         /// <summary>When a fetch for an unknown <c>kid</c> last started; the first one never waits.</summary>
-        public DateTimeOffset LastKidFetch { get; set; } = DateTimeOffset.MinValue;
+        public DateTimeOffset LastKidFetch
+        {
+            get => new(Volatile.Read(ref _lastKidFetch), TimeSpan.Zero);
+            set => Volatile.Write(ref _lastKidFetch, value.UtcTicks);
+        }
     }
 }
 

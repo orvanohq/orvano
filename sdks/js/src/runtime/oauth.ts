@@ -131,19 +131,27 @@ export const directOAuth: OAuthTransport = {
     return (await client.redeemLink(final, request)) as OAuthSignInResult | IdentityLinkResult
   },
   async redeem(type, code, client, options) {
-    const codeVerifier = takeVerifier(client)
+    const codeVerifier = peekVerifier(client)
     if (codeVerifier === null)
       throw new TypeError(
         'Orvano: no PKCE verifier is stored for this flow; start it again with signInWithOAuth.',
       )
     const account = new AccountService(client)
-    if (type === 'oauth') {
-      const result = await account.createOAuthSession({ code, codeVerifier }, options)
-      return { type, user: result.user, isNewUser: result.isNewUser }
+    try {
+      if (type === 'oauth') {
+        const result = await account.createOAuthSession({ code, codeVerifier }, options)
+        takeVerifier(client)
+        return { type, user: result.user, isNewUser: result.isNewUser }
+      }
+      const identity = await account.completeOAuthLink({ code, codeVerifier }, options)
+      takeVerifier(client)
+      await client.reloadSession('userUpdated')
+      return { type, identity }
+    } catch (error) {
+      // Orvano answered, so the code is spent or refused for good; a network error keeps the verifier for a retry.
+      if (error instanceof OrvanoError) takeVerifier(client)
+      throw error
     }
-    const identity = await account.completeOAuthLink({ code, codeVerifier }, options)
-    await client.reloadSession('userUpdated')
-    return { type, identity }
   },
 }
 
@@ -280,6 +288,13 @@ function saveVerifier(client: Client, verifier: string): void {
   const storage = browserStorage()
   if (storage === undefined) memoryVerifiers.set(client, verifier)
   else storage.setItem(verifierStorageKey(client.project), verifier)
+}
+
+function peekVerifier(client: Client): string | null {
+  const storage = browserStorage()
+  return storage === undefined
+    ? (memoryVerifiers.get(client) ?? null)
+    : storage.getItem(verifierStorageKey(client.project))
 }
 
 function takeVerifier(client: Client): string | null {

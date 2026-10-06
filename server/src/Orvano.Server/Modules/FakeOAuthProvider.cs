@@ -137,6 +137,10 @@ internal sealed class FakeOAuthProvider(TestOAuthProvider setting, TimeProvider 
         string? redirectUri = q["redirect_uri"], state = q["state"], clientId = q["client_id"];
         if (redirectUri is null || state is null || clientId is null || q["response_type"] != "code")
             return Results.Text("The fake provider needs response_type=code, client_id, redirect_uri, and state.", statusCode: 400);
+        // Test only: it sends the browser to the redirect_uri it was given, so it takes only an absolute http or https one.
+        // Never copy this endpoint into a real provider adapter; a real provider checks the URI against registered ones.
+        if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out var target) || target.Scheme is not ("http" or "https"))
+            return Results.Text("The fake provider needs an absolute http or https redirect_uri.", statusCode: 400);
         if (q["code_challenge_method"] != "S256" || string.IsNullOrEmpty(q["code_challenge"]))
             return Results.Text("The fake provider needs an S256 code_challenge.", statusCode: 400);
         if (provider != "github" && string.IsNullOrEmpty(q["nonce"])) return Results.Text("The fake provider needs a nonce.", statusCode: 400);

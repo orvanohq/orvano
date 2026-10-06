@@ -96,6 +96,12 @@ internal sealed class RecoveryService(
                 return Failure.InvalidEmailToken;
             if (user.Status != UserStatuses.Active) return Failure.UserBlocked;
 
+            // The inbox owner just proved the email, so an unverified account's linked identities go (spec 0012, AC-12):
+            // a link planted by whoever pre registered the email must not outlive this. The new password replaces the old.
+            Guid[] claimed = user.EmailVerifiedAt is null
+                ? (await AccountClaims.ClaimAsync(uow, sessions, projectId, user, Actor.User(userId), endSessions: false, token, removePassword: false)).EndedSessions
+                : [];
+
             await using (var set = new NpgsqlCommand(
                 """
                 INSERT INTO orvano.auth_passwords (user_id, project_id, hash) VALUES (@user, @project, @hash)
@@ -121,7 +127,7 @@ internal sealed class RecoveryService(
             }
 
             var grant = await sessions.CreateAsync(uow, projectId, userId, client, actor, SessionMethod.Recovery, token);
-            return (userId, grant, ended.ToArray());
+            return (userId, grant, [.. ended, .. claimed]);
         }, ct);
 
         if (!outcome.Succeeded) return outcome.Failure!;

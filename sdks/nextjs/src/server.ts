@@ -280,25 +280,37 @@ interface OAuthCookie {
   t: 'oauth' | 'oauth_link'
 }
 
-/** A path in the app: one leading `/`, never `//` or `/\`, which a browser reads as another host. */
+/**
+ * A path in the app: one leading `/`, no control characters or backslashes (a browser strips tabs and newlines and
+ * reads `\` as `/`, so `/\t/evil.com` is another host), and it must stay on the same origin once parsed.
+ */
 export function safeNext(next: unknown): string {
-  return typeof next === 'string' &&
-    next.startsWith('/') &&
-    !next.startsWith('//') &&
-    !next.startsWith('/\\')
-    ? next
-    : '/'
+  if (typeof next !== 'string' || !next.startsWith('/') || next.startsWith('//')) return '/'
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f\\]/.test(next)) return '/'
+  try {
+    const base = 'http://orvano.invalid'
+    const parsed = new URL(next, base)
+    return parsed.origin === base ? parsed.pathname + parsed.search + parsed.hash : '/'
+  } catch {
+    return '/'
+  }
 }
 
 function encodeCookie(value: OAuthCookie): string {
-  return btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  // UTF-8 first: btoa throws on any character above U+00FF, such as a `next` of `/日本`.
+  let binary = ''
+  for (const byte of new TextEncoder().encode(JSON.stringify(value)))
+    binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 function decodeCookie(value: string | undefined): OAuthCookie | null {
   if (value === undefined || value === '') return null
   try {
+    const binary = atob(value.replace(/-/g, '+').replace(/_/g, '/'))
     const parsed = JSON.parse(
-      atob(value.replace(/-/g, '+').replace(/_/g, '/')),
+      new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0))),
     ) as Partial<OAuthCookie>
     return typeof parsed.v === 'string' &&
       typeof parsed.n === 'string' &&

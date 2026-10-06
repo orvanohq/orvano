@@ -22,7 +22,8 @@ internal sealed class IdentityService(
     SignInResolution resolution,
     Sessions sessions,
     SigningKeys keys,
-    OAuthService oauth)
+    OAuthService oauth,
+    OAuthRedemptions redemptions)
 {
     public const int MaxIdTokenBytes = 8 * 1024;
     public const int MaxAuthorizationCode = 2048;
@@ -41,7 +42,7 @@ internal sealed class IdentityService(
         var native = check.Value!;
         await keys.GetActiveAsync(projectId, ct);
 
-        var outcome = await oauth.WriteRetryingAsync<OAuthRedeemed>(async (uow, token) =>
+        var outcome = await redemptions.WriteRetryingAsync<OAuthRedeemed>(async (uow, token) =>
         {
             if (!await UseAsync(uow, projectId, native, token)) return Failure.InvalidIdToken;
             var name = native.Provider == OAuthProvider.Apple ? request.Name : null;
@@ -51,16 +52,18 @@ internal sealed class IdentityService(
                 SessionMethod.IdToken, token, OAuthProviders.Wire(native.Provider));
             return new OAuthRedeemed(resolved.Value, grant);
         }, ct);
-        return await oauth.FinishAsync(projectId, outcome, ct);
+        return await redemptions.FinishAsync(projectId, outcome, ct);
     }
 
     /// <summary><c>account.createOAuthLinkFlow</c> (AC-13): a fresh session and no identity of the provider yet, then AC-4's start.</summary>
     public async Task<Outcome<string>> StartLinkAsync(
         string projectId, Guid userId, Guid sessionId, OAuthProvider? provider, string? redirectUrl, string? codeChallenge, string ipKey, CancellationToken ct)
     {
+        // AC-4's start limit comes before the two reads below.
+        if (oauth.TakeStartLimit(ipKey) is { } limited) return limited;
         if (!await IsFreshAsync(userId, sessionId, ct)) return Failure.ReauthenticationRequired;
         if (provider is { } chosen && await HasProviderAsync(userId, chosen, ct)) return Failure.ProviderAlreadyLinked;
-        return await oauth.StartAsync(projectId, provider, redirectUrl, codeChallenge, ipKey, ct, linkUserId: userId);
+        return await oauth.StartAsync(projectId, provider, redirectUrl, codeChallenge, ipKey, ct, linkUserId: userId, limitTaken: true);
     }
 
     /// <summary>
@@ -72,7 +75,7 @@ internal sealed class IdentityService(
         if (!HandoffCode.TryParse(codeValue, out var code) || !Pkce.IsVerifier(verifier))
             return Failure.Invalid("Send the orvano_code parameter as code, and the flow's PKCE verifier as codeVerifier.");
 
-        return await oauth.WriteRetryingAsync<IdentityRow>(async (uow, token) =>
+        return await redemptions.WriteRetryingAsync<IdentityRow>(async (uow, token) =>
             await oauth.ConsumeAsync(uow, projectId, code, FlowPurpose.Link, verifier!, userId, token) is { } consumed
                 ? await LinkAsync(uow, projectId, userId, consumed.Provider, consumed.Result, token)
                 : Failure.InvalidOAuthCode, ct);
@@ -85,10 +88,12 @@ internal sealed class IdentityService(
         var check = await CheckAsync(projectId, request, ct);
         if (!check.Succeeded) return check.Failure!;
         var native = check.Value!;
+        // Apple sends the name once, with the first authorization, so a native link keeps what the request carries.
+        var result = native.Provider == OAuthProvider.Apple && native.Result.Name is null ? native.Result with { Name = request.Name } : native.Result;
 
-        return await oauth.WriteRetryingAsync<IdentityRow>(async (uow, token) =>
+        return await redemptions.WriteRetryingAsync<IdentityRow>(async (uow, token) =>
             await UseAsync(uow, projectId, native, token)
-                ? await LinkAsync(uow, projectId, userId, native.Provider, native.Result, token)
+                ? await LinkAsync(uow, projectId, userId, native.Provider, result, token)
                 : Failure.InvalidIdToken, ct);
     }
 

@@ -8,7 +8,7 @@ namespace Orvano.Auth.Application;
 /// Email verification (spec 0010, AC-12, AC-13): the signed in user asks for a link, and anyone holding the link
 /// verifies the email. Verification is data the app reads, never a gate the API enforces.
 /// </summary>
-internal sealed class VerificationService(AuthStore store, AuthMailer mailer)
+internal sealed class VerificationService(AuthStore store, AuthMailer mailer, Sessions sessions, SessionChecks checks)
 {
     /// <summary>
     /// <c>account.createVerification</c> (AC-12): 409 <c>email_already_verified</c> for a verified user, then the two
@@ -42,7 +42,8 @@ internal sealed class VerificationService(AuthStore store, AuthMailer mailer)
     {
         if (!LinkToken.TryParse(tokenValue, out var link)) return Failure.InvalidEmailToken;
 
-        return await store.WriteAsync<Data.UserRow>(async (uow, token) =>
+        Guid[] ended = [];
+        var outcome = await store.WriteAsync<Data.UserRow>(async (uow, token) =>
         {
             if (await EmailTokens.ConsumeLinkAsync(uow, projectId, EmailTokenKind.Verification, link, token) is not { Expired: false, UserId: { } userId } consumed)
                 return Failure.InvalidEmailToken;
@@ -51,6 +52,9 @@ internal sealed class VerificationService(AuthStore store, AuthMailer mailer)
 
             if (user.EmailVerifiedAt is null)
             {
+                // The link went to the inbox owner, so identities linked before this proof go and the sessions end
+                // with them (spec 0012, AC-12). The password stays: the link does not say who chose it.
+                ended = (await AccountClaims.ClaimAsync(uow, sessions, projectId, user, Actor.User(userId), endSessions: false, token, removePassword: false)).EndedSessions;
                 await MarkVerifiedAsync(uow, userId, token);
                 await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserUpdated, projectId, Actor.User(userId), userId.ToString(),
                     new Dictionary<string, string> { ["userId"] = userId.ToString() }, ["emailVerified"], ct: token);
@@ -58,6 +62,9 @@ internal sealed class VerificationService(AuthStore store, AuthMailer mailer)
 
             return await uow.Db.Users.AsNoTracking().SingleAsync(u => u.Id == userId, token);
         }, ct);
+
+        if (outcome.Succeeded) foreach (var id in ended) await checks.EvictAsync(id, ct);
+        return outcome;
     }
 
     /// <summary>Sets <c>email_verified_at = now()</c> when it is null.</summary>

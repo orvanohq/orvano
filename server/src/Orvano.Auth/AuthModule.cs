@@ -60,6 +60,7 @@ internal sealed class AuthModule : IOrvanoModule
         services.AddSingleton<ProviderExchange>();
         services.AddSingleton<Identities>();
         services.AddSingleton<SignInResolution>();
+        services.AddSingleton<OAuthRedemptions>();
         services.AddSingleton<OAuthService>();
         services.AddSingleton<IdentityService>();
     }

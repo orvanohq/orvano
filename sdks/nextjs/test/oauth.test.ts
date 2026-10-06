@@ -127,6 +127,28 @@ describe('createOrvanoRouteHandler oauth (spec 0012, AC-21)', () => {
     expect(cookie.toLowerCase()).toContain('samesite=lax')
   })
 
+  it('starts and finishes a flow whose next has non Latin 1 characters', async () => {
+    const start = handler(flows)
+    const started = await start.POST(
+      post('/api/orvano/oauth', { provider: 'google', next: '/日本/dashboard' }),
+    )
+    expect(started.status).toBe(200)
+    const { GET } = handler({
+      '/v1/account/sessions/oauth': () =>
+        Response.json(
+          { user, session, isNewUser: false, verificationEmail: null },
+          { status: 201 },
+        ),
+    })
+    const response = await GET(
+      get('/api/orvano/oauth-callback?orvano_type=oauth&orvano_code=orv_oc_x', {
+        [oauthCookie]: oauthValue(started),
+      }),
+    )
+    expect(response.status).toBe(303)
+    expect(new URL(response.headers.get('location') ?? '').origin).toBe(app)
+  })
+
   it('refuses an unknown provider', async () => {
     const { POST } = handler(flows)
     const response = await POST(post('/api/orvano/oauth', { provider: 'yahoo' }))
@@ -233,5 +255,15 @@ describe('createOrvanoRouteHandler oauth (spec 0012, AC-21)', () => {
     expect(safeNext('/\\evil.example')).toBe('/')
     expect(safeNext('https://evil.example')).toBe('/')
     expect(safeNext(undefined)).toBe('/')
+    for (const hostile of [
+      '/\t/evil.example',
+      '/\n/evil.example',
+      '/\r/evil.example',
+      '/%09/evil.example',
+    ]) {
+      const target = new URL(safeNext(hostile), app)
+      expect(target.origin).toBe(app)
+    }
+    expect(safeNext('/\t/evil.example')).toBe('/')
   })
 })

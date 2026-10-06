@@ -309,16 +309,16 @@ export function ProviderDialog({
             }}
           </form.Field>
           <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium" id={`${id}-callback-label`}>
+            <label className="text-sm font-medium" htmlFor={`${id}-callback`}>
               Callback URL
-            </span>
+            </label>
             <div className="flex items-center gap-2">
-              <code
-                aria-labelledby={`${id}-callback-label`}
-                className="min-w-0 flex-1 break-all rounded-md border bg-muted px-2 py-1.5 text-xs"
-              >
-                {settings.callbackUrl}
-              </code>
+              <input
+                className="min-w-0 flex-1 rounded-md border bg-muted px-2 py-1.5 font-mono text-xs"
+                id={`${id}-callback`}
+                readOnly
+                value={settings.callbackUrl}
+              />
               <CopyButton value={settings.callbackUrl} label="Copy callback URL" />
             </div>
             <p className="text-small text-muted-foreground">

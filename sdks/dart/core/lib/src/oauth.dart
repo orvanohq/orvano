@@ -184,25 +184,33 @@ extension OAuthSignIn on Client {
         'signInWithOAuth.',
       );
     }
-    _verifiers[this] = null;
     final account = AccountService(this);
-    switch (type) {
-      case OAuthLinkType.oauth:
-        final result = await account.createOAuthSession(
-          CreateOAuthSessionRequest(code: code, codeVerifier: verifier),
-          options: options,
-        );
-        return OAuthSignInResult(
-          user: result.user,
-          isNewUser: result.isNewUser,
-        );
-      case OAuthLinkType.oauthLink:
-        final identity = await account.completeOAuthLink(
-          CompleteOAuthLinkRequest(code: code, codeVerifier: verifier),
-          options: options,
-        );
-        await reloadSession(AuthEvent.userUpdated);
-        return IdentityLinkResult(identity: identity);
+    try {
+      switch (type) {
+        case OAuthLinkType.oauth:
+          final result = await account.createOAuthSession(
+            CreateOAuthSessionRequest(code: code, codeVerifier: verifier),
+            options: options,
+          );
+          _verifiers[this] = null;
+          return OAuthSignInResult(
+            user: result.user,
+            isNewUser: result.isNewUser,
+          );
+        case OAuthLinkType.oauthLink:
+          final identity = await account.completeOAuthLink(
+            CompleteOAuthLinkRequest(code: code, codeVerifier: verifier),
+            options: options,
+          );
+          _verifiers[this] = null;
+          await reloadSession(AuthEvent.userUpdated);
+          return IdentityLinkResult(identity: identity);
+      }
+    } on OrvanoException {
+      // Orvano answered, so the code is spent or refused for good; a network
+      // error keeps the verifier so the same redirect can be tried again.
+      _verifiers[this] = null;
+      rethrow;
     }
   }
 

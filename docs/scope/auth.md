@@ -58,7 +58,7 @@ Sign in with Google, Apple, GitHub, and Microsoft through a browser redirect, pl
    - [ ] Hardening and docs: events, limits, retention, the leak scan, docs pages and fix pages, then the real provider checks in verify.md (AC-17 to 19, 28)
 - [x] Verify it: `/check verify OAuth & ID token sign in`
 - [x] Test it: `/test OAuth & ID token sign in`
-- [ ] Review it (fresh model): `/check review OAuth & ID token sign in`
+- [x] Review it (fresh model): `/check review OAuth & ID token sign in`
 - [ ] Document it: `/document OAuth & ID token sign in`
 Spec [0012](../specs/0012-oauth-id-token-sign-in/index.md) · code in `server/src/Orvano.Auth/`, `contract/auth/`, `sdks/`, `console/`, `tests/scenarios/`, `website/`
 
