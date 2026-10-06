@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -10,50 +11,86 @@ using Orvano.Auth.Domain;
 namespace Orvano.Auth.Application;
 
 /// <summary>
-/// Each provider's discovery document and signing keys (spec 0012, AC-8): one <see cref="ConfigurationManager{T}"/>
-/// per discovery URL, shared across projects, fetched through the <c>oauth</c> client, cached 12 hours, and fetched
-/// again at most once per 5 minutes for an unknown <c>kid</c>.
+/// Each provider's discovery document and signing keys (spec 0012, AC-8): one cached set per discovery URL, shared
+/// across projects, fetched through the <c>oauth</c> client, kept 12 hours, and fetched again at most once per 5
+/// minutes for an unknown <c>kid</c>. Every fetch finishes before the keys are used, so a token signed with a key the
+/// provider just published passes on its first try. (IdentityModel's <c>ConfigurationManager</c> refreshes in the
+/// background once it holds a configuration, so that token was refused.)
 /// </summary>
-internal sealed class ProviderKeys(IHttpClientFactory httpFactory, ProviderCatalog catalog)
+internal sealed class ProviderKeys(IHttpClientFactory httpFactory, ProviderCatalog catalog, TimeProvider clock, ILogger<ProviderKeys> logger)
 {
-    private readonly ConcurrentDictionary<Uri, ConfigurationManager<OpenIdConnectConfiguration>> _managers = new();
+    private readonly ConcurrentDictionary<Uri, Entry> _entries = new();
 
     /// <summary>
-    /// The provider's keys for <paramref name="kid"/>: the cached set, or a fresh one when the cache lacks the
-    /// <c>kid</c> and the last fetch is old enough. Throws <see cref="ProviderCallException"/> when they can't be read.
+    /// The provider's keys for <paramref name="kid"/>: the cached set, or a fresh one when the cache is empty, older than
+    /// 12 hours, or lacks the <c>kid</c> (at most once per 5 minutes). A failed fetch keeps the cached set. Throws
+    /// <see cref="ProviderCallException"/> when there is no set yet and it can't be read.
     /// </summary>
     public async Task<IReadOnlyList<SecurityKey>> GetAsync(Uri discovery, string? kid, CancellationToken ct)
     {
-        var manager = _managers.GetOrAdd(discovery, Create);
-        var config = await ReadAsync(manager, ct);
-        if (kid is not null && !config.SigningKeys.Any(k => k.KeyId == kid))
+        var entry = _entries.GetOrAdd(discovery, _ => new Entry());
+        if (NeedsFetch(entry, kid))
         {
-            manager.RequestRefresh();
-            config = await ReadAsync(manager, ct);
+            await entry.Lock.WaitAsync(ct);
+            try
+            {
+                // Another caller may have fetched while this one waited.
+                if (NeedsFetch(entry, kid)) await FetchAsync(discovery, entry, kid, ct);
+            }
+            finally
+            {
+                entry.Lock.Release();
+            }
         }
 
-        return [.. config.SigningKeys];
+        return [.. entry.Config!.SigningKeys];
     }
 
-    private ConfigurationManager<OpenIdConnectConfiguration> Create(Uri discovery) =>
-        new(discovery.AbsoluteUri, new OpenIdConnectConfigurationRetriever(),
-            new HttpDocumentRetriever(httpFactory.CreateClient(OAuthHttp.ClientName)) { RequireHttps = !catalog.IsFake })
-        {
-            AutomaticRefreshInterval = AuthTimings.ProviderKeysCache,
-            RefreshInterval = AuthTimings.ProviderKeysRefresh,
-        };
-
-    private static async Task<OpenIdConnectConfiguration> ReadAsync(ConfigurationManager<OpenIdConnectConfiguration> manager, CancellationToken ct)
+    private bool NeedsFetch(Entry entry, string? kid)
     {
+        if (entry.Config is not { } config) return true;
+        var now = clock.GetUtcNow();
+        var expired = now - entry.FetchedAt >= AuthTimings.ProviderKeysCache && now - entry.LastAttempt >= AuthTimings.ProviderKeysRefresh;
+        return expired || UnknownKidMayFetch(entry, config, kid, now);
+    }
+
+    private static bool UnknownKidMayFetch(Entry entry, OpenIdConnectConfiguration config, string? kid, DateTimeOffset now) =>
+        kid is not null && !config.SigningKeys.Any(k => k.KeyId == kid) && now - entry.LastKidFetch >= AuthTimings.ProviderKeysRefresh;
+
+    private async Task FetchAsync(Uri discovery, Entry entry, string? kid, CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        if (entry.Config is { } current && UnknownKidMayFetch(entry, current, kid, now)) entry.LastKidFetch = now;
+        entry.LastAttempt = now;
         try
         {
-            return await manager.GetConfigurationAsync(ct);
+            var retriever = new HttpDocumentRetriever(httpFactory.CreateClient(OAuthHttp.ClientName)) { RequireHttps = !catalog.IsFake };
+            entry.Config = await OpenIdConnectConfigurationRetriever.GetAsync(discovery.AbsoluteUri, retriever, ct);
+            entry.FetchedAt = now;
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
-            throw new ProviderCallException(
-                OAuthHttp.IsUnavailable(ex) ? ProviderFailure.Unavailable : ProviderFailure.Error, "The provider's discovery document or keys could not be read");
+            var failure = OAuthHttp.IsUnavailable(ex) ? ProviderFailure.Unavailable : ProviderFailure.Error;
+            if (entry.Config is null)
+                throw new ProviderCallException(failure, "The provider's discovery document or keys could not be read");
+            logger.LogWarning("The keys at {Discovery} could not be fetched again ({Failure}); the cached keys stay in use", discovery, failure);
         }
+    }
+
+    /// <summary>One discovery URL's keys; <see cref="Lock"/> lets one fetch run at a time.</summary>
+    private sealed class Entry
+    {
+        public SemaphoreSlim Lock { get; } = new(1, 1);
+
+        public OpenIdConnectConfiguration? Config { get; set; }
+
+        public DateTimeOffset FetchedAt { get; set; }
+
+        /// <summary>When any fetch last started; a failing refresh of expired keys waits 5 minutes between tries.</summary>
+        public DateTimeOffset LastAttempt { get; set; } = DateTimeOffset.MinValue;
+
+        /// <summary>When a fetch for an unknown <c>kid</c> last started; the first one never waits.</summary>
+        public DateTimeOffset LastKidFetch { get; set; } = DateTimeOffset.MinValue;
     }
 }
 
