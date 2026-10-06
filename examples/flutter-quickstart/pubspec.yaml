@@ -1,6 +1,6 @@
 # The finished app of the Orvano Flutter quickstart: https://orvano.dev/docs/quickstarts/flutter/
 name: flutter_quickstart
-description: Sign up, sign in, see your name and email, and sign out, with orvano_flutter.
+description: Sign up, sign in (with a password or a provider), see your name and email, and sign out, with orvano_flutter.
 publish_to: none
 version: 1.0.0+1
 
@@ -12,7 +12,10 @@ dependencies:
   flutter:
     sdk: flutter
   orvano_flutter: 0.2.0
-# #endregion dependencies
+  # #endregion dependencies
+  # Native Google and Apple sign in (https://orvano.dev/docs/auth/native-sign-in/).
+  google_sign_in: ^7.2.0
+  sign_in_with_apple: ^8.2.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0
