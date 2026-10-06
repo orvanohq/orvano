@@ -27,10 +27,12 @@ One list of scenarios every SDK surface runs against a real Orvano (spec 0001, A
 - Server clients send the fixture API key for the scenario project, read from `fixtures.yaml` (none in a browser, where setting a key throws). Dart runners build both clients with `Surface.connect`; Flutter passes its own client from `orvano_flutter`.
 - The console client is bound to one project, and steps have no per step project, so project scoped console operations (keys, platforms) are covered by the server's HTTP tests, not scenarios.
 - Email scenarios (`auth-recovery`, `auth-verification`, `auth-magic-link`, `auth-email-code`, `auth-email-change`, `auth-users-email`) read real mail: save the runner only `now` before a send and pass it to `test.getLatestEmail` as `after`, which reads Mailpit at `ORVANO_TEST_MAILPIT_URL` (spec 0010). The runner only operations (`redeemLink`, `now`, `verifyAccessToken`, ...) are listed in `README.md`.
+- OAuth scenarios (`auth-oauth*`, `auth-id-token`, `auth-identities*`, spec 0012) run against the server's fake provider: the runner operation `oauthSignIn` follows the provider's redirects over HTTP with no browser, and `test.createIdToken` mints native tokens.
 - Quote substitutions in YAML (`'${version}'`); a bare `{` starts a flow map.
 
 ## Gotchas
 
+- The `api` and the `worker` both need `ORVANO_TEST_OAUTH_PROVIDER_URL` (the `api`'s own `/v1/test/oauth`), as `compose.yml` sets it. A workflow that starts the server outside `compose.yml`, like the iOS job in `sdks-nightly.yml`, must set it too, or every OAuth scenario fails with "ORVANO_TEST_OAUTH_PROVIDER_URL is not set".
 - The send limits live in memory in the `api` process, so rerunning the email scenarios several times within an hour against one long running server can hit the recipient or IP limits. Restart the `api` container, or wait.
 - Run the Dart runner as `dart run bin/run.dart` inside `runners/dart`. `dart run orvano_scenarios:run` runs from a snapshot, so the scenario folder isn't found and it reports 0 passed.
 - After changing the contract or `TestingModule`, start the server with `--build`, or the old image answers.

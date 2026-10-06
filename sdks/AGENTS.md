@@ -24,6 +24,7 @@ The five public SDK surfaces (spec 0001). Each is a thin handwritten runtime plu
 | `dart/core/lib/src/client.dart`, `orvano_exception.dart` | The Dart `Client` and `OrvanoException` |
 | `dotnet/src/Orvano/OrvanoClient.cs`, `OrvanoRequest.cs`, `OrvanoException.cs` | The .NET client, request shape, and exception |
 | `js/src/runtime/auth.ts`, `api-key.ts`, `server-client.ts`; `dart/core/lib/src/auth.dart`, `dart/server/lib/src/client.dart`; `dotnet/src/Orvano/OrvanoHeaders.cs` | Auth providers, session stores, refresh, and the auth names (`Authorization: Bearer`, `X-Orvano-Key`) |
+| `js/src/runtime/oauth.ts`, `nextjs/src/server.ts` (`oauth`, `oauth-callback`); `dart/core/lib/src/oauth.dart`, `dart/flutter/lib/src/web_auth_launcher.dart` | Provider sign in (spec 0012): the PKCE verifier, `signInWithOAuth`, `linkIdentity`, ID token sign in, and the nonce helper; Next.js keeps the verifier in the `orvano_oauth` cookie, and Flutter's default launcher is `flutter_web_auth_2` |
 | `js/src/runtime/access-tokens.ts`, `dart/server/lib/src/access_tokens.dart`, `dotnet/src/Orvano/OrvanoAccessTokens.cs` | Server side access token verification against the project's JWKS, keys kept 10 minutes (spec 0004, AC-19) |
 | `nextjs/src/index.ts`, `nextjs/src/server.ts`; `dart/flutter/lib/src/secure_session_store.dart` | Cookie session stores and the Next.js middleware and route handler (whose `redeem` and `email-code` actions redeem emailed links and codes and set the cookies, spec 0010); the Flutter secure session store |
 | `js/src/runtime/links.ts`, `dart/core/lib/src/links.dart` | The email link helper (spec 0010): `readEmailLink`, plus `redeemLink` in JS and `handleLink` in Dart, which call the matching operation, store the session for `magic_link` and `recovery`, and refresh only when the `email_verified` claim is stale |
@@ -76,6 +77,7 @@ dotnet test --project sdks/dotnet/tests/Orvano.Tests     # net10.0 and net8.0 (t
 - [nextjs-authentication](../.claude/skills/nextjs-authentication/): `giuseppe-trisciuoglio/developer-kit`, cookie and middleware auth in Next.js; written for Auth.js, so spec 0004 wins (security scan: one alert, read it before relying on it)
 - [flutter-security](../.claude/skills/flutter-security/): `dhruvanbhalara/skills`, Flutter app security and secure token storage for `orvano_flutter`
 - [managing-secure-storage](../.claude/skills/managing-secure-storage/): `poorgramer-zack/dart-expert-skills`, `flutter_secure_storage` v10 specifics
+- [authentication](../.claude/skills/authentication/): `dpearson2699/swift-ios-skills`, Swift background on Sign in with Apple and `ASWebAuthenticationSession`, for the native Apple flow behind `orvano_flutter`
 
 ## Related specs
 

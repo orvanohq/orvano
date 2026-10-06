@@ -20,6 +20,7 @@ To run one the way CI does, copy it outside the repo and point it at this checko
 - No secrets in code: the endpoint, project ID, and server API key come from environment variables (`NEXT_PUBLIC_ORVANO_*`, `VITE_ORVANO_*`, `--dart-define`, `ORVANO_ENDPOINT`, `ORVANO_PROJECT`, `ORVANO_API_KEY`).
 - Fixed dev ports: Next.js 3000, Vite 5173, Flutter web 5050, Dart 3001, .NET 3002. The iOS bundle ID and Android package name are `dev.orvano.quickstart`, the same constant `website/scripts/screenshots.ts` registers.
 - A change to an example's steps updates its quickstart page and README in the same pull request.
+- Beyond the quickstart, `nextjs-quickstart/app/providers/` and `flutter-quickstart/lib/main_providers.dart` demo provider sign in and linking (spec 0012); spec 0012's `verify.md` runs its real provider checks on them.
 
 ## Related specs
 
