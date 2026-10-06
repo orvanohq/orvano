@@ -69,3 +69,7 @@ Apple sends back the user's name only the first time they sign in to your app, a
 ## When a user leaves
 
 Apple requires apps to revoke a user's Sign in with Apple when they delete their account. Orvano does it for you: deleting the user, unlinking Apple, or claiming the account queues a job that tells Apple, with a client secret made for the client ID the user signed in with. Deletion never waits for Apple, and the job retries while Apple is down.
+
+## Limits
+
+The same per IP limits apply as for Google; see [Limits](/docs/auth/sign-in-with-google/#limits).

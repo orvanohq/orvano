@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -73,7 +74,8 @@ internal static class OAuthEndpoints
 
     /// <summary>
     /// The callback's answer (AC-5): a redirect (302 after GET, 303 after POST), or the static page. Neither is cached
-    /// or sends a referrer; the page also forbids everything but its own inline style and asks not to be indexed.
+    /// or sends a referrer; the page also forbids everything but its own inline style and asks not to be indexed, and
+    /// over the callback limit says when to try again.
     /// </summary>
     private static IResult Answer(HttpContext http, CallbackAnswer answer, int redirectStatus)
     {
@@ -88,6 +90,8 @@ internal static class OAuthEndpoints
             case CallbackAnswer.Page page:
                 headers[HeaderNames.ContentSecurityPolicy] = "default-src 'none'; style-src 'unsafe-inline'";
                 headers["X-Robots-Tag"] = "noindex";
+                if (page.RetryAfter is { } retryAfter)
+                    headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
                 return TypedResults.Content(PageHtml, "text/html; charset=utf-8", Encoding.UTF8, page.Status);
             default:
                 throw new ArgumentOutOfRangeException(nameof(answer), answer, null);

@@ -17,8 +17,11 @@ internal abstract record CallbackAnswer
     /// <summary>Back to the app's redirect URL, with <c>orvano_code</c> or <c>orvano_error</c>.</summary>
     public sealed record Redirect(string Url) : CallbackAnswer;
 
-    /// <summary>The static "go back to the app" page: 400 for a lost flow, 429 over the callback limit.</summary>
-    public sealed record Page(int Status) : CallbackAnswer;
+    /// <summary>
+    /// The static "go back to the app" page: 400 for a lost flow, 429 over the callback limit, which also says when to
+    /// try again (<paramref name="RetryAfter"/>, sent as <c>Retry-After</c>, AC-17).
+    /// </summary>
+    public sealed record Page(int Status, TimeSpan? RetryAfter = null) : CallbackAnswer;
 }
 
 /// <summary>A flow the callback claimed by its state.</summary>
@@ -132,7 +135,7 @@ internal sealed class OAuthService(
         string projectId, string? providerSegment, string? state, string? code, string? error, string? appleUser, string ipKey, CancellationToken ct)
     {
         var limit = limits.Acquire(RateLimitPolicies.OAuthCallbackPerIp, ipKey);
-        if (!limit.Allowed) return new CallbackAnswer.Page(429);
+        if (!limit.Allowed) return new CallbackAnswer.Page(429, limit.RetryAfter);
         if (!OAuthProviders.TryParse(providerSegment, out var provider) || string.IsNullOrEmpty(state) || state.Length > 512)
             return new CallbackAnswer.Page(400);
 
