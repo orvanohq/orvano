@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 
 import { IdentitiesTable } from '../-users/identities'
-import { SignInMethods } from '../-users/parts'
+import { SessionsTable, SignInMethods } from '../-users/parts'
 import { ProviderCard } from './provider-card'
 import { ProviderDialog } from './provider-dialog'
 
@@ -149,6 +149,125 @@ describe('IdentitiesTable', () => {
     await screen.getByRole('button', { name: 'Unlink GitHub' }).click()
     await screen.getByRole('alertdialog').getByRole('button', { name: 'Unlink' }).click()
     await expect.poll(() => onUnlink.mock.calls.length).toBe(1)
+    expect(onUnlink).toHaveBeenCalledWith(identity)
+  })
+
+  it('says None, Not verified, and Never for an identity with no email that was never used', async () => {
+    const screen = await render(
+      <main>
+        <IdentitiesTable
+          identities={[{ ...identity, provider: 'microsoft', email: null, emailVerified: false }]}
+          loading={false}
+          error={undefined}
+          onRetry={() => undefined}
+          unlinkReason={undefined}
+          onUnlink={vi.fn()}
+        />
+      </main>,
+    )
+    await expect.element(screen.getByText('None')).toBeVisible()
+    await expect.element(screen.getByText('Never')).toBeVisible()
+    await expect.element(screen.getByRole('button', { name: 'Unlink Microsoft' })).toBeVisible()
+    await noAxeViolations()
+  })
+
+  it('says so when no provider is linked', async () => {
+    const screen = await render(
+      <IdentitiesTable
+        identities={[]}
+        loading={false}
+        error={undefined}
+        onRetry={() => undefined}
+        unlinkReason={undefined}
+        onUnlink={vi.fn()}
+      />,
+    )
+    await expect.element(screen.getByText('No provider is linked.')).toBeVisible()
+  })
+
+  it('tells a viewer why they cannot unlink, and a click does nothing', async () => {
+    const onUnlink = vi.fn()
+    const screen = await render(
+      <main>
+        <IdentitiesTable
+          identities={[identity]}
+          loading={false}
+          error={undefined}
+          onRetry={() => undefined}
+          unlinkReason="Developers and owners only"
+          onUnlink={onUnlink}
+        />
+      </main>,
+    )
+    const button = screen.getByRole('button', { name: 'Unlink GitHub' })
+    await expect.element(button).toHaveAccessibleDescription('Developers and owners only')
+    await button.click({ force: true })
+    expect(screen.getByRole('alertdialog').elements()).toHaveLength(0)
+    expect(onUnlink).not.toHaveBeenCalled()
+    await noAxeViolations()
+  })
+
+  it('keeps the dialog open with the reason when the unlink is refused', async () => {
+    const onUnlink = vi
+      .fn()
+      .mockRejectedValue(
+        new OrvanoError(
+          409,
+          'last_sign_in_method',
+          "This is the user's only way to sign in.",
+          null,
+        ),
+      )
+    const screen = await render(
+      <main>
+        <IdentitiesTable
+          identities={[identity]}
+          loading={false}
+          error={undefined}
+          onRetry={() => undefined}
+          unlinkReason={undefined}
+          onUnlink={onUnlink}
+        />
+      </main>,
+    )
+    await screen.getByRole('button', { name: 'Unlink GitHub' }).click()
+    const dialog = screen.getByRole('alertdialog')
+    await dialog.getByRole('button', { name: 'Unlink' }).click()
+    await expect.element(dialog.getByText("This is the user's only way to sign in.")).toBeVisible()
+    await noAxeViolations()
+  })
+})
+
+describe('SessionsTable with provider sign in (AC-26)', () => {
+  it('shows the provider beside the method', async () => {
+    const base = {
+      createdAt: '2026-09-01T10:00:00Z',
+      lastRefreshedAt: '2026-09-02T10:00:00Z',
+      userAgent: null,
+      sdk: null,
+      ipAddress: null,
+      current: false,
+    }
+    const screen = await render(
+      <main>
+        <SessionsTable
+          sessions={[
+            { ...base, id: 's1', method: 'oauth', provider: 'github' },
+            { ...base, id: 's2', method: 'id_token', provider: 'apple' },
+          ]}
+          loading={false}
+          error={undefined}
+          onRetry={() => undefined}
+          hasMore={false}
+          onLoadMore={() => undefined}
+          endReason={undefined}
+          onEnd={vi.fn()}
+        />
+      </main>,
+    )
+    await expect.element(screen.getByText('Provider sign in, GitHub')).toBeVisible()
+    await expect.element(screen.getByText('Native provider sign in, Apple')).toBeVisible()
+    await noAxeViolations()
   })
 })
 

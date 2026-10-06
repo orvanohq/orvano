@@ -146,6 +146,171 @@ describe('provider sign in (AC-20)', () => {
   })
 })
 
+describe('redeemLink for provider redirects (AC-20)', () => {
+  function browser(href: string): { storage: Map<string, string>; replaced: string[] } {
+    const storage = new Map<string, string>()
+    const replaced: string[] = []
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k: string) => storage.get(k) ?? null,
+      setItem: (k: string, v: string) => storage.set(k, v),
+      removeItem: (k: string) => storage.delete(k),
+    })
+    vi.stubGlobal('location', { href, assign: () => undefined })
+    vi.stubGlobal('history', {
+      state: null,
+      replaceState: (_data: unknown, _unused: string, url?: string) => replaced.push(url ?? ''),
+    })
+    return { storage, replaced }
+  }
+
+  it('removes only the Orvano parameters from the address bar after a sign in', async () => {
+    const { replaced } = browser(
+      `${redirectUrl}?next=%2Fhome&orvano_type=oauth&orvano_code=${code}`,
+    )
+    const { fetch } = fakeFetch(Response.json({ url: 'https://accounts.example/auth' }), signedIn())
+    const c = client(fetch)
+    await c.signInWithOAuth('google', { redirectUrl })
+
+    const result = await c.redeemLink()
+
+    expect(result).toMatchObject({ type: 'oauth', isNewUser: true })
+    expect(replaced).toEqual([`${redirectUrl}?next=%2Fhome`])
+  })
+
+  it('removes the error from the address bar too, and forgets the verifier', async () => {
+    const { storage, replaced } = browser(
+      `${redirectUrl}?orvano_type=oauth&orvano_error=provider_unavailable`,
+    )
+    const { fetch, sent } = fakeFetch(Response.json({ url: 'https://accounts.example/auth' }))
+    const c = client(fetch)
+    await c.signInWithOAuth('google', { redirectUrl })
+
+    await expect(c.redeemLink()).rejects.toMatchObject({
+      status: 503,
+      code: 'provider_unavailable',
+    })
+    expect(replaced).toEqual([redirectUrl])
+    expect(storage.has(verifierStorageKey('shop'))).toBe(false)
+    expect(sent).toHaveLength(1)
+  })
+
+  it('leaves the address bar alone when redeeming a URL that is not the current one', async () => {
+    const { replaced } = browser('https://app.example.com/')
+    const { fetch } = fakeFetch(Response.json({ url: 'https://accounts.example/auth' }), signedIn())
+    const c = client(fetch)
+    await c.signInWithOAuth('google', { redirectUrl })
+
+    await c.redeemLink(`${redirectUrl}?orvano_type=oauth&orvano_code=${code}`)
+
+    expect(replaced).toEqual([])
+  })
+
+  it('throws a TypeError before any call for a provider redirect with no code', async () => {
+    const { fetch, sent } = fakeFetch(signedIn())
+
+    await expect(client(fetch).redeemLink(`${redirectUrl}?orvano_type=oauth`)).rejects.toThrow(
+      TypeError,
+    )
+    expect(sent).toHaveLength(0)
+  })
+
+  it('uses a verifier for one redemption only', async () => {
+    const { fetch, sent } = fakeFetch(
+      Response.json({ url: 'https://accounts.example/auth' }),
+      signedIn(),
+    )
+    const c = client(fetch)
+    const back = `${redirectUrl}?orvano_type=oauth&orvano_code=${code}`
+    await c.signInWithOAuth('google', { redirectUrl, open: () => back })
+
+    await expect(c.redeemLink(back)).rejects.toThrow(TypeError)
+    expect(sent).toHaveLength(2)
+  })
+
+  it('is null for a URL with no Orvano parameters', async () => {
+    const { fetch, sent } = fakeFetch()
+
+    expect(await client(fetch).redeemLink(`${redirectUrl}?next=%2F`)).toBeNull()
+    expect(sent).toHaveLength(0)
+  })
+})
+
+describe('native ID tokens (AC-20)', () => {
+  it('signInWithIdToken sends the raw nonce and Apple code, stores the session, and says signedIn', async () => {
+    const { fetch, sent } = fakeFetch(signedIn())
+    const c = client(fetch)
+    const seen: AuthEvent[] = []
+    c.onAuthStateChange((event) => seen.push(event))
+    const { raw } = await createNonce()
+
+    const result = await c.signInWithIdToken({
+      provider: 'apple',
+      idToken: 'id.token.value',
+      nonce: raw,
+      authorizationCode: 'apple-code',
+      name: 'Grace Hopper',
+    })
+
+    expect(new URL(sent[0]?.url ?? '').pathname).toBe('/v1/account/sessions/id-token')
+    expect(JSON.parse(sent[0]?.body ?? '{}')).toEqual({
+      provider: 'apple',
+      idToken: 'id.token.value',
+      nonce: raw,
+      authorizationCode: 'apple-code',
+      name: 'Grace Hopper',
+    })
+    expect(result).toEqual({ user: { id: 'u1', providers: ['google'] }, isNewUser: true })
+    expect((await c.session.get())?.sessionId).toBe('s1')
+    expect(seen).toEqual(['signedIn'])
+  })
+
+  it('leaves out the Apple only fields when they are not given', async () => {
+    const { fetch, sent } = fakeFetch(signedIn())
+
+    await client(fetch).signInWithIdToken({ provider: 'google', idToken: 't', nonce: 'n' })
+
+    expect(JSON.parse(sent[0]?.body ?? '{}')).toEqual({
+      provider: 'google',
+      idToken: 't',
+      nonce: 'n',
+    })
+  })
+
+  it('linkIdentityWithIdToken links and says userUpdated', async () => {
+    const { fetch, sent } = fakeFetch(
+      Response.json({ id: 'i2', provider: 'google' }, { status: 201 }),
+    )
+    const c = client(fetch)
+    const seen: AuthEvent[] = []
+    c.onAuthStateChange((event) => seen.push(event))
+
+    const identity = await c.linkIdentityWithIdToken({
+      provider: 'google',
+      idToken: 't',
+      nonce: 'n',
+    })
+
+    expect(new URL(sent[0]?.url ?? '').pathname).toBe('/v1/account/identities/id-token')
+    expect(identity).toEqual({ id: 'i2', provider: 'google' })
+    expect(seen).toEqual(['userUpdated'])
+  })
+
+  it('a refused token throws invalid_id_token and stores nothing', async () => {
+    const { fetch } = fakeFetch(
+      Response.json(
+        { status: 401, code: 'invalid_id_token', title: 'Invalid ID token', detail: 'Refused.' },
+        { status: 401, headers: { 'Content-Type': 'application/problem+json' } },
+      ),
+    )
+    const c = client(fetch)
+
+    await expect(
+      c.signInWithIdToken({ provider: 'google', idToken: 't', nonce: 'n' }),
+    ).rejects.toMatchObject({ status: 401, code: 'invalid_id_token' })
+    expect(await c.session.get()).toBeNull()
+  })
+})
+
 describe('createNonce (AC-20)', () => {
   it('hashes the raw value to lowercase hex SHA-256', async () => {
     const { raw, hashed } = await createNonce()

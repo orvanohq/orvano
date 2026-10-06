@@ -123,6 +123,52 @@ public class OAuthIdentityTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task A_verified_email_or_an_email_with_a_password_is_another_way_in_but_an_unverified_email_alone_is_not()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, oauth: true);
+
+        // A verified email from the provider: the user may unlink their only identity (AC-14, verify.md check 12).
+        using var verified = await OAuthOnlyUserAsync(api, "verified-google", emailVerified: true);
+        var verifiedBearer = AuthApi.AccessToken(verified);
+        using var verifiedList = await api.SendAsync(HttpMethod.Get, "/v1/account/identities", bearer: verifiedBearer);
+        var only = verifiedList.Body.GetProperty("items")[0].GetProperty("id").GetString();
+        using (var unlinked = await api.SendAsync(HttpMethod.Delete, $"/v1/account/identities/{only}", bearer: verifiedBearer))
+            Assert.Equal(HttpStatusCode.NoContent, unlinked.Status);
+
+        // An unverified email with a password: unlinking the only identity is allowed.
+        using var signedUp = await api.SignUpAsync("password-user@x.com");
+        var bearer = AuthApi.AccessToken(signedUp);
+        var (start, verifier) = await OAuthDriver.StartAsync(api, "github", bearer: bearer, path: "/v1/account/identities/oauth/flows");
+        var back = await OAuthDriver.FollowAsync(api, start.Body.GetProperty("url").GetString()!, new { sub = "4242", email = "gh-pw@x.com", emailVerified = true });
+        start.Dispose();
+        using var linked = await api.SendAsync(HttpMethod.Post, "/v1/account/identities/oauth",
+            new { code = OAuthDriver.Param(back, "orvano_code"), codeVerifier = verifier }, bearer: bearer);
+        Assert.Equal(HttpStatusCode.Created, linked.Status);
+        var github = linked.Body.GetProperty("id").GetString();
+        await TestDatabase.ExecuteAsync(api.Database.Superuser, "UPDATE orvano.auth_users SET email_verified_at = NULL WHERE lower(email) = 'password-user@x.com'");
+
+        // The same user without the password: the unverified email alone is no way in, so the unlink is refused.
+        var hash = await TestDatabase.ScalarAsync<string>(api.Database.Superuser,
+            "SELECT hash FROM orvano.auth_passwords WHERE user_id = (SELECT id FROM orvano.auth_users WHERE lower(email) = 'password-user@x.com')");
+        await TestDatabase.ExecuteAsync(api.Database.Superuser,
+            "DELETE FROM orvano.auth_passwords WHERE user_id = (SELECT id FROM orvano.auth_users WHERE lower(email) = 'password-user@x.com')");
+        using var refused = await api.SendAsync(HttpMethod.Delete, $"/v1/account/identities/{github}", bearer: bearer);
+        Assert.Equal(HttpStatusCode.Conflict, refused.Status);
+        Assert.Equal("last_sign_in_method", refused.Code);
+        using var stillThere = await api.SendAsync(HttpMethod.Get, "/v1/account/identities", bearer: bearer);
+        Assert.Single(stillThere.Body.GetProperty("items").EnumerateArray());
+
+        // With the password back, the same unlink goes through.
+        await TestDatabase.ExecuteAsync(api.Database.Superuser,
+            """
+            INSERT INTO orvano.auth_passwords (user_id, project_id, hash)
+            SELECT id, project_id, @hash FROM orvano.auth_users WHERE lower(email) = 'password-user@x.com'
+            """, ("hash", hash));
+        using var allowed = await api.SendAsync(HttpMethod.Delete, $"/v1/account/identities/{github}", bearer: bearer);
+        Assert.Equal(HttpStatusCode.NoContent, allowed.Status);
+    }
+
+    [Fact]
     public async Task Linking_needs_a_fresh_session_its_own_flow_and_a_free_provider_account()
     {
         await using var api = await AuthApi.StartAsync(postgres, oauth: true);
