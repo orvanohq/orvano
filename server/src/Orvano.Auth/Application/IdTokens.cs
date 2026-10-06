@@ -43,13 +43,15 @@ internal sealed class ProviderKeys(IHttpClientFactory httpFactory, ProviderCatal
             }
         }
 
-        return [.. entry.Config!.SigningKeys];
+        // Nothing cached and the last try failed moments ago: fail fast instead of fetching again.
+        if (entry.Config is not { } config) throw new ProviderCallException(ProviderFailure.Unavailable, "The provider's discovery document or keys could not be read");
+        return [.. config.SigningKeys];
     }
 
     private bool NeedsFetch(Entry entry, string? kid)
     {
-        if (entry.Config is not { } config) return true;
         var now = clock.GetUtcNow();
+        if (entry.Config is not { } config) return now - entry.LastAttempt >= AuthTimings.ProviderKeysRetry;
         var expired = now - entry.FetchedAt >= AuthTimings.ProviderKeysCache && now - entry.LastAttempt >= AuthTimings.ProviderKeysRefresh;
         return expired || UnknownKidMayFetch(entry, config, kid, now);
     }
@@ -73,6 +75,8 @@ internal sealed class ProviderKeys(IHttpClientFactory httpFactory, ProviderCatal
             var failure = OAuthHttp.IsUnavailable(ex) ? ProviderFailure.Unavailable : ProviderFailure.Error;
             if (entry.Config is null)
                 throw new ProviderCallException(failure, "The provider's discovery document or keys could not be read");
+            // A failed fetch for an unknown kid must not block the retry for the full window: try again soon.
+            if (entry.LastKidFetch == now) entry.LastKidFetch = now - (AuthTimings.ProviderKeysRefresh - AuthTimings.ProviderKeysRetry);
             logger.LogWarning("The keys at {Discovery} could not be fetched again ({Failure}); the cached keys stay in use", discovery, failure);
         }
     }
@@ -86,7 +90,7 @@ internal sealed class ProviderKeys(IHttpClientFactory httpFactory, ProviderCatal
 
         public DateTimeOffset FetchedAt { get; set; }
 
-        /// <summary>When any fetch last started; a failing refresh of expired keys waits 5 minutes between tries.</summary>
+        /// <summary>When any fetch last started; a failing refresh of expired keys waits 5 minutes between tries, a failing first fetch 30 seconds.</summary>
         public DateTimeOffset LastAttempt { get; set; } = DateTimeOffset.MinValue;
 
         /// <summary>When a fetch for an unknown <c>kid</c> last started; the first one never waits.</summary>

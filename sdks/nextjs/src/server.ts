@@ -298,14 +298,19 @@ export function safeNext(next: unknown): string {
 }
 
 function encodeCookie(value: OAuthCookie): string {
-  return btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  // UTF-8 first: btoa throws on any character above U+00FF, such as a `next` of `/日本`.
+  let binary = ''
+  for (const byte of new TextEncoder().encode(JSON.stringify(value)))
+    binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 function decodeCookie(value: string | undefined): OAuthCookie | null {
   if (value === undefined || value === '') return null
   try {
+    const binary = atob(value.replace(/-/g, '+').replace(/_/g, '/'))
     const parsed = JSON.parse(
-      atob(value.replace(/-/g, '+').replace(/_/g, '/')),
+      new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0))),
     ) as Partial<OAuthCookie>
     return typeof parsed.v === 'string' &&
       typeof parsed.n === 'string' &&

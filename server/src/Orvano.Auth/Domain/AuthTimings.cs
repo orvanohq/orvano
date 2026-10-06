@@ -69,6 +69,9 @@ internal static class AuthTimings
     /// <summary>The soonest a provider's keys are fetched again for an unknown <c>kid</c> (spec 0012, AC-8).</summary>
     public static readonly TimeSpan ProviderKeysRefresh = TimeSpan.FromMinutes(5);
 
+    /// <summary>The soonest a provider's keys are tried again after a fetch failed with nothing cached, or for an unknown <c>kid</c>.</summary>
+    public static readonly TimeSpan ProviderKeysRetry = TimeSpan.FromSeconds(30);
+
     /// <summary>The open email requests answer no sooner than this after they start, whether or not the account exists (AC-8).</summary>
     public static readonly TimeSpan OpenSendFloor = TimeSpan.FromMilliseconds(500);
 }

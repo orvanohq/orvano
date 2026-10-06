@@ -85,10 +85,12 @@ internal sealed class IdentityService(
         var check = await CheckAsync(projectId, request, ct);
         if (!check.Succeeded) return check.Failure!;
         var native = check.Value!;
+        // Apple sends the name once, with the first authorization, so a native link keeps what the request carries.
+        var result = native.Provider == OAuthProvider.Apple && native.Result.Name is null ? native.Result with { Name = request.Name } : native.Result;
 
         return await oauth.WriteRetryingAsync<IdentityRow>(async (uow, token) =>
             await UseAsync(uow, projectId, native, token)
-                ? await LinkAsync(uow, projectId, userId, native.Provider, native.Result, token)
+                ? await LinkAsync(uow, projectId, userId, native.Provider, result, token)
                 : Failure.InvalidIdToken, ct);
     }
 

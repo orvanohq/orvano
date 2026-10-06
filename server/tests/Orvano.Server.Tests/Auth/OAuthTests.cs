@@ -265,6 +265,22 @@ public class OAuthTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task An_unexpected_error_in_the_callback_redirects_with_provider_error_and_deletes_the_flow()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, oauth: true);
+        var (start, _) = await OAuthDriver.StartAsync(api, "google");
+        using var _ = start;
+        Assert.Equal(HttpStatusCode.OK, start.Status);
+        // A sealed verifier that no longer opens, as after a damaged row.
+        await TestDatabase.ExecuteAsync(api.Database.Superuser, "UPDATE orvano.auth_oauth_flows SET provider_verifier_ciphertext = '\\x0102'::bytea");
+
+        var back = await OAuthDriver.FollowAsync(api, start.Body.GetProperty("url").GetString()!, new { sub = "g-broken", email = "broken@x.com", emailVerified = true });
+
+        Assert.Equal("provider_error", OAuthDriver.Param(back, "orvano_error"));
+        Assert.Equal(0L, await Count(api, "SELECT count(*) FROM orvano.auth_oauth_flows"));
+    }
+
+    [Fact]
     public async Task A_blocked_user_is_refused_and_the_code_still_works_until_it_expires()
     {
         await using var api = await AuthApi.StartAsync(postgres, oauth: true);

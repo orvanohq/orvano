@@ -205,6 +205,20 @@ public class OAuthIdentityTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Linking_apple_natively_keeps_the_name_apple_sent_once()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, oauth: true);
+        using var user = await OAuthOnlyUserAsync(api, "nameless-google", emailVerified: false);
+        var apple = await MintAsync(api, "apple", AuthApi.AppleBundleId, "a-named", null);
+
+        using var linked = await api.SendAsync(HttpMethod.Post, "/v1/account/identities/id-token",
+            new { provider = "apple", idToken = apple.IdToken, nonce = Nonce, authorizationCode = apple.Code, name = "Grace Hopper" }, bearer: AuthApi.AccessToken(user));
+
+        Assert.Equal(HttpStatusCode.Created, linked.Status);
+        Assert.Equal("Grace Hopper", await TestDatabase.ScalarAsync<string>(api.Database.Superuser, "SELECT name FROM orvano.auth_users WHERE id = @id::uuid", ("id", AuthApi.UserId(user))));
+    }
+
+    [Fact]
     public async Task Deleting_a_user_queues_apple_revokes_before_the_cascade()
     {
         await using var api = await AuthApi.StartAsync(postgres, oauth: true);

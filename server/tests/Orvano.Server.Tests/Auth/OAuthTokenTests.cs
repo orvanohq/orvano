@@ -27,6 +27,21 @@ public class OAuthTokenTests
     // AC-3: Apple's client secret.
 
     [Fact]
+    public void A_new_secret_drops_the_ones_for_older_settings_and_the_ones_past_the_reuse_window()
+    {
+        var clock = new ManualClock(Now);
+        var secrets = new AppleSecrets(clock);
+
+        secrets.For(Apple(updatedAt: Now.AddDays(-2)), "com.acme.app", () => AuthApi.ApplePrivateKey);
+        secrets.For(Apple(updatedAt: Now.AddDays(-1)), "com.acme.app", () => AuthApi.ApplePrivateKey);
+        Assert.Equal(1, secrets.CachedCount);
+
+        clock.Advance(TimeSpan.FromMinutes(51));
+        secrets.For(Apple(updatedAt: Now.AddDays(-1)), "com.acme.web", () => AuthApi.ApplePrivateKey);
+        Assert.Equal(1, secrets.CachedCount);
+    }
+
+    [Fact]
     public async Task Apples_client_secret_is_an_es256_jwt_for_the_client_id_that_lasts_one_hour()
     {
         var secrets = new AppleSecrets(new ManualClock(Now));
@@ -94,15 +109,16 @@ public class OAuthTokenTests
         Assert.Equal(2, opened);
 
         // Another instance replaced the key: the row's updated_at moved, so the cached secret is not used.
-        secrets.For(Apple(updatedAt: Now.AddSeconds(1)), "com.acme.app", Open);
+        var replaced = secrets.For(Apple(updatedAt: Now.AddSeconds(1)), "com.acme.app", Open);
+        Assert.NotEqual(bundle, replaced);
         Assert.Equal(3, opened);
 
         // Another project's eviction leaves this one cached; its own eviction does not.
         secrets.Evict("someotherproject");
-        Assert.Equal(bundle, secrets.For(Apple(), "com.acme.app", Open));
+        Assert.Equal(replaced, secrets.For(Apple(updatedAt: Now.AddSeconds(1)), "com.acme.app", Open));
         Assert.Equal(3, opened);
         secrets.Evict(AuthApi.Project);
-        secrets.For(Apple(), "com.acme.app", Open);
+        secrets.For(Apple(updatedAt: Now.AddSeconds(1)), "com.acme.app", Open);
         Assert.Equal(4, opened);
     }
 
@@ -235,6 +251,41 @@ public class OAuthTokenTests
     }
 
     [Fact]
+    public async Task A_failed_first_fetch_fails_fast_for_30_seconds_instead_of_fetching_for_every_caller()
+    {
+        using var provider = new StubProvider { DiscoveryStatus = HttpStatusCode.ServiceUnavailable };
+
+        await Assert.ThrowsAsync<ProviderCallException>(() => provider.CheckAsync(provider.Mint()));
+        var afterFirst = provider.DiscoveryFetches;
+        var second = await Assert.ThrowsAsync<ProviderCallException>(() => provider.CheckAsync(provider.Mint()));
+        Assert.Equal(ProviderFailure.Unavailable, second.Failure);
+        Assert.Equal(afterFirst, provider.DiscoveryFetches);
+
+        provider.DiscoveryStatus = HttpStatusCode.OK;
+        provider.Clock.Advance(TimeSpan.FromSeconds(30));
+        Assert.NotNull(await provider.CheckAsync(provider.Mint()));
+        Assert.True(provider.DiscoveryFetches > afterFirst);
+    }
+
+    [Fact]
+    public async Task A_failed_refresh_for_an_unknown_kid_is_tried_again_after_30_seconds()
+    {
+        using var provider = new StubProvider();
+        Assert.NotNull(await provider.CheckAsync(provider.Mint()));
+        using var rotated = RSA.Create(2048);
+        provider.Publish(rotated, "k2");
+        var rotatedToken = provider.Mint(signingKey: new RsaSecurityKey(rotated) { KeyId = "k2" });
+
+        provider.DiscoveryStatus = HttpStatusCode.ServiceUnavailable;
+        Assert.Null(await provider.CheckAsync(rotatedToken));
+        provider.DiscoveryStatus = HttpStatusCode.OK;
+        Assert.Null(await provider.CheckAsync(rotatedToken));
+
+        provider.Clock.Advance(TimeSpan.FromSeconds(30));
+        Assert.NotNull(await provider.CheckAsync(rotatedToken));
+    }
+
+    [Fact]
     public async Task Known_keys_are_kept_12_hours_then_fetched_again()
     {
         using var provider = new StubProvider();
@@ -302,6 +353,7 @@ public class OAuthTokenTests
         private readonly ProviderCatalog _catalog = new(FakeBase);
         private readonly IdTokens _idTokens;
         private int _jwksFetches;
+        private int _discoveryFetches;
 
         public StubProvider()
         {
@@ -318,6 +370,8 @@ public class OAuthTokenTests
         public HttpStatusCode DiscoveryStatus { get; set; } = HttpStatusCode.OK;
 
         public int JwksFetches => _jwksFetches;
+
+        public int DiscoveryFetches => _discoveryFetches;
 
         public void Publish(RSA key, string kid) => _published[kid] = key;
 
@@ -362,6 +416,7 @@ public class OAuthTokenTests
                 var path = request.RequestUri!.AbsolutePath;
                 if (path.EndsWith("/.well-known/openid-configuration", StringComparison.Ordinal))
                 {
+                    Interlocked.Increment(ref provider._discoveryFetches);
                     if (provider.DiscoveryStatus != HttpStatusCode.OK) return Task.FromResult(new HttpResponseMessage(provider.DiscoveryStatus));
                     return Json(new { issuer = GoogleIssuer, jwks_uri = $"{GoogleIssuer}/jwks", authorization_endpoint = $"{GoogleIssuer}/authorize", token_endpoint = $"{GoogleIssuer}/token" });
                 }

@@ -157,6 +157,11 @@ internal sealed class OAuthService(
             var reason = ex.Failure == ProviderFailure.Unavailable ? ErrorCode.ProviderUnavailable : ErrorCode.ProviderError;
             return await FailAsync(projectId, provider, flow, reason, ex.Message, ct);
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The state is spent, so the flow cannot be retried: a clean provider_error redirect, and the row goes.
+            return await FailAsync(projectId, provider, flow, ErrorCode.ProviderError, $"unexpected {ex.GetType().Name}", ct);
+        }
 
         var handoff = HandoffCode.New();
         var ready = await store.WriteAsync<bool>(async (uow, token) =>
