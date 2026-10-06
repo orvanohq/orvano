@@ -46,7 +46,7 @@ Verify email, reset password, magic link, and email one time code sign in.
 - [x] Document it: `/document email verification, recovery & passwordless`
 Spec [0010](../specs/0010-email-verification-recovery-passwordless/index.md) · code in `server/src/Orvano.Auth/`, `server/src/Orvano.Messaging/`, `contract/auth/`, `sdks/`, `console/`, `tests/scenarios/`
 
-### 12. OAuth & ID token sign in · in-progress · GA
+### 12. OAuth & ID token sign in · done · GA
 Sign in with Google, Apple, GitHub, and Microsoft through a browser redirect, plus native ID token sign in for mobile (Flutter Google and Apple sign in without a web view).
 **Done when:** you enable a provider in the console, and users sign in through it from Next.js (redirect) and Flutter (native); identities link to one user.
 - [x] Design it (spec): `/architect OAuth & ID token sign in`
@@ -59,7 +59,7 @@ Sign in with Google, Apple, GitHub, and Microsoft through a browser redirect, pl
 - [x] Verify it: `/check verify OAuth & ID token sign in`
 - [x] Test it: `/test OAuth & ID token sign in`
 - [x] Review it (fresh model): `/check review OAuth & ID token sign in`
-- [ ] Document it: `/document OAuth & ID token sign in`
+- [x] Document it: `/document OAuth & ID token sign in`
 Spec [0012](../specs/0012-oauth-id-token-sign-in/index.md) · code in `server/src/Orvano.Auth/`, `contract/auth/`, `sdks/`, `console/`, `tests/scenarios/`, `website/`
 
 ### 13. MFA, passkeys & sessions · needs a decision · GA
