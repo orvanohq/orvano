@@ -227,6 +227,23 @@ describe('redeemLink for provider redirects (AC-20)', () => {
     expect(sent).toHaveLength(2)
   })
 
+  it('keeps the verifier through a network error so the same redirect can be tried again', async () => {
+    const { fetch } = fakeFetch(
+      Response.json({ url: 'https://accounts.example/auth' }),
+      () => {
+        throw new TypeError('network down')
+      },
+      signedIn(),
+    )
+    const c = client(fetch)
+    const back = `${redirectUrl}?orvano_type=oauth&orvano_code=${code}`
+
+    await expect(c.signInWithOAuth('google', { redirectUrl, open: () => back })).rejects.toThrow()
+    const retried = await c.redeemLink(back)
+
+    expect(retried).toMatchObject({ type: 'oauth' })
+  })
+
   it('is null for a URL with no Orvano parameters', async () => {
     const { fetch, sent } = fakeFetch()
 

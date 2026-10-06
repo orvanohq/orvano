@@ -87,7 +87,7 @@ describe('ProviderDialog', () => {
     const dialog = screen.getByRole('dialog')
 
     await expect.element(dialog.getByText('Set, ends in 1a2b')).toBeVisible()
-    await expect.element(dialog.getByText(microsoft.callbackUrl)).toBeVisible()
+    await expect.element(dialog.getByLabelText('Callback URL')).toHaveValue(microsoft.callbackUrl)
     await expect.element(dialog.getByText(/xms_edov/)).toBeVisible()
     await noAxeViolations()
 

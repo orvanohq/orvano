@@ -88,13 +88,31 @@ internal sealed class ProviderKeys(IHttpClientFactory httpFactory, ProviderCatal
 
         public OpenIdConnectConfiguration? Config { get; set; }
 
-        public DateTimeOffset FetchedAt { get; set; }
+        // Ticks behind volatile reads and writes: a DateTimeOffset is 16 bytes and could tear between a reader
+        // outside the lock and the writer inside it.
+        private long _fetchedAt;
+        private long _lastAttempt;
+        private long _lastKidFetch;
+
+        public DateTimeOffset FetchedAt
+        {
+            get => new(Volatile.Read(ref _fetchedAt), TimeSpan.Zero);
+            set => Volatile.Write(ref _fetchedAt, value.UtcTicks);
+        }
 
         /// <summary>When any fetch last started; a failing refresh of expired keys waits 5 minutes between tries, a failing first fetch 30 seconds.</summary>
-        public DateTimeOffset LastAttempt { get; set; } = DateTimeOffset.MinValue;
+        public DateTimeOffset LastAttempt
+        {
+            get => new(Volatile.Read(ref _lastAttempt), TimeSpan.Zero);
+            set => Volatile.Write(ref _lastAttempt, value.UtcTicks);
+        }
 
         /// <summary>When a fetch for an unknown <c>kid</c> last started; the first one never waits.</summary>
-        public DateTimeOffset LastKidFetch { get; set; } = DateTimeOffset.MinValue;
+        public DateTimeOffset LastKidFetch
+        {
+            get => new(Volatile.Read(ref _lastKidFetch), TimeSpan.Zero);
+            set => Volatile.Write(ref _lastKidFetch, value.UtcTicks);
+        }
     }
 }
 

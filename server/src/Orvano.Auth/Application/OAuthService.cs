@@ -25,9 +25,6 @@ internal abstract record CallbackAnswer
 /// <summary>A flow the callback claimed by its state.</summary>
 internal sealed record ClaimedFlow(Guid Id, FlowPurpose Purpose, Uri RedirectUrl, byte[]? VerifierCiphertext, byte[]? NonceHash);
 
-/// <summary>A redeemed sign in code: the user it resolved to and the new session.</summary>
-internal sealed record OAuthRedeemed(Resolved Resolved, SessionGrant Grant);
-
 /// <summary>
 /// Provider sign in by redirect (spec 0012, AC-4 to AC-7): starting a flow, the provider's callback, and redeeming the
 /// handoff code with the SDK's PKCE verifier. The flow row is the only state; its secrets are hashed or sealed.
@@ -42,9 +39,8 @@ internal sealed class OAuthService(
     SecretBox secrets,
     SignInResolution resolution,
     Sessions sessions,
-    SessionChecks checks,
     SigningKeys keys,
-    AccountService accounts,
+    OAuthRedemptions redemptions,
     RateLimits limits,
     ILogger<OAuthService> logger)
 {
@@ -58,7 +54,8 @@ internal sealed class OAuthService(
     /// flow and answers the provider's authorize URL.
     /// </summary>
     public async Task<Outcome<string>> StartAsync(
-        string projectId, OAuthProvider? provider, string? redirectUrl, string? codeChallenge, string ipKey, CancellationToken ct, Guid? linkUserId = null)
+        string projectId, OAuthProvider? provider, string? redirectUrl, string? codeChallenge, string ipKey, CancellationToken ct, Guid? linkUserId = null,
+        bool limitTaken = false)
     {
         if (provider is not { } chosen) return Failure.Invalid("The provider must be google, apple, github, or microsoft.");
         if (!Pkce.IsChallenge(codeChallenge)) return Failure.Invalid($"The codeChallenge must be the {Pkce.ChallengeLength} character base64url S256 challenge.");
@@ -68,8 +65,7 @@ internal sealed class OAuthService(
             return Failure.RedirectUrlNotAllowed;
         }
 
-        var limit = limits.Acquire(RateLimitPolicies.OAuthStartPerIp, ipKey);
-        if (!limit.Allowed) return Failure.RateLimited(limit.RetryAfter);
+        if (!limitTaken && TakeStartLimit(ipKey) is { } limited) return limited;
 
         var stored = await settings.GetAsync(projectId, chosen, ct);
         if (!stored.Config.Enabled) return Failure.ProviderNotEnabled;
@@ -119,6 +115,13 @@ internal sealed class OAuthService(
         if (nonce is not null) query.Add(("nonce", nonce));
         if (endpoints.FormPost) query.Add(("response_mode", "form_post"));
         return endpoints.Authorize.AbsoluteUri + "?" + string.Join('&', query.Select(p => $"{p.Item1}={Uri.EscapeDataString(p.Item2)}"));
+    }
+
+    /// <summary>Takes the start limit (<c>auth.oauth_start.ip</c>); null when the caller may go on. <see cref="StartAsync"/> takes it itself unless told it was.</summary>
+    public Failure? TakeStartLimit(string ipKey)
+    {
+        var limit = limits.Acquire(RateLimitPolicies.OAuthStartPerIp, ipKey);
+        return limit.Allowed ? null : Failure.RateLimited(limit.RetryAfter);
     }
 
     /// <summary>
@@ -195,7 +198,7 @@ internal sealed class OAuthService(
             return Failure.Invalid("Send the orvano_code parameter as code, and the flow's PKCE verifier as codeVerifier.");
         await keys.GetActiveAsync(projectId, ct);
 
-        var outcome = await WriteRetryingAsync<OAuthRedeemed>(async (uow, token) =>
+        var outcome = await redemptions.WriteRetryingAsync<OAuthRedeemed>(async (uow, token) =>
         {
             if (await ConsumeAsync(uow, projectId, code, FlowPurpose.SignIn, verifier!, linkUserId: null, token) is not { } consumed)
                 return Failure.InvalidOAuthCode;
@@ -206,7 +209,7 @@ internal sealed class OAuthService(
                 SessionMethod.OAuth, token, OAuthProviders.Wire(consumed.Provider));
             return new OAuthRedeemed(resolved.Value, grant);
         }, ct);
-        return await FinishAsync(projectId, outcome, ct);
+        return await redemptions.FinishAsync(projectId, outcome, ct);
     }
 
     /// <summary>A consumed flow: its provider and the provider's result.</summary>
@@ -242,35 +245,6 @@ internal sealed class OAuthService(
 
         if (!live || !Pkce.Proves(verifier, challenge) || owner != linkUserId || !OAuthProviders.TryParse(providerWire, out var provider)) return null;
         return new ConsumedFlow(provider, ProviderResult.FromJson(secrets.Decrypt(sealedResult, Bound(id, ResultColumn))));
-    }
-
-    /// <summary>
-    /// Runs a redeeming unit of work, and once more when it lost a race (AC-10): a unique violation aborts the Postgres
-    /// transaction, so the whole of it reruns, including the code's conditional delete.
-    /// </summary>
-    public async Task<Outcome<T>> WriteRetryingAsync<T>(Func<AuthUnitOfWork, CancellationToken, Task<Outcome<T>>> work, CancellationToken ct)
-    {
-        for (var attempt = 0; ; attempt++)
-        {
-            try
-            {
-                return await store.WriteAsync(work, ct);
-            }
-            catch (Exception ex) when (attempt == 0 && SignInResolution.IsRace(ex))
-            {
-                logger.LogDebug("A provider sign in lost a race and runs again");
-            }
-        }
-    }
-
-    /// <summary>After a redeeming commit: evicts sessions a claim ended, then issues the new session's access token.</summary>
-    public async Task<Outcome<SignedIn>> FinishAsync(string projectId, Outcome<OAuthRedeemed> outcome, CancellationToken ct)
-    {
-        if (!outcome.Succeeded) return outcome.Failure!;
-        var redeemed = outcome.Value!;
-        foreach (var id in redeemed.Resolved.EndedSessions) await checks.EvictAsync(id, ct);
-        var row = await store.ReadAsync((db, token) => db.Users.AsNoTracking().SingleAsync(u => u.Id == redeemed.Resolved.UserId, token), ct);
-        return await accounts.SignedInAsync(projectId, row, redeemed.Grant, ct, redeemed.Resolved.IsNewUser);
     }
 
     private async Task<ClaimedFlow?> ClaimAsync(string projectId, OAuthProvider provider, byte[] stateHash, CancellationToken ct)

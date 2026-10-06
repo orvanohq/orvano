@@ -71,9 +71,9 @@ test('an owner reviews the providers, saves one, and finds a GitHub user and the
   await browser.getByRole('button', { name: 'Edit Google' }).click()
   const dialog = browser.locator('[data-slot=dialog-content]')
   await expect(dialog.getByText('Set, ends in cret')).toBeVisible()
-  await expect(
-    dialog.getByText(`/v1/projects/${scenariosProject}/oauth/google/callback`),
-  ).toBeVisible()
+  await expect(dialog.getByLabel('Callback URL')).toHaveValue(
+    new RegExp(`/v1/projects/${scenariosProject}/oauth/google/callback$`),
+  )
   await dialog.getByRole('button', { name: 'Cancel' }).click()
 
   await browser.getByRole('button', { name: 'Edit Microsoft' }).click()
