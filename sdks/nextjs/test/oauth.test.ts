@@ -233,5 +233,15 @@ describe('createOrvanoRouteHandler oauth (spec 0012, AC-21)', () => {
     expect(safeNext('/\\evil.example')).toBe('/')
     expect(safeNext('https://evil.example')).toBe('/')
     expect(safeNext(undefined)).toBe('/')
+    for (const hostile of [
+      '/\t/evil.example',
+      '/\n/evil.example',
+      '/\r/evil.example',
+      '/%09/evil.example',
+    ]) {
+      const target = new URL(safeNext(hostile), app)
+      expect(target.origin).toBe(app)
+    }
+    expect(safeNext('/\t/evil.example')).toBe('/')
   })
 })

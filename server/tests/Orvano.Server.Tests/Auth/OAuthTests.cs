@@ -225,6 +225,46 @@ public class OAuthTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Recovering_an_unverified_account_drops_an_identity_planted_on_it()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, oauth: true, email: true, smtp: true);
+        using var impostor = await api.SignUpAsync("victim@x.com");
+        await TestDatabase.ExecuteAsync(api.Database.Superuser,
+            $"INSERT INTO orvano.auth_identities (project_id, user_id, provider, subject, email_verified) VALUES ('{AuthApi.Project}', '{AuthApi.UserId(impostor)}', 'github', '666', false)");
+
+        using var request = await api.SendAsync(HttpMethod.Post, "/v1/account/recovery", new { email = "victim@x.com", redirectUrl = OAuthDriver.Redirect });
+        Assert.Equal(HttpStatusCode.Accepted, request.Status);
+        var email = await api.LatestEmailAsync("victim@x.com");
+        using var reset = await api.SendAsync(HttpMethod.Post, "/v1/account/recovery/confirm", new { token = email!.Token, password = "another horse battery" });
+        Assert.Equal(HttpStatusCode.Created, reset.Status);
+
+        Assert.Equal(0L, await Count(api, $"SELECT count(*) FROM orvano.auth_identities WHERE user_id = '{AuthApi.UserId(reset)}'"));
+        Assert.Equal(1L, await Count(api, "SELECT count(*) FROM orvano.events WHERE type = 'auth.identity.unlinked' AND payload->>'reason' = 'claimed'"));
+        using var oldSession = await api.SendAsync(HttpMethod.Get, "/v1/account", bearer: AuthApi.AccessToken(impostor));
+        Assert.Equal("invalid_token", oldSession.Code);
+        using var newSession = await api.SendAsync(HttpMethod.Get, "/v1/account", bearer: AuthApi.AccessToken(reset));
+        Assert.Equal(HttpStatusCode.OK, newSession.Status);
+    }
+
+    [Fact]
+    public async Task Verifying_an_unverified_account_drops_an_identity_planted_on_it_and_keeps_the_password()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, oauth: true, email: true, smtp: true);
+        using var impostor = await api.SignUpAsync("victim@x.com", extra: new { email = "victim@x.com", password = "correct horse battery", verificationRedirectUrl = OAuthDriver.Redirect });
+        await TestDatabase.ExecuteAsync(api.Database.Superuser,
+            $"INSERT INTO orvano.auth_identities (project_id, user_id, provider, subject, email_verified) VALUES ('{AuthApi.Project}', '{AuthApi.UserId(impostor)}', 'github', '666', false)");
+
+        var email = await api.LatestEmailAsync("victim@x.com");
+        using var verified = await api.SendAsync(HttpMethod.Post, "/v1/account/verification/confirm", new { token = email!.Token });
+        Assert.Equal(HttpStatusCode.OK, verified.Status);
+
+        Assert.Equal(0L, await Count(api, $"SELECT count(*) FROM orvano.auth_identities WHERE user_id = '{AuthApi.UserId(impostor)}'"));
+        Assert.Equal(1L, await Count(api, $"SELECT count(*) FROM orvano.auth_passwords WHERE user_id = '{AuthApi.UserId(impostor)}'"));
+        using var oldSession = await api.SendAsync(HttpMethod.Get, "/v1/account", bearer: AuthApi.AccessToken(impostor));
+        Assert.Equal("invalid_token", oldSession.Code);
+    }
+
+    [Fact]
     public async Task A_blocked_user_is_refused_and_the_code_still_works_until_it_expires()
     {
         await using var api = await AuthApi.StartAsync(postgres, oauth: true);

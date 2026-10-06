@@ -16,13 +16,14 @@ internal static class AccountClaims
     /// <summary>
     /// Removes the password (writing <c>auth.password.removed</c>) and every identity (each with
     /// <c>auth.identity.unlinked</c>, reason <c>claimed</c>), and ends the user's sessions when <paramref name="endSessions"/>
-    /// says so or anything was removed. The caller marks the email verified and writes <c>auth.user.updated</c>.
+    /// says so or anything was removed. <paramref name="removePassword"/> false keeps the password (the email link proves
+    /// the inbox, not who chose the password). The caller marks the email verified and writes <c>auth.user.updated</c>.
     /// </summary>
     public static async Task<Claimed> ClaimAsync(
-        AuthUnitOfWork uow, Sessions sessions, string projectId, LockedUser user, Actor actor, bool endSessions, CancellationToken ct)
+        AuthUnitOfWork uow, Sessions sessions, string projectId, LockedUser user, Actor actor, bool endSessions, CancellationToken ct, bool removePassword = true)
     {
         var removed = false;
-        if (user.HasPassword)
+        if (removePassword && user.HasPassword)
         {
             await using (var remove = new NpgsqlCommand("DELETE FROM orvano.auth_passwords WHERE user_id = @user", uow.Tx.Connection, uow.Tx))
             {

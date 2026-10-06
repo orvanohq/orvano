@@ -280,14 +280,21 @@ interface OAuthCookie {
   t: 'oauth' | 'oauth_link'
 }
 
-/** A path in the app: one leading `/`, never `//` or `/\`, which a browser reads as another host. */
+/**
+ * A path in the app: one leading `/`, no control characters or backslashes (a browser strips tabs and newlines and
+ * reads `\` as `/`, so `/\t/evil.com` is another host), and it must stay on the same origin once parsed.
+ */
 export function safeNext(next: unknown): string {
-  return typeof next === 'string' &&
-    next.startsWith('/') &&
-    !next.startsWith('//') &&
-    !next.startsWith('/\\')
-    ? next
-    : '/'
+  if (typeof next !== 'string' || !next.startsWith('/') || next.startsWith('//')) return '/'
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f\\]/.test(next)) return '/'
+  try {
+    const base = 'http://orvano.invalid'
+    const parsed = new URL(next, base)
+    return parsed.origin === base ? parsed.pathname + parsed.search + parsed.hash : '/'
+  } catch {
+    return '/'
+  }
 }
 
 function encodeCookie(value: OAuthCookie): string {
