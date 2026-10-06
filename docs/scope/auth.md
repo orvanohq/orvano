@@ -56,7 +56,7 @@ Sign in with Google, Apple, GitHub, and Microsoft through a browser redirect, pl
    - [x] Identities: link by redirect and natively, list and unlink with the last method rule, `users.*` identity operations, and Apple revoke on delete (AC-13 to 16, 23, 24)
    - [x] SDK helpers and console: JS, Next.js, and Flutter helpers, the Sign in methods page, and identities on the Users pages (AC-1, 2, 20 to 26)
    - [ ] Hardening and docs: events, limits, retention, the leak scan, docs pages and fix pages, then the real provider checks in verify.md (AC-17 to 19, 28)
-- [ ] Verify it: `/check verify OAuth & ID token sign in`
+- [x] Verify it: `/check verify OAuth & ID token sign in`
 - [ ] Test it: `/test OAuth & ID token sign in`
 - [ ] Review it (fresh model): `/check review OAuth & ID token sign in`
 - [ ] Document it: `/document OAuth & ID token sign in`
