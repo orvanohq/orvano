@@ -14,7 +14,7 @@
 # workflow by hand is always a dry run, so the pipeline can be tried from any branch.
 #
 # Private packages never publish: pnpm skips every package marked `"private": true` (so
-# @orvano/console-client never leaves the repo), and only the three named Dart packages and the one
+# @orvano/console-client never leaves the repo), and only the four named Dart packages and the one
 # .NET project are published.
 #
 # Credentials: OIDC trusted publishing where the registry offers it. The secrets NPM_TOKEN and
@@ -126,9 +126,11 @@ jobs:
           echo "::add-mask::$token"
           echo "PUB_TOKEN=$token" >> "$GITHUB_ENV"
           dart pub token add https://pub.dev --env-var PUB_TOKEN
-      # orvano_core first: the other two depend on it. A version already on pub.dev is skipped, as pnpm and NuGet skip
-      # theirs: a brand new package's first version is uploaded by hand (pub.dev allows GitHub publishing only for a
-      # package that exists), and a rerun after a partial release must not fail on what already went out.
+      # orvano_core first: the other three depend on it. A version already on pub.dev is skipped, as pnpm and NuGet skip
+      # theirs, so a rerun after a partial release doesn't fail on what already went out. pub.dev allows GitHub
+      # publishing only for a package that exists, so on a real release a package pub.dev doesn't know yet (404) is
+      # skipped with a warning, and its first version is uploaded by hand from the tag; any other answer than 200
+      # fails the job, so an outage never silently skips a publish. A dry run skips that probe.
       - name: Publish
         env:
           VERSION: ${{ needs.plan.outputs.version }}
@@ -136,6 +138,16 @@ jobs:
           flag=--force
           if [ "$DRY_RUN" = true ]; then flag=--dry-run; fi
           publish() {
+            if [ "$DRY_RUN" != true ]; then
+              status=$(curl -s -o /dev/null -w '%{http_code}' "https://pub.dev/api/packages/$1")
+              if [ "$status" = 404 ]; then
+                echo "::warning::$1 is not on pub.dev yet, so it was skipped. Upload $VERSION by hand from the tag (cd $2 && $3 pub publish), then allow GitHub publishing for it."
+                return
+              elif [ "$status" != 200 ]; then
+                echo "::error::pub.dev answered $status for $1."
+                return 1
+              fi
+            fi
             if curl -sf -o /dev/null "https://pub.dev/api/packages/$1/versions/$VERSION"; then
               echo "$1 $VERSION is already on pub.dev; skipping it."
             else
@@ -143,6 +155,7 @@ jobs:
             fi
           }
           publish orvano_core sdks/dart/core dart
+          publish orvano_flutter_passkeys sdks/dart/flutter_passkeys flutter
           publish orvano_dart sdks/dart/server dart
           publish orvano_flutter sdks/dart/flutter flutter
 
@@ -269,7 +282,7 @@ jobs:
           - repo: orvano-js
             paths: sdks/js:js sdks/nextjs:nextjs
           - repo: orvano-dart
-            paths: sdks/dart/core:orvano_core sdks/dart/flutter:orvano_flutter sdks/dart/server:orvano_dart
+            paths: sdks/dart/core:orvano_core sdks/dart/flutter:orvano_flutter sdks/dart/flutter_passkeys:orvano_flutter_passkeys sdks/dart/server:orvano_dart
           - repo: orvano-dotnet
             paths: sdks/dotnet/src/Orvano:src/Orvano Directory.Build.props:Directory.Build.props Directory.Packages.props:Directory.Packages.props global.json:global.json VERSION:VERSION
     env:
