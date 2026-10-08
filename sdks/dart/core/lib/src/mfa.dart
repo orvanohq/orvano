@@ -26,8 +26,13 @@ sealed class MfaAnswer {
   /// matter.
   const factory MfaAnswer.recoveryCode(String code) = RecoveryCodeAnswer;
 
+  /// A passkey. Without [answer], the client runs the ceremony: the
+  /// challenge, then its passkey authenticator. With one (a passkey answered
+  /// elsewhere), it goes as it is.
+  const factory MfaAnswer.passkey([PasskeyAnswer? answer]) = PasskeyMfaAnswer;
+
   /// The answer's field in a request body.
-  Map<String, String> toJson();
+  Map<String, Object?> toJson();
 }
 
 /// An authenticator app code.
@@ -39,7 +44,7 @@ final class TotpAnswer extends MfaAnswer {
   final String code;
 
   @override
-  Map<String, String> toJson() => {'totpCode': code};
+  Map<String, Object?> toJson() => {'totpCode': code};
 }
 
 /// A recovery code.
@@ -51,5 +56,24 @@ final class RecoveryCodeAnswer extends MfaAnswer {
   final String code;
 
   @override
-  Map<String, String> toJson() => {'recoveryCode': code};
+  Map<String, Object?> toJson() => {'recoveryCode': code};
+}
+
+/// A passkey.
+final class PasskeyMfaAnswer extends MfaAnswer {
+  /// Creates the answer; without [answer], the client runs the ceremony.
+  const PasskeyMfaAnswer([this.answer]);
+
+  /// The passkey's `challengeId` and `credential`, or null until the client
+  /// runs the ceremony.
+  final PasskeyAnswer? answer;
+
+  /// Throws a [StateError] before the ceremony has run.
+  @override
+  Map<String, Object?> toJson() => {
+    'passkey': switch (answer) {
+      final answer? => answer.toJson(),
+      null => throw StateError('Run the passkey ceremony first.'),
+    },
+  };
 }

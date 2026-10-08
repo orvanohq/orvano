@@ -8,8 +8,10 @@ import 'package:http_parser/http_parser.dart' show parseHttpDate;
 import 'auth.dart';
 import 'generated/models.dart';
 import 'generated/version.dart';
+import 'generated/services.dart';
 import 'mfa.dart';
 import 'orvano_exception.dart';
+import 'passkeys.dart';
 import 'version.dart';
 
 /// What a successful call does to the client's stored session, from the
@@ -139,23 +141,38 @@ base class Client {
   }
 
   /// Finishes a sign in that stopped at the MFA step with an authenticator
-  /// app code or a recovery code (`account.createMfaSession`), stores the
-  /// session, emits [AuthEvent.signedIn], and returns the signed in user.
+  /// app code, a recovery code, or a passkey (`account.createMfaSession`),
+  /// stores the session, emits [AuthEvent.signedIn], and returns the signed
+  /// in user. [MfaAnswer.passkey] runs the ceremony first
+  /// (`account.createMfaPasskeyChallenge`, then [authenticator] or the
+  /// client's default).
   ///
   /// Throws [StateError], before any call, when no sign in is waiting for
-  /// MFA, and [OrvanoException] for a wrong code (`invalid_mfa_code`; after
-  /// 5 the ticket ends) or an ended ticket (`invalid_mfa_ticket`: sign in
-  /// again).
-  Future<User> completeMfa(MfaAnswer answer, {RequestOptions? options}) async {
+  /// MFA, and [OrvanoException] for a wrong code (`invalid_mfa_code`) or
+  /// passkey (`invalid_passkey`; after 5 wrong answers the ticket ends) or an
+  /// ended ticket (`invalid_mfa_ticket`: sign in again).
+  Future<User> completeMfa(
+    MfaAnswer answer, {
+    PasskeyAuthenticator? authenticator,
+    RequestOptions? options,
+  }) async {
     final pending = _mfa;
     if (pending == null) {
       throw StateError('No sign in is waiting for MFA; sign in first.');
     }
     try {
+      final resolved = await _resolve(
+        answer,
+        authenticator,
+        () => AccountService(this).createMfaPasskeyChallenge(
+          CreateMfaPasskeyChallengeRequest(ticket: pending.ticket),
+          options: options,
+        ),
+      );
       final result = await send(
         'POST',
         '/v1/account/sessions/mfa',
-        body: {'ticket': pending.ticket, ...answer.toJson()},
+        body: {'ticket': pending.ticket, ...resolved.toJson()},
         session: SessionChange.start,
         options: options,
       );
@@ -170,16 +187,41 @@ base class Client {
 
   /// Step up (spec 0013, AC-19): proves a second factor on the signed in
   /// session (`account.verifyMfa`), so security changes work for the next 10
-  /// minutes. Stores the new access token, which carries `aal` 2, and emits
-  /// [AuthEvent.tokenRefreshed].
-  Future<void> verifyMfa(MfaAnswer answer, {RequestOptions? options}) async {
+  /// minutes. [MfaAnswer.passkey] runs the ceremony against
+  /// `account.createStepUpPasskeyChallenge` first. Stores the new access
+  /// token, which carries `aal` 2, and emits [AuthEvent.tokenRefreshed].
+  Future<void> verifyMfa(
+    MfaAnswer answer, {
+    PasskeyAuthenticator? authenticator,
+    RequestOptions? options,
+  }) async {
+    final resolved = await _resolve(
+      answer,
+      authenticator,
+      () => AccountService(this).createStepUpPasskeyChallenge(options: options),
+    );
     final tokens = await send(
       'POST',
       '/v1/account/mfa/verify',
-      body: answer.toJson(),
+      body: resolved.toJson(),
       options: options,
     );
     await _save(AuthSession.fromJson(tokens), AuthEvent.tokenRefreshed);
+  }
+
+  /// [answer], with a passkey's ceremony run when it has no answer yet.
+  Future<MfaAnswer> _resolve(
+    MfaAnswer answer,
+    PasskeyAuthenticator? authenticator,
+    Future<PasskeyChallenge> Function() challenge,
+  ) async {
+    if (answer is! PasskeyMfaAnswer || answer.answer != null) return answer;
+    final passkeys = passkeyAuthenticatorFor(this, authenticator);
+    final issued = await challenge();
+    final credential = await passkeys.get(issued.options);
+    return MfaAnswer.passkey(
+      PasskeyAnswer(challengeId: issued.challengeId, credential: credential),
+    );
   }
 
   /// Turns MFA on with the first code from the authenticator app

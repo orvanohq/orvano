@@ -28,3 +28,4 @@ export 'src/mfa.dart';
 export 'src/oauth.dart';
 export 'src/orvano_exception.dart';
 export 'src/pagination.dart';
+export 'src/passkeys.dart';

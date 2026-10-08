@@ -15,5 +15,6 @@ library;
 export 'package:orvano_core/orvano_core.dart';
 
 export 'src/flutter_client.dart' show checkSession, createClient, watchResume;
+export 'src/platform_passkeys.dart' show PlatformPasskeys;
 export 'src/secure_session_store.dart' show SecureSessionStore;
 export 'src/web_auth_launcher.dart' show webAuthLauncher;
