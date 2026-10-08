@@ -4,6 +4,7 @@ import { paginate } from '../runtime/pagination.js'
 import type {
   AuthResult,
   CompleteOAuthLinkRequest,
+  CompletePasskeyRegistrationRequest,
   CompleteRecoveryRequest,
   ConfirmEmailChangeRequest,
   ConfirmTotpRequest,
@@ -13,9 +14,11 @@ import type {
   CreateIdTokenSessionRequest,
   CreateMagicLinkRequest,
   CreateMagicLinkSessionRequest,
+  CreateMfaPasskeyChallengeRequest,
   CreateMfaSessionRequest,
   CreateOAuthFlowRequest,
   CreateOAuthSessionRequest,
+  CreatePasskeySessionRequest,
   CreatePasswordSessionRequest,
   CreateRecoveryRequest,
   CreateVerificationRequest,
@@ -27,6 +30,10 @@ import type {
   MfaStatus,
   OAuthFlow,
   OpenIdConfiguration,
+  Passkey,
+  PasskeyChallenge,
+  PasskeyList,
+  PasskeyRegistration,
   RecoveryCodes,
   RefreshSessionRequest,
   Session,
@@ -36,6 +43,7 @@ import type {
   TotpSetup,
   UpdateAccountRequest,
   UpdateEmailRequest,
+  UpdatePasskeyRequest,
   UpdatePasswordRequest,
   User,
   VerifyEmailRequest,
@@ -54,6 +62,17 @@ export class AccountService {
   completeOAuthLink(body: CompleteOAuthLinkRequest, options?: RequestOptions): Promise<Identity> {
     return this.#client.request<Identity>(
       { method: 'POST', path: '/v1/account/identities/oauth', body },
+      options,
+    )
+  }
+
+  /** Finishes adding a passkey with the browser's or the platform's answer to `account.createPasskeyRegistration`. */
+  completePasskeyRegistration(
+    body: CompletePasskeyRegistrationRequest,
+    options?: RequestOptions,
+  ): Promise<Passkey> {
+    return this.#client.request<Passkey>(
+      { method: 'POST', path: '/v1/account/passkeys', body },
       options,
     )
   }
@@ -171,6 +190,20 @@ export class AccountService {
   }
 
   /**
+   * Starts answering an MFA challenge with a passkey: answers the options for `navigator.credentials.get`, listing the
+   * user's passkeys. Send the passkey's answer to `account.createMfaSession`. Never counts as a wrong attempt.
+   */
+  createMfaPasskeyChallenge(
+    body: CreateMfaPasskeyChallengeRequest,
+    options?: RequestOptions,
+  ): Promise<PasskeyChallenge> {
+    return this.#client.request<PasskeyChallenge>(
+      { method: 'POST', path: '/v1/account/sessions/mfa/passkey-challenge', body },
+      options,
+    )
+  }
+
+  /**
    * Finishes a sign in that answered an MFA challenge: checks the ticket and one factor, then creates the session.
    * After 5 wrong factors the ticket stops working; sign in again.
    */
@@ -218,6 +251,43 @@ export class AccountService {
     )
   }
 
+  /**
+   * Starts a passkey sign in: answers a challenge with an empty `allowCredentials`, so the browser or the platform
+   * offers every passkey of the RP ID, including through autofill. Needs passkeys turned on for the project.
+   */
+  createPasskeyChallenge(options?: RequestOptions): Promise<PasskeyChallenge> {
+    return this.#client.request<PasskeyChallenge>(
+      { method: 'POST', path: '/v1/account/sessions/passkey-challenge' },
+      options,
+    )
+  }
+
+  /**
+   * Starts adding a passkey: answers the options for `navigator.credentials.create`. Needs passkeys turned on, a
+   * session that signed in within 10 minutes (or passed a second factor within 10 minutes), a verified email when the
+   * user has one, and fewer than 10 passkeys.
+   */
+  createPasskeyRegistration(options?: RequestOptions): Promise<PasskeyRegistration> {
+    return this.#client.request<PasskeyRegistration>(
+      { method: 'POST', path: '/v1/account/passkeys/registration' },
+      options,
+    )
+  }
+
+  /**
+   * Signs in with a passkey's answer to `account.createPasskeyChallenge`. A passkey counts as two factors, so this sign
+   * in is never asked for MFA and the session starts at level 2.
+   */
+  createPasskeySession(
+    body: CreatePasskeySessionRequest,
+    options?: RequestOptions,
+  ): Promise<AuthResult> {
+    return this.#client.request<AuthResult>(
+      { method: 'POST', path: '/v1/account/sessions/passkey', body, session: 'start' },
+      options,
+    )
+  }
+
   /** Signs a user in with their email and password. */
   createPasswordSession(
     body: CreatePasswordSessionRequest,
@@ -247,6 +317,17 @@ export class AccountService {
   createRecoveryCodes(options?: RequestOptions): Promise<RecoveryCodes> {
     return this.#client.request<RecoveryCodes>(
       { method: 'POST', path: '/v1/account/mfa/recovery-codes' },
+      options,
+    )
+  }
+
+  /**
+   * Starts a step up with a passkey: answers the options for `navigator.credentials.get`, listing the signed in user's
+   * passkeys. Send the passkey's answer to `account.verifyMfa`.
+   */
+  createStepUpPasskeyChallenge(options?: RequestOptions): Promise<PasskeyChallenge> {
+    return this.#client.request<PasskeyChallenge>(
+      { method: 'POST', path: '/v1/account/mfa/passkey-challenge' },
       options,
     )
   }
@@ -303,6 +384,17 @@ export class AccountService {
     )
   }
 
+  /**
+   * Removes one of the signed in user's passkeys. A user with MFA on needs a second factor on this session within 10
+   * minutes (`account.verifyMfa`); a user without it needs a session that signed in within 10 minutes.
+   */
+  deletePasskey(passkeyId: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'DELETE', path: `/v1/account/passkeys/${encodeURIComponent(passkeyId)}` },
+      options,
+    )
+  }
+
   /** Ends one of the signed in user's sessions. */
   deleteSession(sessionId: string, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
@@ -336,6 +428,14 @@ export class AccountService {
   listIdentities(options?: RequestOptions): Promise<IdentityList> {
     return this.#client.request<IdentityList>(
       { method: 'GET', path: '/v1/account/identities' },
+      options,
+    )
+  }
+
+  /** Lists the signed in user's passkeys, oldest first, including inactive ones. */
+  listPasskeys(options?: RequestOptions): Promise<PasskeyList> {
+    return this.#client.request<PasskeyList>(
+      { method: 'GET', path: '/v1/account/passkeys' },
       options,
     )
   }
@@ -388,6 +488,18 @@ export class AccountService {
   updateEmail(body: UpdateEmailRequest, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
       { method: 'PUT', path: '/v1/account/email', body },
+      options,
+    )
+  }
+
+  /** Renames one of the signed in user's passkeys. */
+  updatePasskey(
+    passkeyId: string,
+    body: UpdatePasskeyRequest,
+    options?: RequestOptions,
+  ): Promise<Passkey> {
+    return this.#client.request<Passkey>(
+      { method: 'PATCH', path: `/v1/account/passkeys/${encodeURIComponent(passkeyId)}`, body },
       options,
     )
   }

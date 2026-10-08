@@ -56,7 +56,8 @@ internal sealed class AccountService(
     IConsoleSignupPolicy signupPolicy,
     IConsoleAccountCreated accountCreated,
     AuthMailer mailer,
-    StepUp stepUp)
+    StepUp stepUp,
+    MethodPolicies policies)
 {
     public const string EmailIndex = UserRecords.EmailIndex;
 
@@ -212,7 +213,7 @@ internal sealed class AccountService(
         var outcome = await store.WriteAsync<(UserRow? User, SessionGrant? Grant, MfaChallengeView? Mfa)>(async (uow, token) =>
         {
             // First, since it locks the user for a user with MFA on: the user row before the password row.
-            var challenge = await MfaGate.ChallengeAsync(uow, projectId, account.Id, SessionMethod.Password, null, client, token);
+            var challenge = await MfaGate.ChallengeAsync(policies, uow, projectId, account.Id, SessionMethod.Password, null, client, token);
             if (rehash is not null)
             {
                 await using var update = new NpgsqlCommand(

@@ -26,6 +26,7 @@ internal sealed class TestingModule : IOrvanoModule
     {
         services.AddSingleton<TestEmails>();
         services.AddSingleton<FakeOAuthProvider>();
+        services.AddSingleton<SoftwareAuthenticator>();
     }
 
     public void MapApi(RouteGroupBuilder v1)
@@ -60,6 +61,17 @@ internal sealed class TestingModule : IOrvanoModule
             return TypedResults.Ok(new TestIdToken(idToken, code));
         })
             .WithName(TestOperations.CreateIdToken.Id);
+
+        v1.MapPost(TestOperations.CreatePasskeyCredential.Route, (TestCreatePasskeyCredentialRequest request, SoftwareAuthenticator authenticator) =>
+            TypedResults.Ok(authenticator.Create(request)))
+            .WithName(TestOperations.CreatePasskeyCredential.Id);
+
+        v1.MapPost(TestOperations.CreatePasskeyAssertion.Route, Results<Ok<PasskeyAssertionCredential>, ProblemHttpResult> (
+                TestCreatePasskeyAssertionRequest request, SoftwareAuthenticator authenticator) =>
+            authenticator.Assert(request) is { } assertion
+                ? TypedResults.Ok(assertion)
+                : Problems.Result(StatusCodes.Status404NotFound, ErrorCode.NotFound, "This authenticator made no passkey with that ID in this run."))
+            .WithName(TestOperations.CreatePasskeyAssertion.Id);
 
         v1.MapGet(TestOperations.ListAppleRevocations.Route, (DateTimeOffset? after) =>
             TypedResults.Ok(new TestAppleRevocationList([.. fake.Revocations

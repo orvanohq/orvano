@@ -3,6 +3,7 @@ import type {
   AcceptedInvitation,
   ApiKey,
   ApiKeyPage,
+  AuthMethodSettings,
   ConsoleAccount,
   CreateApiKeyRequest,
   CreateConsoleAccountRequest,
@@ -41,6 +42,7 @@ import type {
   SigningKeys,
   SmtpSettings,
   SmtpSettingsInput,
+  UpdateAuthMethodSettingsRequest,
   UpdateInstallSettingsRequest,
   UpdateMemberRequest,
   UpdateOAuthProviderRequest,
@@ -193,6 +195,34 @@ export class ConsoleAuthKeysService {
   rotate(options?: RequestOptions): Promise<SigningKeys> {
     return this.#client.request<SigningKeys>(
       { method: 'POST', path: '/v1/console/project/auth/keys/rotate' },
+      options,
+    )
+  }
+}
+
+/** Operations in the `consoleAuthMethods` service. */
+export class ConsoleAuthMethodsService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /** Gets the project's second factor and passkey settings; any member. */
+  get(options?: RequestOptions): Promise<AuthMethodSettings> {
+    return this.#client.request<AuthMethodSettings>(
+      { method: 'GET', path: '/v1/console/project/auth/methods' },
+      options,
+    )
+  }
+
+  /** Changes the project's second factor and passkey settings; owners and developers only. */
+  update(
+    body: UpdateAuthMethodSettingsRequest,
+    options?: RequestOptions,
+  ): Promise<AuthMethodSettings> {
+    return this.#client.request<AuthMethodSettings>(
+      { method: 'PATCH', path: '/v1/console/project/auth/methods', body },
       options,
     )
   }
@@ -1107,6 +1137,8 @@ export class Orvano {
   readonly consoleApiKeys: ConsoleApiKeysService
   /** Operations in the `consoleAuthKeys` service. */
   readonly consoleAuthKeys: ConsoleAuthKeysService
+  /** Operations in the `consoleAuthMethods` service. */
+  readonly consoleAuthMethods: ConsoleAuthMethodsService
   /** Operations in the `consoleAuthProviders` service. */
   readonly consoleAuthProviders: ConsoleAuthProvidersService
   /** Operations in the `consoleEmailTemplates` service. */
@@ -1135,6 +1167,7 @@ export class Orvano {
     this.consoleAccount = new ConsoleAccountService(client)
     this.consoleApiKeys = new ConsoleApiKeysService(client)
     this.consoleAuthKeys = new ConsoleAuthKeysService(client)
+    this.consoleAuthMethods = new ConsoleAuthMethodsService(client)
     this.consoleAuthProviders = new ConsoleAuthProvidersService(client)
     this.consoleEmailTemplates = new ConsoleEmailTemplatesService(client)
     this.consoleEmails = new ConsoleEmailsService(client)

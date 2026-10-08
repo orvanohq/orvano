@@ -18,15 +18,26 @@ internal sealed record TotpSetupView(string Secret, string Uri, DateTimeOffset E
 internal sealed record TotpConfirmationView(IReadOnlyList<string> RecoveryCodes, SessionTokensView Session);
 
 /// <summary>The second factor a step two or step up answers with: exactly one is set.</summary>
-internal sealed record FactorAnswer(string? TotpCode, string? RecoveryCode)
+internal sealed record FactorAnswer(string? TotpCode, string? RecoveryCode, PasskeyAnswerInput? Passkey = null)
 {
     /// <summary>The factor answered, or null when the body sent none or more than one.</summary>
-    public string? Factor => (TotpCode, RecoveryCode) switch
+    public string? Factor => (TotpCode, RecoveryCode, Passkey) switch
     {
-        ({ }, null) => MfaFactors.Totp,
-        (null, { }) => MfaFactors.RecoveryCode,
+        ({ }, null, null) => MfaFactors.Totp,
+        (null, { }, null) => MfaFactors.RecoveryCode,
+        (null, null, { }) => MfaFactors.Passkey,
         _ => null,
     };
+
+    /// <summary>The body's refusal (400 <c>invalid_request</c>), or null when it is well formed.</summary>
+    public Failure? Malformed()
+    {
+        if (Factor is not { } factor) return Failure.Invalid("Send exactly one of totpCode, recoveryCode, and passkey.");
+        if (factor == MfaFactors.Totp && !Totp.IsWellFormed(TotpCode)) return Failure.Invalid("totpCode must be 6 digits.");
+        if (factor == MfaFactors.Passkey && (!Guid.TryParse(Passkey!.ChallengeId, out _) || Passkey.Credential is null))
+            return Failure.Invalid("Send passkey with a challengeId and the credential the browser or the platform made.");
+        return null;
+    }
 }
 
 /// <summary>
@@ -43,13 +54,15 @@ internal sealed class MfaService(
     MfaFactorStore factors,
     IProjectDirectory projects,
     RateLimits limits,
-    StepUp stepUp)
+    StepUp stepUp,
+    MethodPolicies policies,
+    PasskeyService passkeys)
 {
     /// <summary>The user's MFA state (AC-16).</summary>
     public async Task<Outcome<MfaStatusView>> GetAsync(string projectId, Guid userId, CancellationToken ct)
     {
         var state = await store.ReadAsync((db, token) =>
-            MfaFactorState.ReadAsync((NpgsqlConnection)db.Database.GetDbConnection(), null, projectId, userId, token), ct);
+            MfaFactorState.ReadAsync(policies, (NpgsqlConnection)db.Database.GetDbConnection(), null, projectId, userId, token), ct);
         var available = new List<string>();
         if (state.Policy.TotpEnabled) available.Add(MfaFactors.Totp);
         if (state.Policy.PasskeysEnabled) available.Add(MfaFactors.Passkey);
@@ -70,7 +83,7 @@ internal sealed class MfaService(
         return await store.WriteAsync<TotpSetupView>(async (uow, token) =>
         {
             if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
-            var state = await MfaFactorState.ReadAsync(uow.Tx.Connection!, uow.Tx, projectId, userId, token);
+            var state = await MfaFactorState.ReadAsync(policies, uow.Tx.Connection!, uow.Tx, projectId, userId, token);
             if (state.TotpConfirmedAt is not null) return Failure.MfaAlreadyEnabled;
             if (!state.Policy.TotpEnabled) return Failure.FactorNotEnabled;
             if (user.Email is not null && user.EmailVerifiedAt is null) return Failure.EmailNotVerified;
@@ -161,7 +174,7 @@ internal sealed class MfaService(
         return await store.WriteAsync<Done>(async (uow, token) =>
         {
             if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is null) return Failure.UserNotFound;
-            if (!(await MfaFactorState.ReadAsync(uow.Tx.Connection!, uow.Tx, projectId, userId, token)).MfaEnabled) return Failure.MfaNotEnabled;
+            if (!(await MfaFactorState.ReadAsync(policies, uow.Tx.Connection!, uow.Tx, projectId, userId, token)).MfaEnabled) return Failure.MfaNotEnabled;
 
             await MfaFactorStore.DeleteFactorsAsync(uow, userId, token);
             await AuthEvents.WriteAsync(uow.Tx, AuthEvents.MfaDisabled, projectId, Actor.User(userId), userId.ToString(),
@@ -181,7 +194,7 @@ internal sealed class MfaService(
         return await store.WriteAsync<string[]>(async (uow, token) =>
         {
             if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is null) return Failure.UserNotFound;
-            if (!(await MfaFactorState.ReadAsync(uow.Tx.Connection!, uow.Tx, projectId, userId, token)).MfaEnabled) return Failure.MfaNotEnabled;
+            if (!(await MfaFactorState.ReadAsync(policies, uow.Tx.Connection!, uow.Tx, projectId, userId, token)).MfaEnabled) return Failure.MfaNotEnabled;
 
             var codes = await factors.ReplaceRecoveryCodesAsync(uow, projectId, userId, token);
             await AuthEvents.WriteAsync(uow.Tx, AuthEvents.RecoveryCodesCreated, projectId, Actor.User(userId), userId.ToString(),
@@ -200,23 +213,32 @@ internal sealed class MfaService(
         var userKey = userId.ToString();
         var limit = limits.Check(RateLimitPolicies.FailedMfaPerUser, userKey);
         if (!limit.Allowed) return Failure.RateLimited(limit.RetryAfter);
-        if (answer.Factor is not { } factor) return Failure.Invalid("Send exactly one of totpCode and recoveryCode.");
-        if (factor == MfaFactors.Totp && !Totp.IsWellFormed(answer.TotpCode)) return Failure.Invalid("totpCode must be 6 digits.");
+        if (answer.Malformed() is { } malformed) return malformed;
+        var factor = answer.Factor!;
+
+        // A passkey's challenge is spent and its answer verified before the transaction (AC-19): only a step_up
+        // challenge of this user, and only a passkey of this user, can raise this session.
+        AssertionCheck? check = null;
+        if (factor == MfaFactors.Passkey)
+        {
+            var policy = await passkeys.ReadPolicyAsync(projectId, ct);
+            var challenge = await passkeys.ConsumeAsync(projectId, Guid.Parse(answer.Passkey!.ChallengeId!), ChallengePurposes.StepUp, userId, null, ct);
+            check = challenge is null || !policy.PasskeysEnabled
+                ? AssertionCheck.Failed
+                : await passkeys.VerifyAsync(policy, projectId, challenge, answer.Passkey.Credential!, ct);
+        }
 
         var wrong = false;
         var outcome = await store.WriteAsync<(SessionStrength Strength, string Refresh, DateTimeOffset EndsAt, bool EmailVerified)>(async (uow, token) =>
         {
             if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
-            if (!(await MfaFactorState.ReadAsync(uow.Tx.Connection!, uow.Tx, projectId, userId, token)).Factors.Contains(factor))
-                return Failure.FactorNotEnabled;
+            var state = await MfaFactorState.ReadAsync(policies, uow.Tx.Connection!, uow.Tx, projectId, userId, token);
+            if (!Usable(state, factor)) return Failure.FactorNotEnabled;
 
-            var right = factor == MfaFactors.Totp
-                ? await factors.UseTotpAsync(uow, userId, answer.TotpCode, token)
-                : await factors.UseRecoveryCodeAsync(uow, userId, answer.RecoveryCode, token);
-            if (!right)
+            if (!await UseFactorAsync(uow, userId, answer, check, state.Policy, token))
             {
                 wrong = true;
-                return Failure.InvalidMfaCode;
+                return factor == MfaFactors.Passkey ? Failure.InvalidPasskey : Failure.InvalidMfaCode;
             }
 
             if (factor == MfaFactors.RecoveryCode)
@@ -225,7 +247,7 @@ internal sealed class MfaService(
                     new Dictionary<string, string> { ["userId"] = userKey }, ct: token);
             }
 
-            if (await StrengthenAsync(uow, projectId, userId, sessionId, SessionStrength.ForFactor(factor), aal2: true, token) is not { } raised)
+            if (await StrengthenAsync(uow, projectId, userId, sessionId, Amr(factor, check), aal2: true, token) is not { } raised)
                 return Failure.SessionNotFound;
             return (raised.Strength, raised.Refresh, raised.EndsAt, user.EmailVerifiedAt is not null);
         }, ct);
@@ -249,8 +271,8 @@ internal sealed class MfaService(
         var ipLimit = limits.Check(RateLimitPolicies.FailedMfaTicketPerIp, ipKey);
         if (!ipLimit.Allowed) return Failure.RateLimited(ipLimit.RetryAfter);
 
-        if (answer.Factor is not { } factor) return Failure.Invalid("Send exactly one of totpCode and recoveryCode.");
-        if (factor == MfaFactors.Totp && !Totp.IsWellFormed(answer.TotpCode)) return Failure.Invalid("totpCode must be 6 digits.");
+        if (answer.Malformed() is { } malformed) return malformed;
+        var factor = answer.Factor!;
         if (!MfaTicket.TryParse(ticketValue, out var ticket)) return Failure.Invalid("The ticket is not an MFA ticket.");
 
         var found = await store.ReadAsync((db, token) =>
@@ -266,6 +288,18 @@ internal sealed class MfaService(
         if (!userLimit.Allowed) return Failure.RateLimited(userLimit.RetryAfter);
         await keys.GetActiveAsync(projectId, ct);
 
+        // A passkey's mfa challenge is spent and its answer verified before the transaction (AC-11): only a challenge
+        // made for this ticket counts, and the passkey must be the ticket's user's, checked below.
+        AssertionCheck? check = null;
+        if (factor == MfaFactors.Passkey)
+        {
+            var policy = await passkeys.ReadPolicyAsync(projectId, ct);
+            var challenge = await passkeys.ConsumeAsync(projectId, Guid.Parse(answer.Passkey!.ChallengeId!), ChallengePurposes.Mfa, null, found.Id, ct);
+            check = challenge is null || challenge.UserId != found.UserId || !policy.PasskeysEnabled
+                ? AssertionCheck.Failed
+                : await passkeys.VerifyAsync(policy, projectId, challenge, answer.Passkey.Credential!, ct);
+        }
+
         var wrong = false;
         var outcome = await store.WriteDecidingAsync<(Data.UserRow User, SessionGrant Grant, Guid[] Ended)>(async (uow, token) =>
         {
@@ -273,17 +307,14 @@ internal sealed class MfaService(
             if (locked is null || await MfaFactorStore.ReadTicketAsync(uow.Tx.Connection!, uow.Tx, projectId, ticket.Hash, lockRow: true, token) is not { } row)
                 return (Failure.InvalidMfaTicket, false);
 
-            var state = await MfaFactorState.ReadAsync(uow.Tx.Connection!, uow.Tx, projectId, row.UserId, token);
+            var state = await MfaFactorState.ReadAsync(policies, uow.Tx.Connection!, uow.Tx, projectId, row.UserId, token);
             if (!state.Factors.Contains(factor)) return (Failure.FactorNotEnabled, false);
 
-            var right = factor == MfaFactors.Totp
-                ? await factors.UseTotpAsync(uow, row.UserId, answer.TotpCode, token)
-                : await factors.UseRecoveryCodeAsync(uow, row.UserId, answer.RecoveryCode, token);
-            if (!right)
+            if (row.Id != found.Id || !await UseFactorAsync(uow, row.UserId, answer, check, state.Policy, token))
             {
                 wrong = true;
                 await CountWrongAsync(uow, row, token);
-                return (Failure.InvalidMfaCode, true);
+                return (factor == MfaFactors.Passkey ? Failure.InvalidPasskey : Failure.InvalidMfaCode, true);
             }
 
             await DeleteTicketAsync(uow, row.Id, token);
@@ -303,7 +334,7 @@ internal sealed class MfaService(
                     new Dictionary<string, string> { ["userId"] = userKey }, ct: token);
             }
 
-            var strength = SessionStrength.StepOne(row.Method).With(SessionStrength.ForFactor(factor), aal2: true);
+            var strength = SessionStrength.StepOne(row.Method).With(Amr(factor, check), aal2: true);
             var grant = await sessions.CreateAsync(uow, projectId, row.UserId, row.Client, actor, row.Method, token, row.Provider, strength);
             var user = await uow.Db.Users.AsNoTracking().SingleAsync(u => u.Id == row.UserId, token);
             return ((user, grant, ended), true);
@@ -354,6 +385,30 @@ internal sealed class MfaService(
         var refresh = sessions.Open(updated.GetFieldValue<byte[]>(0), sessionId);
         return (next, refresh, new DateTimeOffset(updated.GetFieldValue<DateTime>(1), TimeSpan.Zero));
     }
+
+    /// <summary>
+    /// Whether a step up may use <paramref name="factor"/> now (AC-19): codes need MFA on; a passkey needs passkeys on and
+    /// an active passkey of the user.
+    /// </summary>
+    private static bool Usable(MfaFactorState state, string factor) =>
+        factor == MfaFactors.Passkey ? state.Policy.PasskeysEnabled && state.ActivePasskeys > 0 : state.Factors.Contains(factor);
+
+    /// <summary>
+    /// Uses the answered factor under the user lock: a TOTP step or a recovery code once, or for a passkey, records the
+    /// verified assertion when the passkey is the user's and still active. False for a wrong answer.
+    /// </summary>
+    private async Task<bool> UseFactorAsync(AuthUnitOfWork uow, Guid userId, FactorAnswer answer, AssertionCheck? check, MethodPolicy policy, CancellationToken ct) =>
+        answer.Factor switch
+        {
+            MfaFactors.Totp => await factors.UseTotpAsync(uow, userId, answer.TotpCode, ct),
+            MfaFactors.RecoveryCode => await factors.UseRecoveryCodeAsync(uow, userId, answer.RecoveryCode, ct),
+            _ => check is { Valid: true, Passkey: { } passkey } && passkey.UserId == userId && policy.RpId is { } rpId
+                && await PasskeyRows.UseAsync(uow, passkey.Id, rpId, check.SignCount, check.BackedUp, ct),
+        };
+
+    /// <summary>The <c>amr</c> values a verified factor adds (AC-25): a passkey's from its backup state after this assertion.</summary>
+    private static string[] Amr(string factor, AssertionCheck? check) =>
+        factor == MfaFactors.Passkey ? SessionStrength.ForPasskey(check!.BackedUp) : SessionStrength.ForFactor(factor);
 
     private static async Task CountWrongAsync(AuthUnitOfWork uow, TicketRow row, CancellationToken ct)
     {

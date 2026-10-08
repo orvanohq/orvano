@@ -13,6 +13,14 @@ public interface IWebOriginPolicy
     Task<bool> AllowsAsync(string projectId, string origin, CancellationToken ct);
 
     /// <summary>
+    /// The host patterns of the project's <c>web</c> platforms, lowercase and in a stable order: a hostname,
+    /// <c>*.</c> plus a hostname, <c>localhost</c>, or an IPv4 literal (spec 0013 shows them on the Passkeys card).
+    /// </summary>
+    /// <param name="projectId">The project.</param>
+    /// <param name="ct">Cancels the read.</param>
+    Task<IReadOnlyList<string>> ListWebHostsAsync(string projectId, CancellationToken ct);
+
+    /// <summary>
     /// Whether an email link may open at <paramref name="redirectUrl"/> (spec 0010, AC-6): <c>https</c> on a host
     /// that matches a <c>web</c> platform (any port and path); <c>http</c> only on <c>localhost</c> or
     /// <c>127.0.0.1</c> when that host is a web platform; or a custom scheme equal, ignoring case, to the identifier of

@@ -19,7 +19,7 @@ internal static class MfaEndpoints
     {
         v1.MapPost(Api.AccountOperations.CreateMfaSession.Route, async (HttpContext http, Api.CreateMfaSessionRequest request, MfaService mfa, CancellationToken ct) =>
         {
-            var answer = new FactorAnswer(request.TotpCode, request.RecoveryCode);
+            var answer = new FactorAnswer(request.TotpCode, request.RecoveryCode, PasskeyAnswer(request.Passkey));
             return Created(http, await mfa.CompleteAsync(PublicRequests.Project(http), request.Ticket, answer, ConnectionIp.Key(http), ct), AuthResult);
         })
             .WithName(Api.AccountOperations.CreateMfaSession.Id)
@@ -77,7 +77,7 @@ internal static class MfaEndpoints
         v1.MapPost(Api.AccountOperations.VerifyMfa.Route, async (HttpContext http, Api.VerifyMfaRequest request, MfaService mfa, CancellationToken ct) =>
         {
             var user = PublicRequests.User(http);
-            var answer = new FactorAnswer(request.TotpCode, request.RecoveryCode);
+            var answer = new FactorAnswer(request.TotpCode, request.RecoveryCode, PasskeyAnswer(request.Passkey));
             return Ok(http, await mfa.VerifyAsync(PublicRequests.Project(http), user.UserId, user.SessionId, answer, ct), SessionTokens);
         })
             .WithName(Api.AccountOperations.VerifyMfa.Id)

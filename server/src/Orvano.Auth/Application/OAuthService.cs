@@ -207,7 +207,7 @@ internal sealed class OAuthService(
 
             var resolved = await resolution.ResolveAsync(uow, projectId, consumed.Provider, consumed.Result, null, SessionMethod.OAuth, ipKey, token);
             if (!resolved.Succeeded) return resolved.Failure!;
-            return await OAuthRedemptions.SignInAsync(uow, sessions, projectId, resolved.Value!, client, SessionMethod.OAuth,
+            return await redemptions.SignInAsync(uow, sessions, projectId, resolved.Value!, client, SessionMethod.OAuth,
                 OAuthProviders.Wire(consumed.Provider), token);
         }, ct);
         return await redemptions.FinishAsync(projectId, outcome, ct);

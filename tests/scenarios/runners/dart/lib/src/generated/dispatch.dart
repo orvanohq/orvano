@@ -18,6 +18,17 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.completePasskeyRegistration': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.completePasskeyRegistration(
+        CompletePasskeyRegistrationRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
   'account.completeRecovery': DispatchEntry(
     status: 201,
     client: (o, input) async {
@@ -118,6 +129,17 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.createMfaPasskeyChallenge': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.createMfaPasskeyChallenge(
+        CreateMfaPasskeyChallengeRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
   'account.createMfaSession': DispatchEntry(
     status: 201,
     client: (o, input) async {
@@ -156,6 +178,31 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.createPasskeyChallenge': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.createPasskeyChallenge();
+      return r.toJson();
+    },
+  ),
+  'account.createPasskeyRegistration': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.createPasskeyRegistration();
+      return r.toJson();
+    },
+  ),
+  'account.createPasskeySession': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createPasskeySession(
+        CreatePasskeySessionRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
   'account.createPasswordSession': DispatchEntry(
     status: 201,
     client: (o, input) async {
@@ -180,6 +227,13 @@ final Map<String, DispatchEntry> dispatch = {
     status: 201,
     client: (o, input) async {
       final r = await o.account.createRecoveryCodes();
+      return r.toJson();
+    },
+  ),
+  'account.createStepUpPasskeyChallenge': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.createStepUpPasskeyChallenge();
       return r.toJson();
     },
   ),
@@ -231,6 +285,13 @@ final Map<String, DispatchEntry> dispatch = {
       return null;
     },
   ),
+  'account.deletePasskey': DispatchEntry(
+    status: 204,
+    client: (o, input) async {
+      await o.account.deletePasskey(input['passkeyId'] as String);
+      return null;
+    },
+  ),
   'account.deleteSession': DispatchEntry(
     status: 204,
     client: (o, input) async {
@@ -267,6 +328,13 @@ final Map<String, DispatchEntry> dispatch = {
     status: 200,
     client: (o, input) async {
       final r = await o.account.listIdentities();
+      return r.toJson();
+    },
+  ),
+  'account.listPasskeys': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.listPasskeys();
       return r.toJson();
     },
   ),
@@ -312,6 +380,16 @@ final Map<String, DispatchEntry> dispatch = {
         UpdateEmailRequest.fromJson(input['body'] as Map<String, dynamic>),
       );
       return null;
+    },
+  ),
+  'account.updatePasskey': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.updatePasskey(
+        input['passkeyId'] as String,
+        UpdatePasskeyRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
     },
   ),
   'account.updatePassword': DispatchEntry(
@@ -402,6 +480,28 @@ final Map<String, DispatchEntry> dispatch = {
     server: (o, input) async {
       final r = await o.test.createIdToken(
         TestCreateIdTokenRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
+  'test.createPasskeyAssertion': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.test.createPasskeyAssertion(
+        TestCreatePasskeyAssertionRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
+  'test.createPasskeyCredential': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.test.createPasskeyCredential(
+        TestCreatePasskeyCredentialRequest.fromJson(
           input['body'] as Map<String, dynamic>,
         ),
       );

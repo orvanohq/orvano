@@ -11,6 +11,7 @@ import type {
   EmailTemplateInput,
   InvitationTokenRequest,
   SmtpSettingsInput,
+  UpdateAuthMethodSettingsRequest,
   UpdateInstallSettingsRequest,
   UpdateMemberRequest,
   UpdateOAuthProviderRequest,
@@ -75,6 +76,15 @@ export const consoleDispatch: DispatchTable = {
   'consoleAuthKeys.rotate': {
     status: 200,
     console: (o, _input) => o.consoleAuthKeys.rotate(),
+  },
+  'consoleAuthMethods.get': {
+    status: 200,
+    console: (o, _input) => o.consoleAuthMethods.get(),
+  },
+  'consoleAuthMethods.update': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleAuthMethods.update(input.body as UpdateAuthMethodSettingsRequest),
   },
   'consoleAuthProviders.delete': {
     status: 204,

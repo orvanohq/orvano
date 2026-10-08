@@ -24,6 +24,20 @@ final class AccountService {
     return Identity.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Finishes adding a passkey with the browser's or the platform's answer to `account.createPasskeyRegistration`.
+  Future<Passkey> completePasskeyRegistration(
+    CompletePasskeyRegistrationRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/passkeys',
+      body: body.toJson(),
+      options: options,
+    );
+    return Passkey.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Sets a new password with the token from a reset link, and signs the user in. Every other session of the user
   /// ends, and the email counts as verified. The token works once.
   Future<AuthResult> completeRecovery(
@@ -176,6 +190,21 @@ final class AccountService {
     return AuthResult.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Starts answering an MFA challenge with a passkey: answers the options for `navigator.credentials.get`, listing the
+  /// user's passkeys. Send the passkey's answer to `account.createMfaSession`. Never counts as a wrong attempt.
+  Future<PasskeyChallenge> createMfaPasskeyChallenge(
+    CreateMfaPasskeyChallengeRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/sessions/mfa/passkey-challenge',
+      body: body.toJson(),
+      options: options,
+    );
+    return PasskeyChallenge.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Finishes a sign in that answered an MFA challenge: checks the ticket and one factor, then creates the session.
   /// After 5 wrong factors the ticket stops working; sign in again.
   Future<AuthResult> createMfaSession(
@@ -239,6 +268,49 @@ final class AccountService {
     return AuthResult.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Starts a passkey sign in: answers a challenge with an empty `allowCredentials`, so the browser or the platform
+  /// offers every passkey of the RP ID, including through autofill. Needs passkeys turned on for the project.
+  Future<PasskeyChallenge> createPasskeyChallenge({
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/sessions/passkey-challenge',
+      options: options,
+    );
+    return PasskeyChallenge.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Starts adding a passkey: answers the options for `navigator.credentials.create`. Needs passkeys turned on, a
+  /// session that signed in within 10 minutes (or passed a second factor within 10 minutes), a verified email when the
+  /// user has one, and fewer than 10 passkeys.
+  Future<PasskeyRegistration> createPasskeyRegistration({
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/passkeys/registration',
+      options: options,
+    );
+    return PasskeyRegistration.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Signs in with a passkey's answer to `account.createPasskeyChallenge`. A passkey counts as two factors, so this sign
+  /// in is never asked for MFA and the session starts at level 2.
+  Future<AuthResult> createPasskeySession(
+    CreatePasskeySessionRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/sessions/passkey',
+      body: body.toJson(),
+      session: SessionChange.start,
+      options: options,
+    );
+    return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Signs a user in with their email and password.
   Future<AuthResult> createPasswordSession(
     CreatePasswordSessionRequest body, {
@@ -277,6 +349,19 @@ final class AccountService {
       options: options,
     );
     return RecoveryCodes.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Starts a step up with a passkey: answers the options for `navigator.credentials.get`, listing the signed in user's
+  /// passkeys. Send the passkey's answer to `account.verifyMfa`.
+  Future<PasskeyChallenge> createStepUpPasskeyChallenge({
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/mfa/passkey-challenge',
+      options: options,
+    );
+    return PasskeyChallenge.fromJson(json as Map<String, dynamic>);
   }
 
   /// Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.
@@ -345,6 +430,19 @@ final class AccountService {
     await _client.send('DELETE', '/v1/account/sessions', options: options);
   }
 
+  /// Removes one of the signed in user's passkeys. A user with MFA on needs a second factor on this session within 10
+  /// minutes (`account.verifyMfa`); a user without it needs a session that signed in within 10 minutes.
+  Future<void> deletePasskey(
+    String passkeyId, {
+    RequestOptions? options,
+  }) async {
+    await _client.send(
+      'DELETE',
+      '/v1/account/passkeys/${Uri.encodeComponent(passkeyId)}',
+      options: options,
+    );
+  }
+
   /// Ends one of the signed in user's sessions.
   Future<void> deleteSession(
     String sessionId, {
@@ -383,6 +481,16 @@ final class AccountService {
       options: options,
     );
     return IdentityList.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Lists the signed in user's passkeys, oldest first, including inactive ones.
+  Future<PasskeyList> listPasskeys({RequestOptions? options}) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/account/passkeys',
+      options: options,
+    );
+    return PasskeyList.fromJson(json as Map<String, dynamic>);
   }
 
   /// Lists the signed in user's active sessions, newest first.
@@ -451,6 +559,21 @@ final class AccountService {
       body: body.toJson(),
       options: options,
     );
+  }
+
+  /// Renames one of the signed in user's passkeys.
+  Future<Passkey> updatePasskey(
+    String passkeyId,
+    UpdatePasskeyRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'PATCH',
+      '/v1/account/passkeys/${Uri.encodeComponent(passkeyId)}',
+      body: body.toJson(),
+      options: options,
+    );
+    return Passkey.fromJson(json as Map<String, dynamic>);
   }
 
   /// Changes the signed in user's password and ends every other session of theirs.

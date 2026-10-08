@@ -24,7 +24,8 @@ internal sealed class IdentityService(
     SigningKeys keys,
     OAuthService oauth,
     OAuthRedemptions redemptions,
-    StepUp stepUp)
+    StepUp stepUp,
+    MethodPolicies policies)
 {
     public const int MaxIdTokenBytes = 8 * 1024;
     public const int MaxAuthorizationCode = 2048;
@@ -49,7 +50,7 @@ internal sealed class IdentityService(
             var name = native.Provider == OAuthProvider.Apple ? request.Name : null;
             var resolved = await resolution.ResolveAsync(uow, projectId, native.Provider, native.Result, name, SessionMethod.IdToken, ipKey, token);
             if (!resolved.Succeeded) return resolved.Failure!;
-            return await OAuthRedemptions.SignInAsync(uow, sessions, projectId, resolved.Value!, client, SessionMethod.IdToken,
+            return await redemptions.SignInAsync(uow, sessions, projectId, resolved.Value!, client, SessionMethod.IdToken,
                 OAuthProviders.Wire(native.Provider), token);
         }, ct);
         return await redemptions.FinishAsync(projectId, outcome, ct);
@@ -110,8 +111,8 @@ internal sealed class IdentityService(
 
     /// <summary>
     /// Unlinks one identity (AC-14), under the user's lock: another user's or an unknown identity is 404, and the
-    /// last way in is 409 <c>last_sign_in_method</c>. Another way in is another identity, a verified email, or an
-    /// email with a password. Sessions stay; an Apple identity gets its revoke queued.
+    /// last way in is 409 <c>last_sign_in_method</c>. Another way in is another identity, a verified email, an
+    /// email with a password, or an active passkey. Sessions stay; an Apple identity gets its revoke queued.
     /// </summary>
     public async Task<Outcome<Done>> DeleteAsync(string projectId, string userId, string identityId, string reason, Actor actor, CancellationToken ct)
     {
@@ -124,9 +125,12 @@ internal sealed class IdentityService(
             var all = await Identities.OfUserAsync(uow, uid, token);
             if (all.FirstOrDefault(i => i.Id == iid) is not { } target) return Failure.IdentityNotFound;
 
+            // An active passkey is a way in too (spec 0013), while the project's passkeys are on.
+            var passkeysState = await MfaFactorState.ReadAsync(policies, uow.Tx.Connection!, uow.Tx, projectId, uid, token);
             var anotherWayIn = all.Count > 1
                 || (user.Email is not null && user.EmailVerifiedAt is not null)
-                || (user.Email is not null && user.HasPassword);
+                || (user.Email is not null && user.HasPassword)
+                || (passkeysState.Policy.PasskeysEnabled && passkeysState.ActivePasskeys > 0);
             if (!anotherWayIn) return Failure.LastSignInMethod;
 
             await Identities.DeleteAsync(uow, projectId, target, reason, actor, token);

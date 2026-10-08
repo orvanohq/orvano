@@ -19,6 +19,7 @@ internal sealed class PasswordlessService(
     SigningKeys keys,
     AccountService accounts,
     RateLimits limits,
+    MethodPolicies policies,
     ILogger<PasswordlessService> logger)
 {
     /// <summary>What a redemption decided: the user, their new session, whether it created them, and sessions to evict.</summary>
@@ -170,7 +171,7 @@ internal sealed class PasswordlessService(
 
         // Spec 0013, AC-6: after every check and the claim (which removes factors, AC-29), a user with MFA on gets a
         // challenge in place of the session. The link or code stays used.
-        if (!created && await MfaGate.ChallengeAsync(uow, projectId, user.Id, method, null, client, ct) is { } challenge)
+        if (!created && await MfaGate.ChallengeAsync(policies, uow, projectId, user.Id, method, null, client, ct) is { } challenge)
             return new Redeemed(user.Id, null, false, ended, challenge);
 
         var grant = await sessions.CreateAsync(uow, projectId, user.Id, client, actor, method, ct);

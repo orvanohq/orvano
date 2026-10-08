@@ -52,6 +52,24 @@ internal static class AuthEvents
     /// <summary>A passkey was removed (spec 0013, AC-33); <c>reason</c> says by whom.</summary>
     public const string PasskeyRemoved = "auth.passkey.removed";
 
+    /// <summary>The <c>reason</c> of <see cref="PasskeyRemoved"/> when the user removed it.</summary>
+    public const string RemovedByUser = "user";
+
+    /// <summary>A passkey was added (spec 0013, AC-21).</summary>
+    public const string PasskeyAdded = "auth.passkey.added";
+
+    /// <summary>A passkey was renamed (spec 0013, AC-33).</summary>
+    public const string PasskeyRenamed = "auth.passkey.renamed";
+
+    /// <summary>
+    /// A passkey's signature counter did not go up (spec 0013, AC-22): a sign that it was cloned. Written in its own
+    /// transaction, beside the refusal.
+    /// </summary>
+    public const string PasskeyCounterRegressed = "auth.passkey.counter_regressed";
+
+    /// <summary>A project's second factor and passkey settings changed (spec 0013, AC-1); <c>changed</c> names the fields.</summary>
+    public const string MethodSettingsUpdated = "auth.method_settings.updated";
+
     /// <summary>A user's recovery codes were replaced by 10 new ones (spec 0013, AC-33).</summary>
     public const string RecoveryCodesCreated = "auth.recovery_codes.created";
 

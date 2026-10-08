@@ -202,6 +202,62 @@ internal static class ApiMapping
 
     public static Api.TotpConfirmation TotpConfirmation(TotpConfirmationView view) => new(view.RecoveryCodes, SessionTokens(view.Session));
 
+    public static Api.Passkey Passkey(PasskeyView view) =>
+        new(view.Id.ToString(), view.Name, view.CreatedAt, view.LastUsedAt, view.Synced, view.Active);
+
+    public static Api.PasskeyList PasskeyList(IEnumerable<PasskeyView> views) => new([.. views.Select(Passkey)]);
+
+    public static Api.PasskeyRegistration PasskeyRegistration(RegistrationView view) => new(
+        view.ChallengeId.ToString(),
+        new Api.PasskeyCreationOptions(
+            new Api.PasskeyRelyingParty(view.Options.RpId, view.Options.RpName),
+            new Api.PasskeyUserEntity(view.Options.UserHandle, view.Options.UserName, view.Options.DisplayName),
+            view.Options.Challenge,
+            [.. PasskeyRules.Algorithms.Select(alg => new Api.PasskeyCredentialParameters(PasskeyRules.CredentialType, alg))],
+            PasskeyRules.TimeoutMs,
+            [.. view.Options.ExcludeCredentials.Select(CredentialDescriptor)],
+            new Api.PasskeyAuthenticatorSelection(PasskeyRules.Required, true, PasskeyRules.Required),
+            PasskeyRules.AttestationNone));
+
+    public static Api.PasskeyChallenge PasskeyChallenge(PasskeyChallengeView view) => new(
+        view.ChallengeId.ToString(),
+        new Api.PasskeyRequestOptions(
+            view.Options.Challenge,
+            view.Options.RpId,
+            PasskeyRules.TimeoutMs,
+            PasskeyRules.Required,
+            [.. view.Options.AllowCredentials.Select(CredentialDescriptor)]));
+
+    private static Api.PasskeyCredentialDescriptor CredentialDescriptor(CredentialRef credential) =>
+        new(PasskeyRules.CredentialType, credential.Id, credential.Transports.Count == 0 ? null : [.. credential.Transports]);
+
+    /// <summary>A passkey's answer as the use cases read it; null when the body left it out.</summary>
+    public static AssertionInput? Assertion(Api.PasskeyAssertionCredential? credential) => credential?.Response is null
+        ? null
+        : new AssertionInput(
+            credential.Id, credential.RawId, credential.Type, credential.Response.ClientDataJSON, credential.Response.AuthenticatorData,
+            credential.Response.Signature, credential.Response.UserHandle);
+
+    /// <summary>A new passkey as the use cases read it; null when the body left it out.</summary>
+    public static AttestationInput? Attestation(Api.PasskeyRegistrationCredential? credential) => credential?.Response is null
+        ? null
+        : new AttestationInput(
+            credential.Id, credential.RawId, credential.Type, credential.Response.ClientDataJSON, credential.Response.AttestationObject,
+            credential.Response.Transports);
+
+    /// <summary>A step two's or step up's passkey part; null when the body left it out.</summary>
+    public static PasskeyAnswerInput? PasskeyAnswer(Api.PasskeyAnswer? answer) =>
+        answer is null ? null : new PasskeyAnswerInput(answer.ChallengeId, Assertion(answer.Credential));
+
+    public static Api.AuthMethodSettings AuthMethodSettings(MethodSettingsView view) => new(
+        view.Settings.TotpEnabled,
+        view.Settings.PasskeysEnabled,
+        view.Settings.RpId,
+        view.Settings.RpName,
+        [.. view.Settings.AndroidCertFingerprints],
+        view.ActivePasskeyCount,
+        [.. view.AcceptedOrigins]);
+
     public static Api.Jwk Jwk(PublicSigningKey key) =>
         JsonSerializer.Deserialize<Api.Jwk>(key.PublicJwk) ?? throw new InvalidOperationException($"Signing key {key.Kid} has no public JWK.");
 

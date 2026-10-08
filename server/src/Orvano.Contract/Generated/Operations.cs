@@ -20,6 +20,22 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>POST /v1/account/passkeys: Finishes adding a passkey with the browser's or the platform's answer to <c>account.createPasskeyRegistration</c>.</summary>
+    public static class CompletePasskeyRegistration
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.completePasskeyRegistration";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/passkeys";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account/recovery/confirm: Sets a new password with the token from a reset link, and signs the user in. Every other session of the user</summary>
     public static class CompleteRecovery
     {
@@ -180,6 +196,22 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>POST /v1/account/sessions/mfa/passkey-challenge: Starts answering an MFA challenge with a passkey: answers the options for <c>navigator.credentials.get</c>, listing the</summary>
+    public static class CreateMfaPasskeyChallenge
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createMfaPasskeyChallenge";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/mfa/passkey-challenge";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account/sessions/mfa: Finishes a sign in that answered an MFA challenge: checks the ticket and one factor, then creates the session.</summary>
     public static class CreateMfaSession
     {
@@ -244,6 +276,54 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>POST /v1/account/sessions/passkey-challenge: Starts a passkey sign in: answers a challenge with an empty <c>allowCredentials</c>, so the browser or the platform</summary>
+    public static class CreatePasskeyChallenge
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createPasskeyChallenge";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/passkey-challenge";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/passkeys/registration: Starts adding a passkey: answers the options for <c>navigator.credentials.create</c>. Needs passkeys turned on, a</summary>
+    public static class CreatePasskeyRegistration
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createPasskeyRegistration";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/passkeys/registration";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/sessions/passkey: Signs in with a passkey's answer to <c>account.createPasskeyChallenge</c>. A passkey counts as two factors, so this sign</summary>
+    public static class CreatePasskeySession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createPasskeySession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/passkey";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account/sessions/password: Signs a user in with their email and password.</summary>
     public static class CreatePasswordSession
     {
@@ -287,6 +367,22 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/mfa/recovery-codes";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/mfa/passkey-challenge: Starts a step up with a passkey: answers the options for <c>navigator.credentials.get</c>, listing the signed in user's</summary>
+    public static class CreateStepUpPasskeyChallenge
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createStepUpPasskeyChallenge";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/passkey-challenge";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";
@@ -388,6 +484,22 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>DELETE /v1/account/passkeys/{passkeyId}: Removes one of the signed in user's passkeys. A user with MFA on needs a second factor on this session within 10</summary>
+    public static class DeletePasskey
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.deletePasskey";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/passkeys/{passkeyId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>DELETE /v1/account/sessions/{sessionId}: Ends one of the signed in user's sessions.</summary>
     public static class DeleteSession
     {
@@ -468,6 +580,22 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>GET /v1/account/passkeys: Lists the signed in user's passkeys, oldest first, including inactive ones.</summary>
+    public static class ListPasskeys
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.listPasskeys";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/passkeys";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>GET /v1/account/sessions: Lists the signed in user's active sessions, newest first.</summary>
     public static class ListSessions
     {
@@ -527,6 +655,22 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/email";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>PATCH /v1/account/passkeys/{passkeyId}: Renames one of the signed in user's passkeys.</summary>
+    public static class UpdatePasskey
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.updatePasskey";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PATCH";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/passkeys/{passkeyId}";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";
@@ -747,6 +891,42 @@ public static class ConsoleAuthKeysOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/console/project/auth/keys/rotate";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
+/// <summary>Route constants for the <c>consoleAuthMethods</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleAuthMethodsOperations
+{
+    /// <summary>GET /v1/console/project/auth/methods: Gets the project's second factor and passkey settings; any member.</summary>
+    public static class Get
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAuthMethods.get";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/auth/methods";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>PATCH /v1/console/project/auth/methods: Changes the project's second factor and passkey settings; owners and developers only.</summary>
+    public static class Update
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAuthMethods.update";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PATCH";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/auth/methods";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "console";
@@ -1910,6 +2090,38 @@ public static class TestOperations
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "both";
+    }
+
+    /// <summary>POST /v1/test/passkeys/assertions: Signs a challenge with a passkey the software authenticator made.</summary>
+    public static class CreatePasskeyAssertion
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "test.createPasskeyAssertion";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/test/passkeys/assertions";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/test/passkeys/credentials: Makes a passkey with the software authenticator: a new P-256 key, kept in memory for the run.</summary>
+    public static class CreatePasskeyCredential
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "test.createPasskeyCredential";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/test/passkeys/credentials";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
     }
 
     /// <summary>GET /v1/test/emails/latest: Waits up to 15 seconds for the newest email to <c>to</c> that Mailpit caught after <c>after</c>, and reads it.</summary>

@@ -45,8 +45,12 @@ internal sealed class AuthModule : IOrvanoModule
         services.AddSingleton<AccessTokens>();
         services.AddSingleton<Sessions>();
         services.AddSingleton<AccountService>();
+        services.AddSingleton<MethodPolicies>();
         services.AddSingleton<MfaFactorStore>();
         services.AddSingleton<StepUp>();
+        services.AddSingleton<WebAuthnVerifier>();
+        services.AddSingleton<PasskeyService>();
+        services.AddSingleton<MethodSettingsService>();
         services.AddSingleton<MfaService>();
         services.AddSingleton<SessionService>();
         services.AddSingleton<UsersService>();
@@ -82,6 +86,7 @@ internal sealed class AuthModule : IOrvanoModule
         var auth = v1.WithUserExtras();
         AccountEndpoints.Map(auth);
         MfaEndpoints.Map(auth);
+        PasskeyEndpoints.Map(auth);
         OAuthEndpoints.Map(auth);
         IdentityEndpoints.Map(auth);
         KeysEndpoints.Map(auth);

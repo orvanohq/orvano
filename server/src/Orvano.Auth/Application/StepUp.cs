@@ -12,14 +12,14 @@ namespace Orvano.Auth.Application;
 internal sealed record SessionRecency(bool MfaEnabled, bool Fresh, bool Strong);
 
 /// <summary>The enrollment check (AC-17) and the step up check (AC-18), shared by every operation they guard.</summary>
-internal sealed class StepUp(AuthStore store)
+internal sealed class StepUp(AuthStore store, MethodPolicies policies)
 {
     /// <summary>The caller's <see cref="SessionRecency"/>; an unknown session reads as neither fresh nor strong.</summary>
     public Task<SessionRecency> ReadAsync(string projectId, Guid userId, Guid sessionId, CancellationToken ct) =>
         store.ReadAsync(async (db, token) =>
         {
             var conn = (NpgsqlConnection)db.Database.GetDbConnection();
-            var state = await MfaFactorState.ReadAsync(conn, null, projectId, userId, token);
+            var state = await MfaFactorState.ReadAsync(policies, conn, null, projectId, userId, token);
             await using var cmd = new NpgsqlCommand(
                 """
                 SELECT created_at > now() - @window, coalesce(strong_auth_at > now() - @window, false)

@@ -151,6 +151,24 @@ internal sealed record Failure(FailureKind Kind, string Code, string Detail, Tim
     public static Failure FactorNotEnabled { get; } =
         new(FailureKind.Conflict, ErrorCode.FactorNotEnabled, "This factor is turned off for the project, or can't be used now.");
 
+    public static Failure InvalidPasskey { get; } =
+        new(FailureKind.Unauthorized, ErrorCode.InvalidPasskey, "The passkey could not be checked. Try again or use another way to sign in.");
+
+    public static Failure InvalidPasskeyChallenge { get; } =
+        new(FailureKind.Invalid, ErrorCode.InvalidPasskeyChallenge, "The passkey challenge is unknown, used, or expired. Start again.");
+
+    public static Failure PasskeyAlreadyRegistered { get; } =
+        new(FailureKind.Conflict, ErrorCode.PasskeyAlreadyRegistered, "This passkey is already registered.");
+
+    public static Failure PasskeyLimit { get; } =
+        new(FailureKind.Conflict, ErrorCode.PasskeyLimit, "A user can have at most 10 passkeys. Remove one first.");
+
+    public static Failure PasskeyNotFound { get; } = new(FailureKind.NotFound, ErrorCode.PasskeyNotFound, "No such passkey.");
+
+    public static Failure PasskeysExist(int count) =>
+        new(FailureKind.Conflict, ErrorCode.PasskeysExist,
+            $"{count.ToString(System.Globalization.CultureInfo.InvariantCulture)} passkeys are registered under the current RP ID and stop working after the change. Send confirmRpIdChange: true to go ahead.");
+
     public static Failure Busy { get; } =
         new(FailureKind.Busy, ErrorCode.ServerBusy, "The server is busy checking passwords. Try again in a moment.");
 }

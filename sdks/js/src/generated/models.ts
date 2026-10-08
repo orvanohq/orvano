@@ -54,6 +54,16 @@ export interface CompleteOAuthLinkRequest {
   codeVerifier: string
 }
 
+/** A finished passkey registration. */
+export interface CompletePasskeyRegistrationRequest {
+  /** The `challengeId` of the `PasskeyRegistration`. */
+  challengeId: string
+  /** The browser's or the platform's answer. */
+  credential: PasskeyRegistrationCredential
+  /** 1 to 64 characters. Left out, the passkey is named `Passkey`. */
+  name?: string
+}
+
 /** A password reset, with the token from the emailed link. */
 export interface CompleteRecoveryRequest {
   /** The `orvano_token` parameter of the emailed link. */
@@ -141,6 +151,12 @@ export interface CreateMagicLinkSessionRequest {
   token: string
 }
 
+/** The ticket of a sign in waiting for its second step. */
+export interface CreateMfaPasskeyChallengeRequest {
+  /** The `ticket` of the `MfaChallenge`. */
+  ticket: string
+}
+
 /** The second step of a sign in: the ticket and exactly one factor. */
 export interface CreateMfaSessionRequest {
   /** The `ticket` of the `MfaChallenge`. */
@@ -149,6 +165,8 @@ export interface CreateMfaSessionRequest {
   totpCode?: string
   /** A recovery code; case, spaces, and hyphens do not matter. Each works once. */
   recoveryCode?: string
+  /** A passkey's answer to `account.createMfaPasskeyChallenge`. */
+  passkey?: PasskeyAnswer
 }
 
 /** A request to start signing in with a provider. */
@@ -174,6 +192,14 @@ export interface CreateOAuthSessionRequest {
   code: string
   /** The PKCE verifier whose challenge started the flow: 43 to 128 characters of `[A-Za-z0-9-._~]`. */
   codeVerifier: string
+}
+
+/** A sign in with a passkey. */
+export interface CreatePasskeySessionRequest {
+  /** The `challengeId` of the `PasskeyChallenge`. */
+  challengeId: string
+  /** The browser's or the platform's answer. */
+  credential: PasskeyAssertionCredential
 }
 
 /** A sign in with an email and password. */
@@ -352,6 +378,188 @@ export interface OpenIdConfiguration {
   response_types_supported: string[]
 }
 
+/** A passkey of a user. */
+export interface Passkey {
+  /** The passkey's ID. */
+  id: string
+  /** The name the user gave it, else `Passkey`. */
+  name: string
+  /** When it was added. */
+  createdAt: string
+  /** When it last signed in or answered a challenge; null when it never has. */
+  lastUsedAt: string | null
+  /** Whether the passkey is backed up and synced across devices (for example by iCloud Keychain or a password manager). */
+  synced: boolean
+  /** Whether it can sign in now: false after the project's RP ID changed away from the one it was made for. */
+  active: boolean
+}
+
+/** A passkey's answer to a challenge. */
+export interface PasskeyAnswer {
+  /** The `challengeId` of the `PasskeyChallenge`. */
+  challengeId: string
+  /** The browser's or the platform's answer. */
+  credential: PasskeyAssertionCredential
+}
+
+/** A passkey's answer in WebAuthn's JSON form: what `PublicKeyCredential.toJSON()` gives after `get`. */
+export interface PasskeyAssertionCredential {
+  /** The credential ID, base64url. */
+  id: string
+  /** The credential ID again, base64url; must equal `id`. */
+  rawId: string
+  /** Always `public-key`. */
+  type: string
+  /** The authenticator's answer. */
+  response: PasskeyAssertionResponse
+  /** `platform` or `cross-platform`; null when the browser does not say. */
+  authenticatorAttachment?: string | null
+}
+
+/** The authenticator's answer to `navigator.credentials.get`. */
+export interface PasskeyAssertionResponse {
+  /** The client data, base64url. */
+  clientDataJSON: string
+  /** The authenticator data, base64url. */
+  authenticatorData: string
+  /** The signature, base64url. */
+  signature: string
+  /** The user handle the passkey stores, base64url; null when the authenticator gives none. */
+  userHandle?: string | null
+}
+
+/** The authenticator's answer to `navigator.credentials.create`. */
+export interface PasskeyAttestationResponse {
+  /** The client data, base64url. */
+  clientDataJSON: string
+  /** The attestation object, base64url. */
+  attestationObject: string
+  /** How the authenticator was reached: `internal`, `hybrid`, `usb`, `nfc`, or `ble`. */
+  transports?: string[]
+}
+
+/** What kind of authenticator a new passkey must come from. */
+export interface PasskeyAuthenticatorSelection {
+  /** Always `required`: the passkey is discoverable, so it signs in with no email typed. */
+  residentKey: string
+  /** Always true, for older browsers. */
+  requireResidentKey: boolean
+  /** Always `required`: face, fingerprint, or PIN. */
+  userVerification: string
+}
+
+/** A challenge for a passkey to sign: pass `options` to the browser, then send its answer with `challengeId`. */
+export interface PasskeyChallenge {
+  /** Names this challenge; send it back with the answer within 5 minutes. */
+  challengeId: string
+  /** The options for `navigator.credentials.get`. */
+  options: PasskeyRequestOptions
+}
+
+/**
+ * The options for `navigator.credentials.create` in WebAuthn's JSON form. Pass them to
+ * `PublicKeyCredential.parseCreationOptionsFromJSON`, or let the SDK's `registerPasskey` do it.
+ */
+export interface PasskeyCreationOptions {
+  /** The relying party. */
+  rp: PasskeyRelyingParty
+  /** The user the passkey is for. */
+  user: PasskeyUserEntity
+  /** 32 random bytes, base64url, used once. */
+  challenge: string
+  /** The key types the server accepts, in order of preference. */
+  pubKeyCredParams: PasskeyCredentialParameters[]
+  /** How long the browser waits, in milliseconds: 300000. */
+  timeout: number
+  /** The user's passkeys under this RP ID, so the same authenticator is not registered twice. */
+  excludeCredentials: PasskeyCredentialDescriptor[]
+  /** The authenticator rules. */
+  authenticatorSelection: PasskeyAuthenticatorSelection
+  /** Always `none`: no device certificate is asked for. */
+  attestation: string
+}
+
+/** One passkey, named by its credential ID. */
+export interface PasskeyCredentialDescriptor {
+  /** Always `public-key`. */
+  type: string
+  /** The credential ID, base64url. */
+  id: string
+  /** How the authenticator was reached when the passkey was made: `internal`, `hybrid`, `usb`, `nfc`, or `ble`. */
+  transports?: string[]
+}
+
+/** A key type the server accepts. */
+export interface PasskeyCredentialParameters {
+  /** Always `public-key`. */
+  type: string
+  /** A COSE algorithm: -7 (ES256), -8 (EdDSA), or -257 (RS256). */
+  alg: number
+}
+
+/** A user's passkeys, oldest first; at most 10. */
+export interface PasskeyList {
+  /** The passkeys. */
+  items: Passkey[]
+}
+
+/** A started passkey registration: pass `options` to the browser, then send its answer with `challengeId`. */
+export interface PasskeyRegistration {
+  /** Names this registration; send it back with the new passkey within 5 minutes. */
+  challengeId: string
+  /** The options for `navigator.credentials.create`. */
+  options: PasskeyCreationOptions
+}
+
+/** A new passkey in WebAuthn's JSON form: what `PublicKeyCredential.toJSON()` gives after `create`. */
+export interface PasskeyRegistrationCredential {
+  /** The credential ID, base64url. */
+  id: string
+  /** The credential ID again, base64url; must equal `id`. */
+  rawId: string
+  /** Always `public-key`. */
+  type: string
+  /** The authenticator's answer. */
+  response: PasskeyAttestationResponse
+  /** `platform` or `cross-platform`; null when the browser does not say. */
+  authenticatorAttachment?: string | null
+}
+
+/** The relying party of a passkey: the app's passkey domain and the name people see. */
+export interface PasskeyRelyingParty {
+  /** The RP ID: the domain passkeys are bound to. */
+  id: string
+  /** The name an authenticator shows: the project's RP name, else the project name. */
+  name: string
+}
+
+/**
+ * The options for `navigator.credentials.get` in WebAuthn's JSON form. Pass them to
+ * `PublicKeyCredential.parseRequestOptionsFromJSON`, or let the SDK's helpers do it.
+ */
+export interface PasskeyRequestOptions {
+  /** 32 random bytes, base64url, used once. */
+  challenge: string
+  /** The RP ID. */
+  rpId: string
+  /** How long the browser waits, in milliseconds: 300000. */
+  timeout: number
+  /** Always `required`: face, fingerprint, or PIN. */
+  userVerification: string
+  /** The passkeys that may answer; empty for sign in, so the browser offers every passkey for the RP ID. */
+  allowCredentials: PasskeyCredentialDescriptor[]
+}
+
+/** The account a new passkey is for, as the authenticator stores it. */
+export interface PasskeyUserEntity {
+  /** The user handle: the user ID's 16 bytes, base64url. */
+  id: string
+  /** The user's email, else their user ID. */
+  name: string
+  /** The user's name, else their email, else `User`. */
+  displayName: string
+}
+
 /** New recovery codes. Show them once and ask the user to keep them safe; every older code stopped working. */
 export interface RecoveryCodes {
   /** 10 recovery codes, each `XXXXX-XXXXX`, each working once. */
@@ -472,6 +680,12 @@ export interface UpdateEmailVerificationRequest {
   verified: boolean
 }
 
+/** A new name for a passkey. */
+export interface UpdatePasskeyRequest {
+  /** 1 to 64 characters. */
+  name: string
+}
+
 /** A password change. */
 export interface UpdatePasswordRequest {
   /** The user's current password. A user without one leaves it out, and must have signed in within 10 minutes. */
@@ -534,4 +748,6 @@ export interface VerifyMfaRequest {
   totpCode?: string
   /** A recovery code; case, spaces, and hyphens do not matter. Each works once. */
   recoveryCode?: string
+  /** A passkey's answer to `account.createStepUpPasskeyChallenge`. */
+  passkey?: PasskeyAnswer
 }

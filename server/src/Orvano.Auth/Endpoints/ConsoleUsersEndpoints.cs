@@ -11,6 +11,7 @@ using Orvano.Platform.Contracts;
 using static Orvano.Auth.Endpoints.ApiMapping;
 using Api = Orvano.Contract;
 using Keys = Orvano.Contract.ConsoleAuthKeysOperations;
+using Methods = Orvano.Contract.ConsoleAuthMethodsOperations;
 using Ops = Orvano.Contract.ConsoleUsersOperations;
 using Providers = Orvano.Contract.ConsoleAuthProvidersOperations;
 
@@ -142,6 +143,19 @@ internal static class ConsoleUsersEndpoints
             .WithName(Providers.Delete.Id)
             .RequireRole(Need.Write);
 
+        v1.MapGet(Methods.Get.Route, async (HttpContext http, MethodSettingsService settings, CancellationToken ct) =>
+            Ok(http, await settings.GetAsync(Project(http), ct), AuthMethodSettings))
+            .WithName(Methods.Get.Id)
+            .RequireRole(Need.Read);
+
+        v1.MapPatch(Methods.Update.Route, async (HttpContext http, JsonElement body, MethodSettingsService settings, CancellationToken ct) =>
+            TryReadMethodsUpdate(body, out var update)
+                ? Ok(http, await settings.UpdateAsync(Project(http), update, Me(http), ct), AuthMethodSettings)
+                : ApiProblem.Result(StatusCodes.Status400BadRequest, Api.ErrorCode.InvalidRequest,
+                    "Send a JSON object with any of totpEnabled, passkeysEnabled, rpId, rpName, androidCertFingerprints, and confirmRpIdChange."))
+            .WithName(Methods.Update.Id)
+            .RequireRole(Need.Write);
+
         v1.MapGet(Keys.List.Route, async (HttpContext http, SigningKeys keys, CancellationToken ct) =>
             TypedResults.Ok(SigningKeysView(await keys.ListAsync(Project(http), ct))))
             .WithName(Keys.List.Id)
@@ -186,6 +200,36 @@ internal static class ConsoleUsersEndpoints
             request.AppleKeyId,
             Secret(body, "applePrivateKey", request.ApplePrivateKey),
             request.MicrosoftTenant);
+        return true;
+    }
+
+    /// <summary>
+    /// Reads <c>consoleAuthMethods.update</c>'s body (spec 0013, AC-1): bound as JSON first, so <c>rpId</c> or
+    /// <c>rpName</c> left out keeps the stored value while <c>null</c> clears it.
+    /// </summary>
+    private static bool TryReadMethodsUpdate(JsonElement body, out Domain.MethodSettingsUpdate update)
+    {
+        update = null!;
+        if (body.ValueKind != JsonValueKind.Object) return false;
+
+        Api.UpdateAuthMethodSettingsRequest? request;
+        try
+        {
+            request = body.Deserialize<Api.UpdateAuthMethodSettingsRequest>(JsonSerializerOptions.Web);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+
+        if (request is null) return false;
+        update = new Domain.MethodSettingsUpdate(
+            request.TotpEnabled,
+            request.PasskeysEnabled,
+            body.TryGetProperty("rpId", out _) ? Domain.FieldChange.To(request.RpId) : Domain.FieldChange.Keep,
+            body.TryGetProperty("rpName", out _) ? Domain.FieldChange.To(request.RpName) : Domain.FieldChange.Keep,
+            request.AndroidCertFingerprints,
+            request.ConfirmRpIdChange ?? false);
         return true;
     }
 

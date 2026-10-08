@@ -5,6 +5,7 @@ import "@typespec/openapi";
 import "../errors.tsp";
 import "./security.tsp";
 import "./account.tsp";
+import "./passkeys.tsp";
 
 using Http;
 using OpenAPI;
@@ -55,6 +56,16 @@ model CreateMfaSessionRequest {
   @doc("A recovery code; case, spaces, and hyphens do not matter. Each works once.")
   @example("K7QXM-2RPLD")
   recoveryCode?: string;
+
+  @doc("A passkey's answer to `account.createMfaPasskeyChallenge`.")
+  passkey?: PasskeyAnswer;
+}
+
+@doc("The ticket of a sign in waiting for its second step.")
+model CreateMfaPasskeyChallengeRequest {
+  @doc("The `ticket` of the `MfaChallenge`.")
+  @example("orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE")
+  ticket: string;
 }
 
 @doc("The signed in user's MFA state.")
@@ -135,6 +146,9 @@ model VerifyMfaRequest {
   @doc("A recovery code; case, spaces, and hyphens do not matter. Each works once.")
   @example("K7QXM-2RPLD")
   recoveryCode?: string;
+
+  @doc("A passkey's answer to `account.createStepUpPasskeyChallenge`.")
+  passkey?: PasskeyAnswer;
 }
 
 @route("/v1/account")
@@ -154,6 +168,17 @@ interface AccountMfaApi {
     @statusCode statusCode: 201;
     @body body: AuthResult;
   } | Problem;
+
+  @doc("""
+    Starts answering an MFA challenge with a passkey: answers the options for `navigator.credentials.get`, listing the
+    user's passkeys. Send the passkey's answer to `account.createMfaSession`. Never counts as a wrong attempt.
+    """)
+  @operationId("account.createMfaPasskeyChallenge")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @route("/sessions/mfa/passkey-challenge")
+  @post
+  createMfaPasskeyChallenge(@body request: CreateMfaPasskeyChallengeRequest): PasskeyChallenge | Problem;
 
   @doc("Gets the signed in user's MFA state.")
   @operationId("account.getMfa")
@@ -232,4 +257,16 @@ interface AccountMfaApi {
   @route("/mfa/verify")
   @post
   verifyMfa(@body request: VerifyMfaRequest): SessionTokens | Problem;
+
+  @doc("""
+    Starts a step up with a passkey: answers the options for `navigator.credentials.get`, listing the signed in user's
+    passkeys. Send the passkey's answer to `account.verifyMfa`.
+    """)
+  @operationId("account.createStepUpPasskeyChallenge")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @useAuth(bearer)
+  @route("/mfa/passkey-challenge")
+  @post
+  createStepUpPasskeyChallenge(): PasskeyChallenge | Problem;
 }

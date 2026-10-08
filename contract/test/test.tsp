@@ -5,6 +5,7 @@ import "@typespec/http";
 import "@typespec/openapi";
 import "../errors.tsp";
 import "../auth/security.tsp";
+import "../auth/passkeys.tsp";
 
 using Http;
 using OpenAPI;
@@ -137,6 +138,64 @@ model TestAppleRevocationList {
   items: TestAppleRevocation[];
 }
 
+@doc("A request for a new passkey from the `Test` only software authenticator (spec 0013, AC-45).")
+@extension("x-orvano-test", true)
+model TestCreatePasskeyCredentialRequest {
+  @doc("The `options` of `account.createPasskeyRegistration`.")
+  options: PasskeyCreationOptions;
+
+  @doc("The origin the client data names.")
+  @example("http://localhost:3000")
+  origin: string;
+
+  @doc("The RP ID whose hash the authenticator data carries; defaults to `options.rp.id`.")
+  @example("localhost")
+  rpId?: string;
+
+  @doc("Whether the passkey is backed up (synced); defaults to false.")
+  @example(false)
+  backedUp?: boolean;
+
+  @doc("Whether the user verified flag is set; defaults to true.")
+  @example(true)
+  userVerified?: boolean;
+}
+
+@doc("A request for an assertion from the `Test` only software authenticator (spec 0013, AC-45).")
+@extension("x-orvano-test", true)
+model TestCreatePasskeyAssertionRequest {
+  @doc("The `options` of a `PasskeyChallenge`.")
+  options: PasskeyRequestOptions;
+
+  @doc("The origin the client data names.")
+  @example("http://localhost:3000")
+  origin: string;
+
+  @doc("The `id` of a credential this authenticator made in this run.")
+  @example("pM2Gq8pZ1wqTNO4FqVt9fA")
+  credentialId: string;
+
+  @doc("The RP ID whose hash the authenticator data carries; defaults to `options.rpId`.")
+  @example("localhost")
+  rpId?: string;
+
+  @doc("Whether the passkey is backed up (synced); defaults to the value it was made with.")
+  @example(false)
+  backedUp?: boolean;
+
+  @doc("The signature counter to report; defaults to 0.")
+  @example(0)
+  signCount?: int32;
+
+  @doc("Whether the user verified flag is set; defaults to true.")
+  @example(true)
+  userVerified?: boolean;
+
+  @doc("Whether to send the user handle the passkey stores; defaults to true.")
+  @example(true)
+  includeUserHandle?: boolean;
+}
+
 @route("/v1/test")
 @tag("test")
 interface TestApi {
@@ -148,6 +207,24 @@ interface TestApi {
   @post
   @route("/oauth/id-tokens")
   createIdToken(@body request: TestCreateIdTokenRequest): TestIdToken | Problem;
+
+  @doc("Makes a passkey with the software authenticator: a new P-256 key, kept in memory for the run.")
+  @operationId("test.createPasskeyCredential")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "test")
+  @extension("x-orvano-test", true)
+  @post
+  @route("/passkeys/credentials")
+  createPasskeyCredential(@body request: TestCreatePasskeyCredentialRequest): PasskeyRegistrationCredential | Problem;
+
+  @doc("Signs a challenge with a passkey the software authenticator made.")
+  @operationId("test.createPasskeyAssertion")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "test")
+  @extension("x-orvano-test", true)
+  @post
+  @route("/passkeys/assertions")
+  createPasskeyAssertion(@body request: TestCreatePasskeyAssertionRequest): PasskeyAssertionCredential | Problem;
 
   @doc("Lists the calls the fake Apple revoke endpoint received after `after`.")
   @operationId("test.listAppleRevocations")

@@ -212,6 +212,9 @@ internal sealed record SessionStrength(short Aal, IReadOnlyList<string> Amr)
     /// <summary>The <c>amr</c> values of a passkey: <c>swk</c> when it is backed up, else <c>hwk</c>, plus <c>user</c>.</summary>
     public static string[] ForPasskey(bool backedUp) => [backedUp ? SoftwareKey : HardwareKey, UserPresence];
 
+    /// <summary>A passkey sign in (AC-24): level 2 at once, with the passkey's values and <c>mfa</c>.</summary>
+    public static SessionStrength PasskeySignIn(bool backedUp) => new SessionStrength(1, []).With(ForPasskey(backedUp), aal2: true);
+
     /// <summary>A step one session at level 1.</summary>
     public static SessionStrength StepOne(string method) => new(1, Sorted(ForMethod(method)));
 

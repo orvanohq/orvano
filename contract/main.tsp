@@ -24,6 +24,7 @@ import "./platform/invitations.tsp";
 import "./auth/security.tsp";
 import "./auth/account.tsp";
 import "./auth/mfa.tsp";
+import "./auth/passkeys.tsp";
 import "./auth/keys.tsp";
 import "./auth/users.tsp";
 import "./auth/console-account.tsp";

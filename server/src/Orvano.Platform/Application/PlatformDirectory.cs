@@ -70,6 +70,14 @@ internal sealed class PlatformDirectory(PlatformStore store, TimeProvider clock)
         return identifiers.Any(identifier => WebOriginPattern.TryParse(identifier, out var pattern, out _) && pattern.Matches(origin));
     }
 
+    public async Task<IReadOnlyList<string>> ListWebHostsAsync(string projectId, CancellationToken ct)
+    {
+        var web = PlatformIdentifiers.Wire(PlatformType.Web);
+        var identifiers = await store.ReadAsync((db, ct) =>
+            db.Platforms.AsNoTracking().Where(p => p.ProjectId == projectId && p.Type == web).Select(p => p.Identifier).ToListAsync(ct), ct);
+        return [.. identifiers.Order(StringComparer.Ordinal)];
+    }
+
     public async Task<bool> AllowsRedirectAsync(string projectId, Uri redirectUrl, bool allowCustomScheme, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(redirectUrl);

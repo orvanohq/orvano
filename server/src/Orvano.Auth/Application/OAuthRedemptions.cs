@@ -14,16 +14,17 @@ internal sealed record OAuthRedeemed(Resolved Resolved, SessionGrant? Grant, Mfa
 /// race, and the step after the commit that evicts claimed sessions and issues the access token. Used by
 /// <see cref="OAuthService"/> and <see cref="IdentityService"/>, so neither depends on the other for it.
 /// </summary>
-internal sealed class OAuthRedemptions(AuthStore store, SessionChecks checks, AccountService accounts, ILogger<OAuthRedemptions> logger)
+internal sealed class OAuthRedemptions(
+    AuthStore store, SessionChecks checks, AccountService accounts, MethodPolicies policies, ILogger<OAuthRedemptions> logger)
 {
     /// <summary>
     /// The session of a resolved provider sign in (spec 0012, AC-7, AC-9), or for an existing user with MFA on, a
     /// challenge in its place (spec 0013, AC-6). A user this sign in created has no factor, so it is never challenged.
     /// </summary>
-    public static async Task<OAuthRedeemed> SignInAsync(
+    public async Task<OAuthRedeemed> SignInAsync(
         AuthUnitOfWork uow, Sessions sessions, string projectId, Resolved resolved, ClientInfo client, string method, string provider, CancellationToken ct)
     {
-        if (!resolved.IsNewUser && await MfaGate.ChallengeAsync(uow, projectId, resolved.UserId, method, provider, client, ct) is { } challenge)
+        if (!resolved.IsNewUser && await MfaGate.ChallengeAsync(policies, uow, projectId, resolved.UserId, method, provider, client, ct) is { } challenge)
             return new OAuthRedeemed(resolved, null, challenge);
         var grant = await sessions.CreateAsync(uow, projectId, resolved.UserId, client, Actor.User(resolved.UserId), method, ct, provider);
         return new OAuthRedeemed(resolved, grant);

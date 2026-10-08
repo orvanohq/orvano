@@ -621,6 +621,45 @@
         "x-orvano-audience": "client"
       }
     },
+    "/v1/account/mfa/passkey-challenge": {
+      "post": {
+        "operationId": "account.createStepUpPasskeyChallenge",
+        "description": "Starts a step up with a passkey: answers the options for `navigator.credentials.get`, listing the signed in user's\npasskeys. Send the passkey's answer to `account.verifyMfa`.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyChallenge"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/account/mfa/recovery-codes": {
       "post": {
         "operationId": "account.createRecoveryCodes",
@@ -867,6 +906,230 @@
             }
           }
         },
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/passkeys": {
+      "post": {
+        "operationId": "account.completePasskeyRegistration",
+        "description": "Finishes adding a passkey with the browser's or the platform's answer to `account.createPasskeyRegistration`.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Passkey"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletePasskeyRegistrationRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      },
+      "get": {
+        "operationId": "account.listPasskeys",
+        "description": "Lists the signed in user's passkeys, oldest first, including inactive ones.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/passkeys/registration": {
+      "post": {
+        "operationId": "account.createPasskeyRegistration",
+        "description": "Starts adding a passkey: answers the options for `navigator.credentials.create`. Needs passkeys turned on, a\nsession that signed in within 10 minutes (or passed a second factor within 10 minutes), a verified email when the\nuser has one, and fewer than 10 passkeys.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyRegistration"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/passkeys/{passkeyId}": {
+      "patch": {
+        "operationId": "account.updatePasskey",
+        "description": "Renames one of the signed in user's passkeys.",
+        "parameters": [
+          {
+            "name": "passkeyId",
+            "in": "path",
+            "required": true,
+            "description": "The passkey's ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Passkey"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePasskeyRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      },
+      "delete": {
+        "operationId": "account.deletePasskey",
+        "description": "Removes one of the signed in user's passkeys. A user with MFA on needs a second factor on this session within 10\nminutes (`account.verifyMfa`); a user without it needs a session that signed in within 10 minutes.",
+        "parameters": [
+          {
+            "name": "passkeyId",
+            "in": "path",
+            "required": true,
+            "description": "The passkey's ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "x-orvano-service": "account",
         "x-orvano-audience": "client"
       }
@@ -1299,6 +1562,50 @@
         "x-orvano-audience": "client"
       }
     },
+    "/v1/account/sessions/mfa/passkey-challenge": {
+      "post": {
+        "operationId": "account.createMfaPasskeyChallenge",
+        "description": "Starts answering an MFA challenge with a passkey: answers the options for `navigator.credentials.get`, listing the\nuser's passkeys. Send the passkey's answer to `account.createMfaSession`. Never counts as a wrong attempt.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyChallenge"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMfaPasskeyChallengeRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/account/sessions/oauth": {
       "post": {
         "operationId": "account.createOAuthSession",
@@ -1340,6 +1647,85 @@
           }
         },
         "x-orvano-session": "start",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/sessions/passkey": {
+      "post": {
+        "operationId": "account.createPasskeySession",
+        "description": "Signs in with a passkey's answer to `account.createPasskeyChallenge`. A passkey counts as two factors, so this sign\nin is never asked for MFA and the session starts at level 2.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePasskeySessionRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-session": "start",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/sessions/passkey-challenge": {
+      "post": {
+        "operationId": "account.createPasskeyChallenge",
+        "description": "Starts a passkey sign in: answers a challenge with an empty `allowCredentials`, so the browser or the platform\noffers every passkey of the RP ID, including through autofill. Needs passkeys turned on for the project.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyChallenge"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
         "x-orvano-service": "account",
         "x-orvano-audience": "client"
       }
@@ -2626,6 +3012,34 @@
         },
         "description": "A link of a provider to the signed in user, with the code a link flow returned."
       },
+      "CompletePasskeyRegistrationRequest": {
+        "type": "object",
+        "required": [
+          "challengeId",
+          "credential"
+        ],
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "description": "The `challengeId` of the `PasskeyRegistration`.",
+            "examples": [
+              "01928f3e-6c1a-7b2d-9e4f-5a6b7c8d9e0f"
+            ]
+          },
+          "credential": {
+            "$ref": "#/components/schemas/PasskeyRegistrationCredential",
+            "description": "The browser's or the platform's answer."
+          },
+          "name": {
+            "type": "string",
+            "description": "1 to 64 characters. Left out, the passkey is named `Passkey`.",
+            "examples": [
+              "MacBook"
+            ]
+          }
+        },
+        "description": "A finished passkey registration."
+      },
       "CompleteRecoveryRequest": {
         "type": "object",
         "required": [
@@ -2871,6 +3285,22 @@
         },
         "description": "A sign in with the token from a magic link."
       },
+      "CreateMfaPasskeyChallengeRequest": {
+        "type": "object",
+        "required": [
+          "ticket"
+        ],
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "description": "The `ticket` of the `MfaChallenge`.",
+            "examples": [
+              "orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          }
+        },
+        "description": "The ticket of a sign in waiting for its second step."
+      },
       "CreateMfaSessionRequest": {
         "type": "object",
         "required": [
@@ -2897,6 +3327,10 @@
             "examples": [
               "K7QXM-2RPLD"
             ]
+          },
+          "passkey": {
+            "$ref": "#/components/schemas/PasskeyAnswer",
+            "description": "A passkey's answer to `account.createMfaPasskeyChallenge`."
           }
         },
         "description": "The second step of a sign in: the ticket and exactly one factor."
@@ -2953,6 +3387,27 @@
           }
         },
         "description": "A sign in with the code a provider flow returned."
+      },
+      "CreatePasskeySessionRequest": {
+        "type": "object",
+        "required": [
+          "challengeId",
+          "credential"
+        ],
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "description": "The `challengeId` of the `PasskeyChallenge`.",
+            "examples": [
+              "01928f3e-6c1a-7b2d-9e4f-5a6b7c8d9e0f"
+            ]
+          },
+          "credential": {
+            "$ref": "#/components/schemas/PasskeyAssertionCredential",
+            "description": "The browser's or the platform's answer."
+          }
+        },
+        "description": "A sign in with a passkey."
       },
       "CreatePasswordSessionRequest": {
         "type": "object",
@@ -3584,6 +4039,573 @@
         "description": "The discovery document standard JWT libraries configure themselves from. Orvano is not an OpenID provider;\nthis exists so tools that take an issuer URL find the keys. Its names are the standard snake case ones.",
         "x-orvano-standard-names": true
       },
+      "Passkey": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "createdAt",
+          "lastUsedAt",
+          "synced",
+          "active"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The passkey's ID.",
+            "examples": [
+              "01928f3e-6c1a-7b2d-9e4f-5a6b7c8d9e0f"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "The name the user gave it, else `Passkey`.",
+            "examples": [
+              "MacBook"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was added."
+          },
+          "lastUsedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it last signed in or answered a challenge; null when it never has."
+          },
+          "synced": {
+            "type": "boolean",
+            "description": "Whether the passkey is backed up and synced across devices (for example by iCloud Keychain or a password manager).",
+            "examples": [
+              true
+            ]
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether it can sign in now: false after the project's RP ID changed away from the one it was made for.",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "description": "A passkey of a user."
+      },
+      "PasskeyAnswer": {
+        "type": "object",
+        "required": [
+          "challengeId",
+          "credential"
+        ],
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "description": "The `challengeId` of the `PasskeyChallenge`.",
+            "examples": [
+              "01928f3e-6c1a-7b2d-9e4f-5a6b7c8d9e0f"
+            ]
+          },
+          "credential": {
+            "$ref": "#/components/schemas/PasskeyAssertionCredential",
+            "description": "The browser's or the platform's answer."
+          }
+        },
+        "description": "A passkey's answer to a challenge."
+      },
+      "PasskeyAssertionCredential": {
+        "type": "object",
+        "required": [
+          "id",
+          "rawId",
+          "type",
+          "response"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The credential ID, base64url.",
+            "examples": [
+              "pM2Gq8pZ1wqTNO4FqVt9fA"
+            ]
+          },
+          "rawId": {
+            "type": "string",
+            "description": "The credential ID again, base64url; must equal `id`.",
+            "examples": [
+              "pM2Gq8pZ1wqTNO4FqVt9fA"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "description": "Always `public-key`.",
+            "examples": [
+              "public-key"
+            ]
+          },
+          "response": {
+            "$ref": "#/components/schemas/PasskeyAssertionResponse",
+            "description": "The authenticator's answer."
+          },
+          "authenticatorAttachment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`platform` or `cross-platform`; null when the browser does not say.",
+            "examples": [
+              "platform"
+            ]
+          }
+        },
+        "description": "A passkey's answer in WebAuthn's JSON form: what `PublicKeyCredential.toJSON()` gives after `get`."
+      },
+      "PasskeyAssertionResponse": {
+        "type": "object",
+        "required": [
+          "clientDataJSON",
+          "authenticatorData",
+          "signature"
+        ],
+        "properties": {
+          "clientDataJSON": {
+            "type": "string",
+            "description": "The client data, base64url."
+          },
+          "authenticatorData": {
+            "type": "string",
+            "description": "The authenticator data, base64url."
+          },
+          "signature": {
+            "type": "string",
+            "description": "The signature, base64url."
+          },
+          "userHandle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The user handle the passkey stores, base64url; null when the authenticator gives none."
+          }
+        },
+        "description": "The authenticator's answer to `navigator.credentials.get`."
+      },
+      "PasskeyAttestationResponse": {
+        "type": "object",
+        "required": [
+          "clientDataJSON",
+          "attestationObject"
+        ],
+        "properties": {
+          "clientDataJSON": {
+            "type": "string",
+            "description": "The client data, base64url."
+          },
+          "attestationObject": {
+            "type": "string",
+            "description": "The attestation object, base64url."
+          },
+          "transports": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "How the authenticator was reached: `internal`, `hybrid`, `usb`, `nfc`, or `ble`.",
+            "examples": [
+              [
+                "internal"
+              ]
+            ]
+          }
+        },
+        "description": "The authenticator's answer to `navigator.credentials.create`."
+      },
+      "PasskeyAuthenticatorSelection": {
+        "type": "object",
+        "required": [
+          "residentKey",
+          "requireResidentKey",
+          "userVerification"
+        ],
+        "properties": {
+          "residentKey": {
+            "type": "string",
+            "description": "Always `required`: the passkey is discoverable, so it signs in with no email typed.",
+            "examples": [
+              "required"
+            ]
+          },
+          "requireResidentKey": {
+            "type": "boolean",
+            "description": "Always true, for older browsers.",
+            "examples": [
+              true
+            ]
+          },
+          "userVerification": {
+            "type": "string",
+            "description": "Always `required`: face, fingerprint, or PIN.",
+            "examples": [
+              "required"
+            ]
+          }
+        },
+        "description": "What kind of authenticator a new passkey must come from."
+      },
+      "PasskeyChallenge": {
+        "type": "object",
+        "required": [
+          "challengeId",
+          "options"
+        ],
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "description": "Names this challenge; send it back with the answer within 5 minutes.",
+            "examples": [
+              "01928f3e-6c1a-7b2d-9e4f-5a6b7c8d9e0f"
+            ]
+          },
+          "options": {
+            "$ref": "#/components/schemas/PasskeyRequestOptions",
+            "description": "The options for `navigator.credentials.get`."
+          }
+        },
+        "description": "A challenge for a passkey to sign: pass `options` to the browser, then send its answer with `challengeId`."
+      },
+      "PasskeyCreationOptions": {
+        "type": "object",
+        "required": [
+          "rp",
+          "user",
+          "challenge",
+          "pubKeyCredParams",
+          "timeout",
+          "excludeCredentials",
+          "authenticatorSelection",
+          "attestation"
+        ],
+        "properties": {
+          "rp": {
+            "$ref": "#/components/schemas/PasskeyRelyingParty",
+            "description": "The relying party."
+          },
+          "user": {
+            "$ref": "#/components/schemas/PasskeyUserEntity",
+            "description": "The user the passkey is for."
+          },
+          "challenge": {
+            "type": "string",
+            "description": "32 random bytes, base64url, used once.",
+            "examples": [
+              "Q2hhbGxlbmdlQ2hhbGxlbmdlQ2hhbGxlbmdlQ2hhbGw"
+            ]
+          },
+          "pubKeyCredParams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PasskeyCredentialParameters"
+            },
+            "description": "The key types the server accepts, in order of preference."
+          },
+          "timeout": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How long the browser waits, in milliseconds: 300000.",
+            "examples": [
+              300000
+            ]
+          },
+          "excludeCredentials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PasskeyCredentialDescriptor"
+            },
+            "description": "The user's passkeys under this RP ID, so the same authenticator is not registered twice."
+          },
+          "authenticatorSelection": {
+            "$ref": "#/components/schemas/PasskeyAuthenticatorSelection",
+            "description": "The authenticator rules."
+          },
+          "attestation": {
+            "type": "string",
+            "description": "Always `none`: no device certificate is asked for.",
+            "examples": [
+              "none"
+            ]
+          }
+        },
+        "description": "The options for `navigator.credentials.create` in WebAuthn's JSON form. Pass them to\n`PublicKeyCredential.parseCreationOptionsFromJSON`, or let the SDK's `registerPasskey` do it."
+      },
+      "PasskeyCredentialDescriptor": {
+        "type": "object",
+        "required": [
+          "type",
+          "id"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Always `public-key`.",
+            "examples": [
+              "public-key"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "description": "The credential ID, base64url.",
+            "examples": [
+              "pM2Gq8pZ1wqTNO4FqVt9fA"
+            ]
+          },
+          "transports": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "How the authenticator was reached when the passkey was made: `internal`, `hybrid`, `usb`, `nfc`, or `ble`.",
+            "examples": [
+              [
+                "internal",
+                "hybrid"
+              ]
+            ]
+          }
+        },
+        "description": "One passkey, named by its credential ID."
+      },
+      "PasskeyCredentialParameters": {
+        "type": "object",
+        "required": [
+          "type",
+          "alg"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Always `public-key`.",
+            "examples": [
+              "public-key"
+            ]
+          },
+          "alg": {
+            "type": "integer",
+            "format": "int32",
+            "description": "A COSE algorithm: -7 (ES256), -8 (EdDSA), or -257 (RS256).",
+            "examples": [
+              -7
+            ]
+          }
+        },
+        "description": "A key type the server accepts."
+      },
+      "PasskeyList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Passkey"
+            },
+            "description": "The passkeys."
+          }
+        },
+        "description": "A user's passkeys, oldest first; at most 10."
+      },
+      "PasskeyRegistration": {
+        "type": "object",
+        "required": [
+          "challengeId",
+          "options"
+        ],
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "description": "Names this registration; send it back with the new passkey within 5 minutes.",
+            "examples": [
+              "01928f3e-6c1a-7b2d-9e4f-5a6b7c8d9e0f"
+            ]
+          },
+          "options": {
+            "$ref": "#/components/schemas/PasskeyCreationOptions",
+            "description": "The options for `navigator.credentials.create`."
+          }
+        },
+        "description": "A started passkey registration: pass `options` to the browser, then send its answer with `challengeId`."
+      },
+      "PasskeyRegistrationCredential": {
+        "type": "object",
+        "required": [
+          "id",
+          "rawId",
+          "type",
+          "response"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The credential ID, base64url.",
+            "examples": [
+              "pM2Gq8pZ1wqTNO4FqVt9fA"
+            ]
+          },
+          "rawId": {
+            "type": "string",
+            "description": "The credential ID again, base64url; must equal `id`.",
+            "examples": [
+              "pM2Gq8pZ1wqTNO4FqVt9fA"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "description": "Always `public-key`.",
+            "examples": [
+              "public-key"
+            ]
+          },
+          "response": {
+            "$ref": "#/components/schemas/PasskeyAttestationResponse",
+            "description": "The authenticator's answer."
+          },
+          "authenticatorAttachment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`platform` or `cross-platform`; null when the browser does not say.",
+            "examples": [
+              "platform"
+            ]
+          }
+        },
+        "description": "A new passkey in WebAuthn's JSON form: what `PublicKeyCredential.toJSON()` gives after `create`."
+      },
+      "PasskeyRelyingParty": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The RP ID: the domain passkeys are bound to.",
+            "examples": [
+              "example.com"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "The name an authenticator shows: the project's RP name, else the project name.",
+            "examples": [
+              "Acme"
+            ]
+          }
+        },
+        "description": "The relying party of a passkey: the app's passkey domain and the name people see."
+      },
+      "PasskeyRequestOptions": {
+        "type": "object",
+        "required": [
+          "challenge",
+          "rpId",
+          "timeout",
+          "userVerification",
+          "allowCredentials"
+        ],
+        "properties": {
+          "challenge": {
+            "type": "string",
+            "description": "32 random bytes, base64url, used once.",
+            "examples": [
+              "Q2hhbGxlbmdlQ2hhbGxlbmdlQ2hhbGxlbmdlQ2hhbGw"
+            ]
+          },
+          "rpId": {
+            "type": "string",
+            "description": "The RP ID.",
+            "examples": [
+              "example.com"
+            ]
+          },
+          "timeout": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How long the browser waits, in milliseconds: 300000.",
+            "examples": [
+              300000
+            ]
+          },
+          "userVerification": {
+            "type": "string",
+            "description": "Always `required`: face, fingerprint, or PIN.",
+            "examples": [
+              "required"
+            ]
+          },
+          "allowCredentials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PasskeyCredentialDescriptor"
+            },
+            "description": "The passkeys that may answer; empty for sign in, so the browser offers every passkey for the RP ID."
+          }
+        },
+        "description": "The options for `navigator.credentials.get` in WebAuthn's JSON form. Pass them to\n`PublicKeyCredential.parseRequestOptionsFromJSON`, or let the SDK's helpers do it."
+      },
+      "PasskeyUserEntity": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "displayName"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The user handle: the user ID's 16 bytes, base64url.",
+            "examples": [
+              "AZK1JbJ8dXqZ6m8RkF6uQg"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "The user's email, else their user ID.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The user's name, else their email, else `User`.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          }
+        },
+        "description": "The account a new passkey is for, as the authenticator stores it."
+      },
       "Problem": {
         "type": "object",
         "required": [
@@ -4012,6 +5034,22 @@
         },
         "description": "Sets whether a user's email is verified."
       },
+      "UpdatePasskeyRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "1 to 64 characters.",
+            "examples": [
+              "Work laptop"
+            ]
+          }
+        },
+        "description": "A new name for a passkey."
+      },
       "UpdatePasswordRequest": {
         "type": "object",
         "required": [
@@ -4248,6 +5286,10 @@
             "examples": [
               "K7QXM-2RPLD"
             ]
+          },
+          "passkey": {
+            "$ref": "#/components/schemas/PasskeyAnswer",
+            "description": "A passkey's answer to `account.createStepUpPasskeyChallenge`."
           }
         },
         "description": "A second factor for a step up: exactly one of the fields."

@@ -1042,6 +1042,23 @@ public sealed record ApiKeyPage(
     [property: JsonPropertyName("items")] IReadOnlyList<ApiKey> Items,
     [property: JsonPropertyName("nextCursor")] string? NextCursor);
 
+/// <summary>A project's second factor and passkey settings, with what the Passkeys card shows beside them. A project that never saved any reads as the defaults: TOTP on, passkeys off.</summary>
+/// <param name="TotpEnabled">Whether users can turn on an authenticator app. Turned off, nobody is asked for MFA; stored factors stay.</param>
+/// <param name="PasskeysEnabled">Whether users can add passkeys and sign in with them. Needs <c>rpId</c>.</param>
+/// <param name="RpId">The passkey domain: a lowercase host name such as <c>example.com</c> (no scheme, port, path, or IP address), or <c>localhost</c>.</param>
+/// <param name="RpName">The name authenticators show, 1 to 64 characters; null means the project name.</param>
+/// <param name="AndroidCertFingerprints">SHA-256 fingerprints of the Android app's signing certificates (uppercase hex pairs joined by colons), at most 10.</param>
+/// <param name="ActivePasskeyCount">How many passkeys can sign in now: those made for the current <c>rpId</c>.</param>
+/// <param name="AcceptedOrigins">The origins a passkey ceremony is accepted from today: the project's web platforms on <c>rpId</c> or its subdomains, <c>https://&lt;rpId&gt;</c> for iOS and macOS apps, and one <c>android:apk-key-hash:</c> origin per fingerprint.</param>
+public sealed record AuthMethodSettings(
+    [property: JsonPropertyName("totpEnabled")] bool TotpEnabled,
+    [property: JsonPropertyName("passkeysEnabled")] bool PasskeysEnabled,
+    [property: JsonPropertyName("rpId")] string? RpId,
+    [property: JsonPropertyName("rpName")] string? RpName,
+    [property: JsonPropertyName("androidCertFingerprints")] IReadOnlyList<string> AndroidCertFingerprints,
+    [property: JsonPropertyName("activePasskeyCount")] int ActivePasskeyCount,
+    [property: JsonPropertyName("acceptedOrigins")] IReadOnlyList<string> AcceptedOrigins);
+
 /// <summary>A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of <c>session</c> and <c>mfa</c> is set.</summary>
 /// <param name="User">The user; null while <c>mfa</c> is set.</param>
 /// <param name="Session">The new session's tokens; null while <c>mfa</c> is set.</param>
@@ -1061,6 +1078,15 @@ public sealed record AuthResult(
 public sealed record CompleteOAuthLinkRequest(
     [property: JsonPropertyName("code")] string Code,
     [property: JsonPropertyName("codeVerifier")] string CodeVerifier);
+
+/// <summary>A finished passkey registration.</summary>
+/// <param name="ChallengeId">The <c>challengeId</c> of the <c>PasskeyRegistration</c>.</param>
+/// <param name="Credential">The browser's or the platform's answer.</param>
+/// <param name="Name">1 to 64 characters. Left out, the passkey is named <c>Passkey</c>.</param>
+public sealed record CompletePasskeyRegistrationRequest(
+    [property: JsonPropertyName("challengeId")] string ChallengeId,
+    [property: JsonPropertyName("credential")] PasskeyRegistrationCredential Credential,
+    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null);
 
 /// <summary>A password reset, with the token from the emailed link.</summary>
 /// <param name="Token">The <c>orvano_token</c> parameter of the emailed link.</param>
@@ -1203,14 +1229,21 @@ public sealed record CreateMagicLinkRequest(
 public sealed record CreateMagicLinkSessionRequest(
     [property: JsonPropertyName("token")] string Token);
 
+/// <summary>The ticket of a sign in waiting for its second step.</summary>
+/// <param name="Ticket">The <c>ticket</c> of the <c>MfaChallenge</c>.</param>
+public sealed record CreateMfaPasskeyChallengeRequest(
+    [property: JsonPropertyName("ticket")] string Ticket);
+
 /// <summary>The second step of a sign in: the ticket and exactly one factor.</summary>
 /// <param name="Ticket">The <c>ticket</c> of the <c>MfaChallenge</c>.</param>
 /// <param name="TotpCode">The 6 digit code the authenticator app shows now.</param>
 /// <param name="RecoveryCode">A recovery code; case, spaces, and hyphens do not matter. Each works once.</param>
+/// <param name="Passkey">A passkey's answer to <c>account.createMfaPasskeyChallenge</c>.</param>
 public sealed record CreateMfaSessionRequest(
     [property: JsonPropertyName("ticket")] string Ticket,
     [property: JsonPropertyName("totpCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TotpCode = null,
-    [property: JsonPropertyName("recoveryCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RecoveryCode = null);
+    [property: JsonPropertyName("recoveryCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RecoveryCode = null,
+    [property: JsonPropertyName("passkey"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PasskeyAnswer? Passkey = null);
 
 /// <summary>A request to start signing in with a provider.</summary>
 /// <param name="Provider">The provider to sign in with.</param>
@@ -1232,6 +1265,13 @@ public sealed record CreateOAuthSessionRequest(
 /// <param name="Name">The org name; trimmed, 1 to 100 characters.</param>
 public sealed record CreateOrgRequest(
     [property: JsonPropertyName("name")] string Name);
+
+/// <summary>A sign in with a passkey.</summary>
+/// <param name="ChallengeId">The <c>challengeId</c> of the <c>PasskeyChallenge</c>.</param>
+/// <param name="Credential">The browser's or the platform's answer.</param>
+public sealed record CreatePasskeySessionRequest(
+    [property: JsonPropertyName("challengeId")] string ChallengeId,
+    [property: JsonPropertyName("credential")] PasskeyAssertionCredential Credential);
 
 /// <summary>A sign in with an email and password.</summary>
 /// <param name="Email">The email the user signed up with; case does not matter.</param>
@@ -1645,6 +1685,166 @@ public sealed record OrgPage(
     [property: JsonPropertyName("items")] IReadOnlyList<Org> Items,
     [property: JsonPropertyName("nextCursor")] string? NextCursor);
 
+/// <summary>A passkey of a user.</summary>
+/// <param name="Id">The passkey's ID.</param>
+/// <param name="Name">The name the user gave it, else <c>Passkey</c>.</param>
+/// <param name="CreatedAt">When it was added.</param>
+/// <param name="LastUsedAt">When it last signed in or answered a challenge; null when it never has.</param>
+/// <param name="Synced">Whether the passkey is backed up and synced across devices (for example by iCloud Keychain or a password manager).</param>
+/// <param name="Active">Whether it can sign in now: false after the project's RP ID changed away from the one it was made for.</param>
+public sealed record Passkey(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("lastUsedAt")] DateTimeOffset? LastUsedAt,
+    [property: JsonPropertyName("synced")] bool Synced,
+    [property: JsonPropertyName("active")] bool Active);
+
+/// <summary>A passkey's answer to a challenge.</summary>
+/// <param name="ChallengeId">The <c>challengeId</c> of the <c>PasskeyChallenge</c>.</param>
+/// <param name="Credential">The browser's or the platform's answer.</param>
+public sealed record PasskeyAnswer(
+    [property: JsonPropertyName("challengeId")] string ChallengeId,
+    [property: JsonPropertyName("credential")] PasskeyAssertionCredential Credential);
+
+/// <summary>A passkey's answer in WebAuthn's JSON form: what <c>PublicKeyCredential.toJSON()</c> gives after <c>get</c>.</summary>
+/// <param name="Id">The credential ID, base64url.</param>
+/// <param name="RawId">The credential ID again, base64url; must equal <c>id</c>.</param>
+/// <param name="Type">Always <c>public-key</c>.</param>
+/// <param name="Response">The authenticator's answer.</param>
+/// <param name="AuthenticatorAttachment"><c>platform</c> or <c>cross-platform</c>; null when the browser does not say.</param>
+public sealed record PasskeyAssertionCredential(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("rawId")] string RawId,
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("response")] PasskeyAssertionResponse Response,
+    [property: JsonPropertyName("authenticatorAttachment"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? AuthenticatorAttachment = null);
+
+/// <summary>The authenticator's answer to <c>navigator.credentials.get</c>.</summary>
+/// <param name="ClientDataJSON">The client data, base64url.</param>
+/// <param name="AuthenticatorData">The authenticator data, base64url.</param>
+/// <param name="Signature">The signature, base64url.</param>
+/// <param name="UserHandle">The user handle the passkey stores, base64url; null when the authenticator gives none.</param>
+public sealed record PasskeyAssertionResponse(
+    [property: JsonPropertyName("clientDataJSON")] string ClientDataJSON,
+    [property: JsonPropertyName("authenticatorData")] string AuthenticatorData,
+    [property: JsonPropertyName("signature")] string Signature,
+    [property: JsonPropertyName("userHandle"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? UserHandle = null);
+
+/// <summary>The authenticator's answer to <c>navigator.credentials.create</c>.</summary>
+/// <param name="ClientDataJSON">The client data, base64url.</param>
+/// <param name="AttestationObject">The attestation object, base64url.</param>
+/// <param name="Transports">How the authenticator was reached: <c>internal</c>, <c>hybrid</c>, <c>usb</c>, <c>nfc</c>, or <c>ble</c>.</param>
+public sealed record PasskeyAttestationResponse(
+    [property: JsonPropertyName("clientDataJSON")] string ClientDataJSON,
+    [property: JsonPropertyName("attestationObject")] string AttestationObject,
+    [property: JsonPropertyName("transports"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? Transports = null);
+
+/// <summary>What kind of authenticator a new passkey must come from.</summary>
+/// <param name="ResidentKey">Always <c>required</c>: the passkey is discoverable, so it signs in with no email typed.</param>
+/// <param name="RequireResidentKey">Always true, for older browsers.</param>
+/// <param name="UserVerification">Always <c>required</c>: face, fingerprint, or PIN.</param>
+public sealed record PasskeyAuthenticatorSelection(
+    [property: JsonPropertyName("residentKey")] string ResidentKey,
+    [property: JsonPropertyName("requireResidentKey")] bool RequireResidentKey,
+    [property: JsonPropertyName("userVerification")] string UserVerification);
+
+/// <summary>A challenge for a passkey to sign: pass <c>options</c> to the browser, then send its answer with <c>challengeId</c>.</summary>
+/// <param name="ChallengeId">Names this challenge; send it back with the answer within 5 minutes.</param>
+/// <param name="Options">The options for <c>navigator.credentials.get</c>.</param>
+public sealed record PasskeyChallenge(
+    [property: JsonPropertyName("challengeId")] string ChallengeId,
+    [property: JsonPropertyName("options")] PasskeyRequestOptions Options);
+
+/// <summary>The options for <c>navigator.credentials.create</c> in WebAuthn's JSON form. Pass them to <c>PublicKeyCredential.parseCreationOptionsFromJSON</c>, or let the SDK's <c>registerPasskey</c> do it.</summary>
+/// <param name="Rp">The relying party.</param>
+/// <param name="User">The user the passkey is for.</param>
+/// <param name="Challenge">32 random bytes, base64url, used once.</param>
+/// <param name="PubKeyCredParams">The key types the server accepts, in order of preference.</param>
+/// <param name="Timeout">How long the browser waits, in milliseconds: 300000.</param>
+/// <param name="ExcludeCredentials">The user's passkeys under this RP ID, so the same authenticator is not registered twice.</param>
+/// <param name="AuthenticatorSelection">The authenticator rules.</param>
+/// <param name="Attestation">Always <c>none</c>: no device certificate is asked for.</param>
+public sealed record PasskeyCreationOptions(
+    [property: JsonPropertyName("rp")] PasskeyRelyingParty Rp,
+    [property: JsonPropertyName("user")] PasskeyUserEntity User,
+    [property: JsonPropertyName("challenge")] string Challenge,
+    [property: JsonPropertyName("pubKeyCredParams")] IReadOnlyList<PasskeyCredentialParameters> PubKeyCredParams,
+    [property: JsonPropertyName("timeout")] int Timeout,
+    [property: JsonPropertyName("excludeCredentials")] IReadOnlyList<PasskeyCredentialDescriptor> ExcludeCredentials,
+    [property: JsonPropertyName("authenticatorSelection")] PasskeyAuthenticatorSelection AuthenticatorSelection,
+    [property: JsonPropertyName("attestation")] string Attestation);
+
+/// <summary>One passkey, named by its credential ID.</summary>
+/// <param name="Type">Always <c>public-key</c>.</param>
+/// <param name="Id">The credential ID, base64url.</param>
+/// <param name="Transports">How the authenticator was reached when the passkey was made: <c>internal</c>, <c>hybrid</c>, <c>usb</c>, <c>nfc</c>, or <c>ble</c>.</param>
+public sealed record PasskeyCredentialDescriptor(
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("transports"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? Transports = null);
+
+/// <summary>A key type the server accepts.</summary>
+/// <param name="Type">Always <c>public-key</c>.</param>
+/// <param name="Alg">A COSE algorithm: -7 (ES256), -8 (EdDSA), or -257 (RS256).</param>
+public sealed record PasskeyCredentialParameters(
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("alg")] int Alg);
+
+/// <summary>A user's passkeys, oldest first; at most 10.</summary>
+/// <param name="Items">The passkeys.</param>
+public sealed record PasskeyList(
+    [property: JsonPropertyName("items")] IReadOnlyList<Passkey> Items);
+
+/// <summary>A started passkey registration: pass <c>options</c> to the browser, then send its answer with <c>challengeId</c>.</summary>
+/// <param name="ChallengeId">Names this registration; send it back with the new passkey within 5 minutes.</param>
+/// <param name="Options">The options for <c>navigator.credentials.create</c>.</param>
+public sealed record PasskeyRegistration(
+    [property: JsonPropertyName("challengeId")] string ChallengeId,
+    [property: JsonPropertyName("options")] PasskeyCreationOptions Options);
+
+/// <summary>A new passkey in WebAuthn's JSON form: what <c>PublicKeyCredential.toJSON()</c> gives after <c>create</c>.</summary>
+/// <param name="Id">The credential ID, base64url.</param>
+/// <param name="RawId">The credential ID again, base64url; must equal <c>id</c>.</param>
+/// <param name="Type">Always <c>public-key</c>.</param>
+/// <param name="Response">The authenticator's answer.</param>
+/// <param name="AuthenticatorAttachment"><c>platform</c> or <c>cross-platform</c>; null when the browser does not say.</param>
+public sealed record PasskeyRegistrationCredential(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("rawId")] string RawId,
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("response")] PasskeyAttestationResponse Response,
+    [property: JsonPropertyName("authenticatorAttachment"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? AuthenticatorAttachment = null);
+
+/// <summary>The relying party of a passkey: the app's passkey domain and the name people see.</summary>
+/// <param name="Id">The RP ID: the domain passkeys are bound to.</param>
+/// <param name="Name">The name an authenticator shows: the project's RP name, else the project name.</param>
+public sealed record PasskeyRelyingParty(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("name")] string Name);
+
+/// <summary>The options for <c>navigator.credentials.get</c> in WebAuthn's JSON form. Pass them to <c>PublicKeyCredential.parseRequestOptionsFromJSON</c>, or let the SDK's helpers do it.</summary>
+/// <param name="Challenge">32 random bytes, base64url, used once.</param>
+/// <param name="RpId">The RP ID.</param>
+/// <param name="Timeout">How long the browser waits, in milliseconds: 300000.</param>
+/// <param name="UserVerification">Always <c>required</c>: face, fingerprint, or PIN.</param>
+/// <param name="AllowCredentials">The passkeys that may answer; empty for sign in, so the browser offers every passkey for the RP ID.</param>
+public sealed record PasskeyRequestOptions(
+    [property: JsonPropertyName("challenge")] string Challenge,
+    [property: JsonPropertyName("rpId")] string RpId,
+    [property: JsonPropertyName("timeout")] int Timeout,
+    [property: JsonPropertyName("userVerification")] string UserVerification,
+    [property: JsonPropertyName("allowCredentials")] IReadOnlyList<PasskeyCredentialDescriptor> AllowCredentials);
+
+/// <summary>The account a new passkey is for, as the authenticator stores it.</summary>
+/// <param name="Id">The user handle: the user ID's 16 bytes, base64url.</param>
+/// <param name="Name">The user's email, else their user ID.</param>
+/// <param name="DisplayName">The user's name, else their email, else <c>User</c>.</param>
+public sealed record PasskeyUserEntity(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("displayName")] string DisplayName);
+
 /// <summary>An app allowed to use a project.</summary>
 /// <param name="Id">The platform ID.</param>
 /// <param name="Type">Where the app runs.</param>
@@ -1884,6 +2084,38 @@ public sealed record TestCreateIdTokenRequest(
     [property: JsonPropertyName("emailVerified"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? EmailVerified = null,
     [property: JsonPropertyName("expiresIn"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? ExpiresIn = null);
 
+/// <summary>A request for an assertion from the <c>Test</c> only software authenticator (spec 0013, AC-45).</summary>
+/// <param name="Options">The <c>options</c> of a <c>PasskeyChallenge</c>.</param>
+/// <param name="Origin">The origin the client data names.</param>
+/// <param name="CredentialId">The <c>id</c> of a credential this authenticator made in this run.</param>
+/// <param name="RpId">The RP ID whose hash the authenticator data carries; defaults to <c>options.rpId</c>.</param>
+/// <param name="BackedUp">Whether the passkey is backed up (synced); defaults to the value it was made with.</param>
+/// <param name="SignCount">The signature counter to report; defaults to 0.</param>
+/// <param name="UserVerified">Whether the user verified flag is set; defaults to true.</param>
+/// <param name="IncludeUserHandle">Whether to send the user handle the passkey stores; defaults to true.</param>
+public sealed record TestCreatePasskeyAssertionRequest(
+    [property: JsonPropertyName("options")] PasskeyRequestOptions Options,
+    [property: JsonPropertyName("origin")] string Origin,
+    [property: JsonPropertyName("credentialId")] string CredentialId,
+    [property: JsonPropertyName("rpId"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RpId = null,
+    [property: JsonPropertyName("backedUp"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? BackedUp = null,
+    [property: JsonPropertyName("signCount"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? SignCount = null,
+    [property: JsonPropertyName("userVerified"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? UserVerified = null,
+    [property: JsonPropertyName("includeUserHandle"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? IncludeUserHandle = null);
+
+/// <summary>A request for a new passkey from the <c>Test</c> only software authenticator (spec 0013, AC-45).</summary>
+/// <param name="Options">The <c>options</c> of <c>account.createPasskeyRegistration</c>.</param>
+/// <param name="Origin">The origin the client data names.</param>
+/// <param name="RpId">The RP ID whose hash the authenticator data carries; defaults to <c>options.rp.id</c>.</param>
+/// <param name="BackedUp">Whether the passkey is backed up (synced); defaults to false.</param>
+/// <param name="UserVerified">Whether the user verified flag is set; defaults to true.</param>
+public sealed record TestCreatePasskeyCredentialRequest(
+    [property: JsonPropertyName("options")] PasskeyCreationOptions Options,
+    [property: JsonPropertyName("origin")] string Origin,
+    [property: JsonPropertyName("rpId"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RpId = null,
+    [property: JsonPropertyName("backedUp"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? BackedUp = null,
+    [property: JsonPropertyName("userVerified"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? UserVerified = null);
+
 /// <summary>The newest email Mailpit caught for an address, read from its text part.</summary>
 /// <param name="Subject">The subject line.</param>
 /// <param name="Type">The <c>orvano_type</c> of the first link carrying <c>orvano_token</c>; null when there is none.</param>
@@ -1946,6 +2178,21 @@ public sealed record UpdateAccountRequest(
     [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null,
     [property: JsonPropertyName("metadata"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<string, JsonElement>? Metadata = null);
 
+/// <summary>Changes to a project's second factor and passkey settings. Fields left out keep their value.</summary>
+/// <param name="TotpEnabled">Whether users can turn on an authenticator app.</param>
+/// <param name="PasskeysEnabled">Whether users can add passkeys and sign in with them. Needs an <c>rpId</c>.</param>
+/// <param name="RpId">The passkey domain; null clears it (only while passkeys are off).</param>
+/// <param name="RpName">The name authenticators show, 1 to 64 characters; null means the project name.</param>
+/// <param name="AndroidCertFingerprints">At most 10 SHA-256 fingerprints, uppercase or lowercase hex pairs joined by colons; stored uppercase.</param>
+/// <param name="ConfirmRpIdChange">Must be true to change <c>rpId</c> while passkeys are registered under the current one: they stop working.</param>
+public sealed record UpdateAuthMethodSettingsRequest(
+    [property: JsonPropertyName("totpEnabled"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? TotpEnabled = null,
+    [property: JsonPropertyName("passkeysEnabled"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? PasskeysEnabled = null,
+    [property: JsonPropertyName("rpId"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RpId = null,
+    [property: JsonPropertyName("rpName"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RpName = null,
+    [property: JsonPropertyName("androidCertFingerprints"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? AndroidCertFingerprints = null,
+    [property: JsonPropertyName("confirmRpIdChange"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? ConfirmRpIdChange = null);
+
 /// <summary>A request to change the signed in user's email. It changes once the link sent to the new address is opened.</summary>
 /// <param name="Email">The new email, trimmed, at most 320 characters.</param>
 /// <param name="RedirectUrl">Your page that receives the confirmation link: a host that is one of the project's web platforms, or your app's own scheme. The link adds <c>orvano_type=email_change</c> and <c>orvano_token</c> to it.</param>
@@ -1992,6 +2239,11 @@ public sealed record UpdateOAuthProviderRequest(
 /// <summary>Changes to an org.</summary>
 /// <param name="Name">The new org name; trimmed, 1 to 100 characters.</param>
 public sealed record UpdateOrgRequest(
+    [property: JsonPropertyName("name")] string Name);
+
+/// <summary>A new name for a passkey.</summary>
+/// <param name="Name">1 to 64 characters.</param>
+public sealed record UpdatePasskeyRequest(
     [property: JsonPropertyName("name")] string Name);
 
 /// <summary>A password change.</summary>
@@ -2060,6 +2312,8 @@ public sealed record VerifyEmailRequest(
 /// <summary>A second factor for a step up: exactly one of the fields.</summary>
 /// <param name="TotpCode">The 6 digit code the authenticator app shows now.</param>
 /// <param name="RecoveryCode">A recovery code; case, spaces, and hyphens do not matter. Each works once.</param>
+/// <param name="Passkey">A passkey's answer to <c>account.createStepUpPasskeyChallenge</c>.</param>
 public sealed record VerifyMfaRequest(
     [property: JsonPropertyName("totpCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TotpCode = null,
-    [property: JsonPropertyName("recoveryCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RecoveryCode = null);
+    [property: JsonPropertyName("recoveryCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RecoveryCode = null,
+    [property: JsonPropertyName("passkey"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PasskeyAnswer? Passkey = null);

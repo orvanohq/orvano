@@ -98,6 +98,30 @@ export interface ApiKeyPage {
   nextCursor: string | null
 }
 
+/**
+ * A project's second factor and passkey settings, with what the Passkeys card shows beside them. A project that never
+ * saved any reads as the defaults: TOTP on, passkeys off.
+ */
+export interface AuthMethodSettings {
+  /** Whether users can turn on an authenticator app. Turned off, nobody is asked for MFA; stored factors stay. */
+  totpEnabled: boolean
+  /** Whether users can add passkeys and sign in with them. Needs `rpId`. */
+  passkeysEnabled: boolean
+  /** The passkey domain: a lowercase host name such as `example.com` (no scheme, port, path, or IP address), or `localhost`. */
+  rpId: string | null
+  /** The name authenticators show, 1 to 64 characters; null means the project name. */
+  rpName: string | null
+  /** SHA-256 fingerprints of the Android app's signing certificates (uppercase hex pairs joined by colons), at most 10. */
+  androidCertFingerprints: string[]
+  /** How many passkeys can sign in now: those made for the current `rpId`. */
+  activePasskeyCount: number
+  /**
+   * The origins a passkey ceremony is accepted from today: the project's web platforms on `rpId` or its subdomains,
+   * `https://<rpId>` for iOS and macOS apps, and one `android:apk-key-hash:` origin per fingerprint.
+   */
+  acceptedOrigins: string[]
+}
+
 /** A console account: a user of the console, and whether it is an install admin. */
 export interface ConsoleAccount {
   /** The user ID. */
@@ -625,6 +649,22 @@ export interface TemplateVariable {
   description: string
   /** The value previews and test emails use. */
   sample: string
+}
+
+/** Changes to a project's second factor and passkey settings. Fields left out keep their value. */
+export interface UpdateAuthMethodSettingsRequest {
+  /** Whether users can turn on an authenticator app. */
+  totpEnabled?: boolean
+  /** Whether users can add passkeys and sign in with them. Needs an `rpId`. */
+  passkeysEnabled?: boolean
+  /** The passkey domain; null clears it (only while passkeys are off). */
+  rpId?: string | null
+  /** The name authenticators show, 1 to 64 characters; null means the project name. */
+  rpName?: string | null
+  /** At most 10 SHA-256 fingerprints, uppercase or lowercase hex pairs joined by colons; stored uppercase. */
+  androidCertFingerprints?: string[]
+  /** Must be true to change `rpId` while passkeys are registered under the current one: they stop working. */
+  confirmRpIdChange?: boolean
 }
 
 /** Changes to the install settings. */

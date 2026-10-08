@@ -2,29 +2,57 @@ using System.Net;
 using Npgsql;
 using NpgsqlTypes;
 using Orvano.Auth.Domain;
+using Orvano.Core.Http;
 using Orvano.Core.Secrets;
 
 namespace Orvano.Auth.Application;
 
 /// <summary>
-/// What a project allows now (spec 0013, AC-1, AC-3): TOTP, and passkeys with their RP ID. A project without an
-/// <c>auth_method_settings</c> row reads as the defaults. The <c>console</c> project has no row: TOTP is always on.
+/// What a project allows now (spec 0013, AC-1, AC-3): TOTP, and passkeys with their RP ID, RP name, and Android
+/// certificate fingerprints. <see cref="ConsoleOrigin"/> is set only for the <c>console</c> project, whose one allowed
+/// origin is <c>ORVANO_PUBLIC_URL</c>'s.
 /// </summary>
-internal sealed record MethodPolicy(bool TotpEnabled, bool PasskeysEnabled, string? RpId)
+internal sealed record MethodPolicy(
+    bool TotpEnabled, bool PasskeysEnabled, string? RpId, string? RpName, IReadOnlyList<string> AndroidFingerprints, string? ConsoleOrigin = null)
 {
-    public static MethodPolicy Defaults { get; } = new(true, false, null);
+    public static MethodPolicy Of(MethodSettings settings) =>
+        new(settings.TotpEnabled, settings.PasskeysEnabled, settings.RpId, settings.RpName, settings.AndroidCertFingerprints);
+}
+
+/// <summary>
+/// Reads a project's <see cref="MethodPolicy"/>: the <c>auth_method_settings</c> row, else the defaults. The
+/// <c>console</c> project has no row: TOTP is always on, and passkeys follow <c>ORVANO_PUBLIC_URL</c> (AC-3).
+/// </summary>
+internal sealed class MethodPolicies(PublicUrl publicUrl)
+{
+    private readonly ConsolePasskeys console = ConsolePasskeys.From(publicUrl.Origin);
+
+    /// <summary>The console's policy, the same for every request.</summary>
+    public MethodPolicy Console => new(true, console.Enabled, console.RpId, ConsolePasskeys.RpName, [], console.Origin);
 
     /// <summary>The project's policy, read on the caller's connection (and transaction, when given).</summary>
-    public static async Task<MethodPolicy> ReadAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, string projectId, CancellationToken ct)
+    public async Task<MethodPolicy> ReadAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, string projectId, CancellationToken ct) =>
+        projectId == ConsoleProject.Id ? Console : MethodPolicy.Of(await ReadSettingsAsync(conn, tx, projectId, lockRow: false, ct));
+
+    /// <summary>An app project's stored settings, else the defaults; locked when asked (the update holds the lock).</summary>
+    public static async Task<MethodSettings> ReadSettingsAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, string projectId, bool lockRow, CancellationToken ct)
     {
-        if (projectId == ConsoleProject.Id) return Defaults;
         await using var cmd = new NpgsqlCommand(
-            "SELECT totp_enabled, passkeys_enabled, rp_id FROM orvano.auth_method_settings WHERE project_id = @project", conn, tx);
+            $"""
+            SELECT totp_enabled, passkeys_enabled, rp_id, rp_name, android_cert_fingerprints
+            FROM orvano.auth_method_settings WHERE project_id = @project
+            {(lockRow ? "FOR UPDATE" : "")}
+            """, conn, tx);
         cmd.Parameters.AddWithValue("project", projectId);
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         return await reader.ReadAsync(ct)
-            ? new MethodPolicy(reader.GetBoolean(0), reader.GetBoolean(1), reader.IsDBNull(2) ? null : reader.GetString(2))
-            : Defaults;
+            ? new MethodSettings(
+                reader.GetBoolean(0),
+                reader.GetBoolean(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.GetFieldValue<string[]>(4))
+            : MethodSettings.Defaults;
     }
 }
 
@@ -50,9 +78,10 @@ internal sealed record MfaFactorState(DateTimeOffset? TotpConfirmedAt, int Recov
         }
     }
 
-    public static async Task<MfaFactorState> ReadAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, string projectId, Guid userId, CancellationToken ct)
+    public static async Task<MfaFactorState> ReadAsync(
+        MethodPolicies policies, NpgsqlConnection conn, NpgsqlTransaction? tx, string projectId, Guid userId, CancellationToken ct)
     {
-        var policy = await MethodPolicy.ReadAsync(conn, tx, projectId, ct);
+        var policy = await policies.ReadAsync(conn, tx, projectId, ct);
         await using var cmd = new NpgsqlCommand(
             """
             SELECT (SELECT confirmed_at FROM orvano.auth_totp_factors WHERE user_id = @user AND confirmed_at IS NOT NULL),
@@ -79,14 +108,14 @@ internal static class MfaGate
     /// Keeps the user's live tickets at 5 by deleting the oldest, and drops their expired ones.
     /// </summary>
     public static async Task<MfaChallengeView?> ChallengeAsync(
-        AuthUnitOfWork uow, string projectId, Guid userId, string method, string? provider, ClientInfo client, CancellationToken ct,
+        MethodPolicies policies, AuthUnitOfWork uow, string projectId, Guid userId, string method, string? provider, ClientInfo client, CancellationToken ct,
         string? pendingPasswordHash = null)
     {
         var conn = uow.Tx.Connection!;
-        if (!(await MfaFactorState.ReadAsync(conn, uow.Tx, projectId, userId, ct)).MfaEnabled) return null;
+        if (!(await MfaFactorState.ReadAsync(policies, conn, uow.Tx, projectId, userId, ct)).MfaEnabled) return null;
 
         await UserLocks.ByIdAsync(uow, projectId, userId, ct);
-        var state = await MfaFactorState.ReadAsync(conn, uow.Tx, projectId, userId, ct);
+        var state = await MfaFactorState.ReadAsync(policies, conn, uow.Tx, projectId, userId, ct);
         if (!state.MfaEnabled) return null;
 
         await using (var prune = new NpgsqlCommand(
