@@ -154,6 +154,76 @@ _Steps derived from the acceptance criteria and the Value sourcing table. `/chec
 - Not in task 3: the console's passkey sign in, Security page, and Passkeys card (task 5); `users.listPasskeys`, `users.deletePasskey`, and their console twins (task 4); the `passkey_added` and `passkey_removed` alert emails, retention of expired challenges, and the purge (task 6)
 - Owed to `/architect`: AC-21 names passkeys from a bundled AAGUID list, but the community list has no license, so none ships and every unnamed passkey is `Passkey`; and AC-21 says a failed registration is 400 `invalid_passkey` while AC-40 fixes that code at 401 (the build answers 401)
 
+## Build checks: task 4, servers and recovery for admins · updated 2026-10-08
+
+_Steps derived from AC-27, AC-28, AC-39, and the Value sourcing rows for reset events, `orvano mfa reset`, and server SDK verify. `/check verify` runs these against a local stack; `/test` locks the durable ones._
+
+### API, as a server and the console would call it
+
+- [ ] A user with TOTP on, two sessions, and a passkey: `POST /v1/users/{id}/mfa/reset` with a `users.write` key → 204; the old access token gets 401 at `GET /v1/account`; `auth_totp_factors` and `auth_recovery_codes` have no row for them, the passkey stays; every session ended with `end_reason` `mfa_reset`; one `auth.mfa.reset` event with actor `{ type: "apiKey", id: <key id> }`; a password sign in then answers 201 with `mfa: null` → AC-27
+- [ ] The same call for a user without MFA → 204, their session still works, and no `auth.mfa.reset` or `auth.session.ended` event; an unknown or malformed user ID → 404 `user_not_found`; a `users.read` key → 403; another project's key → 404 → AC-27
+- [ ] `GET /v1/users/{id}/passkeys` → 200 with their passkeys, oldest first; `DELETE /v1/users/{id}/passkeys/{passkeyId}` → 204, sessions stay, one `auth.passkey.removed` with reason `server`; again, or another user's passkey ID → 404 `passkey_not_found`; an unknown user → 404 `user_not_found` → AC-27
+- [ ] As a console viewer: `GET /v1/console/project/users/{id}/passkeys` → 200; `POST .../mfa/reset` and `DELETE .../passkeys/{passkeyId}` → 403 `forbidden`; as a developer → 204 each, `auth.mfa.reset` with actor `{ type: "user" }` and `auth.passkey.removed` with reason `console` → AC-27
+- [ ] `GET /v1/users/{id}` and every `User` in `users.list` carry `mfaEnabled`: true for a user with a confirmed factor, false for one with only a pending factor → AC-39, AC-5
+- [ ] `GET /v1/users?mfa=on` lists only users with MFA, `mfa=off` only the others, `mfa=maybe` → 400 `invalid_request`; the console's `GET /v1/console/project/users?mfa=on` agrees → AC-39
+- [ ] `PATCH /v1/console/project/auth/methods` with `totpEnabled: false` → `mfa=on` finds nobody, `mfa=off` finds everyone, and the enrolled user reads `mfaEnabled: false`; turning it back on restores both → AC-39, AC-5
+
+### Command (AC-28)
+
+- [ ] Give the install admin a confirmed TOTP factor; `docker compose exec api orvano mfa reset --email <ADMIN EMAIL IN CAPITALS> --passkeys` → prints `reset`, exits 0; console sign in with the password alone → 201 and the cookies; one `auth.mfa.reset` with actor `{ type: "system", id: null }` → AC-28
+- [ ] Run it again → prints `no factor`, exits 0; `--email nobody@example.com` → prints `not found`, exits 2; `mfa reset --email` with no address, or `mfa reset --passkeys` with no email → exits 64 with the usage line → AC-28
+- [ ] It works with the api role's settings alone (`ORVANO_DB_URL`, `ORVANO_MASTER_KEYS`, `ORVANO_PUBLIC_URL`) and prints nothing but its answer on stdout → AC-28
+
+### SDKs
+
+- [ ] `verifyAccessToken` in `@orvano/js/server`, `orvano_dart`, and the .NET SDK returns `aal` and `amr` from the token; a token without the claims reads `aal` 1 and `amr` empty; an `aal` that isn't a whole number and an `amr` that isn't an array read the same → AC-39
+- [ ] With `requireMfa` (`VerifyAccessTokenOptions.RequireMfa` in .NET), an `aal` 1 token → 403 `mfa_required` before any online call; an `aal` 2 token passes → AC-39
+
+### Value sourcing
+
+- [ ] Reset events: the actor is the API key (server), the console account (console), or `system` with a null ID (the command), never the reset user → Value sourcing row "Reset events"
+- [ ] `orvano mfa reset`: the account is matched by `lower(email)` in project `console` only; an app user with the same email is untouched → Value sourcing row "`orvano mfa reset`"
+- [ ] Server SDK verify: `aal` and `amr` come from the token alone (no call), so a token issued before a reset still reads `aal` 2 until it expires, and `online: true` catches the ended session → Value sourcing row "Server SDK verify"
+
+### Commands
+
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "Orvano.Server.Tests.Auth.MfaResetTests"` → 6 passed; the whole project → 1234 passed → AC-27, AC-28, AC-39
+- [ ] `pnpm --filter @orvano/js test`, `(cd sdks/dart/server && dart test)`, and `dotnet test --project sdks/dotnet/tests/Orvano.Tests` → all pass, `net10.0` and `net8.0` → AC-39
+- [ ] With the scenario server up, restart `api` between runners, then the .NET runner, `dart run bin/run.dart`, and `node dist/cli.js node` → `auth-mfa-server` passes everywhere; `auth-mfa-reset` passes in the client runners and .NET skips it → AC-27, AC-39, AC-45
+
+### Acceptance criteria coverage (task 4)
+
+- AC-27: API steps 1 to 4 · AC-28: the command steps · AC-39: API steps 5 to 7 and the SDK steps · AC-45 (servers): the scenarios
+- Not in task 4: the `mfa_disabled` and `passkey_removed` alert emails a reset and a removal queue (task 6, with the `security_alert` kind)
+
+## Build checks: task 5, console screens (project side) · updated 2026-10-08
+
+_The project screens of AC-43 and AC-44. The console sign in MFA step, passkey sign in, and the account Security page (AC-41, AC-42) are not built: they wait on `/architect` (see the end of this section)._
+
+### UI
+
+- [ ] As an owner, open a project's Sign in methods page → an "MFA and passkeys" section with an Authenticator app card (On, with an Enabled switch) and a Passkeys card (the RP ID and how many passkeys can sign in, or Not set up) above the providers → AC-43
+- [ ] Turn the Authenticator app switch off → a toast, the card reads Off, and `GET /v1/console/project/auth/methods` has `totpEnabled: false`; turn it back on → AC-43
+- [ ] Open Passkeys → the Enabled switch, RP ID, RP name (placeholder: the project name), Android certificate fingerprints (one per line), the accepted origins, and, for a project with iOS or Android platforms, `apple-app-site-association` (`<TeamID>.<bundle ID>` under `webcredentials`) and `assetlinks.json` (`delegate_permission/common.get_login_creds`) with copy buttons; the dialog scrolls when taller than the window → AC-43
+- [ ] With passkeys registered, save a new RP ID → a confirmation names how many passkeys stop working and needs the new RP ID typed; confirm → saved with `confirmRpIdChange: true`; change it back → AC-2, AC-43
+- [ ] As a viewer: the switch is off with "Needs the developer role", and the Passkeys dialog shows everything disabled → AC-43
+- [ ] Users page: an MFA column that says On or Off in words, and an MFA filter (All, On, Off) kept in the URL as `?mfa=on` next to the verification filter → AC-44
+- [ ] A user's page: a Security section with MFA On or Off, Reset MFA behind a confirmation that says every session ends, and their passkeys (name, added and last used in local time, Synced or Device bound, Active or Inactive) with Remove each; the sessions table has Level (One factor or Two factors) and Factors (such as "Authenticator app, Password") → AC-44
+- [ ] Reset MFA on a user with TOTP → MFA reads Off and "No active sessions"; as a viewer the buttons are off with the reason → AC-44
+
+### Commands
+
+- [ ] `pnpm --filter @orvano/console test` → 696 passed, axe clean on every new part (`method-cards.browser.test.tsx`, `security.browser.test.tsx`, `parts.browser.test.tsx`, `passkey-snippets.unit.test.ts`) → AC-43, AC-44
+- [ ] With the scenario server and the gateway up, `pnpm --filter @orvano/console test:e2e` → `e2e/mfa.spec.ts` passes (the cards and the switch; the MFA filter, two factor session, and Reset MFA) → AC-43, AC-44
+
+### Acceptance criteria coverage (task 5, so far)
+
+- AC-43: UI steps 1 to 5 · AC-44: UI steps 6 to 8, except the two facts below
+- Owed to `/architect` before the rest of task 5:
+  - AC-44's "when it was turned on" and "recovery codes left" for another user have no source: no operation gives the console a user's `MfaStatus` (`consoleUsers.*` has only `resetMfa`, `listPasskeys`, and `deletePasskey`). The detail shows MFA On or Off from `User.mfaEnabled` until one exists.
+  - AC-12 and AC-20 refuse enrollment for an unverified email, and no path verifies a console account's email (spec 0010 leaves console verification to a later row), so every console account would get 409 `email_not_verified` on the AC-42 Security page.
+  - AC-41 has `consoleAccount.createSession` answer a challenge, but it answers 201 `ConsoleAccount`, which can't carry `mfa`; the contract allows one 2xx body and no unions, so the challenge needs a response model.
+
 ## Setup
 
 1. Deploy the branch to the test server, so `ORVANO_PUBLIC_URL` is its real https URL (this also turns on console passkeys, AC-3).
