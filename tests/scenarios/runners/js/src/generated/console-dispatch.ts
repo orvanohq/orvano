@@ -373,6 +373,11 @@ export const consoleDispatch: DispatchTable = {
     console: (o, input) =>
       o.consoleUsers.deleteIdentity(input.userId as string, input.identityId as string),
   },
+  'consoleUsers.deletePasskey': {
+    status: 204,
+    console: (o, input) =>
+      o.consoleUsers.deletePasskey(input.userId as string, input.passkeyId as string),
+  },
   'consoleUsers.deleteSession': {
     status: 204,
     console: (o, input) =>
@@ -395,6 +400,7 @@ export const consoleDispatch: DispatchTable = {
         createdAfter: input.createdAfter as string | undefined,
         createdBefore: input.createdBefore as string | undefined,
         emailVerified: input.emailVerified as boolean | undefined,
+        mfa: input.mfa as string | undefined,
         cursor: input.cursor as string | undefined,
         limit: input.limit as number | undefined,
       }),
@@ -405,12 +411,17 @@ export const consoleDispatch: DispatchTable = {
         createdAfter: input.createdAfter as string | undefined,
         createdBefore: input.createdBefore as string | undefined,
         emailVerified: input.emailVerified as boolean | undefined,
+        mfa: input.mfa as string | undefined,
         limit: input.limit as number | undefined,
       }),
   },
   'consoleUsers.listIdentities': {
     status: 200,
     console: (o, input) => o.consoleUsers.listIdentities(input.userId as string),
+  },
+  'consoleUsers.listPasskeys': {
+    status: 200,
+    console: (o, input) => o.consoleUsers.listPasskeys(input.userId as string),
   },
   'consoleUsers.listSessions': {
     status: 200,
@@ -423,6 +434,10 @@ export const consoleDispatch: DispatchTable = {
       o.consoleUsers.listSessionsAll(input.userId as string, {
         limit: input.limit as number | undefined,
       }),
+  },
+  'consoleUsers.resetMfa': {
+    status: 204,
+    console: (o, input) => o.consoleUsers.resetMfa(input.userId as string),
   },
   'consoleUsers.unblock': {
     status: 200,

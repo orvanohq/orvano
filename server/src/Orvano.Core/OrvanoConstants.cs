@@ -57,4 +57,7 @@ public static class ConnectionBudget
 
     /// <summary><c>migrate</c> role, as <c>orvano_admin</c>.</summary>
     public const int MigrateAdmin = 2;
+
+    /// <summary>A one shot command run inside the <c>api</c> container (<c>orvano mfa reset</c>), as <c>orvano_app</c>.</summary>
+    public const int CommandApp = 2;
 }

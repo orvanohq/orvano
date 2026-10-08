@@ -7,7 +7,15 @@ using Orvano.Core.Paging;
 namespace Orvano.Auth.Application;
 
 /// <summary>Filters for listing a project's users (AC-17, spec 0010 AC-21). Every one is optional.</summary>
-internal sealed record UserFilter(string? EmailPrefix, string? Status, DateTimeOffset? CreatedAfter, DateTimeOffset? CreatedBefore, bool? EmailVerified = null);
+internal sealed record UserFilter(
+    string? EmailPrefix, string? Status, DateTimeOffset? CreatedAfter, DateTimeOffset? CreatedBefore, bool? EmailVerified = null, string? Mfa = null);
+
+/// <summary>The values of the <c>mfa</c> filter (spec 0013, AC-39).</summary>
+internal static class MfaFilter
+{
+    public const string On = "on";
+    public const string Off = "off";
+}
 
 /// <summary>
 /// A project's users as a server (API key) or the console manages them (spec 0004, <c>users</c> service, AC-17,
@@ -22,6 +30,7 @@ internal sealed class UsersService(
     {
         if (PageCursor.Limit(limit) is not { } size) return Failure.Invalid($"limit must be 1 to {PageCursor.MaxLimit}.");
         if (filter.Status is not (null or UserStatuses.Active or UserStatuses.Blocked)) return Failure.Invalid("status must be active or blocked.");
+        if (filter.Mfa is not (null or MfaFilter.On or MfaFilter.Off)) return Failure.Invalid("mfa must be on or off.");
         PagePosition? after = null;
         Guid afterId = default;
         if (cursor is not null)
@@ -44,6 +53,20 @@ internal sealed class UsersService(
             if (filter.CreatedAfter is { } createdAfter) query = query.Where(u => u.CreatedAt > createdAfter);
             if (filter.CreatedBefore is { } createdBefore) query = query.Where(u => u.CreatedAt < createdBefore);
             if (filter.EmailVerified is { } verified) query = verified ? query.Where(u => u.EmailVerifiedAt != null) : query.Where(u => u.EmailVerifiedAt == null);
+            if (filter.Mfa is { } mfa)
+            {
+                // Spec 0013, AC-5 and AC-39: MFA is on with a confirmed TOTP factor while the project allows TOTP (no
+                // settings row reads as allowed), so with TOTP off every user is `off`. UserExtras reads mfaEnabled the same way.
+                var totpAllowed = !await db.MethodSettings.AnyAsync(m => m.ProjectId == projectId && !m.TotpEnabled, token);
+                var confirmed = db.TotpFactors.Where(t => t.ConfirmedAt != null).Select(t => t.UserId);
+                query = (mfa == MfaFilter.On, totpAllowed) switch
+                {
+                    (true, true) => query.Where(u => confirmed.Contains(u.Id)),
+                    (true, false) => query.Where(u => false),
+                    (false, true) => query.Where(u => !confirmed.Contains(u.Id)),
+                    (false, false) => query,
+                };
+            }
             if (after is not null)
                 query = query.Where(u => u.CreatedAt < after.CreatedAt || u.CreatedAt == after.CreatedAt && u.Id.CompareTo(afterId) < 0);
 

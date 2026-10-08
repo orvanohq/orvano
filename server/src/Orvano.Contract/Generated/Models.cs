@@ -1117,6 +1117,7 @@ public sealed record ConfirmTotpRequest(
 /// <param name="LastSignInAt">When the user last signed in; null if never.</param>
 /// <param name="Providers">The providers linked to the user, sorted by name.</param>
 /// <param name="HasPassword">Whether the user has a password.</param>
+/// <param name="MfaEnabled">Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never turns it on.</param>
 /// <param name="IsInstallAdmin">True when the account is an install admin, who may change the install settings.</param>
 public sealed record ConsoleAccount(
     [property: JsonPropertyName("id")] string Id,
@@ -1130,6 +1131,7 @@ public sealed record ConsoleAccount(
     [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt,
     [property: JsonPropertyName("providers")] IReadOnlyList<OAuthProvider> Providers,
     [property: JsonPropertyName("hasPassword")] bool HasPassword,
+    [property: JsonPropertyName("mfaEnabled")] bool MfaEnabled,
     [property: JsonPropertyName("isInstallAdmin")] bool IsInstallAdmin);
 
 /// <summary>A console account and the name and email it goes by, for showing who did something.</summary>
@@ -2284,6 +2286,7 @@ public sealed record UpdateUserEmailRequest(
 /// <param name="LastSignInAt">When the user last signed in; null if never.</param>
 /// <param name="Providers">The providers linked to the user, sorted by name.</param>
 /// <param name="HasPassword">Whether the user has a password.</param>
+/// <param name="MfaEnabled">Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never turns it on.</param>
 public sealed record User(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("email")] string? Email,
@@ -2295,7 +2298,8 @@ public sealed record User(
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
     [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt,
     [property: JsonPropertyName("providers")] IReadOnlyList<OAuthProvider> Providers,
-    [property: JsonPropertyName("hasPassword")] bool HasPassword);
+    [property: JsonPropertyName("hasPassword")] bool HasPassword,
+    [property: JsonPropertyName("mfaEnabled")] bool MfaEnabled);
 
 /// <summary>One page of a project's users, newest first.</summary>
 /// <param name="Items">The users on this page.</param>

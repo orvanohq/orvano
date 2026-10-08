@@ -726,6 +726,11 @@ export interface User {
   providers: OAuthProvider[]
   /** Whether the user has a password. */
   hasPassword: boolean
+  /**
+   * Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never
+   * turns it on.
+   */
+  mfaEnabled: boolean
 }
 
 /** One page of a project's users, newest first. */

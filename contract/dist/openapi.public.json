@@ -2130,6 +2130,16 @@
             "explode": false
           },
           {
+            "name": "mfa",
+            "in": "query",
+            "required": false,
+            "description": "Only users with MFA `on` or `off`. With the project's authenticator app switch off, every user counts as `off`.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
             "name": "cursor",
             "in": "query",
             "required": false,
@@ -2567,6 +2577,152 @@
             "in": "path",
             "required": true,
             "description": "The identity to unlink.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/mfa/reset": {
+      "post": {
+        "operationId": "users.resetMfa",
+        "description": "Turns MFA off for a user who lost every factor: deletes their authenticator app and recovery codes and ends all\ntheir sessions. Their passkeys stay. A user without MFA is left as they are.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/passkeys": {
+      "get": {
+        "operationId": "users.listPasskeys",
+        "description": "Lists a user's passkeys, oldest first, including inactive ones.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.read",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/passkeys/{passkeyId}": {
+      "delete": {
+        "operationId": "users.deletePasskey",
+        "description": "Removes one of a user's passkeys. Sessions stay.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "passkeyId",
+            "in": "path",
+            "required": true,
+            "description": "The passkey's ID.",
             "schema": {
               "type": "string"
             }
@@ -5109,7 +5265,8 @@
           "createdAt",
           "lastSignInAt",
           "providers",
-          "hasPassword"
+          "hasPassword",
+          "mfaEnabled"
         ],
         "properties": {
           "id": {
@@ -5204,6 +5361,13 @@
             "description": "Whether the user has a password.",
             "examples": [
               true
+            ]
+          },
+          "mfaEnabled": {
+            "type": "boolean",
+            "description": "Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never\nturns it on.",
+            "examples": [
+              false
             ]
           }
         },

@@ -43,6 +43,12 @@ internal static class AuthEvents
     /// <summary>MFA turned off (spec 0013, AC-33); <c>reason</c> is <c>user</c> or <c>claimed</c>.</summary>
     public const string MfaDisabled = "auth.mfa.disabled";
 
+    /// <summary>
+    /// A server, the console, or <c>orvano mfa reset</c> turned a user's MFA off and ended their sessions (spec 0013,
+    /// AC-27, AC-28); the actor says which.
+    /// </summary>
+    public const string MfaReset = "auth.mfa.reset";
+
     /// <summary>The <c>reason</c> of <see cref="MfaDisabled"/> when the user turned it off.</summary>
     public const string MfaDisabledByUser = "user";
 

@@ -146,6 +146,11 @@ export interface ConsoleAccount {
   providers: OAuthProvider[]
   /** Whether the user has a password. */
   hasPassword: boolean
+  /**
+   * Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never
+   * turns it on.
+   */
+  mfaEnabled: boolean
   /** True when the account is an install admin, who may change the install settings. */
   isInstallAdmin: boolean
 }

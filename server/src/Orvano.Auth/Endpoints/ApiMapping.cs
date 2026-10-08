@@ -44,6 +44,10 @@ internal static class ApiMapping
     public static IResult NoContent(HttpContext http, Outcome<Done> outcome) =>
         outcome.Succeeded ? TypedResults.NoContent() : Problem(http, outcome.Failure!);
 
+    /// <summary>204 for a use case whose answer the caller doesn't show, such as a reset's result.</summary>
+    public static IResult NoContent<T>(HttpContext http, Outcome<T> outcome) =>
+        outcome.Succeeded ? TypedResults.NoContent() : Problem(http, outcome.Failure!);
+
     public static IResult Accepted(HttpContext http, Outcome<Done> outcome) =>
         outcome.Succeeded ? TypedResults.StatusCode(StatusCodes.Status202Accepted) : Problem(http, outcome.Failure!);
 
@@ -58,13 +62,14 @@ internal static class ApiMapping
         row.CreatedAt,
         row.LastSignInAt,
         [],
+        false,
         false);
 
     public static Api.ConsoleAccount ConsoleAccount(UserRow row, bool isInstallAdmin)
     {
         var user = User(row);
         return new(user.Id, user.Email, user.EmailVerified, user.EmailVerifiedAt, user.Name, user.Status, user.Metadata, user.CreatedAt, user.LastSignInAt,
-            user.Providers, user.HasPassword, isInstallAdmin);
+            user.Providers, user.HasPassword, user.MfaEnabled, isInstallAdmin);
     }
 
     public static Api.Identity Identity(IdentityRow row) => new(

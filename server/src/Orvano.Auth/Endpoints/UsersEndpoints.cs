@@ -19,10 +19,10 @@ internal static class UsersEndpoints
     public static void Map(RouteGroupBuilder v1)
     {
         v1.MapGet(Ops.List.Route, async (
-                HttpContext http, string? email, string? status, DateTimeOffset? createdAfter, DateTimeOffset? createdBefore, bool? emailVerified,
+                HttpContext http, string? email, string? status, DateTimeOffset? createdAfter, DateTimeOffset? createdBefore, bool? emailVerified, string? mfa,
                 string? cursor, int? limit, UsersService users, CancellationToken ct) =>
             Ok(http, await users.ListAsync(
-                PublicRequests.Project(http), new UserFilter(email, status, createdAfter, createdBefore, emailVerified), cursor, limit, ct), UserPage))
+                PublicRequests.Project(http), new UserFilter(email, status, createdAfter, createdBefore, emailVerified, mfa), cursor, limit, ct), UserPage))
             .WithName(Ops.List.Id)
             .RequireProject()
             .RequireApiKey(Ops.List.Scope);
@@ -105,6 +105,27 @@ internal static class UsersEndpoints
             .WithName(Ops.DeleteSession.Id)
             .RequireProject()
             .RequireApiKey(Ops.DeleteSession.Scope);
+
+        // Spec 0013, AC-27: a user who lost every factor, and their passkeys.
+        v1.MapPost(Ops.ResetMfa.Route, async (HttpContext http, string userId, MfaResets resets, CancellationToken ct) =>
+            NoContent(http, await resets.ResetAsync(PublicRequests.Project(http), userId, KeyActor(http), ct)))
+            .WithName(Ops.ResetMfa.Id)
+            .RequireProject()
+            .RequireApiKey(Ops.ResetMfa.Scope);
+
+        v1.MapGet(Ops.ListPasskeys.Route, async (HttpContext http, string userId, PasskeyService passkeys, CancellationToken ct) =>
+            Ok(http, Guid.TryParse(userId, out var id) ? await passkeys.ListAsync(PublicRequests.Project(http), id, ct) : Failure.UserNotFound, PasskeyList))
+            .WithName(Ops.ListPasskeys.Id)
+            .RequireProject()
+            .RequireApiKey(Ops.ListPasskeys.Scope);
+
+        v1.MapDelete(Ops.DeletePasskey.Route, async (HttpContext http, string userId, string passkeyId, PasskeyService passkeys, CancellationToken ct) =>
+            NoContent(http, Guid.TryParse(userId, out var id)
+                ? await passkeys.DeleteAsync(PublicRequests.Project(http), id, passkeyId, KeyActor(http), MfaResets.ByServer, ct)
+                : Failure.UserNotFound))
+            .WithName(Ops.DeletePasskey.Id)
+            .RequireProject()
+            .RequireApiKey(Ops.DeletePasskey.Scope);
     }
 
     private static Actor KeyActor(HttpContext http) => Actor.ApiKey(PublicRequests.Key(http).KeyId);

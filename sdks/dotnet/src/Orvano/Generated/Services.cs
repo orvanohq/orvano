@@ -103,6 +103,13 @@ public sealed class UsersService
     public Task DeleteIdentityAsync(string userId, string identityId, CancellationToken cancellationToken = default) =>
         _client.SendAsync(new OrvanoRequest("DELETE", $"/v1/users/{Uri.EscapeDataString(userId)}/identities/{Uri.EscapeDataString(identityId)}", null, null, false), cancellationToken);
 
+    /// <summary>Removes one of a user's passkeys. Sessions stay.</summary>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="passkeyId">The passkey's ID.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task DeletePasskeyAsync(string userId, string passkeyId, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("DELETE", $"/v1/users/{Uri.EscapeDataString(userId)}/passkeys/{Uri.EscapeDataString(passkeyId)}", null, null, false), cancellationToken);
+
     /// <summary>Ends one session of a user.</summary>
     /// <param name="userId">The user ID.</param>
     /// <param name="sessionId">The session to end.</param>
@@ -128,11 +135,12 @@ public sealed class UsersService
     /// <param name="createdAfter">Only users created after this time.</param>
     /// <param name="createdBefore">Only users created before this time.</param>
     /// <param name="emailVerified">Only verified users (true) or unverified users (false).</param>
+    /// <param name="mfa">Only users with MFA <c>on</c> or <c>off</c>. With the project's authenticator app switch off, every user counts as <c>off</c>.</param>
     /// <param name="cursor">The <c>nextCursor</c> of the previous page.</param>
     /// <param name="limit">Users per page, 1 to 100. Defaults to 25.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
-    public Task<UserPage> ListAsync(string? email = null, string? status = null, DateTimeOffset? createdAfter = null, DateTimeOffset? createdBefore = null, bool? emailVerified = null, string? cursor = null, int? limit = null, CancellationToken cancellationToken = default) =>
-        _client.SendAsync(new OrvanoRequest("GET", "/v1/users", [new("email", email), new("status", status), new("createdAfter", createdAfter is null ? null : createdAfter.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)), new("createdBefore", createdBefore is null ? null : createdBefore.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)), new("emailVerified", emailVerified is null ? null : emailVerified.Value ? "true" : "false"), new("cursor", cursor), new("limit", limit is null ? null : limit.Value.ToString(CultureInfo.InvariantCulture))], null, false), OrvanoJsonContext.Default.UserPage, cancellationToken);
+    public Task<UserPage> ListAsync(string? email = null, string? status = null, DateTimeOffset? createdAfter = null, DateTimeOffset? createdBefore = null, bool? emailVerified = null, string? mfa = null, string? cursor = null, int? limit = null, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("GET", "/v1/users", [new("email", email), new("status", status), new("createdAfter", createdAfter is null ? null : createdAfter.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)), new("createdBefore", createdBefore is null ? null : createdBefore.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)), new("emailVerified", emailVerified is null ? null : emailVerified.Value ? "true" : "false"), new("mfa", mfa), new("cursor", cursor), new("limit", limit is null ? null : limit.Value.ToString(CultureInfo.InvariantCulture))], null, false), OrvanoJsonContext.Default.UserPage, cancellationToken);
 
     /// <summary>Every item of <c>ListAsync</c>, walking all pages: <c>await foreach</c>.</summary>
     /// <param name="email">Only users whose email starts with this, ignoring case.</param>
@@ -140,16 +148,23 @@ public sealed class UsersService
     /// <param name="createdAfter">Only users created after this time.</param>
     /// <param name="createdBefore">Only users created before this time.</param>
     /// <param name="emailVerified">Only verified users (true) or unverified users (false).</param>
+    /// <param name="mfa">Only users with MFA <c>on</c> or <c>off</c>. With the project's authenticator app switch off, every user counts as <c>off</c>.</param>
     /// <param name="limit">Users per page, 1 to 100. Defaults to 25.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
-    public IAsyncEnumerable<User> ListAllAsync(string? email = null, string? status = null, DateTimeOffset? createdAfter = null, DateTimeOffset? createdBefore = null, bool? emailVerified = null, int? limit = null, CancellationToken cancellationToken = default) =>
-        OrvanoPagination.IterateAsync((cursor, ct) => ListAsync(email: email, status: status, createdAfter: createdAfter, createdBefore: createdBefore, emailVerified: emailVerified, cursor: cursor, limit: limit, cancellationToken: ct), page => page.Items, page => page.NextCursor, cancellationToken);
+    public IAsyncEnumerable<User> ListAllAsync(string? email = null, string? status = null, DateTimeOffset? createdAfter = null, DateTimeOffset? createdBefore = null, bool? emailVerified = null, string? mfa = null, int? limit = null, CancellationToken cancellationToken = default) =>
+        OrvanoPagination.IterateAsync((cursor, ct) => ListAsync(email: email, status: status, createdAfter: createdAfter, createdBefore: createdBefore, emailVerified: emailVerified, mfa: mfa, cursor: cursor, limit: limit, cancellationToken: ct), page => page.Items, page => page.NextCursor, cancellationToken);
 
     /// <summary>Lists a user's identities, oldest first.</summary>
     /// <param name="userId">The user ID.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     public Task<IdentityList> ListIdentitiesAsync(string userId, CancellationToken cancellationToken = default) =>
         _client.SendAsync(new OrvanoRequest("GET", $"/v1/users/{Uri.EscapeDataString(userId)}/identities", null, null, false), OrvanoJsonContext.Default.IdentityList, cancellationToken);
+
+    /// <summary>Lists a user's passkeys, oldest first, including inactive ones.</summary>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task<PasskeyList> ListPasskeysAsync(string userId, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("GET", $"/v1/users/{Uri.EscapeDataString(userId)}/passkeys", null, null, false), OrvanoJsonContext.Default.PasskeyList, cancellationToken);
 
     /// <summary>Lists a user's active sessions, newest first. <c>current</c> is always false.</summary>
     /// <param name="userId">The user ID.</param>
@@ -165,6 +180,12 @@ public sealed class UsersService
     /// <param name="cancellationToken">Cancels the request.</param>
     public IAsyncEnumerable<Session> ListSessionsAllAsync(string userId, int? limit = null, CancellationToken cancellationToken = default) =>
         OrvanoPagination.IterateAsync((cursor, ct) => ListSessionsAsync(userId: userId, cursor: cursor, limit: limit, cancellationToken: ct), page => page.Items, page => page.NextCursor, cancellationToken);
+
+    /// <summary>Turns MFA off for a user who lost every factor: deletes their authenticator app and recovery codes and ends all their sessions. Their passkeys stay. A user without MFA is left as they are.</summary>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task ResetMfaAsync(string userId, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("POST", $"/v1/users/{Uri.EscapeDataString(userId)}/mfa/reset", null, null, true), cancellationToken);
 
     /// <summary>Unblocks a user so they can sign in again. Their old sessions stay ended.</summary>
     /// <param name="userId">The user ID.</param>

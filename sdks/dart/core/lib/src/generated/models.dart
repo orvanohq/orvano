@@ -2240,6 +2240,7 @@ final class User {
     this.lastSignInAt,
     required this.providers,
     required this.hasPassword,
+    required this.mfaEnabled,
   });
 
   /// Decodes a [User] from JSON.
@@ -2263,6 +2264,7 @@ final class User {
         .map((e) => OAuthProvider.fromJson(e as String))
         .toList(),
     hasPassword: json['hasPassword'] as bool,
+    mfaEnabled: json['mfaEnabled'] as bool,
   );
 
   /// The user ID.
@@ -2298,6 +2300,10 @@ final class User {
   /// Whether the user has a password.
   final bool hasPassword;
 
+  /// Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never
+  /// turns it on.
+  final bool mfaEnabled;
+
   /// Encodes this [User] as JSON.
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -2317,6 +2323,7 @@ final class User {
     },
     'providers': providers.map((e) => e.value).toList(),
     'hasPassword': hasPassword,
+    'mfaEnabled': mfaEnabled,
   };
 }
 

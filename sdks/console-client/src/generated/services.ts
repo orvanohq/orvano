@@ -56,6 +56,7 @@ import type {
   CreateUserRequest,
   CreateUserVerificationRequest,
   IdentityList,
+  PasskeyList,
   RequestOptions,
   Session,
   SessionPage,
@@ -983,6 +984,17 @@ export class ConsoleUsersService {
     )
   }
 
+  /** Removes one of a user's passkeys. Sessions stay. Owners and developers. */
+  deletePasskey(userId: string, passkeyId: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      {
+        method: 'DELETE',
+        path: `/v1/console/project/users/${encodeURIComponent(userId)}/passkeys/${encodeURIComponent(passkeyId)}`,
+      },
+      options,
+    )
+  }
+
   /** Ends one session of a user. */
   deleteSession(userId: string, sessionId: string, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
@@ -1021,6 +1033,7 @@ export class ConsoleUsersService {
       createdAfter?: string | undefined
       createdBefore?: string | undefined
       emailVerified?: boolean | undefined
+      mfa?: string | undefined
       cursor?: string | undefined
       limit?: number | undefined
     },
@@ -1040,6 +1053,7 @@ export class ConsoleUsersService {
       createdAfter?: string | undefined
       createdBefore?: string | undefined
       emailVerified?: boolean | undefined
+      mfa?: string | undefined
       limit?: number | undefined
     },
     options?: RequestOptions,
@@ -1051,6 +1065,14 @@ export class ConsoleUsersService {
   listIdentities(userId: string, options?: RequestOptions): Promise<IdentityList> {
     return this.#client.request<IdentityList>(
       { method: 'GET', path: `/v1/console/project/users/${encodeURIComponent(userId)}/identities` },
+      options,
+    )
+  }
+
+  /** Lists a user's passkeys, oldest first, including inactive ones. Every role. */
+  listPasskeys(userId: string, options?: RequestOptions): Promise<PasskeyList> {
+    return this.#client.request<PasskeyList>(
+      { method: 'GET', path: `/v1/console/project/users/${encodeURIComponent(userId)}/passkeys` },
       options,
     )
   }
@@ -1078,6 +1100,21 @@ export class ConsoleUsersService {
     options?: RequestOptions,
   ): AsyncGenerator<Session> {
     return paginate((cursor) => this.listSessions(userId, { ...query, cursor }, options))
+  }
+
+  /**
+   * Turns MFA off for a user of the project named by `X-Orvano-Project`: deletes their authenticator app and recovery
+   * codes and ends all their sessions. Passkeys stay. Owners and developers.
+   */
+  resetMfa(userId: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      {
+        method: 'POST',
+        path: `/v1/console/project/users/${encodeURIComponent(userId)}/mfa/reset`,
+        idempotent: true,
+      },
+      options,
+    )
   }
 
   /** Unblocks a user so they can sign in again. Their old sessions stay ended. */

@@ -237,6 +237,26 @@ public sealed record OpenIdConfiguration(
     [property: JsonPropertyName("subject_types_supported")] IReadOnlyList<string> SubjectTypesSupported,
     [property: JsonPropertyName("response_types_supported")] IReadOnlyList<string> ResponseTypesSupported);
 
+/// <summary>A passkey of a user.</summary>
+/// <param name="Id">The passkey's ID.</param>
+/// <param name="Name">The name the user gave it, else <c>Passkey</c>.</param>
+/// <param name="CreatedAt">When it was added.</param>
+/// <param name="LastUsedAt">When it last signed in or answered a challenge; null when it never has.</param>
+/// <param name="Synced">Whether the passkey is backed up and synced across devices (for example by iCloud Keychain or a password manager).</param>
+/// <param name="Active">Whether it can sign in now: false after the project's RP ID changed away from the one it was made for.</param>
+public sealed record Passkey(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("lastUsedAt")] DateTimeOffset? LastUsedAt,
+    [property: JsonPropertyName("synced")] bool Synced,
+    [property: JsonPropertyName("active")] bool Active);
+
+/// <summary>A user's passkeys, oldest first; at most 10.</summary>
+/// <param name="Items">The passkeys.</param>
+public sealed record PasskeyList(
+    [property: JsonPropertyName("items")] IReadOnlyList<Passkey> Items);
+
 /// <summary>An active session of a user: one signed in device or browser.</summary>
 /// <param name="Id">The session ID.</param>
 /// <param name="CreatedAt">When the user signed in.</param>
@@ -293,6 +313,7 @@ public sealed record UpdateUserEmailRequest(
 /// <param name="LastSignInAt">When the user last signed in; null if never.</param>
 /// <param name="Providers">The providers linked to the user, sorted by name.</param>
 /// <param name="HasPassword">Whether the user has a password.</param>
+/// <param name="MfaEnabled">Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never turns it on.</param>
 public sealed record User(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("email")] string? Email,
@@ -304,7 +325,8 @@ public sealed record User(
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
     [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt,
     [property: JsonPropertyName("providers")] IReadOnlyList<OAuthProvider> Providers,
-    [property: JsonPropertyName("hasPassword")] bool HasPassword);
+    [property: JsonPropertyName("hasPassword")] bool HasPassword,
+    [property: JsonPropertyName("mfaEnabled")] bool MfaEnabled);
 
 /// <summary>One page of a project's users, newest first.</summary>
 /// <param name="Items">The users on this page.</param>

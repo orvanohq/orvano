@@ -34,9 +34,9 @@ internal static class ConsoleUsersEndpoints
     public static void Map(RouteGroupBuilder v1)
     {
         v1.MapGet(Ops.List.Route, async (
-                HttpContext http, string? email, string? status, DateTimeOffset? createdAfter, DateTimeOffset? createdBefore, bool? emailVerified,
+                HttpContext http, string? email, string? status, DateTimeOffset? createdAfter, DateTimeOffset? createdBefore, bool? emailVerified, string? mfa,
                 string? cursor, int? limit, UsersService users, CancellationToken ct) =>
-            Ok(http, await users.ListAsync(Project(http), new UserFilter(email, status, createdAfter, createdBefore, emailVerified), cursor, limit, ct), UserPage))
+            Ok(http, await users.ListAsync(Project(http), new UserFilter(email, status, createdAfter, createdBefore, emailVerified, mfa), cursor, limit, ct), UserPage))
             .WithName(Ops.List.Id)
             .RequireRole(Need.Read);
 
@@ -68,6 +68,24 @@ internal static class ConsoleUsersEndpoints
         v1.MapDelete(Ops.Delete.Route, async (HttpContext http, string userId, UsersService users, CancellationToken ct) =>
             NoContent(http, await users.DeleteAsync(Project(http), userId, Me(http), ct)))
             .WithName(Ops.Delete.Id)
+            .RequireRole(Need.Write);
+
+        // Spec 0013, AC-27 and AC-44: the user detail's Security section.
+        v1.MapPost(Ops.ResetMfa.Route, async (HttpContext http, string userId, MfaResets resets, CancellationToken ct) =>
+            NoContent(http, await resets.ResetAsync(Project(http), userId, Me(http), ct)))
+            .WithName(Ops.ResetMfa.Id)
+            .RequireRole(Need.Write);
+
+        v1.MapGet(Ops.ListPasskeys.Route, async (HttpContext http, string userId, PasskeyService passkeys, CancellationToken ct) =>
+            Ok(http, Guid.TryParse(userId, out var id) ? await passkeys.ListAsync(Project(http), id, ct) : Failure.UserNotFound, PasskeyList))
+            .WithName(Ops.ListPasskeys.Id)
+            .RequireRole(Need.Read);
+
+        v1.MapDelete(Ops.DeletePasskey.Route, async (HttpContext http, string userId, string passkeyId, PasskeyService passkeys, CancellationToken ct) =>
+            NoContent(http, Guid.TryParse(userId, out var id)
+                ? await passkeys.DeleteAsync(Project(http), id, passkeyId, Me(http), MfaResets.ByConsole, ct)
+                : Failure.UserNotFound))
+            .WithName(Ops.DeletePasskey.Id)
             .RequireRole(Need.Write);
 
         v1.MapPut(Ops.UpdateEmailVerification.Route, async (HttpContext http, string userId, Api.UpdateEmailVerificationRequest request, UsersService users, CancellationToken ct) =>

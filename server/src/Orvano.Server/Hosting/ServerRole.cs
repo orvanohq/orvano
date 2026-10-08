@@ -143,7 +143,7 @@ internal static class ServerRole
     /// envelope encryption (<c>ORVANO_MASTER_KEYS</c>, api and worker), the public URL and trusted proxies (api), the
     /// in memory cache, and the rate limits.
     /// </summary>
-    private static void AddKernel(WebApplicationBuilder builder, OrvanoRole role)
+    internal static void AddKernel(WebApplicationBuilder builder, OrvanoRole role)
     {
         var config = builder.Configuration;
         var services = builder.Services;

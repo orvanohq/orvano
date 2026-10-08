@@ -234,6 +234,7 @@ export function installFakeApi(): FakeApi {
       lastSignInAt: now,
       providers: [],
       hasPassword: true,
+      mfaEnabled: false,
       isInstallAdmin: false,
     },
     signedIn: true,

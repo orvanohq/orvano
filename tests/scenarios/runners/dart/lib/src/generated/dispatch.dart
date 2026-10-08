@@ -642,6 +642,17 @@ final Map<String, DispatchEntry> dispatch = {
     },
     scope: 'users.write',
   ),
+  'users.deletePasskey': DispatchEntry(
+    status: 204,
+    server: (o, input) async {
+      await o.users.deletePasskey(
+        input['userId'] as String,
+        input['passkeyId'] as String,
+      );
+      return null;
+    },
+    scope: 'users.write',
+  ),
   'users.deleteSession': DispatchEntry(
     status: 204,
     server: (o, input) async {
@@ -684,6 +695,7 @@ final Map<String, DispatchEntry> dispatch = {
         emailVerified: input['emailVerified'] == null
             ? null
             : input['emailVerified'] as bool,
+        mfa: input['mfa'] == null ? null : input['mfa'] as String,
         cursor: input['cursor'] == null ? null : input['cursor'] as String,
         limit: input['limit'] == null ? null : (input['limit'] as num).toInt(),
       );
@@ -702,6 +714,7 @@ final Map<String, DispatchEntry> dispatch = {
           emailVerified: input['emailVerified'] == null
               ? null
               : input['emailVerified'] as bool,
+          mfa: input['mfa'] == null ? null : input['mfa'] as String,
           limit: input['limit'] == null
               ? null
               : (input['limit'] as num).toInt(),
@@ -713,6 +726,14 @@ final Map<String, DispatchEntry> dispatch = {
     status: 200,
     server: (o, input) async {
       final r = await o.users.listIdentities(input['userId'] as String);
+      return r.toJson();
+    },
+    scope: 'users.read',
+  ),
+  'users.listPasskeys': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.users.listPasskeys(input['userId'] as String);
       return r.toJson();
     },
     scope: 'users.read',
@@ -736,6 +757,14 @@ final Map<String, DispatchEntry> dispatch = {
         )
         .map((e) => e.toJson()),
     scope: 'users.read',
+  ),
+  'users.resetMfa': DispatchEntry(
+    status: 204,
+    server: (o, input) async {
+      await o.users.resetMfa(input['userId'] as String);
+      return null;
+    },
+    scope: 'users.write',
   ),
   'users.unblock': DispatchEntry(
     status: 200,

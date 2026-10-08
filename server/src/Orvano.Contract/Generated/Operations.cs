@@ -1840,6 +1840,22 @@ public static class ConsoleUsersOperations
         public const string Audience = "console";
     }
 
+    /// <summary>DELETE /v1/console/project/users/{userId}/passkeys/{passkeyId}: Removes one of a user's passkeys. Sessions stay. Owners and developers.</summary>
+    public static class DeletePasskey
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.deletePasskey";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/passkeys/{passkeyId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>DELETE /v1/console/project/users/{userId}/sessions/{sessionId}: Ends one session of a user.</summary>
     public static class DeleteSession
     {
@@ -1920,6 +1936,22 @@ public static class ConsoleUsersOperations
         public const string Audience = "console";
     }
 
+    /// <summary>GET /v1/console/project/users/{userId}/passkeys: Lists a user's passkeys, oldest first, including inactive ones. Every role.</summary>
+    public static class ListPasskeys
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.listPasskeys";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/passkeys";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>GET /v1/console/project/users/{userId}/sessions: Lists a user's active sessions, newest first. <c>current</c> is always false.</summary>
     public static class ListSessions
     {
@@ -1931,6 +1963,22 @@ public static class ConsoleUsersOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/console/project/users/{userId}/sessions";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/project/users/{userId}/mfa/reset: Turns MFA off for a user of the project named by <c>X-Orvano-Project</c>: deletes their authenticator app and recovery</summary>
+    public static class ResetMfa
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.resetMfa";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/mfa/reset";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "console";
@@ -2290,6 +2338,25 @@ public static class UsersOperations
         public const string Scope = "users.write";
     }
 
+    /// <summary>DELETE /v1/users/{userId}/passkeys/{passkeyId}: Removes one of a user's passkeys. Sessions stay.</summary>
+    public static class DeletePasskey
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.deletePasskey";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/passkeys/{passkeyId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
     /// <summary>DELETE /v1/users/{userId}/sessions/{sessionId}: Ends one session of a user.</summary>
     public static class DeleteSession
     {
@@ -2385,6 +2452,25 @@ public static class UsersOperations
         public const string Scope = "users.read";
     }
 
+    /// <summary>GET /v1/users/{userId}/passkeys: Lists a user's passkeys, oldest first, including inactive ones.</summary>
+    public static class ListPasskeys
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.listPasskeys";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/passkeys";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.read";
+    }
+
     /// <summary>GET /v1/users/{userId}/sessions: Lists a user's active sessions, newest first. <c>current</c> is always false.</summary>
     public static class ListSessions
     {
@@ -2402,6 +2488,25 @@ public static class UsersOperations
 
         /// <summary>The API key scope it needs.</summary>
         public const string Scope = "users.read";
+    }
+
+    /// <summary>POST /v1/users/{userId}/mfa/reset: Turns MFA off for a user who lost every factor: deletes their authenticator app and recovery codes and ends all</summary>
+    public static class ResetMfa
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.resetMfa";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/mfa/reset";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
     }
 
     /// <summary>POST /v1/users/{userId}/unblock: Unblocks a user so they can sign in again. Their old sessions stay ended.</summary>

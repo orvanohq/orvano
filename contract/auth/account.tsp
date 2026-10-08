@@ -58,6 +58,13 @@ model User {
   @doc("Whether the user has a password.")
   @example(true)
   hasPassword: boolean;
+
+  @doc("""
+    Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never
+    turns it on.
+    """)
+  @example(false)
+  mfaEnabled: boolean;
 }
 
 @doc("""

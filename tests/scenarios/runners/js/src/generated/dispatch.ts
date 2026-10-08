@@ -335,6 +335,11 @@ export const dispatch: DispatchTable = {
       o.users.deleteIdentity(input.userId as string, input.identityId as string),
     scope: 'users.write',
   },
+  'users.deletePasskey': {
+    status: 204,
+    server: (o, input) => o.users.deletePasskey(input.userId as string, input.passkeyId as string),
+    scope: 'users.write',
+  },
   'users.deleteSession': {
     status: 204,
     server: (o, input) => o.users.deleteSession(input.userId as string, input.sessionId as string),
@@ -359,6 +364,7 @@ export const dispatch: DispatchTable = {
         createdAfter: input.createdAfter as string | undefined,
         createdBefore: input.createdBefore as string | undefined,
         emailVerified: input.emailVerified as boolean | undefined,
+        mfa: input.mfa as string | undefined,
         cursor: input.cursor as string | undefined,
         limit: input.limit as number | undefined,
       }),
@@ -369,6 +375,7 @@ export const dispatch: DispatchTable = {
         createdAfter: input.createdAfter as string | undefined,
         createdBefore: input.createdBefore as string | undefined,
         emailVerified: input.emailVerified as boolean | undefined,
+        mfa: input.mfa as string | undefined,
         limit: input.limit as number | undefined,
       }),
     scope: 'users.read',
@@ -376,6 +383,11 @@ export const dispatch: DispatchTable = {
   'users.listIdentities': {
     status: 200,
     server: (o, input) => o.users.listIdentities(input.userId as string),
+    scope: 'users.read',
+  },
+  'users.listPasskeys': {
+    status: 200,
+    server: (o, input) => o.users.listPasskeys(input.userId as string),
     scope: 'users.read',
   },
   'users.listSessions': {
@@ -388,6 +400,11 @@ export const dispatch: DispatchTable = {
     serverAll: (o, input) =>
       o.users.listSessionsAll(input.userId as string, { limit: input.limit as number | undefined }),
     scope: 'users.read',
+  },
+  'users.resetMfa': {
+    status: 204,
+    server: (o, input) => o.users.resetMfa(input.userId as string),
+    scope: 'users.write',
   },
   'users.unblock': {
     status: 200,
