@@ -50,6 +50,52 @@ _Steps derived from the acceptance criteria and the Value sourcing table. `/chec
 
 - AC-5: the TOTP switch step · AC-6 (password): step one and "without MFA" · AC-7: step one, other project, six tickets · AC-8 (TOTP and recovery codes): step two, 5 wrong, parallel · AC-9: code reuse · AC-10: recovery code step · AC-12: createTotp steps · AC-13: confirm steps · AC-16: getMfa · AC-17 (enrollment, users without MFA): stale session step · AC-25, AC-26: claims, list, refresh · AC-33, AC-34: data handling · AC-40: the codes above, plus the generated lists and the fix pages (the site build)
 
+## Build checks: task 2, MFA everywhere · updated 2026-10-07
+
+_Steps derived from the acceptance criteria and the Value sourcing table. `/check verify` runs these against a local stack; `/test` locks the durable ones._
+
+### API, as an app would call it
+
+- [ ] A user with MFA on asks for a magic link and opens it → 201 with `user: null`, `session: null`, and `mfa` set; the same link again → 401 `invalid_email_token` (step one stays used) → AC-6
+- [ ] The same user signs in with an emailed code → a challenge, and the code row is gone → AC-6
+- [ ] An email that has no user yet signs up by magic link → 201 with `isNewUser: true` and `mfa: null`, never challenged → AC-6
+- [ ] A user with MFA on signs in with Google (fake provider) → a challenge; step two with a TOTP code → the session's `method` is `oauth`, `provider` is `google`, and `amr` is `["fed","mfa","otp"]` → AC-6, AC-8, AC-25
+- [ ] `POST /v1/account/recovery/confirm` for a user with MFA on → a challenge, and nothing else changes: the old password still signs in (to a challenge), the new one gets 401 `invalid_credentials`, the user's sessions still work, and no `auth.password.reset` event exists → AC-6
+- [ ] Step two for that ticket → 201 with `amr` `["mfa","pwd","rec"]`; now the new password works, the old one does not, every older session answers 401 with `end_reason = 'password_reset'`, and one `auth.password.reset` event exists → AC-8
+- [ ] `DELETE /v1/account/mfa/totp` from a session whose last second factor was 11 minutes ago → 403 `mfa_verification_required` → AC-14, AC-18
+- [ ] `POST /v1/account/mfa/verify` with a recovery code → 200 with a new access token (`amr` gains `rec`) and the same refresh token; then `DELETE /v1/account/mfa/totp` → 204, `GET /v1/account/mfa` says `mfaEnabled: false` and 0 codes, password sign in works with no challenge, and one `auth.mfa.disabled` event has reason `user` → AC-14, AC-19
+- [ ] `DELETE /v1/account/mfa/totp` again → 409 `mfa_not_enabled` → AC-14
+- [ ] `POST /v1/account/mfa/recovery-codes` for a user without MFA → 409 `mfa_not_enabled`; for a user with MFA and a fresh second factor → 201 with 10 codes, and an old code then fails at step two while a new one works → AC-15
+- [ ] With an old second factor, `PUT /v1/account/password` and `POST /v1/account/delete` with a wrong password → 403 `mfa_verification_required` (the step up comes before the password check); after `verifyMfa` the same wrong password → 401 `invalid_credentials`, and the right one → 204 → AC-18
+- [ ] `verifyMfa` with a wrong code → 401 `invalid_mfa_code`; with both fields → 400 `invalid_request`; for a user without MFA with a recovery code → 409 `factor_not_enabled` → AC-19
+- [ ] `POST /v1/account/identities/oauth/flows` for a user with MFA on and an old second factor → 403 `mfa_verification_required` → AC-17
+- [ ] A server marks an enrolled user's email unverified, then the user signs in by magic link → 201 with `mfa: null` and `aal` 1; the TOTP factor and recovery codes are gone, and `auth.mfa.disabled` has reason `claimed` → AC-29
+
+### SDKs
+
+- [ ] `@orvano/js`: after a magic link challenge, `redeemLink` answers `mfaRequired: true` with the factors; `completeMfa({ recoveryCode })` signs in and says `signedIn`; `verifyMfa` says `tokenRefreshed` and the stored access token carries `aal` 2 → AC-36
+- [ ] `@orvano/nextjs`: a server side sign in that is challenged sets `orvano_mfa` (`HttpOnly`, `SameSite=Lax`, `Path=/`, `Max-Age=300`) and returns `mfa.ticket` as an empty string; `POST .../mfa` sets both session cookies, clears `orvano_mfa`, and answers `{ next }`; `POST .../mfa` without the cookie → 401 `invalid_mfa_ticket` → AC-37
+- [ ] `@orvano/nextjs`: the provider callback for a user with MFA on redirects to `mfaPath` (default `/sign-in/mfa`) with no session cookie, and `next` comes back from the `mfa` action → AC-37
+- [ ] `orvano_core`: a challenged sign in emits `AuthEvent.mfaRequired` with the factors, stores nothing, and `completeMfa` signs in → AC-38
+
+### Value sourcing
+
+- [ ] Step two's session `method` and `provider` come from the ticket: a challenged Google sign in finishes as `oauth`/`google`, a challenged magic link as `magic_link` → Value sourcing row 4
+- [ ] The password applied at step two is the one hashed at step one: change nothing between the two steps, then sign in with the new password → Value sourcing row 13
+- [ ] Step up recency comes from the session's `strong_auth_at`: move it 11 minutes back in the database and the guarded calls refuse; `verifyMfa` moves it to now and they pass → Value sourcing row 16
+
+### Commands
+
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests --filter-class "*MfaEverywhereTests" --filter-class "*MfaTests"` → 21 passed → AC-6, AC-8, AC-14, AC-15, AC-17 to AC-19, AC-29
+- [ ] `pnpm --filter @orvano/js build && pnpm --filter @orvano/js --filter @orvano/nextjs test` → all pass (`test/mfa.test.ts` in both) → AC-36, AC-37
+- [ ] `(cd sdks/dart/core && dart test test/mfa_test.dart)` → all pass → AC-38
+- [ ] With `docker compose -f tests/scenarios/compose.yml up -d --build --wait`, restart `api` between runners (the sign up limits are in memory), then `node dist/cli.js <node|bun|deno|browser|workerd|nextjs>` in `tests/scenarios/runners/js` and `dart run bin/run.dart` in `runners/dart` → `auth-mfa-totp` and `auth-mfa-everywhere` pass → AC-36 to AC-38
+
+### Acceptance criteria coverage (task 2)
+
+- AC-6: API steps 1 to 6 · AC-8: steps 4 and 6 · AC-14: steps 7 to 9 · AC-15: step 10 · AC-17: step 13 · AC-18: steps 7 and 11 · AC-19: steps 8 and 12 · AC-29: step 14 · AC-36 to AC-38: SDK steps and the scenarios
+- Not in task 2: the console sign in's MFA step and its `orvano_console_mfa` cookie move to task 5 with the console screens (console accounts can't turn TOTP on before then, and a console challenge fails closed today)
+
 ## Setup
 
 1. Deploy the branch to the test server, so `ORVANO_PUBLIC_URL` is its real https URL (this also turns on console passkeys, AC-3).
