@@ -46,6 +46,7 @@ Map<String, Object?> user(String id) => {
   'lastSignInAt': null,
   'providers': <String>['google'],
   'hasPassword': false,
+  'mfaEnabled': false,
 };
 
 Map<String, Object?> identity(String provider) => {

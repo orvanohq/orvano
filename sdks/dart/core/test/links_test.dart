@@ -45,6 +45,7 @@ Map<String, Object?> user(String id, bool verified) => {
   'lastSignInAt': null,
   'providers': <String>[],
   'hasPassword': true,
+  'mfaEnabled': false,
 };
 
 Answer json(Object body, {int code = 200}) => (response) async {

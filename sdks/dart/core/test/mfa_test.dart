@@ -41,6 +41,7 @@ final user = {
   'lastSignInAt': null,
   'providers': <String>[],
   'hasPassword': true,
+  'mfaEnabled': false,
 };
 
 Answer json(Object body, {int status = 200}) => (response) async {
