@@ -120,7 +120,8 @@ function mfaAnswer(input: Record<string, unknown>): MfaAnswer {
  * `oauthCode` stops at the code so a scenario can redeem it itself, `createNonce` is the SDK's
  * native nonce (spec 0012), `totpCode` is an authenticator app's current code, `completeMfa`,
  * `verifyMfa`, and `confirmTotp` are the client SDK's MFA helpers, and `registerPasskey` and
- * `signInWithPasskey` its passkey helpers, on the server's software authenticator (spec 0013).
+ * `signInWithPasskey` its passkey helpers, on the server's software authenticator (spec 0013), and
+ * `accessToken` hands the client's stored access token to a server step.
  * Their names have no dot, so they never collide with an operationId.
  */
 export const runnerDispatch: DispatchTable = {
@@ -217,17 +218,28 @@ export const runnerDispatch: DispatchTable = {
         body: input.body,
       }),
   },
+  accessToken: {
+    status: 200,
+    client: async (o) => {
+      const session = await o.client.getSession()
+      if (session === null) throw new Error('accessToken needs a signed in client.')
+      return { token: session.accessToken }
+    },
+  },
   verifyAccessToken: {
     status: 200,
     server: async (o, input) => {
       const verified = await (o.client as ServerClient).verifyAccessToken(String(input.token), {
         online: input.online === true,
+        requireMfa: input.requireMfa === true,
       })
       return {
         userId: verified.userId,
         sessionId: verified.sessionId,
         emailVerified: verified.emailVerified,
         expiresAt: verified.expiresAt.toISOString(),
+        aal: verified.aal,
+        amr: verified.amr,
       }
     },
   },

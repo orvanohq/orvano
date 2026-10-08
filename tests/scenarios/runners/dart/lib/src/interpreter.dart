@@ -277,13 +277,24 @@ final Map<String, DispatchEntry> _runnerDispatch = {
       final verified = await (o.client as srv.Client).verifyAccessToken(
         '${input['token']}',
         online: input['online'] == true,
+        requireMfa: input['requireMfa'] == true,
       );
       return {
         'userId': verified.userId,
         'sessionId': verified.sessionId,
         'emailVerified': verified.emailVerified,
         'expiresAt': verified.expiresAt.toIso8601String(),
+        'aal': verified.aal,
+        'amr': verified.amr,
       };
+    },
+  ),
+  'accessToken': DispatchEntry(
+    status: 200,
+    client: (o, input) async => {
+      'token':
+          (await o.client.getSession())?.accessToken ??
+          (throw StateError('accessToken needs a signed in client.')),
     },
   ),
 };

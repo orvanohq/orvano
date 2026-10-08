@@ -32,7 +32,8 @@ with an operationId:
 | `signIn` | `client` | `body: { email, password }` | the sign in answer; the SDK's stored session is left alone, so a runner without client operations (.NET) gets a token too |
 | `redeemLink` | `client` | `url`, optional `password` | `{ type, user, isNewUser }` from the client SDK's link helper (`redeemLink` in JS, `handleLink` in Dart), or null for a URL without Orvano's parameters; .NET skips it |
 | `now` | `client` or `server` | none | `{ now }`, the runner's clock as an ISO 8601 time; save it before a send and pass it to `test.getLatestEmail` as `after` |
-| `verifyAccessToken` | `server` | `token`, optional `online: true` | `{ userId, sessionId, emailVerified, expiresAt }` from the server SDK's own check, or its `token_expired` / `invalid_token` error |
+| `verifyAccessToken` | `server` | `token`, optional `online: true`, optional `requireMfa: true` | `{ userId, sessionId, emailVerified, expiresAt, aal, amr }` from the server SDK's own check, or its `token_expired` / `invalid_token` / `mfa_required` error |
+| `accessToken` | `client` | none | `{ token }`, the access token the client SDK stores now, so a server step can verify a session made by a client helper such as `completeMfa`; .NET skips it |
 | `totpCode` | `client` | `secret`, optional `offset` (steps from now) | `{ code }`, the code an authenticator app shows for that step (spec 0013) |
 | `completeMfa` | `client` | `totpCode`, `recoveryCode`, or `passkey: true` (the runner's test authenticator answers) | `{ user, isNewUser, mfaRequired, factors }` from the client SDK's `completeMfa`, which uses the ticket the last sign in kept (201); .NET skips it |
 | `verifyMfa` | `client` | `totpCode`, `recoveryCode`, or `passkey: true` | `{ verified: true }` after the client SDK's `verifyMfa` stored the new access token |

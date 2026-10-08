@@ -1,0 +1,75 @@
+# Spec 0013, AC-27 and AC-39, for every server SDK (the .NET runner too, which has no client operations): a token
+# from a password sign in reads as one factor, requireMfa refuses it, and a user without MFA has no passkeys, shows
+# mfaEnabled false, is left alone by a reset, and is found by the mfa filter.
+name: a server reads a token's aal and amr and manages a user without MFA
+requires: []
+steps:
+  - op: users.create
+    as: server
+    input:
+      body:
+        {
+          email: 'one-${unique}@example.com',
+          password: correct horse battery staple,
+          emailVerified: true,
+        }
+    expect:
+      status: 201
+      body: { mfaEnabled: false }
+    save:
+      userId: $.id
+  - op: signIn
+    as: client
+    input:
+      body: { email: 'one-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }
+    save:
+      token: $.session.accessToken
+  - op: verifyAccessToken
+    as: server
+    input: { token: '${token}' }
+    expect:
+      status: 200
+      body: { userId: '${userId}', aal: 1, amr: [pwd] }
+  - op: verifyAccessToken
+    as: server
+    input: { token: '${token}', requireMfa: true }
+    expect: { status: 403, code: mfa_required }
+  - op: users.listPasskeys
+    as: server
+    input: { userId: '${userId}' }
+    expect:
+      status: 200
+      body: { items: [] }
+  - op: users.list
+    as: server
+    input: { email: 'one-${unique}@example.com', mfa: 'off' }
+    expect:
+      status: 200
+      body:
+        items: [{ id: '${userId}', mfaEnabled: false }]
+  - op: users.list
+    as: server
+    input: { email: 'one-${unique}@example.com', mfa: 'on' }
+    expect:
+      status: 200
+      body: { items: [] }
+  # Nothing to reset: 204, and the session goes on.
+  - op: users.resetMfa
+    as: server
+    input: { userId: '${userId}' }
+    expect: { status: 204 }
+  - op: verifyAccessToken
+    as: server
+    input: { token: '${token}', online: true }
+    expect:
+      status: 200
+      body: { userId: '${userId}' }
+  - op: users.resetMfa
+    as: server
+    input: { userId: 00000000-0000-7000-8000-000000000000 }
+    expect: { status: 404, code: user_not_found }
+  - op: users.delete
+    as: server
+    input: { userId: '${userId}' }
+    expect: { status: 204 }

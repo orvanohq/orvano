@@ -1,0 +1,114 @@
+# Spec 0013, AC-27 and AC-39: a user turns on an authenticator app, a server sees aal 2 from requireMfa, the filter
+# finds them, then a server resets their MFA: every session ends, and a password alone signs them in again.
+name: a server verifies an MFA session and resets a user who lost their factors
+requires: []
+steps:
+  - op: users.create
+    as: server
+    input:
+      body:
+        {
+          email: 'reset-${unique}@example.com',
+          password: correct horse battery staple,
+          emailVerified: true,
+        }
+    expect: { status: 201 }
+    save:
+      userId: $.id
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'reset-${unique}@example.com', password: correct horse battery staple }
+    expect:
+      status: 201
+      body: { mfa: null }
+  - op: account.createTotp
+    as: client
+    input: {}
+    expect: { status: 201 }
+    save:
+      secret: $.secret
+  - op: totpCode
+    as: client
+    input: { secret: '${secret}', offset: 0 }
+    expect: { status: 200 }
+    save:
+      firstCode: $.code
+  - op: confirmTotp
+    as: client
+    input: { code: '${firstCode}' }
+    expect: { status: 200 }
+  - op: users.get
+    as: server
+    input: { userId: '${userId}' }
+    expect:
+      status: 200
+      body: { mfaEnabled: true }
+  - op: users.list
+    as: server
+    input: { email: 'reset-${unique}@example.com', mfa: 'on' }
+    expect:
+      status: 200
+      body:
+        items: [{ id: '${userId}', mfaEnabled: true }]
+  - op: account.deleteCurrentSession
+    as: client
+    input: {}
+    expect: { status: 204 }
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'reset-${unique}@example.com', password: correct horse battery staple }
+    expect:
+      status: 201
+      body: { session: null, mfa: { factors: [totp, recovery_code] } }
+  - op: totpCode
+    as: client
+    input: { secret: '${secret}', offset: 1 }
+    expect: { status: 200 }
+    save:
+      secondCode: $.code
+  - op: completeMfa
+    as: client
+    input: { totpCode: '${secondCode}' }
+    expect:
+      status: 201
+      body: { mfaRequired: false }
+  - op: accessToken
+    as: client
+    input: {}
+    expect: { status: 200 }
+    save:
+      token: $.token
+  - op: verifyAccessToken
+    as: server
+    input: { token: '${token}', requireMfa: true }
+    expect:
+      status: 200
+      body: { userId: '${userId}', aal: 2, amr: [mfa, otp, pwd] }
+  - op: users.resetMfa
+    as: server
+    input: { userId: '${userId}' }
+    expect: { status: 204 }
+  # The reset ended every session: the online check fails at once.
+  - op: verifyAccessToken
+    as: server
+    input: { token: '${token}', online: true }
+    expect: { status: 401, code: invalid_token }
+  - op: users.get
+    as: server
+    input: { userId: '${userId}' }
+    expect:
+      status: 200
+      body: { mfaEnabled: false }
+  - op: signIn
+    as: client
+    input:
+      body: { email: 'reset-${unique}@example.com', password: correct horse battery staple }
+    expect:
+      status: 201
+      body: { mfa: null }
+  - op: users.delete
+    as: server
+    input: { userId: '${userId}' }
+    expect: { status: 204 }
