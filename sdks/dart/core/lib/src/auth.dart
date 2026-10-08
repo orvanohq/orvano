@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'mfa.dart';
+
 /// A signed in user's session, as a client keeps it: what sign up, sign in,
 /// and refresh return (spec 0004).
 final class AuthSession {
@@ -102,19 +104,26 @@ enum AuthEvent {
 
   /// The signed in user changed their name or metadata.
   userUpdated,
+
+  /// A sign in stopped at the MFA step (spec 0013, AC-38): no session yet;
+  /// [AuthStateChange.mfa] says which factors finish it.
+  mfaRequired,
 }
 
 /// One change to the signed in user: the [event] and the [session] after it
 /// (null after [AuthEvent.signedOut]).
 final class AuthStateChange {
   /// Creates a change.
-  const AuthStateChange(this.event, this.session);
+  const AuthStateChange(this.event, this.session, {this.mfa});
 
   /// What happened.
   final AuthEvent event;
 
   /// The session after it.
   final AuthSession? session;
+
+  /// For [AuthEvent.mfaRequired], the sign in waiting at the MFA step.
+  final PendingMfa? mfa;
 }
 
 /// The key a Flutter app keeps a project's session under:
