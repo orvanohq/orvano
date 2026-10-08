@@ -52,6 +52,22 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>POST /v1/account/mfa/totp/confirm: Turns MFA on with the first code from the authenticator app. Answers 10 new recovery codes, ends every other</summary>
+    public static class ConfirmTotp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.confirmTotp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/totp/confirm";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account: Signs a new user up with an email and password, and signs them in.</summary>
     public static class Create
     {
@@ -164,6 +180,22 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>POST /v1/account/sessions/mfa: Finishes a sign in that answered an MFA challenge: checks the ticket and one factor, then creates the session.</summary>
+    public static class CreateMfaSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createMfaSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/mfa";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account/oauth/flows: Starts signing in with a provider: answers the provider's sign in page to send the browser to. After the user</summary>
     public static class CreateOAuthFlow
     {
@@ -239,6 +271,22 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/recovery";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/mfa/totp: Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.</summary>
+    public static class CreateTotp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createTotp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/totp";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";
@@ -354,6 +402,22 @@ public static class AccountOperations
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "both";
+    }
+
+    /// <summary>GET /v1/account/mfa: Gets the signed in user's MFA state.</summary>
+    public static class GetMfa
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.getMfa";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
     }
 
     /// <summary>GET /v1/account/identities: Lists the signed in user's identities, oldest first.</summary>

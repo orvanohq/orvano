@@ -1,3 +1,5 @@
+import type { PendingMfa } from './mfa.js'
+
 /**
  * A signed in user's session, as a client keeps it: what sign up, sign in, and refresh return
  * (spec 0004). Times are ISO 8601 strings, as on the wire.
@@ -57,11 +59,21 @@ export function readAccessClaims(token: string): { sub: string; emailVerified: b
   }
 }
 
-/** What happened to the signed in user, as `onAuthStateChange` tells it. */
-export type AuthEvent = 'signedIn' | 'signedOut' | 'tokenRefreshed' | 'userUpdated'
+/**
+ * What happened to the signed in user, as `onAuthStateChange` tells it. `mfaRequired` (spec 0013)
+ * means a sign in stopped at the MFA step: no session yet; finish it with `completeMfa`.
+ */
+export type AuthEvent = 'signedIn' | 'signedOut' | 'tokenRefreshed' | 'userUpdated' | 'mfaRequired'
 
-/** Called with each {@link AuthEvent} and the session after it (null after `signedOut`). */
-export type AuthStateListener = (event: AuthEvent, session: AuthSession | null) => void
+/**
+ * Called with each {@link AuthEvent} and the session after it (null after `signedOut`, and
+ * unchanged after `mfaRequired`). For `mfaRequired`, `mfa` carries the factors and the expiry.
+ */
+export type AuthStateListener = (
+  event: AuthEvent,
+  session: AuthSession | null,
+  mfa?: PendingMfa,
+) => void
 
 /** The `localStorage` key a browser keeps a project's session under: `orvano.session.<projectId>`. */
 export function sessionStorageKey(project: string | undefined): string {

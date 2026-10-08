@@ -131,7 +131,7 @@ extension OAuthSignIn on Client {
       ),
       options: options,
     );
-    return OAuthSignInResult(user: result.user, isNewUser: result.isNewUser);
+    return OAuthSignInResult.of(result);
   }
 
   /// Links a provider to the signed in user with its native ID token, and
@@ -193,10 +193,7 @@ extension OAuthSignIn on Client {
             options: options,
           );
           _verifiers[this] = null;
-          return OAuthSignInResult(
-            user: result.user,
-            isNewUser: result.isNewUser,
-          );
+          return OAuthSignInResult.of(result);
         case OAuthLinkType.oauthLink:
           final identity = await account.completeOAuthLink(
             CompleteOAuthLinkRequest(code: code, codeVerifier: verifier),

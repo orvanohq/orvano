@@ -196,7 +196,8 @@ function isLinkType(value: unknown): value is EmailLinkType {
 /**
  * `POST .../redeem` (spec 0010, AC-25): redeems a link with Orvano as the browser. A magic link or
  * reset sets both cookies; a verification or email change refreshes them when they exist, so the
- * access token carries the new claim. Answers `{ type, user, isNewUser }`, never a token.
+ * access token carries the new claim. Answers `{ type, user, isNewUser, mfaRequired, factors }`,
+ * never a token or an MFA ticket; a sign in that stopped at the MFA step sets no cookie.
  */
 async function redeem(
   request: NextRequest,
@@ -221,7 +222,10 @@ async function redeem(
     type: result.type,
     user: result.user,
     isNewUser: result.isNewUser,
+    mfaRequired: result.mfaRequired,
+    factors: result.factors,
   })
+  if (result.mfaRequired) return response
   if (link.type === 'magic_link' || link.type === 'recovery') {
     writeResponse(response, await client.session.get(), secure)
     return response
@@ -260,7 +264,10 @@ async function emailCode(
     type: 'email_code',
     user: result.user,
     isNewUser: result.isNewUser,
+    mfaRequired: result.mfaRequired,
+    factors: result.factors,
   })
+  if (result.mfaRequired) return response
   writeResponse(response, await client.session.get(), secure)
   return response
 }

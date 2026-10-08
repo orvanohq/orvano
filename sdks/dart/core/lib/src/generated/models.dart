@@ -21,6 +21,30 @@ enum IdTokenProvider {
       values.firstWhere((e) => e.value == value, orElse: () => unknown);
 }
 
+/// A second factor.
+enum MfaFactor {
+  /// The wire value `totp`.
+  totp('totp'),
+
+  /// The wire value `recovery_code`.
+  recoveryCode('recovery_code'),
+
+  /// The wire value `passkey`.
+  passkey('passkey'),
+
+  /// A value this SDK version does not know yet.
+  unknown('');
+
+  const MfaFactor(this.value);
+
+  /// The value on the wire.
+  final String value;
+
+  /// Decodes a wire value; values this SDK does not know map to [unknown].
+  static MfaFactor fromJson(String value) =>
+      values.firstWhere((e) => e.value == value, orElse: () => unknown);
+}
+
 /// A sign in provider.
 enum OAuthProvider {
   /// The wire value `google`.
@@ -70,6 +94,9 @@ enum SessionMethod {
 
   /// The wire value `id_token`.
   idToken('id_token'),
+
+  /// The wire value `passkey`.
+  passkey('passkey'),
 
   /// A value this SDK version does not know yet.
   unknown('');
@@ -129,31 +156,44 @@ enum VerificationEmailStatus {
       values.firstWhere((e) => e.value == value, orElse: () => unknown);
 }
 
-/// A signed in user and their new session.
+/// A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of
+/// `session` and `mfa` is set.
 final class AuthResult {
   /// Creates a [AuthResult].
   const AuthResult({
-    required this.user,
-    required this.session,
+    this.user,
+    this.session,
+    this.mfa,
     required this.isNewUser,
     this.verificationEmail,
   });
 
   /// Decodes a [AuthResult] from JSON.
   factory AuthResult.fromJson(Map<String, dynamic> json) => AuthResult(
-    user: User.fromJson(json['user'] as Map<String, dynamic>),
-    session: SessionTokens.fromJson(json['session'] as Map<String, dynamic>),
+    user: json['user'] == null
+        ? null
+        : User.fromJson(json['user'] as Map<String, dynamic>),
+    session: json['session'] == null
+        ? null
+        : SessionTokens.fromJson(json['session'] as Map<String, dynamic>),
+    mfa: json['mfa'] == null
+        ? null
+        : MfaChallenge.fromJson(json['mfa'] as Map<String, dynamic>),
     isNewUser: json['isNewUser'] as bool,
     verificationEmail: json['verificationEmail'] == null
         ? null
         : VerificationEmailStatus.fromJson(json['verificationEmail'] as String),
   );
 
-  /// The user.
-  final User user;
+  /// The user; null while `mfa` is set.
+  final User? user;
 
-  /// The new session's tokens.
-  final SessionTokens session;
+  /// The new session's tokens; null while `mfa` is set.
+  final SessionTokens? session;
+
+  /// Set when the user has MFA on: no session exists yet. Finish with `account.createMfaSession` and the ticket before
+  /// it expires. The SDKs' `completeMfa` does it. Null otherwise.
+  final MfaChallenge? mfa;
 
   /// Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user.
   final bool isNewUser;
@@ -163,8 +203,18 @@ final class AuthResult {
 
   /// Encodes this [AuthResult] as JSON.
   Map<String, dynamic> toJson() => {
-    'user': user.toJson(),
-    'session': session.toJson(),
+    'user': switch (user) {
+      final v? => v.toJson(),
+      null => null,
+    },
+    'session': switch (session) {
+      final v? => v.toJson(),
+      null => null,
+    },
+    'mfa': switch (mfa) {
+      final v? => v.toJson(),
+      null => null,
+    },
     'isNewUser': isNewUser,
     'verificationEmail': switch (verificationEmail) {
       final v? => v.value,
@@ -234,6 +284,22 @@ final class ConfirmEmailChangeRequest {
 
   /// Encodes this [ConfirmEmailChangeRequest] as JSON.
   Map<String, dynamic> toJson() => {'token': token};
+}
+
+/// The first code from the authenticator app, which turns MFA on.
+final class ConfirmTotpRequest {
+  /// Creates a [ConfirmTotpRequest].
+  const ConfirmTotpRequest({required this.code});
+
+  /// Decodes a [ConfirmTotpRequest] from JSON.
+  factory ConfirmTotpRequest.fromJson(Map<String, dynamic> json) =>
+      ConfirmTotpRequest(code: json['code'] as String);
+
+  /// The 6 digit code the authenticator app shows now.
+  final String code;
+
+  /// Encodes this [ConfirmTotpRequest] as JSON.
+  Map<String, dynamic> toJson() => {'code': code};
 }
 
 /// A new user with an email and password.
@@ -428,6 +494,42 @@ final class CreateMagicLinkSessionRequest {
 
   /// Encodes this [CreateMagicLinkSessionRequest] as JSON.
   Map<String, dynamic> toJson() => {'token': token};
+}
+
+/// The second step of a sign in: the ticket and exactly one factor.
+final class CreateMfaSessionRequest {
+  /// Creates a [CreateMfaSessionRequest].
+  const CreateMfaSessionRequest({
+    required this.ticket,
+    this.totpCode,
+    this.recoveryCode,
+  });
+
+  /// Decodes a [CreateMfaSessionRequest] from JSON.
+  factory CreateMfaSessionRequest.fromJson(Map<String, dynamic> json) =>
+      CreateMfaSessionRequest(
+        ticket: json['ticket'] as String,
+        totpCode: json['totpCode'] == null ? null : json['totpCode'] as String,
+        recoveryCode: json['recoveryCode'] == null
+            ? null
+            : json['recoveryCode'] as String,
+      );
+
+  /// The `ticket` of the `MfaChallenge`.
+  final String ticket;
+
+  /// The 6 digit code the authenticator app shows now.
+  final String? totpCode;
+
+  /// A recovery code; case, spaces, and hyphens do not matter. Each works once.
+  final String? recoveryCode;
+
+  /// Encodes this [CreateMfaSessionRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'ticket': ticket,
+    'totpCode': ?totpCode,
+    'recoveryCode': ?recoveryCode,
+  };
 }
 
 /// A request to start signing in with a provider.
@@ -834,6 +936,101 @@ final class Jwks {
   };
 }
 
+/// The second step a sign in must pass before it gets a session: the user has MFA on. Answer it with
+/// `account.createMfaSession` before `expiresAt`.
+final class MfaChallenge {
+  /// Creates a [MfaChallenge].
+  const MfaChallenge({
+    required this.ticket,
+    required this.factors,
+    required this.expiresAt,
+  });
+
+  /// Decodes a [MfaChallenge] from JSON.
+  factory MfaChallenge.fromJson(Map<String, dynamic> json) => MfaChallenge(
+    ticket: json['ticket'] as String,
+    factors: (json['factors'] as List<dynamic>)
+        .map((e) => MfaFactor.fromJson(e as String))
+        .toList(),
+    expiresAt: DateTime.parse(json['expiresAt'] as String),
+  );
+
+  /// Proves the first step passed; send it to `account.createMfaSession`. Keep it in memory only. Empty when the ticket
+  /// travels in a cookie instead (the console).
+  final String ticket;
+
+  /// The factors the user can answer with now, in this order: `totp`, `recovery_code`, `passkey`.
+  final List<MfaFactor> factors;
+
+  /// When the ticket stops working: 5 minutes after the first step. After that, sign in again.
+  final DateTime expiresAt;
+
+  /// Encodes this [MfaChallenge] as JSON.
+  Map<String, dynamic> toJson() => {
+    'ticket': ticket,
+    'factors': factors.map((e) => e.value).toList(),
+    'expiresAt': expiresAt.toUtc().toIso8601String(),
+  };
+}
+
+/// The signed in user's MFA state.
+final class MfaStatus {
+  /// Creates a [MfaStatus].
+  const MfaStatus({
+    required this.mfaEnabled,
+    required this.totpConfirmed,
+    this.totpConfirmedAt,
+    required this.recoveryCodesRemaining,
+    required this.passkeyCount,
+    required this.factorsAvailable,
+  });
+
+  /// Decodes a [MfaStatus] from JSON.
+  factory MfaStatus.fromJson(Map<String, dynamic> json) => MfaStatus(
+    mfaEnabled: json['mfaEnabled'] as bool,
+    totpConfirmed: json['totpConfirmed'] as bool,
+    totpConfirmedAt: json['totpConfirmedAt'] == null
+        ? null
+        : DateTime.parse(json['totpConfirmedAt'] as String),
+    recoveryCodesRemaining: (json['recoveryCodesRemaining'] as num).toInt(),
+    passkeyCount: (json['passkeyCount'] as num).toInt(),
+    factorsAvailable: (json['factorsAvailable'] as List<dynamic>)
+        .map((e) => MfaFactor.fromJson(e as String))
+        .toList(),
+  );
+
+  /// Whether sign in asks for a second factor: a confirmed authenticator app, while the project allows TOTP.
+  final bool mfaEnabled;
+
+  /// Whether an authenticator app is confirmed, even while the project has TOTP turned off.
+  final bool totpConfirmed;
+
+  /// When the authenticator app was confirmed; null when none is.
+  final DateTime? totpConfirmedAt;
+
+  /// How many unused recovery codes are left, 0 to 10.
+  final int recoveryCodesRemaining;
+
+  /// How many of the user's passkeys can sign in now.
+  final int passkeyCount;
+
+  /// What the project lets users turn on now: `totp` and `passkey`.
+  final List<MfaFactor> factorsAvailable;
+
+  /// Encodes this [MfaStatus] as JSON.
+  Map<String, dynamic> toJson() => {
+    'mfaEnabled': mfaEnabled,
+    'totpConfirmed': totpConfirmed,
+    'totpConfirmedAt': switch (totpConfirmedAt) {
+      final v? => v.toUtc().toIso8601String(),
+      null => null,
+    },
+    'recoveryCodesRemaining': recoveryCodesRemaining,
+    'passkeyCount': passkeyCount,
+    'factorsAvailable': factorsAvailable.map((e) => e.value).toList(),
+  };
+}
+
 /// A started provider flow.
 final class OAuthFlow {
   /// Creates a [OAuthFlow].
@@ -934,6 +1131,8 @@ final class Session {
     required this.current,
     required this.method,
     this.provider,
+    required this.aal,
+    required this.amr,
   });
 
   /// Decodes a [Session] from JSON.
@@ -949,6 +1148,8 @@ final class Session {
     provider: json['provider'] == null
         ? null
         : OAuthProvider.fromJson(json['provider'] as String),
+    aal: (json['aal'] as num).toInt(),
+    amr: (json['amr'] as List<dynamic>).map((e) => e as String).toList(),
   );
 
   /// The session ID.
@@ -978,6 +1179,14 @@ final class Session {
   /// The provider of an `oauth` or `id_token` session; null for every other method.
   final OAuthProvider? provider;
 
+  /// How strongly the session signed in: 1 for one factor, 2 once a second factor or a passkey was verified on it. Also
+  /// the access token's `aal` claim.
+  final int aal;
+
+  /// The ways the user proved who they are on this session, sorted: `pwd`, `email`, `fed`, `otp`, `rec`, `hwk`, `swk`,
+  /// `user`, and `mfa` (whenever `aal` is 2). Also the access token's `amr` claim.
+  final List<String> amr;
+
   /// Encodes this [Session] as JSON.
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -992,6 +1201,8 @@ final class Session {
       final v? => v.value,
       null => null,
     },
+    'aal': aal,
+    'amr': amr,
   };
 }
 
@@ -1070,6 +1281,70 @@ final class SessionTokens {
     'refreshToken': refreshToken,
     'refreshTokenExpiresAt': refreshTokenExpiresAt.toUtc().toIso8601String(),
     'sessionId': sessionId,
+  };
+}
+
+/// MFA is on. Show the recovery codes once and ask the user to keep them safe; they can't be read again. Every other
+/// session of the user has ended, and this one is now at level 2.
+final class TotpConfirmation {
+  /// Creates a [TotpConfirmation].
+  const TotpConfirmation({required this.recoveryCodes, required this.session});
+
+  /// Decodes a [TotpConfirmation] from JSON.
+  factory TotpConfirmation.fromJson(Map<String, dynamic> json) =>
+      TotpConfirmation(
+        recoveryCodes: (json['recoveryCodes'] as List<dynamic>)
+            .map((e) => e as String)
+            .toList(),
+        session: SessionTokens.fromJson(
+          json['session'] as Map<String, dynamic>,
+        ),
+      );
+
+  /// 10 recovery codes, each `XXXXX-XXXXX`, each working once.
+  final List<String> recoveryCodes;
+
+  /// This session's tokens: a new access token carrying `aal` 2, and the current refresh token, unchanged.
+  final SessionTokens session;
+
+  /// Encodes this [TotpConfirmation] as JSON.
+  Map<String, dynamic> toJson() => {
+    'recoveryCodes': recoveryCodes,
+    'session': session.toJson(),
+  };
+}
+
+/// A new authenticator app secret, waiting for its first code. Show `uri` as a QR code and `secret` for typing in, then
+/// confirm with `account.confirmTotp` within 15 minutes.
+final class TotpSetup {
+  /// Creates a [TotpSetup].
+  const TotpSetup({
+    required this.secret,
+    required this.uri,
+    required this.expiresAt,
+  });
+
+  /// Decodes a [TotpSetup] from JSON.
+  factory TotpSetup.fromJson(Map<String, dynamic> json) => TotpSetup(
+    secret: json['secret'] as String,
+    uri: json['uri'] as String,
+    expiresAt: DateTime.parse(json['expiresAt'] as String),
+  );
+
+  /// The secret: 20 random bytes as unpadded base32 (32 characters). Never log it.
+  final String secret;
+
+  /// The `otpauth://` URI an authenticator app scans: the project as the issuer, the user's email as the label.
+  final String uri;
+
+  /// When the secret stops waiting for its first code; ask for a new one after that.
+  final DateTime expiresAt;
+
+  /// Encodes this [TotpSetup] as JSON.
+  Map<String, dynamic> toJson() => {
+    'secret': secret,
+    'uri': uri,
+    'expiresAt': expiresAt.toUtc().toIso8601String(),
   };
 }
 

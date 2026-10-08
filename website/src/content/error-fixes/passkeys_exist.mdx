@@ -1,0 +1,7 @@
+## Why it happens
+
+Passkeys are registered under the project's current RP ID, and changing it stops all of them from working.
+
+## How to fix
+
+Send the change again with `confirmRpIdChange: true` if you mean it. Changing back later makes those passkeys work again.

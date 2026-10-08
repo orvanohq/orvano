@@ -20,9 +20,15 @@ internal enum VerificationEmail
 
 /// <summary>
 /// A signed in user and their new session (the contract's <c>AuthResult</c>); <paramref name="IsNewUser"/> when this
-/// call created them, and <paramref name="VerificationEmail"/> when a sign up asked for a verification email.
+/// call created them, and <paramref name="VerificationEmail"/> when a sign up asked for a verification email. For a
+/// user with MFA on, step one answers <see cref="Challenged"/> instead: no user, no session, only the
+/// <paramref name="Mfa"/> challenge (spec 0013, AC-6).
 /// </summary>
-internal sealed record SignedIn(UserRow User, SessionTokensView Session, bool IsNewUser = false, VerificationEmail? VerificationEmail = null);
+internal sealed record SignedIn(
+    UserRow? User, SessionTokensView? Session, bool IsNewUser = false, VerificationEmail? VerificationEmail = null, MfaChallengeView? Mfa = null)
+{
+    public static SignedIn Challenged(MfaChallengeView mfa) => new(null, null, Mfa: mfa);
+}
 
 /// <summary>
 /// Changes to the signed in user (AC-13). A null <see cref="Metadata"/> leaves the metadata alone; <see cref="SetName"/>
@@ -183,7 +189,8 @@ internal sealed class AccountService(
     /// <summary>
     /// Password sign in (AC-4, AC-5). An unknown email is checked against the dummy hash, so a wrong password and an
     /// unknown email cost one Argon2id run each and answer the same. Block status shows only with the right password.
-    /// A hash made with older parameters is replaced (rehash on sign in).
+    /// A hash made with older parameters is replaced (rehash on sign in). A user with MFA on gets a challenge in place
+    /// of a session (spec 0013, AC-6).
     /// </summary>
     public async Task<Outcome<SignedIn>> SignInAsync(string projectId, string? email, string? password, ClientInfo client, CancellationToken ct)
     {
@@ -201,8 +208,10 @@ internal sealed class AccountService(
         var rehash = check.Value.NeedsRehash ? await hasher.TryHashAsync(normalized, ct) : null;
         await keys.GetActiveAsync(projectId, ct);
 
-        var outcome = await store.WriteAsync<(UserRow User, SessionGrant Grant)>(async (uow, token) =>
+        var outcome = await store.WriteAsync<(UserRow? User, SessionGrant? Grant, MfaChallengeView? Mfa)>(async (uow, token) =>
         {
+            // First, since it locks the user for a user with MFA on: the user row before the password row.
+            var challenge = await MfaGate.ChallengeAsync(uow, projectId, account.Id, SessionMethod.Password, null, client, token);
             if (rehash is not null)
             {
                 await using var update = new NpgsqlCommand(
@@ -212,11 +221,14 @@ internal sealed class AccountService(
                 await update.ExecuteNonQueryAsync(token);
             }
 
+            if (challenge is not null) return (null, null, challenge);
             var grant = await sessions.CreateAsync(uow, projectId, account.Id, client, Actor.User(account.Id), SessionMethod.Password, token);
-            return (await ReloadAsync(uow.Db, account.Id, token), grant);
+            return (await ReloadAsync(uow.Db, account.Id, token), grant, null);
         }, ct);
 
-        return outcome.Succeeded ? await SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant, ct) : outcome.Failure!;
+        if (!outcome.Succeeded) return outcome.Failure!;
+        var (user, signedIn, mfa) = outcome.Value;
+        return mfa is not null ? SignedIn.Challenged(mfa) : await SignedInAsync(projectId, user!, signedIn!, ct);
     }
 
     /// <summary>The signed in user (AC-12).</summary>
@@ -374,7 +386,7 @@ internal sealed class AccountService(
     /// <summary>Issues the new session's access token and returns the <c>AuthResult</c> value.</summary>
     public async Task<SignedIn> SignedInAsync(string projectId, UserRow user, SessionGrant grant, CancellationToken ct, bool isNewUser = false)
     {
-        var access = await tokens.IssueAsync(projectId, user.Id, grant.SessionId, user.EmailVerifiedAt is not null, ct);
+        var access = await tokens.IssueAsync(projectId, user.Id, grant.SessionId, user.EmailVerifiedAt is not null, grant.Strength, ct);
         return new SignedIn(user, new SessionTokensView(access.Token, access.ExpiresAt, grant.RefreshToken.Value, grant.RefreshTokenExpiresAt, grant.SessionId), isNewUser);
     }
 

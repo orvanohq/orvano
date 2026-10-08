@@ -127,6 +127,30 @@ internal sealed record Failure(FailureKind Kind, string Code, string Detail, Tim
     public static Failure ProviderUnavailable { get; } =
         new(FailureKind.Unavailable, ErrorCode.ProviderUnavailable, "The sign in provider did not answer in time. Try again.");
 
+    public static Failure InvalidMfaTicket { get; } =
+        new(FailureKind.Unauthorized, ErrorCode.InvalidMfaTicket, "The MFA ticket is not valid anymore. Sign in again.");
+
+    public static Failure InvalidMfaCode { get; } =
+        new(FailureKind.Unauthorized, ErrorCode.InvalidMfaCode, "The code is wrong or was already used.");
+
+    public static Failure MfaVerificationRequired { get; } =
+        new(FailureKind.Forbidden, ErrorCode.MfaVerificationRequired, "Pass a second factor first, then try within 10 minutes.");
+
+    public static Failure MfaAlreadyEnabled { get; } =
+        new(FailureKind.Conflict, ErrorCode.MfaAlreadyEnabled, "An authenticator app is already turned on.");
+
+    public static Failure MfaNotEnabled { get; } =
+        new(FailureKind.Conflict, ErrorCode.MfaNotEnabled, "No authenticator app is turned on.");
+
+    public static Failure EmailNotVerified { get; } =
+        new(FailureKind.Conflict, ErrorCode.EmailNotVerified, "Verify the email first.");
+
+    public static Failure TotpNotPending { get; } =
+        new(FailureKind.Conflict, ErrorCode.TotpNotPending, "No authenticator app is waiting for its first code. Start again.");
+
+    public static Failure FactorNotEnabled { get; } =
+        new(FailureKind.Conflict, ErrorCode.FactorNotEnabled, "This factor is turned off for the project, or can't be used now.");
+
     public static Failure Busy { get; } =
         new(FailureKind.Busy, ErrorCode.ServerBusy, "The server is busy checking passwords. Try again in a moment.");
 }

@@ -5,12 +5,14 @@ import type {
   CompleteOAuthLinkRequest,
   CompleteRecoveryRequest,
   ConfirmEmailChangeRequest,
+  ConfirmTotpRequest,
   CreateAccountRequest,
   CreateEmailCodeRequest,
   CreateEmailCodeSessionRequest,
   CreateIdTokenSessionRequest,
   CreateMagicLinkRequest,
   CreateMagicLinkSessionRequest,
+  CreateMfaSessionRequest,
   CreateOAuthFlowRequest,
   CreateOAuthSessionRequest,
   CreatePasswordSessionRequest,
@@ -44,6 +46,10 @@ export const dispatch: DispatchTable = {
     status: 200,
     client: (o, input) => o.account.confirmEmailChange(input.body as ConfirmEmailChangeRequest),
   },
+  'account.confirmTotp': {
+    status: 200,
+    client: (o, input) => o.account.confirmTotp(input.body as ConfirmTotpRequest),
+  },
   'account.create': {
     status: 201,
     client: (o, input) => o.account.create(input.body as CreateAccountRequest),
@@ -75,6 +81,10 @@ export const dispatch: DispatchTable = {
     client: (o, input) =>
       o.account.createMagicLinkSession(input.body as CreateMagicLinkSessionRequest),
   },
+  'account.createMfaSession': {
+    status: 201,
+    client: (o, input) => o.account.createMfaSession(input.body as CreateMfaSessionRequest),
+  },
   'account.createOAuthFlow': {
     status: 200,
     client: (o, input) => o.account.createOAuthFlow(input.body as CreateOAuthFlowRequest),
@@ -95,6 +105,10 @@ export const dispatch: DispatchTable = {
   'account.createRecovery': {
     status: 202,
     client: (o, input) => o.account.createRecovery(input.body as CreateRecoveryRequest),
+  },
+  'account.createTotp': {
+    status: 201,
+    client: (o, _input) => o.account.createTotp(),
   },
   'account.createVerification': {
     status: 202,
@@ -124,6 +138,10 @@ export const dispatch: DispatchTable = {
     status: 200,
     client: (o, _input) => o.account.get(),
     server: (o, _input) => o.account.get(),
+  },
+  'account.getMfa': {
+    status: 200,
+    client: (o, _input) => o.account.getMfa(),
   },
   'account.listIdentities': {
     status: 200,

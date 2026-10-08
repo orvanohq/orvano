@@ -77,6 +77,9 @@ public enum SessionMethod
 
     /// <summary>The wire value <c>id_token</c>.</summary>
     IdToken,
+
+    /// <summary>The wire value <c>passkey</c>.</summary>
+    Passkey,
 }
 
 /// <summary>Reads and writes <see cref="SessionMethod"/> by wire value; unknown values read as <see cref="SessionMethod.Unknown"/>.</summary>
@@ -93,6 +96,7 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             "recovery" => SessionMethod.Recovery,
             "oauth" => SessionMethod.Oauth,
             "id_token" => SessionMethod.IdToken,
+            "passkey" => SessionMethod.Passkey,
             _ => SessionMethod.Unknown,
         };
 
@@ -107,6 +111,7 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             SessionMethod.Recovery => "recovery",
             SessionMethod.Oauth => "oauth",
             SessionMethod.IdToken => "id_token",
+            SessionMethod.Passkey => "passkey",
             _ => throw new JsonException($"SessionMethod.{value} has no wire value"),
         });
 }
@@ -242,6 +247,8 @@ public sealed record OpenIdConfiguration(
 /// <param name="Current">Whether this is the session making the call.</param>
 /// <param name="Method">How the session began.</param>
 /// <param name="Provider">The provider of an <c>oauth</c> or <c>id_token</c> session; null for every other method.</param>
+/// <param name="Aal">How strongly the session signed in: 1 for one factor, 2 once a second factor or a passkey was verified on it. Also the access token's <c>aal</c> claim.</param>
+/// <param name="Amr">The ways the user proved who they are on this session, sorted: <c>pwd</c>, <c>email</c>, <c>fed</c>, <c>otp</c>, <c>rec</c>, <c>hwk</c>, <c>swk</c>, <c>user</c>, and <c>mfa</c> (whenever <c>aal</c> is 2). Also the access token's <c>amr</c> claim.</param>
 public sealed record Session(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
@@ -251,7 +258,9 @@ public sealed record Session(
     [property: JsonPropertyName("ipAddress")] string? IpAddress,
     [property: JsonPropertyName("current")] bool Current,
     [property: JsonPropertyName("method")] SessionMethod Method,
-    [property: JsonPropertyName("provider")] OAuthProvider? Provider);
+    [property: JsonPropertyName("provider")] OAuthProvider? Provider,
+    [property: JsonPropertyName("aal")] int Aal,
+    [property: JsonPropertyName("amr")] IReadOnlyList<string> Amr);
 
 /// <summary>One page of a user's active sessions, newest first.</summary>
 /// <param name="Items">The sessions on this page.</param>

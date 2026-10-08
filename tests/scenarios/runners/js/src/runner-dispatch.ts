@@ -63,6 +63,44 @@ function base64Url(text: string): string {
 
 const defaultRedirect = 'http://localhost:3000/auth/callback'
 
+const base32Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+
+/**
+ * The 6 digit code an authenticator app shows for `secret` (unpadded base32) at this 30 second step
+ * plus `offset` (RFC 6238, HMAC SHA-1), as the TOTP scenarios need (spec 0013, AC-45).
+ */
+export async function totpCode(secret: string, offset: number): Promise<string> {
+  const bytes: number[] = []
+  let buffer = 0
+  let bits = 0
+  for (const c of secret) {
+    buffer = (buffer << 5) | base32Alphabet.indexOf(c)
+    bits += 5
+    if (bits >= 8) {
+      bytes.push((buffer >> (bits - 8)) & 0xff)
+      bits -= 8
+    }
+  }
+  const step = Math.floor(Date.now() / 1000 / 30) + offset
+  const counter = new Uint8Array(8)
+  new DataView(counter.buffer).setBigUint64(0, BigInt(step))
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new Uint8Array(bytes),
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign'],
+  )
+  const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, counter))
+  const at = (mac[19] ?? 0) & 0x0f
+  const binary =
+    (((mac[at] ?? 0) & 0x7f) << 24) |
+    ((mac[at + 1] ?? 0) << 16) |
+    ((mac[at + 2] ?? 0) << 8) |
+    (mac[at + 3] ?? 0)
+  return String(binary % 1_000_000).padStart(6, '0')
+}
+
 /**
  * Runner operations: calls the scenarios make that are not contract operations. `signIn` is a
  * plain sign in call that leaves the SDK's stored session alone, so a runner without client
@@ -70,10 +108,19 @@ const defaultRedirect = 'http://localhost:3000/auth/callback'
  * is the runner's clock, saved before a send and passed to `test.getLatestEmail` as `after`;
  * `redeemLink` is the client SDK's link helper (spec 0010); `oauthSignIn` runs the client SDK's
  * `signInWithOAuth` or `linkIdentity` with an `open` that follows the fake provider over HTTP,
- * `oauthCode` stops at the code so a scenario can redeem it itself, and `createNonce` is the SDK's
- * native nonce (spec 0012). Their names have no dot, so they never collide with an operationId.
+ * `oauthCode` stops at the code so a scenario can redeem it itself, `createNonce` is the SDK's
+ * native nonce (spec 0012), and `totpCode` is an authenticator app's current code (spec 0013). Their names have no dot, so they never collide with an operationId.
  */
 export const runnerDispatch: DispatchTable = {
+  totpCode: {
+    status: 200,
+    client: async (_, input) => ({
+      code: await totpCode(
+        String(input.secret),
+        typeof input.offset === 'number' ? input.offset : 0,
+      ),
+    }),
+  },
   now: {
     status: 200,
     client: () => Promise.resolve({ now: new Date().toISOString() }),

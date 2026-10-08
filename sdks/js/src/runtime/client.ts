@@ -27,8 +27,11 @@ import type {
   OAuthSignInResult,
   OAuthTransport,
 } from './oauth.js'
+import { signInOutcome } from './mfa.js'
+import type { MfaAnswer, PendingMfa, SignInOutcome } from './mfa.js'
 import { sdkHeader, sdkName, serverVersionHeader, versionMismatch } from './version.js'
-import type { Identity, OAuthProvider } from '../generated/models.js'
+import { AccountService } from '../generated/client.js'
+import type { Identity, MfaFactor, OAuthProvider } from '../generated/models.js'
 import type { Logger } from './version.js'
 import { sdkVersion } from '../generated/version.js'
 
@@ -162,6 +165,7 @@ export class Client {
   readonly #oauth: OAuthTransport
   readonly #listeners = new Set<AuthStateListener>()
   #known: AuthSession | null | undefined
+  #mfa: (PendingMfa & { ticket: string }) | null = null
   #refreshing: Promise<AuthSession | null> | undefined
   #versionChecked = false
 
@@ -208,8 +212,9 @@ export class Client {
 
   /**
    * Calls `listener` with every change to the signed in user: `signedIn`, `signedOut`,
-   * `tokenRefreshed`, and `userUpdated`, including changes another tab made. Returns a function
-   * that stops it.
+   * `tokenRefreshed`, and `userUpdated`, including changes another tab made, and `mfaRequired`
+   * when a sign in stops at the MFA step (with the factors as the third argument). Returns a
+   * function that stops it.
    */
   onAuthStateChange(listener: AuthStateListener): () => void {
     this.#listeners.add(listener)
@@ -342,6 +347,45 @@ export class Client {
     options?: RequestOptions,
   ): Promise<EmailCodeResult> {
     return this.#emailAuth.signInWithEmailCode(email, code, this, options)
+  }
+
+  /**
+   * The sign in waiting at the MFA step (spec 0013, AC-36): its factors and expiry, or null. The
+   * ticket stays in this client's memory only, so a reload or a new client starts over.
+   */
+  get pendingMfa(): PendingMfa | null {
+    return this.#mfa === null
+      ? null
+      : { factors: this.#mfa.factors, expiresAt: this.#mfa.expiresAt }
+  }
+
+  /**
+   * Finishes a sign in that stopped at the MFA step (`mfaRequired`) with an authenticator app code
+   * or a recovery code (`account.createMfaSession`), stores the session, and says `signedIn`.
+   *
+   * @throws TypeError, before any call, when no sign in is waiting for MFA.
+   * @throws {@link OrvanoError} for a wrong code (`invalid_mfa_code`; after 5 the ticket ends) or
+   * an ended ticket (`invalid_mfa_ticket`: sign in again).
+   */
+  async completeMfa(answer: MfaAnswer, options?: RequestOptions): Promise<SignInOutcome> {
+    const pending = this.#mfa
+    if (pending === null)
+      throw new TypeError('Orvano: no sign in is waiting for MFA; sign in first.')
+    try {
+      const result = await new AccountService(this).createMfaSession(
+        { ticket: pending.ticket, ...answer },
+        options,
+      )
+      return signInOutcome(result)
+    } catch (error) {
+      if (
+        error instanceof OrvanoError &&
+        error.code === 'invalid_mfa_ticket' &&
+        this.#mfa === pending
+      )
+        this.#mfa = null
+      throw error
+    }
   }
 
   /**
@@ -498,12 +542,23 @@ export class Client {
     switch (change) {
       case undefined:
         return
-      case 'start':
-        await this.#save(
-          sessionFrom((result as { session?: unknown } | undefined)?.session),
-          'signedIn',
-        )
+      case 'start': {
+        // Spec 0013, AC-36: a sign in that stopped at the MFA step stores nothing and keeps the
+        // ticket in memory only.
+        const body = result as { session?: unknown; mfa?: unknown } | undefined
+        const mfa = pendingMfaFrom(body?.mfa)
+        if (mfa !== null) {
+          this.#mfa = mfa
+          this.#emit('mfaRequired', this.#known ?? null, {
+            factors: mfa.factors,
+            expiresAt: mfa.expiresAt,
+          })
+          return
+        }
+        this.#mfa = null
+        await this.#save(sessionFrom(body?.session), 'signedIn')
         return
+      }
       case 'refresh':
         await this.#save(sessionFrom(result), 'tokenRefreshed')
         return
@@ -558,10 +613,11 @@ export class Client {
     }
   }
 
-  #emit(event: AuthEvent, session: AuthSession | null): void {
+  #emit(event: AuthEvent, session: AuthSession | null, mfa?: PendingMfa): void {
     for (const listener of [...this.#listeners]) {
       try {
-        listener(event, session)
+        if (mfa === undefined) listener(event, session)
+        else listener(event, session, mfa)
       } catch (error) {
         this.#logger.warn(`Orvano: an onAuthStateChange listener threw: ${String(error)}`)
       }
@@ -629,4 +685,18 @@ function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
     }, ms)
     signal?.addEventListener('abort', onAbort, { once: true })
   })
+}
+
+/** The ticket, factors, and expiry of an `AuthResult.mfa`, or null when the result has none. */
+function pendingMfaFrom(value: unknown): (PendingMfa & { ticket: string }) | null {
+  const mfa = value as
+    { ticket?: unknown; factors?: unknown; expiresAt?: unknown } | null | undefined
+  if (mfa === null || mfa === undefined) return null
+  if (
+    typeof mfa.ticket !== 'string' ||
+    typeof mfa.expiresAt !== 'string' ||
+    !Array.isArray(mfa.factors)
+  )
+    throw new TypeError('Orvano: the MFA challenge in the response is malformed')
+  return { ticket: mfa.ticket, factors: mfa.factors as MfaFactor[], expiresAt: mfa.expiresAt }
 }

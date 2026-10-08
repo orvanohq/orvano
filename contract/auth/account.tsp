@@ -84,13 +84,22 @@ model SessionTokens {
   sessionId: string;
 }
 
-@doc("A signed in user and their new session.")
+@doc("""
+  A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of
+  `session` and `mfa` is set.
+  """)
 model AuthResult {
-  @doc("The user.")
-  user: User;
+  @doc("The user; null while `mfa` is set.")
+  user: User | null;
 
-  @doc("The new session's tokens.")
-  session: SessionTokens;
+  @doc("The new session's tokens; null while `mfa` is set.")
+  session: SessionTokens | null;
+
+  @doc("""
+    Set when the user has MFA on: no session exists yet. Finish with `account.createMfaSession` and the ticket before
+    it expires. The SDKs' `completeMfa` does it. Null otherwise.
+    """)
+  mfa: MfaChallenge | null;
 
   @doc("Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user.")
   @example(false)
@@ -242,6 +251,9 @@ enum SessionMethod {
 
   @doc("A provider's ID token from a native app (`account.createIdTokenSession`); `Session.provider` names the provider.")
   id_token,
+
+  @doc("A passkey (`account.createPasskeySession`).")
+  passkey,
 }
 
 @doc("A sign in provider.")
@@ -434,6 +446,20 @@ model Session {
 
   @doc("The provider of an `oauth` or `id_token` session; null for every other method.")
   provider: OAuthProvider | null;
+
+  @doc("""
+    How strongly the session signed in: 1 for one factor, 2 once a second factor or a passkey was verified on it. Also
+    the access token's `aal` claim.
+    """)
+  @example(2)
+  aal: int32;
+
+  @doc("""
+    The ways the user proved who they are on this session, sorted: `pwd`, `email`, `fed`, `otp`, `rec`, `hwk`, `swk`,
+    `user`, and `mfa` (whenever `aal` is 2). Also the access token's `amr` claim.
+    """)
+  @example(#["mfa", "otp", "pwd"])
+  amr: string[];
 }
 
 @doc("One page of a user's active sessions, newest first.")

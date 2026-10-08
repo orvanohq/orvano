@@ -1,7 +1,9 @@
 import { AccountService } from '../generated/client.js'
-import type { IdTokenProvider, Identity, OAuthProvider, User } from '../generated/models.js'
+import type { IdTokenProvider, Identity, OAuthProvider } from '../generated/models.js'
 import type { Client, RequestOptions } from './client.js'
 import { OrvanoError } from './error.js'
+import { signInOutcome } from './mfa.js'
+import type { SignInOutcome } from './mfa.js'
 
 /** What a provider redirect came back for: its `orvano_type` parameter (spec 0012). */
 export type OAuthLinkType = 'oauth' | 'oauth_link'
@@ -33,14 +35,13 @@ export interface OAuthOptions extends RequestOptions {
   open?: OAuthOpener
 }
 
-/** A finished provider sign in: the user, and whether it created them. */
-export interface OAuthSignInResult {
+/**
+ * A finished provider sign in: the user, and whether it created them, or the MFA step it stopped
+ * at (`mfaRequired`).
+ */
+export interface OAuthSignInResult extends SignInOutcome {
   /** `oauth`. */
   type: 'oauth'
-  /** The signed in user. */
-  user: User
-  /** True when the provider account had no user yet. */
-  isNewUser: boolean
 }
 
 /** A finished link of a provider to the signed in user. */
@@ -51,13 +52,11 @@ export interface IdentityLinkResult {
   identity: Identity
 }
 
-/** What a native sign in did: the user, and whether it created them. */
-export interface IdTokenSignInResult {
-  /** The signed in user. */
-  user: User
-  /** True when the provider account had no user yet. */
-  isNewUser: boolean
-}
+/**
+ * What a native sign in did: the user, and whether it created them, or the MFA step it stopped at
+ * (`mfaRequired`).
+ */
+export type IdTokenSignInResult = SignInOutcome
 
 /** A native sign in or link with a provider's ID token (spec 0012, AC-9). */
 export interface IdTokenCredentials {
@@ -141,7 +140,7 @@ export const directOAuth: OAuthTransport = {
       if (type === 'oauth') {
         const result = await account.createOAuthSession({ code, codeVerifier }, options)
         takeVerifier(client)
-        return { type, user: result.user, isNewUser: result.isNewUser }
+        return { type, ...signInOutcome(result) }
       }
       const identity = await account.completeOAuthLink({ code, codeVerifier }, options)
       takeVerifier(client)
@@ -219,7 +218,7 @@ export async function signInWithIdToken(
   options?: RequestOptions,
 ): Promise<IdTokenSignInResult> {
   const result = await new AccountService(client).createIdTokenSession(body(credentials), options)
-  return { user: result.user, isNewUser: result.isNewUser }
+  return signInOutcome(result)
 }
 
 /** Links a provider natively (`account.createIdTokenIdentity`) and says `userUpdated`. */

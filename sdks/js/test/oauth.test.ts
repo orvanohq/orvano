@@ -276,7 +276,12 @@ describe('native ID tokens (AC-20)', () => {
       authorizationCode: 'apple-code',
       name: 'Grace Hopper',
     })
-    expect(result).toEqual({ user: { id: 'u1', providers: ['google'] }, isNewUser: true })
+    expect(result).toEqual({
+      user: { id: 'u1', providers: ['google'] },
+      isNewUser: true,
+      mfaRequired: false,
+      factors: [],
+    })
     expect((await c.session.get())?.sessionId).toBe('s1')
     expect(seen).toEqual(['signedIn'])
   })

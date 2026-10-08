@@ -154,7 +154,7 @@ void main() {
 
         expect(result?.type, EmailLinkType.magicLink);
         expect(result?.isNewUser, isTrue);
-        expect(result?.user.id, 'u2');
+        expect(result?.user?.id, 'u2');
         expect((await client.session.read())?.sessionId, 's2');
         expect(server.paths, ['/v1/account/sessions/magic-link']);
         expect(seen, [AuthEvent.signedIn]);

@@ -25,8 +25,14 @@ public static class ErrorCode
     /// <summary>The <c>email_not_configured</c> error code.</summary>
     public const string EmailNotConfigured = "email_not_configured";
 
+    /// <summary>The <c>email_not_verified</c> error code.</summary>
+    public const string EmailNotVerified = "email_not_verified";
+
     /// <summary>The <c>email_rate_limited</c> error code.</summary>
     public const string EmailRateLimited = "email_rate_limited";
+
+    /// <summary>The <c>factor_not_enabled</c> error code.</summary>
+    public const string FactorNotEnabled = "factor_not_enabled";
 
     /// <summary>The <c>forbidden</c> error code.</summary>
     public const string Forbidden = "forbidden";
@@ -61,8 +67,20 @@ public static class ErrorCode
     /// <summary>The <c>invalid_id_token</c> error code.</summary>
     public const string InvalidIdToken = "invalid_id_token";
 
+    /// <summary>The <c>invalid_mfa_code</c> error code.</summary>
+    public const string InvalidMfaCode = "invalid_mfa_code";
+
+    /// <summary>The <c>invalid_mfa_ticket</c> error code.</summary>
+    public const string InvalidMfaTicket = "invalid_mfa_ticket";
+
     /// <summary>The <c>invalid_oauth_code</c> error code.</summary>
     public const string InvalidOauthCode = "invalid_oauth_code";
+
+    /// <summary>The <c>invalid_passkey</c> error code.</summary>
+    public const string InvalidPasskey = "invalid_passkey";
+
+    /// <summary>The <c>invalid_passkey_challenge</c> error code.</summary>
+    public const string InvalidPasskeyChallenge = "invalid_passkey_challenge";
 
     /// <summary>The <c>invalid_password</c> error code.</summary>
     public const string InvalidPassword = "invalid_password";
@@ -94,6 +112,18 @@ public static class ErrorCode
     /// <summary>The <c>last_sign_in_method</c> error code.</summary>
     public const string LastSignInMethod = "last_sign_in_method";
 
+    /// <summary>The <c>mfa_already_enabled</c> error code.</summary>
+    public const string MfaAlreadyEnabled = "mfa_already_enabled";
+
+    /// <summary>The <c>mfa_not_enabled</c> error code.</summary>
+    public const string MfaNotEnabled = "mfa_not_enabled";
+
+    /// <summary>The <c>mfa_required</c> error code.</summary>
+    public const string MfaRequired = "mfa_required";
+
+    /// <summary>The <c>mfa_verification_required</c> error code.</summary>
+    public const string MfaVerificationRequired = "mfa_verification_required";
+
     /// <summary>The <c>not_found</c> error code.</summary>
     public const string NotFound = "not_found";
 
@@ -108,6 +138,18 @@ public static class ErrorCode
 
     /// <summary>The <c>origin_not_allowed</c> error code.</summary>
     public const string OriginNotAllowed = "origin_not_allowed";
+
+    /// <summary>The <c>passkey_already_registered</c> error code.</summary>
+    public const string PasskeyAlreadyRegistered = "passkey_already_registered";
+
+    /// <summary>The <c>passkey_limit</c> error code.</summary>
+    public const string PasskeyLimit = "passkey_limit";
+
+    /// <summary>The <c>passkey_not_found</c> error code.</summary>
+    public const string PasskeyNotFound = "passkey_not_found";
+
+    /// <summary>The <c>passkeys_exist</c> error code.</summary>
+    public const string PasskeysExist = "passkeys_exist";
 
     /// <summary>The <c>project_not_found</c> error code.</summary>
     public const string ProjectNotFound = "project_not_found";
@@ -177,6 +219,9 @@ public static class ErrorCode
 
     /// <summary>The <c>token_expired</c> error code.</summary>
     public const string TokenExpired = "token_expired";
+
+    /// <summary>The <c>totp_not_pending</c> error code.</summary>
+    public const string TotpNotPending = "totp_not_pending";
 
     /// <summary>The <c>user_already_exists</c> error code.</summary>
     public const string UserAlreadyExists = "user_already_exists";

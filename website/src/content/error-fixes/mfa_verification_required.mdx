@@ -1,0 +1,7 @@
+## Why it happens
+
+This action changes how the person signs in, and they have MFA on, so their session must have passed a second factor within the last 10 minutes.
+
+## How to fix
+
+Ask for an authenticator code or a passkey with `account.verifyMfa`, then repeat the action.

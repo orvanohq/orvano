@@ -30,8 +30,9 @@ internal static class ConsoleAccountEndpoints
             var outcome = await accounts.SignUpAsync(ConsoleProject.Id, request.Email, request.Password, request.Name, PublicRequests.Client(http), ct,
                 new ConsoleGate(request.InviteToken, request.SetupToken));
             if (!outcome.Succeeded) return Problem(http, outcome.Failure!);
-            ConsoleCookies.Set(http, outcome.Value!.Session, publicUrl);
-            return TypedResults.Created((string?)null, await AccountAsync(outcome.Value.User, admins, ct));
+            // A new user has no factor, so sign up is never challenged (spec 0013, AC-6).
+            ConsoleCookies.Set(http, outcome.Value!.Session!, publicUrl);
+            return TypedResults.Created((string?)null, await AccountAsync(outcome.Value.User!, admins, ct));
         })
             .WithName(Ops.Create.Id);
 
@@ -47,8 +48,11 @@ internal static class ConsoleAccountEndpoints
 
             var outcome = await accounts.SignInAsync(ConsoleProject.Id, request.Email, request.Password, PublicRequests.Client(http), ct);
             if (!outcome.Succeeded) return Problem(http, outcome.Failure!);
-            ConsoleCookies.Set(http, outcome.Value!.Session, publicUrl);
-            return TypedResults.Created((string?)null, await AccountAsync(outcome.Value.User, admins, ct));
+            // Console accounts can't turn MFA on until the console's MFA step exists (spec 0013, AC-41); until then a
+            // challenge here fails closed rather than signing in with one factor.
+            if (outcome.Value!.Session is not { } session) return Problem(http, Failure.MfaVerificationRequired);
+            ConsoleCookies.Set(http, session, publicUrl);
+            return TypedResults.Created((string?)null, await AccountAsync(outcome.Value.User!, admins, ct));
         })
             .WithName(Ops.CreateSession.Id);
 

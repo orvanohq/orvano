@@ -357,6 +357,9 @@ base class Client {
         return;
       case SessionChange.start:
         final body = result is Map<String, dynamic> ? result : null;
+        // Spec 0013: a sign in that stopped at the MFA step has no session to
+        // store yet.
+        if (body?['session'] == null && body?['mfa'] != null) return;
         await _save(AuthSession.fromJson(body?['session']), AuthEvent.signedIn);
       case SessionChange.refresh:
         await _save(AuthSession.fromJson(result), AuthEvent.tokenRefreshed);

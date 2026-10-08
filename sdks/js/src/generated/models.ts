@@ -3,12 +3,22 @@
 /** A provider a native app can sign in with by its ID token. */
 export type IdTokenProvider = 'google' | 'apple'
 
+/** A second factor. */
+export type MfaFactor = 'totp' | 'recovery_code' | 'passkey'
+
 /** A sign in provider. */
 export type OAuthProvider = 'google' | 'apple' | 'github' | 'microsoft'
 
 /** How a session began. */
 export type SessionMethod =
-  'password' | 'sign_up' | 'magic_link' | 'email_code' | 'recovery' | 'oauth' | 'id_token'
+  | 'password'
+  | 'sign_up'
+  | 'magic_link'
+  | 'email_code'
+  | 'recovery'
+  | 'oauth'
+  | 'id_token'
+  | 'passkey'
 
 /** Whether a user may sign in. */
 export type UserStatus = 'active' | 'blocked'
@@ -16,12 +26,20 @@ export type UserStatus = 'active' | 'blocked'
 /** What happened to the verification email of a sign up. The user and session are created whatever it says. */
 export type VerificationEmailStatus = 'queued' | 'not_configured' | 'rate_limited'
 
-/** A signed in user and their new session. */
+/**
+ * A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of
+ * `session` and `mfa` is set.
+ */
 export interface AuthResult {
-  /** The user. */
-  user: User
-  /** The new session's tokens. */
-  session: SessionTokens
+  /** The user; null while `mfa` is set. */
+  user: User | null
+  /** The new session's tokens; null while `mfa` is set. */
+  session: SessionTokens | null
+  /**
+   * Set when the user has MFA on: no session exists yet. Finish with `account.createMfaSession` and the ticket before
+   * it expires. The SDKs' `completeMfa` does it. Null otherwise.
+   */
+  mfa: MfaChallenge | null
   /** Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user. */
   isNewUser: boolean
   /** What happened to the verification email sign up was asked to send; null when none was asked for. */
@@ -48,6 +66,12 @@ export interface CompleteRecoveryRequest {
 export interface ConfirmEmailChangeRequest {
   /** The `orvano_token` parameter of the emailed link. */
   token: string
+}
+
+/** The first code from the authenticator app, which turns MFA on. */
+export interface ConfirmTotpRequest {
+  /** The 6 digit code the authenticator app shows now. */
+  code: string
 }
 
 /** A new user with an email and password. */
@@ -115,6 +139,16 @@ export interface CreateMagicLinkRequest {
 export interface CreateMagicLinkSessionRequest {
   /** The `orvano_token` parameter of the emailed link. */
   token: string
+}
+
+/** The second step of a sign in: the ticket and exactly one factor. */
+export interface CreateMfaSessionRequest {
+  /** The `ticket` of the `MfaChallenge`. */
+  ticket: string
+  /** The 6 digit code the authenticator app shows now. */
+  totpCode?: string
+  /** A recovery code; case, spaces, and hyphens do not matter. Each works once. */
+  recoveryCode?: string
 }
 
 /** A request to start signing in with a provider. */
@@ -263,6 +297,38 @@ export interface Jwks {
   keys: Jwk[]
 }
 
+/**
+ * The second step a sign in must pass before it gets a session: the user has MFA on. Answer it with
+ * `account.createMfaSession` before `expiresAt`.
+ */
+export interface MfaChallenge {
+  /**
+   * Proves the first step passed; send it to `account.createMfaSession`. Keep it in memory only. Empty when the ticket
+   * travels in a cookie instead (the console).
+   */
+  ticket: string
+  /** The factors the user can answer with now, in this order: `totp`, `recovery_code`, `passkey`. */
+  factors: MfaFactor[]
+  /** When the ticket stops working: 5 minutes after the first step. After that, sign in again. */
+  expiresAt: string
+}
+
+/** The signed in user's MFA state. */
+export interface MfaStatus {
+  /** Whether sign in asks for a second factor: a confirmed authenticator app, while the project allows TOTP. */
+  mfaEnabled: boolean
+  /** Whether an authenticator app is confirmed, even while the project has TOTP turned off. */
+  totpConfirmed: boolean
+  /** When the authenticator app was confirmed; null when none is. */
+  totpConfirmedAt: string | null
+  /** How many unused recovery codes are left, 0 to 10. */
+  recoveryCodesRemaining: number
+  /** How many of the user's passkeys can sign in now. */
+  passkeyCount: number
+  /** What the project lets users turn on now: `totp` and `passkey`. */
+  factorsAvailable: MfaFactor[]
+}
+
 /** A started provider flow. */
 export interface OAuthFlow {
   /** Send the browser here: the provider's sign in page. */
@@ -312,6 +378,16 @@ export interface Session {
   method: SessionMethod
   /** The provider of an `oauth` or `id_token` session; null for every other method. */
   provider: OAuthProvider | null
+  /**
+   * How strongly the session signed in: 1 for one factor, 2 once a second factor or a passkey was verified on it. Also
+   * the access token's `aal` claim.
+   */
+  aal: number
+  /**
+   * The ways the user proved who they are on this session, sorted: `pwd`, `email`, `fed`, `otp`, `rec`, `hwk`, `swk`,
+   * `user`, and `mfa` (whenever `aal` is 2). Also the access token's `amr` claim.
+   */
+  amr: string[]
 }
 
 /** One page of a user's active sessions, newest first. */
@@ -337,6 +413,30 @@ export interface SessionTokens {
   refreshTokenExpiresAt: string
   /** The session ID, also the `sid` claim of the access token. */
   sessionId: string
+}
+
+/**
+ * MFA is on. Show the recovery codes once and ask the user to keep them safe; they can't be read again. Every other
+ * session of the user has ended, and this one is now at level 2.
+ */
+export interface TotpConfirmation {
+  /** 10 recovery codes, each `XXXXX-XXXXX`, each working once. */
+  recoveryCodes: string[]
+  /** This session's tokens: a new access token carrying `aal` 2, and the current refresh token, unchanged. */
+  session: SessionTokens
+}
+
+/**
+ * A new authenticator app secret, waiting for its first code. Show `uri` as a QR code and `secret` for typing in, then
+ * confirm with `account.confirmTotp` within 15 minutes.
+ */
+export interface TotpSetup {
+  /** The secret: 20 random bytes as unpadded base32 (32 characters). Never log it. */
+  secret: string
+  /** The `otpauth://` URI an authenticator app scans: the project as the issuer, the user's email as the label. */
+  uri: string
+  /** When the secret stops waiting for its first code; ask for a new one after that. */
+  expiresAt: string
 }
 
 /** Changes to the signed in user. A field left out stays as it is. */

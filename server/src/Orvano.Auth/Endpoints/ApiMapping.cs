@@ -126,7 +126,9 @@ internal static class ApiMapping
         view.IpAddress?.ToString(),
         view.Current,
         SessionMethodOf(view.Method),
-        view.Provider is null ? null : ProviderOf(view.Provider));
+        view.Provider is null ? null : ProviderOf(view.Provider),
+        view.Aal,
+        view.Amr);
 
     public static Api.SessionMethod SessionMethodOf(string method) => method switch
     {
@@ -137,6 +139,7 @@ internal static class ApiMapping
         SessionMethod.Recovery => Api.SessionMethod.Recovery,
         SessionMethod.OAuth => Api.SessionMethod.Oauth,
         SessionMethod.IdToken => Api.SessionMethod.IdToken,
+        SessionMethod.Passkey => Api.SessionMethod.Passkey,
         _ => throw new ArgumentOutOfRangeException(nameof(method), method, "Unknown session method."),
     };
 
@@ -167,14 +170,37 @@ internal static class ApiMapping
     public static Api.UserPage UserPage(Page<UserRow> page) => new([.. page.Items.Select(User)], page.NextCursor);
 
     public static Api.AuthResult AuthResult(SignedIn signedIn) =>
-        new(User(signedIn.User), SessionTokens(signedIn.Session), signedIn.IsNewUser, signedIn.VerificationEmail switch
-        {
-            null => null,
-            VerificationEmail.Queued => Api.VerificationEmailStatus.Queued,
-            VerificationEmail.NotConfigured => Api.VerificationEmailStatus.NotConfigured,
-            VerificationEmail.RateLimited => Api.VerificationEmailStatus.RateLimited,
-            _ => throw new ArgumentOutOfRangeException(nameof(signedIn), signedIn.VerificationEmail, "Unknown verification email status."),
-        });
+        new(
+            signedIn.User is null ? null : User(signedIn.User),
+            signedIn.Session is null ? null : SessionTokens(signedIn.Session),
+            signedIn.Mfa is null ? null : MfaChallenge(signedIn.Mfa),
+            signedIn.IsNewUser,
+            signedIn.VerificationEmail switch
+            {
+                null => null,
+                VerificationEmail.Queued => Api.VerificationEmailStatus.Queued,
+                VerificationEmail.NotConfigured => Api.VerificationEmailStatus.NotConfigured,
+                VerificationEmail.RateLimited => Api.VerificationEmailStatus.RateLimited,
+                _ => throw new ArgumentOutOfRangeException(nameof(signedIn), signedIn.VerificationEmail, "Unknown verification email status."),
+            });
+
+    public static Api.MfaChallenge MfaChallenge(MfaChallengeView view) => new(view.Ticket, [.. view.Factors.Select(MfaFactorOf)], view.ExpiresAt);
+
+    public static Api.MfaFactor MfaFactorOf(string factor) => factor switch
+    {
+        MfaFactors.Totp => Api.MfaFactor.Totp,
+        MfaFactors.RecoveryCode => Api.MfaFactor.RecoveryCode,
+        MfaFactors.Passkey => Api.MfaFactor.Passkey,
+        _ => throw new ArgumentOutOfRangeException(nameof(factor), factor, "Unknown MFA factor."),
+    };
+
+    public static Api.MfaStatus MfaStatus(MfaStatusView view) => new(
+        view.MfaEnabled, view.TotpConfirmed, view.TotpConfirmedAt, view.RecoveryCodesRemaining, view.PasskeyCount,
+        [.. view.FactorsAvailable.Select(MfaFactorOf)]);
+
+    public static Api.TotpSetup TotpSetup(TotpSetupView view) => new(view.Secret, view.Uri, view.ExpiresAt);
+
+    public static Api.TotpConfirmation TotpConfirmation(TotpConfirmationView view) => new(view.RecoveryCodes, SessionTokens(view.Session));
 
     public static Api.Jwk Jwk(PublicSigningKey key) =>
         JsonSerializer.Deserialize<Api.Jwk>(key.PublicJwk) ?? throw new InvalidOperationException($"Signing key {key.Kid} has no public JWK.");

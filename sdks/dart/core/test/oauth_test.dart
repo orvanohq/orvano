@@ -183,7 +183,7 @@ void main() {
         expect(verifier, hasLength(43));
         expect(s256(verifier), challenge);
         expect(result.isNewUser, isTrue);
-        expect(result.user.id, 'u2');
+        expect(result.user?.id, 'u2');
         expect((await client.session.read())?.sessionId, 's2');
         expect(seen, [AuthEvent.signedIn]);
       });

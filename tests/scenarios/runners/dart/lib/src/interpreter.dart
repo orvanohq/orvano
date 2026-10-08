@@ -122,9 +122,19 @@ String? fixtureApiKey(String fixturesYaml) {
 /// `after`; `redeemLink` is the client SDK's link helper (spec 0010);
 /// `oauthSignIn` runs `signInWithOAuth` or `linkIdentity` with a launcher
 /// that follows the fake provider over HTTP, `oauthCode` stops at the code,
-/// and `createNonce` is `OrvanoNonce.create` (spec 0012). Their names have no
-/// dot, so they never collide with an operationId.
+/// `createNonce` is `OrvanoNonce.create` (spec 0012), and `totpCode` is an
+/// authenticator app's current code (spec 0013). Their names have no dot, so
+/// they never collide with an operationId.
 final Map<String, DispatchEntry> _runnerDispatch = {
+  'totpCode': DispatchEntry(
+    status: 200,
+    client: (o, input) async => {
+      'code': totpCode(
+        '${input['secret']}',
+        input['offset'] is int ? input['offset'] as int : 0,
+      ),
+    },
+  ),
   'now': DispatchEntry(
     status: 200,
     client: (o, input) async => {'now': _now()},
@@ -224,19 +234,58 @@ final Map<String, DispatchEntry> _runnerDispatch = {
 
 String _now() => DateTime.now().toUtc().toIso8601String();
 
+const _base32Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+/// The 6 digit code an authenticator app shows for [secret] (unpadded
+/// base32) at this 30 second step plus [offset] (RFC 6238, HMAC SHA-1).
+String totpCode(String secret, int offset) {
+  final key = <int>[];
+  var buffer = 0;
+  var bits = 0;
+  for (final c in secret.split('')) {
+    buffer = ((buffer << 5) | _base32Alphabet.indexOf(c)) & 0xffff;
+    bits += 5;
+    if (bits >= 8) {
+      key.add((buffer >> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  final step = DateTime.now().millisecondsSinceEpoch ~/ 1000 ~/ 30 + offset;
+  // The step fits in 32 bits, and shifts past 31 differ on the web.
+  final counter = [
+    0,
+    0,
+    0,
+    0,
+    for (final s in [24, 16, 8, 0]) (step >> s) & 0xff,
+  ];
+  final mac = Hmac(sha1, key).convert(counter).bytes;
+  final at = mac[19] & 0x0f;
+  final binary =
+      ((mac[at] & 0x7f) << 24) |
+      (mac[at + 1] << 16) |
+      (mac[at + 2] << 8) |
+      mac[at + 3];
+  return (binary % 1000000).toString().padLeft(6, '0');
+}
+
 /// What `handleLink`, `signInWithOAuth`, or `linkIdentity` did, as the JS
 /// runner reports it.
 Map<String, Object?>? _handled(core.HandledLink? result) => switch (result) {
   null => null,
   core.LinkResult(:final type, :final user, :final isNewUser) => {
     'type': type.wire,
-    'user': user.toJson(),
+    'user': user?.toJson(),
     'isNewUser': isNewUser,
+    'mfaRequired': result.mfaRequired,
+    'factors': [for (final f in result.factors) f.value],
   },
   core.OAuthSignInResult(:final user, :final isNewUser) => {
     'type': 'oauth',
-    'user': user.toJson(),
+    'user': user?.toJson(),
     'isNewUser': isNewUser,
+    'mfaRequired': result.mfaRequired,
+    'factors': [for (final f in result.factors) f.value],
   },
   core.IdentityLinkResult(:final identity) => {
     'type': 'oauth_link',

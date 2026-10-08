@@ -16,8 +16,12 @@ export const ErrorCode = {
   emailAlreadyVerified: 'email_already_verified',
   /** `email_not_configured` */
   emailNotConfigured: 'email_not_configured',
+  /** `email_not_verified` */
+  emailNotVerified: 'email_not_verified',
   /** `email_rate_limited` */
   emailRateLimited: 'email_rate_limited',
+  /** `factor_not_enabled` */
+  factorNotEnabled: 'factor_not_enabled',
   /** `forbidden` */
   forbidden: 'forbidden',
   /** `identity_already_linked` */
@@ -40,8 +44,16 @@ export const ErrorCode = {
   invalidEmailToken: 'invalid_email_token',
   /** `invalid_id_token` */
   invalidIdToken: 'invalid_id_token',
+  /** `invalid_mfa_code` */
+  invalidMfaCode: 'invalid_mfa_code',
+  /** `invalid_mfa_ticket` */
+  invalidMfaTicket: 'invalid_mfa_ticket',
   /** `invalid_oauth_code` */
   invalidOauthCode: 'invalid_oauth_code',
+  /** `invalid_passkey` */
+  invalidPasskey: 'invalid_passkey',
+  /** `invalid_passkey_challenge` */
+  invalidPasskeyChallenge: 'invalid_passkey_challenge',
   /** `invalid_password` */
   invalidPassword: 'invalid_password',
   /** `invalid_refresh_token` */
@@ -62,6 +74,14 @@ export const ErrorCode = {
   lastOwner: 'last_owner',
   /** `last_sign_in_method` */
   lastSignInMethod: 'last_sign_in_method',
+  /** `mfa_already_enabled` */
+  mfaAlreadyEnabled: 'mfa_already_enabled',
+  /** `mfa_not_enabled` */
+  mfaNotEnabled: 'mfa_not_enabled',
+  /** `mfa_required` */
+  mfaRequired: 'mfa_required',
+  /** `mfa_verification_required` */
+  mfaVerificationRequired: 'mfa_verification_required',
   /** `not_found` */
   notFound: 'not_found',
   /** `oauth_access_denied` */
@@ -72,6 +92,14 @@ export const ErrorCode = {
   orgNotEmpty: 'org_not_empty',
   /** `origin_not_allowed` */
   originNotAllowed: 'origin_not_allowed',
+  /** `passkey_already_registered` */
+  passkeyAlreadyRegistered: 'passkey_already_registered',
+  /** `passkey_limit` */
+  passkeyLimit: 'passkey_limit',
+  /** `passkey_not_found` */
+  passkeyNotFound: 'passkey_not_found',
+  /** `passkeys_exist` */
+  passkeysExist: 'passkeys_exist',
   /** `project_not_found` */
   projectNotFound: 'project_not_found',
   /** `project_not_ready` */
@@ -118,6 +146,8 @@ export const ErrorCode = {
   templateInvalid: 'template_invalid',
   /** `token_expired` */
   tokenExpired: 'token_expired',
+  /** `totp_not_pending` */
+  totpNotPending: 'totp_not_pending',
   /** `user_already_exists` */
   userAlreadyExists: 'user_already_exists',
   /** `user_blocked` */

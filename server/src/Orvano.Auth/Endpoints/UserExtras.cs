@@ -28,7 +28,7 @@ internal static class UserExtras
             {
                 Api.User user => [user.Id],
                 Api.ConsoleAccount account => [account.Id],
-                Api.AuthResult signedIn => [signedIn.User.Id],
+                Api.AuthResult { User: { } signedIn } => [signedIn.Id],
                 Api.UserPage page => page.Items.Select(u => u.Id).ToArray(),
                 _ => (string[]?)null,
             };
@@ -39,7 +39,7 @@ internal static class UserExtras
             {
                 Api.User user => (object)Fill(user, extras),
                 Api.ConsoleAccount account => extras.TryGetValue(account.Id, out var e) ? account with { Providers = e.Providers, HasPassword = e.HasPassword } : account,
-                Api.AuthResult signedIn => signedIn with { User = Fill(signedIn.User, extras) },
+                Api.AuthResult { User: { } user } signedIn => signedIn with { User = Fill(user, extras) },
                 Api.UserPage page => page with { Items = [.. page.Items.Select(u => Fill(u, extras))] },
                 _ => value,
             };

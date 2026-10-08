@@ -444,6 +444,47 @@ public sealed class MemberStatusJsonConverter : JsonConverter<MemberStatus>
         });
 }
 
+/// <summary>A second factor.</summary>
+[JsonConverter(typeof(MfaFactorJsonConverter))]
+public enum MfaFactor
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>totp</c>.</summary>
+    Totp,
+
+    /// <summary>The wire value <c>recovery_code</c>.</summary>
+    RecoveryCode,
+
+    /// <summary>The wire value <c>passkey</c>.</summary>
+    Passkey,
+}
+
+/// <summary>Reads and writes <see cref="MfaFactor"/> by wire value; unknown values read as <see cref="MfaFactor.Unknown"/>.</summary>
+public sealed class MfaFactorJsonConverter : JsonConverter<MfaFactor>
+{
+    /// <inheritdoc/>
+    public override MfaFactor Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "totp" => MfaFactor.Totp,
+            "recovery_code" => MfaFactor.RecoveryCode,
+            "passkey" => MfaFactor.Passkey,
+            _ => MfaFactor.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, MfaFactor value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            MfaFactor.Totp => "totp",
+            MfaFactor.RecoveryCode => "recovery_code",
+            MfaFactor.Passkey => "passkey",
+            _ => throw new JsonException($"MfaFactor.{value} has no wire value"),
+        });
+}
+
 /// <summary>What a provider redirect came back for: the <c>orvano_type</c> parameter Orvano adds when it sends the browser back to your <c>redirectUrl</c>, beside <c>orvano_code</c> or <c>orvano_error</c>. The SDKs' link helpers read it.</summary>
 [JsonConverter(typeof(OAuthLinkTypeJsonConverter))]
 public enum OAuthLinkType
@@ -732,6 +773,9 @@ public enum SessionMethod
 
     /// <summary>The wire value <c>id_token</c>.</summary>
     IdToken,
+
+    /// <summary>The wire value <c>passkey</c>.</summary>
+    Passkey,
 }
 
 /// <summary>Reads and writes <see cref="SessionMethod"/> by wire value; unknown values read as <see cref="SessionMethod.Unknown"/>.</summary>
@@ -748,6 +792,7 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             "recovery" => SessionMethod.Recovery,
             "oauth" => SessionMethod.Oauth,
             "id_token" => SessionMethod.IdToken,
+            "passkey" => SessionMethod.Passkey,
             _ => SessionMethod.Unknown,
         };
 
@@ -762,6 +807,7 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             SessionMethod.Recovery => "recovery",
             SessionMethod.Oauth => "oauth",
             SessionMethod.IdToken => "id_token",
+            SessionMethod.Passkey => "passkey",
             _ => throw new JsonException($"SessionMethod.{value} has no wire value"),
         });
 }
@@ -996,14 +1042,16 @@ public sealed record ApiKeyPage(
     [property: JsonPropertyName("items")] IReadOnlyList<ApiKey> Items,
     [property: JsonPropertyName("nextCursor")] string? NextCursor);
 
-/// <summary>A signed in user and their new session.</summary>
-/// <param name="User">The user.</param>
-/// <param name="Session">The new session's tokens.</param>
+/// <summary>A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of <c>session</c> and <c>mfa</c> is set.</summary>
+/// <param name="User">The user; null while <c>mfa</c> is set.</param>
+/// <param name="Session">The new session's tokens; null while <c>mfa</c> is set.</param>
+/// <param name="Mfa">Set when the user has MFA on: no session exists yet. Finish with <c>account.createMfaSession</c> and the ticket before it expires. The SDKs' <c>completeMfa</c> does it. Null otherwise.</param>
 /// <param name="IsNewUser">Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user.</param>
 /// <param name="VerificationEmail">What happened to the verification email sign up was asked to send; null when none was asked for.</param>
 public sealed record AuthResult(
-    [property: JsonPropertyName("user")] User User,
-    [property: JsonPropertyName("session")] SessionTokens Session,
+    [property: JsonPropertyName("user")] User? User,
+    [property: JsonPropertyName("session")] SessionTokens? Session,
+    [property: JsonPropertyName("mfa")] MfaChallenge? Mfa,
     [property: JsonPropertyName("isNewUser")] bool IsNewUser,
     [property: JsonPropertyName("verificationEmail")] VerificationEmailStatus? VerificationEmail);
 
@@ -1025,6 +1073,11 @@ public sealed record CompleteRecoveryRequest(
 /// <param name="Token">The <c>orvano_token</c> parameter of the emailed link.</param>
 public sealed record ConfirmEmailChangeRequest(
     [property: JsonPropertyName("token")] string Token);
+
+/// <summary>The first code from the authenticator app, which turns MFA on.</summary>
+/// <param name="Code">The 6 digit code the authenticator app shows now.</param>
+public sealed record ConfirmTotpRequest(
+    [property: JsonPropertyName("code")] string Code);
 
 /// <summary>A console account: a user of the console, and whether it is an install admin.</summary>
 /// <param name="Id">The user ID.</param>
@@ -1149,6 +1202,15 @@ public sealed record CreateMagicLinkRequest(
 /// <param name="Token">The <c>orvano_token</c> parameter of the emailed link.</param>
 public sealed record CreateMagicLinkSessionRequest(
     [property: JsonPropertyName("token")] string Token);
+
+/// <summary>The second step of a sign in: the ticket and exactly one factor.</summary>
+/// <param name="Ticket">The <c>ticket</c> of the <c>MfaChallenge</c>.</param>
+/// <param name="TotpCode">The 6 digit code the authenticator app shows now.</param>
+/// <param name="RecoveryCode">A recovery code; case, spaces, and hyphens do not matter. Each works once.</param>
+public sealed record CreateMfaSessionRequest(
+    [property: JsonPropertyName("ticket")] string Ticket,
+    [property: JsonPropertyName("totpCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TotpCode = null,
+    [property: JsonPropertyName("recoveryCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RecoveryCode = null);
 
 /// <summary>A request to start signing in with a provider.</summary>
 /// <param name="Provider">The provider to sign in with.</param>
@@ -1468,6 +1530,30 @@ public sealed record MemberPage(
     [property: JsonPropertyName("items")] IReadOnlyList<Member> Items,
     [property: JsonPropertyName("nextCursor")] string? NextCursor);
 
+/// <summary>The second step a sign in must pass before it gets a session: the user has MFA on. Answer it with <c>account.createMfaSession</c> before <c>expiresAt</c>.</summary>
+/// <param name="Ticket">Proves the first step passed; send it to <c>account.createMfaSession</c>. Keep it in memory only. Empty when the ticket travels in a cookie instead (the console).</param>
+/// <param name="Factors">The factors the user can answer with now, in this order: <c>totp</c>, <c>recovery_code</c>, <c>passkey</c>.</param>
+/// <param name="ExpiresAt">When the ticket stops working: 5 minutes after the first step. After that, sign in again.</param>
+public sealed record MfaChallenge(
+    [property: JsonPropertyName("ticket")] string Ticket,
+    [property: JsonPropertyName("factors")] IReadOnlyList<MfaFactor> Factors,
+    [property: JsonPropertyName("expiresAt")] DateTimeOffset ExpiresAt);
+
+/// <summary>The signed in user's MFA state.</summary>
+/// <param name="MfaEnabled">Whether sign in asks for a second factor: a confirmed authenticator app, while the project allows TOTP.</param>
+/// <param name="TotpConfirmed">Whether an authenticator app is confirmed, even while the project has TOTP turned off.</param>
+/// <param name="TotpConfirmedAt">When the authenticator app was confirmed; null when none is.</param>
+/// <param name="RecoveryCodesRemaining">How many unused recovery codes are left, 0 to 10.</param>
+/// <param name="PasskeyCount">How many of the user's passkeys can sign in now.</param>
+/// <param name="FactorsAvailable">What the project lets users turn on now: <c>totp</c> and <c>passkey</c>.</param>
+public sealed record MfaStatus(
+    [property: JsonPropertyName("mfaEnabled")] bool MfaEnabled,
+    [property: JsonPropertyName("totpConfirmed")] bool TotpConfirmed,
+    [property: JsonPropertyName("totpConfirmedAt")] DateTimeOffset? TotpConfirmedAt,
+    [property: JsonPropertyName("recoveryCodesRemaining")] int RecoveryCodesRemaining,
+    [property: JsonPropertyName("passkeyCount")] int PasskeyCount,
+    [property: JsonPropertyName("factorsAvailable")] IReadOnlyList<MfaFactor> FactorsAvailable);
+
 /// <summary>Apple's form post.</summary>
 /// <param name="State">The flow's state.</param>
 /// <param name="Code">The provider's authorization code.</param>
@@ -1657,6 +1743,8 @@ public sealed record RenderedEmail(
 /// <param name="Current">Whether this is the session making the call.</param>
 /// <param name="Method">How the session began.</param>
 /// <param name="Provider">The provider of an <c>oauth</c> or <c>id_token</c> session; null for every other method.</param>
+/// <param name="Aal">How strongly the session signed in: 1 for one factor, 2 once a second factor or a passkey was verified on it. Also the access token's <c>aal</c> claim.</param>
+/// <param name="Amr">The ways the user proved who they are on this session, sorted: <c>pwd</c>, <c>email</c>, <c>fed</c>, <c>otp</c>, <c>rec</c>, <c>hwk</c>, <c>swk</c>, <c>user</c>, and <c>mfa</c> (whenever <c>aal</c> is 2). Also the access token's <c>amr</c> claim.</param>
 public sealed record Session(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
@@ -1666,7 +1754,9 @@ public sealed record Session(
     [property: JsonPropertyName("ipAddress")] string? IpAddress,
     [property: JsonPropertyName("current")] bool Current,
     [property: JsonPropertyName("method")] SessionMethod Method,
-    [property: JsonPropertyName("provider")] OAuthProvider? Provider);
+    [property: JsonPropertyName("provider")] OAuthProvider? Provider,
+    [property: JsonPropertyName("aal")] int Aal,
+    [property: JsonPropertyName("amr")] IReadOnlyList<string> Amr);
 
 /// <summary>One page of a user's active sessions, newest first.</summary>
 /// <param name="Items">The sessions on this page.</param>
@@ -1827,6 +1917,22 @@ public sealed record TestItemPage(
 public sealed record TestPinged(
     [property: JsonPropertyName("message")] string Message,
     [property: JsonPropertyName("at")] DateTimeOffset At);
+
+/// <summary>MFA is on. Show the recovery codes once and ask the user to keep them safe; they can't be read again. Every other session of the user has ended, and this one is now at level 2.</summary>
+/// <param name="RecoveryCodes">10 recovery codes, each <c>XXXXX-XXXXX</c>, each working once.</param>
+/// <param name="Session">This session's tokens: a new access token carrying <c>aal</c> 2, and the current refresh token, unchanged.</param>
+public sealed record TotpConfirmation(
+    [property: JsonPropertyName("recoveryCodes")] IReadOnlyList<string> RecoveryCodes,
+    [property: JsonPropertyName("session")] SessionTokens Session);
+
+/// <summary>A new authenticator app secret, waiting for its first code. Show <c>uri</c> as a QR code and <c>secret</c> for typing in, then confirm with <c>account.confirmTotp</c> within 15 minutes.</summary>
+/// <param name="Secret">The secret: 20 random bytes as unpadded base32 (32 characters). Never log it.</param>
+/// <param name="Uri">The <c>otpauth://</c> URI an authenticator app scans: the project as the issuer, the user's email as the label.</param>
+/// <param name="ExpiresAt">When the secret stops waiting for its first code; ask for a new one after that.</param>
+public sealed record TotpSetup(
+    [property: JsonPropertyName("secret")] string Secret,
+    [property: JsonPropertyName("uri")] string Uri,
+    [property: JsonPropertyName("expiresAt")] DateTimeOffset ExpiresAt);
 
 /// <summary>Changes to the signed in user. A field left out stays as it is.</summary>
 /// <param name="Name">A new display name of at most 256 characters, or null to remove it.</param>

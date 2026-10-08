@@ -582,6 +582,133 @@
         "x-orvano-audience": "client"
       }
     },
+    "/v1/account/mfa": {
+      "get": {
+        "operationId": "account.getMfa",
+        "description": "Gets the signed in user's MFA state.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/mfa/totp": {
+      "post": {
+        "operationId": "account.createTotp",
+        "description": "Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.\nNeeds a session that signed in within 10 minutes (or passed a second factor within 10 minutes) and, when the user\nhas an email, a verified one.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpSetup"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/mfa/totp/confirm": {
+      "post": {
+        "operationId": "account.confirmTotp",
+        "description": "Turns MFA on with the first code from the authenticator app. Answers 10 new recovery codes, ends every other\nsession of the user, and raises this one to level 2 with a new access token. The SDKs keep their stored session,\nwhose next refresh carries `aal` 2 too.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpConfirmation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmTotpRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/account/oauth/flows": {
       "post": {
         "operationId": "account.createOAuthFlow",
@@ -1000,6 +1127,51 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreateMagicLinkSessionRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-session": "start",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/sessions/mfa": {
+      "post": {
+        "operationId": "account.createMfaSession",
+        "description": "Finishes a sign in that answered an MFA challenge: checks the ticket and one factor, then creates the session.\nAfter 5 wrong factors the ticket stops working; sign in again.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMfaSessionRequest"
               }
             }
           }
@@ -2253,17 +2425,43 @@
         "required": [
           "user",
           "session",
+          "mfa",
           "isNewUser",
           "verificationEmail"
         ],
         "properties": {
           "user": {
-            "$ref": "#/components/schemas/User",
-            "description": "The user."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The user; null while `mfa` is set."
           },
           "session": {
-            "$ref": "#/components/schemas/SessionTokens",
-            "description": "The new session's tokens."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionTokens"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The new session's tokens; null while `mfa` is set."
+          },
+          "mfa": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MfaChallenge"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when the user has MFA on: no session exists yet. Finish with `account.createMfaSession` and the ticket before\nit expires. The SDKs' `completeMfa` does it. Null otherwise."
           },
           "isNewUser": {
             "type": "boolean",
@@ -2284,7 +2482,7 @@
             "description": "What happened to the verification email sign up was asked to send; null when none was asked for."
           }
         },
-        "description": "A signed in user and their new session."
+        "description": "A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of\n`session` and `mfa` is set."
       },
       "CompleteOAuthLinkRequest": {
         "type": "object",
@@ -2349,6 +2547,22 @@
           }
         },
         "description": "An email change confirmation, with the token from the link sent to the new address."
+      },
+      "ConfirmTotpRequest": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The 6 digit code the authenticator app shows now.",
+            "examples": [
+              "492039"
+            ]
+          }
+        },
+        "description": "The first code from the authenticator app, which turns MFA on."
       },
       "CreateAccountRequest": {
         "type": "object",
@@ -2538,6 +2752,36 @@
           }
         },
         "description": "A sign in with the token from a magic link."
+      },
+      "CreateMfaSessionRequest": {
+        "type": "object",
+        "required": [
+          "ticket"
+        ],
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "description": "The `ticket` of the `MfaChallenge`.",
+            "examples": [
+              "orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          },
+          "totpCode": {
+            "type": "string",
+            "description": "The 6 digit code the authenticator app shows now.",
+            "examples": [
+              "492039"
+            ]
+          },
+          "recoveryCode": {
+            "type": "string",
+            "description": "A recovery code; case, spaces, and hyphens do not matter. Each works once.",
+            "examples": [
+              "K7QXM-2RPLD"
+            ]
+          }
+        },
+        "description": "The second step of a sign in: the ticket and exactly one factor."
       },
       "CreateOAuthFlowRequest": {
         "type": "object",
@@ -2819,7 +3063,22 @@
           "identity_already_linked",
           "last_sign_in_method",
           "provider_error",
-          "provider_unavailable"
+          "provider_unavailable",
+          "invalid_mfa_ticket",
+          "invalid_mfa_code",
+          "invalid_passkey",
+          "invalid_passkey_challenge",
+          "mfa_verification_required",
+          "mfa_required",
+          "mfa_already_enabled",
+          "mfa_not_enabled",
+          "email_not_verified",
+          "totp_not_pending",
+          "factor_not_enabled",
+          "passkey_already_registered",
+          "passkey_limit",
+          "passkeys_exist",
+          "passkey_not_found"
         ],
         "description": "Every stable error code the server sends in `Problem.code`."
       },
@@ -3022,6 +3281,108 @@
         },
         "description": "A project's public signing keys: the active key and any key retired within the last 24 hours."
       },
+      "MfaChallenge": {
+        "type": "object",
+        "required": [
+          "ticket",
+          "factors",
+          "expiresAt"
+        ],
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "description": "Proves the first step passed; send it to `account.createMfaSession`. Keep it in memory only. Empty when the ticket\ntravels in a cookie instead (the console).",
+            "examples": [
+              "orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          },
+          "factors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MfaFactor"
+            },
+            "description": "The factors the user can answer with now, in this order: `totp`, `recovery_code`, `passkey`."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the ticket stops working: 5 minutes after the first step. After that, sign in again."
+          }
+        },
+        "description": "The second step a sign in must pass before it gets a session: the user has MFA on. Answer it with\n`account.createMfaSession` before `expiresAt`."
+      },
+      "MfaFactor": {
+        "type": "string",
+        "enum": [
+          "totp",
+          "recovery_code",
+          "passkey"
+        ],
+        "description": "A second factor."
+      },
+      "MfaStatus": {
+        "type": "object",
+        "required": [
+          "mfaEnabled",
+          "totpConfirmed",
+          "totpConfirmedAt",
+          "recoveryCodesRemaining",
+          "passkeyCount",
+          "factorsAvailable"
+        ],
+        "properties": {
+          "mfaEnabled": {
+            "type": "boolean",
+            "description": "Whether sign in asks for a second factor: a confirmed authenticator app, while the project allows TOTP.",
+            "examples": [
+              true
+            ]
+          },
+          "totpConfirmed": {
+            "type": "boolean",
+            "description": "Whether an authenticator app is confirmed, even while the project has TOTP turned off.",
+            "examples": [
+              true
+            ]
+          },
+          "totpConfirmedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the authenticator app was confirmed; null when none is."
+          },
+          "recoveryCodesRemaining": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many unused recovery codes are left, 0 to 10.",
+            "examples": [
+              10
+            ]
+          },
+          "passkeyCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many of the user's passkeys can sign in now.",
+            "examples": [
+              0
+            ]
+          },
+          "factorsAvailable": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MfaFactor"
+            },
+            "description": "What the project lets users turn on now: `totp` and `passkey`."
+          }
+        },
+        "description": "The signed in user's MFA state."
+      },
       "OAuthFlow": {
         "type": "object",
         "required": [
@@ -3185,7 +3546,9 @@
           "ipAddress",
           "current",
           "method",
-          "provider"
+          "provider",
+          "aal",
+          "amr"
         ],
         "properties": {
           "id": {
@@ -3268,6 +3631,28 @@
               }
             ],
             "description": "The provider of an `oauth` or `id_token` session; null for every other method."
+          },
+          "aal": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How strongly the session signed in: 1 for one factor, 2 once a second factor or a passkey was verified on it. Also\nthe access token's `aal` claim.",
+            "examples": [
+              2
+            ]
+          },
+          "amr": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The ways the user proved who they are on this session, sorted: `pwd`, `email`, `fed`, `otp`, `rec`, `hwk`, `swk`,\n`user`, and `mfa` (whenever `aal` is 2). Also the access token's `amr` claim.",
+            "examples": [
+              [
+                "mfa",
+                "otp",
+                "pwd"
+              ]
+            ]
           }
         },
         "description": "An active session of a user: one signed in device or browser."
@@ -3281,7 +3666,8 @@
           "email_code",
           "recovery",
           "oauth",
-          "id_token"
+          "id_token",
+          "passkey"
         ],
         "description": "How a session began."
       },
@@ -3356,6 +3742,63 @@
           }
         },
         "description": "A session's tokens. Send the access token as `Authorization: Bearer`; trade the refresh token for a new pair\nbefore the access token expires. The SDKs do both for you."
+      },
+      "TotpConfirmation": {
+        "type": "object",
+        "required": [
+          "recoveryCodes",
+          "session"
+        ],
+        "properties": {
+          "recoveryCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "10 recovery codes, each `XXXXX-XXXXX`, each working once.",
+            "examples": [
+              [
+                "K7QXM-2RPLD",
+                "A4ZTN-WQ6EB"
+              ]
+            ]
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionTokens",
+            "description": "This session's tokens: a new access token carrying `aal` 2, and the current refresh token, unchanged."
+          }
+        },
+        "description": "MFA is on. Show the recovery codes once and ask the user to keep them safe; they can't be read again. Every other\nsession of the user has ended, and this one is now at level 2."
+      },
+      "TotpSetup": {
+        "type": "object",
+        "required": [
+          "secret",
+          "uri",
+          "expiresAt"
+        ],
+        "properties": {
+          "secret": {
+            "type": "string",
+            "description": "The secret: 20 random bytes as unpadded base32 (32 characters). Never log it.",
+            "examples": [
+              "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
+            ]
+          },
+          "uri": {
+            "type": "string",
+            "description": "The `otpauth://` URI an authenticator app scans: the project as the issuer, the user's email as the label.",
+            "examples": [
+              "otpauth://totp/Acme:ada%40example.com?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=Acme&algorithm=SHA1&digits=6&period=30"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the secret stops waiting for its first code; ask for a new one after that."
+          }
+        },
+        "description": "A new authenticator app secret, waiting for its first code. Show `uri` as a QR code and `secret` for typing in, then\nconfirm with `account.confirmTotp` within 15 minutes."
       },
       "UpdateAccountRequest": {
         "type": "object",

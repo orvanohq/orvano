@@ -95,7 +95,13 @@ describe('the redeem action (AC-25)', () => {
     const body = (await response.json()) as Record<string, unknown>
 
     expect(response.status).toBe(200)
-    expect(body).toEqual({ type: 'magic_link', user, isNewUser: true })
+    expect(body).toEqual({
+      type: 'magic_link',
+      user,
+      isNewUser: true,
+      mfaRequired: false,
+      factors: [],
+    })
     expect(JSON.stringify(body)).not.toContain('orv_rt_')
     expect(calls[0]?.path).toBe('/v1/account/sessions/magic-link')
     expect(calls[0]?.headers.get('X-Orvano-Client-IP')).toBe('203.0.113.7')
@@ -190,7 +196,13 @@ describe('the email-code action (AC-25)', () => {
     const response = await POST(post('email-code', { email: 'ada@example.com', code: '042137' }))
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ type: 'email_code', user, isNewUser: false })
+    expect(await response.json()).toEqual({
+      type: 'email_code',
+      user,
+      isNewUser: false,
+      mfaRequired: false,
+      factors: [],
+    })
     expect(calls[0]?.body).toEqual({ email: 'ada@example.com', code: '042137' })
     expect(response.headers.getSetCookie()).toHaveLength(2)
   })
@@ -216,7 +228,13 @@ describe('the browser transport (AC-24, AC-25)', () => {
     const result = await client.redeemLink(`${app}/cb?orvano_type=magic_link&orvano_token=${token}`)
     await client.signInWithEmailCode('ada@example.com', '042137')
 
-    expect(result).toEqual({ type: 'magic_link', user, isNewUser: true })
+    expect(result).toEqual({
+      type: 'magic_link',
+      user,
+      isNewUser: true,
+      mfaRequired: false,
+      factors: [],
+    })
     expect(posted).toEqual([
       { url: '/auth/orvano/redeem', body: { type: 'magic_link', token } },
       { url: '/auth/orvano/email-code', body: { email: 'ada@example.com', code: '042137' } },

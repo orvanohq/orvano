@@ -35,6 +35,7 @@ import type {
   RequestOptions,
   SessionRefresher,
   SessionStore,
+  SignInOutcome,
 } from '@orvano/js'
 
 export { Client, ErrorCode, Orvano, OrvanoError } from '@orvano/js'
@@ -46,8 +47,11 @@ export type {
   EmailCodeResult,
   EmailLinkType,
   LinkResult,
+  MfaAnswer,
+  PendingMfa,
   RequestOptions,
   SessionStore,
+  SignInOutcome,
 } from '@orvano/js'
 
 /** The cookie that holds the access token; browser code can read it. Named only here. */
@@ -373,16 +377,29 @@ export function emailAuthThroughHandler(handlerPath = defaultHandlerPath): Email
   return {
     async redeemLink(link, client, options): Promise<LinkResult> {
       const result = await post<LinkResult>('redeem', link, options)
-      if (link.type === 'magic_link' || link.type === 'recovery')
+      if (result.mfaRequired) {
+        // No cookie was set: the sign in waits at the MFA step.
+      } else if (link.type === 'magic_link' || link.type === 'recovery')
         await client.reloadSession('signedIn')
       else if ((await client.session.get()) !== null) await client.reloadSession('userUpdated')
-      return { type: result.type, user: result.user, isNewUser: result.isNewUser }
+      return outcome(result, { type: result.type })
     },
     async signInWithEmailCode(email, code, client, options): Promise<EmailCodeResult> {
       const result = await post<EmailCodeResult>('email-code', { email, code }, options)
-      await client.reloadSession('signedIn')
-      return { user: result.user, isNewUser: result.isNewUser }
+      if (!result.mfaRequired) await client.reloadSession('signedIn')
+      return outcome(result, {})
     },
+  }
+}
+
+/** A handler's sign in answer as a `SignInOutcome`, read field by field. */
+function outcome<T extends object>(result: SignInOutcome, extra: T): SignInOutcome & T {
+  return {
+    ...extra,
+    user: result.user,
+    isNewUser: result.isNewUser,
+    mfaRequired: result.mfaRequired,
+    factors: Array.isArray(result.factors) ? result.factors : [],
   }
 }
 

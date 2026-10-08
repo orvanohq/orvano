@@ -6,12 +6,14 @@ import type {
   CompleteOAuthLinkRequest,
   CompleteRecoveryRequest,
   ConfirmEmailChangeRequest,
+  ConfirmTotpRequest,
   CreateAccountRequest,
   CreateEmailCodeRequest,
   CreateEmailCodeSessionRequest,
   CreateIdTokenSessionRequest,
   CreateMagicLinkRequest,
   CreateMagicLinkSessionRequest,
+  CreateMfaSessionRequest,
   CreateOAuthFlowRequest,
   CreateOAuthSessionRequest,
   CreatePasswordSessionRequest,
@@ -22,12 +24,15 @@ import type {
   Identity,
   IdentityList,
   Jwks,
+  MfaStatus,
   OAuthFlow,
   OpenIdConfiguration,
   RefreshSessionRequest,
   Session,
   SessionPage,
   SessionTokens,
+  TotpConfirmation,
+  TotpSetup,
   UpdateAccountRequest,
   UpdateEmailRequest,
   UpdatePasswordRequest,
@@ -69,6 +74,18 @@ export class AccountService {
   confirmEmailChange(body: ConfirmEmailChangeRequest, options?: RequestOptions): Promise<User> {
     return this.#client.request<User>(
       { method: 'POST', path: '/v1/account/email/confirm', body, session: 'user' },
+      options,
+    )
+  }
+
+  /**
+   * Turns MFA on with the first code from the authenticator app. Answers 10 new recovery codes, ends every other
+   * session of the user, and raises this one to level 2 with a new access token. The SDKs keep their stored session,
+   * whose next refresh carries `aal` 2 too.
+   */
+  confirmTotp(body: ConfirmTotpRequest, options?: RequestOptions): Promise<TotpConfirmation> {
+    return this.#client.request<TotpConfirmation>(
+      { method: 'POST', path: '/v1/account/mfa/totp/confirm', body },
       options,
     )
   }
@@ -152,6 +169,17 @@ export class AccountService {
   }
 
   /**
+   * Finishes a sign in that answered an MFA challenge: checks the ticket and one factor, then creates the session.
+   * After 5 wrong factors the ticket stops working; sign in again.
+   */
+  createMfaSession(body: CreateMfaSessionRequest, options?: RequestOptions): Promise<AuthResult> {
+    return this.#client.request<AuthResult>(
+      { method: 'POST', path: '/v1/account/sessions/mfa', body, session: 'start' },
+      options,
+    )
+  }
+
+  /**
    * Starts signing in with a provider: answers the provider's sign in page to send the browser to. After the user
    * agrees, Orvano sends the browser back to `redirectUrl` with a code that only your verifier redeems. The SDKs'
    * `signInWithOAuth` does all of it.
@@ -210,6 +238,18 @@ export class AccountService {
     )
   }
 
+  /**
+   * Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.
+   * Needs a session that signed in within 10 minutes (or passed a second factor within 10 minutes) and, when the user
+   * has an email, a verified one.
+   */
+  createTotp(options?: RequestOptions): Promise<TotpSetup> {
+    return this.#client.request<TotpSetup>(
+      { method: 'POST', path: '/v1/account/mfa/totp' },
+      options,
+    )
+  }
+
   /** Emails the signed in user a link that verifies their email. */
   createVerification(body: CreateVerificationRequest, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
@@ -261,6 +301,11 @@ export class AccountService {
   /** Gets the signed in user. A server can call it with a user's access token to check that the session is still active. */
   get(options?: RequestOptions): Promise<User> {
     return this.#client.request<User>({ method: 'GET', path: '/v1/account' }, options)
+  }
+
+  /** Gets the signed in user's MFA state. */
+  getMfa(options?: RequestOptions): Promise<MfaStatus> {
+    return this.#client.request<MfaStatus>({ method: 'GET', path: '/v1/account/mfa' }, options)
   }
 
   /** Lists the signed in user's identities, oldest first. */

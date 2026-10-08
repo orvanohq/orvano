@@ -37,6 +37,15 @@ internal static class AuthEvents
     public const string PasswordReset = "auth.password.reset";
     public const string PasswordRemoved = "auth.password.removed";
 
+    /// <summary>MFA turned on (spec 0013, AC-33); <c>factor</c> says which.</summary>
+    public const string MfaEnabled = "auth.mfa.enabled";
+
+    /// <summary>A user's recovery codes were replaced by 10 new ones (spec 0013, AC-33).</summary>
+    public const string RecoveryCodesCreated = "auth.recovery_codes.created";
+
+    /// <summary>A recovery code answered a second step or a step up (spec 0013, AC-10).</summary>
+    public const string RecoveryCodeUsed = "auth.recovery_code.used";
+
     /// <summary>
     /// Writes one event about a user (the event's subject) or one of their sessions. <paramref name="fields"/> carries
     /// other plain values, such as a session's <c>method</c> or a token's <c>kind</c>, never personal data.

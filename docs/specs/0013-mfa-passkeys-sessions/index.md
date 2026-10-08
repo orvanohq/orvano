@@ -1,7 +1,7 @@
 # 0013. MFA with authenticator apps and recovery codes, passkeys, and session strength
 
 **Date**: 2026-10-07
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 

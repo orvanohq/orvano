@@ -19,6 +19,8 @@ const session: Session = {
   current: false,
   method: 'password',
   provider: null,
+  aal: 1,
+  amr: ['pwd'],
 }
 
 const signingKeys: SigningKey[] = [

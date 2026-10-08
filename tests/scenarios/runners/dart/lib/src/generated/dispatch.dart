@@ -38,6 +38,15 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.confirmTotp': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.confirmTotp(
+        ConfirmTotpRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+  ),
   'account.create': DispatchEntry(
     status: 201,
     client: (o, input) async {
@@ -109,6 +118,15 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.createMfaSession': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createMfaSession(
+        CreateMfaSessionRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+  ),
   'account.createOAuthFlow': DispatchEntry(
     status: 200,
     client: (o, input) async {
@@ -156,6 +174,13 @@ final Map<String, DispatchEntry> dispatch = {
         CreateRecoveryRequest.fromJson(input['body'] as Map<String, dynamic>),
       );
       return null;
+    },
+  ),
+  'account.createTotp': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createTotp();
+      return r.toJson();
     },
   ),
   'account.createVerification': DispatchEntry(
@@ -214,6 +239,13 @@ final Map<String, DispatchEntry> dispatch = {
     },
     server: (o, input) async {
       final r = await o.account.get();
+      return r.toJson();
+    },
+  ),
+  'account.getMfa': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.getMfa();
       return r.toJson();
     },
   ),

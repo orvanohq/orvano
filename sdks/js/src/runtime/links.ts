@@ -1,6 +1,7 @@
 import { AccountService } from '../generated/client.js'
-import type { User } from '../generated/models.js'
 import type { Client, RequestOptions } from './client.js'
+import { signInOutcome } from './mfa.js'
+import type { SignInOutcome } from './mfa.js'
 
 /**
  * What an emailed link is for: its `orvano_type` parameter (spec 0010). The link also carries the
@@ -32,23 +33,20 @@ export interface EmailLink {
   password?: string
 }
 
-/** What a redeemed link did: its type, the user, and whether the call created them. */
-export interface LinkResult {
+/**
+ * What a redeemed link did: its type, the user, and whether the call created them. A magic link or
+ * reset for a user with MFA on stops at the MFA step: `mfaRequired` is true and `user` null.
+ */
+export interface LinkResult extends SignInOutcome {
   /** What the link was for. */
   type: EmailLinkType
-  /** The user, as it is now. */
-  user: User
-  /** True only when a magic link created the user. */
-  isNewUser: boolean
 }
 
-/** What an email code sign in did: the user, and whether the call created them. */
-export interface EmailCodeResult {
-  /** The signed in user. */
-  user: User
-  /** True when the code was for an email that had no user yet. */
-  isNewUser: boolean
-}
+/**
+ * What an email code sign in did: the user, and whether the call created them, or the MFA step it
+ * stopped at (`mfaRequired`).
+ */
+export type EmailCodeResult = SignInOutcome
 
 /** Options for {@link Client.redeemLink}. */
 export interface RedeemLinkOptions extends RequestOptions {
@@ -83,32 +81,36 @@ export const directEmailAuth: EmailAuthTransport = {
     switch (link.type) {
       case 'magic_link': {
         const result = await account.createMagicLinkSession({ token: link.token }, options)
-        return { type: link.type, user: result.user, isNewUser: result.isNewUser }
+        return { type: link.type, ...signInOutcome(result) }
       }
       case 'recovery': {
         const result = await account.completeRecovery(
           { token: link.token, password: link.password ?? '' },
           options,
         )
-        return { type: link.type, user: result.user, isNewUser: result.isNewUser }
+        return { type: link.type, ...signInOutcome(result) }
       }
       case 'verification':
         return {
           type: link.type,
           user: await account.verifyEmail({ token: link.token }, options),
           isNewUser: false,
+          mfaRequired: false,
+          factors: [],
         }
       case 'email_change':
         return {
           type: link.type,
           user: await account.confirmEmailChange({ token: link.token }, options),
           isNewUser: false,
+          mfaRequired: false,
+          factors: [],
         }
     }
   },
   async signInWithEmailCode(email, code, client, options) {
     const result = await new AccountService(client).createEmailCodeSession({ email, code }, options)
-    return { user: result.user, isNewUser: result.isNewUser }
+    return signInOutcome(result)
   },
 }
 

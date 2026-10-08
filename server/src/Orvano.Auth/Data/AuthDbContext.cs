@@ -29,6 +29,18 @@ internal sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : D
 
     public DbSet<IdTokenUseRow> IdTokenUses => Set<IdTokenUseRow>();
 
+    public DbSet<MethodSettingsRow> MethodSettings => Set<MethodSettingsRow>();
+
+    public DbSet<TotpFactorRow> TotpFactors => Set<TotpFactorRow>();
+
+    public DbSet<RecoveryCodeRow> RecoveryCodes => Set<RecoveryCodeRow>();
+
+    public DbSet<PasskeyRow> Passkeys => Set<PasskeyRow>();
+
+    public DbSet<MfaTicketRow> MfaTickets => Set<MfaTicketRow>();
+
+    public DbSet<WebAuthnChallengeRow> WebAuthnChallenges => Set<WebAuthnChallengeRow>();
+
     /// <summary>A context on an open connection the caller owns; it never opens or closes it.</summary>
     public static AuthDbContext On(NpgsqlConnection connection) =>
         new(new DbContextOptionsBuilder<AuthDbContext>().UseNpgsql(connection).Options);
@@ -90,6 +102,9 @@ internal sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : D
             e.Property(x => x.EndReason).HasColumnName("end_reason");
             e.Property(x => x.Method).HasColumnName("method").HasDefaultValueSql("'password'");
             e.Property(x => x.Provider).HasColumnName("provider");
+            e.Property(x => x.Aal).HasColumnName("aal").HasDefaultValue((short)1);
+            e.Property(x => x.Amr).HasColumnName("amr").HasDefaultValueSql("'{}'");
+            e.Property(x => x.StrongAuthAt).HasColumnName("strong_auth_at");
             e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -173,6 +188,104 @@ internal sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : D
             e.Property(x => x.TokenHash).HasColumnName("token_hash");
             e.Property(x => x.ProjectId).HasColumnName("project_id");
             e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
+        });
+
+        model.Entity<MethodSettingsRow>(e =>
+        {
+            e.ToTable("auth_method_settings");
+            e.HasKey(x => x.ProjectId);
+            e.Property(x => x.ProjectId).HasColumnName("project_id");
+            e.Property(x => x.TotpEnabled).HasColumnName("totp_enabled");
+            e.Property(x => x.PasskeysEnabled).HasColumnName("passkeys_enabled");
+            e.Property(x => x.RpId).HasColumnName("rp_id");
+            e.Property(x => x.RpName).HasColumnName("rp_name");
+            e.Property(x => x.AndroidCertFingerprints).HasColumnName("android_cert_fingerprints");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+        });
+
+        model.Entity<TotpFactorRow>(e =>
+        {
+            e.ToTable("auth_totp_factors");
+            e.HasKey(x => x.UserId);
+            e.Property(x => x.UserId).HasColumnName("user_id").ValueGeneratedNever();
+            e.Property(x => x.ProjectId).HasColumnName("project_id");
+            e.Property(x => x.SecretCiphertext).HasColumnName("secret_ciphertext");
+            e.Property(x => x.ConfirmedAt).HasColumnName("confirmed_at");
+            e.Property(x => x.LastUsedStep).HasColumnName("last_used_step");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+            e.HasOne<UserRow>().WithOne().HasForeignKey<TotpFactorRow>(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        model.Entity<RecoveryCodeRow>(e =>
+        {
+            e.ToTable("auth_recovery_codes");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasDefaultValueSql("uuidv7()");
+            e.Property(x => x.ProjectId).HasColumnName("project_id");
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.CodeMac).HasColumnName("code_mac");
+            e.Property(x => x.MacKeyId).HasColumnName("mac_key_id");
+            e.Property(x => x.UsedAt).HasColumnName("used_at");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        model.Entity<PasskeyRow>(e =>
+        {
+            e.ToTable("auth_passkeys");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasDefaultValueSql("uuidv7()");
+            e.Property(x => x.ProjectId).HasColumnName("project_id");
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.CredentialId).HasColumnName("credential_id");
+            e.Property(x => x.PublicKey).HasColumnName("public_key");
+            e.Property(x => x.SignCount).HasColumnName("sign_count");
+            e.Property(x => x.Aaguid).HasColumnName("aaguid");
+            e.Property(x => x.Name).HasColumnName("name");
+            e.Property(x => x.Transports).HasColumnName("transports");
+            e.Property(x => x.BackupEligible).HasColumnName("backup_eligible");
+            e.Property(x => x.BackedUp).HasColumnName("backed_up");
+            e.Property(x => x.RpId).HasColumnName("rp_id");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            e.Property(x => x.LastUsedAt).HasColumnName("last_used_at");
+            e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        model.Entity<MfaTicketRow>(e =>
+        {
+            e.ToTable("auth_mfa_tickets");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasDefaultValueSql("uuidv7()");
+            e.Property(x => x.ProjectId).HasColumnName("project_id");
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.TicketHash).HasColumnName("ticket_hash");
+            e.Property(x => x.Method).HasColumnName("method");
+            e.Property(x => x.PendingPasswordHash).HasColumnName("pending_password_hash");
+            e.Property(x => x.Provider).HasColumnName("provider");
+            e.Property(x => x.UserAgent).HasColumnName("user_agent");
+            e.Property(x => x.Sdk).HasColumnName("sdk");
+            e.Property(x => x.Ip).HasColumnName("ip");
+            e.Property(x => x.Attempts).HasColumnName("attempts");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
+            e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        model.Entity<WebAuthnChallengeRow>(e =>
+        {
+            e.ToTable("auth_webauthn_challenges");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasDefaultValueSql("uuidv7()");
+            e.Property(x => x.ProjectId).HasColumnName("project_id");
+            e.Property(x => x.Purpose).HasColumnName("purpose");
+            e.Property(x => x.ChallengeHash).HasColumnName("challenge_hash");
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.TicketId).HasColumnName("ticket_id");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
+            e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<MfaTicketRow>().WithMany().HasForeignKey(x => x.TicketId).OnDelete(DeleteBehavior.Cascade);
         });
 
         model.Entity<SigningKeyRow>(e =>
@@ -279,6 +392,15 @@ internal sealed class SessionRow
 
     /// <summary>The provider of an <c>oauth</c> or <c>id_token</c> session (spec 0012); null for every other method.</summary>
     public string? Provider { get; set; }
+
+    /// <summary>The assurance level, 1 or 2 (spec 0013, AC-25); never goes back to 1.</summary>
+    public short Aal { get; set; } = 1;
+
+    /// <summary>The authentication methods, sorted (spec 0013, AC-25).</summary>
+    public string[] Amr { get; set; } = [];
+
+    /// <summary>The last MFA or passkey check on this session; only moves forward.</summary>
+    public DateTimeOffset? StrongAuthAt { get; set; }
 }
 
 /// <summary>
@@ -432,6 +554,149 @@ internal sealed class IdTokenUseRow
     public required byte[] TokenHash { get; set; }
 
     public required string ProjectId { get; set; }
+
+    public DateTimeOffset ExpiresAt { get; set; }
+}
+
+/// <summary><c>auth_method_settings</c> (spec 0013, AC-1): a project's TOTP and passkey settings. A missing row reads as the defaults.</summary>
+internal sealed class MethodSettingsRow
+{
+    public required string ProjectId { get; set; }
+
+    public bool TotpEnabled { get; set; } = true;
+
+    public bool PasskeysEnabled { get; set; }
+
+    public string? RpId { get; set; }
+
+    public string? RpName { get; set; }
+
+    public string[] AndroidCertFingerprints { get; set; } = [];
+
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
+/// <summary><c>auth_totp_factors</c> (spec 0013): a user's authenticator app secret, pending until confirmed.</summary>
+internal sealed class TotpFactorRow
+{
+    public Guid UserId { get; set; }
+
+    public required string ProjectId { get; set; }
+
+    /// <summary>Sealed with associated data <c>auth_totp_factors:&lt;userId&gt;:secret_ciphertext</c>.</summary>
+    public required byte[] SecretCiphertext { get; set; }
+
+    public DateTimeOffset? ConfirmedAt { get; set; }
+
+    public long? LastUsedStep { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
+/// <summary><c>auth_recovery_codes</c> (spec 0013, AC-10): one recovery code, only as a <c>SecretBox.Mac</c> tag.</summary>
+internal sealed class RecoveryCodeRow
+{
+    public Guid Id { get; set; }
+
+    public required string ProjectId { get; set; }
+
+    public Guid UserId { get; set; }
+
+    public required byte[] CodeMac { get; set; }
+
+    public required string MacKeyId { get; set; }
+
+    public DateTimeOffset? UsedAt { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
+/// <summary><c>auth_passkeys</c> (spec 0013): a WebAuthn credential of a user.</summary>
+internal sealed class PasskeyRow
+{
+    public Guid Id { get; set; }
+
+    public required string ProjectId { get; set; }
+
+    public Guid UserId { get; set; }
+
+    public required byte[] CredentialId { get; set; }
+
+    public required byte[] PublicKey { get; set; }
+
+    public long SignCount { get; set; }
+
+    public Guid? Aaguid { get; set; }
+
+    /// <summary>Personal data: never log it.</summary>
+    public required string Name { get; set; }
+
+    public string[] Transports { get; set; } = [];
+
+    public bool BackupEligible { get; set; }
+
+    public bool BackedUp { get; set; }
+
+    /// <summary>The RP ID at registration; the passkey is active only while it equals the project's current one.</summary>
+    public required string RpId { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset? LastUsedAt { get; set; }
+}
+
+/// <summary><c>auth_mfa_tickets</c> (spec 0013, AC-7): step one passed, waiting for the second factor.</summary>
+internal sealed class MfaTicketRow
+{
+    public Guid Id { get; set; }
+
+    public required string ProjectId { get; set; }
+
+    public Guid UserId { get; set; }
+
+    /// <summary>SHA-256 of the ticket.</summary>
+    public required byte[] TicketHash { get; set; }
+
+    /// <summary>How step one signed in, one of <see cref="Domain.SessionMethod"/>.</summary>
+    public required string Method { get; set; }
+
+    /// <summary>The Argon2id hash of a recovery's new password, applied only at step two.</summary>
+    public string? PendingPasswordHash { get; set; }
+
+    public string? Provider { get; set; }
+
+    public string? UserAgent { get; set; }
+
+    public string? Sdk { get; set; }
+
+    public IPAddress? Ip { get; set; }
+
+    public short Attempts { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset ExpiresAt { get; set; }
+}
+
+/// <summary><c>auth_webauthn_challenges</c> (spec 0013): one WebAuthn ceremony's challenge, only as SHA-256.</summary>
+internal sealed class WebAuthnChallengeRow
+{
+    public Guid Id { get; set; }
+
+    public required string ProjectId { get; set; }
+
+    /// <summary><c>register</c>, <c>sign_in</c>, <c>mfa</c>, or <c>step_up</c>.</summary>
+    public required string Purpose { get; set; }
+
+    public required byte[] ChallengeHash { get; set; }
+
+    public Guid? UserId { get; set; }
+
+    public Guid? TicketId { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset ExpiresAt { get; set; }
 }
