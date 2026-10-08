@@ -31,14 +31,27 @@ import { MemoryPendingMfaStore, signInOutcome } from './mfa.js'
 import type {
   MfaAnswer,
   MfaTransport,
+  MfaWireAnswer,
   PendingMfa,
   PendingMfaStore,
   PendingMfaTicket,
   SignInOutcome,
 } from './mfa.js'
+import { browserPasskeys } from './passkeys.js'
+import type {
+  PasskeyAuthenticator,
+  PasskeyRegistrationOptions,
+  PasskeySignInOptions,
+} from './passkeys.js'
 import { sdkHeader, sdkName, serverVersionHeader, versionMismatch } from './version.js'
 import { AccountService } from '../generated/client.js'
-import type { Identity, MfaFactor, OAuthProvider } from '../generated/models.js'
+import type {
+  Identity,
+  MfaFactor,
+  OAuthProvider,
+  Passkey,
+  PasskeyChallenge,
+} from '../generated/models.js'
 import type { Logger } from './version.js'
 import { sdkVersion } from '../generated/version.js'
 
@@ -84,6 +97,11 @@ export interface ClientConfig {
    * operations; `@orvano/nextjs`'s browser client posts them to the app's route handler.
    */
   mfa?: MfaTransport
+  /**
+   * Makes and uses passkeys (spec 0013). Defaults to the browser's WebAuthn API
+   * (`browserPasskeys`); pass your own for a native bridge or a test authenticator.
+   */
+  passkeys?: PasskeyAuthenticator
   /** A custom `fetch`, for tests or runtimes without a global one. */
   fetch?: typeof fetch
   /**
@@ -184,6 +202,7 @@ export class Client {
   #known: AuthSession | null | undefined
   readonly #mfaStore: PendingMfaStore
   readonly #mfaTransport: MfaTransport | undefined
+  readonly #passkeys: PasskeyAuthenticator
   #refreshing: Promise<AuthSession | null> | undefined
   #versionChecked = false
 
@@ -215,6 +234,7 @@ export class Client {
     this.#oauth = config.oauth ?? directOAuth
     this.#mfaStore = config.mfaStore ?? new MemoryPendingMfaStore()
     this.#mfaTransport = config.mfa
+    this.#passkeys = config.passkeys ?? browserPasskeys
     this.#timeoutMs = config.timeoutMs ?? defaultTimeoutMs
     this.#maxRetries = config.maxRetries ?? defaultMaxRetries
     // Bound, because some runtimes (Cloudflare Workers) reject a fetch called on another `this`.
@@ -379,22 +399,41 @@ export class Client {
   }
 
   /**
-   * Finishes a sign in that stopped at the MFA step (`mfaRequired`) with an authenticator app code
-   * or a recovery code (`account.createMfaSession`), stores the session, and says `signedIn`.
+   * Finishes a sign in that stopped at the MFA step (`mfaRequired`) with an authenticator app code,
+   * a recovery code, or `{ passkey: true }` (`account.createMfaSession`), stores the session, and
+   * says `signedIn`. A passkey runs the ceremony first: `account.createMfaPasskeyChallenge`, then
+   * the passkey authenticator, then the answer.
    *
    * @throws TypeError, before any call, when no sign in is waiting for MFA.
-   * @throws {@link OrvanoError} for a wrong code (`invalid_mfa_code`; after 5 the ticket ends) or
-   * an ended ticket (`invalid_mfa_ticket`: sign in again).
+   * @throws {@link OrvanoError} for a wrong code (`invalid_mfa_code`) or passkey
+   * (`invalid_passkey`; after 5 wrong answers the ticket ends) or an ended ticket
+   * (`invalid_mfa_ticket`: sign in again).
    */
-  async completeMfa(answer: MfaAnswer, options?: RequestOptions): Promise<SignInOutcome> {
-    if (this.#mfaTransport !== undefined)
-      return this.#mfaTransport.completeMfa(answer, this, options)
+  async completeMfa(
+    answer: MfaAnswer | MfaWireAnswer,
+    options?: RequestOptions,
+  ): Promise<SignInOutcome> {
+    const transport = this.#mfaTransport
+    if (transport !== undefined) {
+      const wire = await this.#wireAnswer(
+        answer,
+        () => transport.createMfaPasskeyChallenge(this, options),
+        options,
+      )
+      return transport.completeMfa(wire, this, options)
+    }
     const pending = this.#mfaStore.get()
     if (pending === null)
       throw new TypeError('Orvano: no sign in is waiting for MFA; sign in first.')
     try {
+      const wire = await this.#wireAnswer(
+        answer,
+        () =>
+          new AccountService(this).createMfaPasskeyChallenge({ ticket: pending.ticket }, options),
+        options,
+      )
       const result = await new AccountService(this).createMfaSession(
-        { ticket: pending.ticket, ...answer },
+        { ticket: pending.ticket, ...wire },
         options,
       )
       return signInOutcome(result)
@@ -410,14 +449,20 @@ export class Client {
   /**
    * Step up (spec 0013, AC-19): proves a second factor on the signed in session
    * (`account.verifyMfa`), so security changes such as `deleteTotp` work for the next 10 minutes.
+   * `{ passkey: true }` runs the ceremony against `account.createStepUpPasskeyChallenge` first.
    * Stores the new access token, which carries `aal` 2, and says `tokenRefreshed`.
    *
-   * @throws {@link OrvanoError} for a wrong code (`invalid_mfa_code`) or a factor the user can't
-   * use now (`factor_not_enabled`).
+   * @throws {@link OrvanoError} for a wrong code (`invalid_mfa_code`) or passkey
+   * (`invalid_passkey`), or a factor the user can't use now (`factor_not_enabled`).
    */
-  async verifyMfa(answer: MfaAnswer, options?: RequestOptions): Promise<void> {
-    if (this.#mfaTransport !== undefined) return this.#mfaTransport.verifyMfa(answer, this, options)
-    const tokens = await new AccountService(this).verifyMfa(answer, options)
+  async verifyMfa(answer: MfaAnswer | MfaWireAnswer, options?: RequestOptions): Promise<void> {
+    const wire = await this.#wireAnswer(
+      answer,
+      () => new AccountService(this).createStepUpPasskeyChallenge(options),
+      options,
+    )
+    if (this.#mfaTransport !== undefined) return this.#mfaTransport.verifyMfa(wire, this, options)
+    const tokens = await new AccountService(this).verifyMfa(wire, options)
     await this.#save(sessionFrom(tokens), 'tokenRefreshed')
   }
 
@@ -434,6 +479,82 @@ export class Client {
     const confirmation = await new AccountService(this).confirmTotp({ code }, options)
     await this.#save(sessionFrom(confirmation.session), 'tokenRefreshed')
     return confirmation.recoveryCodes
+  }
+
+  /**
+   * Signs in with a passkey (spec 0013, AC-23, AC-24): starts a challenge, lets the user pick a
+   * passkey (a dialog, or with `autofill` the browser's autofill on a field with
+   * `autocomplete="username webauthn"`), and sends its answer. Stores the session and says
+   * `signedIn`. A passkey counts as two factors, so this sign in never stops at the MFA step.
+   *
+   * @throws {@link OrvanoError} for a refused answer (`invalid_passkey`) or passkeys turned off for
+   * the project (`factor_not_enabled`); the browser's own error (for example `NotAllowedError`)
+   * when the user cancels.
+   */
+  async signInWithPasskey(options: PasskeySignInOptions = {}): Promise<SignInOutcome> {
+    const request: RequestOptions = options.signal === undefined ? {} : { signal: options.signal }
+    const transport = this.#mfaTransport
+    const challenge =
+      transport !== undefined
+        ? await transport.createPasskeyChallenge(this, request)
+        : await new AccountService(this).createPasskeyChallenge(request)
+    const credential = await this.#passkeys.get(challenge.options, {
+      ...(options.autofill === true ? { mediation: 'conditional' as const } : {}),
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
+    })
+    const answer = { challengeId: challenge.challengeId, credential }
+    if (transport !== undefined) return transport.signInWithPasskey(answer, this, request)
+    return signInOutcome(await new AccountService(this).createPasskeySession(answer, request))
+  }
+
+  /**
+   * Adds a passkey to the signed in user (spec 0013, AC-20, AC-21):
+   * `account.createPasskeyRegistration`, the passkey authenticator, then
+   * `account.completePasskeyRegistration`. Needs a session that signed in (or passed a second
+   * factor) within 10 minutes and, when the user has an email, a verified one.
+   *
+   * @throws {@link OrvanoError} for `reauthentication_required`, `mfa_verification_required`,
+   * `email_not_verified`, `passkey_limit`, `passkey_already_registered`, or `invalid_passkey`.
+   */
+  async registerPasskey(options: PasskeyRegistrationOptions = {}): Promise<Passkey> {
+    const request: RequestOptions = options.signal === undefined ? {} : { signal: options.signal }
+    const account = new AccountService(this)
+    const registration = await account.createPasskeyRegistration(request)
+    const credential = await this.#passkeys.create(registration.options, options.signal)
+    return account.completePasskeyRegistration(
+      {
+        challengeId: registration.challengeId,
+        credential,
+        ...(options.name === undefined ? {} : { name: options.name }),
+      },
+      request,
+    )
+  }
+
+  /**
+   * Whether passkeys work in this runtime (a browser with WebAuthn, or the client's own passkey
+   * authenticator); with `autofill`, whether they can be offered through autofill too.
+   */
+  isPasskeySupported(options?: { autofill?: boolean }): Promise<boolean> {
+    return this.#passkeys.isSupported(options)
+  }
+
+  /**
+   * The API form of a second factor: for `{ passkey: true }`, runs the passkey ceremony; an answer
+   * already in the API form (a passkey's `challengeId` and `credential`) goes as it is.
+   */
+  async #wireAnswer(
+    answer: MfaAnswer | MfaWireAnswer,
+    challenge: () => Promise<PasskeyChallenge>,
+    options: RequestOptions | undefined,
+  ): Promise<MfaWireAnswer> {
+    if (!('passkey' in answer) || answer.passkey !== true) return answer
+    const issued = await challenge()
+    const credential = await this.#passkeys.get(
+      issued.options,
+      options?.signal === undefined ? {} : { signal: options.signal },
+    )
+    return { passkey: { challengeId: issued.challengeId, credential } }
   }
 
   /**

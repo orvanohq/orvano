@@ -34,11 +34,19 @@ export { MemoryPendingMfaStore, signInOutcome } from './runtime/mfa.js'
 export type {
   MfaAnswer,
   MfaTransport,
+  MfaWireAnswer,
   PendingMfa,
   PendingMfaStore,
   PendingMfaTicket,
   SignInOutcome,
 } from './runtime/mfa.js'
+export { browserPasskeys, fromBase64Url, toBase64Url } from './runtime/passkeys.js'
+export type {
+  PasskeyAuthenticator,
+  PasskeyGetRequest,
+  PasskeyRegistrationOptions,
+  PasskeySignInOptions,
+} from './runtime/passkeys.js'
 export {
   directEmailAuth,
   emailLinkTypes,

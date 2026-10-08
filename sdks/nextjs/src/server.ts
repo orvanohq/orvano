@@ -37,7 +37,8 @@ import type {
   ClientConfig,
   EmailLink,
   EmailLinkType,
-  MfaAnswer,
+  MfaWireAnswer,
+  PasskeyAnswer,
   PendingMfaStore,
 } from '@orvano/js'
 import { NextResponse } from 'next/server.js'
@@ -544,17 +545,52 @@ async function oauthCallback(
   }
 }
 
-/** The one factor of an `mfa` or `mfa-verify` body, or null when it holds none or more than one. */
-function mfaAnswer(body: Record<string, unknown> | null): MfaAnswer | null {
-  if (body === null) return null
-  const { totpCode, recoveryCode } = body
-  if (typeof totpCode === 'string' && recoveryCode === undefined) return { totpCode }
-  if (typeof recoveryCode === 'string' && totpCode === undefined) return { recoveryCode }
-  return null
+/** Whether a value has the shape of a passkey's answer: a `challengeId` and a `credential` object. */
+function isPasskeyAnswer(value: unknown): value is PasskeyAnswer {
+  const answer = value as { challengeId?: unknown; credential?: unknown } | null | undefined
+  return (
+    typeof answer === 'object' &&
+    answer !== null &&
+    typeof answer.challengeId === 'string' &&
+    typeof answer.credential === 'object' &&
+    answer.credential !== null
+  )
 }
 
 /**
- * `POST .../mfa` (spec 0013, AC-37): `{ totpCode }` or `{ recoveryCode }`. Reads the `orvano_mfa`
+ * The one factor of an `mfa` or `mfa-verify` body: `{ totpCode }`, `{ recoveryCode }`, or a
+ * passkey's `{ challengeId, credential }` (also accepted nested as `{ passkey }`, the
+ * `account.verifyMfa` form). Null when it holds none or more than one.
+ */
+function mfaAnswer(body: Record<string, unknown> | null): MfaWireAnswer | null {
+  if (body === null) return null
+  const { totpCode, recoveryCode, passkey, challengeId, credential } = body
+  const flat =
+    challengeId === undefined && credential === undefined ? undefined : { challengeId, credential }
+  const given = [totpCode, recoveryCode, passkey, flat].filter((v) => v !== undefined)
+  if (given.length !== 1) return null
+  if (typeof totpCode === 'string') return { totpCode }
+  if (typeof recoveryCode === 'string') return { recoveryCode }
+  const answer = passkey ?? flat
+  return isPasskeyAnswer(answer) ? { passkey: answer } : null
+}
+
+const answerHint = 'Send { totpCode }, { recoveryCode }, or a passkey { challengeId, credential }.'
+
+/** The `orvano_mfa` cookie's ticket, or a 401 `invalid_mfa_ticket` answer when there is none. */
+function mfaTicket(
+  request: NextRequest,
+): NonNullable<ReturnType<typeof decodeMfaCookie>> | NextResponse {
+  const cookie = decodeMfaCookie(request.cookies.get(mfaCookie)?.value)
+  return (
+    cookie ??
+    problem(401, 'invalid_mfa_ticket', 'No sign in is waiting for a second factor. Sign in again.')
+  )
+}
+
+/**
+ * `POST .../mfa` (spec 0013, AC-37): `{ totpCode }`, `{ recoveryCode }`, or a passkey's
+ * `{ challengeId, credential }` (the challenge from `.../mfa-passkey`). Reads the `orvano_mfa`
  * cookie, finishes the sign in with Orvano as the browser, sets both session cookies, clears
  * `orvano_mfa`, and answers `{ next }`. A missing cookie is 401 `invalid_mfa_ticket`, and an ended
  * ticket clears the cookie.
@@ -565,15 +601,9 @@ async function completeMfa(
   secure: boolean,
 ): Promise<NextResponse> {
   const answer = mfaAnswer(await jsonBody(request))
-  if (answer === null)
-    return problem(400, 'invalid_request', 'Send { totpCode } or { recoveryCode }.')
-  const cookie = decodeMfaCookie(request.cookies.get(mfaCookie)?.value)
-  if (cookie === null)
-    return problem(
-      401,
-      'invalid_mfa_ticket',
-      'No sign in is waiting for a second factor. Sign in again.',
-    )
+  if (answer === null) return problem(400, 'invalid_request', answerHint)
+  const cookie = mfaTicket(request)
+  if (cookie instanceof NextResponse) return cookie
 
   const mfaStore = new MemoryPendingMfaStore()
   mfaStore.set({ ticket: cookie.ticket, factors: [], expiresAt: cookie.expiresAt })
@@ -590,6 +620,75 @@ async function completeMfa(
   const response = NextResponse.json({ next: safeNext(cookie.next) })
   writeResponse(response, await client.session.get(), secure)
   response.cookies.delete(mfaCookie)
+  return response
+}
+
+/**
+ * `POST .../mfa-passkey` (spec 0013, AC-37): reads the `orvano_mfa` cookie and answers the passkey
+ * challenge for its ticket (`account.createMfaPasskeyChallenge`), so the browser can run the
+ * ceremony without ever seeing the ticket. An ended ticket clears the cookie.
+ */
+async function mfaPasskeyChallenge(request: NextRequest, client: Client): Promise<NextResponse> {
+  const cookie = mfaTicket(request)
+  if (cookie instanceof NextResponse) return cookie
+  try {
+    return NextResponse.json(
+      await client.request<unknown>({
+        method: 'POST',
+        path: '/v1/account/sessions/mfa/passkey-challenge',
+        body: { ticket: cookie.ticket },
+      }),
+    )
+  } catch (error) {
+    if (!(error instanceof OrvanoError)) throw error
+    const refused = passThrough(error)
+    if (error.code === 'invalid_mfa_ticket') refused.cookies.delete(mfaCookie)
+    return refused
+  }
+}
+
+/** `POST .../passkey-challenge` (spec 0013, AC-37): starts a passkey sign in and answers the challenge. */
+async function passkeyChallenge(client: Client): Promise<NextResponse> {
+  try {
+    return NextResponse.json(
+      await client.request<unknown>({
+        method: 'POST',
+        path: '/v1/account/sessions/passkey-challenge',
+      }),
+    )
+  } catch (error) {
+    if (error instanceof OrvanoError) return passThrough(error)
+    throw error
+  }
+}
+
+/**
+ * `POST .../passkey` (spec 0013, AC-37): `{ challengeId, credential }`. Signs in with the passkey's
+ * answer, sets both session cookies, and answers `{ user, isNewUser }`. A passkey sign in never
+ * stops at the MFA step.
+ */
+async function passkeySignIn(
+  request: NextRequest,
+  client: Client,
+  secure: boolean,
+): Promise<NextResponse> {
+  const body = await jsonBody(request)
+  if (!isPasskeyAnswer(body))
+    return problem(400, 'invalid_request', 'Send { challengeId, credential }.')
+  let result: { user: unknown; isNewUser: boolean }
+  try {
+    result = await client.request<{ user: unknown; isNewUser: boolean }>({
+      method: 'POST',
+      path: '/v1/account/sessions/passkey',
+      body: { challengeId: body.challengeId, credential: body.credential },
+      session: 'start',
+    })
+  } catch (error) {
+    if (error instanceof OrvanoError) return passThrough(error)
+    throw error
+  }
+  const response = NextResponse.json({ user: result.user, isNewUser: result.isNewUser })
+  writeResponse(response, await client.session.get(), secure)
   return response
 }
 
@@ -625,8 +724,9 @@ async function confirmTotp(
 }
 
 /**
- * `POST .../mfa-verify` (spec 0013, AC-37): `{ totpCode }` or `{ recoveryCode }`. Step up as the
- * signed in user: sets the new access cookie and answers 204.
+ * `POST .../mfa-verify` (spec 0013, AC-37): the `account.verifyMfa` body (`{ totpCode }`,
+ * `{ recoveryCode }`, or `{ passkey }`). Step up as the signed in user: sets the new access cookie
+ * and answers 204.
  */
 async function verifyMfa(
   request: NextRequest,
@@ -634,8 +734,7 @@ async function verifyMfa(
   secure: boolean,
 ): Promise<NextResponse> {
   const answer = mfaAnswer(await jsonBody(request))
-  if (answer === null)
-    return problem(400, 'invalid_request', 'Send { totpCode } or { recoveryCode }.')
+  if (answer === null) return problem(400, 'invalid_request', answerHint)
   try {
     const session = await linkSession(request, client)
     if (session === null) return problem(401, 'session_required', 'Sign in first.')
@@ -671,7 +770,9 @@ async function verifyMfa(
  * MFA (spec 0013, AC-37): a sign in that stops at the MFA step sets the `HttpOnly` `orvano_mfa`
  * cookie (`redeem` and `email-code` answer `{ mfaRequired: true, factors, expiresAt }`; the
  * provider callback redirects to `mfaPath`). `POST .../mfa` finishes it, `POST .../totp-confirm`
- * turns MFA on, and `POST .../mfa-verify` steps up, each setting the session cookies.
+ * turns MFA on, and `POST .../mfa-verify` steps up, each setting the session cookies. Passkeys:
+ * `POST .../mfa-passkey` answers the challenge for the waiting sign in, `POST .../passkey-challenge`
+ * starts a passkey sign in, and `POST .../passkey` finishes it and sets the cookies.
  */
 export function createOrvanoRouteHandler(config: OrvanoRouteHandlerConfig): {
   GET: (request: NextRequest) => Promise<NextResponse>
@@ -750,6 +851,9 @@ export function createOrvanoRouteHandler(config: OrvanoRouteHandlerConfig): {
       if (action === 'mfa') return completeMfa(request, config, secure)
       if (action === 'totp-confirm') return confirmTotp(request, client, secure)
       if (action === 'mfa-verify') return verifyMfa(request, client, secure)
+      if (action === 'mfa-passkey') return mfaPasskeyChallenge(request, client)
+      if (action === 'passkey-challenge') return passkeyChallenge(client)
+      if (action === 'passkey') return passkeySignIn(request, client, secure)
 
       return problem(404, 'not_found', 'Unknown Orvano action.')
     },

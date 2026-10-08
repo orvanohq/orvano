@@ -335,3 +335,121 @@ describe('the browser MFA transport (AC-37)', () => {
     expect(events).toEqual(['signedIn', 'tokenRefreshed', 'tokenRefreshed'])
   })
 })
+
+const passkeyChallenge = { challengeId: 'ch1', options: { challenge: 'Y2g', rpId: 'example.com' } }
+const credential = {
+  id: 'cred',
+  rawId: 'cred',
+  type: 'public-key',
+  response: { clientDataJSON: 'cd', authenticatorData: 'ad', signature: 'sig' },
+}
+
+describe('the route handler passkey actions (AC-37)', () => {
+  it('mfa-passkey answers the challenge for the cookie ticket, never the ticket itself', async () => {
+    const first = handler({ '/v1/account/sessions/email-code': challenged })
+    const started = await first.POST(post('email-code', { email: 'a@x.com', code: '123456' }))
+    const { POST, calls } = handler({
+      '/v1/account/sessions/mfa/passkey-challenge': () => Response.json(passkeyChallenge),
+    })
+
+    const response = await POST(
+      post('mfa-passkey', {}, { [mfaCookie]: setCookie(started, mfaCookie) ?? '' }),
+    )
+
+    expect(await response.json()).toEqual(passkeyChallenge)
+    expect(calls[0]?.body).toEqual({ ticket })
+    expect((await POST(post('mfa-passkey', {}))).status).toBe(401)
+  })
+
+  it('mfa takes a passkey answer flat and sends it nested', async () => {
+    const first = handler({ '/v1/account/sessions/email-code': challenged })
+    const started = await first.POST(post('email-code', { email: 'a@x.com', code: '123456' }))
+    const { POST, calls } = handler({ '/v1/account/sessions/mfa': signedIn })
+
+    const response = await POST(
+      post(
+        'mfa',
+        { challengeId: 'ch1', credential },
+        { [mfaCookie]: setCookie(started, mfaCookie) ?? '' },
+      ),
+    )
+
+    expect(response.status).toBe(200)
+    expect(calls[0]?.body).toEqual({ ticket, passkey: { challengeId: 'ch1', credential } })
+    expect(setCookie(response, refreshCookie)).toBe('orv_rt_new.secret')
+  })
+
+  it('passkey-challenge and passkey sign in with no typing and set both cookies', async () => {
+    const { POST, calls } = handler({
+      '/v1/account/sessions/passkey-challenge': () => Response.json(passkeyChallenge),
+      '/v1/account/sessions/passkey': signedIn,
+    })
+
+    const started = await POST(post('passkey-challenge', {}))
+    expect(await started.json()).toEqual(passkeyChallenge)
+    const response = await POST(post('passkey', { challengeId: 'ch1', credential }))
+
+    expect(await response.json()).toEqual({ user, isNewUser: false })
+    expect(calls[1]?.body).toEqual({ challengeId: 'ch1', credential })
+    expect(setCookie(response, accessCookie)).toBe(session.accessToken)
+    expect(setCookie(response, refreshCookie)).toBe('orv_rt_new.secret')
+    expect((await POST(post('passkey', { challengeId: 'ch1' }))).status).toBe(400)
+  })
+
+  it('mfa-verify passes a nested passkey answer through', async () => {
+    const { POST, calls } = handler({ '/v1/account/mfa/verify': () => Response.json(session) })
+
+    const response = await POST(
+      post(
+        'mfa-verify',
+        { passkey: { challengeId: 'ch1', credential } },
+        { [accessCookie]: session.accessToken },
+      ),
+    )
+
+    expect(response.status).toBe(204)
+    expect(calls[0]?.body).toEqual({ passkey: { challengeId: 'ch1', credential } })
+  })
+
+  it('the browser transport runs the ceremony in the browser and posts to the actions', async () => {
+    const fetch = vi.fn((url: string) =>
+      Promise.resolve(
+        url.endsWith('/passkey')
+          ? Response.json({ user, isNewUser: false })
+          : url.endsWith('/mfa')
+            ? Response.json({ next: '/' })
+            : Response.json(passkeyChallenge),
+      ),
+    )
+    vi.stubGlobal('fetch', fetch)
+    const client = new Client({
+      endpoint,
+      project: 'shop',
+      session: new MemorySessionStore(),
+      mfa: mfaThroughHandler('/api/orvano'),
+      passkeys: {
+        isSupported: () => Promise.resolve(true),
+        create: () => Promise.reject(new Error('not used')),
+        get: () => Promise.resolve(credential as never),
+      },
+      logger: quiet,
+    })
+
+    const outcome = await client.signInWithPasskey()
+    await client.completeMfa({ passkey: true })
+
+    expect(outcome.user).toEqual(user)
+    expect(fetch.mock.calls.map((c) => c[0])).toEqual([
+      '/api/orvano/passkey-challenge',
+      '/api/orvano/passkey',
+      '/api/orvano/mfa-passkey',
+      '/api/orvano/mfa',
+    ])
+    expect(
+      JSON.parse((fetch.mock.calls[3] as unknown as [string, { body: string }])[1].body),
+    ).toEqual({
+      challengeId: 'ch1',
+      credential,
+    })
+  })
+})

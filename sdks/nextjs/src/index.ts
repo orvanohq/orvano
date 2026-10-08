@@ -34,6 +34,7 @@ import type {
   MfaFactor,
   MfaTransport,
   OAuthTransport,
+  PasskeyChallenge,
   PendingMfaStore,
   PendingMfaTicket,
   RequestOptions,
@@ -54,6 +55,10 @@ export type {
   EmailLinkType,
   LinkResult,
   MfaAnswer,
+  MfaWireAnswer,
+  PasskeyAuthenticator,
+  PasskeyRegistrationOptions,
+  PasskeySignInOptions,
   PendingMfa,
   RequestOptions,
   SessionStore,
@@ -503,7 +508,9 @@ function announce(client: Client, result: HandlerAnswer<SignInOutcome>): void {
  * The browser's {@link MfaTransport} (spec 0013, AC-37): `completeMfa`, `verifyMfa`, and
  * `confirmTotp` post to the app's route handler (`.../mfa`, `.../mfa-verify`, `.../totp-confirm`),
  * which reads the `orvano_mfa` cookie or the session cookies, calls Orvano, and sets the cookies,
- * so the browser never holds a refresh token or a ticket.
+ * so the browser never holds a refresh token or a ticket. Passkeys run in the browser; their
+ * challenges come from `.../mfa-passkey` and `.../passkey-challenge`, and a passkey sign in
+ * finishes at `.../passkey`.
  */
 export function mfaThroughHandler(handlerPath = defaultHandlerPath): MfaTransport {
   const post = async (
@@ -524,7 +531,8 @@ export function mfaThroughHandler(handlerPath = defaultHandlerPath): MfaTranspor
   }
   return {
     async completeMfa(answer, client, options): Promise<SignInOutcome> {
-      await post('mfa', answer, options)
+      // A passkey's answer goes flat, as `{ challengeId, credential }` (AC-37).
+      await post('mfa', 'passkey' in answer ? answer.passkey : answer, options)
       await client.reloadSession('signedIn')
       return { user: null, isNewUser: false, mfaRequired: false, factors: [] }
     },
@@ -537,6 +545,18 @@ export function mfaThroughHandler(handlerPath = defaultHandlerPath): MfaTranspor
       const { recoveryCodes } = (await response.json()) as { recoveryCodes: string[] }
       await client.reloadSession('tokenRefreshed')
       return recoveryCodes
+    },
+    async createMfaPasskeyChallenge(_client, options): Promise<PasskeyChallenge> {
+      return (await (await post('mfa-passkey', {}, options)).json()) as PasskeyChallenge
+    },
+    async createPasskeyChallenge(_client, options): Promise<PasskeyChallenge> {
+      return (await (await post('passkey-challenge', {}, options)).json()) as PasskeyChallenge
+    },
+    async signInWithPasskey(answer, client, options): Promise<SignInOutcome> {
+      const response = await post('passkey', answer, options)
+      const { user } = (await response.json()) as { user: SignInOutcome['user'] }
+      await client.reloadSession('signedIn')
+      return { user, isNewUser: false, mfaRequired: false, factors: [] }
     },
   }
 }

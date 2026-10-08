@@ -1,4 +1,10 @@
-import type { AuthResult, MfaFactor, User } from '../generated/models.js'
+import type {
+  AuthResult,
+  MfaFactor,
+  PasskeyAnswer,
+  PasskeyChallenge,
+  User,
+} from '../generated/models.js'
 import type { Client, RequestOptions } from './client.js'
 
 /**
@@ -48,22 +54,47 @@ export class MemoryPendingMfaStore implements PendingMfaStore {
   }
 }
 
-/** One second factor for `completeMfa` and `verifyMfa`: an authenticator app code or a recovery code. */
-export type MfaAnswer = { totpCode: string } | { recoveryCode: string }
+/**
+ * One second factor for `completeMfa` and `verifyMfa`: an authenticator app code, a recovery code,
+ * or `{ passkey: true }`, which runs the passkey ceremony (the challenge, then the browser's or the
+ * client's `ClientConfig.passkeys`) and sends its answer.
+ */
+export type MfaAnswer = { totpCode: string } | { recoveryCode: string } | { passkey: true }
 
 /**
- * Where `completeMfa`, `verifyMfa`, and `confirmTotp` go when the client must not hold the
- * tokens they answer (spec 0013, AC-37): `@orvano/nextjs`'s browser client posts them to the app's
+ * A second factor as the API takes it: a passkey's `challengeId` and `credential` in place of
+ * `{ passkey: true }`. `completeMfa` and `verifyMfa` take it too, for a passkey answered elsewhere.
+ */
+export type MfaWireAnswer =
+  { totpCode: string } | { recoveryCode: string } | { passkey: PasskeyAnswer }
+
+/**
+ * Where `completeMfa`, `verifyMfa`, `confirmTotp`, and passkey sign in go when the client must not
+ * hold the tokens they answer or the ticket they need (spec 0013, AC-37): `@orvano/nextjs`'s browser client posts them to the app's
  * route handler, which keeps the refresh token in its `HttpOnly` cookie. Without one, the client
  * calls Orvano itself.
  */
 export interface MfaTransport {
   /** Finishes the sign in waiting at the MFA step and stores the session. */
-  completeMfa(answer: MfaAnswer, client: Client, options?: RequestOptions): Promise<SignInOutcome>
+  completeMfa(
+    answer: MfaWireAnswer,
+    client: Client,
+    options?: RequestOptions,
+  ): Promise<SignInOutcome>
   /** Step up on the signed in session, storing the new access token. */
-  verifyMfa(answer: MfaAnswer, client: Client, options?: RequestOptions): Promise<void>
+  verifyMfa(answer: MfaWireAnswer, client: Client, options?: RequestOptions): Promise<void>
   /** Turns MFA on with the first code, storing the new access token; answers the recovery codes. */
   confirmTotp(code: string, client: Client, options?: RequestOptions): Promise<string[]>
+  /** The passkey challenge for the sign in waiting at the MFA step (`account.createMfaPasskeyChallenge`). */
+  createMfaPasskeyChallenge(client: Client, options?: RequestOptions): Promise<PasskeyChallenge>
+  /** Starts a passkey sign in (`account.createPasskeyChallenge`). */
+  createPasskeyChallenge(client: Client, options?: RequestOptions): Promise<PasskeyChallenge>
+  /** Signs in with a passkey's answer (`account.createPasskeySession`) and stores the session. */
+  signInWithPasskey(
+    answer: PasskeyAnswer,
+    client: Client,
+    options?: RequestOptions,
+  ): Promise<SignInOutcome>
 }
 
 /**
