@@ -32,6 +32,9 @@ export const keys = {
     ['console', 'projects', projectId, 'users', userId, 'identities'] as const,
   authProviders: (projectId: string) =>
     ['console', 'projects', projectId, 'auth-providers'] as const,
+  authMethods: (projectId: string) => ['console', 'projects', projectId, 'auth-methods'] as const,
+  userPasskeys: (projectId: string, userId: string) =>
+    ['console', 'projects', projectId, 'users', userId, 'passkeys'] as const,
   userSessions: (projectId: string, userId: string) =>
     ['console', 'projects', projectId, 'users', userId, 'sessions'] as const,
   signingKeys: (projectId: string) => ['console', 'projects', projectId, 'signing-keys'] as const,
@@ -197,13 +200,22 @@ export function projectQuery(projectId: string) {
   })
 }
 
-/** A project's users, newest first, paged by cursor; `email` narrows to a prefix (spec 0004, AC-29). */
-export function usersQuery(projectId: string, email: string, emailVerified?: boolean, limit = 25) {
+/**
+ * A project's users, newest first, paged by cursor; `email` narrows to a prefix (spec 0004, AC-29),
+ * and `mfa` to users with MFA `on` or `off` (spec 0013, AC-44).
+ */
+export function usersQuery(
+  projectId: string,
+  email: string,
+  emailVerified?: boolean,
+  limit = 25,
+  mfa?: 'on' | 'off',
+) {
   return infiniteQueryOptions({
-    queryKey: [...keys.users(projectId), { email, emailVerified, limit }] as const,
+    queryKey: [...keys.users(projectId), { email, emailVerified, mfa, limit }] as const,
     queryFn: ({ pageParam, signal }) =>
       projectClient(projectId).consoleUsers.list(
-        { email: email === '' ? undefined : email, emailVerified, cursor: pageParam, limit },
+        { email: email === '' ? undefined : email, emailVerified, mfa, cursor: pageParam, limit },
         { signal },
       ),
     initialPageParam: undefined as string | undefined,
@@ -233,6 +245,22 @@ export function authProvidersQuery(projectId: string) {
   return queryOptions({
     queryKey: keys.authProviders(projectId),
     queryFn: ({ signal }) => projectClient(projectId).consoleAuthProviders.list({ signal }),
+  })
+}
+
+/** A user's passkeys, oldest first, inactive ones included (spec 0013, AC-44). */
+export function userPasskeysQuery(projectId: string, userId: string) {
+  return queryOptions({
+    queryKey: keys.userPasskeys(projectId, userId),
+    queryFn: ({ signal }) => projectClient(projectId).consoleUsers.listPasskeys(userId, { signal }),
+  })
+}
+
+/** The project's MFA and passkey settings, with the active passkey count and accepted origins (spec 0013, AC-43). */
+export function authMethodsQuery(projectId: string) {
+  return queryOptions({
+    queryKey: keys.authMethods(projectId),
+    queryFn: ({ signal }) => projectClient(projectId).consoleAuthMethods.get({ signal }),
   })
 }
 

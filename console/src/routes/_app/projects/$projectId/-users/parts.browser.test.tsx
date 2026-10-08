@@ -4,7 +4,14 @@ import axe from 'axe-core'
 import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 
-import { CreateUserDialog, SessionsTable, SigningKeysPanel, UserStatusBadge } from './parts'
+import {
+  CreateUserDialog,
+  MfaBadge,
+  SessionsTable,
+  SigningKeysPanel,
+  UserStatusBadge,
+  sessionFactorsLabel,
+} from './parts'
 
 // Spec 0004 AC-22 and AC-29: the Users page parts and the signing keys panel, for every role, at
 // WCAG AA.
@@ -50,7 +57,42 @@ describe('UserStatusBadge', () => {
   })
 })
 
+describe('MfaBadge', () => {
+  // Spec 0013 AC-44: the Users list's MFA column says On or Off in words.
+  it('shows MFA as a word', async () => {
+    const screen = await render(<MfaBadge enabled={false} />)
+    await expect.element(screen.getByText('Off')).toBeVisible()
+  })
+})
+
 describe('SessionsTable', () => {
+  // Spec 0013 AC-44: each session's level and factors, in words.
+  it('shows how strongly and with what a session signed in', async () => {
+    const strong: Session = { ...session, id: 's2', aal: 2, amr: ['mfa', 'otp', 'pwd'] }
+    const screen = await render(
+      <main>
+        <SessionsTable
+          sessions={[strong, session]}
+          loading={false}
+          error={undefined}
+          onRetry={() => undefined}
+          hasMore={false}
+          onLoadMore={() => undefined}
+          endReason={undefined}
+          onEnd={() => Promise.resolve()}
+        />
+      </main>,
+    )
+
+    await expect.element(screen.getByRole('cell', { name: 'Two factors' })).toBeVisible()
+    await expect.element(screen.getByRole('cell', { name: 'One factor' })).toBeVisible()
+    await expect
+      .element(screen.getByRole('cell', { name: 'Authenticator app, Password' }))
+      .toBeVisible()
+    expect(sessionFactorsLabel(['hwk', 'mfa', 'user'])).toBe('Passkey (device bound)')
+    expect(sessionFactorsLabel([])).toBe('Unknown')
+  })
+
   it('lists where a session signed in from and ends one after a confirmation', async () => {
     const onEnd = vi.fn().mockResolvedValue(undefined)
     const screen = await render(

@@ -17,6 +17,8 @@ export type {
   Identity,
   IdentityList,
   OAuthProvider,
+  Passkey,
+  PasskeyList,
   Session,
   SessionMethod,
   SessionPage,
