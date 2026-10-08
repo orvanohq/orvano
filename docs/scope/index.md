@@ -56,7 +56,7 @@ Every product feature ships in all of these layers in the same version, unless i
 | 10 | Email verification, recovery & passwordless | v0.2 | done |
 | 11 | Docs site & quickstarts | v0.2 | done |
 | 12 | OAuth & ID token sign in | v0.3 | done |
-| 13 | MFA, passkeys & sessions | v0.3 | planned |
+| 13 | MFA, passkeys & sessions | v0.3 | in-progress |
 | 14 | Auth policies & abuse protection | v0.3 | planned |
 | 15 | Console team members & roles | v0.3 | done |
 | 16 | Tables, rows & data API | v0.4 | planned |
