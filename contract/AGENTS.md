@@ -31,7 +31,7 @@ Commit `dist/openapi.json` and the generated code together. The server's handler
 ## Conventions (SdkGen enforces these and names every violation)
 
 - One folder per product (`system/`, `platform/`, `auth/`, ...), each imported from `main.tsp`.
-- Every operation carries `@operationId("<service>.<method>")` in camelCase, `@extension("x-orvano-audience", "client" | "server" | "both" | "console")`, and `@extension("x-orvano-service", "<service>")` matching the operationId prefix.
+- Every operation carries `@operationId("<service>.<method>")` in camelCase, `@extension("x-orvano-audience", "client" | "server" | "both" | "console" | "browser")`, and `@extension("x-orvano-service", "<service>")` matching the operationId prefix. `browser` (spec 0012) is for routes a person's browser reaches by navigation, like the OAuth callback: it stays in `openapi.json` for the record, SdkGen generates nothing for it, and it may not carry `x-orvano-scope`.
 - Paths live under `/v1/`; `console` operations, and only they, live under `/v1/console/`. Project scoped console operations take the project from `X-Orvano-Project` (never a path parameter) and live under `/v1/console/project/`.
 - A create answers 201 with the created model; a delete with nothing to return answers 204 (`NoContentResponse`). A PATCH uses `@patch(#{ implicitOptionality: false })` with an explicit request model.
 - Every operation returns `| Problem` (its `default` response). A new error code goes in `enum ErrorCode`, which SdkGen turns into constants in every SDK and the server.

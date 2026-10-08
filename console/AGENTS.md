@@ -22,7 +22,8 @@ The Orvano console: a React SPA built with Vite and served as static files by Ca
 | `src/routes/setup.tsx`, `sign-in.tsx`, `-auth/auth-form.tsx` | First admin sign up and sign in (spec 0004, spec 0006), one shared form |
 | `src/routes/sign-up.tsx`, `invite.tsx`, `-invite/` | Open sign up and the public invite page, which reads its token from the URL fragment and clears it (spec 0008) |
 | `src/routes/_app/orgs/$orgId/members.tsx`, `-members/`; `src/routes/_app/install.tsx` | The Members page with invites and row actions, and the install settings page (spec 0008) |
-| `src/routes/_app/projects/$projectId/users/` | The project's Users page and user detail (spec 0004); `-users/email-parts.tsx` and `link-url.ts` hold the verified state, the email actions, and the send dialogs that remember the last link URL per project (spec 0010) |
+| `src/routes/_app/projects/$projectId/users/` | The project's Users page and user detail (spec 0004); `-users/email-parts.tsx` and `link-url.ts` hold the verified state, the email actions, and the send dialogs that remember the last link URL per project (spec 0010); `-users/identities.tsx` lists and unlinks a user's providers (spec 0012) |
+| `src/routes/_app/projects/$projectId/sign-in-methods.tsx`, `-sign-in/` | The Sign in methods page: a card and a settings dialog per provider, with write only secret fields (spec 0012) |
 | `src/routes/_app/projects/$projectId/email/`, `-email/`; `src/email/` | The project's Email pages (templates, log, settings), the CodeMirror template editor, and the SMTP form and log table the install page shares (spec 0009) |
 | `public/frames/email-preview.html`, `email-preview-headers.ts` | The sandboxed email preview page, and the Vite plugin that serves it with the headers in `deploy/gateway/email-preview-headers.caddy` |
 | `design.md` | The design system: tokens, type, density, and the component inventory |
@@ -32,6 +33,7 @@ The Orvano console: a React SPA built with Vite and served as static files by Ca
 | `src/lib/` | `console-client.ts` (the one client, plus `projectClient(id)`), `session.ts` (`redirectToSignIn` and the error codes that mean no usable session), preferences, roles, toast helpers |
 | `src/lib/state-moved.ts` | `useStateMoved`: an org or project action answered 409 `project_not_ready`/`org_not_active` or 404 shows an error toast and refetches (spec 0007, AC-10); route every org and project mutation's failure through it |
 | `src/test/app.tsx`, `src/test/fake-api.ts` | Page tests: `renderApp(url)` renders the whole console against an in memory API that records every request |
+| `src/test/settle.ts` | `settleStyles()`: waits until no finite CSS transition is running, so axe reads final colors after a theme change or a dialog opening; use it before `axe.run`, never a fixed sleep |
 | `src/dev/` | The `/dev/components` catalog; dev only, never in the production build |
 | `public/theme-init.js` | Sets `data-theme` and `data-density` before first paint; a classic script so the CSP needs no hash |
 | `e2e/` | Playwright tests against the gateway on `:8081` |

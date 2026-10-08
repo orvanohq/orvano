@@ -1,7 +1,7 @@
 # 0001. One API contract that generates every Orvano SDK
 
 **Date**: 2026-09-24
-**Updated**: 2026-09-27 (the temporary auth wire formats are replaced by spec 0004's; fixtures and console scenarios follow)
+**Updated**: 2026-10-07 (the `browser` audience for routes a browser reaches by navigation, spec 0012); 2026-09-27 (the temporary auth wire formats are replaced by spec 0004's; fixtures and console scenarios follow)
 **Status**: Accepted
 
 ## Summary
@@ -18,7 +18,7 @@ Orvano's whole public API is written once, in TypeSpec (a short language for des
 
 **Acceptance criteria**:
 - **AC-1**: The TypeSpec sources in `contract/` compile to one OpenAPI 3.1 file at `contract/dist/openapi.json`, which is committed; CI fails if the committed file differs from a fresh compile.
-- **AC-2**: Every operation carries an audience (`client`, `server`, `both`, or `console`) and a service group; the generator refuses to run and names the operation when either is missing or an `operationId` is duplicated.
+- **AC-2**: Every operation carries an audience (`client`, `server`, `both`, `console`, or `browser`, spec 0012) and a service group; the generator refuses to run and names the operation when either is missing or an `operationId` is duplicated.
 - **AC-3**: One command (`dotnet run --project tools/sdkgen`) regenerates the TypeScript core, the private console client, the Dart core and Dart server services, the .NET SDK, the server contract types, and `contract/dist/openapi.public.json`. Running it twice in a row produces no diff, and CI fails if generated code in the repo is stale.
 - **AC-4**: Client SDKs (the `@orvano/js` root entry, `orvano_core`, `orvano_flutter`) contain only `client` and `both` operations and have no way to set an API key. Server SDKs (`@orvano/js/server`, `orvano_dart`, the .NET SDK) contain `server` and `both` operations and accept an API key. Calling the server entry's key setter in a browser throws.
 - **AC-5**: `@orvano/nextjs` contains no generated endpoint code. It wraps `@orvano/js` and gives working helpers for server components, route handlers, server actions, and middleware, carrying the session in a cookie.
@@ -81,7 +81,7 @@ sdks/dart/core/                  orvano_core (models, client + both services, ru
 sdks/dart/flutter/               orvano_flutter (secure storage, deep links, OAuth, push glue)
 sdks/dart/server/                orvano_dart (server services, API key auth)
 sdks/dotnet/                     Orvano (NuGet; server + both services)
-server/src/Orvano.Contract/      generated server types for all four audiences (records, route constants, error codes)
+server/src/Orvano.Contract/      generated server types for every audience except `browser` operations (records, route constants, error codes)
 tests/scenarios/                 shared scenario list (one YAML file per scenario)
 ```
 
@@ -106,8 +106,11 @@ tests/scenarios/                 shared scenario list (one YAML file per scenari
 | `both` | root and `./server` | `orvano_core` (server package depends on it) | included |
 | `server` | `./server` only | `orvano_dart` only | included |
 | `console` | `@orvano/console-client` only (private) | not included | not included |
+| `browser` (spec 0012) | not included | not included | not included |
 
-The server contract types (`Orvano.Contract`) include every audience, since the server implements them all.
+A `browser` operation is a route a person's browser reaches by navigation and no SDK calls, such as the OAuth callback: it answers redirects or HTML. It stays in `openapi.json` for the record and is left out of `openapi.public.json`, every SDK, and the server's generated operations (the module declares its route; a form model it uses still lands in the server's generated models). SdkGen refuses one that declares a credential or `x-orvano-scope`, or that is also a test operation or a session change.
+
+The server contract types (`Orvano.Contract`) include every audience, since the server implements them all; `browser` operations get no route constants, only their models.
 
 **One client pattern in every language**: each runtime has one `Client` with a pluggable auth provider: none, session, or API key. Generated services take that `Client`. Server packages build it with an API key and may also act as a user by attaching a session. The packaging differs only because each ecosystem differs: npm supports subpath exports, so TS uses one package with two entries. pub.dev has no conditional exports and Flutter only code must not reach servers, so Dart uses separate packages (`orvano_dart` depends on `orvano_core` and wraps its `Client` with API key auth). .NET is server only, so it's one package.
 
@@ -316,6 +319,7 @@ Tracer Bullet: first push one real operation through every layer (contract → g
 **Neutral**:
 - Scriban templates are a new skill to learn; they are close to Liquid.
 - Spec 0002 (stack and architecture) confirms .NET 10 for the server and GitHub Actions for CI, and adds the `console` audience this spec now carries.
+- Spec 0012 (OAuth and ID token sign in) adds the `browser` audience for its callback routes.
 
 ## Follow-up
 
