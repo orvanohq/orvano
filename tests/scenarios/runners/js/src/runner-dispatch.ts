@@ -102,8 +102,9 @@ export async function totpCode(secret: string, offset: number): Promise<string> 
   return String(binary % 1_000_000).padStart(6, '0')
 }
 
-/** The one factor of an MFA runner step: `totpCode` or `recoveryCode`. */
+/** The one factor of an MFA runner step: `totpCode`, `recoveryCode`, or `passkey: true`. */
 function mfaAnswer(input: Record<string, unknown>): MfaAnswer {
+  if (input.passkey === true) return { passkey: true }
   return typeof input.totpCode === 'string'
     ? { totpCode: input.totpCode }
     : { recoveryCode: String(input.recoveryCode) }
@@ -117,9 +118,10 @@ function mfaAnswer(input: Record<string, unknown>): MfaAnswer {
  * `redeemLink` is the client SDK's link helper (spec 0010); `oauthSignIn` runs the client SDK's
  * `signInWithOAuth` or `linkIdentity` with an `open` that follows the fake provider over HTTP,
  * `oauthCode` stops at the code so a scenario can redeem it itself, `createNonce` is the SDK's
- * native nonce (spec 0012), `totpCode` is an authenticator app's current code, and `completeMfa`,
- * `verifyMfa`, and `confirmTotp` are the client SDK's MFA helpers (spec 0013). Their names have
- * no dot, so they never collide with an operationId.
+ * native nonce (spec 0012), `totpCode` is an authenticator app's current code, `completeMfa`,
+ * `verifyMfa`, and `confirmTotp` are the client SDK's MFA helpers, and `registerPasskey` and
+ * `signInWithPasskey` its passkey helpers, on the server's software authenticator (spec 0013).
+ * Their names have no dot, so they never collide with an operationId.
  */
 export const runnerDispatch: DispatchTable = {
   totpCode: {
@@ -141,6 +143,15 @@ export const runnerDispatch: DispatchTable = {
       await o.client.verifyMfa(mfaAnswer(input))
       return { verified: true }
     },
+  },
+  registerPasskey: {
+    status: 201,
+    client: async (o, input) =>
+      o.client.registerPasskey(typeof input.name === 'string' ? { name: input.name } : {}),
+  },
+  signInWithPasskey: {
+    status: 201,
+    client: async (o) => o.client.signInWithPasskey(),
   },
   confirmTotp: {
     status: 200,

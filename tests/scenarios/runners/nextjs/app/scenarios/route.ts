@@ -10,6 +10,7 @@ import {
   ConsoleSurface,
   ServerSurface,
   consoleSignIn,
+  testPasskeys,
 } from '@orvano/scenarios-js/surfaces'
 import { cookies } from 'next/headers'
 import { Client } from '@orvano/nextjs'
@@ -33,8 +34,18 @@ export async function POST(request: Request): Promise<Response> {
     consoleEmail === undefined || consolePassword === undefined
       ? undefined
       : new ConsoleSurface(new ConsoleClient({ endpoint }))
+  // Passkeys come from the server's software authenticator, through the client's test service.
+  const client: ClientSurface = new ClientSurface(
+    new Client({
+      endpoint,
+      ...project,
+      session,
+      mfaStore,
+      passkeys: testPasskeys(() => client.test),
+    }),
+  )
   const results = await runScenarios(scenarios, {
-    client: new ClientSurface(new Client({ endpoint, ...project, session, mfaStore })),
+    client,
     server: new ServerSurface(new ServerClient({ endpoint, ...project, ...apiKey })),
     serverKey: 'apiKey' in apiKey,
     console,

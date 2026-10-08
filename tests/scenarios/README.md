@@ -34,9 +34,11 @@ with an operationId:
 | `now` | `client` or `server` | none | `{ now }`, the runner's clock as an ISO 8601 time; save it before a send and pass it to `test.getLatestEmail` as `after` |
 | `verifyAccessToken` | `server` | `token`, optional `online: true` | `{ userId, sessionId, emailVerified, expiresAt }` from the server SDK's own check, or its `token_expired` / `invalid_token` error |
 | `totpCode` | `client` | `secret`, optional `offset` (steps from now) | `{ code }`, the code an authenticator app shows for that step (spec 0013) |
-| `completeMfa` | `client` | `totpCode` or `recoveryCode` | `{ user, isNewUser, mfaRequired, factors }` from the client SDK's `completeMfa`, which uses the ticket the last sign in kept (201); .NET skips it |
-| `verifyMfa` | `client` | `totpCode` or `recoveryCode` | `{ verified: true }` after the client SDK's `verifyMfa` stored the new access token |
+| `completeMfa` | `client` | `totpCode`, `recoveryCode`, or `passkey: true` (the runner's test authenticator answers) | `{ user, isNewUser, mfaRequired, factors }` from the client SDK's `completeMfa`, which uses the ticket the last sign in kept (201); .NET skips it |
+| `verifyMfa` | `client` | `totpCode`, `recoveryCode`, or `passkey: true` | `{ verified: true }` after the client SDK's `verifyMfa` stored the new access token |
 | `confirmTotp` | `client` | `code` | `{ recoveryCodes }` from the client SDK's `confirmTotp`, which stores the new access token |
+| `registerPasskey` | `client` | optional `name` | the `Passkey` from the client SDK's `registerPasskey`, whose passkey the server's `Test` only software authenticator makes (201) |
+| `signInWithPasskey` | `client` | none | `{ user, isNewUser, mfaRequired, factors }` from the client SDK's `signInWithPasskey`, signed by the newest passkey the software authenticator made (201) |
 
 SdkGen writes a test only dispatch table per language (`operationId` to the generated method), so
 each SDK has one small interpreter instead of one test per scenario. A step whose operation has no

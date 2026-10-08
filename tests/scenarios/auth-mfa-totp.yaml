@@ -39,7 +39,7 @@ steps:
     input: {}
     expect:
       status: 200
-      body: { mfaEnabled: false, totpConfirmed: false, factorsAvailable: [totp] }
+      body: { mfaEnabled: false, totpConfirmed: false, factorsAvailable: [totp, passkey] }
   - op: account.createTotp
     as: client
     input: {}

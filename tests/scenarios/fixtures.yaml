@@ -15,6 +15,9 @@
 # oauthProviders: all four sign in providers (spec 0012), saved through the console's settings code. In
 #   Test, ORVANO_TEST_OAUTH_PROVIDER_URL points them at the api's own fake provider, which accepts any
 #   client ID and secret. The Apple key is a throwaway made for these scenarios only.
+# methodSettings: TOTP and passkey settings (spec 0013), saved through the console's settings code. Passkeys
+#   are on with the RP ID localhost, so the server's Test only software authenticator can make passkeys for
+#   the http://localhost web platform.
 consoleUsers:
   - email: fixture-admin@example.com
     password: fixture console password
@@ -73,3 +76,7 @@ oauthProviders:
     enabled: true
     clientId: scenarios-microsoft
     clientSecret: scenarios-microsoft-secret
+methodSettings:
+  - project: scenarios0000000000a
+    passkeysEnabled: true
+    rpId: localhost

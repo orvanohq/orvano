@@ -11,7 +11,8 @@ import 'dispatch_table.dart';
 import 'generated/dispatch.dart';
 import 'generated/test_client.dart';
 import 'generated/test_events.dart';
-import 'generated/test_server.dart';
+import 'generated/test_models.dart';
+import 'generated/test_server.dart' hide TestService;
 
 const _inBrowser = bool.fromEnvironment('dart.library.js_interop');
 
@@ -123,9 +124,11 @@ String? fixtureApiKey(String fixturesYaml) {
 /// `oauthSignIn` runs `signInWithOAuth` or `linkIdentity` with a launcher
 /// that follows the fake provider over HTTP, `oauthCode` stops at the code,
 /// `createNonce` is `OrvanoNonce.create` (spec 0012), `totpCode` is an
-/// authenticator app's current code, and `completeMfa`, `verifyMfa`, and
-/// `confirmTotp` are the client SDK's MFA helpers (spec 0013). Their names
-/// have no dot, so they never collide with an operationId.
+/// authenticator app's current code, `completeMfa`, `verifyMfa`, and
+/// `confirmTotp` are the client SDK's MFA helpers, and `registerPasskey` and
+/// `signInWithPasskey` its passkey helpers, on the server's software
+/// authenticator (spec 0013). Their names have no dot, so they never collide
+/// with an operationId.
 final Map<String, DispatchEntry> _runnerDispatch = {
   'totpCode': DispatchEntry(
     status: 200,
@@ -139,7 +142,10 @@ final Map<String, DispatchEntry> _runnerDispatch = {
   'completeMfa': DispatchEntry(
     status: 201,
     client: (o, input) async {
-      final user = await o.client.completeMfa(_mfaAnswer(input));
+      final user = await o.client.completeMfa(
+        _mfaAnswer(input),
+        authenticator: testPasskeys(o),
+      );
       return {
         'user': user.toJson(),
         'isNewUser': false,
@@ -151,8 +157,32 @@ final Map<String, DispatchEntry> _runnerDispatch = {
   'verifyMfa': DispatchEntry(
     status: 200,
     client: (o, input) async {
-      await o.client.verifyMfa(_mfaAnswer(input));
+      await o.client.verifyMfa(
+        _mfaAnswer(input),
+        authenticator: testPasskeys(o),
+      );
       return {'verified': true};
+    },
+  ),
+  'registerPasskey': DispatchEntry(
+    status: 201,
+    client: (o, input) async => (await o.client.registerPasskey(
+      name: input['name'] as String?,
+      authenticator: testPasskeys(o),
+    )).toJson(),
+  ),
+  'signInWithPasskey': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final user = await o.client.signInWithPasskey(
+        authenticator: testPasskeys(o),
+      );
+      return {
+        'user': user.toJson(),
+        'isNewUser': false,
+        'mfaRequired': false,
+        'factors': <String>[],
+      };
     },
   ),
   'confirmTotp': DispatchEntry(
@@ -297,11 +327,74 @@ String totpCode(String secret, int offset) {
 
 /// What `handleLink`, `signInWithOAuth`, or `linkIdentity` did, as the JS
 /// runner reports it.
-/// The one factor of an MFA runner step: `totpCode` or `recoveryCode`.
-core.MfaAnswer _mfaAnswer(Map<String, Object?> input) =>
-    input['totpCode'] is String
-    ? core.MfaAnswer.totp(input['totpCode']! as String)
-    : core.MfaAnswer.recoveryCode('${input['recoveryCode']}');
+/// The one factor of an MFA runner step: `totpCode`, `recoveryCode`, or
+/// `passkey: true`.
+core.MfaAnswer _mfaAnswer(Map<String, Object?> input) => switch (input) {
+  {'passkey': true} => const core.MfaAnswer.passkey(),
+  {'totpCode': final String code} => core.MfaAnswer.totp(code),
+  _ => core.MfaAnswer.recoveryCode('${input['recoveryCode']}'),
+};
+
+/// The origin the software authenticator names in its client data: a web
+/// platform of the scenario project (`localhost`, any port).
+const passkeyOrigin = 'http://localhost:3000';
+
+final _testPasskeys = Expando<TestPasskeys>('orvano.scenarios.passkeys');
+
+/// The [TestPasskeys] of [surface]'s client, made once per surface.
+TestPasskeys testPasskeys(ClientSurface surface) =>
+    _testPasskeys[surface] ??= TestPasskeys(surface.test);
+
+/// A [core.PasskeyAuthenticator] on the server's `Test` only software
+/// authenticator (spec 0013, AC-45): `create` asks
+/// `test.createPasskeyCredential` for a new passkey, and `get` signs with the
+/// newest one the options allow (any, for a sign in). It holds only the
+/// credential IDs; the keys live in the server for the run.
+final class TestPasskeys implements core.PasskeyAuthenticator {
+  /// Creates the authenticator over [test].
+  TestPasskeys(this.test);
+
+  /// The runner's test service.
+  final TestService test;
+  final _made = <String>[];
+
+  @override
+  Future<core.PasskeyRegistrationCredential> create(
+    core.PasskeyCreationOptions options,
+  ) async {
+    final credential = await test.createPasskeyCredential(
+      TestCreatePasskeyCredentialRequest(
+        options: options,
+        origin: passkeyOrigin,
+      ),
+    );
+    _made.add(credential.id);
+    return credential;
+  }
+
+  @override
+  Future<core.PasskeyAssertionCredential> get(
+    core.PasskeyRequestOptions options, {
+    bool autofill = false,
+  }) {
+    final allowed = {for (final c in options.allowCredentials) c.id};
+    final id = _made.reversed
+        .where((m) => allowed.isEmpty || allowed.contains(m))
+        .firstOrNull;
+    if (id == null) {
+      throw StateError(
+        'the test authenticator made no passkey these options allow',
+      );
+    }
+    return test.createPasskeyAssertion(
+      TestCreatePasskeyAssertionRequest(
+        options: options,
+        origin: passkeyOrigin,
+        credentialId: id,
+      ),
+    );
+  }
+}
 
 Map<String, Object?>? _handled(core.HandledLink? result) => switch (result) {
   null => null,
