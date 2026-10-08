@@ -1,7 +1,7 @@
-name: orvano_flutter
+name: orvano_flutter_passkeys
 description: >-
-  Orvano for Flutter apps on iOS, Android, and the web, built on orvano_core.
-  Orvano is the open source backend you host yourself.
+  Native passkeys for Orvano Flutter apps on iOS, macOS, Android, and the web.
+  An opt in add on to orvano_flutter, built on the passkeys package.
 version: 0.2.0
 homepage: https://orvano.dev
 repository: https://github.com/orvanohq/orvano-dart
@@ -15,12 +15,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_secure_storage: ^11.2.0
-  flutter_web_auth_2: ^5.1.0
-  http: ^1.6.0
   orvano_core: ^0.2.0
+  passkeys: ^2.23.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   lints: ^6.1.0
+  passkeys_platform_interface: ^2.10.0

@@ -18,7 +18,7 @@ public sealed class ManifestStamperTests : IDisposable
         "examples/dotnet-quickstart/DotnetQuickstart.csproj",
     ];
 
-    private static readonly string[] DartPackages = ["sdks/dart/core", "sdks/dart/flutter", "sdks/dart/server"];
+    private static readonly string[] DartPackages = ["sdks/dart/core", "sdks/dart/flutter", "sdks/dart/flutter_passkeys", "sdks/dart/server"];
 
     private static readonly string[] RunnerPubspecs = ["tests/scenarios/runners/dart/pubspec.yaml", "tests/scenarios/runners/flutter/pubspec.yaml"];
 
@@ -86,6 +86,7 @@ public sealed class ManifestStamperTests : IDisposable
             Assert.Contains("\nversion: 0.4.2\n", Read($"{package}/pubspec.yaml"), StringComparison.Ordinal);
         Assert.Contains("orvano_core: ^0.4.2", Read("sdks/dart/server/pubspec.yaml"), StringComparison.Ordinal);
         Assert.Contains("orvano_core: ^0.4.2", Read("sdks/dart/flutter/pubspec.yaml"), StringComparison.Ordinal);
+        Assert.Contains("orvano_core: ^0.4.2", Read("sdks/dart/flutter_passkeys/pubspec.yaml"), StringComparison.Ordinal);
         Assert.Contains("orvano_flutter: ^0.4.2", Read("tests/scenarios/runners/flutter/pubspec.yaml"), StringComparison.Ordinal);
         Assert.Contains("orvano_dart: ^0.4.2", Read("tests/scenarios/runners/dart/pubspec.yaml"), StringComparison.Ordinal);
     }
@@ -113,6 +114,11 @@ public sealed class ManifestStamperTests : IDisposable
         Assert.True(added > 0, changelog);
         Assert.True(added < changelog.IndexOf("\n## 0.0.0\n", StringComparison.Ordinal), changelog);
         Assert.Contains("releases/tag/v0.4.2", changelog, StringComparison.Ordinal);
+
+        // The add on's CHANGELOG starts at its first release, 0.2.0, and gets the new section too.
+        var passkeys = Read("sdks/dart/flutter_passkeys/CHANGELOG.md");
+        var section = passkeys.IndexOf("\n## 0.4.2\n", StringComparison.Ordinal);
+        Assert.True(section > 0 && section < passkeys.IndexOf("\n## 0.2.0\n", StringComparison.Ordinal), passkeys);
     }
 
     [Fact]

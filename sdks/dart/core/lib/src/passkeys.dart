@@ -4,9 +4,10 @@ import 'generated/services.dart';
 
 /// Makes and uses passkeys for a client (spec 0013, AC-38): `create` answers
 /// `navigator.credentials.create` and `get` answers `navigator.credentials.get`,
-/// both in WebAuthn's JSON form. `orvano_flutter` gives every client a default
-/// one built on the `passkeys` package (iOS, Android, and the web); a Dart app
-/// or a test passes its own.
+/// both in WebAuthn's JSON form. No client has one by default: a Flutter app
+/// passes `PlatformPasskeys()` from the opt in `orvano_flutter_passkeys`
+/// package (iOS, macOS, Android, and the web) to `createClient`, and a Dart
+/// app or a test passes its own.
 abstract interface class PasskeyAuthenticator {
   /// Makes a new passkey for [options] and answers it.
   Future<PasskeyRegistrationCredential> create(PasskeyCreationOptions options);
@@ -25,8 +26,9 @@ final _authenticators = Expando<PasskeyAuthenticator>(
 );
 
 /// Gives [client] the authenticator its passkey helpers use when none is
-/// passed. `orvano_flutter`'s `createClient` sets one built on the `passkeys`
-/// package.
+/// passed. `orvano_flutter`'s `createClient` sets the one given as its
+/// `passkeys` argument, such as `PlatformPasskeys()` from
+/// `orvano_flutter_passkeys`.
 void setDefaultPasskeyAuthenticator(
   Client client,
   PasskeyAuthenticator authenticator,
@@ -45,8 +47,10 @@ PasskeyAuthenticator passkeyAuthenticatorFor(
     (throw ArgumentError.value(
       null,
       'authenticator',
-      'Pass a PasskeyAuthenticator, or set one with '
-          'setDefaultPasskeyAuthenticator (orvano_flutter does).',
+      'No passkey authenticator. In a Flutter app, add the '
+          'orvano_flutter_passkeys package and pass PlatformPasskeys() to '
+          'createClient; otherwise pass a PasskeyAuthenticator, or set one '
+          'with setDefaultPasskeyAuthenticator.',
     ));
 
 /// Passkey sign in and registration (spec 0013, AC-38).

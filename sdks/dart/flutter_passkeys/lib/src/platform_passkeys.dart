@@ -2,15 +2,18 @@ import 'package:orvano_core/orvano_core.dart';
 import 'package:passkeys/authenticator.dart' as platform;
 import 'package:passkeys/types.dart';
 
-/// The default [PasskeyAuthenticator] of a Flutter client (spec 0013, AC-38):
-/// the `passkeys` package, which uses `ASAuthorization` on iOS and macOS,
-/// Credential Manager on Android, and WebAuthn on the web.
+/// A [PasskeyAuthenticator] on the `passkeys` package (spec 0013, AC-38),
+/// which uses `ASAuthorization` on iOS and macOS, Credential Manager on
+/// Android, and Corbado's web plugin on the web. Pass it to `orvano_flutter`'s
+/// `createClient` as `passkeys: PlatformPasskeys()`.
 ///
 /// The app sets up its side once: an Associated Domains entry
 /// `webcredentials:<rpId>` on iOS and macOS, and on Android a
 /// `/.well-known/assetlinks.json` on the RP ID's site that names the app's
-/// signing certificate (the project's Passkeys card gives both snippets). On
-/// the web, `passkeys` needs its script in `web/index.html`; see its README.
+/// signing certificate (the project's Passkeys card gives both snippets). A
+/// web build loads Corbado's `bundle.js`, the version matching the resolved
+/// `passkeys_web`, from the app's own `web/` folder in `web/index.html`, or it
+/// fails at startup; see this package's README.
 final class PlatformPasskeys implements PasskeyAuthenticator {
   /// Creates the authenticator; [debugMode] turns on the `passkeys` package's
   /// setup checks.
