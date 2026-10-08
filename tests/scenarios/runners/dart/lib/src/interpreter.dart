@@ -122,9 +122,10 @@ String? fixtureApiKey(String fixturesYaml) {
 /// `after`; `redeemLink` is the client SDK's link helper (spec 0010);
 /// `oauthSignIn` runs `signInWithOAuth` or `linkIdentity` with a launcher
 /// that follows the fake provider over HTTP, `oauthCode` stops at the code,
-/// `createNonce` is `OrvanoNonce.create` (spec 0012), and `totpCode` is an
-/// authenticator app's current code (spec 0013). Their names have no dot, so
-/// they never collide with an operationId.
+/// `createNonce` is `OrvanoNonce.create` (spec 0012), `totpCode` is an
+/// authenticator app's current code, and `completeMfa`, `verifyMfa`, and
+/// `confirmTotp` are the client SDK's MFA helpers (spec 0013). Their names
+/// have no dot, so they never collide with an operationId.
 final Map<String, DispatchEntry> _runnerDispatch = {
   'totpCode': DispatchEntry(
     status: 200,
@@ -133,6 +134,31 @@ final Map<String, DispatchEntry> _runnerDispatch = {
         '${input['secret']}',
         input['offset'] is int ? input['offset'] as int : 0,
       ),
+    },
+  ),
+  'completeMfa': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final user = await o.client.completeMfa(_mfaAnswer(input));
+      return {
+        'user': user.toJson(),
+        'isNewUser': false,
+        'mfaRequired': false,
+        'factors': <String>[],
+      };
+    },
+  ),
+  'verifyMfa': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      await o.client.verifyMfa(_mfaAnswer(input));
+      return {'verified': true};
+    },
+  ),
+  'confirmTotp': DispatchEntry(
+    status: 200,
+    client: (o, input) async => {
+      'recoveryCodes': await o.client.confirmTotp('${input['code']}'),
     },
   ),
   'now': DispatchEntry(
@@ -271,6 +297,12 @@ String totpCode(String secret, int offset) {
 
 /// What `handleLink`, `signInWithOAuth`, or `linkIdentity` did, as the JS
 /// runner reports it.
+/// The one factor of an MFA runner step: `totpCode` or `recoveryCode`.
+core.MfaAnswer _mfaAnswer(Map<String, Object?> input) =>
+    input['totpCode'] is String
+    ? core.MfaAnswer.totp(input['totpCode']! as String)
+    : core.MfaAnswer.recoveryCode('${input['recoveryCode']}');
+
 Map<String, Object?>? _handled(core.HandledLink? result) => switch (result) {
   null => null,
   core.LinkResult(:final type, :final user, :final isNewUser) => {

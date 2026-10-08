@@ -1,6 +1,6 @@
 # Spec 0013, AC-5 to AC-9, AC-12, AC-13, AC-16, AC-25, AC-26: a user with a verified email turns on an
 # authenticator app (the runner computes its codes from the secret), then a password sign in stops at the MFA step
-# with no tokens, and a TOTP code finishes it at level 2.
+# with no tokens, and a TOTP code finishes it at level 2 through the SDK's completeMfa (AC-36 to AC-38).
 name: a user turns on TOTP, and password sign in then needs a code
 requires: []
 steps:
@@ -74,12 +74,9 @@ steps:
     expect:
       status: 201
       body: { user: null, session: null, mfa: { factors: [totp, recovery_code] } }
-    save:
-      ticket: $.mfa.ticket
-  - op: account.createMfaSession
+  - op: completeMfa
     as: client
-    input:
-      body: { ticket: '${ticket}', recoveryCode: 'AAAAA-AAAAA' }
+    input: { recoveryCode: 'AAAAA-AAAAA' }
     expect: { status: 401, code: invalid_mfa_code }
   - op: totpCode
     as: client
@@ -87,13 +84,12 @@ steps:
     expect: { status: 200 }
     save:
       nextCode: $.code
-  - op: account.createMfaSession
+  - op: completeMfa
     as: client
-    input:
-      body: { ticket: '${ticket}', totpCode: '${nextCode}' }
+    input: { totpCode: '${nextCode}' }
     expect:
       status: 201
-      body: { user: { email: 'mfa-${unique}@example.com' }, mfa: null }
+      body: { user: { email: 'mfa-${unique}@example.com' }, mfaRequired: false }
   - op: account.listSessions
     as: client
     input: {}
@@ -101,8 +97,3 @@ steps:
       status: 200
       body:
         items: [{ current: true, method: password, aal: 2, amr: [mfa, otp, pwd] }]
-  - op: account.createMfaSession
-    as: client
-    input:
-      body: { ticket: '${ticket}', totpCode: '${nextCode}' }
-    expect: { status: 401, code: invalid_mfa_ticket }

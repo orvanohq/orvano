@@ -1,4 +1,5 @@
 import { createNonce, createPkce } from '@orvano/js'
+import type { MfaAnswer } from '@orvano/js'
 import type { Client as ServerClient } from '@orvano/js/server'
 import type { DispatchTable } from './dispatch-table.js'
 
@@ -101,6 +102,13 @@ export async function totpCode(secret: string, offset: number): Promise<string> 
   return String(binary % 1_000_000).padStart(6, '0')
 }
 
+/** The one factor of an MFA runner step: `totpCode` or `recoveryCode`. */
+function mfaAnswer(input: Record<string, unknown>): MfaAnswer {
+  return typeof input.totpCode === 'string'
+    ? { totpCode: input.totpCode }
+    : { recoveryCode: String(input.recoveryCode) }
+}
+
 /**
  * Runner operations: calls the scenarios make that are not contract operations. `signIn` is a
  * plain sign in call that leaves the SDK's stored session alone, so a runner without client
@@ -109,7 +117,9 @@ export async function totpCode(secret: string, offset: number): Promise<string> 
  * `redeemLink` is the client SDK's link helper (spec 0010); `oauthSignIn` runs the client SDK's
  * `signInWithOAuth` or `linkIdentity` with an `open` that follows the fake provider over HTTP,
  * `oauthCode` stops at the code so a scenario can redeem it itself, `createNonce` is the SDK's
- * native nonce (spec 0012), and `totpCode` is an authenticator app's current code (spec 0013). Their names have no dot, so they never collide with an operationId.
+ * native nonce (spec 0012), `totpCode` is an authenticator app's current code, and `completeMfa`,
+ * `verifyMfa`, and `confirmTotp` are the client SDK's MFA helpers (spec 0013). Their names have
+ * no dot, so they never collide with an operationId.
  */
 export const runnerDispatch: DispatchTable = {
   totpCode: {
@@ -120,6 +130,21 @@ export const runnerDispatch: DispatchTable = {
         typeof input.offset === 'number' ? input.offset : 0,
       ),
     }),
+  },
+  completeMfa: {
+    status: 201,
+    client: async (o, input) => o.client.completeMfa(mfaAnswer(input)),
+  },
+  verifyMfa: {
+    status: 200,
+    client: async (o, input) => {
+      await o.client.verifyMfa(mfaAnswer(input))
+      return { verified: true }
+    },
+  },
+  confirmTotp: {
+    status: 200,
+    client: async (o, input) => ({ recoveryCodes: await o.client.confirmTotp(String(input.code)) }),
   },
   now: {
     status: 200,
