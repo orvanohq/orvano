@@ -129,7 +129,8 @@ _Steps derived from the acceptance criteria and the Value sourcing table. `/chec
 - [ ] `@orvano/js` in a browser: `isPasskeySupported()` is true, `isPasskeySupported({ autofill: true })` follows `isConditionalMediationAvailable`; `registerPasskey({ name })` runs `navigator.credentials.create`; `signInWithPasskey({ autofill: true })` waits on a field with `autocomplete="username webauthn"` and says `signedIn` → AC-36
 - [ ] `@orvano/js`: `completeMfa({ passkey: true })` after a challenged sign in and `verifyMfa({ passkey: true })` run the ceremony and store the session or the new token → AC-36
 - [ ] `@orvano/nextjs`: `POST .../mfa-passkey` answers the challenge for the `orvano_mfa` ticket (401 without the cookie), `POST .../mfa` accepts `{ challengeId, credential }`, and `POST .../passkey-challenge` then `POST .../passkey` set both session cookies → AC-37
-- [ ] `orvano_flutter`: `createClient` uses `PlatformPasskeys` (the `passkeys` package); on an iOS simulator with Associated Domains for the RP ID, `registerPasskey` and `signInWithPasskey` work, and `completeMfa(MfaAnswer.passkey())` finishes a challenged sign in → AC-38
+- [ ] `orvano_flutter` has no `passkeys` in `flutter pub deps`, and `signInWithPasskey` on a client made with no authenticator throws an `ArgumentError` naming `orvano_flutter_passkeys`; the Flutter runner on Chrome, with no Corbado script in `web/index.html` and no `passkeys_web` in its generated web plugin registrant, starts and passes → AC-38
+- [ ] `orvano_flutter_passkeys`: `flutter test` passes (the fake `PasskeysPlatform` mapping); an app made with `createClient(..., passkeys: PlatformPasskeys())` on an iOS simulator with Associated Domains for the RP ID runs `registerPasskey` and `signInWithPasskey`, and `completeMfa(MfaAnswer.passkey())` finishes a challenged sign in → AC-38
 
 ### Value sourcing
 
@@ -171,8 +172,9 @@ _Steps derived from the acceptance criteria and the Value sourcing table. `/chec
 | 4 | Safari on macOS and iOS with iCloud Keychain: add a passkey, sign out, sign in through the email field's autofill | The passkey is named "iCloud Keychain" and marked synced; sign in needs no typing | AC-20 to AC-24, AC-36 |
 | 5 | Chrome on Windows and Android with Google Password Manager: the same as item 4 | Named "Google Password Manager"; autofill works | AC-20 to AC-24 |
 | 6 | Firefox on Linux with a YubiKey: add the key as a passkey, then use it as the second step after a password | Marked device bound; the counter rises with each use | AC-11, AC-22 |
-| 7 | Flutter on an iOS device: register and sign in with a passkey through the `passkeys` package | Works without a web view; the origin is `https://<rpId>` | AC-4, AC-38 |
+| 7 | Flutter on an iOS device, with `orvano_flutter_passkeys` and `PlatformPasskeys()` passed to `createClient`: register and sign in with a passkey | Works without a web view; the origin is `https://<rpId>` | AC-4, AC-38 |
 | 8 | Flutter on an Android device (debug build, then release build): the same as item 7 | Works for both fingerprints; a build signed with an unlisted key fails | AC-4, AC-38 |
+| 8a | Flutter web in Chrome: the sample app with `orvano_flutter_passkeys` and Corbado's `bundle.js` in `web/`, served from a web platform under the RP ID; then the same app without the add on and without the script | With the add on, register and sign in work; without it, the app starts and every other sign in works | AC-4, AC-38 |
 | 9 | Next.js sample: password sign in for an MFA user, then a passkey at the MFA step | `orvano_mfa` is `HttpOnly` in the browser's cookie view and gone after step two | AC-37 |
 | 10 | Console: turn on TOTP and add a passkey for a console account on the Security page, sign out, sign in with each | Both work; the QR code scans; the step up dialog appears when removing the passkey | AC-41, AC-42 |
 | 11 | Console: change the test project's RP ID to another domain, then back | The warning names the passkey count; passkeys stop, then work again | AC-2, AC-43 |
