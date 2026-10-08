@@ -96,6 +96,63 @@ _Steps derived from the acceptance criteria and the Value sourcing table. `/chec
 - AC-6: API steps 1 to 6 · AC-8: steps 4 and 6 · AC-14: steps 7 to 9 · AC-15: step 10 · AC-17: step 13 · AC-18: steps 7 and 11 · AC-19: steps 8 and 12 · AC-29: step 14 · AC-36 to AC-38: SDK steps and the scenarios
 - Not in task 2: the console sign in's MFA step and its `orvano_console_mfa` cookie move to task 5 with the console screens (console accounts can't turn TOTP on before then, and a console challenge fails closed today)
 
+## Build checks: task 3, passkeys · updated 2026-10-08
+
+_Steps derived from the acceptance criteria and the Value sourcing table. `/check verify` runs these against a local stack; `/test` locks the durable ones. Every passkey here comes from the `Test` only software authenticator (`POST /v1/test/passkeys/credentials` and `/assertions`)._
+
+### API, as an app and the console would call it
+
+- [ ] `GET /v1/console/project/auth/methods` for a project that never saved settings → `totpEnabled: true`, `passkeysEnabled: false`, `rpId: null`, empty `acceptedOrigins` → AC-1
+- [ ] `PATCH` it with `passkeysEnabled: true` and no `rpId`, an uppercase or `https://` or `:443` or IP `rpId`, a 65 character `rpName`, or a fingerprint that is not 32 hex pairs → 400 `invalid_request` each; as a viewer → 403 `forbidden` → AC-1
+- [ ] `PATCH` with `passkeysEnabled: true`, `rpId: example.com`, and a lowercase fingerprint → 200, the fingerprint stored uppercase, `acceptedOrigins` listing `https://app.example.com` (a web platform under the RP ID), `https://example.com`, and one `android:apk-key-hash:` origin, and an `auth.method_settings.updated` event naming the changed fields → AC-1, AC-4
+- [ ] `rpName: null` clears the name while a left out `rpId` keeps its value; `rpId: null` while passkeys are on → 400 → AC-1
+- [ ] With a passkey registered, `PATCH` a new `rpId` → 409 `passkeys_exist`; with `confirmRpIdChange: true` → 200 and `activePasskeyCount: 0`; the passkey lists `active: false` and can't sign in; changing back makes it active and sign in works again → AC-2
+- [ ] `POST /v1/account/passkeys/registration` for a user with an unverified email → 409 `email_not_verified`; for a verified one → 200 with `rp.id` the RP ID, `rp.name` the project name, `user.name` the email, algorithms `[-7, -8, -257]`, `residentKey` and `userVerification` `required`, `attestation: none`, `timeout: 300000`, and `excludeCredentials` listing the user's passkeys → AC-20
+- [ ] `POST /v1/account/passkeys` with the authenticator's answer → 201 `Passkey` named `Passkey` (or the given name), `active: true`, `synced: false`; the same answer again → 400 `invalid_passkey_challenge` (the challenge is spent); one `auth.passkey.added` event → AC-21
+- [ ] With 10 passkey rows, registration → 409 `passkey_limit` → AC-20
+- [ ] `POST /v1/account/sessions/passkey-challenge` → 200 with an empty `allowCredentials`; `POST /v1/account/sessions/passkey` with the answer → 201, `mfa: null` even for a user with MFA on, `aal` 2, `amr` `["hwk","mfa","user"]` (`swk` for a backed up passkey), session `method` `passkey`, `strong_auth_at` and the passkey's `last_used_at` set → AC-23, AC-24, AC-25
+- [ ] A wrong origin, a wrong RP ID, the user verified flag missing, a credential the server never stored, and a replayed challenge each → 401 `invalid_passkey` with the same detail → AC-22, AC-24
+- [ ] A counter of 5, then 3, then 5 again → 201, 401, 401, and two `auth.passkey.counter_regressed` events; a backed up passkey at counter 0 signs in twice → AC-22
+- [ ] For a user with TOTP and a passkey, a password sign in offers `["totp","recovery_code","passkey"]`; `POST /v1/account/sessions/mfa/passkey-challenge` lists only the ticket user's passkeys; another user's passkey at step two → 401 `invalid_passkey` and `attempts` 1; the user's own → 201 with `amr` `["hwk","mfa","pwd","user"]` and the ticket gone → AC-7, AC-8, AC-11
+- [ ] `POST /v1/account/mfa/passkey-challenge` then `POST /v1/account/mfa/verify` with `passkey` → 200 with `aal` 2; another user's passkey answering it → 401 and the session stays `aal` 1 → AC-19
+- [ ] A user without MFA and an 11 minute old session: `DELETE /v1/account/passkeys/{id}` → 403 `reauthentication_required`; after a passkey step up → 204 and `auth.passkey.removed` with reason `user`; again → 404 `passkey_not_found` → AC-18, AC-27
+- [ ] `PATCH /v1/account/passkeys/{id}` with `name: "  MacBook  "` → 200 named `MacBook`; a blank name → 400 → AC-21
+- [ ] Passkeys off: sign in challenge, registration, and step up challenge → 409 `factor_not_enabled`; list, rename, and delete still work → AC-30
+- [ ] A user whose last identity is being unlinked and who has no email but an active passkey → 204 (the passkey is a way in) → spec 0012 AC-14 as amended
+
+### Console project (AC-3)
+
+- [ ] With `ORVANO_PUBLIC_URL=https://orvano.example.com`, the console's policy has passkeys on with RP ID `orvano.example.com` and accepts only that origin; with `http://localhost:8080` on with RP ID `localhost`; with `https://10.0.0.5` or `http://orvano.example.com` off → AC-3 (the console screens that use it arrive in task 5)
+
+### SDKs
+
+- [ ] `@orvano/js` in a browser: `isPasskeySupported()` is true, `isPasskeySupported({ autofill: true })` follows `isConditionalMediationAvailable`; `registerPasskey({ name })` runs `navigator.credentials.create`; `signInWithPasskey({ autofill: true })` waits on a field with `autocomplete="username webauthn"` and says `signedIn` → AC-36
+- [ ] `@orvano/js`: `completeMfa({ passkey: true })` after a challenged sign in and `verifyMfa({ passkey: true })` run the ceremony and store the session or the new token → AC-36
+- [ ] `@orvano/nextjs`: `POST .../mfa-passkey` answers the challenge for the `orvano_mfa` ticket (401 without the cookie), `POST .../mfa` accepts `{ challengeId, credential }`, and `POST .../passkey-challenge` then `POST .../passkey` set both session cookies → AC-37
+- [ ] `orvano_flutter`: `createClient` uses `PlatformPasskeys` (the `passkeys` package); on an iOS simulator with Associated Domains for the RP ID, `registerPasskey` and `signInWithPasskey` work, and `completeMfa(MfaAnswer.passkey())` finishes a challenged sign in → AC-38
+
+### Value sourcing
+
+- [ ] Registration's `rp.id` and `rp.name` follow the settings row (`rpName` null falls back to the project name) → Value sourcing row 9
+- [ ] `excludeCredentials` lists only the user's passkeys under the current RP ID → row 11
+- [ ] A passkey's default name is `Passkey` (no AAGUID list is bundled yet, see the note below) → row 12
+- [ ] Accepted origins come from the web platforms, `https://` + RP ID, and the fingerprints: add a web platform under the RP ID and it appears in `acceptedOrigins` and passes a ceremony; one outside it does neither → row 13
+- [ ] Passkey sign in finds the user from the credential ID alone (no email typed) → row 14
+- [ ] The `amr` of a passkey follows its backup state after the assertion: the same passkey answering with `backedUp` true gives `swk` → row 5
+
+### Commands
+
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "Orvano.Server.Tests.Auth.PasskeyTests"` → 11 passed; the whole project → 1228 passed → AC-1 to AC-4, AC-11, AC-19 to AC-24, AC-30, AC-45
+- [ ] `pnpm --filter @orvano/js build && pnpm --filter @orvano/js --filter @orvano/nextjs test` → all pass (`test/passkeys.test.ts`, and the passkey actions in `nextjs/test/mfa.test.ts`) → AC-36, AC-37
+- [ ] `flutter analyze --fatal-infos sdks/dart` and `(cd sdks/dart/core && dart test)` → clean and all pass → AC-38
+- [ ] With the scenario server up, restart `api` between runners, then `node dist/cli.js <node|bun|deno|browser|workerd|nextjs>`, `dart run bin/run.dart`, the Flutter runner on an iOS simulator, and the .NET runner → `auth-passkeys` and `auth-mfa-passkey` pass in every client runner, and .NET skips them → AC-36 to AC-38, AC-45
+
+### Acceptance criteria coverage (task 3)
+
+- AC-1: API steps 1 to 4 · AC-2: step 5 · AC-3: console step · AC-4: step 3 and Value sourcing row 13 · AC-11: step 12 · AC-19: steps 13 and 14 · AC-20: steps 6 and 8 · AC-21: steps 7 and 15 · AC-22: steps 10 and 11 · AC-23, AC-24: step 9 · AC-30: step 16 · AC-36 to AC-38: SDK steps and the scenarios · AC-45: every step (the software authenticator)
+- Not in task 3: the console's passkey sign in, Security page, and Passkeys card (task 5); `users.listPasskeys`, `users.deletePasskey`, and their console twins (task 4); the `passkey_added` and `passkey_removed` alert emails, retention of expired challenges, and the purge (task 6)
+- Owed to `/architect`: AC-21 names passkeys from a bundled AAGUID list, but the community list has no license, so none ships and every unnamed passkey is `Passkey`; and AC-21 says a failed registration is 400 `invalid_passkey` while AC-40 fixes that code at 401 (the build answers 401)
+
 ## Setup
 
 1. Deploy the branch to the test server, so `ORVANO_PUBLIC_URL` is its real https URL (this also turns on console passkeys, AC-3).
