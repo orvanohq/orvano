@@ -176,6 +176,13 @@ final Map<String, DispatchEntry> dispatch = {
       return null;
     },
   ),
+  'account.createRecoveryCodes': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createRecoveryCodes();
+      return r.toJson();
+    },
+  ),
   'account.createTotp': DispatchEntry(
     status: 201,
     client: (o, input) async {
@@ -228,6 +235,13 @@ final Map<String, DispatchEntry> dispatch = {
     status: 204,
     client: (o, input) async {
       await o.account.deleteSession(input['sessionId'] as String);
+      return null;
+    },
+  ),
+  'account.deleteTotp': DispatchEntry(
+    status: 204,
+    client: (o, input) async {
+      await o.account.deleteTotp();
       return null;
     },
   ),
@@ -314,6 +328,15 @@ final Map<String, DispatchEntry> dispatch = {
     client: (o, input) async {
       final r = await o.account.verifyEmail(
         VerifyEmailRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.verifyMfa': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.verifyMfa(
+        VerifyMfaRequest.fromJson(input['body'] as Map<String, dynamic>),
       );
       return r.toJson();
     },

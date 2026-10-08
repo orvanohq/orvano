@@ -621,6 +621,45 @@
         "x-orvano-audience": "client"
       }
     },
+    "/v1/account/mfa/recovery-codes": {
+      "post": {
+        "operationId": "account.createRecoveryCodes",
+        "description": "Replaces the user's recovery codes with 10 new ones; every older code stops working. Needs MFA on and a second\nfactor on this session within 10 minutes (`account.verifyMfa`).",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodes"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/account/mfa/totp": {
       "post": {
         "operationId": "account.createTotp",
@@ -636,6 +675,36 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      },
+      "delete": {
+        "operationId": "account.deleteTotp",
+        "description": "Turns MFA off: removes the authenticator app and every recovery code. Sessions stay. Needs a second factor on this\nsession within 10 minutes (`account.verifyMfa`).",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
           },
           "default": {
             "description": "An unexpected error response.",
@@ -696,6 +765,55 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ConfirmTotpRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/mfa/verify": {
+      "post": {
+        "operationId": "account.verifyMfa",
+        "description": "Step up: checks a second factor on the signed in session, so security changes work for the next 10 minutes. Raises\nthe session to level 2 and answers a new access token with the current refresh token, unchanged. The SDK helpers\n(`verifyMfa`) store them.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionTokens"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyMfaRequest"
               }
             }
           }
@@ -3519,6 +3637,28 @@
         },
         "description": "An RFC 9457 problem details body. Every operation declares it as its `default` response, sent\nas `application/problem+json`."
       },
+      "RecoveryCodes": {
+        "type": "object",
+        "required": [
+          "codes"
+        ],
+        "properties": {
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "10 recovery codes, each `XXXXX-XXXXX`, each working once.",
+            "examples": [
+              [
+                "K7QXM-2RPLD",
+                "A4ZTN-WQ6EB"
+              ]
+            ]
+          }
+        },
+        "description": "New recovery codes. Show them once and ask the user to keep them safe; every older code stopped working."
+      },
       "RefreshSessionRequest": {
         "type": "object",
         "required": [
@@ -4091,6 +4231,26 @@
           }
         },
         "description": "An email verification, with the token from the emailed link."
+      },
+      "VerifyMfaRequest": {
+        "type": "object",
+        "properties": {
+          "totpCode": {
+            "type": "string",
+            "description": "The 6 digit code the authenticator app shows now.",
+            "examples": [
+              "492039"
+            ]
+          },
+          "recoveryCode": {
+            "type": "string",
+            "description": "A recovery code; case, spaces, and hyphens do not matter. Each works once.",
+            "examples": [
+              "K7QXM-2RPLD"
+            ]
+          }
+        },
+        "description": "A second factor for a step up: exactly one of the fields."
       }
     },
     "securitySchemes": {

@@ -294,10 +294,10 @@ public class MfaTests(PostgresFixture postgres)
         Assert.Equal(32, await TestDatabase.ScalarAsync<int>(api.Database.Superuser, "SELECT octet_length(ticket_hash) FROM orvano.auth_mfa_tickets"));
     }
 
-    private sealed record Enrolled(string UserId, string Secret, IReadOnlyList<string> RecoveryCodes, DateTime LastSignInAt);
+    internal sealed record Enrolled(string UserId, string Secret, IReadOnlyList<string> RecoveryCodes, DateTime LastSignInAt);
 
     /// <summary>Signs a user up, verifies their email, and turns on TOTP with this step's code.</summary>
-    private static async Task<Enrolled> EnrollAsync(AuthApi api, string email)
+    internal static async Task<Enrolled> EnrollAsync(AuthApi api, string email)
     {
         using var signUp = await api.SignUpAsync(email);
         var userId = AuthApi.UserId(signUp);
@@ -312,13 +312,13 @@ public class MfaTests(PostgresFixture postgres)
         return new Enrolled(userId, secret, codes, await LastSignInAsync(api, userId));
     }
 
-    private static async Task VerifyEmailAsync(AuthApi api, string userId)
+    internal static async Task VerifyEmailAsync(AuthApi api, string userId)
     {
         using var marked = await api.AsServerAsync(HttpMethod.Put, $"/v1/users/{userId}/email-verification", new { verified = true });
         Assert.Equal(HttpStatusCode.OK, marked.Status);
     }
 
-    private static Task<Reply> StepTwoAsync(AuthApi api, string ticket, string? totpCode = null, string? recoveryCode = null) =>
+    internal static Task<Reply> StepTwoAsync(AuthApi api, string ticket, string? totpCode = null, string? recoveryCode = null) =>
         api.SendAsync(HttpMethod.Post, "/v1/account/sessions/mfa", new Dictionary<string, string?>
         {
             ["ticket"] = ticket,
@@ -326,19 +326,19 @@ public class MfaTests(PostgresFixture postgres)
             ["recoveryCode"] = recoveryCode,
         }.Where(p => p.Value is not null).ToDictionary());
 
-    private static string Ticket(Reply stepOne) => stepOne.Body.GetProperty("mfa").GetProperty("ticket").GetString()!;
+    internal static string Ticket(Reply stepOne) => stepOne.Body.GetProperty("mfa").GetProperty("ticket").GetString()!;
 
-    private static string Sid(Reply signedIn) => signedIn.Body.GetProperty("session").GetProperty("sessionId").GetString()!;
+    internal static string Sid(Reply signedIn) => signedIn.Body.GetProperty("session").GetProperty("sessionId").GetString()!;
 
-    private static Task<DateTime> LastSignInAsync(AuthApi api, string userId) =>
+    internal static Task<DateTime> LastSignInAsync(AuthApi api, string userId) =>
         TestDatabase.ScalarAsync<DateTime>(api.Database.Superuser, "SELECT last_sign_in_at FROM orvano.auth_users WHERE id = @id", ("id", Guid.Parse(userId)));
 
     /// <summary>The code an authenticator app shows for this step plus <paramref name="offset"/> steps.</summary>
-    private static string CodeAt(string base32Secret, int offset) =>
+    internal static string CodeAt(string base32Secret, int offset) =>
         Totp.Code(DecodeBase32(base32Secret), Totp.StepAt(DateTimeOffset.UtcNow) + offset);
 
     /// <summary>A code that matches none of the three accepted steps.</summary>
-    private static string WrongCode(string base32Secret)
+    internal static string WrongCode(string base32Secret)
     {
         var secret = DecodeBase32(base32Secret);
         var step = Totp.StepAt(DateTimeOffset.UtcNow);
@@ -362,6 +362,6 @@ public class MfaTests(PostgresFixture postgres)
         return [.. bytes];
     }
 
-    private static JsonElement Claims(string accessToken) =>
+    internal static JsonElement Claims(string accessToken) =>
         JsonDocument.Parse(Base64Url.DecodeFromChars(accessToken.Split('.')[1])).RootElement.Clone();
 }

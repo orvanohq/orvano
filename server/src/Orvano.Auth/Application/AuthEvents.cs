@@ -40,6 +40,18 @@ internal static class AuthEvents
     /// <summary>MFA turned on (spec 0013, AC-33); <c>factor</c> says which.</summary>
     public const string MfaEnabled = "auth.mfa.enabled";
 
+    /// <summary>MFA turned off (spec 0013, AC-33); <c>reason</c> is <c>user</c> or <c>claimed</c>.</summary>
+    public const string MfaDisabled = "auth.mfa.disabled";
+
+    /// <summary>The <c>reason</c> of <see cref="MfaDisabled"/> when the user turned it off.</summary>
+    public const string MfaDisabledByUser = "user";
+
+    /// <summary>The <c>reason</c> of <see cref="MfaDisabled"/> and <see cref="PasskeyRemoved"/> when a claim removed it (AC-29).</summary>
+    public const string RemovedByClaim = "claimed";
+
+    /// <summary>A passkey was removed (spec 0013, AC-33); <c>reason</c> says by whom.</summary>
+    public const string PasskeyRemoved = "auth.passkey.removed";
+
     /// <summary>A user's recovery codes were replaced by 10 new ones (spec 0013, AC-33).</summary>
     public const string RecoveryCodesCreated = "auth.recovery_codes.created";
 

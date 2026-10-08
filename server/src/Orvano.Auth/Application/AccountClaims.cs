@@ -5,8 +5,9 @@ namespace Orvano.Auth.Application;
 
 /// <summary>
 /// Claiming an unverified account for whoever just proved the email (spec 0010, AC-32, amended by spec 0012, AC-12):
-/// the password and every identity go, Apple ones with a revoke queued, and the user's sessions end with reason
-/// <c>account_claimed</c>. Runs in the caller's transaction, under the user's lock, before the caller signs in.
+/// the password and every identity go, Apple ones with a revoke queued, the second factors and passkeys go (spec 0013,
+/// AC-29), and the user's sessions end with reason <c>account_claimed</c>. Runs in the caller's transaction, under the
+/// user's lock, before the caller signs in.
 /// </summary>
 internal static class AccountClaims
 {
@@ -40,6 +41,23 @@ internal static class AccountClaims
         {
             await Identities.DeleteAsync(uow, projectId, identity, Identities.UnlinkReason.Claimed, actor, ct);
             removed = true;
+        }
+
+        // Spec 0013, AC-29: a claimed account keeps no second factor and no passkey, with no alert emails. Removing
+        // them alone ends no session.
+        var userKey = user.Id.ToString();
+        var ids = new Dictionary<string, string> { ["userId"] = userKey };
+        if (await MfaFactorStore.DeleteFactorsAsync(uow, user.Id, ct))
+        {
+            await AuthEvents.WriteAsync(uow.Tx, AuthEvents.MfaDisabled, projectId, actor, userKey, ids,
+                fields: new Dictionary<string, string?> { ["reason"] = AuthEvents.RemovedByClaim }, ct: ct);
+        }
+
+        foreach (var passkeyId in await MfaFactorStore.DeletePasskeysAsync(uow, user.Id, ct))
+        {
+            await AuthEvents.WriteAsync(uow.Tx, AuthEvents.PasskeyRemoved, projectId, actor, userKey,
+                new Dictionary<string, string> { ["userId"] = userKey, ["passkeyId"] = passkeyId.ToString() },
+                fields: new Dictionary<string, string?> { ["reason"] = AuthEvents.RemovedByClaim }, ct: ct);
         }
 
         Guid[] ended = endSessions || removed

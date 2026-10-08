@@ -55,7 +55,8 @@ internal sealed class AccountService(
     SigningKeys keys,
     IConsoleSignupPolicy signupPolicy,
     IConsoleAccountCreated accountCreated,
-    AuthMailer mailer)
+    AuthMailer mailer,
+    StepUp stepUp)
 {
     public const string EmailIndex = UserRecords.EmailIndex;
 
@@ -360,13 +361,15 @@ internal sealed class AccountService(
     internal sealed record Credential(string? Hash);
 
     /// <summary>
-    /// Checks the signed in user's credential (spec 0004 AC-14, AC-15; spec 0010 AC-17, AC-19): a user with a password
-    /// must send it (missing or wrong: 401 <c>invalid_credentials</c>, one Argon2id run); a user without one must call
-    /// from a session created at most 10 minutes ago (otherwise 403 <c>reauthentication_required</c>), and any
-    /// password they send is ignored.
+    /// Checks the signed in user's credential (spec 0004 AC-14, AC-15; spec 0010 AC-17, AC-19): first, for a user with
+    /// MFA on, a second factor on this session within 10 minutes (spec 0013, AC-18: 403
+    /// <c>mfa_verification_required</c>). Then a user with a password must send it (missing or wrong: 401
+    /// <c>invalid_credentials</c>, one Argon2id run); a user without one must call from a session created at most 10
+    /// minutes ago (otherwise 403 <c>reauthentication_required</c>), and any password they send is ignored.
     /// </summary>
     internal async Task<Outcome<Credential>> CheckCredentialAsync(string projectId, Guid userId, Guid sessionId, string? password, CancellationToken ct)
     {
+        if (await stepUp.SensitiveChangeAsync(projectId, userId, sessionId, ct) is { } stepUpRefused) return stepUpRefused;
         var hash = await store.ReadAsync((db, token) =>
             db.Passwords.AsNoTracking().Where(p => p.UserId == userId && p.ProjectId == projectId).Select(p => p.Hash).SingleOrDefaultAsync(token), ct);
         if (hash is null)

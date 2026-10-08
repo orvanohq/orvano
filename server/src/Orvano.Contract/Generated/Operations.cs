@@ -276,6 +276,22 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>POST /v1/account/mfa/recovery-codes: Replaces the user's recovery codes with 10 new ones; every older code stops working. Needs MFA on and a second</summary>
+    public static class CreateRecoveryCodes
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createRecoveryCodes";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/recovery-codes";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account/mfa/totp: Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.</summary>
     public static class CreateTotp
     {
@@ -383,6 +399,22 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/sessions/{sessionId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>DELETE /v1/account/mfa/totp: Turns MFA off: removes the authenticator app and every recovery code. Sessions stay. Needs a second factor on this</summary>
+    public static class DeleteTotp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.deleteTotp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/totp";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";
@@ -527,6 +559,22 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/verification/confirm";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/mfa/verify: Step up: checks a second factor on the signed in session, so security changes work for the next 10 minutes. Raises</summary>
+    public static class VerifyMfa
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.verifyMfa";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/verify";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";

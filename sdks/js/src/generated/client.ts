@@ -27,6 +27,7 @@ import type {
   MfaStatus,
   OAuthFlow,
   OpenIdConfiguration,
+  RecoveryCodes,
   RefreshSessionRequest,
   Session,
   SessionPage,
@@ -38,6 +39,7 @@ import type {
   UpdatePasswordRequest,
   User,
   VerifyEmailRequest,
+  VerifyMfaRequest,
 } from './models.js'
 
 /** Operations in the `account` service. */
@@ -239,6 +241,17 @@ export class AccountService {
   }
 
   /**
+   * Replaces the user's recovery codes with 10 new ones; every older code stops working. Needs MFA on and a second
+   * factor on this session within 10 minutes (`account.verifyMfa`).
+   */
+  createRecoveryCodes(options?: RequestOptions): Promise<RecoveryCodes> {
+    return this.#client.request<RecoveryCodes>(
+      { method: 'POST', path: '/v1/account/mfa/recovery-codes' },
+      options,
+    )
+  }
+
+  /**
    * Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.
    * Needs a session that signed in within 10 minutes (or passed a second factor within 10 minutes) and, when the user
    * has an email, a verified one.
@@ -294,6 +307,17 @@ export class AccountService {
   deleteSession(sessionId: string, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
       { method: 'DELETE', path: `/v1/account/sessions/${encodeURIComponent(sessionId)}` },
+      options,
+    )
+  }
+
+  /**
+   * Turns MFA off: removes the authenticator app and every recovery code. Sessions stay. Needs a second factor on this
+   * session within 10 minutes (`account.verifyMfa`).
+   */
+  deleteTotp(options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'DELETE', path: '/v1/account/mfa/totp' },
       options,
     )
   }
@@ -383,6 +407,18 @@ export class AccountService {
   verifyEmail(body: VerifyEmailRequest, options?: RequestOptions): Promise<User> {
     return this.#client.request<User>(
       { method: 'POST', path: '/v1/account/verification/confirm', body, session: 'user' },
+      options,
+    )
+  }
+
+  /**
+   * Step up: checks a second factor on the signed in session, so security changes work for the next 10 minutes. Raises
+   * the session to level 2 and answers a new access token with the current refresh token, unchanged. The SDK helpers
+   * (`verifyMfa`) store them.
+   */
+  verifyMfa(body: VerifyMfaRequest, options?: RequestOptions): Promise<SessionTokens> {
+    return this.#client.request<SessionTokens>(
+      { method: 'POST', path: '/v1/account/mfa/verify', body },
       options,
     )
   }

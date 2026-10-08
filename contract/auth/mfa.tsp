@@ -119,6 +119,24 @@ model TotpConfirmation {
   session: SessionTokens;
 }
 
+@doc("New recovery codes. Show them once and ask the user to keep them safe; every older code stopped working.")
+model RecoveryCodes {
+  @doc("10 recovery codes, each `XXXXX-XXXXX`, each working once.")
+  @example(#["K7QXM-2RPLD", "A4ZTN-WQ6EB"])
+  codes: string[];
+}
+
+@doc("A second factor for a step up: exactly one of the fields.")
+model VerifyMfaRequest {
+  @doc("The 6 digit code the authenticator app shows now.")
+  @example("492039")
+  totpCode?: string;
+
+  @doc("A recovery code; case, spaces, and hyphens do not matter. Each works once.")
+  @example("K7QXM-2RPLD")
+  recoveryCode?: string;
+}
+
 @route("/v1/account")
 @tag("account")
 interface AccountMfaApi {
@@ -174,4 +192,44 @@ interface AccountMfaApi {
   @route("/mfa/totp/confirm")
   @post
   confirmTotp(@body request: ConfirmTotpRequest): TotpConfirmation | Problem;
+
+  @doc("""
+    Turns MFA off: removes the authenticator app and every recovery code. Sessions stay. Needs a second factor on this
+    session within 10 minutes (`account.verifyMfa`).
+    """)
+  @operationId("account.deleteTotp")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @useAuth(bearer)
+  @route("/mfa/totp")
+  @delete
+  deleteTotp(): NoContentResponse | Problem;
+
+  @doc("""
+    Replaces the user's recovery codes with 10 new ones; every older code stops working. Needs MFA on and a second
+    factor on this session within 10 minutes (`account.verifyMfa`).
+    """)
+  @operationId("account.createRecoveryCodes")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @useAuth(bearer)
+  @route("/mfa/recovery-codes")
+  @post
+  createRecoveryCodes(): {
+    @statusCode statusCode: 201;
+    @body body: RecoveryCodes;
+  } | Problem;
+
+  @doc("""
+    Step up: checks a second factor on the signed in session, so security changes work for the next 10 minutes. Raises
+    the session to level 2 and answers a new access token with the current refresh token, unchanged. The SDK helpers
+    (`verifyMfa`) store them.
+    """)
+  @operationId("account.verifyMfa")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @useAuth(bearer)
+  @route("/mfa/verify")
+  @post
+  verifyMfa(@body request: VerifyMfaRequest): SessionTokens | Problem;
 }

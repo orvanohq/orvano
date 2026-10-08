@@ -268,6 +268,17 @@ final class AccountService {
     );
   }
 
+  /// Replaces the user's recovery codes with 10 new ones; every older code stops working. Needs MFA on and a second
+  /// factor on this session within 10 minutes (`account.verifyMfa`).
+  Future<RecoveryCodes> createRecoveryCodes({RequestOptions? options}) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/mfa/recovery-codes',
+      options: options,
+    );
+    return RecoveryCodes.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.
   /// Needs a session that signed in within 10 minutes (or passed a second factor within 10 minutes) and, when the user
   /// has an email, a verified one.
@@ -344,6 +355,12 @@ final class AccountService {
       '/v1/account/sessions/${Uri.encodeComponent(sessionId)}',
       options: options,
     );
+  }
+
+  /// Turns MFA off: removes the authenticator app and every recovery code. Sessions stay. Needs a second factor on this
+  /// session within 10 minutes (`account.verifyMfa`).
+  Future<void> deleteTotp({RequestOptions? options}) async {
+    await _client.send('DELETE', '/v1/account/mfa/totp', options: options);
   }
 
   /// Gets the signed in user. A server can call it with a user's access token to check that the session is still active.
@@ -463,6 +480,22 @@ final class AccountService {
       options: options,
     );
     return User.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Step up: checks a second factor on the signed in session, so security changes work for the next 10 minutes. Raises
+  /// the session to level 2 and answers a new access token with the current refresh token, unchanged. The SDK helpers
+  /// (`verifyMfa`) store them.
+  Future<SessionTokens> verifyMfa(
+    VerifyMfaRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/mfa/verify',
+      body: body.toJson(),
+      options: options,
+    );
+    return SessionTokens.fromJson(json as Map<String, dynamic>);
   }
 }
 

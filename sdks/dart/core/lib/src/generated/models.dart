@@ -1102,6 +1102,23 @@ final class OpenIdConfiguration {
   };
 }
 
+/// New recovery codes. Show them once and ask the user to keep them safe; every older code stopped working.
+final class RecoveryCodes {
+  /// Creates a [RecoveryCodes].
+  const RecoveryCodes({required this.codes});
+
+  /// Decodes a [RecoveryCodes] from JSON.
+  factory RecoveryCodes.fromJson(Map<String, dynamic> json) => RecoveryCodes(
+    codes: (json['codes'] as List<dynamic>).map((e) => e as String).toList(),
+  );
+
+  /// 10 recovery codes, each `XXXXX-XXXXX`, each working once.
+  final List<String> codes;
+
+  /// Encodes this [RecoveryCodes] as JSON.
+  Map<String, dynamic> toJson() => {'codes': codes};
+}
+
 /// A trade of a refresh token for a new pair.
 final class RefreshSessionRequest {
   /// Creates a [RefreshSessionRequest].
@@ -1619,4 +1636,31 @@ final class VerifyEmailRequest {
 
   /// Encodes this [VerifyEmailRequest] as JSON.
   Map<String, dynamic> toJson() => {'token': token};
+}
+
+/// A second factor for a step up: exactly one of the fields.
+final class VerifyMfaRequest {
+  /// Creates a [VerifyMfaRequest].
+  const VerifyMfaRequest({this.totpCode, this.recoveryCode});
+
+  /// Decodes a [VerifyMfaRequest] from JSON.
+  factory VerifyMfaRequest.fromJson(Map<String, dynamic> json) =>
+      VerifyMfaRequest(
+        totpCode: json['totpCode'] == null ? null : json['totpCode'] as String,
+        recoveryCode: json['recoveryCode'] == null
+            ? null
+            : json['recoveryCode'] as String,
+      );
+
+  /// The 6 digit code the authenticator app shows now.
+  final String? totpCode;
+
+  /// A recovery code; case, spaces, and hyphens do not matter. Each works once.
+  final String? recoveryCode;
+
+  /// Encodes this [VerifyMfaRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'totpCode': ?totpCode,
+    'recoveryCode': ?recoveryCode,
+  };
 }

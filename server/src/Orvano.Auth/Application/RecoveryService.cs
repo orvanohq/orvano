@@ -74,7 +74,8 @@ internal sealed class RecoveryService(
     /// <summary>
     /// <c>account.completeRecovery</c> (AC-10): checks the password, then the token without a lock (so junk tokens
     /// never take a hashing slot), hashes outside any transaction, and in one transaction consumes the token, sets the
-    /// password, verifies the email, ends every session, and signs the user in.
+    /// password, verifies the email, ends every session, and signs the user in. A user with MFA on gets a challenge
+    /// instead, and the reset waits for step two (spec 0013, AC-6).
     /// </summary>
     public async Task<Outcome<SignedIn>> CompleteAsync(string projectId, string? tokenValue, string? password, ClientInfo client, CancellationToken ct)
     {
@@ -88,7 +89,7 @@ internal sealed class RecoveryService(
         if (hash is null) return Failure.Busy;
         await keys.GetActiveAsync(projectId, ct);
 
-        var outcome = await store.WriteAsync<(Guid UserId, SessionGrant Grant, Guid[] Ended)>(async (uow, token) =>
+        var outcome = await store.WriteAsync<(Guid UserId, SessionGrant? Grant, Guid[] Ended, MfaChallengeView? Mfa)>(async (uow, token) =>
         {
             if (await EmailTokens.ConsumeLinkAsync(uow, projectId, EmailTokenKind.Recovery, link, token) is not { Expired: false, UserId: { } userId } consumed)
                 return Failure.InvalidEmailToken;
@@ -102,24 +103,13 @@ internal sealed class RecoveryService(
                 ? (await AccountClaims.ClaimAsync(uow, sessions, projectId, user, Actor.User(userId), endSessions: false, token, removePassword: false)).EndedSessions
                 : [];
 
-            await using (var set = new NpgsqlCommand(
-                """
-                INSERT INTO orvano.auth_passwords (user_id, project_id, hash) VALUES (@user, @project, @hash)
-                ON CONFLICT (user_id) DO UPDATE SET hash = excluded.hash, updated_at = now();
-                UPDATE orvano.auth_users SET email_verified_at = coalesce(email_verified_at, now()), updated_at = now() WHERE id = @user;
-                """, uow.Tx.Connection, uow.Tx))
-            {
-                set.Parameters.AddWithValue("user", userId);
-                set.Parameters.AddWithValue("project", projectId);
-                set.Parameters.AddWithValue("hash", hash);
-                await set.ExecuteNonQueryAsync(token);
-            }
+            // Spec 0013, AC-6: for a user with MFA on, the new password waits on the ticket, and the reset happens at step
+            // two, so the inbox alone changes nothing. The link stays used.
+            var challenge = await MfaGate.ChallengeAsync(uow, projectId, userId, SessionMethod.Recovery, null, client, token, pendingPasswordHash: hash);
+            if (challenge is not null) return (userId, null, claimed, challenge);
 
             var actor = Actor.User(userId);
-            var ended = await sessions.EndAllAsync(uow, projectId, userId, SessionEndReason.PasswordReset, actor, keep: null, token);
-            await EmailTokens.DeleteForUserAsync(uow, projectId, userId, EmailTokenKind.Recovery, token);
-            await AuthEvents.WriteAsync(uow.Tx, AuthEvents.PasswordReset, projectId, actor, userId.ToString(),
-                new Dictionary<string, string> { ["userId"] = userId.ToString() }, ct: token);
+            var ended = await ResetPasswordAsync(uow, sessions, projectId, userId, hash, actor, token);
             if (user.EmailVerifiedAt is null)
             {
                 await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserUpdated, projectId, actor, userId.ToString(),
@@ -127,12 +117,42 @@ internal sealed class RecoveryService(
             }
 
             var grant = await sessions.CreateAsync(uow, projectId, userId, client, actor, SessionMethod.Recovery, token);
-            return (userId, grant, [.. ended, .. claimed]);
+            return (userId, grant, [.. ended, .. claimed], null);
         }, ct);
 
         if (!outcome.Succeeded) return outcome.Failure!;
         foreach (var id in outcome.Value.Ended) await checks.EvictAsync(id, ct);
+        if (outcome.Value.Mfa is { } mfa) return SignedIn.Challenged(mfa);
         var row = await store.ReadAsync((db, token) => db.Users.AsNoTracking().SingleAsync(u => u.Id == outcome.Value.UserId, token), ct);
-        return await accounts.SignedInAsync(projectId, row, outcome.Value.Grant, ct);
+        return await accounts.SignedInAsync(projectId, row, outcome.Value.Grant!, ct);
+    }
+
+    /// <summary>
+    /// The reset itself (spec 0010, AC-10), in the caller's transaction under the user lock: sets the password hash,
+    /// verifies the email, ends every session of the user (<c>password_reset</c>), deletes their live reset links, and
+    /// writes <c>auth.password.reset</c>. Runs at once for a user without MFA, and at step two for one with it (spec
+    /// 0013, AC-8). Answers the ended session IDs to evict after the commit.
+    /// </summary>
+    public static async Task<Guid[]> ResetPasswordAsync(
+        AuthUnitOfWork uow, Sessions sessions, string projectId, Guid userId, string hash, Actor actor, CancellationToken ct)
+    {
+        await using (var set = new NpgsqlCommand(
+            """
+            INSERT INTO orvano.auth_passwords (user_id, project_id, hash) VALUES (@user, @project, @hash)
+            ON CONFLICT (user_id) DO UPDATE SET hash = excluded.hash, updated_at = now();
+            UPDATE orvano.auth_users SET email_verified_at = coalesce(email_verified_at, now()), updated_at = now() WHERE id = @user;
+            """, uow.Tx.Connection, uow.Tx))
+        {
+            set.Parameters.AddWithValue("user", userId);
+            set.Parameters.AddWithValue("project", projectId);
+            set.Parameters.AddWithValue("hash", hash);
+            await set.ExecuteNonQueryAsync(ct);
+        }
+
+        var ended = await sessions.EndAllAsync(uow, projectId, userId, SessionEndReason.PasswordReset, actor, keep: null, ct);
+        await EmailTokens.DeleteForUserAsync(uow, projectId, userId, EmailTokenKind.Recovery, ct);
+        await AuthEvents.WriteAsync(uow.Tx, AuthEvents.PasswordReset, projectId, actor, userId.ToString(),
+            new Dictionary<string, string> { ["userId"] = userId.ToString() }, ct: ct);
+        return [.. ended];
     }
 }

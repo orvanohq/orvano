@@ -29,6 +29,7 @@ import type {
   UpdatePasswordRequest,
   UpdateUserEmailRequest,
   VerifyEmailRequest,
+  VerifyMfaRequest,
 } from '@orvano/js'
 import type { DispatchTable } from '../dispatch-table.js'
 
@@ -106,6 +107,10 @@ export const dispatch: DispatchTable = {
     status: 202,
     client: (o, input) => o.account.createRecovery(input.body as CreateRecoveryRequest),
   },
+  'account.createRecoveryCodes': {
+    status: 201,
+    client: (o, _input) => o.account.createRecoveryCodes(),
+  },
   'account.createTotp': {
     status: 201,
     client: (o, _input) => o.account.createTotp(),
@@ -133,6 +138,10 @@ export const dispatch: DispatchTable = {
   'account.deleteSession': {
     status: 204,
     client: (o, input) => o.account.deleteSession(input.sessionId as string),
+  },
+  'account.deleteTotp': {
+    status: 204,
+    client: (o, _input) => o.account.deleteTotp(),
   },
   'account.get': {
     status: 200,
@@ -176,6 +185,10 @@ export const dispatch: DispatchTable = {
   'account.verifyEmail': {
     status: 200,
     client: (o, input) => o.account.verifyEmail(input.body as VerifyEmailRequest),
+  },
+  'account.verifyMfa': {
+    status: 200,
+    client: (o, input) => o.account.verifyMfa(input.body as VerifyMfaRequest),
   },
   'health.get': {
     status: 200,

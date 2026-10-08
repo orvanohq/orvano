@@ -259,6 +259,33 @@ internal sealed class MfaFactorStore(SecretBox secrets, TimeProvider clock)
         return await use.ExecuteNonQueryAsync(ct) == 1;
     }
 
+    /// <summary>
+    /// Deletes the user's TOTP factor, pending or confirmed, and every recovery code (AC-14, AC-27, AC-29). The caller
+    /// holds the user lock. True when a confirmed factor was there, so MFA was on.
+    /// </summary>
+    public static async Task<bool> DeleteFactorsAsync(AuthUnitOfWork uow, Guid userId, CancellationToken ct)
+    {
+        await using var delete = new NpgsqlCommand(
+            """
+            WITH codes AS (DELETE FROM orvano.auth_recovery_codes WHERE user_id = @user)
+            DELETE FROM orvano.auth_totp_factors WHERE user_id = @user RETURNING confirmed_at IS NOT NULL
+            """, uow.Tx.Connection, uow.Tx);
+        delete.Parameters.AddWithValue("user", userId);
+        return await delete.ExecuteScalarAsync(ct) is true;
+    }
+
+    /// <summary>Deletes every passkey of the user (AC-28, AC-29) and answers their IDs. The caller holds the user lock.</summary>
+    public static async Task<Guid[]> DeletePasskeysAsync(AuthUnitOfWork uow, Guid userId, CancellationToken ct)
+    {
+        await using var delete = new NpgsqlCommand(
+            "DELETE FROM orvano.auth_passkeys WHERE user_id = @user RETURNING id", uow.Tx.Connection, uow.Tx);
+        delete.Parameters.AddWithValue("user", userId);
+        var ids = new List<Guid>();
+        await using var reader = await delete.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct)) ids.Add(reader.GetGuid(0));
+        return [.. ids];
+    }
+
     /// <summary>Reads a live ticket by (project, SHA-256), optionally locked; null when there is none or it expired.</summary>
     public static async Task<TicketRow?> ReadTicketAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, string projectId, byte[] hash, bool lockRow, CancellationToken ct)
     {

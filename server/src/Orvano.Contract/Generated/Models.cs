@@ -1719,6 +1719,11 @@ public sealed record ProjectSmtp(
     [property: JsonPropertyName("settings")] SmtpSettings? Settings,
     [property: JsonPropertyName("installSender")] EmailSender? InstallSender);
 
+/// <summary>New recovery codes. Show them once and ask the user to keep them safe; every older code stopped working.</summary>
+/// <param name="Codes">10 recovery codes, each <c>XXXXX-XXXXX</c>, each working once.</param>
+public sealed record RecoveryCodes(
+    [property: JsonPropertyName("codes")] IReadOnlyList<string> Codes);
+
 /// <summary>A trade of a refresh token for a new pair.</summary>
 /// <param name="RefreshToken">The session's current refresh token.</param>
 public sealed record RefreshSessionRequest(
@@ -2051,3 +2056,10 @@ public sealed record UserPage(
 /// <param name="Token">The <c>orvano_token</c> parameter of the emailed link.</param>
 public sealed record VerifyEmailRequest(
     [property: JsonPropertyName("token")] string Token);
+
+/// <summary>A second factor for a step up: exactly one of the fields.</summary>
+/// <param name="TotpCode">The 6 digit code the authenticator app shows now.</param>
+/// <param name="RecoveryCode">A recovery code; case, spaces, and hyphens do not matter. Each works once.</param>
+public sealed record VerifyMfaRequest(
+    [property: JsonPropertyName("totpCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TotpCode = null,
+    [property: JsonPropertyName("recoveryCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RecoveryCode = null);

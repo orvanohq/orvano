@@ -352,6 +352,12 @@ export interface OpenIdConfiguration {
   response_types_supported: string[]
 }
 
+/** New recovery codes. Show them once and ask the user to keep them safe; every older code stopped working. */
+export interface RecoveryCodes {
+  /** 10 recovery codes, each `XXXXX-XXXXX`, each working once. */
+  codes: string[]
+}
+
 /** A trade of a refresh token for a new pair. */
 export interface RefreshSessionRequest {
   /** The session's current refresh token. */
@@ -520,4 +526,12 @@ export interface UserPage {
 export interface VerifyEmailRequest {
   /** The `orvano_token` parameter of the emailed link. */
   token: string
+}
+
+/** A second factor for a step up: exactly one of the fields. */
+export interface VerifyMfaRequest {
+  /** The 6 digit code the authenticator app shows now. */
+  totpCode?: string
+  /** A recovery code; case, spaces, and hyphens do not matter. Each works once. */
+  recoveryCode?: string
 }

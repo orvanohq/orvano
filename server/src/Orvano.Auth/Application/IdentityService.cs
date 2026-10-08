@@ -23,7 +23,8 @@ internal sealed class IdentityService(
     Sessions sessions,
     SigningKeys keys,
     OAuthService oauth,
-    OAuthRedemptions redemptions)
+    OAuthRedemptions redemptions,
+    StepUp stepUp)
 {
     public const int MaxIdTokenBytes = 8 * 1024;
     public const int MaxAuthorizationCode = 2048;
@@ -48,20 +49,19 @@ internal sealed class IdentityService(
             var name = native.Provider == OAuthProvider.Apple ? request.Name : null;
             var resolved = await resolution.ResolveAsync(uow, projectId, native.Provider, native.Result, name, SessionMethod.IdToken, ipKey, token);
             if (!resolved.Succeeded) return resolved.Failure!;
-            var grant = await sessions.CreateAsync(uow, projectId, resolved.Value!.UserId, client, Actor.User(resolved.Value.UserId),
-                SessionMethod.IdToken, token, OAuthProviders.Wire(native.Provider));
-            return new OAuthRedeemed(resolved.Value, grant);
+            return await OAuthRedemptions.SignInAsync(uow, sessions, projectId, resolved.Value!, client, SessionMethod.IdToken,
+                OAuthProviders.Wire(native.Provider), token);
         }, ct);
         return await redemptions.FinishAsync(projectId, outcome, ct);
     }
 
-    /// <summary><c>account.createOAuthLinkFlow</c> (AC-13): a fresh session and no identity of the provider yet, then AC-4's start.</summary>
+    /// <summary><c>account.createOAuthLinkFlow</c> (AC-13): the enrollment check (spec 0013, AC-17) and no identity of the provider yet, then AC-4's start.</summary>
     public async Task<Outcome<string>> StartLinkAsync(
         string projectId, Guid userId, Guid sessionId, OAuthProvider? provider, string? redirectUrl, string? codeChallenge, string ipKey, CancellationToken ct)
     {
         // AC-4's start limit comes before the two reads below.
         if (oauth.TakeStartLimit(ipKey) is { } limited) return limited;
-        if (!await IsFreshAsync(userId, sessionId, ct)) return Failure.ReauthenticationRequired;
+        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, ct) is { } stale) return stale;
         if (provider is { } chosen && await HasProviderAsync(userId, chosen, ct)) return Failure.ProviderAlreadyLinked;
         return await oauth.StartAsync(projectId, provider, redirectUrl, codeChallenge, ipKey, ct, linkUserId: userId, limitTaken: true);
     }
@@ -81,10 +81,10 @@ internal sealed class IdentityService(
                 : Failure.InvalidOAuthCode, ct);
     }
 
-    /// <summary><c>account.createIdTokenIdentity</c> (AC-13): AC-9's checks on a fresh session, then the link.</summary>
+    /// <summary><c>account.createIdTokenIdentity</c> (AC-13): the enrollment check (spec 0013, AC-17), AC-9's checks, then the link.</summary>
     public async Task<Outcome<IdentityRow>> LinkNativeAsync(string projectId, Guid userId, Guid sessionId, NativeRequest request, CancellationToken ct)
     {
-        if (!await IsFreshAsync(userId, sessionId, ct)) return Failure.ReauthenticationRequired;
+        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, ct) is { } stale) return stale;
         var check = await CheckAsync(projectId, request, ct);
         if (!check.Succeeded) return check.Failure!;
         var native = check.Value!;
@@ -207,9 +207,6 @@ internal sealed class IdentityService(
         insert.Parameters.AddWithValue("expires", native.ExpiresAt + AuthTimings.ClockLeeway);
         return await insert.ExecuteNonQueryAsync(ct) == 1;
     }
-
-    private Task<bool> IsFreshAsync(Guid userId, Guid sessionId, CancellationToken ct) =>
-        store.ReadAsync((db, token) => UserRecords.IsSessionFreshAsync((NpgsqlConnection)db.Database.GetDbConnection(), null, userId, sessionId, token), ct);
 
     private Task<bool> HasProviderAsync(Guid userId, OAuthProvider provider, CancellationToken ct)
     {
