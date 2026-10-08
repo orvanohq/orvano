@@ -23,6 +23,7 @@
  */
 import {
   Client,
+  MemoryPendingMfaStore,
   MemorySessionStore,
   OrvanoError,
   createPkce,
@@ -31,30 +32,80 @@ import {
   refreshMarginMs,
   refreshWithToken,
 } from '@orvano/js'
-import type { AuthSession, ClientConfig, EmailLink, EmailLinkType } from '@orvano/js'
+import type {
+  AuthSession,
+  ClientConfig,
+  EmailLink,
+  EmailLinkType,
+  MfaAnswer,
+  PendingMfaStore,
+} from '@orvano/js'
 import { NextResponse } from 'next/server.js'
 import type { NextRequest } from 'next/server.js'
 
+import {
+  decodeJsonCookie,
+  decodeMfaCookie,
+  encodeJsonCookie,
+  encodeMfaCookie,
+} from './cookie-codec.js'
 import {
   accessClaims,
   accessCookie,
   cookieOptions,
   forwardedClientHeaders,
+  mfaCookie,
+  mfaCookieOptions,
   oauthCookie,
   refreshCookie,
   secureCookies,
 } from './index.js'
 
 /** Settings for {@link updateSession} and {@link createOrvanoRouteHandler}. */
-export type OrvanoNextConfig = Omit<ClientConfig, 'session' | 'refresh'>
+export type OrvanoNextConfig = Omit<ClientConfig, 'session' | 'refresh' | 'mfaStore' | 'mfa'>
 
-/** A client that speaks for the request's browser: its IP and user agent go along, no session. */
-function clientFor(config: OrvanoNextConfig, request: NextRequest): Client {
+/** Settings for {@link createOrvanoRouteHandler}. */
+export interface OrvanoRouteHandlerConfig extends OrvanoNextConfig {
+  /**
+   * The app page that asks for the second factor (spec 0013, AC-37): `GET .../oauth-callback`
+   * redirects there when the sign in stops at the MFA step. Defaults to `/sign-in/mfa`.
+   */
+  mfaPath?: string
+}
+
+/** Where the provider callback sends a sign in that stopped at the MFA step, unless told otherwise. */
+export const defaultMfaPath = '/sign-in/mfa'
+
+/**
+ * A client that speaks for the request's browser: its IP and user agent go along, no session. A
+ * sign in that stops at the MFA step leaves its ticket in `mfaStore`.
+ */
+function clientFor(
+  config: OrvanoNextConfig,
+  request: NextRequest,
+  mfaStore: PendingMfaStore = new MemoryPendingMfaStore(),
+): Client {
   return new Client({
     ...config,
     headers: { ...config.headers, ...forwardedClientHeaders(request.headers) },
     session: new MemorySessionStore(),
+    mfaStore,
   })
+}
+
+/**
+ * Keeps a sign in that stopped at the MFA step in the `orvano_mfa` cookie (spec 0013, AC-37), with
+ * the app path to land on once it finishes. The ticket never goes in a body.
+ */
+function writeMfaCookie(
+  response: NextResponse,
+  store: PendingMfaStore,
+  next: string,
+  secure: boolean,
+): void {
+  const pending = store.get()
+  if (pending === null) return
+  response.cookies.set(mfaCookie, encodeMfaCookie({ ...pending, next }), mfaCookieOptions(secure))
 }
 
 /**
@@ -197,13 +248,16 @@ function isLinkType(value: unknown): value is EmailLinkType {
  * `POST .../redeem` (spec 0010, AC-25): redeems a link with Orvano as the browser. A magic link or
  * reset sets both cookies; a verification or email change refreshes them when they exist, so the
  * access token carries the new claim. Answers `{ type, user, isNewUser, mfaRequired, factors }`,
- * never a token or an MFA ticket; a sign in that stopped at the MFA step sets no cookie.
+ * never a token or an MFA ticket; a sign in that stopped at the MFA step sets only the `HttpOnly`
+ * `orvano_mfa` cookie (spec 0013, AC-37), with `next` from the body.
  */
 async function redeem(
   request: NextRequest,
-  client: Client,
+  config: OrvanoNextConfig,
   secure: boolean,
 ): Promise<NextResponse> {
+  const mfaStore = new MemoryPendingMfaStore()
+  const client = clientFor(config, request, mfaStore)
   const body = await jsonBody(request)
   if (body === null || !isLinkType(body.type) || typeof body.token !== 'string')
     return problem(400, 'invalid_request', 'Send { type, token } and, for a reset, password.')
@@ -224,8 +278,12 @@ async function redeem(
     isNewUser: result.isNewUser,
     mfaRequired: result.mfaRequired,
     factors: result.factors,
+    ...mfaExpiry(mfaStore),
   })
-  if (result.mfaRequired) return response
+  if (result.mfaRequired) {
+    writeMfaCookie(response, mfaStore, safeNext(body.next), secure)
+    return response
+  }
   if (link.type === 'magic_link' || link.type === 'recovery') {
     writeResponse(response, await client.session.get(), secure)
     return response
@@ -242,12 +300,23 @@ async function redeem(
   return response
 }
 
-/** `POST .../email-code` (spec 0010, AC-25): signs in with an emailed code and sets both cookies. */
+/** The challenge's expiry for a body, never its ticket; nothing when there is no challenge. */
+function mfaExpiry(store: PendingMfaStore): { expiresAt?: string } {
+  const pending = store.get()
+  return pending === null ? {} : { expiresAt: pending.expiresAt }
+}
+
+/**
+ * `POST .../email-code` (spec 0010, AC-25): signs in with an emailed code and sets both cookies. A
+ * sign in that stops at the MFA step sets only `orvano_mfa` (spec 0013, AC-37).
+ */
 async function emailCode(
   request: NextRequest,
-  client: Client,
+  config: OrvanoNextConfig,
   secure: boolean,
 ): Promise<NextResponse> {
+  const mfaStore = new MemoryPendingMfaStore()
+  const client = clientFor(config, request, mfaStore)
   const body = await jsonBody(request)
   if (body === null || typeof body.email !== 'string' || typeof body.code !== 'string')
     return problem(400, 'invalid_request', 'Send { email, code }.')
@@ -266,8 +335,12 @@ async function emailCode(
     isNewUser: result.isNewUser,
     mfaRequired: result.mfaRequired,
     factors: result.factors,
+    ...mfaExpiry(mfaStore),
   })
-  if (result.mfaRequired) return response
+  if (result.mfaRequired) {
+    writeMfaCookie(response, mfaStore, safeNext(body.next), secure)
+    return response
+  }
   writeResponse(response, await client.session.get(), secure)
   return response
 }
@@ -305,28 +378,17 @@ export function safeNext(next: unknown): string {
 }
 
 function encodeCookie(value: OAuthCookie): string {
-  // UTF-8 first: btoa throws on any character above U+00FF, such as a `next` of `/日本`.
-  let binary = ''
-  for (const byte of new TextEncoder().encode(JSON.stringify(value)))
-    binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  return encodeJsonCookie(value)
 }
 
 function decodeCookie(value: string | undefined): OAuthCookie | null {
-  if (value === undefined || value === '') return null
-  try {
-    const binary = atob(value.replace(/-/g, '+').replace(/_/g, '/'))
-    const parsed = JSON.parse(
-      new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0))),
-    ) as Partial<OAuthCookie>
-    return typeof parsed.v === 'string' &&
-      typeof parsed.n === 'string' &&
-      (parsed.t === 'oauth' || parsed.t === 'oauth_link')
-      ? { v: parsed.v, n: parsed.n, t: parsed.t }
-      : null
-  } catch {
-    return null
-  }
+  const parsed = decodeJsonCookie(value)
+  return parsed !== null &&
+    typeof parsed.v === 'string' &&
+    typeof parsed.n === 'string' &&
+    (parsed.t === 'oauth' || parsed.t === 'oauth_link')
+    ? { v: parsed.v, n: parsed.n, t: parsed.t }
+    : null
 }
 
 /** The handler's own base path: the request path without its last segment (the action). */
@@ -415,14 +477,17 @@ async function oauthStart(
  * `GET .../oauth-callback` (spec 0012, AC-21): where the provider flow comes back. Reads the
  * `orvano_oauth` cookie, redeems `orvano_code` with its verifier, sets both session cookies (for a
  * link, refreshing first when the access cookie is missing or nearly expired), clears the cookie,
- * and answers 303 to `next`. A provider error, a missing cookie, or a refused redemption goes to
- * `next` with `orvano_error`. It needs no `Origin`: the cookie's verifier binds it to this browser.
+ * and answers 303 to `next`. A sign in that stops at the MFA step sets `orvano_mfa` instead and
+ * goes to `mfaPath` (spec 0013, AC-37). A provider error, a missing cookie, or a refused redemption
+ * goes to `next` with `orvano_error`. It needs no `Origin`: the cookie's verifier binds it to this browser.
  */
 async function oauthCallback(
   request: NextRequest,
-  client: Client,
+  config: OrvanoRouteHandlerConfig,
   secure: boolean,
 ): Promise<NextResponse> {
+  const mfaStore = new MemoryPendingMfaStore()
+  const client = clientFor(config, request, mfaStore)
   const state = decodeCookie(request.cookies.get(oauthCookie)?.value)
   const next = safeNext(state?.n)
   const target = (error?: string): URL => {
@@ -453,6 +518,14 @@ async function oauthCallback(
         body: { code, codeVerifier: state.v },
         session: 'start',
       })
+      if (mfaStore.get() !== null) {
+        // Spec 0013, AC-37: the MFA page finishes it; `next` waits in the cookie with the ticket.
+        const response = done(
+          new URL(safeNext(config.mfaPath ?? defaultMfaPath), request.nextUrl.origin),
+        )
+        writeMfaCookie(response, mfaStore, next, secure)
+        return response
+      }
       return done(target(), await client.session.get())
     }
 
@@ -471,6 +544,116 @@ async function oauthCallback(
   }
 }
 
+/** The one factor of an `mfa` or `mfa-verify` body, or null when it holds none or more than one. */
+function mfaAnswer(body: Record<string, unknown> | null): MfaAnswer | null {
+  if (body === null) return null
+  const { totpCode, recoveryCode } = body
+  if (typeof totpCode === 'string' && recoveryCode === undefined) return { totpCode }
+  if (typeof recoveryCode === 'string' && totpCode === undefined) return { recoveryCode }
+  return null
+}
+
+/**
+ * `POST .../mfa` (spec 0013, AC-37): `{ totpCode }` or `{ recoveryCode }`. Reads the `orvano_mfa`
+ * cookie, finishes the sign in with Orvano as the browser, sets both session cookies, clears
+ * `orvano_mfa`, and answers `{ next }`. A missing cookie is 401 `invalid_mfa_ticket`, and an ended
+ * ticket clears the cookie.
+ */
+async function completeMfa(
+  request: NextRequest,
+  config: OrvanoNextConfig,
+  secure: boolean,
+): Promise<NextResponse> {
+  const answer = mfaAnswer(await jsonBody(request))
+  if (answer === null)
+    return problem(400, 'invalid_request', 'Send { totpCode } or { recoveryCode }.')
+  const cookie = decodeMfaCookie(request.cookies.get(mfaCookie)?.value)
+  if (cookie === null)
+    return problem(
+      401,
+      'invalid_mfa_ticket',
+      'No sign in is waiting for a second factor. Sign in again.',
+    )
+
+  const mfaStore = new MemoryPendingMfaStore()
+  mfaStore.set({ ticket: cookie.ticket, factors: [], expiresAt: cookie.expiresAt })
+  const client = clientFor(config, request, mfaStore)
+  try {
+    await client.completeMfa(answer)
+  } catch (error) {
+    if (!(error instanceof OrvanoError)) throw error
+    const refused = passThrough(error)
+    if (error.code === 'invalid_mfa_ticket') refused.cookies.delete(mfaCookie)
+    return refused
+  }
+
+  const response = NextResponse.json({ next: safeNext(cookie.next) })
+  writeResponse(response, await client.session.get(), secure)
+  response.cookies.delete(mfaCookie)
+  return response
+}
+
+/**
+ * `POST .../totp-confirm` (spec 0013, AC-37): `{ code }`. Turns MFA on as the signed in user,
+ * sets the new access cookie (the refresh token stays as it was), and answers
+ * `{ recoveryCodes }`.
+ */
+async function confirmTotp(
+  request: NextRequest,
+  client: Client,
+  secure: boolean,
+): Promise<NextResponse> {
+  const body = await jsonBody(request)
+  if (body === null || typeof body.code !== 'string')
+    return problem(400, 'invalid_request', 'Send { code }.')
+  try {
+    const session = await linkSession(request, client)
+    if (session === null) return problem(401, 'session_required', 'Sign in first.')
+    const confirmation = await client.request<{ recoveryCodes: string[]; session: AuthSession }>({
+      method: 'POST',
+      path: '/v1/account/mfa/totp/confirm',
+      body: { code: body.code },
+      bearer: session.access,
+    })
+    const response = NextResponse.json({ recoveryCodes: confirmation.recoveryCodes })
+    writeResponse(response, confirmation.session, secure)
+    return response
+  } catch (error) {
+    if (error instanceof OrvanoError) return passThrough(error)
+    throw error
+  }
+}
+
+/**
+ * `POST .../mfa-verify` (spec 0013, AC-37): `{ totpCode }` or `{ recoveryCode }`. Step up as the
+ * signed in user: sets the new access cookie and answers 204.
+ */
+async function verifyMfa(
+  request: NextRequest,
+  client: Client,
+  secure: boolean,
+): Promise<NextResponse> {
+  const answer = mfaAnswer(await jsonBody(request))
+  if (answer === null)
+    return problem(400, 'invalid_request', 'Send { totpCode } or { recoveryCode }.')
+  try {
+    const session = await linkSession(request, client)
+    if (session === null) return problem(401, 'session_required', 'Sign in first.')
+    const tokens = await client.request<AuthSession>({
+      method: 'POST',
+      path: '/v1/account/mfa/verify',
+      body: answer,
+      bearer: session.access,
+    })
+    const response = new NextResponse(null, { status: 204 })
+    writeResponse(response, tokens, secure)
+    return response
+  } catch (error) {
+    if (error instanceof OrvanoError) return passThrough(error)
+    throw error
+  }
+}
+
 /**
  * The route handler the browser client refreshes, signs out, and redeems emailed links and codes
  * through. Mount it once, at `app/api/orvano/[...orvano]/route.ts`: `POST .../refresh` trades the
@@ -484,8 +667,13 @@ async function oauthCallback(
  * Provider sign in (spec 0012, AC-21): `POST .../oauth` (`{ provider, next?, link? }`) starts a flow
  * and answers `{ url }`, and `GET .../oauth-callback` finishes it and redirects to `next`. Export
  * both methods: `export const { GET, POST } = createOrvanoRouteHandler(...)`.
+ *
+ * MFA (spec 0013, AC-37): a sign in that stops at the MFA step sets the `HttpOnly` `orvano_mfa`
+ * cookie (`redeem` and `email-code` answer `{ mfaRequired: true, factors, expiresAt }`; the
+ * provider callback redirects to `mfaPath`). `POST .../mfa` finishes it, `POST .../totp-confirm`
+ * turns MFA on, and `POST .../mfa-verify` steps up, each setting the session cookies.
  */
-export function createOrvanoRouteHandler(config: OrvanoNextConfig): {
+export function createOrvanoRouteHandler(config: OrvanoRouteHandlerConfig): {
   GET: (request: NextRequest) => Promise<NextResponse>
   POST: (request: NextRequest) => Promise<NextResponse>
 } {
@@ -496,11 +684,7 @@ export function createOrvanoRouteHandler(config: OrvanoNextConfig): {
         .filter((part: string) => part !== '')
         .at(-1)
       if (action !== 'oauth-callback') return problem(404, 'not_found', 'Unknown Orvano action.')
-      return oauthCallback(
-        request,
-        clientFor(config, request),
-        secureCookies(request.nextUrl.origin),
-      )
+      return oauthCallback(request, config, secureCookies(request.nextUrl.origin))
     },
 
     async POST(request: NextRequest): Promise<NextResponse> {
@@ -560,9 +744,12 @@ export function createOrvanoRouteHandler(config: OrvanoNextConfig): {
         return response
       }
 
-      if (action === 'redeem') return redeem(request, client, secure)
-      if (action === 'email-code') return emailCode(request, client, secure)
+      if (action === 'redeem') return redeem(request, config, secure)
+      if (action === 'email-code') return emailCode(request, config, secure)
       if (action === 'oauth') return oauthStart(request, client, secure)
+      if (action === 'mfa') return completeMfa(request, config, secure)
+      if (action === 'totp-confirm') return confirmTotp(request, client, secure)
+      if (action === 'mfa-verify') return verifyMfa(request, client, secure)
 
       return problem(404, 'not_found', 'Unknown Orvano action.')
     },

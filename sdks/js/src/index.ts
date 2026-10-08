@@ -30,8 +30,15 @@ export {
 } from './runtime/auth.js'
 export type { AuthEvent, AuthSession, AuthStateListener, SessionStore } from './runtime/auth.js'
 export { OrvanoError, retryAfterSeconds } from './runtime/error.js'
-export { signInOutcome } from './runtime/mfa.js'
-export type { MfaAnswer, PendingMfa, SignInOutcome } from './runtime/mfa.js'
+export { MemoryPendingMfaStore, signInOutcome } from './runtime/mfa.js'
+export type {
+  MfaAnswer,
+  MfaTransport,
+  PendingMfa,
+  PendingMfaStore,
+  PendingMfaTicket,
+  SignInOutcome,
+} from './runtime/mfa.js'
 export {
   directEmailAuth,
   emailLinkTypes,

@@ -27,8 +27,15 @@ import type {
   OAuthSignInResult,
   OAuthTransport,
 } from './oauth.js'
-import { signInOutcome } from './mfa.js'
-import type { MfaAnswer, PendingMfa, SignInOutcome } from './mfa.js'
+import { MemoryPendingMfaStore, signInOutcome } from './mfa.js'
+import type {
+  MfaAnswer,
+  MfaTransport,
+  PendingMfa,
+  PendingMfaStore,
+  PendingMfaTicket,
+  SignInOutcome,
+} from './mfa.js'
 import { sdkHeader, sdkName, serverVersionHeader, versionMismatch } from './version.js'
 import { AccountService } from '../generated/client.js'
 import type { Identity, MfaFactor, OAuthProvider } from '../generated/models.js'
@@ -67,6 +74,16 @@ export interface ClientConfig {
    * with the PKCE verifier in `sessionStorage`; `@orvano/nextjs` posts to the app's route handler.
    */
   oauth?: OAuthTransport
+  /**
+   * Where a sign in waiting at the MFA step keeps its ticket (spec 0013). Defaults to this
+   * client's memory; `@orvano/nextjs` keeps it in an `HttpOnly` cookie on the server.
+   */
+  mfaStore?: PendingMfaStore
+  /**
+   * How `completeMfa`, `verifyMfa`, and `confirmTotp` run (spec 0013). Defaults to the `account`
+   * operations; `@orvano/nextjs`'s browser client posts them to the app's route handler.
+   */
+  mfa?: MfaTransport
   /** A custom `fetch`, for tests or runtimes without a global one. */
   fetch?: typeof fetch
   /**
@@ -165,7 +182,8 @@ export class Client {
   readonly #oauth: OAuthTransport
   readonly #listeners = new Set<AuthStateListener>()
   #known: AuthSession | null | undefined
-  #mfa: (PendingMfa & { ticket: string }) | null = null
+  readonly #mfaStore: PendingMfaStore
+  readonly #mfaTransport: MfaTransport | undefined
   #refreshing: Promise<AuthSession | null> | undefined
   #versionChecked = false
 
@@ -195,6 +213,8 @@ export class Client {
     this.#refresher = config.refresh ?? refreshWithToken
     this.#emailAuth = config.emailAuth ?? directEmailAuth
     this.#oauth = config.oauth ?? directOAuth
+    this.#mfaStore = config.mfaStore ?? new MemoryPendingMfaStore()
+    this.#mfaTransport = config.mfa
     this.#timeoutMs = config.timeoutMs ?? defaultTimeoutMs
     this.#maxRetries = config.maxRetries ?? defaultMaxRetries
     // Bound, because some runtimes (Cloudflare Workers) reject a fetch called on another `this`.
@@ -354,9 +374,8 @@ export class Client {
    * ticket stays in this client's memory only, so a reload or a new client starts over.
    */
   get pendingMfa(): PendingMfa | null {
-    return this.#mfa === null
-      ? null
-      : { factors: this.#mfa.factors, expiresAt: this.#mfa.expiresAt }
+    const pending = this.#mfaStore.get()
+    return pending === null ? null : { factors: pending.factors, expiresAt: pending.expiresAt }
   }
 
   /**
@@ -368,7 +387,9 @@ export class Client {
    * an ended ticket (`invalid_mfa_ticket`: sign in again).
    */
   async completeMfa(answer: MfaAnswer, options?: RequestOptions): Promise<SignInOutcome> {
-    const pending = this.#mfa
+    if (this.#mfaTransport !== undefined)
+      return this.#mfaTransport.completeMfa(answer, this, options)
+    const pending = this.#mfaStore.get()
     if (pending === null)
       throw new TypeError('Orvano: no sign in is waiting for MFA; sign in first.')
     try {
@@ -378,14 +399,50 @@ export class Client {
       )
       return signInOutcome(result)
     } catch (error) {
-      if (
-        error instanceof OrvanoError &&
-        error.code === 'invalid_mfa_ticket' &&
-        this.#mfa === pending
-      )
-        this.#mfa = null
+      if (error instanceof OrvanoError && error.code === 'invalid_mfa_ticket') {
+        const now = this.#mfaStore.get()
+        if (now !== null && now.ticket === pending.ticket) this.#mfaStore.set(null)
+      }
       throw error
     }
+  }
+
+  /**
+   * Step up (spec 0013, AC-19): proves a second factor on the signed in session
+   * (`account.verifyMfa`), so security changes such as `deleteTotp` work for the next 10 minutes.
+   * Stores the new access token, which carries `aal` 2, and says `tokenRefreshed`.
+   *
+   * @throws {@link OrvanoError} for a wrong code (`invalid_mfa_code`) or a factor the user can't
+   * use now (`factor_not_enabled`).
+   */
+  async verifyMfa(answer: MfaAnswer, options?: RequestOptions): Promise<void> {
+    if (this.#mfaTransport !== undefined) return this.#mfaTransport.verifyMfa(answer, this, options)
+    const tokens = await new AccountService(this).verifyMfa(answer, options)
+    await this.#save(sessionFrom(tokens), 'tokenRefreshed')
+  }
+
+  /**
+   * Turns MFA on with the first code from the authenticator app (`account.confirmTotp`), after
+   * `account.createTotp`. Stores the new access token and says `tokenRefreshed`; every other
+   * session of the user has ended. Answers the 10 recovery codes: show them once.
+   *
+   * @throws {@link OrvanoError} for a wrong code (`invalid_mfa_code`) or no secret waiting for
+   * its first code (`totp_not_pending`).
+   */
+  async confirmTotp(code: string, options?: RequestOptions): Promise<string[]> {
+    if (this.#mfaTransport !== undefined) return this.#mfaTransport.confirmTotp(code, this, options)
+    const confirmation = await new AccountService(this).confirmTotp({ code }, options)
+    await this.#save(sessionFrom(confirmation.session), 'tokenRefreshed')
+    return confirmation.recoveryCodes
+  }
+
+  /**
+   * Tells listeners `mfaRequired` for a sign in another party started and holds the ticket of,
+   * such as `@orvano/nextjs`'s route handler. {@link pendingMfa} then shows its factors.
+   */
+  announceMfa(pending: PendingMfa): void {
+    this.#mfaStore.set({ ticket: '', factors: pending.factors, expiresAt: pending.expiresAt })
+    this.#emit('mfaRequired', this.#known ?? null, pending)
   }
 
   /**
@@ -545,17 +602,19 @@ export class Client {
       case 'start': {
         // Spec 0013, AC-36: a sign in that stopped at the MFA step stores nothing and keeps the
         // ticket in memory only.
-        const body = result as { session?: unknown; mfa?: unknown } | undefined
+        const body = result as { session?: unknown; mfa?: { ticket?: unknown } | null } | undefined
         const mfa = pendingMfaFrom(body?.mfa)
         if (mfa !== null) {
-          this.#mfa = mfa
+          this.#mfaStore.set(mfa)
+          // The ticket lives in a cookie the caller must not read: it never leaves this client.
+          if (this.#mfaStore.hidesTicket === true && body?.mfa != null) body.mfa.ticket = ''
           this.#emit('mfaRequired', this.#known ?? null, {
             factors: mfa.factors,
             expiresAt: mfa.expiresAt,
           })
           return
         }
-        this.#mfa = null
+        this.#mfaStore.set(null)
         await this.#save(sessionFrom(body?.session), 'signedIn')
         return
       }
@@ -688,7 +747,7 @@ function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
 }
 
 /** The ticket, factors, and expiry of an `AuthResult.mfa`, or null when the result has none. */
-function pendingMfaFrom(value: unknown): (PendingMfa & { ticket: string }) | null {
+function pendingMfaFrom(value: unknown): PendingMfaTicket | null {
   const mfa = value as
     { ticket?: unknown; factors?: unknown; expiresAt?: unknown } | null | undefined
   if (mfa === null || mfa === undefined) return null
