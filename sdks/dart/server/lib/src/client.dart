@@ -52,14 +52,19 @@ final class Client extends core.Client {
   /// (30 seconds leeway). A token whose session ended still passes until it
   /// expires (at most 15 minutes); pass [online] to also ask Orvano, as the
   /// user and never with the API key, whether the session is still active.
+  /// The answer carries `aal` and `amr`; [requireMfa] refuses a session that
+  /// signed in with one factor (spec 0013). It reads the token, so pair it
+  /// with [online] when an MFA reset since the token was issued must count.
   ///
   /// Throws [core.OrvanoException] with status 401 and code `token_expired`
-  /// or `invalid_token` when the token does not check out, and [StateError]
-  /// when the client has no [project].
+  /// or `invalid_token` when the token does not check out, 403
+  /// `mfa_required` when [requireMfa] is set and `aal` is below 2, and
+  /// [StateError] when the client has no [project].
   Future<VerifiedAccessToken> verifyAccessToken(
     String token, {
     bool online = false,
-  }) => _verifier.verify(token, online: online);
+    bool requireMfa = false,
+  }) => _verifier.verify(token, online: online, requireMfa: requireMfa);
 
   @override
   Future<void> authorize(

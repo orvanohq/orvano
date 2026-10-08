@@ -16,12 +16,28 @@ export interface VerifiedAccessToken {
   emailVerified: boolean
   /** When the token expires (the `exp` claim). */
   expiresAt: Date
+  /**
+   * How strongly the session signed in (the `aal` claim): 1 for one factor, 2 after a second
+   * factor or with a passkey. 1 for a token issued before Orvano had the claim.
+   */
+  aal: number
+  /**
+   * How the session signed in (the `amr` claim), such as `["mfa", "otp", "pwd"]`; empty for a
+   * token issued before Orvano had the claim.
+   */
+  amr: string[]
 }
 
 /** Options for {@link AccessTokenVerifier.verify}. */
 export interface VerifyAccessTokenOptions {
   /** Also ask Orvano, as the user and never with the API key, whether the session is still active. */
   online?: boolean
+  /**
+   * Refuse a session that signed in with one factor (`aal` below 2) with the typed error
+   * `mfa_required`. A local claim check: it reads the token, so pair it with `online` when the
+   * answer must reflect an MFA reset that happened since the token was issued.
+   */
+  requireMfa?: boolean
   /** Cancels the check. */
   signal?: AbortSignal
 }
@@ -92,11 +108,13 @@ export class AccessTokenVerifier {
       throw invalid('The access token is not valid for this project.')
     }
 
-    const { sub, sid, exp, email_verified } = payload as {
+    const { sub, sid, exp, email_verified, aal, amr } = payload as {
       sub?: unknown
       sid?: unknown
       exp?: unknown
       email_verified?: unknown
+      aal?: unknown
+      amr?: unknown
     }
     if (
       typeof sub !== 'string' ||
@@ -106,6 +124,18 @@ export class AccessTokenVerifier {
       typeof exp !== 'number'
     ) {
       throw invalid('The access token names no user, session, or expiry.')
+    }
+
+    // Tokens from before spec 0013 carry neither claim: they read as one factor.
+    const level = typeof aal === 'number' && Number.isInteger(aal) && aal >= 1 ? aal : 1
+    const methods = Array.isArray(amr) ? amr.filter((m): m is string => typeof m === 'string') : []
+    if (options.requireMfa === true && level < 2) {
+      throw new OrvanoError(
+        403,
+        'mfa_required',
+        'This needs a session that passed a second factor or signed in with a passkey.',
+        null,
+      )
     }
 
     if (options.online === true) {
@@ -119,6 +149,8 @@ export class AccessTokenVerifier {
       sessionId: sid,
       emailVerified: email_verified === true,
       expiresAt: new Date(exp * 1000),
+      aal: level,
+      amr: methods,
     }
   }
 

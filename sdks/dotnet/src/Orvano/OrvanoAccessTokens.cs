@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
@@ -11,7 +12,33 @@ namespace Orvano;
 /// Whether the user's email was verified when the token was issued (the <c>email_verified</c> claim); false when the
 /// claim is missing. Up to 15 minutes old: verify <c>online</c> for the current value.
 /// </param>
-public sealed record VerifiedAccessToken(string UserId, string SessionId, DateTimeOffset ExpiresAt, bool EmailVerified);
+public sealed record VerifiedAccessToken(string UserId, string SessionId, DateTimeOffset ExpiresAt, bool EmailVerified)
+{
+    /// <summary>
+    /// How strongly the session signed in (the <c>aal</c> claim): 1 for one factor, 2 after a second factor or with a
+    /// passkey. 1 for a token issued before Orvano had the claim.
+    /// </summary>
+    public int Aal { get; init; } = 1;
+
+    /// <summary>
+    /// How the session signed in (the <c>amr</c> claim), such as <c>["mfa", "otp", "pwd"]</c>; empty for a token issued
+    /// before Orvano had the claim.
+    /// </summary>
+    public IReadOnlyList<string> Amr { get; init; } = [];
+}
+
+/// <summary>Options for <see cref="OrvanoClient.VerifyAccessTokenAsync(string, VerifyAccessTokenOptions, CancellationToken)"/>.</summary>
+public sealed record VerifyAccessTokenOptions
+{
+    /// <summary>Also make one <c>GET /v1/account</c> with the token, never with the API key.</summary>
+    public bool Online { get; init; }
+
+    /// <summary>
+    /// Refuse a session that signed in with one factor (<c>aal</c> below 2) with code <c>mfa_required</c>. A local claim
+    /// check: it reads the token, so pair it with <see cref="Online"/> when an MFA reset since the token was issued must count.
+    /// </summary>
+    public bool RequireMfa { get; init; }
+}
 
 public sealed partial class OrvanoClient
 {
@@ -45,8 +72,25 @@ public sealed partial class OrvanoClient
     /// Status 401 with code <c>token_expired</c> or <c>invalid_token</c> when the token does not check out.
     /// </exception>
     /// <exception cref="InvalidOperationException">The client has no <see cref="OrvanoClientOptions.Project"/>.</exception>
-    public async Task<VerifiedAccessToken> VerifyAccessTokenAsync(string token, bool online = false, CancellationToken cancellationToken = default)
+    public Task<VerifiedAccessToken> VerifyAccessTokenAsync(string token, bool online = false, CancellationToken cancellationToken = default) =>
+        VerifyAccessTokenAsync(token, new VerifyAccessTokenOptions { Online = online }, cancellationToken);
+
+    /// <summary>
+    /// Checks a user's access token as <see cref="VerifyAccessTokenAsync(string, bool, CancellationToken)"/> does, with
+    /// <see cref="VerifyAccessTokenOptions.RequireMfa"/> to refuse a session that signed in with one factor (spec 0013).
+    /// </summary>
+    /// <param name="token">The access token, without <c>Bearer </c>.</param>
+    /// <param name="options">Whether to check online and whether to require MFA.</param>
+    /// <param name="cancellationToken">Cancels the check.</param>
+    /// <returns>The user ID, session ID, expiry, <c>aal</c>, and <c>amr</c>.</returns>
+    /// <exception cref="OrvanoException">
+    /// Status 401 with code <c>token_expired</c> or <c>invalid_token</c> when the token does not check out; 403 with code
+    /// <c>mfa_required</c> when MFA is required and <c>aal</c> is below 2.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">The client has no <see cref="OrvanoClientOptions.Project"/>.</exception>
+    public async Task<VerifiedAccessToken> VerifyAccessTokenAsync(string token, VerifyAccessTokenOptions options, CancellationToken cancellationToken = default)
     {
+        if (options is null) throw new ArgumentNullException(nameof(options));
         var project = _project ?? throw new InvalidOperationException("Set OrvanoClientOptions.Project to verify access tokens of that project.");
         if (string.IsNullOrEmpty(token)) throw InvalidToken("No access token was given.");
 
@@ -88,13 +132,20 @@ public sealed partial class OrvanoClient
             throw InvalidToken("The access token names no user or session.");
         }
 
-        if (online)
+        // Tokens from before spec 0013 carry neither claim: they read as one factor.
+        var (aal, amr) = ReadStrength(jwt);
+        if (options.RequireMfa && aal < 2)
+        {
+            throw new OrvanoException(403, "mfa_required", "This needs a session that passed a second factor or signed in with a passkey.", null);
+        }
+
+        if (options.Online)
         {
             await SendAsync(new OrvanoRequest("GET", "/v1/account", null, null, false) { Bearer = token }, cancellationToken).ConfigureAwait(false);
         }
 
         var emailVerified = jwt.TryGetPayloadValue<bool>("email_verified", out var verified) && verified;
-        return new VerifiedAccessToken(userId, sessionId, new DateTimeOffset(jwt.ValidTo, TimeSpan.Zero), emailVerified);
+        return new VerifiedAccessToken(userId, sessionId, new DateTimeOffset(jwt.ValidTo, TimeSpan.Zero), emailVerified) { Aal = aal, Amr = amr };
     }
 
     private static readonly JsonWebTokenHandler Handler = new() { MapInboundClaims = false };
@@ -130,4 +181,19 @@ public sealed partial class OrvanoClient
     }
 
     private static OrvanoException InvalidToken(string message) => new(401, "invalid_token", message, null);
+
+    /// <summary>
+    /// <c>aal</c> and <c>amr</c> read from the raw payload, so only a whole number of at least 1 and an array of strings
+    /// count, the same as the other SDKs; anything else reads as 1 and empty.
+    /// </summary>
+    private static (int Aal, IReadOnlyList<string> Amr) ReadStrength(JsonWebToken jwt)
+    {
+        using var payload = JsonDocument.Parse(Base64UrlEncoder.DecodeBytes(jwt.EncodedPayload));
+        var root = payload.RootElement;
+        var aal = root.TryGetProperty("aal", out var level) && level.ValueKind == JsonValueKind.Number && level.TryGetInt32(out var n) && n >= 1 ? n : 1;
+        IReadOnlyList<string> amr = root.TryGetProperty("amr", out var methods) && methods.ValueKind == JsonValueKind.Array
+            ? [.. methods.EnumerateArray().Where(m => m.ValueKind == JsonValueKind.String).Select(m => m.GetString()!)]
+            : [];
+        return (aal, amr);
+    }
 }

@@ -152,15 +152,50 @@ public class AccessTokenTests
 
     private static ECDsaSecurityKey NewKey(string kid) => new(ECDsa.Create(ECCurve.NamedCurves.nistP256)) { KeyId = kid };
 
+    // Spec 0013 AC-39: aal and amr from the token, missing ones read as 1 and empty; RequireMfa refuses a one factor
+    // session with mfa_required before any online check.
+    [Fact]
+    public async Task Reads_aal_and_amr_and_RequireMfa_refuses_a_one_factor_session()
+    {
+        var key = NewKey("k1");
+        var server = new FakeServer().Then(() => Jwks(key));
+        using var client = server.Client(o => o.Project = Project);
+        var strong = Sign(key, extra: new Dictionary<string, object> { ["aal"] = 2, ["amr"] = new[] { "mfa", "otp", "pwd" } });
+        var weak = Sign(key, extra: new Dictionary<string, object> { ["aal"] = 1, ["amr"] = new[] { "pwd" } });
+        var old = Sign(key);
+        var junk = Sign(key, extra: new Dictionary<string, object> { ["aal"] = "two", ["amr"] = "pwd" });
+
+        var verified = await client.VerifyAccessTokenAsync(strong, new VerifyAccessTokenOptions { RequireMfa = true }, Ct);
+
+        Assert.Equal(2, verified.Aal);
+        Assert.Equal(["mfa", "otp", "pwd"], verified.Amr);
+        Assert.Equal(["pwd"], (await client.VerifyAccessTokenAsync(weak, cancellationToken: Ct)).Amr);
+        var before = await client.VerifyAccessTokenAsync(old, cancellationToken: Ct);
+        Assert.Equal((1, 0), (before.Aal, before.Amr.Count));
+        var odd = await client.VerifyAccessTokenAsync(junk, cancellationToken: Ct);
+        Assert.Equal((1, 0), (odd.Aal, odd.Amr.Count));
+        foreach (var token in new[] { weak, old })
+        {
+            var refused = await Assert.ThrowsAsync<OrvanoException>(() =>
+                client.VerifyAccessTokenAsync(token, new VerifyAccessTokenOptions { RequireMfa = true, Online = true }, Ct));
+            Assert.Equal((403, "mfa_required"), (refused.Status, refused.Code));
+        }
+
+        Assert.Single(server.Requests);
+    }
+
     private static string Sign(
-        ECDsaSecurityKey key, string audience = Project, string issuer = Issuer, string? sid = "session-1", DateTime? expires = null, bool? emailVerified = null)
+        ECDsaSecurityKey key, string audience = Project, string issuer = Issuer, string? sid = "session-1", DateTime? expires = null, bool? emailVerified = null,
+        IDictionary<string, object>? extra = null)
     {
         var claims = new List<Claim> { new("sub", "user-1") };
         if (sid is not null) claims.Add(new Claim("sid", sid));
         var exp = expires ?? DateTime.UtcNow.AddMinutes(15);
         return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
-            Claims = emailVerified is { } verified ? new Dictionary<string, object> { ["email_verified"] = verified } : null,
+            Claims = emailVerified is null && extra is null
+                ? null
+                : new Dictionary<string, object>(extra ?? new Dictionary<string, object>()) { ["email_verified"] = emailVerified ?? false },
             Issuer = issuer,
             Audience = audience,
             Subject = new ClaimsIdentity(claims),

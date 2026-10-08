@@ -56,6 +56,7 @@ String sign(
   String? sid = 'session-1',
   DateTime? expires,
   bool? emailVerified,
+  Map<String, Object?> extra = const {},
 }) {
   final key = JWTKey.fromJWK({...publicJwk(kid, name), 'd': keys[name]!.$1});
   final exp = expires ?? clock.now().add(const Duration(minutes: 15));
@@ -66,6 +67,7 @@ String sign(
       'email_verified': ?emailVerified,
       'iat': exp.millisecondsSinceEpoch ~/ 1000 - 900,
       'exp': exp.millisecondsSinceEpoch ~/ 1000,
+      ...extra,
     },
     header: {'kid': kid},
     audience: Audience.one(audience),
@@ -238,6 +240,50 @@ void main() {
       c.verifyAccessToken(token, online: true),
       throwsA(orvanoError('invalid_token')),
     );
+  });
+
+  // Spec 0013 AC-39: aal and amr from the token, missing ones read as 1 and
+  // empty; requireMfa refuses a one factor session before any online check.
+  test('reads aal and amr, and requireMfa refuses one factor', () async {
+    final sent = <http.BaseRequest>[];
+    final c = client(sent, (_) => jwks([publicJwk('k1', 'a')]));
+    final strong = sign(
+      'a',
+      extra: {
+        'aal': 2,
+        'amr': ['mfa', 'otp', 'pwd'],
+      },
+    );
+    final weak = sign(
+      'a',
+      extra: {
+        'aal': 1,
+        'amr': ['pwd'],
+      },
+    );
+    final old = sign('a');
+    final junk = sign('a', extra: {'aal': 'two', 'amr': 'pwd'});
+
+    final verified = await c.verifyAccessToken(strong, requireMfa: true);
+
+    expect(verified.aal, 2);
+    expect(verified.amr, ['mfa', 'otp', 'pwd']);
+    expect((await c.verifyAccessToken(weak)).amr, ['pwd']);
+    expect((await c.verifyAccessToken(old)).aal, 1);
+    expect((await c.verifyAccessToken(old)).amr, isEmpty);
+    expect((await c.verifyAccessToken(junk)).aal, 1);
+    expect((await c.verifyAccessToken(junk)).amr, isEmpty);
+    for (final token in [weak, old]) {
+      await expectLater(
+        c.verifyAccessToken(token, requireMfa: true, online: true),
+        throwsA(
+          isA<OrvanoException>()
+              .having((e) => e.status, 'status', 403)
+              .having((e) => e.code, 'code', 'mfa_required'),
+        ),
+      );
+    }
+    expect(sent, hasLength(1));
   });
 
   test('needs a project', () {
