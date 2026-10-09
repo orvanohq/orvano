@@ -35,9 +35,9 @@ projects:
   - id: scenarios0000000000a
     name: Scenarios
   - id: scenarios0000000000b
-    name: Scenarios require MFA
+    name: Required MFA
   - id: scenarios0000000000c
-    name: Scenarios session cap
+    name: Session cap
 apiKeys:
   - project: scenarios0000000000a
     secret: orv_sk_scenarioScenarioScenarioScenarioScenario000
