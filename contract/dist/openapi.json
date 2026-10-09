@@ -630,6 +630,182 @@
         "x-orvano-audience": "client"
       }
     },
+    "/v1/account/mfa/enrollment/passkey": {
+      "post": {
+        "operationId": "account.createMfaEnrollmentPasskey",
+        "description": "Starts enrolling a passkey for a sign in that must enroll a first factor (`MfaChallenge.enrollmentRequired`):\nanswers the options for `navigator.credentials.create`. Finish with `account.completeMfaEnrollmentPasskey`.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyRegistration"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMfaEnrollmentRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/mfa/enrollment/passkey/confirm": {
+      "post": {
+        "operationId": "account.completeMfaEnrollmentPasskey",
+        "description": "Finishes enrolling a passkey with the browser's or the platform's answer: stores the passkey and answers the\nsession, at level 2. After 5 wrong answers the ticket stops working; sign in again.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaEnrollmentResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteMfaEnrollmentPasskeyRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/mfa/enrollment/totp": {
+      "post": {
+        "operationId": "account.createMfaEnrollmentTotp",
+        "description": "Starts enrolling an authenticator app for a sign in that must enroll a first factor\n(`MfaChallenge.enrollmentRequired`): answers a new secret. Confirm it with `account.completeMfaEnrollmentTotp`\nwithin 15 minutes.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpSetup"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMfaEnrollmentRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/mfa/enrollment/totp/confirm": {
+      "post": {
+        "operationId": "account.completeMfaEnrollmentTotp",
+        "description": "Finishes enrolling an authenticator app with its first code: turns MFA on and answers 10 recovery codes and the\nsession, at level 2. After 5 wrong codes the ticket stops working; sign in again.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaEnrollmentResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteMfaEnrollmentTotpRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/account/mfa/passkey-challenge": {
       "post": {
         "operationId": "account.createStepUpPasskeyChallenge",
@@ -8601,7 +8777,9 @@
           "rpName",
           "androidCertFingerprints",
           "activePasskeyCount",
-          "acceptedOrigins"
+          "acceptedOrigins",
+          "mfaRequired",
+          "activeUsersWithoutMfa"
         ],
         "properties": {
           "totpEnabled": {
@@ -8677,6 +8855,28 @@
                 "https://app.example.com",
                 "https://example.com"
               ]
+            ]
+          },
+          "mfaRequired": {
+            "type": "boolean",
+            "description": "Whether every user must have a second factor (an authenticator app or a passkey) before they get a session. Sign\nup and password sign in then need a verified email, and a user with no factor enrolls one at their next sign in.\nNeeds TOTP or passkeys on, and an email server.",
+            "examples": [
+              false
+            ]
+          },
+          "activeUsersWithoutMfa": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int32"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How many users hold a live session and have no second factor, so would enroll one at their next sign in while\n`mfaRequired` is on. Counted by `consoleAuthMethods.get` only; null in the answer of an update.",
+            "examples": [
+              4
             ]
           }
         },
@@ -9135,6 +9335,66 @@
           }
         },
         "description": "A signed in user and their new session; for a user with MFA on, the challenge to answer first; or, for a sign up in\na project that requires verified emails, a pending answer that says to check the inbox. Exactly one of `session`,\n`mfa`, or `verificationRequired` true is set."
+      },
+      "CompleteMfaEnrollmentPasskeyRequest": {
+        "type": "object",
+        "required": [
+          "ticket",
+          "challengeId",
+          "credential"
+        ],
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "description": "The `ticket` of the `MfaChallenge`.",
+            "examples": [
+              "orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          },
+          "challengeId": {
+            "type": "string",
+            "description": "The `challengeId` of the `PasskeyRegistration` from `account.createMfaEnrollmentPasskey`.",
+            "examples": [
+              "01928f3e-6c1a-7b2d-9e4f-5a6b7c8d9e0f"
+            ]
+          },
+          "credential": {
+            "$ref": "#/components/schemas/PasskeyRegistrationCredential",
+            "description": "The browser's or the platform's answer."
+          },
+          "name": {
+            "type": "string",
+            "description": "1 to 64 characters. Left out, the passkey is named `Passkey`.",
+            "examples": [
+              "MacBook"
+            ]
+          }
+        },
+        "description": "The browser's or the platform's new passkey, which finishes enrollment."
+      },
+      "CompleteMfaEnrollmentTotpRequest": {
+        "type": "object",
+        "required": [
+          "ticket",
+          "code"
+        ],
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "description": "The `ticket` of the `MfaChallenge`.",
+            "examples": [
+              "orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "description": "The 6 digit code the authenticator app shows now.",
+            "examples": [
+              "492039"
+            ]
+          }
+        },
+        "description": "The first code from the authenticator app, which finishes enrollment."
       },
       "CompleteOAuthLinkRequest": {
         "type": "object",
@@ -9884,6 +10144,22 @@
           }
         },
         "description": "A sign in with the token from a magic link."
+      },
+      "CreateMfaEnrollmentRequest": {
+        "type": "object",
+        "required": [
+          "ticket"
+        ],
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "description": "The `ticket` of the `MfaChallenge`.",
+            "examples": [
+              "orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          }
+        },
+        "description": "The enrollment ticket of a sign in that must enroll a first factor (`MfaChallenge.enrollmentRequired`)."
       },
       "CreateMfaPasskeyChallengeRequest": {
         "type": "object",
@@ -11342,12 +11618,13 @@
         "required": [
           "ticket",
           "factors",
-          "expiresAt"
+          "expiresAt",
+          "enrollmentRequired"
         ],
         "properties": {
           "ticket": {
             "type": "string",
-            "description": "Proves the first step passed; send it to `account.createMfaSession`. Keep it in memory only. Empty when the ticket\ntravels in a cookie instead (the console).",
+            "description": "Proves the first step passed; send it to `account.createMfaSession`, or with `enrollmentRequired`, to the\nenrollment operations. Keep it in memory only. Empty when the ticket travels in a cookie instead (the console).",
             "examples": [
               "orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
             ]
@@ -11357,15 +11634,56 @@
             "items": {
               "$ref": "#/components/schemas/MfaFactor"
             },
-            "description": "The factors the user can answer with now, in this order: `totp`, `recovery_code`, `passkey`."
+            "description": "The factors the user can answer with now, in this order: `totp`, `recovery_code`, `passkey`. With\n`enrollmentRequired`, the factors the user can enroll instead: `totp`, `passkey`."
           },
           "expiresAt": {
             "type": "string",
             "format": "date-time",
-            "description": "When the ticket stops working: 5 minutes after the first step. After that, sign in again."
+            "description": "When the ticket stops working: 5 minutes after the first step, or 15 with `enrollmentRequired`. After that, sign in\nagain."
+          },
+          "enrollmentRequired": {
+            "type": "boolean",
+            "description": "True when the project requires MFA and the user must enroll a first factor before any session; false for a second\nstep.",
+            "examples": [
+              false
+            ]
           }
         },
-        "description": "The second step a sign in must pass before it gets a session: the user has MFA on. Answer it with\n`account.createMfaSession` before `expiresAt`."
+        "description": "What a sign in must pass before it gets a session. Usually the second step: the user has MFA on, so answer it with\n`account.createMfaSession` before `expiresAt`. When `enrollmentRequired` is true, the project requires MFA and the\nuser has no second factor yet: enroll one with the ticket (`account.createMfaEnrollmentTotp` or\n`account.createMfaEnrollmentPasskey`), which answers the session."
+      },
+      "MfaEnrollmentResult": {
+        "type": "object",
+        "required": [
+          "auth",
+          "recoveryCodes"
+        ],
+        "properties": {
+          "auth": {
+            "$ref": "#/components/schemas/AuthResult",
+            "description": "The signed in user and their new session."
+          },
+          "recoveryCodes": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "10 recovery codes, each `XXXXX-XXXXX`, each working once, after an authenticator app; null after a passkey.",
+            "examples": [
+              [
+                "K7QXM-2RPLD",
+                "A4ZTN-WQ6EB"
+              ]
+            ]
+          }
+        },
+        "description": "An enrolled first factor and the session it earned, at level 2. With an authenticator app, show the recovery codes\nonce and ask the user to keep them safe; they can't be read again."
       },
       "MfaFactor": {
         "type": "string",
@@ -13907,6 +14225,13 @@
               "type": "string"
             },
             "description": "At most 10 SHA-256 fingerprints, uppercase or lowercase hex pairs joined by colons; stored uppercase."
+          },
+          "mfaRequired": {
+            "type": "boolean",
+            "description": "Whether every user must have a second factor before they get a session. Needs `totpEnabled` or `passkeysEnabled`,\nand turning it on needs an email server.",
+            "examples": [
+              true
+            ]
           },
           "confirmRpIdChange": {
             "type": "boolean",

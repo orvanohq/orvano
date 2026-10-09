@@ -9,14 +9,21 @@ namespace Orvano.Auth.Application;
 
 /// <summary>
 /// What a project allows now (spec 0013, AC-1, AC-3): TOTP, and passkeys with their RP ID, RP name, and Android
-/// certificate fingerprints. <see cref="ConsoleOrigin"/> is set only for the <c>console</c> project, whose one allowed
-/// origin is <c>ORVANO_PUBLIC_URL</c>'s.
+/// certificate fingerprints, and whether it requires MFA (spec 0014, AC-27). <see cref="ConsoleOrigin"/> is set only
+/// for the <c>console</c> project, whose one allowed origin is <c>ORVANO_PUBLIC_URL</c>'s and which never requires MFA
+/// (AC-37).
 /// </summary>
 internal sealed record MethodPolicy(
-    bool TotpEnabled, bool PasskeysEnabled, string? RpId, string? RpName, IReadOnlyList<string> AndroidFingerprints, string? ConsoleOrigin = null)
+    bool TotpEnabled, bool PasskeysEnabled, string? RpId, string? RpName, IReadOnlyList<string> AndroidFingerprints, string? ConsoleOrigin = null,
+    bool MfaRequired = false)
 {
     public static MethodPolicy Of(MethodSettings settings) =>
-        new(settings.TotpEnabled, settings.PasskeysEnabled, settings.RpId, settings.RpName, settings.AndroidCertFingerprints);
+        new(settings.TotpEnabled, settings.PasskeysEnabled, settings.RpId, settings.RpName, settings.AndroidCertFingerprints,
+            MfaRequired: settings.MfaRequired);
+
+    /// <summary>The factors a user may enroll now (spec 0014, AC-27), in the challenge's order: <c>totp</c>, then <c>passkey</c>.</summary>
+    public IReadOnlyList<string> Enrollable =>
+        [.. new[] { (TotpEnabled, MfaFactors.Totp), (PasskeysEnabled, MfaFactors.Passkey) }.Where(f => f.Item1).Select(f => f.Item2)];
 }
 
 /// <summary>
@@ -61,14 +68,26 @@ internal sealed class MethodPolicies(PublicUrl publicUrl, PolicySettings setting
     }
 }
 
-/// <summary>An MFA challenge as the API returns it (the contract's <c>MfaChallenge</c>).</summary>
-internal sealed record MfaChallengeView(string Ticket, IReadOnlyList<string> Factors, DateTimeOffset ExpiresAt);
+/// <summary>
+/// An MFA challenge as the API returns it (the contract's <c>MfaChallenge</c>): a step two, or with
+/// <paramref name="EnrollmentRequired"/>, the enrollment a project that requires MFA asks first (spec 0014, AC-27).
+/// </summary>
+internal sealed record MfaChallengeView(string Ticket, IReadOnlyList<string> Factors, DateTimeOffset ExpiresAt, bool EnrollmentRequired = false);
 
 /// <summary>A user's second factor state, read without locks (spec 0013, AC-5, AC-7, AC-16).</summary>
 internal sealed record MfaFactorState(DateTimeOffset? TotpConfirmedAt, int RecoveryCodesRemaining, int ActivePasskeys, MethodPolicy Policy)
 {
     /// <summary>AC-5: a confirmed TOTP factor while the project allows TOTP. A passkey alone never turns MFA on.</summary>
     public bool MfaEnabled => TotpConfirmedAt is not null && Policy.TotpEnabled;
+
+    /// <summary>
+    /// Spec 0014, AC-27: a factor that counts for required MFA, a confirmed TOTP factor while TOTP is on or an active
+    /// passkey while passkeys are on.
+    /// </summary>
+    public bool HasFactor => MfaEnabled || (Policy.PasskeysEnabled && ActivePasskeys > 0);
+
+    /// <summary>Spec 0014, AC-27: the project requires MFA and the user has no factor, so step one ends in enrollment.</summary>
+    public bool MustEnroll => Policy.MfaRequired && !HasFactor;
 
     /// <summary>AC-7's list, in its order, each present only when usable now.</summary>
     public IReadOnlyList<string> Factors
@@ -104,26 +123,38 @@ internal sealed record MfaFactorState(DateTimeOffset? TotpConfirmedAt, int Recov
 
 /// <summary>
 /// The step one gate (spec 0013, AC-6, AC-7): for a user with MFA on, a sign in creates a ticket in place of a
-/// session. Runs inside the sign in's transaction, after its own checks, and locks the user before the ticket rows.
+/// session. Spec 0014, AC-27: in a project that requires MFA, a user with no factor gets an enrollment ticket in its
+/// place instead. Runs inside the sign in's transaction, after its own checks, and locks the user before the ticket rows.
 /// </summary>
 internal static class MfaGate
 {
     /// <summary>
-    /// The challenge to answer instead of a session, or a null value when the user has MFA off and the sign in goes on.
-    /// Keeps the user's live tickets at 5 by deleting the oldest, and drops their expired ones. Refuses with
-    /// <see cref="Failure.UserNotFound"/> when the user is gone by the time it takes the lock, so the caller fails
-    /// cleanly in place of a foreign key error on the ticket insert.
+    /// The challenge to answer instead of a session, or a null value when the sign in goes on. A user with MFA on gets
+    /// a step two ticket; under required MFA, a user with no factor gets an <c>enroll</c> ticket (15 minutes), except a
+    /// guest, who is never challenged, and a user whose email is not verified, who gets 403
+    /// <c>email_verification_required</c>. Keeps the user's live tickets at 5 by deleting the oldest, and drops their
+    /// expired ones. Refuses with <see cref="Failure.UserNotFound"/> when the user is gone by the time it takes the lock,
+    /// so the caller fails cleanly in place of a foreign key error on the ticket insert.
     /// </summary>
     public static async Task<Outcome<MfaChallengeView?>> ChallengeAsync(
         MethodPolicies policies, AuthUnitOfWork uow, string projectId, Guid userId, string method, string? provider, ClientInfo client, CancellationToken ct,
         string? pendingPasswordHash = null)
     {
         var conn = uow.Tx.Connection!;
-        if (!(await MfaFactorState.ReadAsync(policies, conn, uow.Tx, projectId, userId, ct)).MfaEnabled) return (MfaChallengeView?)null;
+        var first = await MfaFactorState.ReadAsync(policies, conn, uow.Tx, projectId, userId, ct);
+        if (!first.MfaEnabled && !first.MustEnroll) return (MfaChallengeView?)null;
 
-        if (await UserLocks.ByIdAsync(uow, projectId, userId, ct) is null) return Failure.UserNotFound;
+        if (await UserLocks.ByIdAsync(uow, projectId, userId, ct) is not { } user) return Failure.UserNotFound;
         var state = await MfaFactorState.ReadAsync(policies, conn, uow.Tx, projectId, userId, ct);
-        if (!state.MfaEnabled) return (MfaChallengeView?)null;
+        string purpose;
+        if (state.MfaEnabled) purpose = MfaTicketPurposes.Challenge;
+        else if (state.MustEnroll && !user.IsAnonymous)
+        {
+            // Spec 0013 enrolls only verified emails, so an unverified one can't reach a factor from here.
+            if (VerifiedEmailRule.Blocks(projectId, user.Email, user.EmailVerifiedAt)) return Failure.EmailVerificationRequired;
+            purpose = MfaTicketPurposes.Enroll;
+        }
+        else return (MfaChallengeView?)null;
 
         await using (var prune = new NpgsqlCommand(
             """
@@ -138,12 +169,13 @@ internal static class MfaGate
             await prune.ExecuteNonQueryAsync(ct);
         }
 
+        var enroll = purpose == MfaTicketPurposes.Enroll;
         var ticket = MfaTicket.New();
         await using var insert = new NpgsqlCommand(
             """
             INSERT INTO orvano.auth_mfa_tickets (
-                project_id, user_id, ticket_hash, method, pending_password_hash, provider, user_agent, sdk, ip, expires_at)
-            VALUES (@project, @user, @hash, @method, @pending, @provider, @agent, @sdk, @ip, now() + @lifetime)
+                project_id, user_id, ticket_hash, method, pending_password_hash, provider, user_agent, sdk, ip, expires_at, purpose)
+            VALUES (@project, @user, @hash, @method, @pending, @provider, @agent, @sdk, @ip, now() + @lifetime, @purpose)
             RETURNING expires_at
             """, conn, uow.Tx);
         insert.Parameters.AddWithValue("project", projectId);
@@ -155,9 +187,12 @@ internal static class MfaGate
         insert.Parameters.AddWithValue("agent", NpgsqlDbType.Text, (object?)client.UserAgent ?? DBNull.Value);
         insert.Parameters.AddWithValue("sdk", NpgsqlDbType.Text, (object?)client.Sdk ?? DBNull.Value);
         insert.Parameters.AddWithValue("ip", NpgsqlDbType.Inet, (object?)client.Ip ?? DBNull.Value);
-        insert.Parameters.AddWithValue("lifetime", AuthTimings.MfaTicket);
-        var expiresAt = (DateTime)(await insert.ExecuteScalarAsync(ct))!;
-        return new MfaChallengeView(ticket.Value, state.Factors, new DateTimeOffset(expiresAt, TimeSpan.Zero));
+        insert.Parameters.AddWithValue("lifetime", enroll ? AuthTimings.MfaEnrollmentTicket : AuthTimings.MfaTicket);
+        insert.Parameters.AddWithValue("purpose", purpose);
+        var expiresAt = new DateTimeOffset((DateTime)(await insert.ExecuteScalarAsync(ct))!, TimeSpan.Zero);
+        return enroll
+            ? new MfaChallengeView(ticket.Value, state.Policy.Enrollable, expiresAt, EnrollmentRequired: true)
+            : new MfaChallengeView(ticket.Value, state.Factors, expiresAt);
     }
 }
 
@@ -179,6 +214,47 @@ internal sealed class MfaFactorStore(SecretBox secrets, TimeProvider clock)
 
     private byte[] OpenSecret(Guid userId, byte[] ciphertext) =>
         secrets.Decrypt(ciphertext, SecretBox.AssociatedData(TotpTable, userId.ToString(), TotpSecretColumn));
+
+    /// <summary>
+    /// A new 20 byte secret for the user, replacing any pending one (spec 0013, AC-12), waiting 15 minutes for its first
+    /// code. The caller holds the user lock and checked that no factor is confirmed. Never log the answer.
+    /// </summary>
+    public async Task<TotpSetupView> PendTotpAsync(AuthUnitOfWork uow, string projectId, Guid userId, string issuer, string? email, CancellationToken ct)
+    {
+        var secret = Totp.NewSecret();
+        await using var upsert = new NpgsqlCommand(
+            """
+            INSERT INTO orvano.auth_totp_factors (user_id, project_id, secret_ciphertext)
+            VALUES (@user, @project, @secret)
+            ON CONFLICT (user_id) DO UPDATE
+            SET secret_ciphertext = excluded.secret_ciphertext, last_used_step = NULL, created_at = now(), updated_at = now()
+            WHERE auth_totp_factors.confirmed_at IS NULL
+            RETURNING created_at
+            """, uow.Tx.Connection, uow.Tx);
+        upsert.Parameters.AddWithValue("user", userId);
+        upsert.Parameters.AddWithValue("project", projectId);
+        upsert.Parameters.AddWithValue("secret", SealSecret(userId, secret));
+        var createdAt = (DateTime)(await upsert.ExecuteScalarAsync(ct))!;
+
+        var encoded = Base32.Encode(secret);
+        var uri = Totp.Uri(issuer, email ?? userId.ToString(), encoded);
+        return new TotpSetupView(encoded, uri, new DateTimeOffset(createdAt, TimeSpan.Zero) + AuthTimings.PendingTotp);
+    }
+
+    /// <summary>
+    /// Reads the user's pending factor's sealed secret when it is at most 15 minutes old (AC-13); null when there is none.
+    /// </summary>
+    public static async Task<byte[]?> PendingTotpAsync(AuthUnitOfWork uow, Guid userId, CancellationToken ct)
+    {
+        await using var read = new NpgsqlCommand(
+            """
+            SELECT secret_ciphertext FROM orvano.auth_totp_factors
+            WHERE user_id = @user AND confirmed_at IS NULL AND created_at > now() - @pending
+            """, uow.Tx.Connection, uow.Tx);
+        read.Parameters.AddWithValue("user", userId);
+        read.Parameters.AddWithValue("pending", AuthTimings.PendingTotp);
+        return (byte[]?)await read.ExecuteScalarAsync(ct);
+    }
 
     /// <summary>
     /// Checks <paramref name="code"/> against the user's confirmed factor and, when it matches a step newer than the
@@ -322,18 +398,23 @@ internal sealed class MfaFactorStore(SecretBox secrets, TimeProvider clock)
         return [.. ids];
     }
 
-    /// <summary>Reads a live ticket by (project, SHA-256), optionally locked; null when there is none or it expired.</summary>
-    public static async Task<TicketRow?> ReadTicketAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, string projectId, byte[] hash, bool lockRow, CancellationToken ct)
+    /// <summary>
+    /// Reads a live ticket of <paramref name="purpose"/> (one of <see cref="MfaTicketPurposes"/>) by (project, SHA-256),
+    /// optionally locked; null when there is none, it expired, or it is for the other purpose (spec 0014, AC-27).
+    /// </summary>
+    public static async Task<TicketRow?> ReadTicketAsync(
+        NpgsqlConnection conn, NpgsqlTransaction? tx, string projectId, byte[] hash, bool lockRow, CancellationToken ct, string purpose = MfaTicketPurposes.Challenge)
     {
         await using var cmd = new NpgsqlCommand(
             $"""
             SELECT id, user_id, method, provider, pending_password_hash, user_agent, sdk, ip, attempts
             FROM orvano.auth_mfa_tickets
-            WHERE project_id = @project AND ticket_hash = @hash AND expires_at > now()
+            WHERE project_id = @project AND ticket_hash = @hash AND expires_at > now() AND purpose = @purpose
             {(lockRow ? "FOR UPDATE" : "")}
             """, conn, tx);
         cmd.Parameters.AddWithValue("project", projectId);
         cmd.Parameters.AddWithValue("hash", hash);
+        cmd.Parameters.AddWithValue("purpose", purpose);
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         if (!await reader.ReadAsync(ct)) return null;
         return new TicketRow(

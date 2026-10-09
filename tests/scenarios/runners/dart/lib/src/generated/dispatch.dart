@@ -7,6 +7,28 @@ import '../dispatch_table.dart';
 
 /// Every non console operation; a missing `client` or `server` call means the SDK has none.
 final Map<String, DispatchEntry> dispatch = {
+  'account.completeMfaEnrollmentPasskey': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.completeMfaEnrollmentPasskey(
+        CompleteMfaEnrollmentPasskeyRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.completeMfaEnrollmentTotp': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.completeMfaEnrollmentTotp(
+        CompleteMfaEnrollmentTotpRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
   'account.completeOAuthLink': DispatchEntry(
     status: 201,
     client: (o, input) async {
@@ -123,6 +145,28 @@ final Map<String, DispatchEntry> dispatch = {
     client: (o, input) async {
       final r = await o.account.createMagicLinkSession(
         CreateMagicLinkSessionRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.createMfaEnrollmentPasskey': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createMfaEnrollmentPasskey(
+        CreateMfaEnrollmentRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.createMfaEnrollmentTotp': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createMfaEnrollmentTotp(
+        CreateMfaEnrollmentRequest.fromJson(
           input['body'] as Map<String, dynamic>,
         ),
       );

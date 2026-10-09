@@ -59,6 +59,26 @@ export interface AuthResult {
   verificationRequired: boolean
 }
 
+/** The browser's or the platform's new passkey, which finishes enrollment. */
+export interface CompleteMfaEnrollmentPasskeyRequest {
+  /** The `ticket` of the `MfaChallenge`. */
+  ticket: string
+  /** The `challengeId` of the `PasskeyRegistration` from `account.createMfaEnrollmentPasskey`. */
+  challengeId: string
+  /** The browser's or the platform's answer. */
+  credential: PasskeyRegistrationCredential
+  /** 1 to 64 characters. Left out, the passkey is named `Passkey`. */
+  name?: string
+}
+
+/** The first code from the authenticator app, which finishes enrollment. */
+export interface CompleteMfaEnrollmentTotpRequest {
+  /** The `ticket` of the `MfaChallenge`. */
+  ticket: string
+  /** The 6 digit code the authenticator app shows now. */
+  code: string
+}
+
 /** A link of a provider to the signed in user, with the code a link flow returned. */
 export interface CompleteOAuthLinkRequest {
   /** The `orvano_code` parameter Orvano added to your redirect URL. It works once, for 2 minutes. */
@@ -185,6 +205,12 @@ export interface CreateMagicLinkRequest {
 export interface CreateMagicLinkSessionRequest {
   /** The `orvano_token` parameter of the emailed link. */
   token: string
+}
+
+/** The enrollment ticket of a sign in that must enroll a first factor (`MfaChallenge.enrollmentRequired`). */
+export interface CreateMfaEnrollmentRequest {
+  /** The `ticket` of the `MfaChallenge`. */
+  ticket: string
 }
 
 /** The ticket of a sign in waiting for its second step. */
@@ -406,19 +432,43 @@ export interface Jwks {
 }
 
 /**
- * The second step a sign in must pass before it gets a session: the user has MFA on. Answer it with
- * `account.createMfaSession` before `expiresAt`.
+ * What a sign in must pass before it gets a session. Usually the second step: the user has MFA on, so answer it with
+ * `account.createMfaSession` before `expiresAt`. When `enrollmentRequired` is true, the project requires MFA and the
+ * user has no second factor yet: enroll one with the ticket (`account.createMfaEnrollmentTotp` or
+ * `account.createMfaEnrollmentPasskey`), which answers the session.
  */
 export interface MfaChallenge {
   /**
-   * Proves the first step passed; send it to `account.createMfaSession`. Keep it in memory only. Empty when the ticket
-   * travels in a cookie instead (the console).
+   * Proves the first step passed; send it to `account.createMfaSession`, or with `enrollmentRequired`, to the
+   * enrollment operations. Keep it in memory only. Empty when the ticket travels in a cookie instead (the console).
    */
   ticket: string
-  /** The factors the user can answer with now, in this order: `totp`, `recovery_code`, `passkey`. */
+  /**
+   * The factors the user can answer with now, in this order: `totp`, `recovery_code`, `passkey`. With
+   * `enrollmentRequired`, the factors the user can enroll instead: `totp`, `passkey`.
+   */
   factors: MfaFactor[]
-  /** When the ticket stops working: 5 minutes after the first step. After that, sign in again. */
+  /**
+   * When the ticket stops working: 5 minutes after the first step, or 15 with `enrollmentRequired`. After that, sign in
+   * again.
+   */
   expiresAt: string
+  /**
+   * True when the project requires MFA and the user must enroll a first factor before any session; false for a second
+   * step.
+   */
+  enrollmentRequired: boolean
+}
+
+/**
+ * An enrolled first factor and the session it earned, at level 2. With an authenticator app, show the recovery codes
+ * once and ask the user to keep them safe; they can't be read again.
+ */
+export interface MfaEnrollmentResult {
+  /** The signed in user and their new session. */
+  auth: AuthResult
+  /** 10 recovery codes, each `XXXXX-XXXXX`, each working once, after an authenticator app; null after a passkey. */
+  recoveryCodes: string[] | null
 }
 
 /** A user's MFA state. */

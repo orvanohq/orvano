@@ -32,6 +32,7 @@ import type {
 } from './oauth.js'
 import { MemoryPendingMfaStore, signInOutcome } from './mfa.js'
 import type {
+  EnrollmentOutcome,
   MfaAnswer,
   MfaTransport,
   MfaWireAnswer,
@@ -50,10 +51,12 @@ import { sdkHeader, sdkName, serverVersionHeader, versionMismatch } from './vers
 import { AccountService } from '../generated/client.js'
 import type {
   Identity,
+  MfaEnrollmentResult,
   MfaFactor,
   OAuthProvider,
   Passkey,
   PasskeyChallenge,
+  TotpSetup,
 } from '../generated/models.js'
 import type { Logger } from './version.js'
 import { sdkVersion } from '../generated/version.js'
@@ -404,7 +407,13 @@ export class Client {
    */
   get pendingMfa(): PendingMfa | null {
     const pending = this.#mfaStore.get()
-    return pending === null ? null : { factors: pending.factors, expiresAt: pending.expiresAt }
+    return pending === null
+      ? null
+      : {
+          factors: pending.factors,
+          expiresAt: pending.expiresAt,
+          enrollmentRequired: pending.enrollmentRequired,
+        }
   }
 
   /**
@@ -431,9 +440,7 @@ export class Client {
       )
       return transport.completeMfa(wire, this, options)
     }
-    const pending = this.#mfaStore.get()
-    if (pending === null)
-      throw new TypeError('Orvano: no sign in is waiting for MFA; sign in first.')
+    const pending = this.#waiting(false)
     try {
       const wire = await this.#wireAnswer(
         answer,
@@ -453,6 +460,124 @@ export class Client {
       }
       throw error
     }
+  }
+
+  /**
+   * Starts enrolling an authenticator app for a sign in that must enroll a first factor (spec
+   * 0014, AC-27: `enrollmentRequired`), with the ticket this client holds
+   * (`account.createMfaEnrollmentTotp`). Show the answer's `uri` as a QR code and its `secret` for
+   * typing in, then call {@link completeTotpEnrollment} with the app's first code within 15 minutes.
+   *
+   * @throws TypeError, before any call, when no sign in is waiting to enroll.
+   * @throws {@link OrvanoError} for an ended ticket (`invalid_mfa_ticket`: sign in again) or TOTP
+   * turned off for the project (`factor_not_enabled`).
+   */
+  async startTotpEnrollment(options?: RequestOptions): Promise<TotpSetup> {
+    if (this.#mfaTransport !== undefined)
+      return this.#mfaTransport.startTotpEnrollment(this, options)
+    const pending = this.#waiting(true)
+    return this.#keepingTicket(pending, () =>
+      new AccountService(this).createMfaEnrollmentTotp({ ticket: pending.ticket }, options),
+    )
+  }
+
+  /**
+   * Finishes enrolling an authenticator app with its first code
+   * (`account.completeMfaEnrollmentTotp`): turns MFA on, stores the session (at `aal` 2), and says
+   * `signedIn`. Answers the user and the 10 recovery codes: show them once.
+   *
+   * @throws TypeError, before any call, when no sign in is waiting to enroll.
+   * @throws {@link OrvanoError} for a wrong code (`invalid_mfa_code`; after 5 the ticket ends),
+   * no secret waiting (`totp_not_pending`), or an ended ticket (`invalid_mfa_ticket`).
+   */
+  async completeTotpEnrollment(code: string, options?: RequestOptions): Promise<EnrollmentOutcome> {
+    if (this.#mfaTransport !== undefined)
+      return this.#mfaTransport.completeTotpEnrollment(code, this, options)
+    const pending = this.#waiting(true)
+    const result = await this.#keepingTicket(pending, () =>
+      new AccountService(this).completeMfaEnrollmentTotp({ ticket: pending.ticket, code }, options),
+    )
+    return this.#enrolled(result)
+  }
+
+  /**
+   * Enrolls a passkey for a sign in that must enroll a first factor (spec 0014, AC-27):
+   * `account.createMfaEnrollmentPasskey`, the passkey authenticator, then
+   * `account.completeMfaEnrollmentPasskey`. Stores the session (at `aal` 2) and says `signedIn`.
+   *
+   * @throws TypeError, before any call, when no sign in is waiting to enroll.
+   * @throws {@link OrvanoError} for a refused credential (`invalid_passkey`; after 5 the ticket
+   * ends), `passkey_already_registered`, passkeys turned off (`factor_not_enabled`), or an ended
+   * ticket (`invalid_mfa_ticket`); the browser's own error (for example `NotAllowedError`) when
+   * the user cancels.
+   */
+  async enrollPasskey(options: PasskeyRegistrationOptions = {}): Promise<EnrollmentOutcome> {
+    const request: RequestOptions = options.signal === undefined ? {} : { signal: options.signal }
+    const transport = this.#mfaTransport
+    const name = options.name === undefined ? {} : { name: options.name }
+    if (transport !== undefined) {
+      const registration = await transport.createMfaEnrollmentPasskey(this, request)
+      const credential = await this.#passkeys.create(registration.options, options.signal)
+      return transport.completeMfaEnrollmentPasskey(
+        { challengeId: registration.challengeId, credential, ...name },
+        this,
+        request,
+      )
+    }
+    const pending = this.#waiting(true)
+    const account = new AccountService(this)
+    const result = await this.#keepingTicket(pending, async () => {
+      const registration = await account.createMfaEnrollmentPasskey(
+        { ticket: pending.ticket },
+        request,
+      )
+      const credential = await this.#passkeys.create(registration.options, options.signal)
+      return account.completeMfaEnrollmentPasskey(
+        { ticket: pending.ticket, challengeId: registration.challengeId, credential, ...name },
+        request,
+      )
+    })
+    return this.#enrolled(result)
+  }
+
+  /**
+   * The waiting sign in this helper needs: an enrollment, or a second step. Throws a TypeError
+   * before any call when there is none, or when it waits for the other kind.
+   */
+  #waiting(enrollment: boolean): PendingMfaTicket {
+    const pending = this.#mfaStore.get()
+    if (pending === null)
+      throw new TypeError('Orvano: no sign in is waiting for MFA; sign in first.')
+    if (pending.enrollmentRequired !== enrollment)
+      throw new TypeError(
+        enrollment
+          ? 'Orvano: the waiting sign in needs a second factor (completeMfa), not an enrollment.'
+          : 'Orvano: the waiting sign in must enroll a first factor (startTotpEnrollment or enrollPasskey).',
+      )
+    return pending
+  }
+
+  /** Runs a ticket call, forgetting the ticket when Orvano says it ended (`invalid_mfa_ticket`). */
+  async #keepingTicket<T>(pending: PendingMfaTicket, call: () => Promise<T>): Promise<T> {
+    try {
+      return await call()
+    } catch (error) {
+      if (error instanceof OrvanoError && error.code === 'invalid_mfa_ticket') {
+        const now = this.#mfaStore.get()
+        if (now !== null && now.ticket === pending.ticket) this.#mfaStore.set(null)
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Stores the session an enrollment earned, forgets the ticket, and says `signedIn`. The
+   * operation's answer nests the `AuthResult` under `auth`, so the generated call stores nothing.
+   */
+  async #enrolled(result: MfaEnrollmentResult): Promise<EnrollmentOutcome> {
+    this.#mfaStore.set(null)
+    await this.#save(sessionFrom(result.auth.session), 'signedIn')
+    return { user: result.auth.user, recoveryCodes: result.recoveryCodes }
   }
 
   /**
@@ -580,7 +705,12 @@ export class Client {
    * such as `@orvano/nextjs`'s route handler. {@link pendingMfa} then shows its factors.
    */
   announceMfa(pending: PendingMfa): void {
-    this.#mfaStore.set({ ticket: '', factors: pending.factors, expiresAt: pending.expiresAt })
+    this.#mfaStore.set({
+      ticket: '',
+      factors: pending.factors,
+      expiresAt: pending.expiresAt,
+      enrollmentRequired: pending.enrollmentRequired,
+    })
     this.#emit('mfaRequired', this.#known ?? null, pending)
   }
 
@@ -758,6 +888,7 @@ export class Client {
           this.#emit('mfaRequired', this.#known ?? null, {
             factors: mfa.factors,
             expiresAt: mfa.expiresAt,
+            enrollmentRequired: mfa.enrollmentRequired,
           })
           return
         }
@@ -904,7 +1035,9 @@ function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
 /** The ticket, factors, and expiry of an `AuthResult.mfa`, or null when the result has none. */
 function pendingMfaFrom(value: unknown): PendingMfaTicket | null {
   const mfa = value as
-    { ticket?: unknown; factors?: unknown; expiresAt?: unknown } | null | undefined
+    | { ticket?: unknown; factors?: unknown; expiresAt?: unknown; enrollmentRequired?: unknown }
+    | null
+    | undefined
   if (mfa === null || mfa === undefined) return null
   if (
     typeof mfa.ticket !== 'string' ||
@@ -912,5 +1045,10 @@ function pendingMfaFrom(value: unknown): PendingMfaTicket | null {
     !Array.isArray(mfa.factors)
   )
     throw new TypeError('Orvano: the MFA challenge in the response is malformed')
-  return { ticket: mfa.ticket, factors: mfa.factors as MfaFactor[], expiresAt: mfa.expiresAt }
+  return {
+    ticket: mfa.ticket,
+    factors: mfa.factors as MfaFactor[],
+    expiresAt: mfa.expiresAt,
+    enrollmentRequired: mfa.enrollmentRequired === true,
+  }
 }

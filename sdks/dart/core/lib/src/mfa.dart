@@ -2,17 +2,50 @@ import 'generated/models.dart';
 
 /// A sign in that stopped at the MFA step (spec 0013, AC-38): the user has
 /// MFA on, so no session exists yet. Finish it with `Client.completeMfa`
-/// before [expiresAt]. The ticket stays inside the client's memory, so an app
-/// restart starts over.
+/// before [expiresAt]. With [enrollmentRequired] (spec 0014, AC-27), the
+/// project requires MFA and the user has none yet: enroll a first factor with
+/// `Client.startTotpEnrollment` and `Client.completeTotpEnrollment`, or
+/// `Client.enrollPasskey`. The ticket stays inside the client's memory, so an
+/// app restart starts over.
 final class PendingMfa {
   /// Creates a pending sign in.
-  const PendingMfa({required this.factors, required this.expiresAt});
+  const PendingMfa({
+    required this.factors,
+    required this.expiresAt,
+    this.enrollmentRequired = false,
+  });
 
-  /// The factors the user can answer with now, in the challenge's order.
+  /// The factors the user can answer with now, in the challenge's order;
+  /// with [enrollmentRequired], the factors the user can enroll.
   final List<MfaFactor> factors;
 
   /// When the challenge stops working; after that, sign in again.
   final DateTime expiresAt;
+
+  /// True when the user must enroll a first factor before any session.
+  final bool enrollmentRequired;
+}
+
+/// Whether [result] stopped because the project requires MFA and the user
+/// has no factor yet (spec 0014, AC-27): no session exists, and the user
+/// enrolls one with `Client.startTotpEnrollment` and
+/// `Client.completeTotpEnrollment`, or `Client.enrollPasskey`.
+bool enrollmentRequired(AuthResult result) =>
+    result.mfa?.enrollmentRequired ?? false;
+
+/// What an enrollment did (spec 0014, AC-27): the signed in [user], whose
+/// session now holds `aal` 2, and after an authenticator app the 10
+/// [recoveryCodes] to show once (null after a passkey).
+final class MfaEnrollment {
+  /// Creates the outcome.
+  const MfaEnrollment({required this.user, required this.recoveryCodes});
+
+  /// The signed in user.
+  final User user;
+
+  /// 10 recovery codes after an authenticator app, each working once; null
+  /// after a passkey.
+  final List<String>? recoveryCodes;
 }
 
 /// One second factor for `Client.completeMfa` and `Client.verifyMfa`.

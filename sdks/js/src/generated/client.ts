@@ -3,6 +3,8 @@ import type { Client, RequestOptions } from '../runtime/client.js'
 import { paginate } from '../runtime/pagination.js'
 import type {
   AuthResult,
+  CompleteMfaEnrollmentPasskeyRequest,
+  CompleteMfaEnrollmentTotpRequest,
   CompleteOAuthLinkRequest,
   CompletePasskeyRegistrationRequest,
   CompleteRecoveryRequest,
@@ -15,6 +17,7 @@ import type {
   CreateIdTokenSessionRequest,
   CreateMagicLinkRequest,
   CreateMagicLinkSessionRequest,
+  CreateMfaEnrollmentRequest,
   CreateMfaPasskeyChallengeRequest,
   CreateMfaSessionRequest,
   CreateOAuthFlowRequest,
@@ -31,6 +34,7 @@ import type {
   Identity,
   IdentityList,
   Jwks,
+  MfaEnrollmentResult,
   MfaStatus,
   OAuthFlow,
   OpenIdConfiguration,
@@ -62,6 +66,34 @@ export class AccountService {
 
   constructor(client: Client) {
     this.#client = client
+  }
+
+  /**
+   * Finishes enrolling a passkey with the browser's or the platform's answer: stores the passkey and answers the
+   * session, at level 2. After 5 wrong answers the ticket stops working; sign in again.
+   */
+  completeMfaEnrollmentPasskey(
+    body: CompleteMfaEnrollmentPasskeyRequest,
+    options?: RequestOptions,
+  ): Promise<MfaEnrollmentResult> {
+    return this.#client.request<MfaEnrollmentResult>(
+      { method: 'POST', path: '/v1/account/mfa/enrollment/passkey/confirm', body },
+      options,
+    )
+  }
+
+  /**
+   * Finishes enrolling an authenticator app with its first code: turns MFA on and answers 10 recovery codes and the
+   * session, at level 2. After 5 wrong codes the ticket stops working; sign in again.
+   */
+  completeMfaEnrollmentTotp(
+    body: CompleteMfaEnrollmentTotpRequest,
+    options?: RequestOptions,
+  ): Promise<MfaEnrollmentResult> {
+    return this.#client.request<MfaEnrollmentResult>(
+      { method: 'POST', path: '/v1/account/mfa/enrollment/totp/confirm', body },
+      options,
+    )
   }
 
   /** Links the provider with the code a link flow returned and its verifier. Only the user who started the flow can finish it. */
@@ -199,6 +231,35 @@ export class AccountService {
   ): Promise<AuthResult> {
     return this.#client.request<AuthResult>(
       { method: 'POST', path: '/v1/account/sessions/magic-link', body, session: 'start' },
+      options,
+    )
+  }
+
+  /**
+   * Starts enrolling a passkey for a sign in that must enroll a first factor (`MfaChallenge.enrollmentRequired`):
+   * answers the options for `navigator.credentials.create`. Finish with `account.completeMfaEnrollmentPasskey`.
+   */
+  createMfaEnrollmentPasskey(
+    body: CreateMfaEnrollmentRequest,
+    options?: RequestOptions,
+  ): Promise<PasskeyRegistration> {
+    return this.#client.request<PasskeyRegistration>(
+      { method: 'POST', path: '/v1/account/mfa/enrollment/passkey', body },
+      options,
+    )
+  }
+
+  /**
+   * Starts enrolling an authenticator app for a sign in that must enroll a first factor
+   * (`MfaChallenge.enrollmentRequired`): answers a new secret. Confirm it with `account.completeMfaEnrollmentTotp`
+   * within 15 minutes.
+   */
+  createMfaEnrollmentTotp(
+    body: CreateMfaEnrollmentRequest,
+    options?: RequestOptions,
+  ): Promise<TotpSetup> {
+    return this.#client.request<TotpSetup>(
+      { method: 'POST', path: '/v1/account/mfa/enrollment/totp', body },
       options,
     )
   }

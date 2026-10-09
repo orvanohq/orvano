@@ -90,7 +90,7 @@ internal static class UserRecords
 }
 
 /// <summary>A user row as the email flows need it, read under the transaction's lock.</summary>
-internal sealed record LockedUser(Guid Id, string? Email, string? Name, string Status, DateTimeOffset? EmailVerifiedAt, bool HasPassword);
+internal sealed record LockedUser(Guid Id, string? Email, string? Name, string Status, DateTimeOffset? EmailVerifiedAt, bool HasPassword, bool IsAnonymous = false);
 
 /// <summary>Reads a user <c>FOR UPDATE</c> inside the caller's transaction (spec 0010).</summary>
 internal static class UserLocks
@@ -108,7 +108,7 @@ internal static class UserLocks
         await using var cmd = new NpgsqlCommand(
             $"""
             SELECT u.id, u.email, u.name, u.status, u.email_verified_at,
-                   EXISTS (SELECT 1 FROM orvano.auth_passwords p WHERE p.user_id = u.id)
+                   EXISTS (SELECT 1 FROM orvano.auth_passwords p WHERE p.user_id = u.id), u.is_anonymous
             FROM orvano.auth_users u
             WHERE {where}
             FOR UPDATE OF u
@@ -123,6 +123,7 @@ internal static class UserLocks
             reader.IsDBNull(2) ? null : reader.GetString(2),
             reader.GetString(3),
             reader.IsDBNull(4) ? null : reader.GetFieldValue<DateTimeOffset>(4),
-            reader.GetBoolean(5));
+            reader.GetBoolean(5),
+            reader.GetBoolean(6));
     }
 }

@@ -102,25 +102,43 @@ internal sealed class MfaService(
             if (!state.Policy.TotpEnabled) return Failure.FactorNotEnabled;
             if (VerifiedEmailRule.Blocks(projectId, user.Email, user.EmailVerifiedAt)) return Failure.EmailNotVerified;
 
-            var secret = Totp.NewSecret();
-            await using var upsert = new NpgsqlCommand(
-                """
-                INSERT INTO orvano.auth_totp_factors (user_id, project_id, secret_ciphertext)
-                VALUES (@user, @project, @secret)
-                ON CONFLICT (user_id) DO UPDATE
-                SET secret_ciphertext = excluded.secret_ciphertext, last_used_step = NULL, created_at = now(), updated_at = now()
-                WHERE auth_totp_factors.confirmed_at IS NULL
-                RETURNING created_at
-                """, uow.Tx.Connection, uow.Tx);
-            upsert.Parameters.AddWithValue("user", userId);
-            upsert.Parameters.AddWithValue("project", projectId);
-            upsert.Parameters.AddWithValue("secret", factors.SealSecret(userId, secret));
-            var createdAt = (DateTime)(await upsert.ExecuteScalarAsync(token))!;
-
-            var encoded = Base32.Encode(secret);
-            var uri = Totp.Uri(issuer, user.Email ?? userId.ToString(), encoded);
-            return new TotpSetupView(encoded, uri, new DateTimeOffset(createdAt, TimeSpan.Zero) + AuthTimings.PendingTotp);
+            return await factors.PendTotpAsync(uow, projectId, userId, issuer, user.Email, token);
         }, ct);
+    }
+
+    /// <summary>
+    /// Starts TOTP enrollment with an enrollment ticket (spec 0014, AC-27), in place of a session: the ticket must be a
+    /// live <c>enroll</c> ticket (401 <c>invalid_mfa_ticket</c>) and TOTP on (409 <c>factor_not_enabled</c>). Takes
+    /// <c>auth.mfa_enroll.user</c>; otherwise <see cref="CreateTotpAsync"/>'s rules, under the user lock.
+    /// </summary>
+    public async Task<Outcome<TotpSetupView>> CreateEnrollmentTotpAsync(string projectId, string? ticketValue, string ipKey, CancellationToken ct)
+    {
+        var found = await MfaTickets.FindAsync(store, limits, projectId, ticketValue, MfaTicketPurposes.Enroll, ipKey, ct);
+        if (!found.Succeeded) return found.Failure!;
+        var userId = found.Value!.UserId;
+        if (stepUp.TakeEnrollLimit(userId) is { } limited) return limited;
+        var issuer = await alerts.ProjectNameAsync(projectId, ct);
+
+        var vanished = false;
+        var outcome = await store.WriteAsync<TotpSetupView>(async (uow, token) =>
+        {
+            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user
+                || await MfaTickets.RereadAsync(uow, projectId, ticketValue!, MfaTicketPurposes.Enroll, lockRow: false, token) is null)
+            {
+                vanished = true;
+                return Failure.InvalidMfaTicket;
+            }
+
+            var state = await MfaFactorState.ReadAsync(policies, uow.Tx.Connection!, uow.Tx, projectId, userId, token);
+            if (!state.Policy.TotpEnabled) return Failure.FactorNotEnabled;
+            if (state.TotpConfirmedAt is not null) return Failure.MfaAlreadyEnabled;
+            if (VerifiedEmailRule.Blocks(projectId, user.Email, user.EmailVerifiedAt)) return Failure.EmailNotVerified;
+            return await factors.PendTotpAsync(uow, projectId, userId, issuer, user.Email, token);
+        }, ct);
+
+        // A ticket gone between the two reads counts against the IP like an unknown one at the first read.
+        if (vanished) limits.Acquire(RateLimitPolicies.FailedMfaTicketPerIp, ipKey);
+        return outcome;
     }
 
     /// <summary>
@@ -133,8 +151,7 @@ internal sealed class MfaService(
     public async Task<Outcome<TotpConfirmationView>> ConfirmTotpAsync(
         string projectId, Guid userId, Guid sessionId, string? code, string ipKey, CancellationToken ct)
     {
-        var userKey = userId.ToString();
-        using var failures = ReserveFactor(userId, ipKey, MfaFactors.Totp);
+        using var failures = MfaTickets.ReserveFactor(limits, userId, ipKey, MfaFactors.Totp);
         if (!failures.Allowed) return Failure.RateLimited(failures.Decision.RetryAfter);
         var projectName = await alerts.ProjectNameAsync(projectId, ct);
 
@@ -143,35 +160,17 @@ internal sealed class MfaService(
             {
                 if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
 
-                byte[]? ciphertext = null;
-                await using (var read = new NpgsqlCommand(
-                    """
-                    SELECT secret_ciphertext FROM orvano.auth_totp_factors
-                    WHERE user_id = @user AND confirmed_at IS NULL AND created_at > now() - @pending
-                    """, uow.Tx.Connection, uow.Tx))
-                {
-                    read.Parameters.AddWithValue("user", userId);
-                    read.Parameters.AddWithValue("pending", AuthTimings.PendingTotp);
-                    ciphertext = (byte[]?)await read.ExecuteScalarAsync(token);
-                }
-
-                if (ciphertext is null) return Failure.TotpNotPending;
+                if (await MfaFactorStore.PendingTotpAsync(uow, userId, token) is not { } ciphertext) return Failure.TotpNotPending;
                 if (!await factors.ConfirmTotpAsync(uow, userId, ciphertext, code, token))
                 {
                     failures.Fail();
                     return Failure.InvalidMfaCode;
                 }
 
-                var codes = await factors.ReplaceRecoveryCodesAsync(uow, projectId, userId, token);
-                var actor = Actor.User(userId);
-                var ended = await sessions.EndAllAsync(uow, projectId, userId, SessionEndReason.MfaEnabled, actor, sessionId, token);
+                var (codes, ended) = await TotpConfirmedAsync(uow, projectId, projectName, user, sessionId, token);
                 if (await StrengthenAsync(uow, projectId, userId, sessionId, SessionStrength.ForFactor(MfaFactors.Totp), aal2: true, token) is not { } raised)
                     return Failure.SessionNotFound;
-                var ids = new Dictionary<string, string> { ["userId"] = userKey };
-                await AuthEvents.WriteAsync(uow.Tx, AuthEvents.MfaEnabled, projectId, actor, userKey, ids, fields: Factor(MfaFactors.Totp), ct: token);
-                await AuthEvents.WriteAsync(uow.Tx, AuthEvents.RecoveryCodesCreated, projectId, actor, userKey, ids, ct: token);
-                await alerts.QueueAsync(uow, projectId, projectName, user.Email, SecurityAlertKind.MfaEnabled, token);
-                return (codes, ended.ToArray(), raised.Strength, raised.EndsAt, user.EmailVerifiedAt is not null);
+                return (codes, ended, raised.Strength, raised.EndsAt, user.EmailVerifiedAt is not null);
             }, ct);
 
         if (!outcome.Succeeded) return outcome.Failure!;
@@ -179,6 +178,82 @@ internal sealed class MfaService(
         foreach (var id in done.Ended) await checks.EvictAsync(id, ct);
         var access = await tokens.IssueAsync(projectId, userId, sessionId, done.EmailVerified, done.Strength, ct);
         return new TotpConfirmationView(done.Codes, new RaisedSessionView(access.Token, access.ExpiresAt, done.EndsAt, sessionId));
+    }
+
+    /// <summary>
+    /// Finishes TOTP enrollment with an enrollment ticket (spec 0014, AC-27), in the order of step two: the IP limit, the
+    /// ticket, the user's factor limits (AC-18), then under the user lock and the ticket's row lock, the first code. A
+    /// wrong code commits its attempt with the refusal (as <see cref="CompleteAsync"/> does) and the fifth deletes the
+    /// ticket. A right one turns MFA on as <see cref="ConfirmTotpAsync"/> does (recovery codes, every other session
+    /// ended), applies a recovery's pending password, and creates the session at level 2 with <c>otp</c> added to the
+    /// step one method's <c>amr</c>, all in one transaction.
+    /// </summary>
+    public async Task<Outcome<MfaEnrollmentView>> CompleteEnrollmentTotpAsync(
+        string projectId, string? ticketValue, string? code, string ipKey, CancellationToken ct)
+    {
+        if (!Totp.IsWellFormed(code)) return Failure.Invalid("code must be 6 digits.");
+        var found = await MfaTickets.FindAsync(store, limits, projectId, ticketValue, MfaTicketPurposes.Enroll, ipKey, ct);
+        if (!found.Succeeded) return found.Failure!;
+        var userId = found.Value!.UserId;
+        using var failures = MfaTickets.ReserveFactor(limits, userId, ipKey, MfaFactors.Totp);
+        if (!failures.Allowed) return Failure.RateLimited(failures.Decision.RetryAfter);
+        await keys.GetActiveAsync(projectId, ct);
+        var projectName = await alerts.ProjectNameAsync(projectId, ct);
+
+        var wrong = false;
+        var vanished = false;
+        var outcome = await store.WriteDecidingAsync<(Data.UserRow User, SessionGrant Grant, Guid[] Ended, IReadOnlyList<string> Codes)>(async (uow, token) =>
+        {
+            var locked = await UserLocks.ByIdAsync(uow, projectId, userId, token);
+            if (locked is null || await MfaTickets.RereadAsync(uow, projectId, ticketValue!, MfaTicketPurposes.Enroll, lockRow: true, token) is not { } row)
+            {
+                vanished = true;
+                return (Failure.InvalidMfaTicket, false);
+            }
+
+            var policy = await policies.ReadAsync(uow.Tx.Connection!, uow.Tx, projectId, token);
+            if (!policy.TotpEnabled) return (Failure.FactorNotEnabled, false);
+            if (await MfaFactorStore.PendingTotpAsync(uow, userId, token) is not { } ciphertext) return (Failure.TotpNotPending, false);
+            if (!await factors.ConfirmTotpAsync(uow, userId, ciphertext, code, token))
+            {
+                wrong = true;
+                await MfaTickets.CountWrongAsync(uow, row, token);
+                return (Failure.InvalidMfaCode, true);
+            }
+
+            if (locked.Status == UserStatuses.Blocked) return (Failure.UserBlocked, false);
+            var (codes, ended) = await TotpConfirmedAsync(uow, projectId, projectName, locked, keep: null, token);
+            var (user, grant, reset) = await MfaTickets.FinishEnrollmentAsync(uow, sessions, projectId, row, SessionStrength.ForFactor(MfaFactors.Totp), token);
+            return ((user, grant, [.. ended, .. reset], codes), true);
+        }, ct);
+
+        if (wrong) failures.Fail();
+        // A ticket gone between the two reads counts against the IP like an unknown one at the first read.
+        if (vanished) limits.Acquire(RateLimitPolicies.FailedMfaTicketPerIp, ipKey);
+        if (!outcome.Succeeded) return outcome.Failure!;
+
+        var done = outcome.Value;
+        foreach (var id in done.Ended) await checks.EvictAsync(id, ct);
+        return new MfaEnrollmentView(await accounts.SignedInAsync(projectId, done.User, done.Grant, ct), done.Codes);
+    }
+
+    /// <summary>
+    /// What turning MFA on with a confirmed TOTP factor does (AC-13), under the user lock: 10 new recovery codes, every
+    /// session of the user but <paramref name="keep"/> ended (<c>mfa_enabled</c>), <c>auth.mfa.enabled</c>,
+    /// <c>auth.recovery_codes.created</c>, and the <c>mfa_enabled</c> alert. Answers the codes and the ended sessions.
+    /// </summary>
+    private async Task<(IReadOnlyList<string> Codes, Guid[] Ended)> TotpConfirmedAsync(
+        AuthUnitOfWork uow, string projectId, string projectName, LockedUser user, Guid? keep, CancellationToken ct)
+    {
+        var userKey = user.Id.ToString();
+        var codes = await factors.ReplaceRecoveryCodesAsync(uow, projectId, user.Id, ct);
+        var actor = Actor.User(user.Id);
+        var ended = await sessions.EndAllAsync(uow, projectId, user.Id, SessionEndReason.MfaEnabled, actor, keep, ct);
+        var ids = new Dictionary<string, string> { ["userId"] = userKey };
+        await AuthEvents.WriteAsync(uow.Tx, AuthEvents.MfaEnabled, projectId, actor, userKey, ids, fields: Factor(MfaFactors.Totp), ct: ct);
+        await AuthEvents.WriteAsync(uow.Tx, AuthEvents.RecoveryCodesCreated, projectId, actor, userKey, ids, ct: ct);
+        await alerts.QueueAsync(uow, projectId, projectName, user.Email, SecurityAlertKind.MfaEnabled, ct);
+        return (codes, [.. ended]);
     }
 
     /// <summary>
@@ -236,7 +311,7 @@ internal sealed class MfaService(
         var userKey = userId.ToString();
         if (answer.Malformed() is { } malformed) return malformed;
         var factor = answer.Factor!;
-        using var failures = ReserveFactor(userId, ipKey, factor);
+        using var failures = MfaTickets.ReserveFactor(limits, userId, ipKey, factor);
         if (!failures.Allowed) return Failure.RateLimited(failures.Decision.RetryAfter);
         var projectName = await alerts.ProjectNameAsync(projectId, ct);
 
@@ -312,7 +387,7 @@ internal sealed class MfaService(
         }
 
         var userKey = found.UserId.ToString();
-        using var failures = ReserveFactor(found.UserId, ipKey, factor);
+        using var failures = MfaTickets.ReserveFactor(limits, found.UserId, ipKey, factor);
         if (!failures.Allowed) return Failure.RateLimited(failures.Decision.RetryAfter);
         await keys.GetActiveAsync(projectId, ct);
         var projectName = await alerts.ProjectNameAsync(projectId, ct);
@@ -347,11 +422,11 @@ internal sealed class MfaService(
             if (row.Id != found.Id || !await UseFactorAsync(uow, row.UserId, answer, check, state.Policy, token))
             {
                 wrong = true;
-                ticketGone = await CountWrongAsync(uow, row, token);
+                ticketGone = await MfaTickets.CountWrongAsync(uow, row, token);
                 return (factor == MfaFactors.Passkey ? Failure.InvalidPasskey : Failure.InvalidMfaCode, true);
             }
 
-            await DeleteTicketAsync(uow, row.Id, token);
+            await MfaTickets.DeleteAsync(uow, row.Id, token);
             if (locked.Status == UserStatuses.Blocked) return (Failure.UserBlocked, false);
 
             var actor = Actor.User(row.UserId);
@@ -386,20 +461,6 @@ internal sealed class MfaService(
 
         foreach (var id in outcome.Value.Ended) await checks.EvictAsync(id, ct);
         return await accounts.SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant, ct);
-    }
-
-    /// <summary>
-    /// Reserves a wrong factor's slots (spec 0014, AC-18): <c>auth.mfa_failed.user_ip</c> for every factor, keyed by
-    /// the user and the limit IP, so someone who knows the password can't block step two for the owner on another
-    /// network; and for a TOTP code also <c>auth.mfa_totp_failed.user</c>, the per account ceiling of 6 digit codes,
-    /// which leaves recovery codes and passkeys open. Count a wrong factor with <see cref="FailureReservation.Fail"/>.
-    /// </summary>
-    private FailureReservation ReserveFactor(Guid userId, string ipKey, string factor)
-    {
-        var perUserIp = (RateLimitPolicies.FailedMfaPerUserIp, $"{userId}\n{ipKey}");
-        return factor == MfaFactors.Totp
-            ? limits.Reserve(perUserIp, (RateLimitPolicies.FailedTotpPerUser, userId.ToString()))
-            : limits.Reserve(perUserIp);
     }
 
     /// <summary>
@@ -463,28 +524,6 @@ internal sealed class MfaService(
     /// <summary>The <c>amr</c> values a verified factor adds (AC-25): a passkey's from its backup state after this assertion.</summary>
     private static string[] Amr(string factor, AssertionCheck? check) =>
         factor == MfaFactors.Passkey ? SessionStrength.ForPasskey(check!.BackedUp) : SessionStrength.ForFactor(factor);
-
-    /// <summary>Counts a wrong factor on the ticket; true when it was the last allowed and the ticket is gone.</summary>
-    private static async Task<bool> CountWrongAsync(AuthUnitOfWork uow, TicketRow row, CancellationToken ct)
-    {
-        if (row.Attempts + 1 >= AuthTimings.MfaTicketAttempts)
-        {
-            await DeleteTicketAsync(uow, row.Id, ct);
-            return true;
-        }
-
-        await using var count = new NpgsqlCommand("UPDATE orvano.auth_mfa_tickets SET attempts = attempts + 1 WHERE id = @id", uow.Tx.Connection, uow.Tx);
-        count.Parameters.AddWithValue("id", row.Id);
-        await count.ExecuteNonQueryAsync(ct);
-        return false;
-    }
-
-    private static async Task DeleteTicketAsync(AuthUnitOfWork uow, Guid ticketId, CancellationToken ct)
-    {
-        await using var delete = new NpgsqlCommand("DELETE FROM orvano.auth_mfa_tickets WHERE id = @id", uow.Tx.Connection, uow.Tx);
-        delete.Parameters.AddWithValue("id", ticketId);
-        await delete.ExecuteNonQueryAsync(ct);
-    }
 
     private static Dictionary<string, string?> Factor(string factor) => new() { ["factor"] = factor };
 

@@ -19,18 +19,22 @@ internal sealed class OAuthRedemptions(
 {
     /// <summary>
     /// The session of a resolved provider sign in (spec 0012, AC-7, AC-9), or for an existing user with MFA on, a
-    /// challenge in its place (spec 0013, AC-6). A user this sign in created has no factor, so it is never challenged.
+    /// challenge in its place (spec 0013, AC-6). Under required MFA (spec 0014, AC-27) a user with no factor, new ones
+    /// included, gets an enrollment ticket instead, or 403 <c>email_verification_required</c> while their email is not
+    /// verified.
     /// </summary>
-    public async Task<OAuthRedeemed> SignInAsync(
+    public async Task<Outcome<OAuthRedeemed>> SignInAsync(
         AuthUnitOfWork uow, Sessions sessions, string projectId, Resolved resolved, ClientInfo client, string method, string provider, CancellationToken ct)
     {
-        if (!resolved.IsNewUser)
+        // SignInResolution locked or created the resolved user in this transaction, so it can't be gone here.
+        var gate = await MfaGate.ChallengeAsync(policies, uow, projectId, resolved.UserId, method, provider, client, ct);
+        if (!gate.Succeeded)
         {
-            // SignInResolution locked the resolved user in this transaction, so it can't be gone here.
-            var gate = await MfaGate.ChallengeAsync(policies, uow, projectId, resolved.UserId, method, provider, client, ct);
-            if (!gate.Succeeded) throw new InvalidOperationException("A user that just existed is gone.");
-            if (gate.Value is { } challenge) return new OAuthRedeemed(resolved, null, challenge);
+            if (gate.Failure == Failure.UserNotFound) throw new InvalidOperationException("A user that just existed is gone.");
+            return gate.Failure!;
         }
+
+        if (gate.Value is { } challenge) return new OAuthRedeemed(resolved, null, challenge);
         var grant = await sessions.CreateAsync(uow, projectId, resolved.UserId, client, Actor.User(resolved.UserId), method, ct, provider);
         return new OAuthRedeemed(resolved, grant);
     }

@@ -19,6 +19,8 @@ const settings: AuthMethodSettings = {
   androidCertFingerprints: ['AA:BB'],
   activePasskeyCount: 3,
   acceptedOrigins: ['https://example.com', 'https://app.example.com', 'https://*.example.com'],
+  mfaRequired: false,
+  activeUsersWithoutMfa: 2,
 }
 
 const at = '2026-10-08T00:00:00Z'
@@ -70,7 +72,13 @@ describe('TotpCard', () => {
     const onToggle = vi.fn().mockResolvedValue(undefined)
     const screen = await render(
       <main>
-        <TotpCard settings={settings} readOnlyReason={undefined} onToggle={onToggle} />
+        <TotpCard
+          projectId="shop"
+          settings={settings}
+          readOnlyReason={undefined}
+          onToggle={onToggle}
+          onRequireMfa={vi.fn()}
+        />
       </main>,
     )
 
@@ -87,15 +95,85 @@ describe('TotpCard', () => {
     const screen = await render(
       <main>
         <TotpCard
+          projectId="shop"
           settings={settings}
           readOnlyReason="Needs the developer role"
           onToggle={onToggle}
+          onRequireMfa={vi.fn()}
         />
       </main>,
     )
 
     await expect.element(screen.getByRole('switch', { name: 'Enabled' })).toBeDisabled()
-    await expect.element(screen.getByText('Needs the developer role')).toBeVisible()
+    await expect.element(screen.getByRole('switch', { name: 'Require MFA' })).toBeDisabled()
+    await expect.element(screen.getByText('Needs the developer role').first()).toBeVisible()
+    await noAxeViolations()
+  })
+})
+
+// Spec 0014 AC-35: the Require MFA switch on the MFA card, with the count of signed in users who
+// have no factor, disabled with a reason while no factor can be enrolled.
+describe('Require MFA', () => {
+  it('saves the switch at once and shows how many signed in users have no factor', async () => {
+    const onRequireMfa = vi.fn().mockResolvedValue(undefined)
+    const screen = await render(
+      <main>
+        <TotpCard
+          projectId="shop"
+          settings={settings}
+          readOnlyReason={undefined}
+          onToggle={vi.fn()}
+          onRequireMfa={onRequireMfa}
+        />
+      </main>,
+    )
+
+    await expect
+      .element(screen.getByText('2 signed in users have no second factor yet.'))
+      .toBeVisible()
+    await noAxeViolations()
+    await screen.getByRole('switch', { name: 'Require MFA' }).click()
+
+    await expect.poll(() => onRequireMfa.mock.calls.length).toBe(1)
+    expect(onRequireMfa).toHaveBeenCalledWith(true)
+  })
+
+  it('is disabled with a reason while neither the authenticator app nor passkeys are on', async () => {
+    const screen = await render(
+      <main>
+        <TotpCard
+          projectId="shop"
+          settings={{ ...settings, totpEnabled: false, passkeysEnabled: false }}
+          readOnlyReason={undefined}
+          onToggle={vi.fn()}
+          onRequireMfa={vi.fn()}
+        />
+      </main>,
+    )
+
+    await expect.element(screen.getByRole('switch', { name: 'Require MFA' })).toBeDisabled()
+    await expect
+      .element(screen.getByText(/Turn on the authenticator app or passkeys first/))
+      .toBeVisible()
+    await noAxeViolations()
+  })
+
+  it('shows why a save failed', async () => {
+    const onRequireMfa = vi.fn().mockRejectedValue(new Error('Network down'))
+    const screen = await render(
+      <main>
+        <TotpCard
+          projectId="shop"
+          settings={settings}
+          readOnlyReason={undefined}
+          onToggle={vi.fn()}
+          onRequireMfa={onRequireMfa}
+        />
+      </main>,
+    )
+
+    await screen.getByRole('switch', { name: 'Require MFA' }).click()
+    await expect.element(screen.getByRole('alert')).toBeVisible()
     await noAxeViolations()
   })
 })

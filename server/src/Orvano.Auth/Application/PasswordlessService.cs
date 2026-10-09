@@ -180,13 +180,11 @@ internal sealed class PasswordlessService(
         }
 
         // Spec 0013, AC-6: after every check and the claim (which removes factors, AC-29), a user with MFA on gets a
-        // challenge in place of the session. The link or code stays used.
-        if (!created)
-        {
-            var gate = await MfaGate.ChallengeAsync(policies, uow, projectId, user.Id, method, null, client, ct);
-            if (!gate.Succeeded) return gate.Failure!;
-            if (gate.Value is { } challenge) return new Redeemed(user.Id, null, false, ended, challenge);
-        }
+        // challenge in place of the session. Spec 0014, AC-27: under required MFA, a user with no factor (a new one too)
+        // gets an enrollment ticket instead. The link or code stays used.
+        var gate = await MfaGate.ChallengeAsync(policies, uow, projectId, user.Id, method, null, client, ct);
+        if (!gate.Succeeded) return gate.Failure!;
+        if (gate.Value is { } challenge) return new Redeemed(user.Id, null, false, ended, challenge);
 
         var grant = await sessions.CreateAsync(uow, projectId, user.Id, client, actor, method, ct);
         return new Redeemed(user.Id, grant, created, ended);

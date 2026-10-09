@@ -6,6 +6,8 @@ import type {
   TestCreatePasskeyCredentialRequest,
 } from './test-models.js'
 import type {
+  CompleteMfaEnrollmentPasskeyRequest,
+  CompleteMfaEnrollmentTotpRequest,
   CompleteOAuthLinkRequest,
   CompletePasskeyRegistrationRequest,
   CompleteRecoveryRequest,
@@ -18,6 +20,7 @@ import type {
   CreateIdTokenSessionRequest,
   CreateMagicLinkRequest,
   CreateMagicLinkSessionRequest,
+  CreateMfaEnrollmentRequest,
   CreateMfaPasskeyChallengeRequest,
   CreateMfaSessionRequest,
   CreateOAuthFlowRequest,
@@ -48,6 +51,16 @@ import type { DispatchTable } from '../dispatch-table.js'
 
 /** Every non console operation; a missing `client` or `server` call means the SDK has none. */
 export const dispatch: DispatchTable = {
+  'account.completeMfaEnrollmentPasskey': {
+    status: 201,
+    client: (o, input) =>
+      o.account.completeMfaEnrollmentPasskey(input.body as CompleteMfaEnrollmentPasskeyRequest),
+  },
+  'account.completeMfaEnrollmentTotp': {
+    status: 201,
+    client: (o, input) =>
+      o.account.completeMfaEnrollmentTotp(input.body as CompleteMfaEnrollmentTotpRequest),
+  },
   'account.completeOAuthLink': {
     status: 201,
     client: (o, input) => o.account.completeOAuthLink(input.body as CompleteOAuthLinkRequest),
@@ -99,6 +112,16 @@ export const dispatch: DispatchTable = {
     status: 201,
     client: (o, input) =>
       o.account.createMagicLinkSession(input.body as CreateMagicLinkSessionRequest),
+  },
+  'account.createMfaEnrollmentPasskey': {
+    status: 201,
+    client: (o, input) =>
+      o.account.createMfaEnrollmentPasskey(input.body as CreateMfaEnrollmentRequest),
+  },
+  'account.createMfaEnrollmentTotp': {
+    status: 201,
+    client: (o, input) =>
+      o.account.createMfaEnrollmentTotp(input.body as CreateMfaEnrollmentRequest),
   },
   'account.createMfaPasskeyChallenge': {
     status: 200,

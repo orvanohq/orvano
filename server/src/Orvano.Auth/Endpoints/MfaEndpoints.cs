@@ -24,6 +24,32 @@ internal static class MfaEndpoints
             .WithName(Api.AccountOperations.CreateMfaSession.Id)
             .RequireProject();
 
+        // Spec 0014, AC-27: enrollment with the ticket of a sign in that must enroll a first factor; no session needed.
+        v1.MapPost(Api.AccountOperations.CreateMfaEnrollmentTotp.Route, async (HttpContext http, Api.CreateMfaEnrollmentRequest request, MfaService mfa, CancellationToken ct) =>
+            Created(http, await mfa.CreateEnrollmentTotpAsync(PublicRequests.Project(http), request.Ticket, PublicRequests.LimitKey(http), ct), TotpSetup))
+            .WithName(Api.AccountOperations.CreateMfaEnrollmentTotp.Id)
+            .RequireProject();
+
+        v1.MapPost(Api.AccountOperations.CompleteMfaEnrollmentTotp.Route, async (HttpContext http, Api.CompleteMfaEnrollmentTotpRequest request, MfaService mfa, CancellationToken ct) =>
+            Created(http, await mfa.CompleteEnrollmentTotpAsync(PublicRequests.Project(http), request.Ticket, request.Code, PublicRequests.LimitKey(http), ct),
+                MfaEnrollmentResult))
+            .WithName(Api.AccountOperations.CompleteMfaEnrollmentTotp.Id)
+            .RequireProject();
+
+        v1.MapPost(Api.AccountOperations.CreateMfaEnrollmentPasskey.Route, async (HttpContext http, Api.CreateMfaEnrollmentRequest request, PasskeyService passkeys, CancellationToken ct) =>
+            Created(http, await passkeys.CreateEnrollmentRegistrationAsync(PublicRequests.Project(http), request.Ticket, PublicRequests.LimitKey(http), ct),
+                PasskeyRegistration))
+            .WithName(Api.AccountOperations.CreateMfaEnrollmentPasskey.Id)
+            .RequireProject();
+
+        v1.MapPost(Api.AccountOperations.CompleteMfaEnrollmentPasskey.Route,
+            async (HttpContext http, Api.CompleteMfaEnrollmentPasskeyRequest request, PasskeyService passkeys, CancellationToken ct) =>
+                Created(http, await passkeys.CompleteEnrollmentRegistrationAsync(
+                    PublicRequests.Project(http), request.Ticket, request.ChallengeId, Attestation(request.Credential), request.Name, PublicRequests.LimitKey(http), ct),
+                    MfaEnrollmentResult))
+            .WithName(Api.AccountOperations.CompleteMfaEnrollmentPasskey.Id)
+            .RequireProject();
+
         v1.MapGet(Api.AccountOperations.GetMfa.Route, async (HttpContext http, MfaService mfa, CancellationToken ct) =>
             Ok(http, await mfa.GetAsync(PublicRequests.Project(http), PublicRequests.User(http).UserId, ct), MfaStatus))
             .WithName(Api.AccountOperations.GetMfa.Id)

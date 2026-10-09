@@ -518,3 +518,136 @@ describe('the route handler passkey actions (AC-37)', () => {
     })
   })
 })
+
+// Spec 0014 AC-27, AC-36: a sign in that must enroll a first factor keeps its enrollment ticket in
+// orvano_mfa (for its 15 minutes), the enrollment actions spend it, and the browser transport posts
+// to them.
+describe('the route handler enrollment actions (spec 0014)', () => {
+  const enroll = { ticket, factors: ['totp', 'passkey'], expiresAt, enrollmentRequired: true }
+  const mustEnroll = (): Response =>
+    Response.json(
+      {
+        user: null,
+        session: null,
+        mfa: enroll,
+        isNewUser: false,
+        verificationEmail: null,
+        verificationRequired: false,
+      },
+      { status: 201 },
+    )
+  const enrolled = (recoveryCodes: string[] | null) => (): Response =>
+    Response.json(
+      {
+        auth: {
+          user,
+          session,
+          mfa: null,
+          isNewUser: false,
+          verificationEmail: null,
+          verificationRequired: false,
+        },
+        recoveryCodes,
+      },
+      { status: 201 },
+    )
+
+  async function started(): Promise<string> {
+    const first = handler({ '/v1/account/sessions/email-code': mustEnroll })
+    const response = await first.POST(
+      post('email-code', { email: 'ada@example.com', code: '123456', next: '/account' }),
+    )
+    const body = (await response.json()) as Record<string, unknown>
+    expect(body).toMatchObject({ mfaRequired: true, enrollmentRequired: true, expiresAt })
+    expect(response.headers.getSetCookie().find((c) => c.startsWith(mfaCookie))).toMatch(
+      /Max-Age=900/i,
+    )
+    return setCookie(response, mfaCookie) ?? ''
+  }
+
+  it('mfa-enroll-totp answers the secret, and the confirm sets both cookies and answers the codes', async () => {
+    const cookie = await started()
+    const setup = { secret: 'JBSWY3DPEHPK3PXP', uri: 'otpauth://totp/x', expiresAt }
+    const { POST, calls } = handler({
+      '/v1/account/mfa/enrollment/totp': () => Response.json(setup, { status: 201 }),
+      '/v1/account/mfa/enrollment/totp/confirm': enrolled(['AAAAA-BBBBB']),
+    })
+
+    const secret = await POST(post('mfa-enroll-totp', {}, { [mfaCookie]: cookie }))
+    expect(await secret.json()).toEqual(setup)
+    const done = await POST(
+      post('mfa-enroll-totp-confirm', { code: '123456' }, { [mfaCookie]: cookie }),
+    )
+
+    expect(await done.json()).toEqual({ user, recoveryCodes: ['AAAAA-BBBBB'], next: '/account' })
+    expect(calls.map((c) => c.body)).toEqual([{ ticket }, { ticket, code: '123456' }])
+    expect(setCookie(done, accessCookie)).toBe(session.accessToken)
+    expect(setCookie(done, refreshCookie)).toBe('orv_rt_new.secret')
+    expect(setCookie(done, mfaCookie)).toBe('')
+  })
+
+  it('mfa-enroll-passkey-confirm sends the passkey with the ticket; mfa refuses an enrollment', async () => {
+    const cookie = await started()
+    const { POST, calls } = handler({
+      '/v1/account/mfa/enrollment/passkey/confirm': enrolled(null),
+    })
+
+    expect((await POST(post('mfa', { totpCode: '123456' }, { [mfaCookie]: cookie }))).status).toBe(
+      400,
+    )
+    const done = await POST(
+      post(
+        'mfa-enroll-passkey-confirm',
+        { challengeId: 'ch1', credential: { id: 'c' }, name: 'Laptop' },
+        { [mfaCookie]: cookie },
+      ),
+    )
+
+    expect(((await done.json()) as { recoveryCodes: unknown }).recoveryCodes).toBeNull()
+    expect(calls[0]?.body).toEqual({
+      ticket,
+      challengeId: 'ch1',
+      credential: { id: 'c' },
+      name: 'Laptop',
+    })
+    expect(setCookie(done, refreshCookie)).toBe('orv_rt_new.secret')
+  })
+
+  it('the enrollment actions refuse a second step cookie and clear an ended ticket', async () => {
+    const first = handler({ '/v1/account/sessions/email-code': challenged })
+    const second = await first.POST(post('email-code', { email: 'a@x.com', code: '123456' }))
+    const { POST } = handler({
+      '/v1/account/mfa/enrollment/totp': () =>
+        Response.json({ status: 401, code: 'invalid_mfa_ticket' }, { status: 401 }),
+    })
+
+    const wrongKind = await POST(
+      post('mfa-enroll-totp', {}, { [mfaCookie]: setCookie(second, mfaCookie) ?? '' }),
+    )
+    expect(wrongKind.status).toBe(400)
+    const ended = await POST(post('mfa-enroll-totp', {}, { [mfaCookie]: await started() }))
+    expect(ended.status).toBe(401)
+    expect(setCookie(ended, mfaCookie)).toBe('')
+  })
+
+  it('the browser transport posts the enrollment and reloads the session', async () => {
+    const sent: string[] = []
+    vi.stubGlobal('fetch', (input: string | URL) => {
+      sent.push(input.toString())
+      return Promise.resolve(Response.json({ user, recoveryCodes: ['AAAAA-BBBBB'], next: '/' }))
+    })
+    const transport = mfaThroughHandler()
+    const c = new Client({
+      endpoint,
+      project: 'shop',
+      logger: quiet,
+      session: new MemorySessionStore(),
+    })
+
+    expect(await transport.completeTotpEnrollment('123456', c)).toEqual({
+      user,
+      recoveryCodes: ['AAAAA-BBBBB'],
+    })
+    expect(sent).toEqual(['/api/orvano/mfa-enroll-totp-confirm'])
+  })
+})

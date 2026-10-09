@@ -288,6 +288,7 @@ describe('native ID tokens (AC-20)', () => {
       user: { id: 'u1', providers: ['google'] },
       isNewUser: true,
       mfaRequired: false,
+      enrollmentRequired: false,
       factors: [],
     })
     expect((await c.session.get())?.sessionId).toBe('s1')

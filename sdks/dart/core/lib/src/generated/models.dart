@@ -234,6 +234,75 @@ final class AuthResult {
   };
 }
 
+/// The browser's or the platform's new passkey, which finishes enrollment.
+final class CompleteMfaEnrollmentPasskeyRequest {
+  /// Creates a [CompleteMfaEnrollmentPasskeyRequest].
+  const CompleteMfaEnrollmentPasskeyRequest({
+    required this.ticket,
+    required this.challengeId,
+    required this.credential,
+    this.name,
+  });
+
+  /// Decodes a [CompleteMfaEnrollmentPasskeyRequest] from JSON.
+  factory CompleteMfaEnrollmentPasskeyRequest.fromJson(
+    Map<String, dynamic> json,
+  ) => CompleteMfaEnrollmentPasskeyRequest(
+    ticket: json['ticket'] as String,
+    challengeId: json['challengeId'] as String,
+    credential: PasskeyRegistrationCredential.fromJson(
+      json['credential'] as Map<String, dynamic>,
+    ),
+    name: json['name'] == null ? null : json['name'] as String,
+  );
+
+  /// The `ticket` of the `MfaChallenge`.
+  final String ticket;
+
+  /// The `challengeId` of the `PasskeyRegistration` from `account.createMfaEnrollmentPasskey`.
+  final String challengeId;
+
+  /// The browser's or the platform's answer.
+  final PasskeyRegistrationCredential credential;
+
+  /// 1 to 64 characters. Left out, the passkey is named `Passkey`.
+  final String? name;
+
+  /// Encodes this [CompleteMfaEnrollmentPasskeyRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'ticket': ticket,
+    'challengeId': challengeId,
+    'credential': credential.toJson(),
+    'name': ?name,
+  };
+}
+
+/// The first code from the authenticator app, which finishes enrollment.
+final class CompleteMfaEnrollmentTotpRequest {
+  /// Creates a [CompleteMfaEnrollmentTotpRequest].
+  const CompleteMfaEnrollmentTotpRequest({
+    required this.ticket,
+    required this.code,
+  });
+
+  /// Decodes a [CompleteMfaEnrollmentTotpRequest] from JSON.
+  factory CompleteMfaEnrollmentTotpRequest.fromJson(
+    Map<String, dynamic> json,
+  ) => CompleteMfaEnrollmentTotpRequest(
+    ticket: json['ticket'] as String,
+    code: json['code'] as String,
+  );
+
+  /// The `ticket` of the `MfaChallenge`.
+  final String ticket;
+
+  /// The 6 digit code the authenticator app shows now.
+  final String code;
+
+  /// Encodes this [CompleteMfaEnrollmentTotpRequest] as JSON.
+  Map<String, dynamic> toJson() => {'ticket': ticket, 'code': code};
+}
+
 /// A link of a provider to the signed in user, with the code a link flow returned.
 final class CompleteOAuthLinkRequest {
   /// Creates a [CompleteOAuthLinkRequest].
@@ -599,6 +668,22 @@ final class CreateMagicLinkSessionRequest {
 
   /// Encodes this [CreateMagicLinkSessionRequest] as JSON.
   Map<String, dynamic> toJson() => {'token': token};
+}
+
+/// The enrollment ticket of a sign in that must enroll a first factor (`MfaChallenge.enrollmentRequired`).
+final class CreateMfaEnrollmentRequest {
+  /// Creates a [CreateMfaEnrollmentRequest].
+  const CreateMfaEnrollmentRequest({required this.ticket});
+
+  /// Decodes a [CreateMfaEnrollmentRequest] from JSON.
+  factory CreateMfaEnrollmentRequest.fromJson(Map<String, dynamic> json) =>
+      CreateMfaEnrollmentRequest(ticket: json['ticket'] as String);
+
+  /// The `ticket` of the `MfaChallenge`.
+  final String ticket;
+
+  /// Encodes this [CreateMfaEnrollmentRequest] as JSON.
+  Map<String, dynamic> toJson() => {'ticket': ticket};
 }
 
 /// The ticket of a sign in waiting for its second step.
@@ -1192,14 +1277,17 @@ final class Jwks {
   };
 }
 
-/// The second step a sign in must pass before it gets a session: the user has MFA on. Answer it with
-/// `account.createMfaSession` before `expiresAt`.
+/// What a sign in must pass before it gets a session. Usually the second step: the user has MFA on, so answer it with
+/// `account.createMfaSession` before `expiresAt`. When `enrollmentRequired` is true, the project requires MFA and the
+/// user has no second factor yet: enroll one with the ticket (`account.createMfaEnrollmentTotp` or
+/// `account.createMfaEnrollmentPasskey`), which answers the session.
 final class MfaChallenge {
   /// Creates a [MfaChallenge].
   const MfaChallenge({
     required this.ticket,
     required this.factors,
     required this.expiresAt,
+    required this.enrollmentRequired,
   });
 
   /// Decodes a [MfaChallenge] from JSON.
@@ -1209,23 +1297,61 @@ final class MfaChallenge {
         .map((e) => MfaFactor.fromJson(e as String))
         .toList(),
     expiresAt: DateTime.parse(json['expiresAt'] as String),
+    enrollmentRequired: json['enrollmentRequired'] as bool,
   );
 
-  /// Proves the first step passed; send it to `account.createMfaSession`. Keep it in memory only. Empty when the ticket
-  /// travels in a cookie instead (the console).
+  /// Proves the first step passed; send it to `account.createMfaSession`, or with `enrollmentRequired`, to the
+  /// enrollment operations. Keep it in memory only. Empty when the ticket travels in a cookie instead (the console).
   final String ticket;
 
-  /// The factors the user can answer with now, in this order: `totp`, `recovery_code`, `passkey`.
+  /// The factors the user can answer with now, in this order: `totp`, `recovery_code`, `passkey`. With
+  /// `enrollmentRequired`, the factors the user can enroll instead: `totp`, `passkey`.
   final List<MfaFactor> factors;
 
-  /// When the ticket stops working: 5 minutes after the first step. After that, sign in again.
+  /// When the ticket stops working: 5 minutes after the first step, or 15 with `enrollmentRequired`. After that, sign in
+  /// again.
   final DateTime expiresAt;
+
+  /// True when the project requires MFA and the user must enroll a first factor before any session; false for a second
+  /// step.
+  final bool enrollmentRequired;
 
   /// Encodes this [MfaChallenge] as JSON.
   Map<String, dynamic> toJson() => {
     'ticket': ticket,
     'factors': factors.map((e) => e.value).toList(),
     'expiresAt': expiresAt.toUtc().toIso8601String(),
+    'enrollmentRequired': enrollmentRequired,
+  };
+}
+
+/// An enrolled first factor and the session it earned, at level 2. With an authenticator app, show the recovery codes
+/// once and ask the user to keep them safe; they can't be read again.
+final class MfaEnrollmentResult {
+  /// Creates a [MfaEnrollmentResult].
+  const MfaEnrollmentResult({required this.auth, this.recoveryCodes});
+
+  /// Decodes a [MfaEnrollmentResult] from JSON.
+  factory MfaEnrollmentResult.fromJson(Map<String, dynamic> json) =>
+      MfaEnrollmentResult(
+        auth: AuthResult.fromJson(json['auth'] as Map<String, dynamic>),
+        recoveryCodes: json['recoveryCodes'] == null
+            ? null
+            : (json['recoveryCodes'] as List<dynamic>)
+                  .map((e) => e as String)
+                  .toList(),
+      );
+
+  /// The signed in user and their new session.
+  final AuthResult auth;
+
+  /// 10 recovery codes, each `XXXXX-XXXXX`, each working once, after an authenticator app; null after a passkey.
+  final List<String>? recoveryCodes;
+
+  /// Encodes this [MfaEnrollmentResult] as JSON.
+  Map<String, dynamic> toJson() => {
+    'auth': auth.toJson(),
+    'recoveryCodes': recoveryCodes,
   };
 }
 

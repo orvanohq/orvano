@@ -18,7 +18,11 @@ import { providerInfo } from '@/auth/providers'
 import { meetsRole } from '@/shell/nav'
 import { PageHeading } from '@/shell/page-heading'
 import { ErrorPanel } from '@/shell/error-panel'
-import type { OAuthProvider, UpdateAuthMethodSettingsRequest } from '@orvano/console-client'
+import type {
+  AuthMethodSettings,
+  OAuthProvider,
+  UpdateAuthMethodSettingsRequest,
+} from '@orvano/console-client'
 
 import { PasskeysCard, TotpCard } from './-sign-in/method-cards'
 import { PasskeysDialog } from './-sign-in/passkeys-dialog'
@@ -55,7 +59,13 @@ function SignInMethodsPage() {
 
   const saveMethods = async (request: UpdateAuthMethodSettingsRequest) => {
     const saved = await projectClient(projectId).consoleAuthMethods.update(request)
-    queryClient.setQueryData(keys.authMethods(projectId), saved)
+    // Spec 0014, AC-27: an update doesn't count users without MFA, so keep the last count and read
+    // it again.
+    queryClient.setQueryData<AuthMethodSettings>(keys.authMethods(projectId), (before) => ({
+      ...saved,
+      activeUsersWithoutMfa: saved.activeUsersWithoutMfa ?? before?.activeUsersWithoutMfa ?? null,
+    }))
+    void queryClient.invalidateQueries({ queryKey: keys.authMethods(projectId) })
     return saved
   }
 
@@ -88,8 +98,13 @@ function SignInMethodsPage() {
           <ul className="grid gap-4 sm:grid-cols-2" aria-label="MFA and passkeys">
             <li>
               <TotpCard
+                projectId={projectId}
                 settings={methods.data}
                 readOnlyReason={readOnlyReason}
+                onRequireMfa={async (required) => {
+                  const saved = await saveMethods({ mfaRequired: required })
+                  notifySuccess('Require MFA saved', saved.mfaRequired ? 'On' : 'Off')
+                }}
                 onToggle={async (enabled) => {
                   try {
                     const saved = await saveMethods({ totpEnabled: enabled })
