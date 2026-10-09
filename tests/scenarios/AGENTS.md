@@ -28,12 +28,15 @@ One list of scenarios every SDK surface runs against a real Orvano (spec 0001, A
 - The console client is bound to one project, and steps have no per step project, so project scoped console operations (keys, platforms) are covered by the server's HTTP tests, not scenarios.
 - Email scenarios (`auth-recovery`, `auth-verification`, `auth-magic-link`, `auth-email-code`, `auth-email-change`, `auth-users-email`) read real mail: save the runner only `now` before a send and pass it to `test.getLatestEmail` as `after`, which reads Mailpit at `ORVANO_TEST_MAILPIT_URL` (spec 0010). The runner only operations (`redeemLink`, `now`, `verifyAccessToken`, ...) are listed in `README.md`.
 - OAuth scenarios (`auth-oauth*`, `auth-id-token`, `auth-identities*`, spec 0012) run against the server's fake provider: the runner operation `oauthSignIn` follows the provider's redirects over HTTP with no browser, and `test.createIdToken` mints native tokens.
+- A scenario that needs rules no other scenario may see names another fixture project with a top level `project:` (spec 0014): `scenarios0000000000b` requires MFA, `scenarios0000000000c` caps sessions at 2. Its steps run on clients for that project with no API key and no console account; `runScenarios` takes a `surfaceFor` in JS and Dart, and .NET skips such scenarios. Never turn a rule like that on in the first project, which every other scenario shares.
 - MFA and passkey scenarios (`auth-mfa*`, `auth-passkeys`, spec 0013) make codes with the runner operation `totpCode` and answer passkeys through the server's `Test` only software authenticator; the README's runner operation table has `completeMfa`, `verifyMfa`, `confirmTotp`, `registerPasskey`, and `signInWithPasskey`.
 - Quote substitutions in YAML (`'${version}'`); a bare `{` starts a flow map.
 
 ## Gotchas
 
 - The `api` and the `worker` both need `ORVANO_TEST_OAUTH_PROVIDER_URL` (the `api`'s own `/v1/test/oauth`), as `compose.yml` sets it. A workflow that starts the server outside `compose.yml`, like the iOS job in `sdks-nightly.yml`, must set it too, or every OAuth scenario fails with "ORVANO_TEST_OAUTH_PROVIDER_URL is not set".
+- Several runners back to back against one server hit the sign up limit (`auth.sign_up.ip`, 60 an hour per project and IP) and answer 429; CI gives each runner its own server. Restart the `api` container between local runs.
+- `verifyAccessToken` fails in the browser runner, whose server SDK takes the page's proxy origin as the issuer; check a session there with a client operation (`account.listSessions`).
 - The send limits live in memory in the `api` process, so rerunning the email scenarios several times within an hour against one long running server can hit the recipient or IP limits. Restart the `api` container, or wait.
 - Run the Dart runner as `dart run bin/run.dart` inside `runners/dart`. `dart run orvano_scenarios:run` runs from a snapshot, so the scenario folder isn't found and it reports 0 passed.
 - After changing the contract or `TestingModule`, start the server with `--build`, or the old image answers.
