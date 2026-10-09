@@ -198,7 +198,7 @@ _Steps derived from AC-27, AC-28, AC-39, and the Value sourcing rows for reset e
 
 ## Build checks: task 5, console screens (project side) · updated 2026-10-08
 
-_The project screens of AC-43 and AC-44. The console sign in MFA step, passkey sign in, and the account Security page (AC-41, AC-42) are not built: they wait on `/architect` (see the end of this section)._
+_The project screens of AC-43 and AC-44. The console sign in MFA step, passkey sign in, and the account Security page (AC-41, AC-42) are not built yet; `/architect` settled what they waited on on 2026-10-08 (see the end of this section and *Build checks: task 5, the rest*)._
 
 ### UI
 
@@ -219,10 +219,33 @@ _The project screens of AC-43 and AC-44. The console sign in MFA step, passkey s
 ### Acceptance criteria coverage (task 5, so far)
 
 - AC-43: UI steps 1 to 5 · AC-44: UI steps 6 to 8, except the two facts below
-- Owed to `/architect` before the rest of task 5:
-  - AC-44's "when it was turned on" and "recovery codes left" for another user have no source: no operation gives the console a user's `MfaStatus` (`consoleUsers.*` has only `resetMfa`, `listPasskeys`, and `deletePasskey`). The detail shows MFA On or Off from `User.mfaEnabled` until one exists.
-  - AC-12 and AC-20 refuse enrollment for an unverified email, and no path verifies a console account's email (spec 0010 leaves console verification to a later row), so every console account would get 409 `email_not_verified` on the AC-42 Security page.
-  - AC-41 has `consoleAccount.createSession` answer a challenge, but it answers 201 `ConsoleAccount`, which can't carry `mfa`; the contract allows one 2xx body and no unions, so the challenge needs a response model.
+- Settled by `/architect` on 2026-10-08 (see the spec's AC-12, AC-27, AC-41, AC-44 and task 5's sub steps):
+  - Console accounts skip the verified email rule (AC-12, AC-20): nothing can claim a console account, so the rule protects nothing there.
+  - `consoleAccount.createSession` answers 201 `ConsoleAuthResult` (`account` or `mfa`); the step two and passkey sign in twins answer `ConsoleAccount` (AC-41).
+  - `users.getMfa` and `consoleUsers.getMfa` answer `MfaStatus` for any user; the detail reads its "turned on" date and codes left from it (AC-27, AC-44).
+- Still owed to `/architect` from task 3: the AAGUID name list (the community list has no license, so none ships), and AC-21's `invalid_passkey` status (400 there, 401 in AC-40; the build answers 401).
+
+## Build checks: task 5, the rest · updated 2026-10-08
+
+_Steps derived from the 2026-10-08 update (AC-12, AC-20, AC-27, AC-29, AC-41, AC-44). `/develop` adds to them as it builds; `/check verify` runs them against a local stack._
+
+### API
+
+- [ ] A console account with an unverified email: `POST /v1/console/account/mfa/totp` → 201, and passkey registration through the `consoleAccount.*` twins → 200 then 201; an app user with an unverified email still gets 409 `email_not_verified` → AC-12, AC-20
+- [ ] `GET /v1/users/{id}/mfa` with a `users.read` key → 200 `MfaStatus` with `totpConfirmedAt` and `recoveryCodesRemaining` 10, then 9 after a code is used at step two; an unknown user, or one in another project → 404 `user_not_found`; a key without `users.read` → 403 → AC-27, AC-39
+- [ ] `GET /v1/console/project/users/{id}/mfa` as a viewer → 200, the same body; with the project's TOTP switch off → `mfaEnabled: false`, `totpConfirmed: true` → AC-27, AC-44
+- [ ] `POST /v1/console/account/session` for an account without MFA → 201 with `account` set, `mfa` null, and both session cookies; for one with MFA → 201 with `account` null, `mfa.ticket` empty, `mfa.factors` set, `orvano_console_mfa` set (no `Secure` on `http://localhost`, `Secure` on https), and no session cookie set or changed → AC-41
+- [ ] `POST /v1/console/account/session/mfa` with a right code → 201 `ConsoleAccount`, both session cookies, `orvano_console_mfa` cleared; with the fifth wrong code, or after the ticket expired → 401 and the cookie cleared → AC-41
+
+### UI
+
+- [ ] `/sign-in` for an account with MFA → the Two step verification step; a right code lands on `redirect`; "Start over" returns to the email and password form → AC-41
+- [ ] `/invite` sign in for an account with MFA → the same step in place, then the join step → AC-41
+- [ ] A user's page shows "turned on" and codes left from `consoleUsers.getMfa`, and "Off (authenticator app set up, project has TOTP off)" while the switch is off → AC-44
+
+### Code
+
+- [ ] A unit test proves `AccountClaims.ClaimAsync` refuses project `console` → AC-29
 
 ## Setup
 

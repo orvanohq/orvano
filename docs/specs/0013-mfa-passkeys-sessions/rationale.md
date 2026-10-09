@@ -136,6 +136,9 @@ The engineer's choices shape the rest. MFA turns on only with TOTP, so adding a 
 | Users page | MFA column, filter, and detail section | Detail only |
 | Passkey tests | A Test only software authenticator | One per runner |
 | TOTP tests | Runners compute codes | A Test only code operation |
+| Verified email rule for console accounts (2026-10-08) | Skipped for project `console`, which nothing can claim | Invite sign up marks the email verified |
+| Console sign in body (2026-10-08) | `ConsoleAuthResult` (`account` or `mfa`), reusing `MfaChallenge` with an empty ticket | A console only challenge model with no ticket field |
+| Another user's MFA state (2026-10-08) | `users.getMfa` and `consoleUsers.getMfa`, both answering `MfaStatus` | `consoleUsers.getMfa` only |
 
 ### What the cross check changed
 
@@ -152,6 +155,14 @@ The engineer chose a separate opt in package, `orvano_flutter_passkeys`, over ke
 
 The add on depends only on `orvano_core` (where `PasskeyAuthenticator` lives), not on `orvano_flutter`, so it stays small and works with any core client. It is released in step with the other Dart packages; pub.dev takes the first version only by hand, so the release workflow warns and skips a package pub.dev doesn't know yet instead of failing the release, while any other pub.dev error still fails it. A cross check on another model then filled in the starting version, the SdkGen and release workflow details, the first release order, and a check that the add on never leaks into the runner's web plugins through the shared Dart workspace.
 
+### Console gaps found while building task 5 (update, 2026-10-08)
+
+Building the project side of task 5 turned up three things the spec assumed but the console couldn't do.
+
+- **Console accounts couldn't pass the verified email rule.** No path verifies a console account's email (spec 0010 leaves that to a later console row), so AC-12 and AC-20 would have refused every console account with 409 `email_not_verified`, and the Security page would be dead on arrival. The rule exists for one attack: an impostor signs up with someone's email, plants a factor, and the real owner later claims the account through their inbox. A console account can't be claimed at all, because magic links, email codes, OAuth, ID tokens, recovery, and `verifyEmail` never reach project `console` (spec 0010 AC-7, spec 0003 AC-4). So the rule protects nothing there, and the engineer chose to skip it for `console`. Runner up: mark the email verified on invite sign up, which still leaves the first admin and open sign up accounts unable to enroll, and proves nothing when an inviter copies the link by hand. Building console verification now was ruled out as pulling a planned row into this spec and blocking MFA on installs with no SMTP. The exemption holds only while no console path claims an account. A cross check on another model pointed out that a follow up checkbox is a weak guard for that, so `AccountClaims.ClaimAsync` now refuses project `console` outright: the change that adds console recovery fails its tests until it removes the guard and brings the rule back. The same cross check caught that the new cookie must follow `ConsoleCookies.Secure` (off on plain `http://localhost`), when step two's cookie is cleared, what the user detail shows while the project's TOTP switch is off, and the other callers of `createSession`.
+- **`consoleAccount.createSession` had no body for a challenge.** It answered 201 `ConsoleAccount`, and the contract allows one 2xx body and no unions except `T | null`, the same constraint that shaped `AuthResult`. The engineer chose a `ConsoleAuthResult` wrapper (`account` or `mfa`) that reuses `MfaChallenge` with the empty ticket AC-41 already set, as the Next.js SDK does. The step two and passkey sign in twins answer plain `ConsoleAccount` because they always end in a session. Only the private `@orvano/console-client` calls these, so no published SDK breaks. Runner up: a console only challenge model with no `ticket` field, cleaner on the wire but one more model and less shared with the app side screens. Answering the challenge as a 401 problem was ruled out because it turns a normal sign in step into an error, against the one error pattern rule.
+- **The console couldn't read another user's MFA state.** AC-44 shows when MFA was turned on and how many recovery codes are left, but only `account.getMfa` returned them, for the caller. The engineer chose `users.getMfa` and `consoleUsers.getMfa`, both answering the existing `MfaStatus`, which keeps the `users.*` and `consoleUsers.*` twin pattern of `resetMfa`, `listPasskeys`, and `deletePasskey`, so a developer's support tool sees what the console sees. Runner up: the console twin only, less SDK surface but a break in the pattern. Adding the fields to `User` was not considered, because it would put them in every user response of every SDK.
+
 ### Calls made while writing (the engineer did not weigh in)
 
 - **Ticket format** `orv_mt_` plus 32 bytes, matching spec 0004's `orv_rt_` and spec 0012's `orv_oc_` prefixes so leak scans find it. Runner up: an unprefixed token.
@@ -160,7 +171,8 @@ The add on depends only on `orvano_core` (where `PasskeyAuthenticator` lives), n
 - **`amr` values**: RFC 8176 where one fits, plus `email`, `fed`, and `rec`, so developers can tell a recovery code from an authenticator code. Runner up: RFC values only, folding recovery codes into `otp`.
 - **COSE algorithms** ES256, EdDSA, and RS256, which cover platform authenticators, security keys, and Windows Hello. Runner up: ES256 only.
 - **`verifyMfa` and `confirmTotp` return a new access token with the current refresh token**, without rotation, so a step up never races a parallel refresh. Runner up: rotate the pair.
-- **The console ticket travels as an empty `ticket` in the body plus the cookie**, so the console uses the same models as the app SDKs. Runner up: a separate console model.
+- **The console ticket travels as an empty `ticket` in the body plus the cookie**, so the console uses the same `MfaChallenge` as the app SDKs (inside `ConsoleAuthResult` since the 2026-10-08 update). Runner up: a separate console model.
+- **"Start over" and an expired ticket return the console to the email and password form**, and `/invite` shows the two step screen in place so the invitation token, already cleared from the URL, is never needed again. Runner up: send `/invite` users to `/sign-in` and back, which would lose the token.
 - **Console passkeys only on https with a host name or on localhost**, because WebAuthn refuses other origins. Runner up: none possible.
 - **Alerts never block the change** they report, unlike spec 0010's emails, which are the point of their requests.
 - **The limits** in *Rate limits*, sized like spec 0004's and 0012's.
