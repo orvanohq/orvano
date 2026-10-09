@@ -13,9 +13,11 @@ import { PageHeading } from '@/shell/page-heading'
 import type { UpdateAuthPoliciesRequest } from '@orvano/console-client'
 
 import { AppServersCard } from './-security/app-servers-card'
+import { EmailDomainsCard } from './-security/email-domains-card'
 import { PasswordsCard } from './-security/passwords-card'
 import { RateLimitsCard } from './-security/rate-limits-card'
 import { SessionsCard } from './-security/sessions-card'
+import { SignUpsCard } from './-security/sign-ups-card'
 
 export const Route = createFileRoute('/_app/projects/$projectId/security')({
   component: SecurityPage,
@@ -64,8 +66,25 @@ function SecurityPage() {
         </div>
       ) : (
         <>
-          <PasswordsCard
+          <SignUpsCard
             // A fresh form once a save changed this card's values, and only then.
+            key={JSON.stringify([policies.data.signUpsEnabled, policies.data.requireVerifiedEmail])}
+            projectId={projectId}
+            policies={policies.data}
+            readOnlyReason={readOnlyReason}
+            onSave={save('Sign ups')}
+          />
+          <EmailDomainsCard
+            key={JSON.stringify([
+              policies.data.blockDisposableEmails,
+              policies.data.blockedEmailDomains,
+              policies.data.allowedEmailDomains,
+            ])}
+            policies={policies.data}
+            readOnlyReason={readOnlyReason}
+            onSave={save('Email domains')}
+          />
+          <PasswordsCard
             key={JSON.stringify([
               policies.data.passwordMinLength,
               policies.data.passwordCommonCheck,

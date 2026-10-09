@@ -189,7 +189,8 @@ internal static class ApiMapping
                 VerificationEmail.NotConfigured => Api.VerificationEmailStatus.NotConfigured,
                 VerificationEmail.RateLimited => Api.VerificationEmailStatus.RateLimited,
                 _ => throw new ArgumentOutOfRangeException(nameof(signedIn), signedIn.VerificationEmail, "Unknown verification email status."),
-            });
+            },
+            signedIn.VerificationRequired);
 
     public static Api.MfaChallenge MfaChallenge(MfaChallengeView view) => new(view.Ticket, [.. view.Factors.Select(MfaFactorOf)], view.ExpiresAt);
 

@@ -25,8 +25,8 @@ export function PolicyCard({
   title: string
   description: ReactNode
   readOnlyReason: string | undefined
-  /** The message of a refused save no field owns, or null. */
-  alert: string | null
+  /** The message of a refused save no field owns (text, or text with a link), or null. */
+  alert: ReactNode
   saving: boolean
   onSubmit: () => void
   children: ReactNode

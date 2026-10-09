@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { Client, MemorySessionStore, OrvanoError, readEmailLink } from '../src/index.js'
+import {
+  AccountService,
+  Client,
+  MemorySessionStore,
+  OrvanoError,
+  readEmailLink,
+} from '../src/index.js'
 import type { AuthEvent, AuthSession, ClientConfig } from '../src/index.js'
 import { fakeFetch, problem } from './fake-fetch.js'
 
@@ -294,5 +300,59 @@ describe('retryAfter (AC-26)', () => {
     await expect(
       client(none.fetch).request({ method: 'POST', path: '/v1/x' }),
     ).rejects.toMatchObject({ retryAfter: null })
+  })
+})
+
+// Spec 0014, AC-12, AC-15, AC-36: a pending sign up stores nothing, and the reject link signs no
+// one in.
+describe('verified email sign up (spec 0014)', () => {
+  it('a pending sign up stores no session and announces nothing', async () => {
+    const { fetch } = fakeFetch(() =>
+      Response.json(
+        {
+          user: null,
+          session: null,
+          mfa: null,
+          isNewUser: false,
+          verificationEmail: null,
+          verificationRequired: true,
+        },
+        { status: 201 },
+      ),
+    )
+    const c = client(fetch, { session: new MemorySessionStore() })
+    const seen = events(c)
+
+    const result = await new AccountService(c).create({
+      email: 'ada@example.com',
+      password: 'correct horse battery',
+      verificationRedirectUrl: 'https://app.example.com/cb',
+    })
+
+    expect(result.verificationRequired).toBe(true)
+    expect(result.session).toBeNull()
+    expect(await c.session.get()).toBeNull()
+    expect(seen).toEqual([])
+  })
+
+  it('a verification_reject link calls rejectEmailVerification and keeps the stored session', async () => {
+    const { fetch, sent } = fakeFetch(() => new Response(null, { status: 204 }))
+    const c = client(fetch, { session: new MemorySessionStore(session('u1', false)) })
+    const seen = events(c)
+
+    const result = await c.redeemLink(
+      `https://app.example.com/cb?orvano_type=verification_reject&orvano_token=${token}`,
+    )
+
+    expect(result).toEqual({
+      type: 'verification_reject',
+      user: null,
+      isNewUser: false,
+      mfaRequired: false,
+      factors: [],
+    })
+    expect(new URL(sent[0]?.url ?? '').pathname).toBe('/v1/account/verification/reject')
+    expect(JSON.parse(sent[0]?.body ?? '{}')).toEqual({ token })
+    expect(seen).toEqual([])
   })
 })

@@ -75,6 +75,7 @@ Answer authResult(String sub, {bool isNewUser = false, String sid = 's2'}) =>
       'session': session(sub, sid: sid).toJson(),
       'isNewUser': isNewUser,
       'verificationEmail': null,
+      'verificationRequired': false,
     }, code: 201);
 
 String s256(String verifier) => base64Url

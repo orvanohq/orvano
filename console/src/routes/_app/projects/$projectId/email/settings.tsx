@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { SmtpForm } from '@/email/smtp-form'
 import { projectClient } from '@/lib/console-client'
 import { usePageTitle } from '@/lib/page-title'
-import { keys, projectQuery, smtpQuery } from '@/lib/queries'
+import { authPoliciesQuery, keys, projectQuery, smtpQuery } from '@/lib/queries'
 import { roleReason, useOrgRole } from '@/lib/roles'
 import { useStateMoved } from '@/lib/state-moved'
 import { notifySuccess } from '@/lib/toast'
@@ -39,6 +39,8 @@ function EmailSettingsPage() {
   const queryClient = useQueryClient()
   const stateMoved = useStateMoved()
   const smtp = useQuery(smtpQuery(projectId))
+  // Spec 0014, AC-11: sign ups fail while verified emails are required and no server can send.
+  const requiresVerifiedEmail = useQuery(authPoliciesQuery(projectId)).data?.requireVerifiedEmail
   const changeReason = meetsRole(role, 'developer') ? undefined : roleReason('developer')
 
   if (smtp.isError) {
@@ -75,6 +77,20 @@ function EmailSettingsPage() {
         <FormAlert variant="warning" title="No email server is set up">
           Auth emails can’t be sent until you add one here or the install admin adds one for the
           whole server.
+        </FormAlert>
+      ) : null}
+      {source === 'none' && requiresVerifiedEmail === true ? (
+        <FormAlert variant="warning" title="Sign ups are failing">
+          This project requires a verified email, so every sign up gets email_not_configured until
+          an email server is set up. You can also turn the rule off on the{' '}
+          <Link
+            to="/projects/$projectId/security"
+            params={{ projectId }}
+            className="text-link underline"
+          >
+            Security
+          </Link>{' '}
+          page.
         </FormAlert>
       ) : null}
       <SettingsSection

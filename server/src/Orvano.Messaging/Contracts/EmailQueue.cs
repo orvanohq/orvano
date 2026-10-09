@@ -44,6 +44,12 @@ public enum SecurityAlertKind
 
     /// <summary>A recovery code was used to sign in or to step up.</summary>
     RecoveryCodeUsed,
+
+    /// <summary>
+    /// Someone signed up with an email that already has a verified account (spec 0014, AC-12). The sign up changed
+    /// nothing; the alert tells the owner it happened.
+    /// </summary>
+    SignUpAttempt,
 }
 
 /// <summary>One auth email to queue. Never log <paramref name="To"/>, <paramref name="ActionUrl"/>, or <paramref name="Code"/>.</summary>
@@ -55,6 +61,10 @@ public enum SecurityAlertKind
 /// <param name="ActionUrl">The link the user opens: required for the three link kinds, null for <see cref="AuthEmailKind.EmailCode"/>.</param>
 /// <param name="Code">The code the user types in: required for <see cref="AuthEmailKind.EmailCode"/>, null otherwise.</param>
 /// <param name="ExpiresInMinutes">How many minutes the link or code works, 1 to 10,080.</param>
+/// <param name="RejectUrl">
+/// The second link of a verification email, which says the sign up wasn't the inbox owner's (spec 0014, AC-15): only
+/// for <see cref="AuthEmailKind.Verification"/>, and null for an email change, which uses the same template.
+/// </param>
 public sealed record AuthEmail(
     string ProjectId,
     string ProjectName,
@@ -63,7 +73,8 @@ public sealed record AuthEmail(
     string? UserName,
     string? ActionUrl,
     string? Code,
-    int ExpiresInMinutes);
+    int ExpiresInMinutes,
+    string? RejectUrl = null);
 
 /// <summary>What <see cref="IEmailQueue.QueueAuthEmailAsync"/> did.</summary>
 public abstract record EmailQueueResult

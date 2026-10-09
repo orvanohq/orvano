@@ -84,7 +84,7 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
-    /// <summary>POST /v1/account: Signs a new user up with an email and password, and signs them in.</summary>
+    /// <summary>POST /v1/account: Signs a new user up with an email and password, and signs them in. While the project requires verified emails or</summary>
     public static class Create
     {
         /// <summary>The operationId, also the endpoint name.</summary>
@@ -116,7 +116,7 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
-    /// <summary>POST /v1/account/sessions/email-code: Signs a user in with an emailed code. After 5 wrong tries the code stops working; ask for a new one.</summary>
+    /// <summary>POST /v1/account/sessions/email-code: Signs a user in with an emailed code. After 10 wrong tries the code stops working; ask for a new one.</summary>
     public static class CreateEmailCodeSession
     {
         /// <summary>The operationId, also the endpoint name.</summary>
@@ -623,6 +623,22 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/sessions/refresh";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/verification/reject: Says a sign up with this email wasn't you, with the token from the second link of a verification email. While the</summary>
+    public static class RejectEmailVerification
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.rejectEmailVerification";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/verification/reject";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";

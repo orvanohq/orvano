@@ -5,9 +5,11 @@ import type { SignInOutcome } from './mfa.js'
 
 /**
  * What an emailed link is for: its `orvano_type` parameter (spec 0010). The link also carries the
- * secret as `orvano_token`.
+ * secret as `orvano_token`. `verification_reject` is the second link of a verification email,
+ * which says the sign up wasn't the inbox owner's (spec 0014).
  */
-export type EmailLinkType = 'verification' | 'recovery' | 'magic_link' | 'email_change'
+export type EmailLinkType =
+  'verification' | 'recovery' | 'magic_link' | 'email_change' | 'verification_reject'
 
 /** Every {@link EmailLinkType}, in the order the contract lists them. */
 export const emailLinkTypes: readonly EmailLinkType[] = [
@@ -15,6 +17,7 @@ export const emailLinkTypes: readonly EmailLinkType[] = [
   'recovery',
   'magic_link',
   'email_change',
+  'verification_reject',
 ]
 
 /** The query parameter Orvano sets to the link's {@link EmailLinkType}. */
@@ -35,7 +38,9 @@ export interface EmailLink {
 
 /**
  * What a redeemed link did: its type, the user, and whether the call created them. A magic link or
- * reset for a user with MFA on stops at the MFA step: `mfaRequired` is true and `user` null.
+ * reset for a user with MFA on stops at the MFA step: `mfaRequired` is true and `user` null. A
+ * `verification_reject` link signs no one in and answers no user: `user` is null; tell the person
+ * the account was secured and they can sign in with a magic link or an email code.
  */
 export interface LinkResult extends SignInOutcome {
   /** What the link was for. */
@@ -106,6 +111,9 @@ export const directEmailAuth: EmailAuthTransport = {
           mfaRequired: false,
           factors: [],
         }
+      case 'verification_reject':
+        await account.rejectEmailVerification({ token: link.token }, options)
+        return { type: link.type, user: null, isNewUser: false, mfaRequired: false, factors: [] }
     }
   },
   async signInWithEmailCode(email, code, client, options) {

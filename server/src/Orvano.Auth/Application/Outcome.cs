@@ -45,6 +45,15 @@ internal sealed record Failure(FailureKind Kind, string Code, string Detail, Tim
         new(FailureKind.Invalid, ErrorCode.InvalidPassword,
             $"The password must be {minLength.ToString(System.Globalization.CultureInfo.InvariantCulture)} to 256 characters.");
 
+    public static Failure SignUpDisabled { get; } =
+        new(FailureKind.Forbidden, ErrorCode.SignUpDisabled, "Sign ups are closed for this project.");
+
+    public static Failure EmailDomainNotAllowed { get; } =
+        new(FailureKind.Forbidden, ErrorCode.EmailDomainNotAllowed, "This project doesn't allow email addresses from this domain.");
+
+    public static Failure EmailVerificationRequired { get; } =
+        new(FailureKind.Forbidden, ErrorCode.EmailVerificationRequired, "Verify your email first: open the link we sent, then sign in again.");
+
     public static Failure InvalidCredentials { get; } =
         new(FailureKind.Unauthorized, ErrorCode.InvalidCredentials, "The email or password is wrong.");
 

@@ -32,7 +32,7 @@
     "/v1/account": {
       "post": {
         "operationId": "account.create",
-        "description": "Signs a new user up with an email and password, and signs them in.",
+        "description": "Signs a new user up with an email and password, and signs them in. While the project requires verified emails or\nMFA, it signs no one in: it answers `verificationRequired` true and emails a link instead, the same answer whether\nor not the email already had an account.",
         "parameters": [],
         "responses": {
           "201": {
@@ -1414,7 +1414,7 @@
     "/v1/account/sessions/email-code": {
       "post": {
         "operationId": "account.createEmailCodeSession",
-        "description": "Signs a user in with an emailed code. After 5 wrong tries the code stops working; ask for a new one.",
+        "description": "Signs a user in with an emailed code. After 10 wrong tries the code stops working; ask for a new one.",
         "parameters": [],
         "responses": {
           "201": {
@@ -1975,6 +1975,43 @@
           }
         },
         "x-orvano-session": "user",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/verification/reject": {
+      "post": {
+        "operationId": "account.rejectEmailVerification",
+        "description": "Says a sign up with this email wasn't you, with the token from the second link of a verification email. While the\nemail is not verified, the account loses its password, linked providers, second factors, and sessions, so whoever\nsigned up with your address can't use it; you can then sign in with a magic link or an email code. It needs no\nsession. The token works once, and verifying the email uses it up too.",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectEmailVerificationRequest"
+              }
+            }
+          }
+        },
         "x-orvano-service": "account",
         "x-orvano-audience": "client"
       }
@@ -9034,7 +9071,8 @@
           "session",
           "mfa",
           "isNewUser",
-          "verificationEmail"
+          "verificationEmail",
+          "verificationRequired"
         ],
         "properties": {
           "user": {
@@ -9046,7 +9084,7 @@
                 "type": "null"
               }
             ],
-            "description": "The user; null while `mfa` is set."
+            "description": "The user; null while `mfa` is set or `verificationRequired` is true."
           },
           "session": {
             "anyOf": [
@@ -9057,7 +9095,7 @@
                 "type": "null"
               }
             ],
-            "description": "The new session's tokens; null while `mfa` is set."
+            "description": "The new session's tokens; null while `mfa` is set or `verificationRequired` is true."
           },
           "mfa": {
             "anyOf": [
@@ -9072,7 +9110,7 @@
           },
           "isNewUser": {
             "type": "boolean",
-            "description": "Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user.",
+            "description": "Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a\nprovider sign in that created the user. False on a pending answer, even when the user was created.",
             "examples": [
               false
             ]
@@ -9086,10 +9124,17 @@
                 "type": "null"
               }
             ],
-            "description": "What happened to the verification email sign up was asked to send; null when none was asked for."
+            "description": "What happened to the verification email sign up was asked to send; null when none was asked for, and null on a\npending answer."
+          },
+          "verificationRequired": {
+            "type": "boolean",
+            "description": "True on the pending answer of a sign up while the project requires verified emails: no session exists, and the\nanswer is the same whether or not the email already had an account. Tell the user to open the link in their\ninbox, then sign in. False on every other answer.",
+            "examples": [
+              false
+            ]
           }
         },
-        "description": "A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of\n`session` and `mfa` is set."
+        "description": "A signed in user and their new session; for a user with MFA on, the challenge to answer first; or, for a sign up in\na project that requires verified emails, a pending answer that says to check the inbox. Exactly one of `session`,\n`mfa`, or `verificationRequired` true is set."
       },
       "CompleteOAuthLinkRequest": {
         "type": "object",
@@ -9466,7 +9511,7 @@
           },
           "verificationRedirectUrl": {
             "type": "string",
-            "description": "When set, also emails a verification link that opens here: a host that is one of the project's web platforms, or\nyour app's own scheme. `AuthResult.verificationEmail` says whether it was sent.",
+            "description": "When set, also emails a verification link that opens here: a host that is one of the project's web platforms, or\nyour app's own scheme. `AuthResult.verificationEmail` says whether it was sent. Required while the project\nrequires verified emails or MFA: the answer is then pending and never says whether the email was sent.",
             "examples": [
               "https://app.example.com/auth/callback"
             ]
@@ -10049,6 +10094,13 @@
             "examples": [
               "correct horse battery staple"
             ]
+          },
+          "verificationRedirectUrl": {
+            "type": "string",
+            "description": "Where a fresh verification link opens when the project requires verified emails and this user's email is not\nverified yet: a host that is one of the project's web platforms, or your app's own scheme. The sign in still\nanswers 403 `email_verification_required`, whether or not the email was sent.",
+            "examples": [
+              "https://app.example.com/auth/callback"
+            ]
           }
         },
         "description": "A sign in with an email and password."
@@ -10313,7 +10365,8 @@
           "verification",
           "recovery",
           "magic_link",
-          "email_change"
+          "email_change",
+          "verification_reject"
         ],
         "description": "What an emailed link is for: the `orvano_type` parameter Orvano adds to every link it emails, beside\n`orvano_token`. The SDKs' link helpers (`redeemLink`, `handleLink`) read it to call the right operation."
       },
@@ -10696,6 +10749,9 @@
           "invalid_password",
           "password_too_common",
           "password_breached",
+          "sign_up_disabled",
+          "email_domain_not_allowed",
+          "email_verification_required",
           "invalid_credentials",
           "session_required",
           "invalid_token",
@@ -12717,6 +12773,22 @@
           }
         },
         "description": "A trade of a refresh token for a new pair."
+      },
+      "RejectEmailVerificationRequest": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The `orvano_token` parameter of the emailed link.",
+            "examples": [
+              "orv_el_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          }
+        },
+        "description": "A rejection of a sign up, with the token from the emailed link that says it wasn't you."
       },
       "RenderedEmail": {
         "type": "object",

@@ -372,6 +372,17 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.rejectEmailVerification': DispatchEntry(
+    status: 204,
+    client: (o, input) async {
+      await o.account.rejectEmailVerification(
+        RejectEmailVerificationRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return null;
+    },
+  ),
   'account.update': DispatchEntry(
     status: 200,
     client: (o, input) async {

@@ -62,6 +62,7 @@ Answer authResult(String sub, {bool isNewUser = false, String sid = 's2'}) =>
       'session': session(sub, true, sid: sid).toJson(),
       'isNewUser': isNewUser,
       'verificationEmail': null,
+      'verificationRequired': false,
     }, code: 201);
 
 void main() {
@@ -219,6 +220,63 @@ void main() {
         await Future<void>.delayed(Duration.zero);
 
         expect(server.paths, ['/v1/account/email/confirm']);
+        expect(seen, isEmpty);
+      });
+
+      // Spec 0014, AC-15 and AC-36.
+      test('a verification_reject link calls rejectEmailVerification, signs '
+          'no one in, and keeps the session', () async {
+        final before = session('u1', false);
+        await serve([
+          (response) async {
+            response.statusCode = 204;
+            await response.close();
+          },
+        ], signedIn: before);
+        final seen = <AuthEvent>[];
+        client.authStateChanges.listen((c) => seen.add(c.event));
+
+        final result = await client.handleLink(
+          Uri.parse(
+            'https://a.example/?orvano_type=verification_reject&orvano_token=$token',
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(server.paths, ['/v1/account/verification/reject']);
+        expect(result, isA<LinkResult>());
+        expect((result! as LinkResult).type, EmailLinkType.verificationReject);
+        expect((result as LinkResult).user, isNull);
+        expect((await client.session.read())?.sessionId, before.sessionId);
+        expect(seen, isEmpty);
+      });
+
+      // Spec 0014, AC-12 and AC-36.
+      test('a pending sign up stores no session', () async {
+        await serve([
+          json({
+            'user': null,
+            'session': null,
+            'mfa': null,
+            'isNewUser': false,
+            'verificationEmail': null,
+            'verificationRequired': true,
+          }, code: 201),
+        ]);
+        final seen = <AuthEvent>[];
+        client.authStateChanges.listen((c) => seen.add(c.event));
+
+        final result = await AccountService(client).create(
+          CreateAccountRequest(
+            email: 'ada@example.com',
+            password: 'correct horse battery',
+            verificationRedirectUrl: 'https://app.example.com/cb',
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(result.verificationRequired, isTrue);
+        expect(await client.session.read(), isNull);
         expect(seen, isEmpty);
       });
 

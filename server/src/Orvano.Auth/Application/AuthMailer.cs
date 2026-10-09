@@ -38,9 +38,16 @@ internal sealed class AuthMailer(
     /// project, address, and kind whatever the IP, so one inbox can't be flooded. <paramref name="limitKey"/> is the
     /// project plus the limit IP of the request that sends.
     /// </summary>
-    public Failure? TakeRecipientLimits(string projectId, string email, EmailTokenKind kind, string limitKey)
+    public Failure? TakeRecipientLimits(string projectId, string email, EmailTokenKind kind, string limitKey) =>
+        TakeRecipientLimits(projectId, email, EmailTokenKinds.Wire(kind), limitKey);
+
+    /// <summary>
+    /// The same limits for an email that is not a token kind, such as the <c>sign_up_attempt</c> alert, which anyone
+    /// can trigger by signing up with a known address (spec 0014, AC-12).
+    /// </summary>
+    public Failure? TakeRecipientLimits(string projectId, string email, string kind, string limitKey)
     {
-        var recipient = $"{projectId}\n{email.ToLowerInvariant()}\n{EmailTokenKinds.Wire(kind)}";
+        var recipient = $"{projectId}\n{email.ToLowerInvariant()}\n{kind}";
         var fromHere = $"{recipient}\n{limitKey}";
         return Refused(limits.Acquire(RateLimitPolicies.EmailSendPerRecipientShort, fromHere))
             ?? Refused(limits.Acquire(RateLimitPolicies.EmailSendPerRecipient, fromHere))
@@ -72,7 +79,12 @@ internal sealed class AuthMailer(
     {
         var link = await tokens.CreateLinkAsync(uow, target.ProjectId, kind, target.UserId, target.Email, ct);
         var url = LinkUrl.Build(redirect.Url, kind, link);
-        var email = new AuthEmail(target.ProjectId, target.ProjectName, TemplateOf(kind), target.Email, target.UserName, url, null, Minutes(kind));
+        // Spec 0014, AC-15: every verification email of an app project also carries the same token as the link that
+        // says the sign up wasn't the inbox owner's. Console accounts are never claimed (spec 0013, AC-29).
+        var reject = kind == EmailTokenKind.Verification && target.ProjectId != ConsoleProject.Id
+            ? LinkUrl.Build(redirect.Url, LinkUrl.VerificationRejectType, link)
+            : null;
+        var email = new AuthEmail(target.ProjectId, target.ProjectName, TemplateOf(kind), target.Email, target.UserName, url, null, Minutes(kind), reject);
         return await QueueAsync(uow, target, kind, email, actor, ct);
     }
 

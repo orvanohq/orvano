@@ -34,6 +34,7 @@ import type {
   CreateVerificationRequest,
   DeleteAccountRequest,
   RefreshSessionRequest,
+  RejectEmailVerificationRequest,
   UpdateAccountRequest,
   UpdateEmailRequest,
   UpdateEmailVerificationRequest,
@@ -216,6 +217,11 @@ export const dispatch: DispatchTable = {
   'account.refreshSession': {
     status: 200,
     client: (o, input) => o.account.refreshSession(input.body as RefreshSessionRequest),
+  },
+  'account.rejectEmailVerification': {
+    status: 204,
+    client: (o, input) =>
+      o.account.rejectEmailVerification(input.body as RejectEmailVerificationRequest),
   },
   'account.update': {
     status: 200,

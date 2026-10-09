@@ -30,9 +30,10 @@ internal sealed record EmailTemplateInfo(
 /// <param name="ExpiresInMinutes"><c>expires_in_minutes</c>.</param>
 /// <param name="Alert"><c>alert</c>, for the security alert: which change happened (spec 0013, AC-31).</param>
 /// <param name="OccurredAt"><c>occurred_at</c>, for the security alert: when, as text in UTC.</param>
+/// <param name="RejectUrl"><c>reject_url</c>, for the verification template: the link that says it wasn't you (spec 0014, AC-15).</param>
 internal sealed record TemplateValues(
     string ProjectName, string UserEmail, string UserName, string? ActionUrl, string? Code, int ExpiresInMinutes,
-    string? Alert = null, string? OccurredAt = null)
+    string? Alert = null, string? OccurredAt = null, string? RejectUrl = null)
 {
     /// <summary>The value of the variable called <paramref name="name"/>, as text.</summary>
     public string Text(string name) => name switch
@@ -45,6 +46,7 @@ internal sealed record TemplateValues(
         EmailTemplateCatalog.ExpiresInMinutes => ExpiresInMinutes.ToString(CultureInfo.InvariantCulture),
         EmailTemplateCatalog.Alert => Alert ?? "",
         EmailTemplateCatalog.OccurredAt => OccurredAt ?? "",
+        EmailTemplateCatalog.RejectUrl => RejectUrl ?? "",
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, null),
     };
 }
@@ -63,11 +65,13 @@ internal static class EmailTemplateCatalog
     public const string ExpiresInMinutes = "expires_in_minutes";
     public const string Alert = "alert";
     public const string OccurredAt = "occurred_at";
+    public const string RejectUrl = "reject_url";
 
     /// <summary>The only locale for now; the column is already part of the key.</summary>
     public const string Locale = "en";
 
     public const string SampleActionUrl = "https://example.com/auth/confirm?token=sample";
+    public const string SampleRejectUrl = "https://example.com/auth/confirm?type=verification_reject&token=sample";
     public const string SampleCode = "428613";
     public const int SampleLinkMinutes = 60;
     public const int SampleCodeMinutes = 10;
@@ -81,20 +85,23 @@ internal static class EmailTemplateCatalog
     private static readonly TemplateVariable TheCode = new(Code, "The code the user types in.");
     private static readonly TemplateVariable Expires = new(ExpiresInMinutes, "How many minutes the link or code works.");
 
+    private static readonly TemplateVariable Reject = new(RejectUrl,
+        "The link the user opens when they didn't sign up: it removes the password and sign ins someone else added. Empty in an email change email.");
+
     private static readonly TemplateVariable WhichAlert = new(Alert,
-        "What changed: mfa_enabled, mfa_disabled, passkey_added, passkey_removed, recovery_codes_created, or recovery_code_used.");
+        "What changed: mfa_enabled, mfa_disabled, passkey_added, passkey_removed, recovery_codes_created, recovery_code_used, or sign_up_attempt.");
 
     private static readonly TemplateVariable When = new(OccurredAt, "When it changed, in UTC, for example 2026-06-01 10:00 UTC.");
 
     /// <summary>The five templates, in the order the console lists them.</summary>
     public static IReadOnlyList<EmailTemplateInfo> All { get; } =
     [
-        new(AuthEmailKind.Verification, "verification", "Email verification", "Sent to confirm a user owns their email address.", [Project, Email, Name, Url, Expires]),
+        new(AuthEmailKind.Verification, "verification", "Email verification", "Sent to confirm a user owns their email address.", [Project, Email, Name, Url, Reject, Expires]),
         new(AuthEmailKind.Recovery, "recovery", "Password reset", "Sent when a user asks to reset their password.", [Project, Email, Name, Url, Expires]),
         new(AuthEmailKind.MagicLink, "magic_link", "Magic link", "Sent when a user signs in with a link instead of a password.", [Project, Email, Name, Url, Expires]),
         new(AuthEmailKind.EmailCode, "email_code", "Email code", "Sent when a user signs in with a one time code.", [Project, Email, Name, TheCode, Expires]),
         new(AuthEmailKind.SecurityAlert, "security_alert", "Security alert",
-            "Sent when a user's sign in security changes: MFA on or off, a passkey added or removed, recovery codes made or used.",
+            "Sent when a user's sign in security changes (MFA on or off, a passkey added or removed, recovery codes made or used), or someone signs up again with their email.",
             [Project, WhichAlert, When]),
     ];
 
@@ -111,6 +118,7 @@ internal static class EmailTemplateCatalog
     {
         AuthEmailKind.EmailCode => new(projectName, callerEmail, callerName ?? "", null, SampleCode, SampleCodeMinutes),
         AuthEmailKind.SecurityAlert => new(projectName, callerEmail, callerName ?? "", null, null, 0, SampleAlert, AlertTime(SampleOccurredAt)),
+        AuthEmailKind.Verification => new(projectName, callerEmail, callerName ?? "", SampleActionUrl, null, SampleLinkMinutes, RejectUrl: SampleRejectUrl),
         _ => new(projectName, callerEmail, callerName ?? "", SampleActionUrl, null, SampleLinkMinutes),
     };
 
@@ -123,6 +131,7 @@ internal static class EmailTemplateCatalog
         SecurityAlertKind.PasskeyRemoved => "passkey_removed",
         SecurityAlertKind.RecoveryCodesCreated => "recovery_codes_created",
         SecurityAlertKind.RecoveryCodeUsed => "recovery_code_used",
+        SecurityAlertKind.SignUpAttempt => "sign_up_attempt",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 

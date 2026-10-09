@@ -22,6 +22,9 @@ public static class ErrorCode
     /// <summary>The <c>email_already_verified</c> error code.</summary>
     public const string EmailAlreadyVerified = "email_already_verified";
 
+    /// <summary>The <c>email_domain_not_allowed</c> error code.</summary>
+    public const string EmailDomainNotAllowed = "email_domain_not_allowed";
+
     /// <summary>The <c>email_not_configured</c> error code.</summary>
     public const string EmailNotConfigured = "email_not_configured";
 
@@ -30,6 +33,9 @@ public static class ErrorCode
 
     /// <summary>The <c>email_rate_limited</c> error code.</summary>
     public const string EmailRateLimited = "email_rate_limited";
+
+    /// <summary>The <c>email_verification_required</c> error code.</summary>
+    public const string EmailVerificationRequired = "email_verification_required";
 
     /// <summary>The <c>factor_not_enabled</c> error code.</summary>
     public const string FactorNotEnabled = "factor_not_enabled";
@@ -198,6 +204,9 @@ public static class ErrorCode
 
     /// <summary>The <c>setup_token_invalid</c> error code.</summary>
     public const string SetupTokenInvalid = "setup_token_invalid";
+
+    /// <summary>The <c>sign_up_disabled</c> error code.</summary>
+    public const string SignUpDisabled = "sign_up_disabled";
 
     /// <summary>The <c>signup_closed</c> error code.</summary>
     public const string SignupClosed = "signup_closed";

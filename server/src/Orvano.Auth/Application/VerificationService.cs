@@ -67,6 +67,35 @@ internal sealed class VerificationService(AuthStore store, AuthMailer mailer, Se
         return outcome;
     }
 
+    /// <summary>
+    /// <c>account.rejectEmailVerification</c> (spec 0014, AC-15): consumes a verification token as <see cref="VerifyAsync"/>
+    /// does and, while its user is still unverified, claims the account for the inbox owner: the password, identities,
+    /// factors, and sessions go (with the events a claim writes), the user row and its ID stay, and the email stays
+    /// unverified until the owner signs in by magic link or email code. A verified user's token is spent and changes
+    /// nothing. A used, expired, unknown, or wrong kind token is 401 <c>invalid_email_token</c>.
+    /// </summary>
+    public async Task<Outcome<Done>> RejectAsync(string projectId, string? tokenValue, CancellationToken ct)
+    {
+        // Console accounts are never claimed (spec 0013, AC-29), and their emails carry no reject link.
+        if (projectId == ConsoleProject.Id || !LinkToken.TryParse(tokenValue, out var link)) return Failure.InvalidEmailToken;
+
+        Guid[] ended = [];
+        var outcome = await store.WriteAsync<Done>(async (uow, token) =>
+        {
+            if (await EmailTokens.ConsumeLinkAsync(uow, projectId, EmailTokenKind.Verification, link, token) is not { Expired: false, UserId: { } userId } consumed)
+                return Failure.InvalidEmailToken;
+            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user || !EmailRule.SameAddress(user.Email, consumed.Email))
+                return Failure.InvalidEmailToken;
+
+            if (user.EmailVerifiedAt is null)
+                ended = (await AccountClaims.ClaimAsync(uow, sessions, projectId, user, Actor.User(userId), endSessions: true, token)).EndedSessions;
+            return default(Done);
+        }, ct);
+
+        if (outcome.Succeeded) foreach (var id in ended) await checks.EvictAsync(id, ct);
+        return outcome;
+    }
+
     /// <summary>Sets <c>email_verified_at = now()</c> when it is null.</summary>
     internal static async Task MarkVerifiedAsync(AuthUnitOfWork uow, Guid userId, CancellationToken ct)
     {

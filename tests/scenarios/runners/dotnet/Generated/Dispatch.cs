@@ -46,6 +46,7 @@ internal static class Dispatch
         ["account.listPasskeys"] = new(200, null, null),
         ["account.listSessions"] = new(200, null, null),
         ["account.refreshSession"] = new(200, null, null),
+        ["account.rejectEmailVerification"] = new(204, null, null),
         ["account.update"] = new(200, null, null),
         ["account.updateEmail"] = new(202, null, null),
         ["account.updatePasskey"] = new(200, null, null),

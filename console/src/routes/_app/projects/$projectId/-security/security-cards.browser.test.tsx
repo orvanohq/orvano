@@ -3,12 +3,15 @@ import axe from 'axe-core'
 import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 
+import { renderInRouter } from '@/test/router'
 import { settleStyles } from '@/test/settle'
 
 import { AppServersCard } from './app-servers-card'
+import { EmailDomainsCard } from './email-domains-card'
 import { PasswordsCard } from './passwords-card'
 import { RateLimitsCard } from './rate-limits-card'
 import { SessionsCard } from './sessions-card'
+import { SignUpsCard } from './sign-ups-card'
 
 // Spec 0014 AC-34: the Security page's cards save only their own fields, place a refused value on
 // its field, show every value to viewers with the controls disabled, and meet WCAG AA.
@@ -236,5 +239,114 @@ describe('SessionsCard', () => {
     await vi.waitFor(() => {
       expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ maxSessionsPerUser: null }))
     })
+  })
+})
+
+// Spec 0014 AC-11, AC-34: the Sign ups and Email domains cards.
+describe('SignUpsCard', () => {
+  const paths = ['/', '/projects/$projectId/email/settings']
+
+  it('saves its two switches and links a missing email server to Email settings', async () => {
+    const onSave = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new OrvanoError(409, 'email_not_configured', 'No email server is set up.', 'r'),
+      )
+      .mockResolvedValue(undefined)
+    const { screen } = await renderInRouter(
+      <SignUpsCard
+        projectId="p1"
+        policies={policiesOf()}
+        readOnlyReason={undefined}
+        onSave={onSave}
+      />,
+      { at: '/', paths },
+    )
+    await expect.element(screen.getByRole('heading', { name: 'Sign ups' })).toBeVisible()
+    await noAxeViolations()
+
+    await screen.getByRole('switch', { name: 'Require a verified email' }).click()
+    await screen.getByRole('button', { name: 'Save' }).click()
+    expect(onSave).toHaveBeenCalledWith({ signUpsEnabled: true, requireVerifiedEmail: true })
+    await expect
+      .element(screen.getByRole('link', { name: 'Email settings' }))
+      .toHaveAttribute('href', '/projects/p1/email/settings')
+    await noAxeViolations()
+
+    await screen.getByRole('switch', { name: 'Allow sign ups' }).click()
+    await screen.getByRole('button', { name: 'Save' }).click()
+    await vi.waitFor(() => {
+      expect(onSave).toHaveBeenLastCalledWith({ signUpsEnabled: false, requireVerifiedEmail: true })
+    })
+  })
+
+  it('warns that sign ups fail while verified emails are required and no server can send', async () => {
+    const { screen } = await renderInRouter(
+      <SignUpsCard
+        projectId="p1"
+        policies={{ ...policiesOf({ requireVerifiedEmail: true }), smtpAvailable: false }}
+        readOnlyReason={undefined}
+        onSave={vi.fn()}
+      />,
+      { at: '/', paths },
+    )
+    await expect.element(screen.getByText('Sign ups are failing')).toBeVisible()
+    await noAxeViolations()
+  })
+})
+
+describe('EmailDomainsCard', () => {
+  it('saves both lists one domain per line and names a refused line by its number', async () => {
+    const onSave = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new OrvanoError(
+          400,
+          'invalid_request',
+          'blockedEmailDomains has bad entries at positions 1: each must be a domain such as example.com.',
+          'r',
+        ),
+      )
+      .mockResolvedValue(undefined)
+    const screen = await render(
+      <EmailDomainsCard policies={policiesOf()} readOnlyReason={undefined} onSave={onSave} />,
+    )
+    await noAxeViolations()
+    await screen.getByRole('switch', { name: 'Block disposable addresses' }).click()
+    const blocked = screen.getByLabelText('Blocked domains')
+    await blocked.fill('competitor.example\n\n*.bad.example')
+    await screen.getByRole('button', { name: 'Save' }).click()
+    expect(onSave).toHaveBeenCalledWith({
+      blockDisposableEmails: true,
+      blockedEmailDomains: ['competitor.example', '*.bad.example'],
+      allowedEmailDomains: [],
+    })
+    await expect.element(screen.getByText(/^Line 3: Each must be a domain/)).toBeVisible()
+    await expect.element(blocked).toHaveAttribute('aria-invalid', 'true')
+    await noAxeViolations()
+
+    await blocked.fill('competitor.example')
+    await screen.getByLabelText('Allowed domains').fill('example.com')
+    await screen.getByRole('button', { name: 'Save' }).click()
+    await vi.waitFor(() => {
+      expect(onSave).toHaveBeenLastCalledWith({
+        blockDisposableEmails: true,
+        blockedEmailDomains: ['competitor.example'],
+        allowedEmailDomains: ['example.com'],
+      })
+    })
+  })
+
+  it('shows a viewer every value with the controls disabled', async () => {
+    const screen = await render(
+      <EmailDomainsCard
+        policies={policiesOf({ blockedEmailDomains: ['competitor.example'] })}
+        readOnlyReason="Viewers can look but not change."
+        onSave={vi.fn()}
+      />,
+    )
+    await expect.element(screen.getByLabelText('Blocked domains')).toHaveValue('competitor.example')
+    await expect.element(screen.getByLabelText('Blocked domains')).toBeDisabled()
+    await noAxeViolations()
   })
 })

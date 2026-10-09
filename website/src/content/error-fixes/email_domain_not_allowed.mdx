@@ -1,0 +1,7 @@
+## Why it happens
+
+The project's email domain rule refused the address. On the Email domains card of the project's **Security** page, either an allowed list is set and the address's domain isn't on it, or the domain (or a domain it belongs to, so `mail.example.com` for `example.com`) is on the blocked list, or **Block disposable addresses** is on and the domain is a known throwaway inbox. With an allowed list, a provider account without any email is refused too. The rule checks every new email: sign up, a server creating a user, an email change, and a magic link, email code, or provider sign in that would create a user. Addresses users already have are never checked again.
+
+## How to fix
+
+Ask the person for an address on a domain your project accepts, and say which domains those are if your app is meant for one organization. To change the rule, edit the lists or the disposable switch on the Email domains card.

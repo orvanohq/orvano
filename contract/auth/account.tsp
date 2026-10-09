@@ -92,14 +92,15 @@ model SessionTokens {
 }
 
 @doc("""
-  A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of
-  `session` and `mfa` is set.
+  A signed in user and their new session; for a user with MFA on, the challenge to answer first; or, for a sign up in
+  a project that requires verified emails, a pending answer that says to check the inbox. Exactly one of `session`,
+  `mfa`, or `verificationRequired` true is set.
   """)
 model AuthResult {
-  @doc("The user; null while `mfa` is set.")
+  @doc("The user; null while `mfa` is set or `verificationRequired` is true.")
   user: User | null;
 
-  @doc("The new session's tokens; null while `mfa` is set.")
+  @doc("The new session's tokens; null while `mfa` is set or `verificationRequired` is true.")
   session: SessionTokens | null;
 
   @doc("""
@@ -108,12 +109,26 @@ model AuthResult {
     """)
   mfa: MfaChallenge | null;
 
-  @doc("Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user.")
+  @doc("""
+    Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a
+    provider sign in that created the user. False on a pending answer, even when the user was created.
+    """)
   @example(false)
   isNewUser: boolean;
 
-  @doc("What happened to the verification email sign up was asked to send; null when none was asked for.")
+  @doc("""
+    What happened to the verification email sign up was asked to send; null when none was asked for, and null on a
+    pending answer.
+    """)
   verificationEmail: VerificationEmailStatus | null;
+
+  @doc("""
+    True on the pending answer of a sign up while the project requires verified emails: no session exists, and the
+    answer is the same whether or not the email already had an account. Tell the user to open the link in their
+    inbox, then sign in. False on every other answer.
+    """)
+  @example(false)
+  verificationRequired: boolean;
 }
 
 @doc("What happened to the verification email of a sign up. The user and session are created whatever it says.")
@@ -144,6 +159,12 @@ enum EmailLinkType {
 
   @doc("Confirms an email change (`account.confirmEmailChange`).")
   email_change,
+
+  @doc("""
+    Says the email was not this person's sign up (`account.rejectEmailVerification`). Every verification email carries
+    it as a second link beside the `verification` one.
+    """)
+  verification_reject,
 }
 
 @doc("A request to email a verification link to the signed in user.")
@@ -159,6 +180,13 @@ model CreateVerificationRequest {
 
 @doc("An email verification, with the token from the emailed link.")
 model VerifyEmailRequest {
+  @doc("The `orvano_token` parameter of the emailed link.")
+  @example("orv_el_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE")
+  token: string;
+}
+
+@doc("A rejection of a sign up, with the token from the emailed link that says it wasn't you.")
+model RejectEmailVerificationRequest {
   @doc("The `orvano_token` parameter of the emailed link.")
   @example("orv_el_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE")
   token: string;
@@ -379,7 +407,8 @@ model CreateAccountRequest {
 
   @doc("""
     When set, also emails a verification link that opens here: a host that is one of the project's web platforms, or
-    your app's own scheme. `AuthResult.verificationEmail` says whether it was sent.
+    your app's own scheme. `AuthResult.verificationEmail` says whether it was sent. Required while the project
+    requires verified emails or MFA: the answer is then pending and never says whether the email was sent.
     """)
   @example("https://app.example.com/auth/callback")
   verificationRedirectUrl?: string;
@@ -487,12 +516,24 @@ model CreatePasswordSessionRequest {
   @doc("The user's password.")
   @example("correct horse battery staple")
   password: string;
+
+  @doc("""
+    Where a fresh verification link opens when the project requires verified emails and this user's email is not
+    verified yet: a host that is one of the project's web platforms, or your app's own scheme. The sign in still
+    answers 403 `email_verification_required`, whether or not the email was sent.
+    """)
+  @example("https://app.example.com/auth/callback")
+  verificationRedirectUrl?: string;
 }
 
 @route("/v1/account")
 @tag("account")
 interface AccountApi {
-  @doc("Signs a new user up with an email and password, and signs them in.")
+  @doc("""
+    Signs a new user up with an email and password, and signs them in. While the project requires verified emails or
+    MFA, it signs no one in: it answers `verificationRequired` true and emails a link instead, the same answer whether
+    or not the email already had an account.
+    """)
   @operationId("account.create")
   @extension("x-orvano-audience", "client")
   @extension("x-orvano-service", "account")
@@ -594,6 +635,19 @@ interface AccountApi {
   verifyEmail(@body request: VerifyEmailRequest): User | Problem;
 
   @doc("""
+    Says a sign up with this email wasn't you, with the token from the second link of a verification email. While the
+    email is not verified, the account loses its password, linked providers, second factors, and sessions, so whoever
+    signed up with your address can't use it; you can then sign in with a magic link or an email code. It needs no
+    session. The token works once, and verifying the email uses it up too.
+    """)
+  @operationId("account.rejectEmailVerification")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @route("/verification/reject")
+  @post
+  rejectEmailVerification(@body request: RejectEmailVerificationRequest): NoContentResponse | Problem;
+
+  @doc("""
     Emails a sign in link. An email without a user gets one that creates the user, unless `createUser` is false. The
     answer is the same 202 either way, so it never tells anyone which emails have accounts.
     """)
@@ -631,7 +685,7 @@ interface AccountApi {
     @statusCode statusCode: 202;
   } | Problem;
 
-  @doc("Signs a user in with an emailed code. After 5 wrong tries the code stops working; ask for a new one.")
+  @doc("Signs a user in with an emailed code. After 10 wrong tries the code stops working; ask for a new one.")
   @operationId("account.createEmailCodeSession")
   @extension("x-orvano-audience", "client")
   @extension("x-orvano-service", "account")

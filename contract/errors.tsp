@@ -91,6 +91,15 @@ enum ErrorCode {
   @doc("The new password appears in a known data breach, by the Have I Been Pwned check the project turned on (400).")
   password_breached,
 
+  @doc("The project closed sign ups, so this request can't create a user; existing users still sign in (403).")
+  sign_up_disabled,
+
+  @doc("The email's domain is not allowed by the project's rules: not on its allowed list, on its blocked list, or a disposable address (403).")
+  email_domain_not_allowed,
+
+  @doc("The project requires a verified email before sign in, and this user's email is not verified yet (403).")
+  email_verification_required,
+
   @doc("The email and password do not match a user, or the password given to confirm an action is missing or wrong (401).")
   invalid_credentials,
 
@@ -181,7 +190,7 @@ enum ErrorCode {
   @doc("The email link's token is unknown, already used, expired, or replaced by a newer email (401).")
   invalid_email_token,
 
-  @doc("The email code is wrong, expired, or used up; ask for a new one after 5 wrong tries (401).")
+  @doc("The email code is wrong, expired, or used up; ask for a new one after 10 wrong tries (401).")
   invalid_code,
 
   @doc("Sign in again within 10 minutes before this action: a user without a password, or an old session removing a passkey (403).")

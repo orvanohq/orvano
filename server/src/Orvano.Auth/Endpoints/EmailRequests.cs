@@ -27,6 +27,16 @@ internal static class EmailRequests
     public static async Task<IResult> OpenAcceptedAsync(HttpContext http, Outcome<Done> outcome, Stopwatch started, CancellationToken ct)
     {
         if (!outcome.Succeeded) return Problem(http, outcome.Failure!);
+        await HoldToFloorAsync(http, started, ct);
+        return TypedResults.StatusCode(StatusCodes.Status202Accepted);
+    }
+
+    /// <summary>
+    /// Waits until <see cref="AuthTimings.OpenSendFloor"/> after <paramref name="started"/>, so every branch of an answer
+    /// that must not reveal an account takes the same time: the open sends and the pending sign up (spec 0014, AC-12).
+    /// </summary>
+    public static async Task HoldToFloorAsync(HttpContext http, Stopwatch started, CancellationToken ct)
+    {
         var remaining = AuthTimings.OpenSendFloor - started.Elapsed;
         if (remaining > TimeSpan.Zero)
         {
@@ -46,8 +56,6 @@ internal static class EmailRequests
                         (int)started.ElapsedMilliseconds, (int)AuthTimings.OpenSendFloor.TotalMilliseconds);
             }
         }
-
-        return TypedResults.StatusCode(StatusCodes.Status202Accepted);
     }
 
     /// <summary>

@@ -1,0 +1,7 @@
+## Why it happens
+
+The project turned off **Allow sign ups** on the Sign ups card of its **Security** page in the console, so nothing from your app may create a user: sign up, and a magic link, email code, or provider sign in for an email that has no account yet. People who already have an account still sign in as before, and a server key or the console can still create users.
+
+## How to fix
+
+If your app is invite only, this is working as intended: tell the person sign ups are closed, and create their account from your server with [`users.create`](/docs/api/operations/userscreate/) or from the console. To open sign ups again, turn **Allow sign ups** back on.

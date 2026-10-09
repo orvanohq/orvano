@@ -20,6 +20,9 @@ abstract final class ErrorCode {
   /// `email_already_verified`
   static const emailAlreadyVerified = 'email_already_verified';
 
+  /// `email_domain_not_allowed`
+  static const emailDomainNotAllowed = 'email_domain_not_allowed';
+
   /// `email_not_configured`
   static const emailNotConfigured = 'email_not_configured';
 
@@ -28,6 +31,9 @@ abstract final class ErrorCode {
 
   /// `email_rate_limited`
   static const emailRateLimited = 'email_rate_limited';
+
+  /// `email_verification_required`
+  static const emailVerificationRequired = 'email_verification_required';
 
   /// `factor_not_enabled`
   static const factorNotEnabled = 'factor_not_enabled';
@@ -196,6 +202,9 @@ abstract final class ErrorCode {
 
   /// `setup_token_invalid`
   static const setupTokenInvalid = 'setup_token_invalid';
+
+  /// `sign_up_disabled`
+  static const signUpDisabled = 'sign_up_disabled';
 
   /// `signup_closed`
   static const signupClosed = 'signup_closed';

@@ -72,8 +72,13 @@ internal sealed class SignInResolution(Identities identities, Sessions sessions,
         }
 
         // Third: a new user, with the verified email or none.
-        var signUp = limits.Acquire(ProjectLimits.SignUpPerIp((await policies.GetAsync(uow.Tx.Connection!, uow.Tx, projectId, ct)).Auth), ipKey);
+        var project = await policies.GetAsync(uow.Tx.Connection!, uow.Tx, projectId, ct);
+        var signUp = limits.Acquire(ProjectLimits.SignUpPerIp(project.Auth), ipKey);
         if (!signUp.Allowed) return Failure.RateLimited(signUp.RetryAfter);
+        // Spec 0014, AC-9, AC-10, AC-14: sign ups open, the domain rule (no email fails only an allowed list), and under
+        // the verified email flow a provider email that is missing or unverified creates no user.
+        if (project.CheckSignUp(result.VerifiedEmail) is { } refused) return refused;
+        if (project.VerifiedEmailFlow && result.VerifiedEmail is null) return Failure.EmailVerificationRequired;
         Guid created;
         await using (var insert = new NpgsqlCommand(
             """
