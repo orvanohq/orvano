@@ -107,7 +107,8 @@ public class AccessTokenTests(PostgresFixture postgres)
         var clock = new ManualClock(Start);
         var secrets = new SecretBox(MasterKeys.Parse(OrvanoProcess.MasterKeys));
         var keys = new SigningKeys(database.App, secrets, clock);
-        return (new AccessTokens(keys, PublicUrl.Parse("https://orvano.example.com"), clock), clock);
+        var policies = new PolicySettings(new AuthStore(database.App), clock);
+        return (new AccessTokens(keys, PublicUrl.Parse("https://orvano.example.com"), clock, policies), clock);
     }
 
     private static string Encode(string json) => Base64Url.EncodeToString(Encoding.UTF8.GetBytes(json));

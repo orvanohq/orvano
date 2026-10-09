@@ -214,7 +214,7 @@ public class ConsoleAccountTests(PostgresFixture postgres)
         await database.MigrateAsync();
         var clock = new ManualClock(DateTimeOffset.UtcNow);
         var keys = new SigningKeys(database.App, new SecretBox(MasterKeys.Parse(OrvanoProcess.MasterKeys)), clock);
-        var tokens = new AccessTokens(keys, PublicUrl.Parse(OrvanoProcess.PublicUrl), clock);
+        var tokens = new AccessTokens(keys, PublicUrl.Parse(OrvanoProcess.PublicUrl), clock, new PolicySettings(new AuthStore(database.App), clock));
         var issued = await tokens.IssueAsync(ConsoleProject.Id, Guid.CreateVersion7(), Guid.CreateVersion7(), emailVerified: false, SessionStrength.StepOne(SessionMethod.Password), Ct);
         var checks = new ConsoleSessionChecks(tokens, null!);
 

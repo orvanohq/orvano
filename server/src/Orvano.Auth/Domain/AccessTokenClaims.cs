@@ -3,7 +3,8 @@ namespace Orvano.Auth.Domain;
 /// <summary>
 /// The claims of an access token (AC-6): issuer, audience (the project ID), subject (the user), session, whether the
 /// user's email is verified (spec 0010, AC-14), the session's strength (<c>aal</c> and <c>amr</c>, spec 0013, AC-26),
-/// and the issue and expiry times, <c>exp = iat + 900</c>. No email, name, or other personal data, since tokens end
+/// and the issue and expiry times, <c>exp = iat + </c> the project's <c>accessTokenSeconds</c> (900 by default,
+/// spec 0014, AC-25). No email, name, or other personal data, since tokens end
 /// up in other people's logs.
 /// </summary>
 internal sealed record AccessTokenClaims(
@@ -28,12 +29,16 @@ internal sealed record AccessTokenClaims(
     /// <summary><c>&lt;ORVANO_PUBLIC_URL&gt;/v1/projects/&lt;projectId&gt;</c>.</summary>
     public static string IssuerFor(string publicOrigin, string projectId) => $"{publicOrigin}/v1/projects/{projectId}";
 
-    /// <summary>Claims for a token issued at <paramref name="now"/>, truncated to whole seconds as JWT times are.</summary>
+    /// <summary>
+    /// Claims for a token issued at <paramref name="now"/>, truncated to whole seconds as JWT times are, that lasts
+    /// <paramref name="lifetime"/> (the default 15 minutes when not given).
+    /// </summary>
     public static AccessTokenClaims For(
-        string publicOrigin, string projectId, Guid userId, Guid sessionId, bool emailVerified, SessionStrength strength, DateTimeOffset now)
+        string publicOrigin, string projectId, Guid userId, Guid sessionId, bool emailVerified, SessionStrength strength, DateTimeOffset now,
+        TimeSpan? lifetime = null)
     {
         var issuedAt = DateTimeOffset.FromUnixTimeSeconds(now.ToUnixTimeSeconds());
         return new AccessTokenClaims(
-            IssuerFor(publicOrigin, projectId), projectId, userId, sessionId, emailVerified, strength, issuedAt, issuedAt + AuthTimings.AccessToken);
+            IssuerFor(publicOrigin, projectId), projectId, userId, sessionId, emailVerified, strength, issuedAt, issuedAt + (lifetime ?? AuthTimings.AccessToken));
     }
 }

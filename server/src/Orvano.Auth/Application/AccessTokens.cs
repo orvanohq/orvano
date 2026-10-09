@@ -34,7 +34,7 @@ internal readonly record struct TokenCheck(TokenIdentity? Identity, TokenRejecti
 /// the signature to verify against the header project's keys, <c>iss</c> and <c>aud</c> to name that project, and
 /// <c>exp</c> not to have passed (30 seconds of leeway). The session check is the caller's.
 /// </summary>
-internal sealed class AccessTokens(SigningKeys keys, PublicUrl publicUrl, TimeProvider clock)
+internal sealed class AccessTokens(SigningKeys keys, PublicUrl publicUrl, TimeProvider clock, PolicySettings policies)
 {
     private static readonly JsonWebTokenHandler Handler = new() { SetDefaultTimesOnTokenCreation = false, MapInboundClaims = false };
 
@@ -45,7 +45,9 @@ internal sealed class AccessTokens(SigningKeys keys, PublicUrl publicUrl, TimePr
     public async Task<IssuedToken> IssueAsync(string projectId, Guid userId, Guid sessionId, bool emailVerified, SessionStrength strength, CancellationToken ct)
     {
         var key = await keys.GetActiveAsync(projectId, ct);
-        var claims = AccessTokenClaims.For(publicUrl.Origin, projectId, userId, sessionId, emailVerified, strength, clock.GetUtcNow());
+        // Spec 0014, AC-25: the project's access token lifetime, for this token and every refresh.
+        var lifetime = TimeSpan.FromSeconds((await policies.GetAsync(projectId, ct)).Auth.AccessTokenSeconds);
+        var claims = AccessTokenClaims.For(publicUrl.Origin, projectId, userId, sessionId, emailVerified, strength, clock.GetUtcNow(), lifetime);
         var token = Handler.CreateToken(new SecurityTokenDescriptor
         {
             Issuer = claims.Issuer,

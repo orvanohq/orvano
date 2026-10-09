@@ -8,6 +8,7 @@ import { settleStyles } from '@/test/settle'
 import { AppServersCard } from './app-servers-card'
 import { PasswordsCard } from './passwords-card'
 import { RateLimitsCard } from './rate-limits-card'
+import { SessionsCard } from './sessions-card'
 
 // Spec 0014 AC-34: the Security page's cards save only their own fields, place a refused value on
 // its field, show every value to viewers with the controls disabled, and meet WCAG AA.
@@ -183,5 +184,57 @@ describe('RateLimitsCard', () => {
     await expect.element(screen.getByText('Enter a whole number from 10 to 10000.')).toBeVisible()
     expect(onSave).not.toHaveBeenCalled()
     await noAxeViolations()
+  })
+})
+
+describe('SessionsCard', () => {
+  it('shows lifetimes in minutes, hours, and days and saves them as seconds', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    const screen = await render(
+      <SessionsCard policies={policiesOf()} readOnlyReason={undefined} onSave={onSave} />,
+    )
+    await expect.element(screen.getByLabelText('Access token lifetime')).toHaveValue('15')
+    await expect.element(screen.getByLabelText('Idle session lifetime')).toHaveValue('720')
+    await expect.element(screen.getByLabelText('Longest session lifetime')).toHaveValue('365')
+    await expect.element(screen.getByLabelText('Sessions per user')).toHaveValue('')
+    await noAxeViolations()
+
+    await screen.getByLabelText('Access token lifetime').fill('5')
+    await screen.getByLabelText('Longest session lifetime').fill('1')
+    await screen.getByLabelText('Idle session lifetime').fill('24')
+    await screen.getByLabelText('Sessions per user').fill('2')
+    await screen.getByRole('button', { name: 'Save' }).click()
+    await vi.waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith({
+        accessTokenSeconds: 300,
+        sessionIdleSeconds: 86400,
+        sessionAbsoluteSeconds: 86400,
+        maxSessionsPerUser: 2,
+      })
+    })
+  })
+
+  it('refuses an idle lifetime past the longest one, and clears the cap when emptied', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    const screen = await render(
+      <SessionsCard
+        policies={policiesOf({ maxSessionsPerUser: 3 })}
+        readOnlyReason={undefined}
+        onSave={onSave}
+      />,
+    )
+    await screen.getByLabelText('Longest session lifetime').fill('1')
+    await screen.getByRole('button', { name: 'Save' }).click()
+    await expect
+      .element(screen.getByText('The idle lifetime must be at most the longest lifetime.'))
+      .toBeVisible()
+    expect(onSave).not.toHaveBeenCalled()
+
+    await screen.getByLabelText('Longest session lifetime').fill('365')
+    await screen.getByLabelText('Sessions per user').fill('')
+    await screen.getByRole('button', { name: 'Save' }).click()
+    await vi.waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ maxSessionsPerUser: null }))
+    })
   })
 })

@@ -29,7 +29,7 @@ internal sealed record ClientInfo(string? UserAgent, string? Sdk, IPAddress? Ip)
 internal sealed record SessionGrant(Guid SessionId, RefreshToken RefreshToken, DateTimeOffset RefreshTokenExpiresAt, SessionStrength Strength);
 
 /// <summary>Creates and ends session rows inside the caller's transaction (spec 0004, data model, state transitions, AC-31).</summary>
-internal sealed class Sessions(SecretBox secrets)
+internal sealed class Sessions(SecretBox secrets, PolicySettings policies, SessionChecks checks)
 {
     public const string Table = "auth_sessions";
     public const string RefreshColumn = "refresh_ciphertext";
@@ -40,7 +40,8 @@ internal sealed class Sessions(SecretBox secrets)
     /// <c>oauth</c> or <c>id_token</c> session (spec 0012, AC-18). The session ID comes from Postgres' <c>uuidv7()</c>
     /// first, since the encrypted refresh token is bound to it. Its strength (spec 0013, AC-25) is step one's for
     /// <paramref name="method"/> unless <paramref name="strength"/> says more; a level 2 session also records
-    /// <c>strong_auth_at</c>.
+    /// <c>strong_auth_at</c>. Its lifetimes are the project's (spec 0014, AC-25), and with a session cap (AC-26) it
+    /// first locks the user and ends the least recently used live sessions past the cap, evicted once committed.
     /// </summary>
     public async Task<SessionGrant> CreateAsync(
         AuthUnitOfWork uow, string projectId, Guid userId, ClientInfo client, Actor actor, string method, CancellationToken ct, string? provider = null,
@@ -48,6 +49,9 @@ internal sealed class Sessions(SecretBox secrets)
     {
         strength ??= SessionStrength.StepOne(method);
         var conn = uow.Tx.Connection!;
+        var rules = (await policies.GetAsync(conn, uow.Tx, projectId, ct)).Auth;
+        if (rules.MaxSessionsPerUser is { } cap) await EndPastCapAsync(uow, projectId, userId, cap, ct);
+
         Guid sessionId;
         await using (var id = new NpgsqlCommand("SELECT uuidv7()", conn, uow.Tx))
         {
@@ -78,8 +82,8 @@ internal sealed class Sessions(SecretBox secrets)
         insert.Parameters.AddWithValue("agent", NpgsqlDbType.Text, (object?)client.UserAgent ?? DBNull.Value);
         insert.Parameters.AddWithValue("sdk", NpgsqlDbType.Text, (object?)client.Sdk ?? DBNull.Value);
         insert.Parameters.AddWithValue("ip", NpgsqlDbType.Inet, (object?)client.Ip ?? DBNull.Value);
-        insert.Parameters.AddWithValue("idle", AuthTimings.IdleExpiry);
-        insert.Parameters.AddWithValue("absolute", AuthTimings.AbsoluteExpiry);
+        insert.Parameters.AddWithValue("idle", TimeSpan.FromSeconds(rules.SessionIdleSeconds));
+        insert.Parameters.AddWithValue("absolute", TimeSpan.FromSeconds(rules.SessionAbsoluteSeconds));
         insert.Parameters.AddWithValue("method", method);
         insert.Parameters.AddWithValue("provider", NpgsqlDbType.Text, (object?)provider ?? DBNull.Value);
         insert.Parameters.AddWithValue("aal", NpgsqlDbType.Smallint, strength.Aal);
@@ -90,6 +94,41 @@ internal sealed class Sessions(SecretBox secrets)
             new Dictionary<string, string> { ["userId"] = userId.ToString(), ["sessionId"] = sessionId.ToString() },
             fields: CreatedFields(method, provider, strength.Aal), ct: ct);
         return new SessionGrant(sessionId, token, new DateTimeOffset(endsAt, TimeSpan.Zero), strength);
+    }
+
+    /// <summary>
+    /// AC-26: under the user's lock, so parallel sign ins can't pass the cap together, ends the user's live sessions
+    /// (not ended, neither expiry passed) beyond the newest <c>cap - 1</c> by <c>coalesce(last_refreshed_at, created_at)</c>,
+    /// with <c>end_reason</c> <c>session_limit</c>, so the new one makes <c>cap</c>.
+    /// </summary>
+    private async Task EndPastCapAsync(AuthUnitOfWork uow, string projectId, Guid userId, int cap, CancellationToken ct)
+    {
+        await UserLocks.ByIdAsync(uow, projectId, userId, ct);
+        var ended = new List<Guid>();
+        await using (var end = new NpgsqlCommand(
+            """
+            UPDATE orvano.auth_sessions SET ended_at = now(), end_reason = @reason
+            WHERE id IN (
+                SELECT id FROM orvano.auth_sessions
+                WHERE user_id = @user AND project_id = @project AND ended_at IS NULL AND idle_expires_at > now() AND expires_at > now()
+                ORDER BY coalesce(last_refreshed_at, created_at) DESC, id DESC
+                OFFSET @keep)
+            RETURNING id
+            """, uow.Tx.Connection, uow.Tx))
+        {
+            end.Parameters.AddWithValue("reason", SessionEndReason.SessionLimit);
+            end.Parameters.AddWithValue("user", userId);
+            end.Parameters.AddWithValue("project", projectId);
+            end.Parameters.AddWithValue("keep", cap - 1);
+            await using var reader = await end.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct)) ended.Add(reader.GetGuid(0));
+        }
+
+        foreach (var sessionId in ended)
+        {
+            await WriteEndedAsync(uow, projectId, userId, sessionId, SessionEndReason.SessionLimit, Actor.System, ct);
+            uow.AfterCommit.Add(token => checks.EvictAsync(sessionId, token));
+        }
     }
 
     /// <summary>The <c>method</c> of a created event, and the <c>provider</c> when there is one (spec 0012, AC-18).</summary>

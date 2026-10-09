@@ -15,6 +15,7 @@ import type { UpdateAuthPoliciesRequest } from '@orvano/console-client'
 import { AppServersCard } from './-security/app-servers-card'
 import { PasswordsCard } from './-security/passwords-card'
 import { RateLimitsCard } from './-security/rate-limits-card'
+import { SessionsCard } from './-security/sessions-card'
 
 export const Route = createFileRoute('/_app/projects/$projectId/security')({
   component: SecurityPage,
@@ -73,6 +74,17 @@ function SecurityPage() {
             policies={policies.data}
             readOnlyReason={readOnlyReason}
             onSave={save('Passwords')}
+          />
+          <SessionsCard
+            key={JSON.stringify([
+              policies.data.accessTokenSeconds,
+              policies.data.sessionIdleSeconds,
+              policies.data.sessionAbsoluteSeconds,
+              policies.data.maxSessionsPerUser,
+            ])}
+            policies={policies.data}
+            readOnlyReason={readOnlyReason}
+            onSave={save('Sessions')}
           />
           <AppServersCard
             key={JSON.stringify(policies.data.trustedServerCidrs)}

@@ -6,8 +6,20 @@ using Orvano.Core.Data;
 
 namespace Orvano.Auth.Application;
 
-/// <summary>One transaction: the EF context on it, and the Npgsql transaction for outbox events and module hooks.</summary>
-internal sealed record AuthUnitOfWork(AuthDbContext Db, NpgsqlTransaction Tx);
+/// <summary>
+/// One transaction: the EF context on it, and the Npgsql transaction for outbox events and module hooks. Work that may
+/// run only once the change is committed (evicting a cached session it ended) goes in <see cref="AfterCommit"/>.
+/// </summary>
+internal sealed record AuthUnitOfWork(AuthDbContext Db, NpgsqlTransaction Tx)
+{
+    /// <summary>Runs, in order, after the transaction commits; never when it rolls back.</summary>
+    public List<Func<CancellationToken, ValueTask>> AfterCommit { get; } = [];
+
+    internal async Task RunAfterCommitAsync(CancellationToken ct)
+    {
+        foreach (var action in AfterCommit) await action(ct);
+    }
+}
 
 /// <summary>
 /// Opens the Auth module's units of work on the <c>orvano_app</c> data source. A write commits only when its use case
@@ -22,8 +34,14 @@ internal sealed class AuthStore([FromKeyedServices(OrvanoDb.App)] NpgsqlDataSour
         await using var context = AuthDbContext.On(conn);
         await context.Database.UseTransactionAsync(tx, ct);
 
-        var outcome = await work(new AuthUnitOfWork(context, tx), ct);
-        if (outcome.Succeeded) await tx.CommitAsync(ct);
+        var uow = new AuthUnitOfWork(context, tx);
+        var outcome = await work(uow, ct);
+        if (outcome.Succeeded)
+        {
+            await tx.CommitAsync(ct);
+            await uow.RunAfterCommitAsync(ct);
+        }
+
         return outcome;
     }
 
@@ -40,8 +58,14 @@ internal sealed class AuthStore([FromKeyedServices(OrvanoDb.App)] NpgsqlDataSour
         await using var context = AuthDbContext.On(conn);
         await context.Database.UseTransactionAsync(tx, ct);
 
-        var (outcome, commit) = await work(new AuthUnitOfWork(context, tx), ct);
-        if (commit) await tx.CommitAsync(ct);
+        var uow = new AuthUnitOfWork(context, tx);
+        var (outcome, commit) = await work(uow, ct);
+        if (commit)
+        {
+            await tx.CommitAsync(ct);
+            await uow.RunAfterCommitAsync(ct);
+        }
+
         return outcome;
     }
 

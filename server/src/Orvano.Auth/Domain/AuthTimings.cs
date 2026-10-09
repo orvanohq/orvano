@@ -3,13 +3,13 @@ namespace Orvano.Auth.Domain;
 /// <summary>Every auth time constant in one place (spec 0004, token formats). Row 14 turns the first three into per project settings.</summary>
 internal static class AuthTimings
 {
-    /// <summary>How long an access token is valid.</summary>
+    /// <summary>How long an access token is valid by default; a project sets its own (spec 0014, AC-25).</summary>
     public static readonly TimeSpan AccessToken = TimeSpan.FromSeconds(900);
 
-    /// <summary>A session ends this long after its last refresh.</summary>
+    /// <summary>A session ends this long after its last refresh, by default (spec 0014, AC-25).</summary>
     public static readonly TimeSpan IdleExpiry = TimeSpan.FromDays(30);
 
-    /// <summary>A session ends this long after it was created, however often it refreshes.</summary>
+    /// <summary>A session ends this long after it was created, however often it refreshes, by default (spec 0014, AC-25).</summary>
     public static readonly TimeSpan AbsoluteExpiry = TimeSpan.FromDays(365);
 
     /// <summary>For this long after a rotation, the previous refresh token replays the current pair instead of counting as reuse.</summary>
