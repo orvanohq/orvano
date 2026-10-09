@@ -18,6 +18,11 @@ steps:
       version: $.version     # later steps can use '${version}' (quote it, YAML reads { } as a map)
 ```
 
+A scenario that needs rules no other scenario may see (spec 0014: required MFA, a session cap) names
+another fixture project with a top level `project:` key. Its steps run on clients for that project,
+with no API key and no console account, so it uses no server step that needs a scope and no console
+step. The JS runners, Next.js, Dart, and Flutter run it; .NET skips it.
+
 `${unique}` is built in: twelve random lowercase letters and digits, fresh for each scenario run, so
 runs against one server never collide on unique values such as emails. Client and server steps
 send the first fixture project as `X-Orvano-Project`, and server steps send that project's first
@@ -42,6 +47,9 @@ with an operationId:
 | `registerPasskey` | `client` | optional `name`, optional `password` (the user's current password, spec 0013) | the `Passkey` from the client SDK's `registerPasskey`, whose passkey the server's `Test` only software authenticator makes (201) |
 | `oauthSignIn` | `client` | `provider`, `testUser` (the fake provider's user), optional `redirectUrl`, optional `link: true`, and for a link optional `password` | `{ type, ... }` from the client SDK's `signInWithOAuth`, or `linkIdentity` with `link: true` (sending `password`), following the fake provider over HTTP (spec 0012); .NET runs only the sign in |
 | `signInWithPasskey` | `client` | none | `{ user, isNewUser, mfaRequired, factors }` from the client SDK's `signInWithPasskey`, signed by the newest passkey the software authenticator made (201) |
+| `startTotpEnrollment` | `client` | none | the `TotpSetup` from the client SDK's `startTotpEnrollment`, with the enrollment ticket the last sign in kept (spec 0014) (201); .NET skips it |
+| `completeTotpEnrollment` | `client` | `code` | `{ user, recoveryCodes }` from the client SDK's `completeTotpEnrollment`, which stores the session (201); .NET skips it |
+| `enrollPasskey` | `client` | optional `name` | `{ user, recoveryCodes }` from the client SDK's `enrollPasskey`, whose passkey the software authenticator makes (201); .NET skips it |
 
 SdkGen writes a test only dispatch table per language (`operationId` to the generated method), so
 each SDK has one small interpreter instead of one test per scenario. A step whose operation has no

@@ -2,7 +2,7 @@
 // JSON; the response is the results.
 import { runScenarios } from '../interpreter.js'
 import type { Scenario } from '../interpreter.js'
-import { createSurface } from '../surface.js'
+import { createSurface, projectSurfaces } from '../surface.js'
 
 interface Env {
   ORVANO_ENDPOINT: string
@@ -23,6 +23,8 @@ export default {
       project: env.ORVANO_PROJECT,
       apiKey: env.ORVANO_API_KEY,
     })
-    return Response.json(await runScenarios(scenarios, surface))
+    return Response.json(
+      await runScenarios(scenarios, surface, projectSurfaces(env.ORVANO_ENDPOINT)),
+    )
   },
 }

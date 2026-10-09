@@ -43,7 +43,15 @@ void main() {
       apiKey: fixtureApiKey(fixtures),
       client: Client(endpoint: endpoint, project: project),
     );
-    final results = await runScenarios(scenarios, surface);
+    final results = await runScenarios(
+      scenarios,
+      surface,
+      surfaceFor: (other) => Surface.connect(
+        endpoint,
+        project: other,
+        client: Client(endpoint: endpoint, project: other),
+      ),
+    );
     surface.close();
 
     for (final r in results) {

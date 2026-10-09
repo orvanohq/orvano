@@ -5,7 +5,7 @@ import * as app from '@orvano/js'
 import { Client as ServerClient } from '@orvano/js/server'
 import { runScenarios } from '../interpreter.js'
 import type { Scenario, ScenarioResult } from '../interpreter.js'
-import { createSurface } from '../surface.js'
+import { createSurface, projectSurfaces } from '../surface.js'
 import type { ConsoleUser } from '../surface.js'
 
 declare global {
@@ -77,5 +77,6 @@ window.orvanoRunScenarios = async (scenarios, project, consoleUser) => [
   ...(await runScenarios(
     scenarios,
     createSurface(location.origin, { browser: true, project, consoleUser }),
+    projectSurfaces(location.origin, { browser: true }),
   )),
 ]

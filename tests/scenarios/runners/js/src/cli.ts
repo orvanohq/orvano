@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { runScenarios } from './interpreter.js'
 import type { Scenario, ScenarioResult } from './interpreter.js'
-import { createSurface } from './surface.js'
+import { createSurface, projectSurfaces } from './surface.js'
 import type { ConsoleUser } from './surface.js'
 import type { BrowserContext } from 'playwright'
 
@@ -299,7 +299,11 @@ async function inNextjs(scenarios: Scenario[]): Promise<ScenarioResult[]> {
 async function run(target: Target, scenarios: Scenario[]): Promise<ScenarioResult[]> {
   switch (target) {
     case 'node':
-      return runScenarios(scenarios, createSurface(endpoint, { consoleUser, project, apiKey }))
+      return runScenarios(
+        scenarios,
+        createSurface(endpoint, { consoleUser, project, apiKey }),
+        projectSurfaces(endpoint),
+      )
     case 'bun':
       return inRuntime('bun', ['run'], scenarios)
     case 'deno':

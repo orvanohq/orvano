@@ -26,6 +26,11 @@ export interface ScenarioStep {
 export interface Scenario {
   name: string
   requires?: string[]
+  /**
+   * A fixture project other than the first, for a scenario that needs rules no other scenario may
+   * see (spec 0014): its steps run on a surface for that project, with no API key and no console.
+   */
+  project?: string
   steps: ScenarioStep[]
 }
 
@@ -57,15 +62,29 @@ class StepFailure extends Error {}
 
 class ScenarioSkipped extends Error {}
 
+/**
+ * Builds the surface for a scenario's own fixture project (`Scenario.project`); a runtime without
+ * one skips those scenarios.
+ */
+export type SurfaceFor = (project: string) => Surface
+
 /** Runs every scenario in order and reports each one. Never throws for a scenario failure. */
 export async function runScenarios(
   scenarios: Scenario[],
   surface: Surface,
+  surfaceFor?: SurfaceFor,
 ): Promise<ScenarioResult[]> {
   const results: ScenarioResult[] = []
   for (const scenario of scenarios) {
     try {
-      await runScenario(scenario, surface)
+      if (scenario.project !== undefined && surfaceFor === undefined)
+        throw new ScenarioSkipped('this runner runs only the first fixture project')
+      await runScenario(
+        scenario,
+        scenario.project === undefined || surfaceFor === undefined
+          ? surface
+          : surfaceFor(scenario.project),
+      )
       results.push({ name: scenario.name, outcome: 'passed' })
     } catch (error) {
       if (error instanceof ScenarioSkipped) {

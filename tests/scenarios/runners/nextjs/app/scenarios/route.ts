@@ -4,7 +4,7 @@ import { Client as ServerClient } from '@orvano/js/server'
 import { Client as ConsoleClient } from '@orvano/console-client'
 import { CookiePendingMfaStore, CookieSessionStore } from '@orvano/nextjs'
 import { runScenarios } from '@orvano/scenarios-js'
-import type { Scenario } from '@orvano/scenarios-js'
+import type { Scenario, Surface } from '@orvano/scenarios-js'
 import {
   ClientSurface,
   ConsoleSurface,
@@ -44,15 +44,36 @@ export async function POST(request: Request): Promise<Response> {
       passkeys: testPasskeys(() => client.test),
     }),
   )
-  const results = await runScenarios(scenarios, {
-    client,
-    server: new ServerSurface(new ServerClient({ endpoint, ...project, ...apiKey })),
-    serverKey: 'apiKey' in apiKey,
-    console,
-    consoleReady:
-      console === undefined || consoleEmail === undefined || consolePassword === undefined
-        ? undefined
-        : consoleSignIn(console, { email: consoleEmail, password: consolePassword }),
-  })
+  // Spec 0014: a scenario on its own fixture project gets clients for it on the same cookies, with
+  // no API key and no console account.
+  const surfaceFor = (other: string): Surface => {
+    const otherClient: ClientSurface = new ClientSurface(
+      new Client({
+        endpoint,
+        project: other,
+        session,
+        mfaStore,
+        passkeys: testPasskeys(() => otherClient.test),
+      }),
+    )
+    return {
+      client: otherClient,
+      server: new ServerSurface(new ServerClient({ endpoint, project: other })),
+    }
+  }
+  const results = await runScenarios(
+    scenarios,
+    {
+      client,
+      server: new ServerSurface(new ServerClient({ endpoint, ...project, ...apiKey })),
+      serverKey: 'apiKey' in apiKey,
+      console,
+      consoleReady:
+        console === undefined || consoleEmail === undefined || consolePassword === undefined
+          ? undefined
+          : consoleSignIn(console, { email: consoleEmail, password: consolePassword }),
+    },
+    surfaceFor,
+  )
   return Response.json(results)
 }

@@ -30,7 +30,11 @@ Future<void> main() async {
     project: fixtureProject(fixtures),
     apiKey: fixtureApiKey(fixtures),
   );
-  final results = await runScenarios(scenarios, surface);
+  final results = await runScenarios(
+    scenarios,
+    surface,
+    surfaceFor: (project) => Surface.connect(endpoint, project: project),
+  );
   surface.close();
 
   results.forEach(print);

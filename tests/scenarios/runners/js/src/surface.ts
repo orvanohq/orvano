@@ -65,3 +65,12 @@ export function createSurface(endpoint: string, options: SurfaceOptions = {}): S
         : consoleSignIn(console, options.consoleUser),
   }
 }
+
+/**
+ * The surface factory for scenarios on their own fixture project (`Scenario.project`): the client
+ * and server SDKs for that project, with no API key and no console account.
+ */
+export function projectSurfaces(endpoint: string, options: { browser?: boolean } = {}) {
+  return (project: string): Surface =>
+    createSurface(endpoint, { project, ...(options.browser === true ? { browser: true } : {}) })
+}

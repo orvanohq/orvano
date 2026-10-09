@@ -141,7 +141,8 @@ function mfaAnswer(input: Record<string, unknown>): MfaAnswer {
  * helpers, on the server's software authenticator (spec 0013); `registerPasskey` and a linking
  * `oauthSignIn` send the step's `password`. `accessToken` hands the client's stored access token to
  * a server step. `signInFrom` is `signIn` as a trusted app server sends it for the visitor at
- * `clientIp` (spec 0014).
+ * `clientIp` (spec 0014). `startTotpEnrollment`, `completeTotpEnrollment`, and `enrollPasskey` are
+ * the client SDK's enrollment helpers under required MFA (spec 0014).
  * Their names have no dot, so they never collide with an operationId.
  */
 export const runnerDispatch: DispatchTable = {
@@ -178,6 +179,21 @@ export const runnerDispatch: DispatchTable = {
   signInWithPasskey: {
     status: 201,
     client: async (o) => o.client.signInWithPasskey(),
+  },
+  // Spec 0014, AC-27, AC-36: the client SDK's enrollment helpers, spending the ticket the last
+  // sign in kept.
+  startTotpEnrollment: {
+    status: 201,
+    client: async (o) => o.client.startTotpEnrollment(),
+  },
+  completeTotpEnrollment: {
+    status: 201,
+    client: async (o, input) => o.client.completeTotpEnrollment(String(input.code)),
+  },
+  enrollPasskey: {
+    status: 201,
+    client: async (o, input) =>
+      o.client.enrollPasskey(typeof input.name === 'string' ? { name: input.name } : {}),
   },
   confirmTotp: {
     status: 200,

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import process from 'node:process'
 import { runScenarios } from '../interpreter.js'
 import type { Scenario } from '../interpreter.js'
-import { createSurface } from '../surface.js'
+import { createSurface, projectSurfaces } from '../surface.js'
 
 const file = process.env.ORVANO_SCENARIOS_FILE
 const endpoint = process.env.ORVANO_ENDPOINT
@@ -22,5 +22,5 @@ const surface = createSurface(endpoint, {
   project: process.env.ORVANO_PROJECT,
   apiKey: process.env.ORVANO_API_KEY,
 })
-const results = await runScenarios(scenarios, surface)
+const results = await runScenarios(scenarios, surface, projectSurfaces(endpoint))
 console.log('ORVANO_SCENARIO_RESULTS ' + JSON.stringify(results))
