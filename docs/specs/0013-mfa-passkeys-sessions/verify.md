@@ -131,6 +131,7 @@ _Steps derived from the acceptance criteria and the Value sourcing table. `/chec
 - [x] `@orvano/nextjs`: `POST .../mfa-passkey` answers the challenge for the `orvano_mfa` ticket (401 without the cookie), `POST .../mfa` accepts `{ challengeId, credential }`, and `POST .../passkey-challenge` then `POST .../passkey` set both session cookies → AC-37
 - [x] `orvano_flutter` has no `passkeys` in `flutter pub deps`, and `signInWithPasskey` on a client made with no authenticator throws an `ArgumentError` naming `orvano_flutter_passkeys`; the Flutter runner on Chrome, with no Corbado script in `web/index.html` and no `passkeys_web` in its generated web plugin registrant, starts and passes → AC-38
 - [ ] `orvano_flutter_passkeys`: `flutter test` passes (the fake `PasskeysPlatform` mapping); an app made with `createClient(..., passkeys: PlatformPasskeys())` on an iOS simulator with Associated Domains for the RP ID runs `registerPasskey` and `signInWithPasskey`, and `completeMfa(MfaAnswer.passkey())` finishes a challenged sign in → AC-38
+  - 2026-10-08: `flutter test` in `sdks/dart/flutter_passkeys` passes (4 tests). The iOS simulator run with Associated Domains is still owed, so this box stays open.
 
 ### Value sourcing
 
@@ -152,7 +153,7 @@ _Steps derived from the acceptance criteria and the Value sourcing table. `/chec
 
 - AC-1: API steps 1 to 4 · AC-2: step 5 · AC-3: console step · AC-4: step 3 and Value sourcing row 13 · AC-11: step 12 · AC-19: steps 13 and 14 · AC-20: steps 6 and 8 · AC-21: steps 7 and 15 · AC-22: steps 10 and 11 · AC-23, AC-24: step 9 · AC-30: step 16 · AC-36 to AC-38: SDK steps and the scenarios · AC-45: every step (the software authenticator)
 - Not in task 3: the console's passkey sign in, Security page, and Passkeys card (task 5); `users.listPasskeys`, `users.deletePasskey`, and their console twins (task 4); the `passkey_added` and `passkey_removed` alert emails, retention of expired challenges, and the purge (task 6)
-- Owed to `/architect`: AC-21 names passkeys from a bundled AAGUID list, but the community list has no license, so none ships and every unnamed passkey is `Passkey`; and AC-21 says a failed registration is 400 `invalid_passkey` while AC-40 fixes that code at 401 (the build answers 401)
+- Settled after the 2026-10-08 review: AC-21 now names an unnamed passkey `Passkey` (no AAGUID list ships, since the community list has no license) and says 401 `invalid_passkey`, as AC-40 and the build do.
 
 ## Build checks: task 4, servers and recovery for admins · updated 2026-10-08
 

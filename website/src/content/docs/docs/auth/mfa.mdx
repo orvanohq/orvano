@@ -19,7 +19,8 @@ MFA is on for a project by default: the **Authenticator app** card on the consol
   <TabItem label="JavaScript">
 
 ```ts
-const { uri, secret } = await orvano.account.createTotp()
+// A user with a password confirms it first (check user.hasPassword).
+const { uri, secret } = await orvano.account.createTotp({ password })
 showQrCode(uri, secret)
 
 // once the user typed the first code:
@@ -31,8 +32,8 @@ const recoveryCodes = await orvano.client.confirmTotp(code)
 
 ```ts
 'use server'
-export async function startTotp() {
-  return (await orvano()).account.createTotp() // { uri, secret, expiresAt }
+export async function startTotp(password?: string) {
+  return (await orvano()).account.createTotp({ password }) // { uri, secret, expiresAt }
 }
 ```
 
@@ -46,7 +47,7 @@ const recoveryCodes = await orvano.client.confirmTotp(code)
   <TabItem label="Flutter">
 
 ```dart
-final setup = await orvano.account.createTotp();
+final setup = await orvano.account.createTotp(CreateTotpRequest(password: password));
 showQrCode(setup.uri, setup.secret);
 
 // once the user typed the first code:
@@ -56,9 +57,9 @@ final recoveryCodes = await orvano.client.confirmTotp(code);
   </TabItem>
 </Tabs>
 
-- The user must have signed in within the last 10 minutes; an older session gets [`reauthentication_required`](/errors/reauthentication_required/). A user with an unverified email gets [`email_not_verified`](/errors/email_not_verified/).
+- A user with a password sends it (`password`), even right after signing in, so a stolen access token can't add an authenticator: a missing or wrong one gets [`invalid_credentials`](/errors/invalid_credentials/). A user without a password must have signed in within the last 10 minutes ([`reauthentication_required`](/errors/reauthentication_required/) otherwise). A user with an unverified email gets [`email_not_verified`](/errors/email_not_verified/).
 - The secret waits 15 minutes for its first code ([`totp_not_pending`](/errors/totp_not_pending/) after that). A wrong code gets [`invalid_mfa_code`](/errors/invalid_mfa_code/).
-- Turning MFA on signs the user out everywhere else, and raises this session to two factors. Use the client's `confirmTotp` (not `orvano.account.confirmTotp`): it keeps the stronger access token.
+- Turning MFA on signs the user out everywhere else, and raises this session to two factors. Use the client's `confirmTotp` (not `orvano.account.confirmTotp`): it keeps the stronger access token. The answer carries no refresh token; the one the client holds stays valid, and its next refresh carries the second factor too.
 
 [`account.getMfa`](/docs/api/operations/accountgetmfa/) answers the user's state for a settings screen: `mfaEnabled`, `totpConfirmedAt`, `recoveryCodesRemaining`, `passkeyCount`, and what the project allows, `factorsAvailable`.
 
@@ -155,7 +156,7 @@ final codes = (await orvano.account.createRecoveryCodes()).codes;
 
 ## Step up before security changes
 
-For a user with MFA on, changing security needs a second factor from the last 10 minutes on this session: making recovery codes, turning MFA off, removing a passkey, changing the password or email, and deleting the account. An older session gets 403 [`mfa_verification_required`](/errors/mfa_verification_required/). Ask for a code, call `verifyMfa`, and try the change again:
+For a user with MFA on, changing security needs a second factor from the last 10 minutes on this session: making recovery codes, turning MFA off, adding or removing a passkey, linking a provider, changing the password or email, and deleting the account. An older session gets 403 [`mfa_verification_required`](/errors/mfa_verification_required/). Ask for a code, call `verifyMfa`, and try the change again:
 
 <Tabs syncKey="sdk">
   <TabItem label="JavaScript">

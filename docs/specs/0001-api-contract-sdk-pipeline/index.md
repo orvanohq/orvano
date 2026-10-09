@@ -1,7 +1,7 @@
 # 0001. One API contract that generates every Orvano SDK
 
 **Date**: 2026-09-24
-**Updated**: 2026-10-07 (the `browser` audience for routes a browser reaches by navigation, spec 0012); 2026-09-27 (the temporary auth wire formats are replaced by spec 0004's; fixtures and console scenarios follow)
+**Updated**: 2026-10-08 (spec 0013: the `x-orvano-session` effect stores tokens only when `AuthResult.session` is set); 2026-10-07 (the `browser` audience for routes a browser reaches by navigation, spec 0012); 2026-09-27 (the temporary auth wire formats are replaced by spec 0004's; fixtures and console scenarios follow)
 **Status**: Accepted
 
 ## Summary
@@ -49,7 +49,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 | Layer | Choice | Reason |
 |---|---|---|
 | Contract authoring | TypeSpec 1.x with `@typespec/http`, `@typespec/openapi`, `@typespec/openapi3` | Several times shorter than raw OpenAPI for hundreds of endpoints; compiles to standard OpenAPI 3.1 so every OpenAPI tool still works. |
-| Orvano metadata | OpenAPI extensions set via TypeSpec `@extension`: `x-orvano-audience`, `x-orvano-service`, `x-orvano-event`, `x-orvano-idempotent`, `x-orvano-since`, `x-orvano-test` (see *Test only operations*); `x-orvano-upload` is reserved and gets its templates with Buckets & files (row 20) | Carries what OpenAPI lacks (who may call it, grouping, events) without a custom format. |
+| Orvano metadata | OpenAPI extensions set via TypeSpec `@extension`: `x-orvano-audience`, `x-orvano-service`, `x-orvano-event`, `x-orvano-idempotent`, `x-orvano-since`, `x-orvano-test` (see *Test only operations*); `x-orvano-upload` is reserved and gets its templates with Buckets & files (row 20). `x-orvano-session` (`start`, `refresh`, `end`, or `user`) marks a client operation whose generated call updates the stored session through the runtime; spec 0013 (AC-36) amends `start`: it stores tokens only when `AuthResult.session` is set, and leaves the stored session untouched when the call stops at the MFA step | Carries what OpenAPI lacks (who may call it, grouping, events) without a custom format. |
 | Generator | C# console app on .NET 10 at `tools/sdkgen/` | Your choice; shares the server's language and toolchain, so there's one less runtime to maintain. |
 | OpenAPI parsing | `Microsoft.OpenApi` 2.x (reads 3.1) | Microsoft's maintained parser, the same one ASP.NET Core 10 uses. |
 | Templates | Scriban, one template folder per language under `tools/sdkgen/templates/<lang>/` | Liquid style text templates; editing output shape never needs a C# change. |
