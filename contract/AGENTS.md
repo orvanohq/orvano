@@ -61,5 +61,6 @@ Commit `dist/openapi.json` and the generated code together. The server's handler
 - [0004 App user sign up, sign in, and sessions](../docs/specs/0004-app-user-auth/index.md) (auth schemes, scopes, session effects)
 - [0010 Email verification, recovery, and passwordless](../docs/specs/0010-email-verification-recovery-passwordless/index.md) (the email `account.*`, `users.*`, and `consoleUsers.*` operations, and `test.getLatestEmail`)
 - [0011 Docs site and quickstarts](../docs/specs/0011-docs-site-quickstarts/index.md) (`dist/errors.json` and the error pages)
+- [0013 MFA, passkeys, and session strength](../docs/specs/0013-mfa-passkeys-sessions/index.md) (`auth/mfa.tsp`, `auth/passkeys.tsp`, `auth/console-account-mfa.tsp`, `auth/users-mfa.tsp`, and the nullable `AuthResult`)
 
 _Drafted by /sync from the introducing change, worth a quick human pass._

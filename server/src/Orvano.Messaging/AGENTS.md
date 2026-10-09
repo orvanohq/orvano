@@ -8,7 +8,7 @@ The Messaging module (spec 0009): SMTP settings per project with the install's a
 
 | Folder | Owns |
 |---|---|
-| `Contracts/EmailQueue.cs` | The only public types: `IEmailQueue` (api role only), `AuthEmail`, `AuthEmailKind`, `EmailQueueResult`, `EmailAvailability` |
+| `Contracts/EmailQueue.cs` | The only public types: `IEmailQueue` (api role only), `AuthEmail`, `AuthEmailKind`, `SecurityAlertKind` (spec 0013), `EmailQueueResult`, `EmailAvailability` |
 | `Domain/` | Plain rules: `LiquidEngine` (Fluid with its limits and allowed filters), `DefaultTemplates`, `EmailTemplateCatalog`, `GlobalUnicast` and `SmtpHost` (which hosts a project may use), `EmailAddress`, `RecipientMask`, `HtmlToText`, `MessagingSettings` |
 | `Application/` | Use cases (`SmtpSettingsService`, `EmailTemplateService`, `EmailLogService`), `EmailQueue` (the shared queue core, raw Npgsql on the caller's transaction), `AuthEmailQueue`, `InvitationMailer` (Platform's `IConsoleInvitationMailer`), `EmailSealer`, `EffectiveSmtp`, `ProjectAccess`, `MessagingStore`, `MessagingEvents` |
 | `Data/MessagingDbContext.cs` | EF Core mapping of the `messaging_` tables (`0005_messaging.sql`); internal, listed in the drift check |
@@ -25,6 +25,7 @@ The Messaging module (spec 0009): SMTP settings per project with the install's a
 - The send job never renders. It unseals and sends through the SMTP in effect at that moment, and every outcome is one conditional update on `status = 'queued'`, so a duplicate run can't flip a final row. It throws only to ask for a retry (`JobRetryException` sets the delay).
 - A project's SMTP host must be global unicast unless `ORVANO_SMTP_ALLOW_PRIVATE_HOSTS=true`. `SmtpConnector` dials the exact addresses it checked, so DNS can't change between the check and the connect.
 - `IEmailQueue.CheckAvailabilityAsync` (spec 0010) must resolve SMTP and the hourly cap exactly as `QueueAuthEmailAsync` does, so Auth can refuse before it reads an account. Change both together.
+- `IEmailQueue.QueueSecurityAlertAsync` (spec 0013, AC-31) takes the same path as `QueueAuthEmailAsync` (SMTP resolution, the hourly cap, render, the sealed row and its job, in the caller's transaction) for the `security_alert` template, which has no link and no code. Change the two together.
 - Templates render only through `LiquidEngine`: no file access, an HTML encoder on every output, no `raw` filter, and caps on steps, characters, and filter work.
 - `ORVANO_SMTP_ALLOW_PRIVATE_HOSTS` and `ORVANO_EMAIL_INSTALL_HOURLY_LIMIT` (the soft hourly cap on install SMTP per project) are read in `ConfigureServices`, so every role refuses a bad value.
 - `ORVANO_INSTALL_SMTP_URL` and `ORVANO_INSTALL_SMTP_FROM` (spec 0011) seed the install SMTP row once: `InstallSmtpSeeder` runs from `OnApiStartingAsync` with `ON CONFLICT DO NOTHING`, so a console save always wins, and sets `updated_by_user_id` to the all zero UUID ("from configuration"). `InstallSmtpSeed` parses them in `ConfigureServices`, so every role refuses a bad value, and its errors name the setting but never print the URL (it can hold a password).
@@ -39,6 +40,7 @@ The Messaging module (spec 0009): SMTP settings per project with the install's a
 - [0009 Transactional email](../../../docs/specs/0009-transactional-email/index.md) (with `verify.md`)
 - [0010 Email verification, recovery, and passwordless](../../../docs/specs/0010-email-verification-recovery-passwordless/index.md) (`CheckAvailabilityAsync`, the `ActionUrl` rule)
 - [0011 Docs site and quickstarts](../../../docs/specs/0011-docs-site-quickstarts/index.md) (the install SMTP seed)
+- [0013 MFA, passkeys, and session strength](../../../docs/specs/0013-mfa-passkeys-sessions/index.md) (the `security_alert` template kind, migration `0009_messaging_security_alert.sql`)
 
 ## Agent skills
 

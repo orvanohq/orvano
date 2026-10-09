@@ -8,7 +8,7 @@ Everything that ships Orvano to a server: the two images (the server image every
 
 | File | Owns |
 |---|---|
-| `server.Dockerfile` | The one server image (`ghcr.io/orvanohq/orvano`): `orvano api|worker|realtime|migrate`, plus `install`, `setup-status`, and `healthcheck` |
+| `server.Dockerfile` | The one server image (`ghcr.io/orvanohq/orvano`): `orvano api|worker|realtime|migrate`, plus `install`, `setup-status`, `healthcheck`, and `mfa reset` (spec 0013) |
 | `gateway/Dockerfile` | The gateway image (`ghcr.io/orvanohq/orvano-gateway`): builds the console with pnpm, then serves it from Caddy |
 | `gateway/Caddyfile` | The only public entry point: routing to `api` and `realtime`, the console's security headers, asset caching, and HSTS |
 | `gateway/email-preview-headers.caddy` | The headers of the console's email preview page (spec 0009): the Caddyfile imports it and the console's Vite servers read it, so keep one `Name "value"` per line |

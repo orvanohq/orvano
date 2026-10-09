@@ -12,6 +12,7 @@ The Orvano server: one .NET 10 program, built as separate modules, shipped as on
 | `src/Orvano.Server/Hosting/StartupChecks.cs` | Config validation; a role refuses to start on a bad value |
 | `src/Orvano.Server/Install/` | `orvano install` (spec 0006): plain, unit tested rules (`EnvFile`, `InstallSecrets`, `PgTuning`, `VersionRule`, `DomainRule`, `EmailRule`, `InstallPlan`) behind `InstallCommand`, which writes every file in the install directory and never talks to Docker; see [deploy/install/AGENTS.md](../deploy/install/AGENTS.md) |
 | `src/Orvano.Server/Hosting/SetupStatusCommand.cs` | `orvano setup-status`, run inside `api`: prints `required` or `done` |
+| `src/Orvano.Server/Hosting/MfaResetCommand.cs` | `orvano mfa reset --email <address> [--passkeys]` (spec 0013, AC-28), run inside `api` for a locked out console account: prints `reset`, `no factor`, or `not found` (exit 2); 64 on a bad argument |
 | `src/Orvano.Server/Modules/OrvanoModules.cs` | The explicit module list (no assembly scanning) |
 | `src/Orvano.Core/Modules/IOrvanoModule.cs` | The module contract: services (every role, plus `ConfigureApiServices` for the api only ones), API, work, realtime hooks |
 | `src/Orvano.Core/Data/ProjectScope.cs` | The only code path allowed to `SET LOCAL ROLE p_<id>` |
@@ -27,6 +28,7 @@ The Orvano server: one .NET 10 program, built as separate modules, shipped as on
 | `src/Orvano.Core/Http/PublicUrl.cs`, `TrustedProxies.cs`, `ConnectionIp.cs`; `src/Orvano.Server/Hosting/PublicCors.cs` | `ORVANO_PUBLIC_URL`, `ORVANO_TRUSTED_PROXIES`, the caller's IP for limits and records, and CORS for the public API (checked against the project's web platforms) |
 | `src/Orvano.Core/RateLimiting/RateLimits.cs` | The in memory rate limiter and its named `RateLimitPolicies` |
 | `src/Orvano.Server/Modules/TestingModule.cs` | The fixed answers of the test only operations; registered only in `Test` |
+| `src/Orvano.Server/Modules/SoftwareAuthenticator.cs` | The `Test` only software authenticator (spec 0013, AC-45): passkeys with in memory P-256 keys, so tests and scenarios run real WebAuthn ceremonies without a browser |
 | `src/Orvano.Server/Modules/FakeOAuthProvider.cs` | The `Test` only fake Google, Apple, GitHub, and Microsoft under `/v1/test/oauth/` (spec 0012, AC-27): authorize, token, discovery, keys, GitHub's API, and Apple's revoke, approving at once with the user its `test_user` parameter describes |
 | `src/Orvano.Platform/` | The Platform module: orgs, projects, API keys, platforms, install settings, and their jobs (spec 0003); see its AGENTS.md |
 | `src/Orvano.Messaging/` | The Messaging module: SMTP settings, email templates, the send queue, and invite emails (spec 0009); see its AGENTS.md |
@@ -64,7 +66,7 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 - Test only routes (`/v1/test/*`, `/v1/console/test/*`) exist only in `Test`, because `OrvanoModules` adds `TestingModule` only there.
 - In the `Test` environment a response that breaks the contract (extra, missing, or mistyped field, undeclared 2xx status, unnamed endpoint) becomes a 500 `contract_violation`. `ORVANO_TEST_FIXTURES`, `ORVANO_TEST_MAILPIT_URL` (`Hosting/TestMailpit.cs`, read by `test.getLatestEmail`), and `ORVANO_TEST_OAUTH_PROVIDER_URL` (`Hosting/TestOAuthProvider.cs`, which points every provider endpoint and issuer at the fake provider) are refused outside `Test`.
 - `Orvano.Contract` embeds `contract/dist/openapi.json`, so `deploy/server.Dockerfile` copies that file too; a new server project also needs its csproj copied before restore there.
-- `Orvano.Server` embeds `deploy/compose/docker-compose.yml`, `deploy/compose/docker-compose.local.yml` (local installs only), and `deploy/compose/initdb/10-orvano-roles.sh`, which `orvano install` writes to every install, so editing either changes what the next release installs. `install`, `setup-status`, and `healthcheck` are checked before role selection in `OrvanoProgram`, so they run with no `ORVANO_ROLE`.
+- `Orvano.Server` embeds `deploy/compose/docker-compose.yml`, `deploy/compose/docker-compose.local.yml` (local installs only), and `deploy/compose/initdb/10-orvano-roles.sh`, which `orvano install` writes to every install, so editing either changes what the next release installs. `install`, `setup-status`, `healthcheck`, and `mfa` are checked before role selection in `OrvanoProgram`, so they run with no `ORVANO_ROLE`.
 - In `Production`, `api` refuses to start while no install admin exists and `ORVANO_SETUP_TOKEN` is unset; a malformed token is refused in every environment (spec 0006, AC-21).
 - Every job handler must be idempotent, and no consumer may rely on event order. A consumer that throws is retried later through the `events.redispatch` job.
 - Consumers stay small and do no IO: a hanging consumer still stalls the dispatcher.
@@ -92,5 +94,6 @@ ORVANO_DB_ADMIN_URL="Host=localhost;Port=5432;Username=orvano_admin;Password=...
 - [0006 Self host installer](../docs/specs/0006-self-host-installer/index.md) (`orvano install`, `setup-status`, the setup token)
 - [0009 Transactional email](../docs/specs/0009-transactional-email/index.md) (`Orvano.Messaging`, SMTP, templates, the send queue)
 - [0010 Email verification, recovery, and passwordless](../docs/specs/0010-email-verification-recovery-passwordless/index.md) (`auth_email_tokens`, the email flows, `IWebOriginPolicy.AllowsRedirectAsync`, `SecretBox.Mac`)
+- [0013 MFA, passkeys, and session strength](../docs/specs/0013-mfa-passkeys-sessions/index.md) (`orvano mfa reset`, the software authenticator, migrations `0008` and `0009`)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
