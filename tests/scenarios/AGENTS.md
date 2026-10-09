@@ -28,6 +28,7 @@ One list of scenarios every SDK surface runs against a real Orvano (spec 0001, A
 - The console client is bound to one project, and steps have no per step project, so project scoped console operations (keys, platforms) are covered by the server's HTTP tests, not scenarios.
 - Email scenarios (`auth-recovery`, `auth-verification`, `auth-magic-link`, `auth-email-code`, `auth-email-change`, `auth-users-email`) read real mail: save the runner only `now` before a send and pass it to `test.getLatestEmail` as `after`, which reads Mailpit at `ORVANO_TEST_MAILPIT_URL` (spec 0010). The runner only operations (`redeemLink`, `now`, `verifyAccessToken`, ...) are listed in `README.md`.
 - OAuth scenarios (`auth-oauth*`, `auth-id-token`, `auth-identities*`, spec 0012) run against the server's fake provider: the runner operation `oauthSignIn` follows the provider's redirects over HTTP with no browser, and `test.createIdToken` mints native tokens.
+- MFA and passkey scenarios (`auth-mfa*`, `auth-passkeys`, spec 0013) make codes with the runner operation `totpCode` and answer passkeys through the server's `Test` only software authenticator; the README's runner operation table has `completeMfa`, `verifyMfa`, `confirmTotp`, `registerPasskey`, and `signInWithPasskey`.
 - Quote substitutions in YAML (`'${version}'`); a bare `{` starts a flow map.
 
 ## Gotchas
@@ -47,5 +48,6 @@ One list of scenarios every SDK surface runs against a real Orvano (spec 0001, A
 - [0001 API contract and SDK pipeline](../../docs/specs/0001-api-contract-sdk-pipeline/index.md)
 - [0004 App user sign up, sign in, and sessions](../../docs/specs/0004-app-user-auth/index.md) (the `auth*.yaml` scenarios)
 - [0010 Email verification, recovery, and passwordless](../../docs/specs/0010-email-verification-recovery-passwordless/index.md) (the email scenarios and `test.getLatestEmail`)
+- [0013 MFA, passkeys, and session strength](../../docs/specs/0013-mfa-passkeys-sessions/index.md) (the `auth-mfa*` and `auth-passkeys` scenarios)
 
 _Drafted by /sync from the introducing change, worth a quick human pass._

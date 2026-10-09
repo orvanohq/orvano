@@ -24,6 +24,8 @@ The Orvano console: a React SPA built with Vite and served as static files by Ca
 | `src/routes/_app/orgs/$orgId/members.tsx`, `-members/`; `src/routes/_app/install.tsx` | The Members page with invites and row actions, and the install settings page (spec 0008) |
 | `src/routes/_app/projects/$projectId/users/` | The project's Users page and user detail (spec 0004); `-users/email-parts.tsx` and `link-url.ts` hold the verified state, the email actions, and the send dialogs that remember the last link URL per project (spec 0010); `-users/identities.tsx` lists and unlinks a user's providers (spec 0012) |
 | `src/routes/_app/projects/$projectId/sign-in-methods.tsx`, `-sign-in/` | The Sign in methods page: a card and a settings dialog per provider, with write only secret fields (spec 0012) |
+| `src/routes/_app/account/security.tsx`, `-security/`; `src/routes/-auth/mfa-step.tsx`, `factor-form.tsx`, `passkeys.ts` | MFA and passkeys for console accounts (spec 0013): the Security page (authenticator app with its `uqr` QR code, recovery codes, passkeys), the sign in MFA step and passkey sign in with autofill, and `step-up.tsx`'s `useStepUp`, which every security change runs through (it asks for a second factor, a fresh sign in, or the password, then repeats the change) |
+| `src/routes/_app/projects/$projectId/-sign-in/method-cards.tsx`, `passkeys-dialog.tsx`; `-users/security.tsx` | The project's MFA and Passkeys cards with the RP ID dialog, and a user's Security section (MFA state, passkeys, Reset MFA) (spec 0013) |
 | `src/routes/_app/projects/$projectId/email/`, `-email/`; `src/email/` | The project's Email pages (templates, log, settings), the CodeMirror template editor, and the SMTP form and log table the install page shares (spec 0009) |
 | `public/frames/email-preview.html`, `email-preview-headers.ts` | The sandboxed email preview page, and the Vite plugin that serves it with the headers in `deploy/gateway/email-preview-headers.caddy` |
 | `design.md` | The design system: tokens, type, density, and the component inventory |
@@ -106,5 +108,6 @@ Declined: Base UI MCP, a11y MCP `ronantakizawa/a11ymcp`
 - [0008 Console team members, invitations, and roles](../docs/specs/0008-console-team-members/index.md) (Members page, invite links, `/invite`, `/sign-up`, `/install`)
 - [0009 Transactional email](../docs/specs/0009-transactional-email/index.md) (the Email pages, the template editor, the preview frame and its policy)
 - [0010 Email verification, recovery, and passwordless](../docs/specs/0010-email-verification-recovery-passwordless/index.md) (the Users page verified state, email actions, and send dialogs)
+- [0013 MFA, passkeys, and session strength](../docs/specs/0013-mfa-passkeys-sessions/index.md) (the Security page, the sign in MFA step, step up, and the MFA and Passkeys cards)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
