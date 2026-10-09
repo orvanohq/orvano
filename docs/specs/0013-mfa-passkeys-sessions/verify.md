@@ -170,7 +170,7 @@ _Steps derived from AC-27, AC-28, AC-39, and the Value sourcing rows for reset e
 
 ### Command (AC-28)
 
-- [ ] Give the install admin a confirmed TOTP factor; `docker compose exec api orvano mfa reset --email <ADMIN EMAIL IN CAPITALS> --passkeys` → prints `reset`, exits 0; console sign in with the password alone → 201 and the cookies; one `auth.mfa.reset` with actor `{ type: "system", id: null }` → AC-28
+- [ ] Give the install admin a confirmed TOTP factor; `docker compose exec api /app/orvano mfa reset --email <ADMIN EMAIL IN CAPITALS> --passkeys` → prints `reset`, exits 0; console sign in with the password alone → 201 and the cookies; one `auth.mfa.reset` with actor `{ type: "system", id: null }` → AC-28
 - [ ] Run it again → prints `no factor`, exits 0; `--email nobody@example.com` → prints `not found`, exits 2; `mfa reset --email` with no address, or `mfa reset --passkeys` with no email → exits 64 with the usage line → AC-28
 - [ ] It works with the api role's settings alone (`ORVANO_DB_URL`, `ORVANO_MASTER_KEYS`, `ORVANO_PUBLIC_URL`) and prints nothing but its answer on stdout → AC-28
 
@@ -247,6 +247,68 @@ _Steps derived from the 2026-10-08 update (AC-12, AC-20, AC-27, AC-29, AC-41, AC
 
 - [ ] A unit test proves `AccountClaims.ClaimAsync` refuses project `console` → AC-29
 
+### Built on 2026-10-08 (task 5, the rest)
+
+_Added by `/develop` as the steps above landed; `/check verify` runs them against a local stack._
+
+#### API
+
+- [ ] `POST /v1/console/account/session/mfa` with no `orvano_console_mfa` cookie → 401 `invalid_mfa_ticket` and the cookie cleared; the fourth wrong code leaves the cookie, the fifth clears it, and the sixth (same cookie) → 401 `invalid_mfa_ticket` → AC-41
+- [ ] `POST /v1/console/account/session/passkey-challenge`, then `POST /v1/console/account/session/passkey` with the software authenticator's answer (origin = `ORVANO_PUBLIC_URL`) → 201 `ConsoleAccount`, both session cookies, and an access token with `aal` 2 → AC-41
+- [ ] For a console account with TOTP and a passkey: password sign in offers `["totp","recovery_code","passkey"]`; `POST /v1/console/account/session/mfa/passkey-challenge` (cookie) then `/session/mfa` with `passkey` → 201 with `amr` holding `hwk` → AC-41
+- [ ] `POST /v1/console/account/mfa/totp/confirm` → 200 `{ recoveryCodes }` only (no `session`) and a new `orvano_console` cookie with `aal` 2 → AC-42
+- [ ] With sessions aged 11 minutes: `DELETE /v1/console/account/mfa/totp` → 403 `mfa_verification_required`; `POST /v1/console/account/mfa/verify` with a recovery code → 204 and a new `orvano_console` cookie whose `amr` holds `rec`; the delete again → 204 → AC-42
+- [ ] The console twins of passkey registration, list, rename, and delete behave as the `account.*` operations, under `/v1/console/account/passkeys` → AC-42
+
+#### UI
+
+- [ ] `/sign-in`: the email field has `autocomplete="username webauthn"`; with a passkey in the browser it is offered there, and **Sign in with a passkey** signs in with no typing → AC-41
+- [ ] Two step verification: a 5 digit code says "Enter the 6 digit code." and sends nothing; a wrong code says so; **Use a recovery code** switches the field; **Start over** returns to the form; an expired ticket returns to the form with "That sign in expired. Sign in again." → AC-41
+- [ ] Account menu → **Security**: **Turn on** shows the QR code (drawn in the page, dark on light in both themes) and the key with **Copy key**; the first code shows 10 recovery codes with **Copy codes** and **Download** (a text file); **I saved them** hides them for good and shows "10 of 10" → AC-42
+- [ ] **Make new codes** and **Turn off** with an old session open **Confirm it's you**; a code or recovery code there repeats the change once; Escape cancels and nothing changes → AC-42
+- [ ] An account without MFA and with an old session: **Turn on** opens the dialog with **Sign in again** (no code field), which signs out and returns to `/account/security` after sign in; with a passkey it offers **Use a passkey** instead → AC-42
+- [ ] **Add a passkey** runs the browser prompt and lists it **Device bound** or **Synced**; **Rename** and **Remove** work → AC-42
+- [ ] axe clean on the Security page, the step up dialog, and the two step verification step, light and dark → AC-44 (WCAG AA)
+
+#### Commands
+
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "Orvano.Server.Tests.Auth.ConsoleMfaTests"` → 5 passed → AC-12, AC-20, AC-41, AC-42
+- [ ] `pnpm --filter @orvano/console test` → all pass, including `sign-in.browser.test.tsx`, `invite-page.browser.test.tsx`, and `_app/account/security.browser.test.tsx` → AC-41, AC-42
+- [ ] `ORVANO_SCENARIOS_PUBLIC_URL=http://localhost:8081 docker compose -f tests/scenarios/compose.yml --profile console up -d --build --wait`, then `ORVANO_SCENARIOS_PUBLIC_URL=http://localhost:8081 pnpm --filter @orvano/console test:e2e` → `e2e/account-security.spec.ts` passes both tests (the passkey one uses Playwright's virtual authenticator, and is skipped when the variable is unset) → AC-41, AC-42, AC-45
+
+## Build checks: task 6, alerts, hardening, and docs · updated 2026-10-08
+
+_Steps derived from AC-31, AC-33 to AC-35, AC-46, and the Value sourcing row for the alert email. `/check verify` runs these; `/test` locks the durable ones._
+
+### Alerts
+
+- [ ] With an SMTP server, each change queues one `security_alert` email to the user, in its own transaction: confirm TOTP (`mfa_enabled`), step two or step up with a recovery code (`recovery_code_used`), new codes (`recovery_codes_created`), add a passkey (`passkey_added`), remove one (`passkey_removed`, also from a server or the console), turn TOTP off or a reset (`mfa_disabled`) → AC-31
+- [ ] The email's subject is "Security alert for <project name>" ("Orvano" for a console account, sent through the install SMTP); its preheader and heading name the change; it says "When: <UTC time>" and what to do if it wasn't you; it has no button and no code → AC-31
+- [ ] With no SMTP anywhere, the same changes commit and nothing is queued; a user with no email gets no alert; a claim removes factors with no alert → AC-31, AC-29
+- [ ] The project's Email → Templates lists **Security alert** fifth; it edits, previews (sample `alert` `mfa_enabled`), and tests like the others; a custom template that fails to render falls back to the default → AC-31
+- [ ] `orvano mfa reset --email <admin>` on an install with SMTP queues the admin's `mfa_disabled` alert (and `passkey_removed` with `--passkeys`) → AC-28, AC-31
+
+### Data handling
+
+- [ ] After a full run (enroll, step two with a code and a recovery code, refusals, passkey registration and sign in, step up, alerts), no log line, event, job payload, or problem body holds a TOTP secret, `otpauth://`, a recovery code, a ticket, a WebAuthn challenge, a credential's JSON, or an email → AC-34
+- [ ] `auth.method_settings.updated`, `auth.mfa.*`, `auth.recovery_code*`, and `auth.passkey.*` events carry IDs, reasons, field names, and the actor only → AC-33
+- [ ] The hourly retention deletes tickets and challenges past `expires_at` and authenticator apps still pending after 15 minutes, and keeps live and confirmed ones → AC-35
+- [ ] A project purge deletes its rows in `auth_method_settings`, `auth_totp_factors`, `auth_recovery_codes`, `auth_passkeys`, `auth_mfa_tickets`, and `auth_webauthn_challenges`, and leaves other projects' → AC-35
+
+### Docs
+
+- [ ] `ORVANO_SITE_ENV=preview pnpm --filter @orvano/website build` passes (links, regions, and every error code with a fix page); the new pages render: `auth/mfa`, `auth/passkeys`, `console/account-security`, and the console recovery section of `self-hosting/upgrade` → AC-46
+- [ ] Screenshots: rerun `pnpm --filter @orvano/website screenshots` so the Email templates image shows five templates → AC-46
+
+### Commands
+
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "Orvano.Server.Tests.Auth.SecurityAlertTests"` → 5 passed; `MfaJobsTests` → 2; `MfaLeakTests` → 1; `Orvano.Server.Tests.Messaging.EmailTemplateDomainTests` → all pass with the six alert cases → AC-31, AC-34, AC-35
+- [ ] With the scenario stack up, every client runner passes `auth-mfa-totp`, which reads the alert from Mailpit after the confirm → AC-31
+
+### Acceptance criteria coverage (task 5, the rest, and task 6)
+
+- AC-12, AC-20, AC-29: task 5 API step 1 and the claim guard unit test · AC-27, AC-39, AC-44: the `getMfa` steps and the user detail · AC-41: the console sign in steps, UI, and e2e · AC-42: the Security page steps and e2e · AC-45: the virtual authenticator e2e · AC-31: Alerts · AC-33, AC-34, AC-35: Data handling · AC-46: Docs · AC-47: the manual checks below, still to run on real devices
+
 ## Setup
 
 1. Deploy the branch to the test server, so `ORVANO_PUBLIC_URL` is its real https URL (this also turns on console passkeys, AC-3).
@@ -271,7 +333,7 @@ _Steps derived from the 2026-10-08 update (AC-12, AC-20, AC-27, AC-29, AC-41, AC
 | 9 | Next.js sample: password sign in for an MFA user, then a passkey at the MFA step | `orvano_mfa` is `HttpOnly` in the browser's cookie view and gone after step two | AC-37 |
 | 10 | Console: turn on TOTP and add a passkey for a console account on the Security page, sign out, sign in with each | Both work; the QR code scans; the step up dialog appears when removing the passkey | AC-41, AC-42 |
 | 11 | Console: change the test project's RP ID to another domain, then back | The warning names the passkey count; passkeys stop, then work again | AC-2, AC-43 |
-| 12 | Run `docker compose exec api orvano mfa reset --email <admin>` on the test server | Prints `reset`; the admin signs in with the password alone and gets the alert email | AC-28, AC-31 |
+| 12 | Run `docker compose exec api /app/orvano mfa reset --email <admin>` on the test server | Prints `reset`; the admin signs in with the password alone and gets the alert email | AC-28, AC-31 |
 | 13 | Check the inbox of the test user after items 1, 4, 10, and 12 | One readable alert email per change, in a mail client and with a screen reader | AC-31 |
 
 ## Results
