@@ -126,10 +126,10 @@ _Steps derived from the acceptance criteria and the Value sourcing table. `/chec
 
 ### SDKs
 
-- [ ] `@orvano/js` in a browser: `isPasskeySupported()` is true, `isPasskeySupported({ autofill: true })` follows `isConditionalMediationAvailable`; `registerPasskey({ name })` runs `navigator.credentials.create`; `signInWithPasskey({ autofill: true })` waits on a field with `autocomplete="username webauthn"` and says `signedIn` → AC-36
+- [x] `@orvano/js` in a browser: `isPasskeySupported()` is true, `isPasskeySupported({ autofill: true })` follows `isConditionalMediationAvailable`; `registerPasskey({ name })` runs `navigator.credentials.create`; `signInWithPasskey({ autofill: true })` waits on a field with `autocomplete="username webauthn"` and says `signedIn` → AC-36
 - [x] `@orvano/js`: `completeMfa({ passkey: true })` after a challenged sign in and `verifyMfa({ passkey: true })` run the ceremony and store the session or the new token → AC-36
 - [x] `@orvano/nextjs`: `POST .../mfa-passkey` answers the challenge for the `orvano_mfa` ticket (401 without the cookie), `POST .../mfa` accepts `{ challengeId, credential }`, and `POST .../passkey-challenge` then `POST .../passkey` set both session cookies → AC-37
-- [ ] `orvano_flutter` has no `passkeys` in `flutter pub deps`, and `signInWithPasskey` on a client made with no authenticator throws an `ArgumentError` naming `orvano_flutter_passkeys`; the Flutter runner on Chrome, with no Corbado script in `web/index.html` and no `passkeys_web` in its generated web plugin registrant, starts and passes → AC-38
+- [x] `orvano_flutter` has no `passkeys` in `flutter pub deps`, and `signInWithPasskey` on a client made with no authenticator throws an `ArgumentError` naming `orvano_flutter_passkeys`; the Flutter runner on Chrome, with no Corbado script in `web/index.html` and no `passkeys_web` in its generated web plugin registrant, starts and passes → AC-38
 - [ ] `orvano_flutter_passkeys`: `flutter test` passes (the fake `PasskeysPlatform` mapping); an app made with `createClient(..., passkeys: PlatformPasskeys())` on an iOS simulator with Associated Domains for the RP ID runs `registerPasskey` and `signInWithPasskey`, and `completeMfa(MfaAnswer.passkey())` finishes a challenged sign in → AC-38
 
 ### Value sourcing
@@ -204,8 +204,8 @@ _The project screens of AC-43 and AC-44. The console sign in MFA step, passkey s
 
 - [x] As an owner, open a project's Sign in methods page → an "MFA and passkeys" section with an Authenticator app card (On, with an Enabled switch) and a Passkeys card (the RP ID and how many passkeys can sign in, or Not set up) above the providers → AC-43
 - [x] Turn the Authenticator app switch off → a toast, the card reads Off, and `GET /v1/console/project/auth/methods` has `totpEnabled: false`; turn it back on → AC-43
-- [ ] Open Passkeys → the Enabled switch, RP ID, RP name (placeholder: the project name), Android certificate fingerprints (one per line), the accepted origins, and, for a project with iOS or Android platforms, `apple-app-site-association` (`<TeamID>.<bundle ID>` under `webcredentials`) and `assetlinks.json` (`delegate_permission/common.get_login_creds`) with copy buttons; the dialog scrolls when taller than the window → AC-43
-- [ ] With passkeys registered, save a new RP ID → a confirmation names how many passkeys stop working and needs the new RP ID typed; confirm → saved with `confirmRpIdChange: true`; change it back → AC-2, AC-43
+- [x] Open Passkeys → the Enabled switch, RP ID, RP name (placeholder: the project name), Android certificate fingerprints (one per line), the accepted origins, and, for a project with iOS or Android platforms, `apple-app-site-association` (`<TeamID>.<bundle ID>` under `webcredentials`) and `assetlinks.json` (`delegate_permission/common.get_login_creds`) with copy buttons; the dialog scrolls when taller than the window → AC-43
+- [x] With passkeys registered, save a new RP ID → a confirmation names how many passkeys stop working and needs the new RP ID typed; confirm → saved with `confirmRpIdChange: true`; change it back → AC-2, AC-43
 - [x] As a viewer: the switch is disabled with "Developers and owners only", and the Passkeys dialog shows everything disabled → AC-43
 - [x] Users page: an MFA column that says On or Off in words, and an MFA filter (All, On, Off) kept in the URL as `?mfa=on` next to the verification filter → AC-44
 - [x] A user's page: a Security section with MFA On or Off, Reset MFA behind a confirmation that says every session ends, and their passkeys (name, added and last used in local time, Synced or Device bound, Active or Inactive) with Remove each; the sessions table has Level (One factor or Two factors) and Factors (such as "Authenticator app, Password") → AC-44
@@ -239,9 +239,9 @@ _Steps derived from the 2026-10-08 update (AC-12, AC-20, AC-27, AC-29, AC-41, AC
 
 ### UI
 
-- [ ] `/sign-in` for an account with MFA → the Two step verification step; a right code lands on `redirect`; "Start over" returns to the email and password form → AC-41
-- [ ] `/invite` sign in for an account with MFA → the same step in place, then the join step → AC-41
-- [ ] A user's page shows "turned on" and codes left from `consoleUsers.getMfa`, and "Off (authenticator app set up, project has TOTP off)" while the switch is off → AC-44
+- [x] `/sign-in` for an account with MFA → the Two step verification step; a right code lands on `redirect`; "Start over" returns to the email and password form → AC-41
+- [x] `/invite` sign in for an account with MFA → the same step in place, then the join step → AC-41
+- [x] A user's page shows "turned on" and codes left from `consoleUsers.getMfa`, and "Off (authenticator app set up, project has TOTP off)" while the switch is off → AC-44
 
 ### Code
 
@@ -263,11 +263,11 @@ _Added by `/develop` as the steps above landed; `/check verify` runs them agains
 #### UI
 
 - [x] `/sign-in`: the email field has `autocomplete="username webauthn"`; with a passkey in the browser it is offered there, and **Sign in with a passkey** signs in with no typing → AC-41
-- [ ] Two step verification: a 5 digit code says "Enter the 6 digit code." and sends nothing; a wrong code says so; **Use a recovery code** switches the field; **Start over** returns to the form; an expired ticket returns to the form with "That sign in expired. Sign in again." → AC-41
-- [ ] Account menu → **Security**: **Turn on** shows the QR code (drawn in the page, dark on light in both themes) and the key with **Copy key**; the first code shows 10 recovery codes with **Copy codes** and **Download** (a text file); **I saved them** hides them for good and shows "10 of 10" → AC-42
-- [ ] **Make new codes** and **Turn off** with an old session open **Confirm it's you**; a code or recovery code there repeats the change once; Escape cancels and nothing changes → AC-42
-- [ ] An account without MFA and with an old session: **Turn on** opens the dialog with **Sign in again** (no code field), which signs out and returns to `/account/security` after sign in; with a passkey it offers **Use a passkey** instead → AC-42
-- [ ] **Add a passkey** runs the browser prompt and lists it **Device bound** or **Synced**; **Rename** and **Remove** work → AC-42
+- [x] Two step verification: a 5 digit code says "Enter the 6 digit code." and sends nothing; a wrong code says so; **Use a recovery code** switches the field; **Start over** returns to the form; an expired ticket returns to the form with "That sign in expired. Sign in again." → AC-41
+- [x] Account menu → **Security**: **Turn on** shows the QR code (drawn in the page, dark on light in both themes) and the key with **Copy key**; the first code shows 10 recovery codes with **Copy codes** and **Download** (a text file); **I saved them** hides them for good and shows "10 of 10" → AC-42
+- [x] **Make new codes** and **Turn off** with an old session open **Confirm it's you**; a code or recovery code there repeats the change once; Escape cancels and nothing changes → AC-42
+- [x] An account without MFA and with an old session: **Turn on** opens the dialog with **Sign in again** (no code field), which signs out and returns to `/account/security` after sign in; with a passkey it offers **Use a passkey** instead → AC-42
+- [x] **Add a passkey** runs the browser prompt and lists it **Device bound** or **Synced**; **Rename** and **Remove** work → AC-42
 - [x] axe clean on the Security page, the step up dialog, and the two step verification step, light and dark → AC-44 (WCAG AA)
 
 #### Commands
