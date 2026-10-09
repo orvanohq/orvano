@@ -100,6 +100,7 @@ describe('the redeem action (AC-25)', () => {
       user,
       isNewUser: true,
       mfaRequired: false,
+      enrollmentRequired: false,
       factors: [],
     })
     expect(JSON.stringify(body)).not.toContain('orv_rt_')
@@ -218,6 +219,7 @@ describe('the email-code action (AC-25)', () => {
       user,
       isNewUser: false,
       mfaRequired: false,
+      enrollmentRequired: false,
       factors: [],
     })
     expect(calls[0]?.body).toEqual({ email: 'ada@example.com', code: '042137' })
@@ -250,6 +252,7 @@ describe('the browser transport (AC-24, AC-25)', () => {
       user,
       isNewUser: true,
       mfaRequired: false,
+      enrollmentRequired: false,
       factors: [],
     })
     expect(posted).toEqual([

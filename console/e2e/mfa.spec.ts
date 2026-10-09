@@ -64,7 +64,7 @@ test('an owner sees the MFA and passkey cards and turns the authenticator app of
 }) => {
   await page.goto(`/projects/${scenariosProject}/sign-in-methods`)
   const cards = page.getByRole('list', { name: 'MFA and passkeys' })
-  await expect(cards.getByText('Authenticator app')).toBeVisible()
+  await expect(cards.getByText('Authenticator app', { exact: true })).toBeVisible()
   await expect(cards.getByText('Passkeys', { exact: true })).toBeVisible()
 
   const totp = cards.getByRole('switch', { name: 'Enabled' })

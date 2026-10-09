@@ -7,6 +7,8 @@ internal static class Dispatch
     /// <summary>Every non console operation; a null call means the .NET SDK has none.</summary>
     public static readonly IReadOnlyDictionary<string, DispatchEntry> Operations = new Dictionary<string, DispatchEntry>(StringComparer.Ordinal)
     {
+        ["account.completeMfaEnrollmentPasskey"] = new(201, null, null),
+        ["account.completeMfaEnrollmentTotp"] = new(201, null, null),
         ["account.completeOAuthLink"] = new(201, null, null),
         ["account.completePasskeyRegistration"] = new(201, null, null),
         ["account.completeRecovery"] = new(201, null, null),
@@ -19,6 +21,8 @@ internal static class Dispatch
         ["account.createIdTokenSession"] = new(201, null, null),
         ["account.createMagicLink"] = new(202, null, null),
         ["account.createMagicLinkSession"] = new(201, null, null),
+        ["account.createMfaEnrollmentPasskey"] = new(201, null, null),
+        ["account.createMfaEnrollmentTotp"] = new(201, null, null),
         ["account.createMfaPasskeyChallenge"] = new(200, null, null),
         ["account.createMfaSession"] = new(201, null, null),
         ["account.createOAuthFlow"] = new(200, null, null),

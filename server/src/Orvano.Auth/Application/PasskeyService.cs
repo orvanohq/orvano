@@ -23,7 +23,8 @@ internal sealed class PasskeyService(
     AccountService accounts,
     IProjectDirectory projects,
     RateLimits limits,
-    SecurityAlerts alerts)
+    SecurityAlerts alerts,
+    SessionChecks checks)
 {
     /// <summary>
     /// Starts a passkey sign in (AC-23): a <c>sign_in</c> challenge with no user and an empty <c>allowCredentials</c>,
@@ -94,25 +95,34 @@ internal sealed class PasskeyService(
         var rpName = await RpNameAsync(projectId, await ReadPolicyAsync(projectId, ct), ct);
 
         return await store.WriteAsync<RegistrationView>(async (uow, token) =>
-        {
-            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
-            var policy = await policies.ReadAsync(uow.Tx.Connection!, uow.Tx, projectId, token);
-            if (!policy.PasskeysEnabled || policy.RpId is not { } rpId) return Failure.FactorNotEnabled;
-            if (VerifiedEmailRule.Blocks(projectId, user.Email, user.EmailVerifiedAt)) return Failure.EmailNotVerified;
-            if (await PasskeyRows.CountAsync(uow, userId, token) >= PasskeyRules.MaxPerUser) return Failure.PasskeyLimit;
+            await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user
+                ? Failure.UserNotFound
+                : await RegisterChallengeAsync(uow, projectId, user, rpName, token), ct);
+    }
 
-            var exclude = await PasskeyRows.RefsAsync(uow.Tx.Connection!, uow.Tx, userId, rpId, token);
-            var (id, challenge) = await PasskeyRows.CreateChallengeAsync(uow, projectId, ChallengePurposes.Register, userId, null, token);
-            var options = new CreationOptionsView(
-                rpId,
-                policy.RpName ?? rpName,
-                Base64Codec.Encode(PasskeyRules.UserHandle(userId)),
-                user.Email ?? userId.ToString(),
-                user.Name ?? user.Email ?? "User",
-                Base64Codec.Encode(challenge),
-                exclude);
-            return new RegistrationView(id, options);
-        }, ct);
+    /// <summary>
+    /// Under the user lock: passkeys on, a verified email when the user has one, and fewer than 10 passkeys, then a
+    /// 5 minute <c>register</c> challenge bound to the user, and the creation options.
+    /// </summary>
+    private async Task<Outcome<RegistrationView>> RegisterChallengeAsync(
+        AuthUnitOfWork uow, string projectId, LockedUser user, string rpName, CancellationToken ct)
+    {
+        var policy = await policies.ReadAsync(uow.Tx.Connection!, uow.Tx, projectId, ct);
+        if (!policy.PasskeysEnabled || policy.RpId is not { } rpId) return Failure.FactorNotEnabled;
+        if (VerifiedEmailRule.Blocks(projectId, user.Email, user.EmailVerifiedAt)) return Failure.EmailNotVerified;
+        if (await PasskeyRows.CountAsync(uow, user.Id, ct) >= PasskeyRules.MaxPerUser) return Failure.PasskeyLimit;
+
+        var exclude = await PasskeyRows.RefsAsync(uow.Tx.Connection!, uow.Tx, user.Id, rpId, ct);
+        var (id, challenge) = await PasskeyRows.CreateChallengeAsync(uow, projectId, ChallengePurposes.Register, user.Id, null, ct);
+        var options = new CreationOptionsView(
+            rpId,
+            policy.RpName ?? rpName,
+            Base64Codec.Encode(PasskeyRules.UserHandle(user.Id)),
+            user.Email ?? user.Id.ToString(),
+            user.Name ?? user.Email ?? "User",
+            Base64Codec.Encode(challenge),
+            exclude);
+        return new RegistrationView(id, options);
     }
 
     /// <summary>
@@ -158,6 +168,112 @@ internal sealed class PasskeyService(
             await alerts.QueueAsync(uow, projectId, projectName, user.Email, SecurityAlertKind.PasskeyAdded, token);
             return passkey;
         }, ct);
+    }
+
+    /// <summary>
+    /// Starts passkey enrollment with an enrollment ticket (spec 0014, AC-27), in place of a session: the ticket must be
+    /// a live <c>enroll</c> ticket (401 <c>invalid_mfa_ticket</c>) and passkeys on (409 <c>factor_not_enabled</c>).
+    /// Takes <c>auth.mfa_enroll.user</c>; otherwise <see cref="CreateRegistrationAsync"/>'s rules. The <c>register</c>
+    /// challenge is bound to the ticket's user, as any registration's is: completing still needs that user's live ticket.
+    /// </summary>
+    public async Task<Outcome<RegistrationView>> CreateEnrollmentRegistrationAsync(string projectId, string? ticketValue, string ipKey, CancellationToken ct)
+    {
+        var found = await MfaTickets.FindAsync(store, limits, projectId, ticketValue, MfaTicketPurposes.Enroll, ipKey, ct);
+        if (!found.Succeeded) return found.Failure!;
+        var userId = found.Value!.UserId;
+        if (stepUp.TakeEnrollLimit(userId) is { } limited) return limited;
+        var rpName = await RpNameAsync(projectId, await ReadPolicyAsync(projectId, ct), ct);
+
+        var vanished = false;
+        var outcome = await store.WriteAsync<RegistrationView>(async (uow, token) =>
+        {
+            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user
+                || await MfaTickets.RereadAsync(uow, projectId, ticketValue!, MfaTicketPurposes.Enroll, lockRow: false, token) is null)
+            {
+                vanished = true;
+                return Failure.InvalidMfaTicket;
+            }
+
+            return await RegisterChallengeAsync(uow, projectId, user, rpName, token);
+        }, ct);
+
+        // A ticket gone between the two reads counts against the IP like an unknown one at the first read.
+        if (vanished) limits.Acquire(RateLimitPolicies.FailedMfaTicketPerIp, ipKey);
+        return outcome;
+    }
+
+    /// <summary>
+    /// Finishes passkey enrollment with an enrollment ticket (spec 0014, AC-27): the IP limit, the ticket, the user's
+    /// factor limit (AC-18), then the user's <c>register</c> challenge taken out and the registration verified outside
+    /// any lock, as <see cref="CompleteRegistrationAsync"/> does. A wrong challenge or credential counts on the ticket
+    /// (the fifth deletes it) and commits with the refusal. A right one stores the passkey and creates the session at
+    /// level 2 with the passkey's <c>amr</c> added to the step one method's, under the user lock and the ticket's row lock.
+    /// </summary>
+    public async Task<Outcome<MfaEnrollmentView>> CompleteEnrollmentRegistrationAsync(
+        string projectId, string? ticketValue, string? challengeId, AttestationInput? credential, string? name, string ipKey, CancellationToken ct)
+    {
+        string? given = null;
+        if (name is not null)
+        {
+            if (!PasskeyRules.TryName(name, out var trimmed)) return Failure.Invalid("name must be 1 to 64 characters.");
+            given = trimmed;
+        }
+
+        if (credential is null || !Guid.TryParse(challengeId, out var id))
+            return Failure.Invalid("Send the challengeId and the credential the browser or the platform made.");
+        var found = await MfaTickets.FindAsync(store, limits, projectId, ticketValue, MfaTicketPurposes.Enroll, ipKey, ct);
+        if (!found.Succeeded) return found.Failure!;
+        var ticket = found.Value!;
+        using var failures = MfaTickets.ReserveFactor(limits, ticket.UserId, ipKey, MfaFactors.Passkey);
+        if (!failures.Allowed) return Failure.RateLimited(failures.Decision.RetryAfter);
+
+        var policy = await ReadPolicyAsync(projectId, ct);
+        if (!policy.PasskeysEnabled || policy.RpId is not { } rpId) return Failure.FactorNotEnabled;
+        await keys.GetActiveAsync(projectId, ct);
+        var projectName = await alerts.ProjectNameAsync(projectId, ct);
+        var made = await ConsumeAsync(projectId, id, ChallengePurposes.Register, ticket.UserId, null, ct) is { } challenge
+            ? await verifier.VerifyRegistrationAsync(policy, projectId, challenge, ticket.UserId, credential, ct)
+            : null;
+
+        var wrong = false;
+        var vanished = false;
+        var outcome = await store.WriteDecidingAsync<(Data.UserRow User, SessionGrant Grant, Guid[] Ended)>(async (uow, token) =>
+        {
+            var locked = await UserLocks.ByIdAsync(uow, projectId, ticket.UserId, token);
+            if (locked is null || await MfaTickets.RereadAsync(uow, projectId, ticketValue!, MfaTicketPurposes.Enroll, lockRow: true, token) is not { } row)
+            {
+                vanished = true;
+                return (Failure.InvalidMfaTicket, false);
+            }
+
+            if (made is null)
+            {
+                wrong = true;
+                await MfaTickets.CountWrongAsync(uow, row, token);
+                return (Failure.InvalidPasskey, true);
+            }
+
+            if (!(await policies.ReadAsync(uow.Tx.Connection!, uow.Tx, projectId, token)).PasskeysEnabled) return (Failure.FactorNotEnabled, false);
+            if (VerifiedEmailRule.Blocks(projectId, locked.Email, locked.EmailVerifiedAt)) return (Failure.EmailNotVerified, false);
+            if (await PasskeyRows.CountAsync(uow, ticket.UserId, token) >= PasskeyRules.MaxPerUser) return (Failure.PasskeyLimit, false);
+            if (locked.Status == UserStatuses.Blocked) return (Failure.UserBlocked, false);
+
+            if (await PasskeyRows.InsertAsync(uow, projectId, ticket.UserId, made, PasskeyRules.NameFor(given, made.AaGuid), rpId, token) is not { } passkey)
+                return (Failure.PasskeyAlreadyRegistered, false);
+            await AuthEvents.WriteAsync(uow.Tx, AuthEvents.PasskeyAdded, projectId, Actor.User(ticket.UserId), ticket.UserId.ToString(),
+                Ids(ticket.UserId, passkey.Id), ct: token);
+            await alerts.QueueAsync(uow, projectId, projectName, locked.Email, SecurityAlertKind.PasskeyAdded, token);
+            var done = await MfaTickets.FinishEnrollmentAsync(uow, sessions, projectId, row, SessionStrength.ForPasskey(made.BackedUp), token);
+            return (done, true);
+        }, ct);
+
+        if (wrong) failures.Fail();
+        // A ticket gone between the two reads counts against the IP like an unknown one at the first read.
+        if (vanished) limits.Acquire(RateLimitPolicies.FailedMfaTicketPerIp, ipKey);
+        if (!outcome.Succeeded) return outcome.Failure!;
+
+        foreach (var ended in outcome.Value.Ended) await checks.EvictAsync(ended, ct);
+        return new MfaEnrollmentView(await accounts.SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant, ct), null);
     }
 
     /// <summary>The user's passkeys, oldest first, including inactive ones (AC-2).</summary>

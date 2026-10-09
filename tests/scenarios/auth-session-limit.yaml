@@ -1,0 +1,29 @@
+# Spec 0014, AC-26, AC-36: in a project that caps each user at 2 live sessions (fixtures.yaml, scenarios0000000000c),
+# a third sign in ends the least recently used session (session_limit): of the sign up's session and two password
+# sign ins, only the two password sessions are left.
+name: a project's session cap ends the least recently used session
+project: scenarios0000000000c
+requires: []
+steps:
+  - op: account.create
+    as: client
+    input:
+      body: { email: 'cap-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }
+  - op: signIn
+    as: client
+    input:
+      body: { email: 'cap-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'cap-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }
+  - op: account.listSessions
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body:
+        items: [{ method: password }, { method: password }]

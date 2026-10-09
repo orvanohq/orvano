@@ -3,19 +3,30 @@ import type {
   MfaFactor,
   PasskeyAnswer,
   PasskeyChallenge,
+  PasskeyRegistration,
+  PasskeyRegistrationCredential,
+  TotpSetup,
   User,
 } from '../generated/models.js'
 import type { Client, RequestOptions } from './client.js'
 
 /**
  * A sign in that stopped at the MFA step (spec 0013, AC-36): the user has MFA on, so no session
- * exists yet. Finish it with `completeMfa` before `expiresAt`. The ticket stays inside the client.
+ * exists yet. Finish it with `completeMfa` before `expiresAt`. With `enrollmentRequired` (spec
+ * 0014, AC-27), the project requires MFA and the user has none yet: enroll a first factor with
+ * `startTotpEnrollment` and `completeTotpEnrollment`, or `enrollPasskey`. The ticket stays inside
+ * the client.
  */
 export interface PendingMfa {
-  /** The factors the user can answer with now: `totp`, `recovery_code`, `passkey`. */
+  /**
+   * The factors the user can answer with now: `totp`, `recovery_code`, `passkey`; with
+   * `enrollmentRequired`, the factors the user can enroll: `totp`, `passkey`.
+   */
   factors: MfaFactor[]
   /** When the challenge stops working; after that, sign in again. */
   expiresAt: string
+  /** True when the user must enroll a first factor before any session (spec 0014, AC-27). */
+  enrollmentRequired: boolean
 }
 
 /** A {@link PendingMfa} with its ticket, as a {@link PendingMfaStore} keeps it. Never log it. */
@@ -95,6 +106,43 @@ export interface MfaTransport {
     client: Client,
     options?: RequestOptions,
   ): Promise<SignInOutcome>
+  /** Starts enrolling an authenticator app with the waiting ticket (`account.createMfaEnrollmentTotp`). */
+  startTotpEnrollment(client: Client, options?: RequestOptions): Promise<TotpSetup>
+  /** Finishes it with the first code (`account.completeMfaEnrollmentTotp`) and stores the session. */
+  completeTotpEnrollment(
+    code: string,
+    client: Client,
+    options?: RequestOptions,
+  ): Promise<EnrollmentOutcome>
+  /** The passkey options for the waiting ticket (`account.createMfaEnrollmentPasskey`). */
+  createMfaEnrollmentPasskey(client: Client, options?: RequestOptions): Promise<PasskeyRegistration>
+  /** Finishes a passkey enrollment (`account.completeMfaEnrollmentPasskey`) and stores the session. */
+  completeMfaEnrollmentPasskey(
+    answer: PasskeyEnrollmentAnswer,
+    client: Client,
+    options?: RequestOptions,
+  ): Promise<EnrollmentOutcome>
+}
+
+/** A new passkey for an enrollment: the registration's `challengeId`, the credential, and a name. */
+export interface PasskeyEnrollmentAnswer {
+  /** The `challengeId` of the `PasskeyRegistration`. */
+  challengeId: string
+  /** The browser's or the platform's new credential. */
+  credential: PasskeyRegistrationCredential
+  /** 1 to 64 characters; left out, the passkey is named `Passkey`. */
+  name?: string
+}
+
+/**
+ * What an enrollment did (spec 0014, AC-27): the signed in user, whose session now holds `aal` 2,
+ * and after an authenticator app the 10 recovery codes to show once (null after a passkey).
+ */
+export interface EnrollmentOutcome {
+  /** The signed in user; null when a route handler signed in for this client and did not say. */
+  user: User | null
+  /** 10 recovery codes after an authenticator app, each working once; null after a passkey. */
+  recoveryCodes: string[] | null
 }
 
 /**
@@ -104,22 +152,44 @@ export interface MfaTransport {
 export interface SignInOutcome {
   /** The signed in user; null while `mfaRequired` is true. */
   user: User | null
-  /** True when this call created the user. A new user is never challenged. */
+  /** True when this call created the user. */
   isNewUser: boolean
-  /** True when the sign in stopped at the MFA step: call `completeMfa`. */
+  /**
+   * True when the sign in stopped at the MFA step: call `completeMfa`, or with
+   * `enrollmentRequired`, enroll a first factor.
+   */
   mfaRequired: boolean
-  /** The factors the challenge offers; empty when `mfaRequired` is false. */
+  /**
+   * True when the project requires MFA and the user must enroll a first factor before any session
+   * (spec 0014, AC-27): `startTotpEnrollment` then `completeTotpEnrollment`, or `enrollPasskey`.
+   */
+  enrollmentRequired: boolean
+  /**
+   * The factors the challenge offers, or with `enrollmentRequired` the factors the user can enroll;
+   * empty when `mfaRequired` is false.
+   */
   factors: MfaFactor[]
 }
 
 /** The {@link SignInOutcome} of an `AuthResult`. */
 export function signInOutcome(result: AuthResult): SignInOutcome {
-  // A server older than spec 0013 sends no `mfa` at all.
+  // A server older than spec 0013 sends no `mfa` at all, and one older than 0014 no `enrollmentRequired`.
   const mfa = (result.mfa as AuthResult['mfa'] | undefined) ?? null
   return {
     user: result.user,
     isNewUser: result.isNewUser,
     mfaRequired: mfa !== null,
+    enrollmentRequired: mfa?.enrollmentRequired === true,
     factors: mfa?.factors ?? [],
   }
+}
+
+/**
+ * Whether a sign in stopped because the project requires MFA and the user has no factor yet (spec
+ * 0014, AC-27): no session exists, and the user enrolls one with `startTotpEnrollment` and
+ * `completeTotpEnrollment`, or `enrollPasskey`, which sign them in.
+ */
+export function enrollmentRequired(result: AuthResult | SignInOutcome): boolean {
+  if ('enrollmentRequired' in result) return result.enrollmentRequired
+  return (result.mfa as AuthResult['mfa'] | undefined)?.enrollmentRequired === true
 }

@@ -25,22 +25,37 @@ enum MfaFactor {
 }
 
 @doc("""
-  The second step a sign in must pass before it gets a session: the user has MFA on. Answer it with
-  `account.createMfaSession` before `expiresAt`.
+  What a sign in must pass before it gets a session. Usually the second step: the user has MFA on, so answer it with
+  `account.createMfaSession` before `expiresAt`. When `enrollmentRequired` is true, the project requires MFA and the
+  user has no second factor yet: enroll one with the ticket (`account.createMfaEnrollmentTotp` or
+  `account.createMfaEnrollmentPasskey`), which answers the session.
   """)
 model MfaChallenge {
   @doc("""
-    Proves the first step passed; send it to `account.createMfaSession`. Keep it in memory only. Empty when the ticket
-    travels in a cookie instead (the console).
+    Proves the first step passed; send it to `account.createMfaSession`, or with `enrollmentRequired`, to the
+    enrollment operations. Keep it in memory only. Empty when the ticket travels in a cookie instead (the console).
     """)
   @example("orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE")
   ticket: string;
 
-  @doc("The factors the user can answer with now, in this order: `totp`, `recovery_code`, `passkey`.")
+  @doc("""
+    The factors the user can answer with now, in this order: `totp`, `recovery_code`, `passkey`. With
+    `enrollmentRequired`, the factors the user can enroll instead: `totp`, `passkey`.
+    """)
   factors: MfaFactor[];
 
-  @doc("When the ticket stops working: 5 minutes after the first step. After that, sign in again.")
+  @doc("""
+    When the ticket stops working: 5 minutes after the first step, or 15 with `enrollmentRequired`. After that, sign in
+    again.
+    """)
   expiresAt: utcDateTime;
+
+  @doc("""
+    True when the project requires MFA and the user must enroll a first factor before any session; false for a second
+    step.
+    """)
+  @example(false)
+  enrollmentRequired: boolean;
 }
 
 @doc("The second step of a sign in: the ticket and exactly one factor.")
@@ -178,9 +193,115 @@ model VerifyMfaRequest {
   passkey?: PasskeyAnswer;
 }
 
+@doc("The enrollment ticket of a sign in that must enroll a first factor (`MfaChallenge.enrollmentRequired`).")
+model CreateMfaEnrollmentRequest {
+  @doc("The `ticket` of the `MfaChallenge`.")
+  @example("orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE")
+  ticket: string;
+}
+
+@doc("The first code from the authenticator app, which finishes enrollment.")
+model CompleteMfaEnrollmentTotpRequest {
+  @doc("The `ticket` of the `MfaChallenge`.")
+  @example("orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE")
+  ticket: string;
+
+  @doc("The 6 digit code the authenticator app shows now.")
+  @example("492039")
+  code: string;
+}
+
+@doc("The browser's or the platform's new passkey, which finishes enrollment.")
+model CompleteMfaEnrollmentPasskeyRequest {
+  @doc("The `ticket` of the `MfaChallenge`.")
+  @example("orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE")
+  ticket: string;
+
+  @doc("The `challengeId` of the `PasskeyRegistration` from `account.createMfaEnrollmentPasskey`.")
+  @example("01928f3e-6c1a-7b2d-9e4f-5a6b7c8d9e0f")
+  challengeId: string;
+
+  @doc("The browser's or the platform's answer.")
+  credential: PasskeyRegistrationCredential;
+
+  @doc("1 to 64 characters. Left out, the passkey is named `Passkey`.")
+  @example("MacBook")
+  name?: string;
+}
+
+@doc("""
+  An enrolled first factor and the session it earned, at level 2. With an authenticator app, show the recovery codes
+  once and ask the user to keep them safe; they can't be read again.
+  """)
+model MfaEnrollmentResult {
+  @doc("The signed in user and their new session.")
+  auth: AuthResult;
+
+  @doc("10 recovery codes, each `XXXXX-XXXXX`, each working once, after an authenticator app; null after a passkey.")
+  @example(#["K7QXM-2RPLD", "A4ZTN-WQ6EB"])
+  recoveryCodes: string[] | null;
+}
+
 @route("/v1/account")
 @tag("account")
 interface AccountMfaApi {
+  @doc("""
+    Starts enrolling an authenticator app for a sign in that must enroll a first factor
+    (`MfaChallenge.enrollmentRequired`): answers a new secret. Confirm it with `account.completeMfaEnrollmentTotp`
+    within 15 minutes.
+    """)
+  @operationId("account.createMfaEnrollmentTotp")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @route("/mfa/enrollment/totp")
+  @post
+  createMfaEnrollmentTotp(@body request: CreateMfaEnrollmentRequest): {
+    @statusCode statusCode: 201;
+    @body body: TotpSetup;
+  } | Problem;
+
+  @doc("""
+    Finishes enrolling an authenticator app with its first code: turns MFA on and answers 10 recovery codes and the
+    session, at level 2. After 5 wrong codes the ticket stops working; sign in again.
+    """)
+  @operationId("account.completeMfaEnrollmentTotp")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @route("/mfa/enrollment/totp/confirm")
+  @post
+  completeMfaEnrollmentTotp(@body request: CompleteMfaEnrollmentTotpRequest): {
+    @statusCode statusCode: 201;
+    @body body: MfaEnrollmentResult;
+  } | Problem;
+
+  @doc("""
+    Starts enrolling a passkey for a sign in that must enroll a first factor (`MfaChallenge.enrollmentRequired`):
+    answers the options for `navigator.credentials.create`. Finish with `account.completeMfaEnrollmentPasskey`.
+    """)
+  @operationId("account.createMfaEnrollmentPasskey")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @route("/mfa/enrollment/passkey")
+  @post
+  createMfaEnrollmentPasskey(@body request: CreateMfaEnrollmentRequest): {
+    @statusCode statusCode: 201;
+    @body body: PasskeyRegistration;
+  } | Problem;
+
+  @doc("""
+    Finishes enrolling a passkey with the browser's or the platform's answer: stores the passkey and answers the
+    session, at level 2. After 5 wrong answers the ticket stops working; sign in again.
+    """)
+  @operationId("account.completeMfaEnrollmentPasskey")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @route("/mfa/enrollment/passkey/confirm")
+  @post
+  completeMfaEnrollmentPasskey(@body request: CompleteMfaEnrollmentPasskeyRequest): {
+    @statusCode statusCode: 201;
+    @body body: MfaEnrollmentResult;
+  } | Problem;
+
   @doc("""
     Finishes a sign in that answered an MFA challenge: checks the ticket and one factor, then creates the session.
     After 5 wrong factors the ticket stops working; sign in again.

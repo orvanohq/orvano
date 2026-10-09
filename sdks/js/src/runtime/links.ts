@@ -101,6 +101,7 @@ export const directEmailAuth: EmailAuthTransport = {
           user: await account.verifyEmail({ token: link.token }, options),
           isNewUser: false,
           mfaRequired: false,
+          enrollmentRequired: false,
           factors: [],
         }
       case 'email_change':
@@ -109,11 +110,19 @@ export const directEmailAuth: EmailAuthTransport = {
           user: await account.confirmEmailChange({ token: link.token }, options),
           isNewUser: false,
           mfaRequired: false,
+          enrollmentRequired: false,
           factors: [],
         }
       case 'verification_reject':
         await account.rejectEmailVerification({ token: link.token }, options)
-        return { type: link.type, user: null, isNewUser: false, mfaRequired: false, factors: [] }
+        return {
+          type: link.type,
+          user: null,
+          isNewUser: false,
+          mfaRequired: false,
+          enrollmentRequired: false,
+          factors: [],
+        }
     }
   },
   async signInWithEmailCode(email, code, client, options) {

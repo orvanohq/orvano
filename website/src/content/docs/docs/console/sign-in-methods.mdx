@@ -11,7 +11,7 @@ The project's **Sign in methods** page starts with **MFA and passkeys**, then li
 
 Two cards sit above the providers.
 
-- **Authenticator app** turns [MFA](/docs/auth/mfa/) on or off for the whole project with its **Enabled** switch. It is on by default. Turning it off stops asking anyone for a code, and keeps every user's app and recovery codes for when you turn it back on.
+- **Authenticator app** turns [MFA](/docs/auth/mfa/) on or off for the whole project with its **Enabled** switch. It is on by default. Turning it off stops asking anyone for a code, and keeps every user's app and recovery codes for when you turn it back on. Its **Require MFA** switch makes every user [enroll a second factor](/docs/auth/mfa/#require-mfa-for-every-user) before they get a session, and says how many signed in users have none yet. It needs the authenticator app or passkeys on, and an [email server](/docs/console/email/#settings), since sign ups then verify their email first.
 - **Passkeys** opens a dialog with the **Enabled** switch, the **RP ID** (the domain passkeys belong to, such as `example.com`), the **RP name** (the name a passkey prompt shows; empty means the project's name), and the **Android certificate fingerprints** of your Android apps, one per line. Below them it lists the origins a passkey is accepted from today, and, for a project with iOS or Android [platforms](/docs/console/platforms/), the `apple-app-site-association` and `assetlinks.json` files to serve on your domain, each with a copy button. [Passkeys](/docs/auth/passkeys/) walks through the setup.
 
 Changing the RP ID while passkeys can sign in shows how many will stop working, and asks you to type the new RP ID again to confirm. Those passkeys come back if you change it back.

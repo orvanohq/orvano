@@ -127,6 +127,17 @@ export interface AuthMethodSettings {
    * platform shows as a pattern, such as `https://*.example.com`, which accepts any one subdomain level.
    */
   acceptedOrigins: string[]
+  /**
+   * Whether every user must have a second factor (an authenticator app or a passkey) before they get a session. Sign
+   * up and password sign in then need a verified email, and a user with no factor enrolls one at their next sign in.
+   * Needs TOTP or passkeys on, and an email server.
+   */
+  mfaRequired: boolean
+  /**
+   * How many users hold a live session and have no second factor, so would enroll one at their next sign in while
+   * `mfaRequired` is on. Counted by `consoleAuthMethods.get` only; null in the answer of an update.
+   */
+  activeUsersWithoutMfa: number | null
 }
 
 /** A project's auth rules with what the Security page shows beside them. */
@@ -808,6 +819,11 @@ export interface UpdateAuthMethodSettingsRequest {
   rpName?: string | null
   /** At most 10 SHA-256 fingerprints, uppercase or lowercase hex pairs joined by colons; stored uppercase. */
   androidCertFingerprints?: string[]
+  /**
+   * Whether every user must have a second factor before they get a session. Needs `totpEnabled` or `passkeysEnabled`,
+   * and turning it on needs an email server.
+   */
+  mfaRequired?: boolean
   /** Must be true to change `rpId` while passkeys are registered under the current one: they stop working. */
   confirmRpIdChange?: boolean
 }

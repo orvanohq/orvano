@@ -30,22 +30,25 @@ import type {
   ClientConfig,
   EmailAuthTransport,
   EmailCodeResult,
+  EnrollmentOutcome,
   LinkResult,
   MfaFactor,
   MfaTransport,
   OAuthTransport,
   PasskeyChallenge,
+  PasskeyRegistration,
   PendingMfaStore,
   PendingMfaTicket,
   RequestOptions,
   SessionRefresher,
   SessionStore,
   SignInOutcome,
+  TotpSetup,
 } from '@orvano/js'
 
 import { decodeMfaCookie, encodeMfaCookie } from './cookie-codec.js'
 
-export { Client, ErrorCode, Orvano, OrvanoError } from '@orvano/js'
+export { Client, ErrorCode, Orvano, OrvanoError, enrollmentRequired } from '@orvano/js'
 export type {
   AuthEvent,
   AuthSession,
@@ -53,6 +56,7 @@ export type {
   ClientConfig,
   EmailCodeResult,
   EmailLinkType,
+  EnrollmentOutcome,
   LinkResult,
   MfaAnswer,
   MfaWireAnswer,
@@ -79,6 +83,9 @@ export const mfaCookie = 'orvano_mfa'
 
 /** How long the `orvano_mfa` cookie lives: the ticket's 5 minutes. */
 export const mfaCookieSeconds = 300
+
+/** How long the `orvano_mfa` cookie lives for an enrollment: its ticket's 15 minutes (spec 0014, AC-27). */
+export const mfaEnrollmentCookieSeconds = 900
 
 /** Where the app mounts {@link createOrvanoRouteHandler} unless told otherwise. */
 export const defaultHandlerPath = '/api/orvano'
@@ -107,9 +114,15 @@ export interface MfaCookieOptions {
   maxAge: number
 }
 
-/** The options the `orvano_mfa` cookie is written with. */
-export function mfaCookieOptions(secure: boolean): MfaCookieOptions {
-  return { httpOnly: true, secure, sameSite: 'lax', path: '/', maxAge: mfaCookieSeconds }
+/** The options the `orvano_mfa` cookie is written with; an enrollment's lives longer. */
+export function mfaCookieOptions(secure: boolean, enrollment = false): MfaCookieOptions {
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: enrollment ? mfaEnrollmentCookieSeconds : mfaCookieSeconds,
+  }
 }
 
 /**
@@ -292,6 +305,7 @@ export class CookiePendingMfaStore implements PendingMfaStore {
           ticket: cookie.ticket,
           factors: cookie.factors as MfaFactor[],
           expiresAt: cookie.expiresAt,
+          enrollmentRequired: cookie.enrollmentRequired,
         }
   }
 
@@ -303,7 +317,7 @@ export class CookiePendingMfaStore implements PendingMfaStore {
           store.set?.(
             mfaCookie,
             encodeMfaCookie({ ...pending, next: this.#next }),
-            mfaCookieOptions(this.#secure),
+            mfaCookieOptions(this.#secure, pending.enrollmentRequired),
           )
       } catch {
         // Server components can't set cookies; sign in from a server action or route handler.
@@ -517,8 +531,9 @@ export function emailAuthThroughHandler(handlerPath = defaultHandlerPath): Email
  * A sign in answer as the route handler sends it: `mfaRequired` may be missing (a handler older
  * than spec 0013), and `expiresAt` comes with a challenge.
  */
-type HandlerAnswer<T extends SignInOutcome> = Omit<T, 'mfaRequired'> & {
+type HandlerAnswer<T extends SignInOutcome> = Omit<T, 'mfaRequired' | 'enrollmentRequired'> & {
   mfaRequired?: boolean
+  enrollmentRequired?: boolean
   expiresAt?: string
 }
 
@@ -527,6 +542,7 @@ function announce(client: Client, result: HandlerAnswer<SignInOutcome>): void {
   client.announceMfa({
     factors: Array.isArray(result.factors) ? result.factors : [],
     expiresAt: typeof result.expiresAt === 'string' ? result.expiresAt : '',
+    enrollmentRequired: result.enrollmentRequired === true,
   })
 }
 
@@ -537,7 +553,10 @@ function announce(client: Client, result: HandlerAnswer<SignInOutcome>): void {
  * (after `verifyMfa` and `confirmTotp`, only the access cookie: the refresh cookie stays as it
  * was), so the browser never holds a refresh token or a ticket. Passkeys run in the browser; their
  * challenges come from `.../mfa-passkey` and `.../passkey-challenge`, and a passkey sign in
- * finishes at `.../passkey`.
+ * finishes at `.../passkey`. Enrollment under required MFA (spec 0014, AC-27) goes to
+ * `.../mfa-enroll-totp`, `.../mfa-enroll-totp-confirm`, `.../mfa-enroll-passkey`, and
+ * `.../mfa-enroll-passkey-confirm`, which read the ticket from the `orvano_mfa` cookie and set
+ * both session cookies once a factor is enrolled.
  */
 export function mfaThroughHandler(handlerPath = defaultHandlerPath): MfaTransport {
   const post = async (
@@ -561,7 +580,13 @@ export function mfaThroughHandler(handlerPath = defaultHandlerPath): MfaTranspor
       // A passkey's answer goes flat, as `{ challengeId, credential }` (AC-37).
       await post('mfa', 'passkey' in answer ? answer.passkey : answer, options)
       await client.reloadSession('signedIn')
-      return { user: null, isNewUser: false, mfaRequired: false, factors: [] }
+      return {
+        user: null,
+        isNewUser: false,
+        mfaRequired: false,
+        enrollmentRequired: false,
+        factors: [],
+      }
     },
     async verifyMfa(answer, client, options): Promise<void> {
       await post('mfa-verify', answer, options)
@@ -583,7 +608,25 @@ export function mfaThroughHandler(handlerPath = defaultHandlerPath): MfaTranspor
       const response = await post('passkey', answer, options)
       const { user } = (await response.json()) as { user: SignInOutcome['user'] }
       await client.reloadSession('signedIn')
-      return { user, isNewUser: false, mfaRequired: false, factors: [] }
+      return { user, isNewUser: false, mfaRequired: false, enrollmentRequired: false, factors: [] }
+    },
+    async startTotpEnrollment(_client, options): Promise<TotpSetup> {
+      return (await (await post('mfa-enroll-totp', {}, options)).json()) as TotpSetup
+    },
+    async completeTotpEnrollment(code, client, options): Promise<EnrollmentOutcome> {
+      const response = await post('mfa-enroll-totp-confirm', { code }, options)
+      const enrolled = (await response.json()) as EnrollmentOutcome
+      await client.reloadSession('signedIn')
+      return { user: enrolled.user, recoveryCodes: enrolled.recoveryCodes }
+    },
+    async createMfaEnrollmentPasskey(_client, options): Promise<PasskeyRegistration> {
+      return (await (await post('mfa-enroll-passkey', {}, options)).json()) as PasskeyRegistration
+    },
+    async completeMfaEnrollmentPasskey(answer, client, options): Promise<EnrollmentOutcome> {
+      const response = await post('mfa-enroll-passkey-confirm', answer, options)
+      const enrolled = (await response.json()) as EnrollmentOutcome
+      await client.reloadSession('signedIn')
+      return { user: enrolled.user, recoveryCodes: null }
     },
   }
 }
@@ -598,6 +641,7 @@ function outcome<T extends object>(
     user: result.user,
     isNewUser: result.isNewUser,
     mfaRequired: result.mfaRequired === true,
+    enrollmentRequired: result.enrollmentRequired === true,
     factors: Array.isArray(result.factors) ? result.factors : [],
   }
 }

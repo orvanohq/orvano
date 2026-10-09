@@ -1,0 +1,55 @@
+# Spec 0014, AC-27, AC-36: in a project that requires MFA (fixtures.yaml, scenarios0000000000b), a verified user's
+# enrollment challenge also takes a passkey (the runner's test authenticator answers): the client SDK's enrollPasskey
+# stores the passkey and the session at level 2, with no recovery codes.
+name: a project that requires MFA lets a user enroll a passkey as the first factor
+project: scenarios0000000000b
+requires: []
+steps:
+  - op: now
+    as: client
+    input: {}
+    expect: { status: 200 }
+    save:
+      beforeSignUp: $.now
+  - op: account.create
+    as: client
+    input:
+      body:
+        email: 'reqpk-${unique}@example.com'
+        password: correct horse battery staple
+        verificationRedirectUrl: 'http://localhost:3000/auth/callback'
+    expect:
+      status: 201
+      body: { verificationRequired: true }
+  - op: test.getLatestEmail
+    as: client
+    input: { to: 'reqpk-${unique}@example.com', after: '${beforeSignUp}' }
+    expect:
+      status: 200
+      body: { type: verification }
+    save:
+      link: $.url
+  - op: redeemLink
+    as: client
+    input: { url: '${link}' }
+    expect: { status: 200 }
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'reqpk-${unique}@example.com', password: correct horse battery staple }
+    expect:
+      status: 201
+      body: { session: null, mfa: { enrollmentRequired: true } }
+  - op: enrollPasskey
+    as: client
+    input: { name: Laptop }
+    expect:
+      status: 201
+      body: { user: { email: 'reqpk-${unique}@example.com' }, recoveryCodes: null }
+  - op: account.listSessions
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body:
+        items: [{ current: true, aal: 2 }]

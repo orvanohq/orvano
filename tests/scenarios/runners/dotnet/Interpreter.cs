@@ -58,6 +58,9 @@ internal static partial class Interpreter
 
     private static async Task RunScenarioAsync(JsonObject scenario, Surface surface, CancellationToken ct)
     {
+        // Spec 0014: a scenario on its own fixture project runs where the runner builds clients for it; the .NET
+        // runner covers the server SDK, which those scenarios barely use.
+        if (scenario["project"] is not null) throw new ScenarioSkipped("this runner runs only the first fixture project");
         // `${unique}` is fresh per scenario run, so runs never collide on unique values such as emails.
         var vars = new Dictionary<string, JsonNode?>(StringComparer.Ordinal) { ["unique"] = JsonValue.Create(UniqueValue()) };
         var steps = scenario["steps"]!.AsArray();

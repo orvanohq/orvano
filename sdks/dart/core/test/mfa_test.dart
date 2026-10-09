@@ -77,6 +77,7 @@ Answer challenged() => json({
     'ticket': ticket,
     'factors': ['totp', 'recovery_code'],
     'expiresAt': '2026-10-07T12:05:00Z',
+    'enrollmentRequired': false,
   },
   'isNewUser': false,
   'verificationEmail': null,
@@ -291,6 +292,97 @@ void main() {
       expect(jsonDecode(server.bodies[0]), {'password': 'correct horse'});
     },
   );
+
+  // Spec 0014 AC-27, AC-36: a project that requires MFA answers a user with no
+  // factor an enrollment challenge; the helpers spend its ticket and store the
+  // session the first factor earns.
+  Answer mustEnroll() => json({
+    'user': null,
+    'session': null,
+    'mfa': {
+      'ticket': ticket,
+      'factors': ['totp', 'passkey'],
+      'expiresAt': '2026-10-07T12:20:00Z',
+      'enrollmentRequired': true,
+    },
+    'isNewUser': false,
+    'verificationEmail': null,
+    'verificationRequired': false,
+  }, status: 201);
+
+  test(
+    'an enrollment challenge refuses completeMfa and enrolls TOTP with the ticket',
+    () async {
+      await serve([
+        mustEnroll(),
+        json({
+          'secret': 'JBSWY3DPEHPK3PXP',
+          'uri': 'otpauth://totp/x',
+          'expiresAt': '2026-10-07T12:20:00Z',
+        }, status: 201),
+        json({
+          'auth': {
+            'user': user,
+            'session': tokens('level2', sid: 's9'),
+            'mfa': null,
+            'isNewUser': false,
+            'verificationEmail': null,
+            'verificationRequired': false,
+          },
+          'recoveryCodes': ['AAAAA-BBBBB'],
+        }, status: 201),
+      ]);
+      final events = <AuthEvent>[];
+      client.authStateChanges.listen((c) => events.add(c.event));
+
+      final result = await Orvano(client).account.createPasswordSession(
+        const CreatePasswordSessionRequest(
+          email: 'ada@example.com',
+          password: 'pw',
+        ),
+      );
+      expect(enrollmentRequired(result), isTrue);
+      expect(client.pendingMfa?.enrollmentRequired, isTrue);
+      expect(
+        () => client.completeMfa(const MfaAnswer.totp('123456')),
+        throwsStateError,
+      );
+
+      expect((await client.startTotpEnrollment()).secret, 'JBSWY3DPEHPK3PXP');
+      final enrolled = await client.completeTotpEnrollment('123456');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(enrolled.user.id, 'u1');
+      expect(enrolled.recoveryCodes, ['AAAAA-BBBBB']);
+      expect(server.paths.sublist(1), [
+        '/v1/account/mfa/enrollment/totp',
+        '/v1/account/mfa/enrollment/totp/confirm',
+      ]);
+      expect(server.jsonBody(2), {'ticket': ticket, 'code': '123456'});
+      expect((await client.session.read())?.sessionId, 's9');
+      expect(client.pendingMfa, isNull);
+      expect(events, [AuthEvent.mfaRequired, AuthEvent.signedIn]);
+    },
+  );
+
+  test('an ended enrollment ticket is forgotten', () async {
+    await serve([
+      mustEnroll(),
+      json({
+        'status': 401,
+        'code': 'invalid_mfa_ticket',
+        'title': 'Unauthorized',
+      }, status: 401),
+    ]);
+    await signIn();
+
+    await expectLater(
+      client.startTotpEnrollment(),
+      throwsA(isA<OrvanoException>()),
+    );
+    expect(client.pendingMfa, isNull);
+    expect(client.startTotpEnrollment, throwsStateError);
+  });
 }
 
 /// Thrown by [_NoPasskeys] to stop a ceremony after the first call.

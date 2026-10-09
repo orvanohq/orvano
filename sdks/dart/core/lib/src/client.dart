@@ -135,9 +135,146 @@ base class Client {
   /// over.
   PendingMfa? get pendingMfa {
     final mfa = _mfa;
-    return mfa == null
-        ? null
-        : PendingMfa(factors: mfa.factors, expiresAt: mfa.expiresAt);
+    return mfa == null ? null : _pendingOf(mfa);
+  }
+
+  static PendingMfa _pendingOf(MfaChallenge mfa) => PendingMfa(
+    factors: mfa.factors,
+    expiresAt: mfa.expiresAt,
+    enrollmentRequired: mfa.enrollmentRequired,
+  );
+
+  /// The waiting sign in a helper needs: an enrollment, or a second step.
+  /// Throws a [StateError] before any call when there is none, or when it
+  /// waits for the other kind.
+  MfaChallenge _waiting({required bool enrollment}) {
+    final pending = _mfa;
+    if (pending == null) {
+      throw StateError('No sign in is waiting for MFA; sign in first.');
+    }
+    if (pending.enrollmentRequired != enrollment) {
+      throw StateError(
+        enrollment
+            ? 'The waiting sign in needs a second factor (completeMfa), not an '
+                  'enrollment.'
+            : 'The waiting sign in must enroll a first factor '
+                  '(startTotpEnrollment or enrollPasskey).',
+      );
+    }
+    return pending;
+  }
+
+  /// Runs a ticket call, forgetting the ticket when Orvano says it ended
+  /// (`invalid_mfa_ticket`).
+  Future<T> _keepingTicket<T>(
+    MfaChallenge pending,
+    Future<T> Function() call,
+  ) async {
+    try {
+      return await call();
+    } on OrvanoException catch (e) {
+      if (e.code == 'invalid_mfa_ticket' && identical(_mfa, pending)) {
+        _mfa = null;
+      }
+      rethrow;
+    }
+  }
+
+  /// Starts enrolling an authenticator app for a sign in that must enroll a
+  /// first factor (spec 0014, AC-27: [PendingMfa.enrollmentRequired]), with
+  /// the ticket this client holds (`account.createMfaEnrollmentTotp`). Show
+  /// the answer's `uri` as a QR code and its `secret` for typing in, then call
+  /// [completeTotpEnrollment] with the app's first code within 15 minutes.
+  ///
+  /// Throws [StateError], before any call, when no sign in is waiting to
+  /// enroll, and [OrvanoException] for an ended ticket (`invalid_mfa_ticket`:
+  /// sign in again) or TOTP turned off (`factor_not_enabled`).
+  Future<TotpSetup> startTotpEnrollment({RequestOptions? options}) {
+    final pending = _waiting(enrollment: true);
+    return _keepingTicket(
+      pending,
+      () => AccountService(this).createMfaEnrollmentTotp(
+        CreateMfaEnrollmentRequest(ticket: pending.ticket),
+        options: options,
+      ),
+    );
+  }
+
+  /// Finishes enrolling an authenticator app with its first [code]
+  /// (`account.completeMfaEnrollmentTotp`): turns MFA on, stores the session
+  /// (at `aal` 2), and emits [AuthEvent.signedIn]. Returns the user and the
+  /// 10 recovery codes: show them once.
+  ///
+  /// Throws [StateError], before any call, when no sign in is waiting to
+  /// enroll, and [OrvanoException] for a wrong code (`invalid_mfa_code`; after
+  /// 5 the ticket ends), no secret waiting (`totp_not_pending`), or an ended
+  /// ticket (`invalid_mfa_ticket`).
+  Future<MfaEnrollment> completeTotpEnrollment(
+    String code, {
+    RequestOptions? options,
+  }) async {
+    final pending = _waiting(enrollment: true);
+    final result = await _keepingTicket(
+      pending,
+      () => AccountService(this).completeMfaEnrollmentTotp(
+        CompleteMfaEnrollmentTotpRequest(ticket: pending.ticket, code: code),
+        options: options,
+      ),
+    );
+    return _enrolled(result);
+  }
+
+  /// Enrolls a passkey for a sign in that must enroll a first factor (spec
+  /// 0014, AC-27): `account.createMfaEnrollmentPasskey`, [authenticator] (or
+  /// the client's default), then `account.completeMfaEnrollmentPasskey`,
+  /// naming it [name] (1 to 64 characters; `Passkey` when left out). Stores
+  /// the session (at `aal` 2) and emits [AuthEvent.signedIn].
+  ///
+  /// Throws [StateError], before any call, when no sign in is waiting to
+  /// enroll, and [OrvanoException] for a refused credential
+  /// (`invalid_passkey`; after 5 the ticket ends),
+  /// `passkey_already_registered`, passkeys turned off
+  /// (`factor_not_enabled`), or an ended ticket (`invalid_mfa_ticket`).
+  Future<MfaEnrollment> enrollPasskey({
+    String? name,
+    PasskeyAuthenticator? authenticator,
+    RequestOptions? options,
+  }) async {
+    final pending = _waiting(enrollment: true);
+    final passkeys = passkeyAuthenticatorFor(this, authenticator);
+    final account = AccountService(this);
+    final result = await _keepingTicket(pending, () async {
+      final registration = await account.createMfaEnrollmentPasskey(
+        CreateMfaEnrollmentRequest(ticket: pending.ticket),
+        options: options,
+      );
+      final credential = await passkeys.create(registration.options);
+      return account.completeMfaEnrollmentPasskey(
+        CompleteMfaEnrollmentPasskeyRequest(
+          ticket: pending.ticket,
+          challengeId: registration.challengeId,
+          credential: credential,
+          name: name,
+        ),
+        options: options,
+      );
+    });
+    return _enrolled(result);
+  }
+
+  /// Stores the session an enrollment earned, forgets the ticket, and emits
+  /// [AuthEvent.signedIn]. The operation's answer nests the [AuthResult]
+  /// under `auth`, so the generated call stores nothing.
+  Future<MfaEnrollment> _enrolled(MfaEnrollmentResult result) async {
+    _mfa = null;
+    await _save(
+      AuthSession.fromJson(result.auth.session?.toJson()),
+      AuthEvent.signedIn,
+    );
+    return MfaEnrollment(
+      user: result.auth.user!,
+      recoveryCodes: result.recoveryCodes,
+    );
   }
 
   /// Finishes a sign in that stopped at the MFA step with an authenticator
@@ -148,7 +285,8 @@ base class Client {
   /// client's default).
   ///
   /// Throws [StateError], before any call, when no sign in is waiting for
-  /// MFA, and [OrvanoException] for a wrong code (`invalid_mfa_code`) or
+  /// MFA (or it waits to enroll a first factor), and [OrvanoException] for a
+  /// wrong code (`invalid_mfa_code`) or
   /// passkey (`invalid_passkey`; after 5 wrong answers the ticket ends) or an
   /// ended ticket (`invalid_mfa_ticket`: sign in again).
   Future<User> completeMfa(
@@ -156,10 +294,7 @@ base class Client {
     PasskeyAuthenticator? authenticator,
     RequestOptions? options,
   }) async {
-    final pending = _mfa;
-    if (pending == null) {
-      throw StateError('No sign in is waiting for MFA; sign in first.');
-    }
+    final pending = _waiting(enrollment: false);
     try {
       final resolved = await _resolve(
         answer,
@@ -518,7 +653,7 @@ base class Client {
               AuthStateChange(
                 AuthEvent.mfaRequired,
                 await session.read(),
-                mfa: PendingMfa(factors: mfa.factors, expiresAt: mfa.expiresAt),
+                mfa: _pendingOf(mfa),
               ),
             );
           }

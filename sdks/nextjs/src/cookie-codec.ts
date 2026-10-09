@@ -33,10 +33,18 @@ export interface MfaCookie {
   expiresAt: string
   /** The app path to land on once the sign in finishes. */
   next: string
+  /** True when the user must enroll a first factor (spec 0014, AC-27); false for a second step. */
+  enrollmentRequired: boolean
 }
 
 export function encodeMfaCookie(value: MfaCookie): string {
-  return encodeJsonCookie({ t: value.ticket, f: value.factors, e: value.expiresAt, n: value.next })
+  return encodeJsonCookie({
+    t: value.ticket,
+    f: value.factors,
+    e: value.expiresAt,
+    n: value.next,
+    r: value.enrollmentRequired,
+  })
 }
 
 export function decodeMfaCookie(value: string | undefined): MfaCookie | null {
@@ -50,5 +58,12 @@ export function decodeMfaCookie(value: string | undefined): MfaCookie | null {
     !parsed.f.every((f): f is string => typeof f === 'string')
   )
     return null
-  return { ticket: parsed.t, factors: parsed.f, expiresAt: parsed.e, next: parsed.n }
+  return {
+    ticket: parsed.t,
+    factors: parsed.f,
+    expiresAt: parsed.e,
+    next: parsed.n,
+    // A cookie written before spec 0014 holds a second step.
+    enrollmentRequired: parsed.r === true,
+  }
 }

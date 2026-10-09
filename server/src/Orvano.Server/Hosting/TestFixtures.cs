@@ -145,7 +145,8 @@ internal sealed record TestFixtures(
             if (!projects.Any(project => project.Id == m.Project)) return Fail($"{Setting}: methodSettings project '{m.Project}' is not one of the fixture projects");
             var update = new MethodSettingsUpdate(
                 m.TotpEnabled, m.PasskeysEnabled, m.RpId is null ? FieldChange.Keep : FieldChange.To(m.RpId),
-                m.RpName is null ? FieldChange.Keep : FieldChange.To(m.RpName), m.AndroidCertFingerprints, ConfirmRpIdChange: true);
+                m.RpName is null ? FieldChange.Keep : FieldChange.To(m.RpName), m.AndroidCertFingerprints, ConfirmRpIdChange: true,
+                MfaRequired: m.MfaRequired);
             if (MethodSettingsRules.Apply(Auth.Domain.MethodSettings.Defaults, update) is (null, var problem))
                 return Fail($"{Setting}: methodSettings of '{m.Project}': {problem}");
             methods.Add(new FixtureMethodSettings(m.Project!, update));
@@ -283,6 +284,9 @@ internal sealed record TestFixtures(
 
         [YamlMember(Alias = "androidCertFingerprints")]
         public List<string>? AndroidCertFingerprints { get; set; }
+
+        [YamlMember(Alias = "mfaRequired")]
+        public bool? MfaRequired { get; set; }
     }
 
     private sealed class OAuthProviderEntry

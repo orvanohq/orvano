@@ -4,6 +4,38 @@ namespace Orvano.Contract;
 /// <summary>Route constants for the <c>account</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class AccountOperations
 {
+    /// <summary>POST /v1/account/mfa/enrollment/passkey/confirm: Finishes enrolling a passkey with the browser's or the platform's answer: stores the passkey and answers the</summary>
+    public static class CompleteMfaEnrollmentPasskey
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.completeMfaEnrollmentPasskey";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/enrollment/passkey/confirm";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/mfa/enrollment/totp/confirm: Finishes enrolling an authenticator app with its first code: turns MFA on and answers 10 recovery codes and the</summary>
+    public static class CompleteMfaEnrollmentTotp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.completeMfaEnrollmentTotp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/enrollment/totp/confirm";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account/identities/oauth: Links the provider with the code a link flow returned and its verifier. Only the user who started the flow can finish it.</summary>
     public static class CompleteOAuthLink
     {
@@ -191,6 +223,38 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/sessions/magic-link";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/mfa/enrollment/passkey: Starts enrolling a passkey for a sign in that must enroll a first factor (<c>MfaChallenge.enrollmentRequired</c>):</summary>
+    public static class CreateMfaEnrollmentPasskey
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createMfaEnrollmentPasskey";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/enrollment/passkey";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/mfa/enrollment/totp: Starts enrolling an authenticator app for a sign in that must enroll a first factor</summary>
+    public static class CreateMfaEnrollmentTotp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createMfaEnrollmentTotp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/enrollment/totp";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";

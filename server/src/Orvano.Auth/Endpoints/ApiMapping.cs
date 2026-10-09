@@ -192,7 +192,11 @@ internal static class ApiMapping
             },
             signedIn.VerificationRequired);
 
-    public static Api.MfaChallenge MfaChallenge(MfaChallengeView view) => new(view.Ticket, [.. view.Factors.Select(MfaFactorOf)], view.ExpiresAt);
+    public static Api.MfaChallenge MfaChallenge(MfaChallengeView view) =>
+        new(view.Ticket, [.. view.Factors.Select(MfaFactorOf)], view.ExpiresAt, view.EnrollmentRequired);
+
+    public static Api.MfaEnrollmentResult MfaEnrollmentResult(MfaEnrollmentView view) =>
+        new(AuthResult(view.Auth), view.RecoveryCodes is null ? null : [.. view.RecoveryCodes]);
 
     public static Api.MfaFactor MfaFactorOf(string factor) => factor switch
     {
@@ -264,7 +268,9 @@ internal static class ApiMapping
         view.Settings.RpName,
         [.. view.Settings.AndroidCertFingerprints],
         view.ActivePasskeyCount,
-        [.. view.AcceptedOrigins]);
+        [.. view.AcceptedOrigins],
+        view.Settings.MfaRequired,
+        view.ActiveUsersWithoutMfa);
 
     public static Api.AuthPolicies AuthPolicies(AuthPoliciesView view)
     {

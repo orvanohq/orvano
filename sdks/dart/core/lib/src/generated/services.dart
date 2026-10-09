@@ -10,6 +10,36 @@ final class AccountService {
 
   final Client _client;
 
+  /// Finishes enrolling a passkey with the browser's or the platform's answer: stores the passkey and answers the
+  /// session, at level 2. After 5 wrong answers the ticket stops working; sign in again.
+  Future<MfaEnrollmentResult> completeMfaEnrollmentPasskey(
+    CompleteMfaEnrollmentPasskeyRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/mfa/enrollment/passkey/confirm',
+      body: body.toJson(),
+      options: options,
+    );
+    return MfaEnrollmentResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Finishes enrolling an authenticator app with its first code: turns MFA on and answers 10 recovery codes and the
+  /// session, at level 2. After 5 wrong codes the ticket stops working; sign in again.
+  Future<MfaEnrollmentResult> completeMfaEnrollmentTotp(
+    CompleteMfaEnrollmentTotpRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/mfa/enrollment/totp/confirm',
+      body: body.toJson(),
+      options: options,
+    );
+    return MfaEnrollmentResult.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Links the provider with the code a link flow returned and its verifier. Only the user who started the flow can finish it.
   Future<Identity> completeOAuthLink(
     CompleteOAuthLinkRequest body, {
@@ -192,6 +222,37 @@ final class AccountService {
       options: options,
     );
     return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Starts enrolling a passkey for a sign in that must enroll a first factor (`MfaChallenge.enrollmentRequired`):
+  /// answers the options for `navigator.credentials.create`. Finish with `account.completeMfaEnrollmentPasskey`.
+  Future<PasskeyRegistration> createMfaEnrollmentPasskey(
+    CreateMfaEnrollmentRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/mfa/enrollment/passkey',
+      body: body.toJson(),
+      options: options,
+    );
+    return PasskeyRegistration.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Starts enrolling an authenticator app for a sign in that must enroll a first factor
+  /// (`MfaChallenge.enrollmentRequired`): answers a new secret. Confirm it with `account.completeMfaEnrollmentTotp`
+  /// within 15 minutes.
+  Future<TotpSetup> createMfaEnrollmentTotp(
+    CreateMfaEnrollmentRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/mfa/enrollment/totp',
+      body: body.toJson(),
+      options: options,
+    );
+    return TotpSetup.fromJson(json as Map<String, dynamic>);
   }
 
   /// Starts answering an MFA challenge with a passkey: answers the options for `navigator.credentials.get`, listing the

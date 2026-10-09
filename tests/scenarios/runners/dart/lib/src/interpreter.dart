@@ -204,6 +204,37 @@ final Map<String, DispatchEntry> _runnerDispatch = {
       };
     },
   ),
+  // Spec 0014, AC-27, AC-36: the client SDK's enrollment helpers, spending
+  // the ticket the last sign in kept.
+  'startTotpEnrollment': DispatchEntry(
+    status: 201,
+    client: (o, input) async => (await o.client.startTotpEnrollment()).toJson(),
+  ),
+  'completeTotpEnrollment': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final enrolled = await o.client.completeTotpEnrollment(
+        '${input['code']}',
+      );
+      return {
+        'user': enrolled.user.toJson(),
+        'recoveryCodes': enrolled.recoveryCodes,
+      };
+    },
+  ),
+  'enrollPasskey': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final enrolled = await o.client.enrollPasskey(
+        name: input['name'] is String ? input['name'] as String : null,
+        authenticator: testPasskeys(o),
+      );
+      return {
+        'user': enrolled.user.toJson(),
+        'recoveryCodes': enrolled.recoveryCodes,
+      };
+    },
+  ),
   'confirmTotp': DispatchEntry(
     status: 200,
     client: (o, input) async {
@@ -560,16 +591,27 @@ Map<String, Object?> parseScenario(String yamlText) =>
     jsonDecode(jsonEncode(loadYaml(yamlText))) as Map<String, Object?>;
 
 /// Runs every scenario in order and reports each one. Never throws for a
-/// scenario failure.
+/// scenario failure. A scenario with its own fixture `project` (spec 0014)
+/// runs on the surface [surfaceFor] builds for it, closed afterwards, and
+/// skips without one.
 Future<List<ScenarioResult>> runScenarios(
   List<Map<String, Object?>> scenarios,
-  Surface surface,
-) async {
+  Surface surface, {
+  Surface Function(String project)? surfaceFor,
+}) async {
   final results = <ScenarioResult>[];
   for (final scenario in scenarios) {
     final name = scenario['name'] as String;
+    final project = scenario['project'];
+    Surface? own;
     try {
-      await _runScenario(scenario, surface);
+      if (project is String) {
+        if (surfaceFor == null) {
+          throw _Skipped('this runner runs only the first fixture project');
+        }
+        own = surfaceFor(project);
+      }
+      await _runScenario(scenario, own ?? surface);
       results.add(ScenarioResult(name, 'passed'));
     } on _Skipped catch (e) {
       results.add(ScenarioResult(name, 'skipped', e.reason));
@@ -577,6 +619,8 @@ Future<List<ScenarioResult>> runScenarios(
       results.add(ScenarioResult(name, 'failed', e.reason));
     } on Object catch (e) {
       results.add(ScenarioResult(name, 'failed', '$e'));
+    } finally {
+      own?.close();
     }
   }
   return results;

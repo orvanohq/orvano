@@ -78,6 +78,9 @@ internal static class AuthTimings
     /// <summary>How long an MFA ticket waits for the second step (spec 0013, AC-7).</summary>
     public static readonly TimeSpan MfaTicket = TimeSpan.FromMinutes(5);
 
+    /// <summary>How long an enrollment ticket waits for a first factor (spec 0014, AC-27).</summary>
+    public static readonly TimeSpan MfaEnrollmentTicket = TimeSpan.FromMinutes(15);
+
     /// <summary>How long a WebAuthn challenge works (spec 0013, AC-20, AC-23).</summary>
     public static readonly TimeSpan WebAuthnChallenge = TimeSpan.FromMinutes(5);
 

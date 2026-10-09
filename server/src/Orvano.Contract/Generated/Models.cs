@@ -1065,6 +1065,8 @@ public sealed record ApiKeyPage(
 /// <param name="AndroidCertFingerprints">SHA-256 fingerprints of the Android app's signing certificates (uppercase hex pairs joined by colons), at most 10.</param>
 /// <param name="ActivePasskeyCount">How many passkeys can sign in now: those made for the current <c>rpId</c>.</param>
 /// <param name="AcceptedOrigins">The origins a passkey ceremony is accepted from today: the project's web platforms on <c>rpId</c> or its subdomains, <c>https://&lt;rpId&gt;</c> for iOS and macOS apps, and one <c>android:apk-key-hash:</c> origin per fingerprint. A wildcard web platform shows as a pattern, such as <c>https://*.example.com</c>, which accepts any one subdomain level.</param>
+/// <param name="MfaRequired">Whether every user must have a second factor (an authenticator app or a passkey) before they get a session. Sign up and password sign in then need a verified email, and a user with no factor enrolls one at their next sign in. Needs TOTP or passkeys on, and an email server.</param>
+/// <param name="ActiveUsersWithoutMfa">How many users hold a live session and have no second factor, so would enroll one at their next sign in while <c>mfaRequired</c> is on. Counted by <c>consoleAuthMethods.get</c> only; null in the answer of an update.</param>
 public sealed record AuthMethodSettings(
     [property: JsonPropertyName("totpEnabled")] bool TotpEnabled,
     [property: JsonPropertyName("passkeysEnabled")] bool PasskeysEnabled,
@@ -1072,7 +1074,9 @@ public sealed record AuthMethodSettings(
     [property: JsonPropertyName("rpName")] string? RpName,
     [property: JsonPropertyName("androidCertFingerprints")] IReadOnlyList<string> AndroidCertFingerprints,
     [property: JsonPropertyName("activePasskeyCount")] int ActivePasskeyCount,
-    [property: JsonPropertyName("acceptedOrigins")] IReadOnlyList<string> AcceptedOrigins);
+    [property: JsonPropertyName("acceptedOrigins")] IReadOnlyList<string> AcceptedOrigins,
+    [property: JsonPropertyName("mfaRequired")] bool MfaRequired,
+    [property: JsonPropertyName("activeUsersWithoutMfa")] int? ActiveUsersWithoutMfa);
 
 /// <summary>A project's auth rules with what the Security page shows beside them.</summary>
 /// <param name="SignUpsEnabled">Whether new users can sign up from an app. Servers and the console can always create users.</param>
@@ -1172,6 +1176,24 @@ public sealed record AuthResult(
     [property: JsonPropertyName("isNewUser")] bool IsNewUser,
     [property: JsonPropertyName("verificationEmail")] VerificationEmailStatus? VerificationEmail,
     [property: JsonPropertyName("verificationRequired")] bool VerificationRequired);
+
+/// <summary>The browser's or the platform's new passkey, which finishes enrollment.</summary>
+/// <param name="Ticket">The <c>ticket</c> of the <c>MfaChallenge</c>.</param>
+/// <param name="ChallengeId">The <c>challengeId</c> of the <c>PasskeyRegistration</c> from <c>account.createMfaEnrollmentPasskey</c>.</param>
+/// <param name="Credential">The browser's or the platform's answer.</param>
+/// <param name="Name">1 to 64 characters. Left out, the passkey is named <c>Passkey</c>.</param>
+public sealed record CompleteMfaEnrollmentPasskeyRequest(
+    [property: JsonPropertyName("ticket")] string Ticket,
+    [property: JsonPropertyName("challengeId")] string ChallengeId,
+    [property: JsonPropertyName("credential")] PasskeyRegistrationCredential Credential,
+    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null);
+
+/// <summary>The first code from the authenticator app, which finishes enrollment.</summary>
+/// <param name="Ticket">The <c>ticket</c> of the <c>MfaChallenge</c>.</param>
+/// <param name="Code">The 6 digit code the authenticator app shows now.</param>
+public sealed record CompleteMfaEnrollmentTotpRequest(
+    [property: JsonPropertyName("ticket")] string Ticket,
+    [property: JsonPropertyName("code")] string Code);
 
 /// <summary>A link of a provider to the signed in user, with the code a link flow returned.</summary>
 /// <param name="Code">The <c>orvano_code</c> parameter Orvano added to your redirect URL. It works once, for 2 minutes.</param>
@@ -1367,6 +1389,11 @@ public sealed record CreateMagicLinkRequest(
 /// <param name="Token">The <c>orvano_token</c> parameter of the emailed link.</param>
 public sealed record CreateMagicLinkSessionRequest(
     [property: JsonPropertyName("token")] string Token);
+
+/// <summary>The enrollment ticket of a sign in that must enroll a first factor (<c>MfaChallenge.enrollmentRequired</c>).</summary>
+/// <param name="Ticket">The <c>ticket</c> of the <c>MfaChallenge</c>.</param>
+public sealed record CreateMfaEnrollmentRequest(
+    [property: JsonPropertyName("ticket")] string Ticket);
 
 /// <summary>The ticket of a sign in waiting for its second step.</summary>
 /// <param name="Ticket">The <c>ticket</c> of the <c>MfaChallenge</c>.</param>
@@ -1732,14 +1759,23 @@ public sealed record MemberPage(
     [property: JsonPropertyName("items")] IReadOnlyList<Member> Items,
     [property: JsonPropertyName("nextCursor")] string? NextCursor);
 
-/// <summary>The second step a sign in must pass before it gets a session: the user has MFA on. Answer it with <c>account.createMfaSession</c> before <c>expiresAt</c>.</summary>
-/// <param name="Ticket">Proves the first step passed; send it to <c>account.createMfaSession</c>. Keep it in memory only. Empty when the ticket travels in a cookie instead (the console).</param>
-/// <param name="Factors">The factors the user can answer with now, in this order: <c>totp</c>, <c>recovery_code</c>, <c>passkey</c>.</param>
-/// <param name="ExpiresAt">When the ticket stops working: 5 minutes after the first step. After that, sign in again.</param>
+/// <summary>What a sign in must pass before it gets a session. Usually the second step: the user has MFA on, so answer it with <c>account.createMfaSession</c> before <c>expiresAt</c>. When <c>enrollmentRequired</c> is true, the project requires MFA and the user has no second factor yet: enroll one with the ticket (<c>account.createMfaEnrollmentTotp</c> or <c>account.createMfaEnrollmentPasskey</c>), which answers the session.</summary>
+/// <param name="Ticket">Proves the first step passed; send it to <c>account.createMfaSession</c>, or with <c>enrollmentRequired</c>, to the enrollment operations. Keep it in memory only. Empty when the ticket travels in a cookie instead (the console).</param>
+/// <param name="Factors">The factors the user can answer with now, in this order: <c>totp</c>, <c>recovery_code</c>, <c>passkey</c>. With <c>enrollmentRequired</c>, the factors the user can enroll instead: <c>totp</c>, <c>passkey</c>.</param>
+/// <param name="ExpiresAt">When the ticket stops working: 5 minutes after the first step, or 15 with <c>enrollmentRequired</c>. After that, sign in again.</param>
+/// <param name="EnrollmentRequired">True when the project requires MFA and the user must enroll a first factor before any session; false for a second step.</param>
 public sealed record MfaChallenge(
     [property: JsonPropertyName("ticket")] string Ticket,
     [property: JsonPropertyName("factors")] IReadOnlyList<MfaFactor> Factors,
-    [property: JsonPropertyName("expiresAt")] DateTimeOffset ExpiresAt);
+    [property: JsonPropertyName("expiresAt")] DateTimeOffset ExpiresAt,
+    [property: JsonPropertyName("enrollmentRequired")] bool EnrollmentRequired);
+
+/// <summary>An enrolled first factor and the session it earned, at level 2. With an authenticator app, show the recovery codes once and ask the user to keep them safe; they can't be read again.</summary>
+/// <param name="Auth">The signed in user and their new session.</param>
+/// <param name="RecoveryCodes">10 recovery codes, each <c>XXXXX-XXXXX</c>, each working once, after an authenticator app; null after a passkey.</param>
+public sealed record MfaEnrollmentResult(
+    [property: JsonPropertyName("auth")] AuthResult Auth,
+    [property: JsonPropertyName("recoveryCodes")] IReadOnlyList<string>? RecoveryCodes);
 
 /// <summary>A user's MFA state.</summary>
 /// <param name="MfaEnabled">Whether sign in asks for a second factor: a confirmed authenticator app, while the project allows TOTP.</param>
@@ -2367,6 +2403,7 @@ public sealed record UpdateAccountRequest(
 /// <param name="RpId">The passkey domain; null clears it (only while passkeys are off).</param>
 /// <param name="RpName">The name authenticators show, 1 to 64 characters; null means the project name.</param>
 /// <param name="AndroidCertFingerprints">At most 10 SHA-256 fingerprints, uppercase or lowercase hex pairs joined by colons; stored uppercase.</param>
+/// <param name="MfaRequired">Whether every user must have a second factor before they get a session. Needs <c>totpEnabled</c> or <c>passkeysEnabled</c>, and turning it on needs an email server.</param>
 /// <param name="ConfirmRpIdChange">Must be true to change <c>rpId</c> while passkeys are registered under the current one: they stop working.</param>
 public sealed record UpdateAuthMethodSettingsRequest(
     [property: JsonPropertyName("totpEnabled"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? TotpEnabled = null,
@@ -2374,6 +2411,7 @@ public sealed record UpdateAuthMethodSettingsRequest(
     [property: JsonPropertyName("rpId"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RpId = null,
     [property: JsonPropertyName("rpName"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RpName = null,
     [property: JsonPropertyName("androidCertFingerprints"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? AndroidCertFingerprints = null,
+    [property: JsonPropertyName("mfaRequired"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? MfaRequired = null,
     [property: JsonPropertyName("confirmRpIdChange"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? ConfirmRpIdChange = null);
 
 /// <summary>Changes to a project's auth rules. Fields left out keep their value; the result must meet every bound.</summary>

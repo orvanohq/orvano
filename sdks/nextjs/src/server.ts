@@ -37,6 +37,7 @@ import type {
   ClientConfig,
   EmailLink,
   EmailLinkType,
+  MfaEnrollmentResult,
   MfaWireAnswer,
   PasskeyAnswer,
   PendingMfaStore,
@@ -116,7 +117,11 @@ function writeMfaCookie(
 ): void {
   const pending = store.get()
   if (pending === null) return
-  response.cookies.set(mfaCookie, encodeMfaCookie({ ...pending, next }), mfaCookieOptions(secure))
+  response.cookies.set(
+    mfaCookie,
+    encodeMfaCookie({ ...pending, next }),
+    mfaCookieOptions(secure, pending.enrollmentRequired),
+  )
 }
 
 /**
@@ -288,6 +293,7 @@ async function redeem(
     user: result.user,
     isNewUser: result.isNewUser,
     mfaRequired: result.mfaRequired,
+    enrollmentRequired: result.enrollmentRequired,
     factors: result.factors,
     ...mfaExpiry(mfaStore),
   })
@@ -347,6 +353,7 @@ async function emailCode(
     user: result.user,
     isNewUser: result.isNewUser,
     mfaRequired: result.mfaRequired,
+    enrollmentRequired: result.enrollmentRequired,
     factors: result.factors,
     ...mfaExpiry(mfaStore),
   })
@@ -623,9 +630,16 @@ async function completeMfa(
   if (answer === null) return problem(400, 'invalid_request', answerHint)
   const cookie = mfaTicket(request)
   if (cookie instanceof NextResponse) return cookie
+  if (cookie.enrollmentRequired)
+    return problem(400, 'invalid_request', 'This sign in must enroll a first factor first.')
 
   const mfaStore = new MemoryPendingMfaStore()
-  mfaStore.set({ ticket: cookie.ticket, factors: [], expiresAt: cookie.expiresAt })
+  mfaStore.set({
+    ticket: cookie.ticket,
+    factors: [],
+    expiresAt: cookie.expiresAt,
+    enrollmentRequired: false,
+  })
   const client = clientFor(config, request, mfaStore)
   try {
     await client.completeMfa(answer)
@@ -638,6 +652,96 @@ async function completeMfa(
 
   const response = NextResponse.json({ next: safeNext(cookie.next) })
   writeResponse(response, await client.session.get(), secure)
+  response.cookies.delete(mfaCookie)
+  return response
+}
+
+/** The `orvano_mfa` cookie of a sign in that must enroll, or the refusal when it holds none. */
+function enrollmentTicket(
+  request: NextRequest,
+): NonNullable<ReturnType<typeof decodeMfaCookie>> | NextResponse {
+  const cookie = mfaTicket(request)
+  if (cookie instanceof NextResponse || cookie.enrollmentRequired) return cookie
+  return problem(400, 'invalid_request', 'This sign in needs a second factor, not an enrollment.')
+}
+
+/** Orvano's refusal for the browser; an ended ticket also clears the `orvano_mfa` cookie. */
+function refusedTicket(error: unknown): NextResponse {
+  if (!(error instanceof OrvanoError)) throw error
+  const refused = passThrough(error)
+  if (error.code === 'invalid_mfa_ticket') refused.cookies.delete(mfaCookie)
+  return refused
+}
+
+/**
+ * `POST .../mfa-enroll-totp` and `POST .../mfa-enroll-passkey` (spec 0014, AC-27, AC-36): read the
+ * enrollment ticket from the `orvano_mfa` cookie and answer the authenticator app's secret or the
+ * passkey's creation options, so the browser never sees the ticket. An ended ticket clears the
+ * cookie.
+ */
+async function startEnrollment(
+  request: NextRequest,
+  client: Client,
+  path: string,
+): Promise<NextResponse> {
+  const cookie = enrollmentTicket(request)
+  if (cookie instanceof NextResponse) return cookie
+  try {
+    return NextResponse.json(
+      await client.request<unknown>({ method: 'POST', path, body: { ticket: cookie.ticket } }),
+    )
+  } catch (error) {
+    return refusedTicket(error)
+  }
+}
+
+/**
+ * `POST .../mfa-enroll-totp-confirm` (`{ code }`) and `POST .../mfa-enroll-passkey-confirm`
+ * (`{ challengeId, credential, name? }`) (spec 0014, AC-27, AC-36): finish the enrollment with the
+ * cookie's ticket, set both session cookies, clear `orvano_mfa`, and answer
+ * `{ user, recoveryCodes, next }` (`recoveryCodes` null after a passkey).
+ */
+async function completeEnrollment(
+  request: NextRequest,
+  client: Client,
+  secure: boolean,
+  factor: 'totp' | 'passkey',
+): Promise<NextResponse> {
+  const body = await jsonBody(request)
+  let answer: Record<string, unknown>
+  if (factor === 'totp') {
+    if (body === null || typeof body.code !== 'string')
+      return problem(400, 'invalid_request', 'Send { code }.')
+    answer = { code: body.code }
+  } else {
+    if (!isPasskeyAnswer(body))
+      return problem(
+        400,
+        'invalid_request',
+        'Send { challengeId, credential } and, if you like, name.',
+      )
+    answer = { challengeId: body.challengeId, credential: body.credential }
+    if (typeof body.name === 'string') answer.name = body.name
+  }
+  const cookie = enrollmentTicket(request)
+  if (cookie instanceof NextResponse) return cookie
+
+  let enrolled: MfaEnrollmentResult
+  try {
+    enrolled = await client.request<MfaEnrollmentResult>({
+      method: 'POST',
+      path: `/v1/account/mfa/enrollment/${factor}/confirm`,
+      body: { ticket: cookie.ticket, ...answer },
+    })
+  } catch (error) {
+    return refusedTicket(error)
+  }
+  const response = NextResponse.json({
+    user: enrolled.auth.user,
+    recoveryCodes: enrolled.recoveryCodes,
+    next: safeNext(cookie.next),
+  })
+  writeResponse(response, enrolled.auth.session, secure)
   response.cookies.delete(mfaCookie)
   return response
 }
@@ -808,6 +912,12 @@ async function verifyMfa(
  * the new access cookie and leaving the refresh cookie as it was (spec 0013). Passkeys:
  * `POST .../mfa-passkey` answers the challenge for the waiting sign in, `POST .../passkey-challenge`
  * starts a passkey sign in, and `POST .../passkey` finishes it and sets the cookies.
+ *
+ * Required MFA (spec 0014, AC-27): a sign in that must enroll a first factor sets `orvano_mfa` the
+ * same way, with `enrollmentRequired: true` in the answer. `POST .../mfa-enroll-totp` answers the
+ * authenticator app's secret and `POST .../mfa-enroll-totp-confirm` (`{ code }`) finishes it;
+ * `POST .../mfa-enroll-passkey` answers the passkey options and `POST .../mfa-enroll-passkey-confirm`
+ * finishes it. Both finishes set the session cookies and answer `{ user, recoveryCodes, next }`.
  */
 export function createOrvanoRouteHandler(config: OrvanoRouteHandlerConfig): {
   GET: (request: NextRequest) => Promise<NextResponse>
@@ -889,6 +999,14 @@ export function createOrvanoRouteHandler(config: OrvanoRouteHandlerConfig): {
       if (action === 'mfa-passkey') return mfaPasskeyChallenge(request, client)
       if (action === 'passkey-challenge') return passkeyChallenge(client)
       if (action === 'passkey') return passkeySignIn(request, client, secure)
+      if (action === 'mfa-enroll-totp')
+        return startEnrollment(request, client, '/v1/account/mfa/enrollment/totp')
+      if (action === 'mfa-enroll-totp-confirm')
+        return completeEnrollment(request, client, secure, 'totp')
+      if (action === 'mfa-enroll-passkey')
+        return startEnrollment(request, client, '/v1/account/mfa/enrollment/passkey')
+      if (action === 'mfa-enroll-passkey-confirm')
+        return completeEnrollment(request, client, secure, 'passkey')
 
       return problem(404, 'not_found', 'Unknown Orvano action.')
     },

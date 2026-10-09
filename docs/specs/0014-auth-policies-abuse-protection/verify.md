@@ -102,3 +102,37 @@ _Steps derived from spec 0014's AC-7 to AC-15, AC-33, and AC-34 (Sign ups, Email
 ## Acceptance criteria coverage (milestone 4)
 
 - AC-7 (disposable list, already bundled) · AC-8, AC-9: domain steps · AC-10: sign ups off step · AC-11: SMTP steps · AC-12 to AC-14: verified email steps · AC-15: reject link step · AC-33: last method step · AC-34: Sign ups and Email domains cards · AC-36: `signUp`'s pending answer stores nothing and `redeemLink`/`handleLink` route `verification_reject` (SDK unit tests); closed sign ups and hidden sign up run only in the server tests, since every scenario shares one fixture project
+
+# Verify: auth policies and abuse protection (build tasks 5 and 6: sessions and require MFA) · spec 0014 · updated 2026-10-09
+_Steps derived from spec 0014's AC-2 (MFA), AC-25 to AC-27, AC-35 (MFA card), and AC-36 (enrollment helpers). The session lifetime and cap steps are in the first block above. `/check verify` runs these; `/test` locks the durable ones. Server HTTP tests: `RequireMfaTests`, `SessionPolicyTests`; shared scenarios: `auth-require-mfa`, `auth-require-mfa-passkey`, `auth-session-limit` (on their own fixture projects, `scenarios0000000000b` and `c`)._
+
+## UI / manual
+
+- [ ] Console, Sign in methods, as an owner of a project with no SMTP anywhere: turn on **Require MFA** → the card shows "Couldn't require MFA" with a link to Email settings, and the switch stays off → AC-2
+- [ ] Add SMTP, turn it on → toast "Require MFA saved", the switch is on, and the card still shows "N signed in users have no second factor yet." after the save (the count is read again) → AC-2, AC-35
+- [ ] Turn the Authenticator app off while passkeys are off → refused (400), the switch stays as it was; with Require MFA off and both factors off, the Require MFA switch is disabled with "Turn on the authenticator app or passkeys first" → AC-2, AC-35
+- [ ] As a viewer, both switches are disabled and say why; axe finds nothing on the page → AC-35
+- [ ] A web app on the JS SDK, Require MFA on: a verified user with no factor signs in by password → no session, `enrollmentRequired(result)` true, `pendingMfa.factors` lists `totp` (and `passkey` when on); `startTotpEnrollment`, scan the QR code with a real authenticator app, `completeTotpEnrollment(code)` → signed in, 10 recovery codes, the access token has `aal` 2 and `amr` `[mfa, otp, pwd]` → AC-27, AC-36
+- [ ] The same in the Next.js app on a real deployment: the sign in sets only `orvano_mfa` (Max-Age 900, HttpOnly), the MFA page enrolls through `mfa-enroll-totp` and `mfa-enroll-totp-confirm`, both session cookies are set, `orvano_mfa` is cleared, and the browser never sees the ticket → AC-36
+- [ ] `enrollPasskey()` in Safari or Chrome with a real platform authenticator → signed in at `aal` 2, no recovery codes, and the passkey then signs in by itself → AC-27, AC-36
+- [ ] A new magic link user and a password reset under Require MFA both land on enrollment; after the reset's enrollment, the new password signs in and the old one doesn't → AC-27
+- [ ] An unverified user's right password gets `email_verification_required`, a wrong one `invalid_credentials`; a session made before the switch keeps refreshing until that user signs in again → AC-13, AC-27
+
+## Commands
+
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "*RequireMfaTests" --filter-class "*SessionPolicyTests"` → all pass → AC-2, AC-25 to AC-27
+- [ ] `pnpm --filter @orvano/js --filter @orvano/nextjs test`, `(cd sdks/dart/core && dart test)` → the enrollment tests pass → AC-36
+- [ ] `pnpm --filter @orvano/console exec vitest run --project browser src/routes/_app/projects` → the Require MFA card tests pass with axe → AC-35
+- [ ] Against `tests/scenarios/compose.yml`, one fresh server per runner: `pnpm --filter @orvano/scenarios-js scenarios <node|bun|deno|browser|workerd|nextjs>` and `dart run bin/run.dart` → `auth-require-mfa`, `auth-require-mfa-passkey`, and `auth-session-limit` pass; .NET skips them → AC-26, AC-27, AC-36
+- [ ] Flutter on Chrome and Android (`sdks.yml`) → the same three scenarios pass → AC-36
+
+## Value sourcing
+
+- [ ] `factors` of an enrollment challenge follows `totp_enabled` and `passkeys_enabled`: passkeys off gives `[totp]` only → AC-27
+- [ ] The ticket's lifetime is `AuthTimings.MfaEnrollmentTicket`: `expiresAt` is 15 minutes after the first step, and the ticket fails after it → AC-27
+- [ ] The enrolled session's `amr` is the step one method's plus the factor's: a magic link user enrolling a passkey gets `[email, hwk or swk, mfa, user]`, a password user enrolling TOTP `[mfa, otp, pwd]` → AC-27
+- [ ] `activeUsersWithoutMfa` counts users with a live session and no factor that counts now: turning passkeys off raises it for users whose only factor is a passkey; guests are not counted → AC-27, AC-35
+
+## Acceptance criteria coverage (build tasks 5 and 6: sessions and require MFA)
+
+- AC-2 (mfaRequired): switch steps and `RequireMfaTests.The_switch_needs_a_factor_users_can_enroll_and_an_email_server` · AC-25, AC-26: the session steps in the first block, `SessionPolicyTests`, and `auth-session-limit` · AC-27: enrollment steps and `RequireMfaTests` · AC-35 (MFA card): card steps · AC-36 (enrollment helpers): SDK steps and the three scenarios

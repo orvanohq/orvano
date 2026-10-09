@@ -14,6 +14,17 @@ internal static class MfaFactors
 }
 
 /// <summary>
+/// What an MFA ticket is for (spec 0014, AC-27): the step two <c>challenge</c> of a user with MFA on (spec 0013), or the
+/// <c>enroll</c>ment a project that requires MFA asks of a user with no factor before their first session. Each works
+/// only with its own operations.
+/// </summary>
+internal static class MfaTicketPurposes
+{
+    public const string Challenge = "challenge";
+    public const string Enroll = "enroll";
+}
+
+/// <summary>
 /// The verified email rule (spec 0013, AC-12, AC-20): in an app project, a user who has an email enrolls TOTP or a
 /// passkey only once it is verified, so a factor planted on an unverified account never outlives a claim. Project
 /// <c>console</c> skips it: nothing can claim a console account (AC-29), so the rule guards nothing there.

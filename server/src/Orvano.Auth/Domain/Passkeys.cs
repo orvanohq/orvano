@@ -274,12 +274,13 @@ internal sealed record MethodSettingsUpdate(
     FieldChange RpId,
     FieldChange RpName,
     IReadOnlyList<string>? AndroidCertFingerprints,
-    bool ConfirmRpIdChange);
+    bool ConfirmRpIdChange,
+    bool? MfaRequired = null);
 
 /// <summary>The checked result of an update: the new settings, the changed field names, and whether the RP ID moved.</summary>
 internal sealed record MethodSettingsChange(MethodSettings Next, IReadOnlyList<string> Changed, bool RpIdChanged);
 
-/// <summary>AC-1's field rules, checked on the settings as they would be after the update.</summary>
+/// <summary>AC-1's field rules, and spec 0014's AC-2 rule for <c>mfaRequired</c>, checked on the settings as they would be after the update.</summary>
 internal static class MethodSettingsRules
 {
     public const int MaxRpName = 64;
@@ -320,8 +321,12 @@ internal static class MethodSettingsRules
             RpId = rpId,
             RpName = rpName,
             AndroidCertFingerprints = fingerprints,
+            MfaRequired = update.MfaRequired ?? current.MfaRequired,
         };
         if (next.PasskeysEnabled && next.RpId is null) return (null, "Set rpId to turn passkeys on.");
+        // Spec 0014, AC-2: required MFA needs a factor users can enroll.
+        if (next.MfaRequired && !next.TotpEnabled && !next.PasskeysEnabled)
+            return (null, "mfaRequired needs totpEnabled or passkeysEnabled: turn one on, or turn mfaRequired off.");
 
         var changed = new List<string>();
         if (next.TotpEnabled != current.TotpEnabled) changed.Add("totpEnabled");
@@ -329,6 +334,7 @@ internal static class MethodSettingsRules
         if (next.RpId != current.RpId) changed.Add("rpId");
         if (next.RpName != current.RpName) changed.Add("rpName");
         if (!next.AndroidCertFingerprints.SequenceEqual(current.AndroidCertFingerprints, StringComparer.Ordinal)) changed.Add("androidCertFingerprints");
+        if (next.MfaRequired != current.MfaRequired) changed.Add("mfaRequired");
         return (new MethodSettingsChange(next, changed, next.RpId != current.RpId), null);
     }
 }

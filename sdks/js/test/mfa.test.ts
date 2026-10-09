@@ -6,8 +6,16 @@ import {
   MemoryPendingMfaStore,
   MemorySessionStore,
   OrvanoError,
+  enrollmentRequired,
 } from '../src/index.js'
-import type { AuthEvent, AuthSession, ClientConfig, PendingMfa } from '../src/index.js'
+import type {
+  AuthEvent,
+  AuthSession,
+  ClientConfig,
+  PasskeyAuthenticator,
+  PasskeyRegistrationCredential,
+  PendingMfa,
+} from '../src/index.js'
 import { fakeFetch, problem } from './fake-fetch.js'
 
 // Spec 0013 AC-36: a sign in that stops at the MFA step stores nothing, keeps the ticket in
@@ -105,8 +113,14 @@ describe('the MFA step (AC-36)', () => {
     expect(result.mfa?.factors).toEqual(['totp', 'recovery_code'])
     expect(await c.session.get()).toBeNull()
     expect(seen.events).toEqual(['mfaRequired'])
-    expect(seen.mfa).toEqual([{ factors: ['totp', 'recovery_code'], expiresAt }])
-    expect(c.pendingMfa).toEqual({ factors: ['totp', 'recovery_code'], expiresAt })
+    expect(seen.mfa).toEqual([
+      { factors: ['totp', 'recovery_code'], expiresAt, enrollmentRequired: false },
+    ])
+    expect(c.pendingMfa).toEqual({
+      factors: ['totp', 'recovery_code'],
+      expiresAt,
+      enrollmentRequired: false,
+    })
     expect(JSON.stringify(c.pendingMfa)).not.toContain(ticket)
   })
 
@@ -125,6 +139,7 @@ describe('the MFA step (AC-36)', () => {
       user: { id: 'u1', email: 'ada@example.com' },
       isNewUser: false,
       mfaRequired: false,
+      enrollmentRequired: false,
       factors: [],
     })
     expect((await c.session.get())?.sessionId).toBe('s2')
@@ -231,14 +246,14 @@ describe('step up and turning MFA on (AC-19, AC-13, AC-36)', () => {
     const c = client(fetch, { mfa: transport })
     const seen = listen(c)
 
-    c.announceMfa({ factors: ['totp'], expiresAt })
+    c.announceMfa({ factors: ['totp'], expiresAt, enrollmentRequired: false })
     await c.completeMfa({ totpCode: '123456' })
     await c.verifyMfa({ totpCode: '123456' })
     expect(await c.confirmTotp('123456')).toEqual(['AAAAA-BBBBB'])
 
     expect(sent).toHaveLength(0)
     expect(seen.events).toEqual(['mfaRequired'])
-    expect(c.pendingMfa).toEqual({ factors: ['totp'], expiresAt })
+    expect(c.pendingMfa).toEqual({ factors: ['totp'], expiresAt, enrollmentRequired: false })
     expect(transport.completeMfa).toHaveBeenCalledWith({ totpCode: '123456' }, c, undefined)
   })
 
@@ -256,5 +271,109 @@ describe('step up and turning MFA on (AC-19, AC-13, AC-36)', () => {
 
     expect(result.mfa?.ticket).toBe('')
     expect(store.get()?.ticket).toBe(ticket)
+  })
+})
+
+// Spec 0014 AC-27, AC-36: a project that requires MFA answers a user with no factor an enrollment
+// challenge; the enrollment helpers spend its ticket and store the session the first factor earns.
+describe('required MFA enrollment (spec 0014)', () => {
+  const enroll = (): Response =>
+    Response.json(
+      {
+        user: null,
+        session: null,
+        mfa: { ticket, factors: ['totp', 'passkey'], expiresAt, enrollmentRequired: true },
+        isNewUser: false,
+        verificationEmail: null,
+        verificationRequired: false,
+      },
+      { status: 201 },
+    )
+  const enrolled = (recoveryCodes: string[] | null): Response =>
+    Response.json(
+      {
+        auth: {
+          user: { id: 'u1', email: 'ada@example.com' },
+          session: tokens('s9', 'strong'),
+          mfa: null,
+          isNewUser: false,
+          verificationEmail: null,
+          verificationRequired: false,
+        },
+        recoveryCodes,
+      },
+      { status: 201 },
+    )
+  const setup = (): Response =>
+    Response.json(
+      { secret: 'JBSWY3DPEHPK3PXP', uri: 'otpauth://totp/x', expiresAt },
+      { status: 201 },
+    )
+
+  it('stops at enrollment, refuses completeMfa, and enrolls TOTP with the ticket', async () => {
+    const { fetch, sent } = fakeFetch(enroll, setup, () => enrolled(['AAAAA-BBBBB']))
+    const c = client(fetch)
+    const seen = listen(c)
+
+    const result = await new AccountService(c).createPasswordSession({
+      email: 'ada@example.com',
+      password: 'pw',
+    })
+    expect(enrollmentRequired(result)).toBe(true)
+    expect(await c.session.get()).toBeNull()
+    expect(c.pendingMfa).toEqual({
+      factors: ['totp', 'passkey'],
+      expiresAt,
+      enrollmentRequired: true,
+    })
+    await expect(c.completeMfa({ totpCode: '123456' })).rejects.toThrow(TypeError)
+
+    expect((await c.startTotpEnrollment()).secret).toBe('JBSWY3DPEHPK3PXP')
+    const outcome = await c.completeTotpEnrollment('123456')
+
+    expect(outcome).toEqual({
+      user: { id: 'u1', email: 'ada@example.com' },
+      recoveryCodes: ['AAAAA-BBBBB'],
+    })
+    expect(sent.slice(1).map((r) => r.url.replace(endpoint, ''))).toEqual([
+      '/v1/account/mfa/enrollment/totp',
+      '/v1/account/mfa/enrollment/totp/confirm',
+    ])
+    expect(JSON.parse(sent[2]?.body ?? '{}')).toEqual({ ticket, code: '123456' })
+    expect((await c.session.get())?.accessToken).toBe('strong')
+    expect(c.pendingMfa).toBeNull()
+    expect(seen.events).toEqual(['mfaRequired', 'signedIn'])
+  })
+
+  it('enrolls a passkey through the authenticator and forgets an ended ticket', async () => {
+    const credential = { id: 'cred' } as unknown as PasskeyRegistrationCredential
+    const passkeys: PasskeyAuthenticator = {
+      isSupported: () => Promise.resolve(true),
+      create: () => Promise.resolve(credential),
+      get: () => Promise.reject(new Error('not asked')),
+    }
+    const registration = (): Response =>
+      Response.json({ challengeId: 'ch1', options: { challenge: 'x' } }, { status: 201 })
+    const { fetch, sent } = fakeFetch(enroll, registration, () => enrolled(null))
+    const c = client(fetch, { passkeys })
+
+    await new AccountService(c).createPasswordSession({ email: 'ada@example.com', password: 'pw' })
+    expect(await c.enrollPasskey({ name: 'Laptop' })).toEqual({
+      user: { id: 'u1', email: 'ada@example.com' },
+      recoveryCodes: null,
+    })
+    expect(JSON.parse(sent[2]?.body ?? '{}')).toEqual({
+      ticket,
+      challengeId: 'ch1',
+      credential,
+      name: 'Laptop',
+    })
+    expect((await c.session.get())?.sessionId).toBe('s9')
+
+    const ended = fakeFetch(enroll, problem(401, { code: 'invalid_mfa_ticket', status: 401 }))
+    const again = client(ended.fetch)
+    await new AccountService(again).createPasswordSession({ email: 'a@x.com', password: 'pw' })
+    await expect(again.startTotpEnrollment()).rejects.toThrow(OrvanoError)
+    expect(again.pendingMfa).toBeNull()
   })
 })

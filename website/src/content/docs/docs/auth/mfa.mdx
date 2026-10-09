@@ -193,6 +193,67 @@ await orvano.account.deleteTotp();
 
 Each change (MFA on or off, new codes, a recovery code used, a passkey added or removed) emails the user a **Security alert** when the project can send email. You can reword it on the console's [Email](/docs/console/email/#templates) page.
 
+## Require MFA for every user
+
+The **Require MFA** switch on the console's [Sign in methods](/docs/console/sign-in-methods/#mfa-and-passkeys) page makes a second factor a condition of every session. It needs the authenticator app or passkeys on, and an email server ([`email_not_configured`](/errors/email_not_configured/) otherwise), because only a verified email can enroll: while it is on, sign up and password sign in follow the [verified email flow](/docs/auth/email-verification/).
+
+From then on, a first step (password, magic link, email code, a provider, a password reset) for a user with no factor answers no session, only a challenge with `enrollmentRequired: true` and the factors the user can enroll (`totp`, `passkey`). The user enrolls one with the challenge's ticket, and that answers the session, already at two factors. The SDKs keep the ticket and announce `mfaRequired` as for a second step; `enrollmentRequired(result)` tells the two apart.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+import { enrollmentRequired } from '@orvano/js'
+
+const result = await orvano.account.createPasswordSession({ email, password })
+if (enrollmentRequired(result)) {
+  const { uri, secret } = await orvano.client.startTotpEnrollment()
+  showQrCode(uri, secret)
+  // once the user typed the first code:
+  const { recoveryCodes } = await orvano.client.completeTotpEnrollment(code)
+  // or, in place of an app: await orvano.client.enrollPasskey()
+}
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```tsx
+'use client'
+// app/sign-in/mfa/page.tsx: the route handler reads the ticket from `orvano_mfa` and sets the session cookies.
+if (orvano.client.pendingMfa?.enrollmentRequired) {
+  const { uri, secret } = await orvano.client.startTotpEnrollment()
+  showQrCode(uri, secret)
+  const { recoveryCodes } = await orvano.client.completeTotpEnrollment(code)
+  router.push('/')
+}
+```
+
+A server action sees `result.mfa?.enrollmentRequired`; an emailed link or code answers `{ mfaRequired: true, enrollmentRequired: true, factors }`.
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final result = await orvano.account.createPasswordSession(
+  CreatePasswordSessionRequest(email: email, password: password),
+);
+if (enrollmentRequired(result)) {
+  final setup = await orvano.client.startTotpEnrollment();
+  showQrCode(setup.uri, setup.secret);
+  final enrolled = await orvano.client.completeTotpEnrollment(code);
+  // or, in place of an app: await orvano.client.enrollPasskey();
+}
+```
+
+  </TabItem>
+</Tabs>
+
+- The enrollment ticket lasts 15 minutes and allows 5 wrong answers; after that, the user signs in again. It works only with the enrollment operations ([`account.createMfaEnrollmentTotp`](/docs/api/operations/accountcreatemfaenrollmenttotp/) and [`account.completeMfaEnrollmentTotp`](/docs/api/operations/accountcompletemfaenrollmenttotp/), or [`account.createMfaEnrollmentPasskey`](/docs/api/operations/accountcreatemfaenrollmentpasskey/) and [`account.completeMfaEnrollmentPasskey`](/docs/api/operations/accountcompletemfaenrollmentpasskey/)), and a step two ticket never works with them. The SDK helpers store the session themselves; the generated operations don't, since the session comes inside `auth`.
+- Enrolling an app answers 10 recovery codes and signs the user out everywhere else, as turning MFA on always does. A password reset waits on the enrollment, as it waits on a second step.
+- A user whose email isn't verified gets [`email_verification_required`](/errors/email_verification_required/) in place of the challenge. A user with an authenticator app or a passkey gets the usual second step, or none for a passkey only user. Guests are never asked.
+- Sessions that exist when you turn the switch on keep working; the users holding them enroll at their next sign in.
+
 ## On your server
 
 A user who lost both their phone and their recovery codes asks you for help. Once you're sure who is asking, [`users.resetMfa`](/docs/api/operations/usersresetmfa/) removes their authenticator app and recovery codes and ends all their sessions; their passkeys stay. [`users.getMfa`](/docs/api/operations/usersgetmfa/) answers their state first. The console's user page has the same **Reset MFA** button.

@@ -316,7 +316,7 @@ internal sealed class AccountService(
             // First, since it locks the user for a user with MFA on: the user row before the password row.
             var gate = await MfaGate.ChallengeAsync(policies, uow, projectId, account.Id, SessionMethod.Password, null, client, token);
             // The account was read before this transaction; deleted since, it is no account at all.
-            if (!gate.Succeeded) return Failure.InvalidCredentials;
+            if (!gate.Succeeded) return gate.Failure == Failure.UserNotFound ? Failure.InvalidCredentials : gate.Failure!;
             var challenge = gate.Value;
             if (rehash is not null)
             {

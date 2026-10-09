@@ -268,7 +268,8 @@ internal static class ConsoleUsersEndpoints
             body.TryGetProperty("rpId", out _) ? Domain.FieldChange.To(request.RpId) : Domain.FieldChange.Keep,
             body.TryGetProperty("rpName", out _) ? Domain.FieldChange.To(request.RpName) : Domain.FieldChange.Keep,
             request.AndroidCertFingerprints,
-            request.ConfirmRpIdChange ?? false);
+            request.ConfirmRpIdChange ?? false,
+            request.MfaRequired);
         return true;
     }
 

@@ -104,6 +104,7 @@ describe('redeeming a link (AC-24)', () => {
       user: user('u2', true),
       isNewUser: true,
       mfaRequired: false,
+      enrollmentRequired: false,
       factors: [],
     })
     expect((await c.session.get())?.sessionId).toBe('s2')
@@ -150,6 +151,7 @@ describe('redeeming a link (AC-24)', () => {
       user: user('u1', true),
       isNewUser: false,
       mfaRequired: false,
+      enrollmentRequired: false,
       factors: [],
     })
     expect(sent.map((s) => new URL(s.url).pathname)).toEqual([
@@ -253,6 +255,7 @@ describe('email code sign in', () => {
       user: user('u1', true),
       isNewUser: true,
       mfaRequired: false,
+      enrollmentRequired: false,
       factors: [],
     })
     expect(new URL(sent[0]?.url ?? '').pathname).toBe('/v1/account/sessions/email-code')
@@ -349,6 +352,7 @@ describe('verified email sign up (spec 0014)', () => {
       user: null,
       isNewUser: false,
       mfaRequired: false,
+      enrollmentRequired: false,
       factors: [],
     })
     expect(new URL(sent[0]?.url ?? '').pathname).toBe('/v1/account/verification/reject')
