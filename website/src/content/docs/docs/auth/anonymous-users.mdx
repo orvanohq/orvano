@@ -1,0 +1,151 @@
+---
+title: Anonymous users
+description: "Let guests use your app before they sign up, and keep their data when they do."
+sidebar:
+  order: 18
+---
+
+import { TabItem, Tabs } from '@astrojs/starlight/components'
+
+A guest is a real user with no email, name, or password. Your app signs them in with one call, they use the app with a normal session, and anything you store under their user ID stays theirs when they later sign up. Sign up doesn't have to be the first screen.
+
+Guests are off by default. Turn on **Allow guest sign in** on the **Anonymous users** card of the console's [Sign in methods](/docs/console/sign-in-methods/#guests) page.
+
+## 1. Sign a guest in
+
+[`account.createAnonymousSession`](/docs/api/operations/accountcreateanonymoussession/) creates the guest and their session in one call. The SDK stores the session like any sign in, and `user.isAnonymous` is true.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const { user } = await orvano.account.createAnonymousSession()
+console.log(user?.isAnonymous) // true
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+// From the browser, through your route handler (app/api/orvano/[...orvano]/route.ts), which sets
+// the session cookies.
+const answer = await fetch('/api/orvano/anonymous', { method: 'POST' })
+const { user } = await answer.json()
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final result = await orvano.account.createAnonymousSession();
+print(result.user?.isAnonymous); // true
+```
+
+  </TabItem>
+</Tabs>
+
+A guest session proves nothing about who the user is: its `aal` is 1 and its `amr` is empty, and its access token carries `is_anonymous: true`. Each address may start 30 guests an hour by default (the **Rate limits** card of the project's **Security** page in the console changes it), and a project at most 1,000 an hour. Closed sign ups refuse guest sign in too.
+
+## 2. What a guest can and can't do
+
+A guest reads and changes their own account (`account.get`, `account.update`), lists and ends their sessions, signs out, and deletes their account without being asked for a password, since their session is their only credential.
+
+A guest can't set a password, change or verify an email, or add an authenticator app or a passkey: those calls answer 403 [`anonymous_not_allowed`](/errors/anonymous_not_allowed/). Hide those settings while `user.isAnonymous` is true, and offer an upgrade instead.
+
+## 3. Upgrade the guest
+
+[`account.upgradeAnonymous`](/docs/api/operations/accountupgradeanonymous/) gives the signed in guest an email and password. The user ID stays the same, so their data stays theirs, and the password is held to the project's password rules (the **Passwords** card of the **Security** page). The session in hand keeps working: the SDK refreshes it, and the new access token says `is_anonymous: false`.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const result = await orvano.account.upgradeAnonymous({
+  email,
+  password,
+  verificationRedirectUrl: 'https://app.example.com/auth/callback',
+})
+if (result.verificationRequired) {
+  showCheckYourInbox()
+} else {
+  console.log(result.user?.isAnonymous) // false
+}
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+const answer = await fetch('/api/orvano/anonymous-upgrade', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ email, password, verificationRedirectUrl: `${location.origin}/auth/callback` }),
+})
+const result = await answer.json()
+if (result.verificationRequired) showCheckYourInbox()
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final result = await orvano.account.upgradeAnonymous(
+  CreateAnonymousUpgradeRequest(
+    email: email,
+    password: password,
+    verificationRedirectUrl: 'com.acme.app://auth/callback',
+  ),
+);
+if (result.verificationRequired) showCheckYourInbox();
+```
+
+  </TabItem>
+</Tabs>
+
+How it finishes depends on the project:
+
+- **Without a verified email rule**, the guest becomes permanent at once with an unverified email. An email another user already has gets 409 [`user_already_exists`](/errors/user_already_exists/). With `verificationRedirectUrl`, Orvano also sends a [verification link](/docs/auth/email-verification/), and `verificationEmail` says what happened to it.
+- **When the project requires verified emails or MFA**, `verificationRedirectUrl` is required and the answer is `verificationRequired: true` with no user. Orvano emails a confirmation link to the new address (`orvano_type=email_change`), and the guest stays a guest until it is opened; your link handler redeems it with [`account.confirmEmailChange`](/docs/api/operations/accountconfirmemailchange/), as for any [email change](/docs/auth/change-email/). The answer is the same whether or not the email already had an account, and the owner of a taken address gets an alert instead. A later upgrade call replaces an earlier one.
+
+With **Require MFA** on, the moment the guest becomes permanent ends their sessions, so a permanent user without a second factor never holds one. Send them to sign in again: their next sign in asks them to [enroll a factor](/docs/auth/mfa/#require-mfa-for-every-user).
+
+## 4. Or link a provider
+
+A guest can link Google, Apple, GitHub, or Microsoft with [`linkIdentity`](/docs/auth/link-identities/), with no password or recent sign in asked. Linking makes them permanent, and takes the provider's verified email when no other user has it. When the project's email domain rules (the **Email domains** card of the **Security** page) refuse that email, the link answers 403 [`email_domain_not_allowed`](/errors/email_domain_not_allowed/) and nothing changes.
+
+## 5. Idle guests are deleted
+
+A guest who hasn't signed in or refreshed for 30 days is deleted, with their sessions, by the server's hourly cleanup. Change the number of days (1 to 365) on the **Anonymous users** card. Upgrade a guest before then to keep them. Store your own data with a foreign key that deletes with the user, or clean it up when you see `auth.user.deleted` with reason `anonymous_idle`.
+
+## On your server
+
+The server SDKs' token check says whether a token belongs to a guest:
+
+<Tabs syncKey="server-sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const token = await orvano.verifyAccessToken(accessToken)
+if (token.isAnonymous) refuse('Sign up to place an order.')
+```
+
+  </TabItem>
+  <TabItem label="Dart">
+
+```dart
+final token = await orvano.verifyAccessToken(accessToken);
+if (token.isAnonymous) refuse('Sign up to place an order.');
+```
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+var token = await orvano.VerifyAccessTokenAsync(accessToken);
+if (token.IsAnonymous) return Results.Forbid();
+```
+
+  </TabItem>
+</Tabs>
+
+The claim is up to 15 minutes old; ask [`users.get`](/docs/api/operations/usersget/) for the current `isAnonymous`. [`users.list`](/docs/api/operations/userslist/) takes `anonymous=true` or `anonymous=false` to list guests or permanent users.

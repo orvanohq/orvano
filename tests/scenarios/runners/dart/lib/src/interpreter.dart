@@ -354,6 +354,7 @@ final Map<String, DispatchEntry> _runnerDispatch = {
         'expiresAt': verified.expiresAt.toIso8601String(),
         'aal': verified.aal,
         'amr': verified.amr,
+        'isAnonymous': verified.isAnonymous,
       };
     },
   ),

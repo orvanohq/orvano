@@ -22,6 +22,7 @@ const user: User = {
   providers: [],
   hasPassword: true,
   mfaEnabled: true,
+  isAnonymous: false,
 }
 
 const mfa: MfaStatus = {

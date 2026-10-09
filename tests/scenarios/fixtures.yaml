@@ -17,7 +17,8 @@
 #   client ID and secret. The Apple key is a throwaway made for these scenarios only.
 # methodSettings: TOTP and passkey settings (spec 0013), saved through the console's settings code. Passkeys
 #   are on with the RP ID localhost, so the server's Test only software authenticator can make passkeys for
-#   the http://localhost web platform.
+#   the http://localhost web platform. Guests are on in the first project (spec 0014, auth-anonymous), which lets
+#   anyone sign in as a guest but changes nothing for the other scenarios.
 # authPolicies: project auth rules (spec 0014), saved through the console's settings code after the users and
 #   the install's SMTP. A 12 character minimum, which every scenario password meets, and the breached check, which
 #   compose.yml points at the api's own fake range API (ORVANO_TEST_HIBP_URL), so auth-password-rules can prove
@@ -105,6 +106,7 @@ methodSettings:
   - project: scenarios0000000000a
     passkeysEnabled: true
     rpId: localhost
+    anonymousEnabled: true
   - project: scenarios0000000000b
     passkeysEnabled: true
     rpId: localhost

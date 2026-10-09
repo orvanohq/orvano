@@ -159,6 +159,56 @@
         "x-orvano-audience": "client"
       }
     },
+    "/v1/account/anonymous/upgrade": {
+      "post": {
+        "operationId": "account.upgradeAnonymous",
+        "description": "Turns the signed in guest into a permanent user with an email and password, keeping their user ID and data. While\nthe project requires verified emails or MFA, the guest stays a guest until they open the link emailed to the new\naddress, and the answer never says whether that email already had an account.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnonymousUpgradeResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAnonymousUpgradeRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-session": "user",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/account/delete": {
       "post": {
         "operationId": "account.delete",
@@ -1550,6 +1600,41 @@
             "bearer": []
           }
         ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/sessions/anonymous": {
+      "post": {
+        "operationId": "account.createAnonymousSession",
+        "description": "Signs a new guest in: creates an anonymous user with no email, name, or password, and their session. Needs the\nproject's anonymous users switch. The guest keeps their user ID when they later upgrade or link a provider; a guest\nidle longer than the project's idle days is deleted.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "x-orvano-session": "start",
         "x-orvano-service": "account",
         "x-orvano-audience": "client"
       }
@@ -5877,6 +5962,16 @@
             "explode": false
           },
           {
+            "name": "anonymous",
+            "in": "query",
+            "required": false,
+            "description": "Only guests (true) or only permanent users (false).",
+            "schema": {
+              "type": "boolean"
+            },
+            "explode": false
+          },
+          {
             "name": "cursor",
             "in": "query",
             "required": false,
@@ -7621,6 +7716,16 @@
             "explode": false
           },
           {
+            "name": "anonymous",
+            "in": "query",
+            "required": false,
+            "description": "Only guests (true) or only permanent users (false).",
+            "schema": {
+              "type": "boolean"
+            },
+            "explode": false
+          },
+          {
             "name": "cursor",
             "in": "query",
             "required": false,
@@ -8629,6 +8734,46 @@
         },
         "description": "The org an accepted invitation joined."
       },
+      "AnonymousUpgradeResult": {
+        "type": "object",
+        "required": [
+          "user",
+          "verificationRequired",
+          "verificationEmail"
+        ],
+        "properties": {
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upgraded, permanent user; null while `verificationRequired` is true."
+          },
+          "verificationRequired": {
+            "type": "boolean",
+            "description": "True while the project requires verified emails or MFA: the guest stays a guest until the link sent to the new\naddress is opened. The answer is the same whether or not that email already had an account. False otherwise.",
+            "examples": [
+              false
+            ]
+          },
+          "verificationEmail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerificationEmailStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What happened to the verification email the upgrade was asked to send; null when none was asked for, and null\nwhile `verificationRequired` is true."
+          }
+        },
+        "description": "The result of upgrading a guest. Either the user is permanent now (`user` set), or the project requires verified\nemails or MFA and the upgrade waits for the emailed link (`verificationRequired` true, `user` null)."
+      },
       "ApiKey": {
         "type": "object",
         "required": [
@@ -8779,7 +8924,9 @@
           "activePasskeyCount",
           "acceptedOrigins",
           "mfaRequired",
-          "activeUsersWithoutMfa"
+          "activeUsersWithoutMfa",
+          "anonymousEnabled",
+          "anonymousIdleDays"
         ],
         "properties": {
           "totpEnabled": {
@@ -8878,9 +9025,24 @@
             "examples": [
               4
             ]
+          },
+          "anonymousEnabled": {
+            "type": "boolean",
+            "description": "Whether guests can sign in with `account.createAnonymousSession`. Off by default.",
+            "examples": [
+              false
+            ]
+          },
+          "anonymousIdleDays": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many days a guest may stay idle (no sign in or refresh) before it is deleted, 1 to 365. Defaults to 30.",
+            "examples": [
+              30
+            ]
           }
         },
-        "description": "A project's second factor and passkey settings, with what the Passkeys card shows beside them. A project that never\nsaved any reads as the defaults: TOTP on, passkeys off."
+        "description": "A project's second factor, passkey, and guest settings, with what the Passkeys card shows beside them. A project\nthat never saved any reads as the defaults: TOTP on, passkeys off, guests off."
       },
       "AuthPolicies": {
         "type": "object",
@@ -9519,6 +9681,7 @@
           "providers",
           "hasPassword",
           "mfaEnabled",
+          "isAnonymous",
           "isInstallAdmin"
         ],
         "properties": {
@@ -9619,6 +9782,13 @@
           "mfaEnabled": {
             "type": "boolean",
             "description": "Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never\nturns it on.",
+            "examples": [
+              false
+            ]
+          },
+          "isAnonymous": {
+            "type": "boolean",
+            "description": "Whether the user is a guest from `account.createAnonymousSession`: no email, name, or password until they upgrade\nwith `account.upgradeAnonymous` or link a provider. Also the access token's `is_anonymous` claim.",
             "examples": [
               false
             ]
@@ -9778,6 +9948,51 @@
           }
         },
         "description": "A new user with an email and password."
+      },
+      "CreateAnonymousUpgradeRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email, trimmed, at most 320 characters. Unique in the project, ignoring case.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "description": "The password, held to the project's password rules.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A display name, at most 256 characters. Set at once in every case.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          },
+          "verificationRedirectUrl": {
+            "type": "string",
+            "description": "Where the emailed link opens: a host that is one of the project's web platforms, or your app's own scheme. Without\na verified email rule, setting it also sends a verification link (`verificationEmail` says what happened). Required\nwhile the project requires verified emails or MFA: the link then confirms the email and completes the upgrade\n(`orvano_type=email_change`).",
+            "examples": [
+              "https://app.example.com/auth/callback"
+            ]
+          }
+        },
+        "description": "An upgrade of the signed in guest to a permanent account with an email and password. The user ID stays."
       },
       "CreateApiKeyRequest": {
         "type": "object",
@@ -11028,6 +11243,8 @@
           "sign_up_disabled",
           "email_domain_not_allowed",
           "email_verification_required",
+          "anonymous_disabled",
+          "anonymous_not_allowed",
           "invalid_credentials",
           "session_required",
           "invalid_token",
@@ -13266,7 +13483,8 @@
           "recovery",
           "oauth",
           "id_token",
-          "passkey"
+          "passkey",
+          "anonymous"
         ],
         "description": "How a session began."
       },
@@ -14233,6 +14451,21 @@
               true
             ]
           },
+          "anonymousEnabled": {
+            "type": "boolean",
+            "description": "Whether guests can sign in with `account.createAnonymousSession`.",
+            "examples": [
+              true
+            ]
+          },
+          "anonymousIdleDays": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many days a guest may stay idle before it is deleted, 1 to 365.",
+            "examples": [
+              30
+            ]
+          },
           "confirmRpIdChange": {
             "type": "boolean",
             "description": "Must be true to change `rpId` while passkeys are registered under the current one: they stop working.",
@@ -14241,7 +14474,7 @@
             ]
           }
         },
-        "description": "Changes to a project's second factor and passkey settings. Fields left out keep their value."
+        "description": "Changes to a project's second factor, passkey, and guest settings. Fields left out keep their value."
       },
       "UpdateAuthPoliciesRequest": {
         "type": "object",
@@ -14728,7 +14961,8 @@
           "lastSignInAt",
           "providers",
           "hasPassword",
-          "mfaEnabled"
+          "mfaEnabled",
+          "isAnonymous"
         ],
         "properties": {
           "id": {
@@ -14828,6 +15062,13 @@
           "mfaEnabled": {
             "type": "boolean",
             "description": "Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never\nturns it on.",
+            "examples": [
+              false
+            ]
+          },
+          "isAnonymous": {
+            "type": "boolean",
+            "description": "Whether the user is a guest from `account.createAnonymousSession`: no email, name, or password until they upgrade\nwith `account.upgradeAnonymous` or link a provider. Also the access token's `is_anonymous` claim.",
             "examples": [
               false
             ]

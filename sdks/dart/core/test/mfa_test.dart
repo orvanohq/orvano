@@ -60,6 +60,7 @@ final user = {
   'providers': <String>[],
   'hasPassword': true,
   'mfaEnabled': false,
+  'isAnonymous': false,
 };
 
 Answer json(Object body, {int status = 200}) => (response) async {

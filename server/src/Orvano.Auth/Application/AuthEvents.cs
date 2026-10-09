@@ -29,6 +29,12 @@ internal static class AuthEvents
     public const string UserBlocked = "auth.user.blocked";
     public const string UserUnblocked = "auth.user.unblocked";
     public const string UserDeleted = "auth.user.deleted";
+
+    /// <summary>A guest became a permanent user (spec 0014, AC-30); <c>method</c> says how.</summary>
+    public const string UserUpgraded = "auth.user.upgraded";
+
+    /// <summary>The <c>reason</c> of <see cref="UserDeleted"/> when retention deleted an idle guest (spec 0014, AC-31).</summary>
+    public const string AnonymousIdle = "anonymous_idle";
     public const string PasswordChanged = "auth.password.changed";
     public const string SessionCreated = "auth.session.created";
     public const string SessionEnded = "auth.session.ended";

@@ -6,6 +6,7 @@ import { render } from 'vitest-browser-react'
 
 import {
   CreateUserDialog,
+  GuestBadge,
   MfaBadge,
   SessionsTable,
   SigningKeysPanel,
@@ -54,6 +55,16 @@ describe('UserStatusBadge', () => {
   it('shows the status as a word', async () => {
     const screen = await render(<UserStatusBadge status="blocked" />)
     await expect.element(screen.getByText('Blocked')).toBeVisible()
+  })
+})
+
+describe('GuestBadge', () => {
+  // Spec 0014 AC-32: a guest says so in a word, and screen readers hear what it means.
+  it('says Guest, with the meaning for screen readers', async () => {
+    const screen = await render(<GuestBadge />)
+    await expect.element(screen.getByText('Guest', { exact: false })).toBeVisible()
+    expect(document.body.textContent).toContain('an anonymous user')
+    await noAxeViolations()
   })
 })
 

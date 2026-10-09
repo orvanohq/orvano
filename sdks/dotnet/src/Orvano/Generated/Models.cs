@@ -121,6 +121,9 @@ public enum SessionMethod
 
     /// <summary>The wire value <c>passkey</c>.</summary>
     Passkey,
+
+    /// <summary>The wire value <c>anonymous</c>.</summary>
+    Anonymous,
 }
 
 /// <summary>Reads and writes <see cref="SessionMethod"/> by wire value; unknown values read as <see cref="SessionMethod.Unknown"/>.</summary>
@@ -138,6 +141,7 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             "oauth" => SessionMethod.Oauth,
             "id_token" => SessionMethod.IdToken,
             "passkey" => SessionMethod.Passkey,
+            "anonymous" => SessionMethod.Anonymous,
             _ => SessionMethod.Unknown,
         };
 
@@ -153,6 +157,7 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             SessionMethod.Oauth => "oauth",
             SessionMethod.IdToken => "id_token",
             SessionMethod.Passkey => "passkey",
+            SessionMethod.Anonymous => "anonymous",
             _ => throw new JsonException($"SessionMethod.{value} has no wire value"),
         });
 }
@@ -370,6 +375,7 @@ public sealed record UpdateUserEmailRequest(
 /// <param name="Providers">The providers linked to the user, sorted by name.</param>
 /// <param name="HasPassword">Whether the user has a password.</param>
 /// <param name="MfaEnabled">Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never turns it on.</param>
+/// <param name="IsAnonymous">Whether the user is a guest from <c>account.createAnonymousSession</c>: no email, name, or password until they upgrade with <c>account.upgradeAnonymous</c> or link a provider. Also the access token's <c>is_anonymous</c> claim.</param>
 public sealed record User(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("email")] string? Email,
@@ -382,7 +388,8 @@ public sealed record User(
     [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt,
     [property: JsonPropertyName("providers")] IReadOnlyList<OAuthProvider> Providers,
     [property: JsonPropertyName("hasPassword")] bool HasPassword,
-    [property: JsonPropertyName("mfaEnabled")] bool MfaEnabled);
+    [property: JsonPropertyName("mfaEnabled")] bool MfaEnabled,
+    [property: JsonPropertyName("isAnonymous")] bool IsAnonymous);
 
 /// <summary>One page of a project's users, newest first.</summary>
 /// <param name="Items">The users on this page.</param>

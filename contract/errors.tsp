@@ -100,6 +100,12 @@ enum ErrorCode {
   @doc("The project requires a verified email before sign in, and this user's email is not verified yet (403).")
   email_verification_required,
 
+  @doc("The project has not turned on anonymous users, so guests can't sign in (403).")
+  anonymous_disabled,
+
+  @doc("An anonymous user (a guest) can't do this; upgrade them to a permanent account first (403).")
+  anonymous_not_allowed,
+
   @doc("The email and password do not match a user, or the password given to confirm an action is missing or wrong (401).")
   invalid_credentials,
 

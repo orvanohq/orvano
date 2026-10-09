@@ -286,6 +286,26 @@ void main() {
     expect(sent, hasLength(1));
   });
 
+  // Spec 0014 AC-36: the is_anonymous claim, false when missing or not a
+  // boolean.
+  test('reads is_anonymous', () async {
+    final c = client([], (_) => jwks([publicJwk('k1', 'a')]));
+
+    expect(
+      (await c.verifyAccessToken(
+        sign('a', extra: {'is_anonymous': true}),
+      )).isAnonymous,
+      isTrue,
+    );
+    expect((await c.verifyAccessToken(sign('a'))).isAnonymous, isFalse);
+    expect(
+      (await c.verifyAccessToken(
+        sign('a', extra: {'is_anonymous': 'yes'}),
+      )).isAnonymous,
+      isFalse,
+    );
+  });
+
   test('needs a project', () {
     final c = Client(endpoint: endpoint, onWarning: (_) {});
 

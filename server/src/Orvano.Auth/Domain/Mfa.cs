@@ -224,6 +224,8 @@ internal sealed record SessionStrength(short Aal, IReadOnlyList<string> Amr)
         SessionMethod.Password or SessionMethod.SignUp or SessionMethod.Recovery => [Password],
         SessionMethod.MagicLink or SessionMethod.EmailCode => [Email],
         SessionMethod.OAuth or SessionMethod.IdToken => [Federated],
+        // Spec 0014, AC-28: a guest proved nothing about who they are.
+        SessionMethod.Anonymous => [],
         _ => throw new ArgumentOutOfRangeException(nameof(method), method, null),
     };
 

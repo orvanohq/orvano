@@ -65,6 +65,13 @@ model User {
     """)
   @example(false)
   mfaEnabled: boolean;
+
+  @doc("""
+    Whether the user is a guest from `account.createAnonymousSession`: no email, name, or password until they upgrade
+    with `account.upgradeAnonymous` or link a provider. Also the access token's `is_anonymous` claim.
+    """)
+  @example(false)
+  isAnonymous: boolean;
 }
 
 @doc("""
@@ -289,6 +296,9 @@ enum SessionMethod {
 
   @doc("A passkey (`account.createPasskeySession`).")
   passkey,
+
+  @doc("A guest sign in (`account.createAnonymousSession`).")
+  anonymous,
 }
 
 @doc("A sign in provider.")
@@ -526,6 +536,52 @@ model CreatePasswordSessionRequest {
   verificationRedirectUrl?: string;
 }
 
+@doc("An upgrade of the signed in guest to a permanent account with an email and password. The user ID stays.")
+model CreateAnonymousUpgradeRequest {
+  @doc("The email, trimmed, at most 320 characters. Unique in the project, ignoring case.")
+  @example("ada@example.com")
+  email: string;
+
+  @doc("The password, held to the project's password rules.")
+  @example("correct horse battery staple")
+  password: string;
+
+  @doc("A display name, at most 256 characters. Set at once in every case.")
+  @example("Ada Lovelace")
+  name?: string | null;
+
+  @doc("""
+    Where the emailed link opens: a host that is one of the project's web platforms, or your app's own scheme. Without
+    a verified email rule, setting it also sends a verification link (`verificationEmail` says what happened). Required
+    while the project requires verified emails or MFA: the link then confirms the email and completes the upgrade
+    (`orvano_type=email_change`).
+    """)
+  @example("https://app.example.com/auth/callback")
+  verificationRedirectUrl?: string;
+}
+
+@doc("""
+  The result of upgrading a guest. Either the user is permanent now (`user` set), or the project requires verified
+  emails or MFA and the upgrade waits for the emailed link (`verificationRequired` true, `user` null).
+  """)
+model AnonymousUpgradeResult {
+  @doc("The upgraded, permanent user; null while `verificationRequired` is true.")
+  user: User | null;
+
+  @doc("""
+    True while the project requires verified emails or MFA: the guest stays a guest until the link sent to the new
+    address is opened. The answer is the same whether or not that email already had an account. False otherwise.
+    """)
+  @example(false)
+  verificationRequired: boolean;
+
+  @doc("""
+    What happened to the verification email the upgrade was asked to send; null when none was asked for, and null
+    while `verificationRequired` is true.
+    """)
+  verificationEmail: VerificationEmailStatus | null;
+}
+
 @route("/v1/account")
 @tag("account")
 interface AccountApi {
@@ -555,6 +611,36 @@ interface AccountApi {
     @statusCode statusCode: 201;
     @body body: AuthResult;
   } | Problem;
+
+  @doc("""
+    Signs a new guest in: creates an anonymous user with no email, name, or password, and their session. Needs the
+    project's anonymous users switch. The guest keeps their user ID when they later upgrade or link a provider; a guest
+    idle longer than the project's idle days is deleted.
+    """)
+  @operationId("account.createAnonymousSession")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @extension("x-orvano-session", "start")
+  @route("/sessions/anonymous")
+  @post
+  createAnonymousSession(): {
+    @statusCode statusCode: 201;
+    @body body: AuthResult;
+  } | Problem;
+
+  @doc("""
+    Turns the signed in guest into a permanent user with an email and password, keeping their user ID and data. While
+    the project requires verified emails or MFA, the guest stays a guest until they open the link emailed to the new
+    address, and the answer never says whether that email already had an account.
+    """)
+  @operationId("account.upgradeAnonymous")
+  @extension("x-orvano-audience", "client")
+  @extension("x-orvano-service", "account")
+  @extension("x-orvano-session", "user")
+  @useAuth(bearer)
+  @route("/anonymous/upgrade")
+  @post
+  upgradeAnonymous(@body request: CreateAnonymousUpgradeRequest): AnonymousUpgradeResult | Problem;
 
   @doc("""
     Starts signing in with a provider: answers the provider's sign in page to send the browser to. After the user

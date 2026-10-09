@@ -1,11 +1,11 @@
 ---
 title: Sign in methods
-description: "Turn on MFA, passkeys, and Google, Apple, GitHub, and Microsoft sign in for a project."
+description: "Turn on MFA, passkeys, guests, and Google, Apple, GitHub, and Microsoft sign in for a project."
 sidebar:
   order: 5
 ---
 
-The project's **Sign in methods** page starts with **MFA and passkeys**, then lists the four providers: Google, Apple, GitHub, and Microsoft. Each card says whether it is **On** or **Off**, and which ways of signing in are ready: **Redirect** (the browser goes to the provider) and **Native** (Google and Apple in a mobile app). Owners and developers change them; viewers see everything, with the fields turned off.
+The project's **Sign in methods** page starts with **MFA and passkeys** and **Guests**, then lists the four providers: Google, Apple, GitHub, and Microsoft. Each card says whether it is **On** or **Off**, and which ways of signing in are ready: **Redirect** (the browser goes to the provider) and **Native** (Google and Apple in a mobile app). Owners and developers change them; viewers see everything, with the fields turned off.
 
 ## MFA and passkeys
 
@@ -15,6 +15,10 @@ Two cards sit above the providers.
 - **Passkeys** opens a dialog with the **Enabled** switch, the **RP ID** (the domain passkeys belong to, such as `example.com`), the **RP name** (the name a passkey prompt shows; empty means the project's name), and the **Android certificate fingerprints** of your Android apps, one per line. Below them it lists the origins a passkey is accepted from today, and, for a project with iOS or Android [platforms](/docs/console/platforms/), the `apple-app-site-association` and `assetlinks.json` files to serve on your domain, each with a copy button. [Passkeys](/docs/auth/passkeys/) walks through the setup.
 
 Changing the RP ID while passkeys can sign in shows how many will stop working, and asks you to type the new RP ID again to confirm. Those passkeys come back if you change it back.
+
+## Guests
+
+The **Anonymous users** card lets people use your app as a guest before they sign up ([Anonymous users](/docs/auth/anonymous-users/)). **Allow guest sign in** turns guest sign in on; it is off by default, and turning it off keeps the guests who exist. **Delete idle guests after** sets how many days, from 1 to 365 (30 by default), a guest may go without signing in or refreshing before the server deletes them. **Save** saves both.
 
 ## Set up a provider
 
@@ -31,6 +35,6 @@ Client secrets and Apple's private key are stored encrypted and never shown agai
 
 ## On the Users pages
 
-The Users list has a **Sign in** column: a mark for each linked provider, then **Password** for a user with a password, or **Email** for a user with neither. Its **MFA** column says **On** or **Off**, and the **MFA** filter (All, On, Off) finds either group. A user's page lists their **Identities** (the provider, the email at the provider, and when it was linked and last used) with **Unlink**. Unlinking a user's only way in is refused: "This is the user's only way to sign in." The sessions table names the provider beside the method, the session's **Level** (one factor or two), and its **Factors**.
+The Users list has a **Sign in** column: a mark for each linked provider, then **Password** for a user with a password, or **Email** for a user with neither (**None** for a guest). A guest shows a **Guest** badge beside their ID, and the **Kind** filter (All, Permanent, Guests) finds either group; a guest's own page says they are a guest. Its **MFA** column says **On** or **Off**, and the **MFA** filter (All, On, Off) finds either group. A user's page lists their **Identities** (the provider, the email at the provider, and when it was linked and last used) with **Unlink**. Unlinking a user's only way in is refused: "This is the user's only way to sign in." The sessions table names the provider beside the method, the session's **Level** (one factor or two), and its **Factors**.
 
 A user's **Security** section shows whether MFA is on, when it was turned on, and how many recovery codes are left, then the user's passkeys: their name, when they were added and last used, whether they are synced or device bound, and whether they can sign in now. When a user lost every factor, **Reset MFA** removes their authenticator app and recovery codes and ends all their sessions; their passkeys stay. **Remove** deletes one passkey. Both ask you to confirm, and both email the user an alert. Viewers see the section with the buttons turned off.

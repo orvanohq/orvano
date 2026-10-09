@@ -66,6 +66,7 @@ internal static class RunnerDispatch
                 ["expiresAt"] = verified.ExpiresAt.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
                 ["aal"] = verified.Aal,
                 ["amr"] = new JsonArray([.. verified.Amr.Select(m => (JsonNode?)JsonValue.Create(m))]),
+                ["isAnonymous"] = verified.IsAnonymous,
             };
         }, null),
     };

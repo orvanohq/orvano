@@ -15,7 +15,7 @@ internal sealed record MethodSettingsView(
     MethodSettings Settings, int ActivePasskeyCount, IReadOnlyList<string> AcceptedOrigins, int? ActiveUsersWithoutMfa = null);
 
 /// <summary>
-/// The TOTP and Passkeys switches of an app project (spec 0013, AC-1, AC-2), and required MFA (spec 0014, AC-2),
+/// The TOTP and Passkeys switches of an app project (spec 0013, AC-1, AC-2), and guests and required MFA (spec 0014, AC-2),
 /// behind <c>consoleAuthMethods.*</c>. The <c>console</c> project has no row and is never edited here (AC-3).
 /// </summary>
 internal sealed class MethodSettingsService(AuthStore store, IWebOriginPolicy origins, PolicySettings policies, IEmailQueue email)
@@ -70,7 +70,8 @@ internal sealed class MethodSettingsService(AuthStore store, IWebOriginPolicy or
                     """
                     UPDATE orvano.auth_method_settings
                     SET totp_enabled = @totp, passkeys_enabled = @passkeys, rp_id = @rpId, rp_name = @rpName,
-                        android_cert_fingerprints = @fingerprints, mfa_required = @mfaRequired, updated_at = now()
+                        android_cert_fingerprints = @fingerprints, mfa_required = @mfaRequired,
+                        anonymous_enabled = @anonymousEnabled, anonymous_idle_days = @anonymousIdleDays, updated_at = now()
                     WHERE project_id = @project
                     """, conn, uow.Tx);
                 save.Parameters.AddWithValue("totp", next.TotpEnabled);
@@ -79,6 +80,8 @@ internal sealed class MethodSettingsService(AuthStore store, IWebOriginPolicy or
                 save.Parameters.AddWithValue("rpName", NpgsqlDbType.Text, (object?)next.RpName ?? DBNull.Value);
                 save.Parameters.AddWithValue("fingerprints", NpgsqlDbType.Array | NpgsqlDbType.Text, next.AndroidCertFingerprints.ToArray());
                 save.Parameters.AddWithValue("mfaRequired", next.MfaRequired);
+                save.Parameters.AddWithValue("anonymousEnabled", next.AnonymousEnabled);
+                save.Parameters.AddWithValue("anonymousIdleDays", (short)next.AnonymousIdleDays);
                 save.Parameters.AddWithValue("project", projectId);
                 await save.ExecuteNonQueryAsync(token);
                 await AuthEvents.WriteAsync(uow.Tx, AuthEvents.MethodSettingsUpdated, projectId, actor, projectId,

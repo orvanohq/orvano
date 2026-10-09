@@ -14,6 +14,7 @@ import type {
   ConfirmEmailChangeRequest,
   ConfirmTotpRequest,
   CreateAccountRequest,
+  CreateAnonymousUpgradeRequest,
   CreateEmailCodeRequest,
   CreateEmailCodeSessionRequest,
   CreateIdTokenIdentityRequest,
@@ -85,6 +86,10 @@ export const dispatch: DispatchTable = {
   'account.create': {
     status: 201,
     client: (o, input) => o.account.create(input.body as CreateAccountRequest),
+  },
+  'account.createAnonymousSession': {
+    status: 201,
+    client: (o, _input) => o.account.createAnonymousSession(),
   },
   'account.createEmailCode': {
     status: 202,
@@ -263,6 +268,10 @@ export const dispatch: DispatchTable = {
     status: 204,
     client: (o, input) => o.account.updatePassword(input.body as UpdatePasswordRequest),
   },
+  'account.upgradeAnonymous': {
+    status: 200,
+    client: (o, input) => o.account.upgradeAnonymous(input.body as CreateAnonymousUpgradeRequest),
+  },
   'account.verifyEmail': {
     status: 200,
     client: (o, input) => o.account.verifyEmail(input.body as VerifyEmailRequest),
@@ -412,6 +421,7 @@ export const dispatch: DispatchTable = {
         createdBefore: input.createdBefore as string | undefined,
         emailVerified: input.emailVerified as boolean | undefined,
         mfa: input.mfa as string | undefined,
+        anonymous: input.anonymous as boolean | undefined,
         cursor: input.cursor as string | undefined,
         limit: input.limit as number | undefined,
       }),
@@ -423,6 +433,7 @@ export const dispatch: DispatchTable = {
         createdBefore: input.createdBefore as string | undefined,
         emailVerified: input.emailVerified as boolean | undefined,
         mfa: input.mfa as string | undefined,
+        anonymous: input.anonymous as boolean | undefined,
         limit: input.limit as number | undefined,
       }),
     scope: 'users.read',

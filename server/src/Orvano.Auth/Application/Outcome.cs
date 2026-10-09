@@ -54,6 +54,16 @@ internal sealed record Failure(FailureKind Kind, string Code, string Detail, Tim
     public static Failure EmailVerificationRequired { get; } =
         new(FailureKind.Forbidden, ErrorCode.EmailVerificationRequired, "Verify your email first: open the link we sent, then sign in again.");
 
+    public static Failure AnonymousDisabled { get; } =
+        new(FailureKind.Forbidden, ErrorCode.AnonymousDisabled, "This project doesn't allow guest sign in.");
+
+    public static Failure AnonymousNotAllowed { get; } =
+        new(FailureKind.Forbidden, ErrorCode.AnonymousNotAllowed, "Guests can't do this. Upgrade to a permanent account first.");
+
+    /// <summary><c>account.upgradeAnonymous</c> from a user who is not a guest (spec 0014, API surface).</summary>
+    public static Failure NotAnonymous { get; } =
+        new(FailureKind.Forbidden, ErrorCode.Forbidden, "Only a guest can be upgraded.");
+
     public static Failure InvalidCredentials { get; } =
         new(FailureKind.Unauthorized, ErrorCode.InvalidCredentials, "The email or password is wrong.");
 

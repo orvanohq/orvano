@@ -47,6 +47,18 @@ export function UserStatusBadge({ status }: { status: UserStatus }) {
   )
 }
 
+/**
+ * Marks a guest (spec 0014, AC-32): a user from `account.createAnonymousSession` with no email or
+ * password yet. The badge says "Guest", and screen readers also hear what that means.
+ */
+export function GuestBadge() {
+  return (
+    <Badge variant="status" tone="neutral">
+      Guest<span className="sr-only">: an anonymous user who hasn&apos;t signed up yet</span>
+    </Badge>
+  )
+}
+
 /** Whether a user has MFA on, as a word (spec 0013, AC-44): never only an icon. */
 export function MfaBadge({ enabled }: { enabled: boolean }) {
   return (
@@ -63,13 +75,16 @@ export function userColumns(projectId: string): ColumnDef<User>[] {
       accessorKey: 'email',
       header: 'Email',
       cell: ({ row }) => (
-        <Link
-          to="/projects/$projectId/users/$userId"
-          params={{ projectId, userId: row.original.id }}
-          className="font-medium text-link hover:underline"
-        >
-          {row.original.email ?? row.original.id}
-        </Link>
+        <span className="flex flex-wrap items-center gap-2">
+          <Link
+            to="/projects/$projectId/users/$userId"
+            params={{ projectId, userId: row.original.id }}
+            className="font-medium text-link hover:underline"
+          >
+            {row.original.email ?? row.original.id}
+          </Link>
+          {row.original.isAnonymous ? <GuestBadge /> : null}
+        </span>
       ),
     },
     { accessorKey: 'name', header: 'Name', cell: ({ row }) => row.original.name ?? '' },
@@ -113,16 +128,23 @@ export function userColumns(projectId: string): ColumnDef<User>[] {
 
 /**
  * How a user signs in (spec 0012, AC-26): a mark per linked provider, named for screen readers, then
- * "Password" when they have one, and "Email" for a user with neither.
+ * "Password" when they have one, and "Email" for a user with neither; a guest with neither has no
+ * way back in but their session (spec 0014), so "None".
  */
-export function SignInMethods({ user }: { user: Pick<User, 'providers' | 'hasPassword'> }) {
+export function SignInMethods({
+  user,
+}: {
+  user: Pick<User, 'providers' | 'hasPassword'> & Partial<Pick<User, 'isAnonymous'>>
+}) {
   return (
     <span className="flex flex-wrap items-center gap-1.5">
       {user.providers.map((provider) => (
         <ProviderMark key={provider} provider={provider} />
       ))}
       {user.hasPassword ? <span>Password</span> : null}
-      {user.providers.length === 0 && !user.hasPassword ? <span>Email</span> : null}
+      {user.providers.length === 0 && !user.hasPassword ? (
+        <span>{user.isAnonymous === true ? 'None' : 'Email'}</span>
+      ) : null}
     </span>
   )
 }

@@ -672,18 +672,28 @@ base class Client {
 
   /// A call changed a user (spec 0010, AC-14). When this client holds that
   /// user's session, listeners hear [AuthEvent.userUpdated], after a refresh
-  /// when the token's `email_verified` claim no longer matches, so the next
-  /// call carries the new claim. A session for another user, or none, hears
-  /// nothing.
+  /// when the token's `email_verified` or `is_anonymous` claim no longer
+  /// matches, so the next call carries the new claim. A session for another
+  /// user, or none, hears nothing. A guest's upgrade (spec 0014, AC-30)
+  /// answers the user inside `user`, and nothing at all while it waits for its
+  /// emailed link (`verificationRequired`): then nothing changed yet.
   Future<void> _userChanged(Object? result) async {
+    final body = result is Map<String, dynamic> ? result : null;
+    if (body?['verificationRequired'] == true) return;
     final current = await session.read();
     if (current == null) return;
     final claims = _accessClaims(current.accessToken);
-    final user = result is Map<String, dynamic> ? result : null;
+    final inner = body != null && body.containsKey('user')
+        ? body['user']
+        : body;
+    final user = inner is Map<String, dynamic> ? inner : null;
     final id = user?['id'];
     if (claims != null && id is String && claims.sub != id) return;
     final verified = user?['emailVerified'];
-    if (claims != null && verified is bool && verified != claims.verified) {
+    final anonymous = user?['isAnonymous'];
+    if (claims != null &&
+        ((verified is bool && verified != claims.verified) ||
+            (anonymous is bool && anonymous != claims.anonymous))) {
       try {
         if (await _refresh(current) == null) return;
       } on Object {
@@ -698,9 +708,11 @@ base class Client {
     }
   }
 
-  /// The `sub` and `email_verified` claims of an access token, read without
-  /// checking it; null when it is not a readable JWT.
-  static ({String sub, bool verified})? _accessClaims(String token) {
+  /// The `sub`, `email_verified`, and `is_anonymous` claims of an access
+  /// token, read without checking it; null when it is not a readable JWT.
+  static ({String sub, bool verified, bool anonymous})? _accessClaims(
+    String token,
+  ) {
     final parts = token.split('.');
     if (parts.length < 2) return null;
     try {
@@ -708,7 +720,11 @@ base class Client {
         utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
       );
       if (json case {'sub': final String sub}) {
-        return (sub: sub, verified: json['email_verified'] == true);
+        return (
+          sub: sub,
+          verified: json['email_verified'] == true,
+          anonymous: json['is_anonymous'] == true,
+        );
       }
       return null;
     } on FormatException {

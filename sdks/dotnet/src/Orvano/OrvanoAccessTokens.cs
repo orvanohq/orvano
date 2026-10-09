@@ -25,6 +25,12 @@ public sealed record VerifiedAccessToken(string UserId, string SessionId, DateTi
     /// before Orvano had the claim.
     /// </summary>
     public IReadOnlyList<string> Amr { get; init; } = [];
+
+    /// <summary>
+    /// Whether the user was a guest (<c>account.createAnonymousSession</c>) when the token was issued (the
+    /// <c>is_anonymous</c> claim, spec 0014); false when the claim is missing. Up to 15 minutes old.
+    /// </summary>
+    public bool IsAnonymous { get; init; }
 }
 
 /// <summary>Options for <see cref="OrvanoClient.VerifyAccessTokenAsync(string, VerifyAccessTokenOptions, CancellationToken)"/>.</summary>
@@ -145,7 +151,13 @@ public sealed partial class OrvanoClient
         }
 
         var emailVerified = jwt.TryGetPayloadValue<bool>("email_verified", out var verified) && verified;
-        return new VerifiedAccessToken(userId, sessionId, new DateTimeOffset(jwt.ValidTo, TimeSpan.Zero), emailVerified) { Aal = aal, Amr = amr };
+        var isAnonymous = jwt.TryGetPayloadValue<bool>("is_anonymous", out var anonymous) && anonymous;
+        return new VerifiedAccessToken(userId, sessionId, new DateTimeOffset(jwt.ValidTo, TimeSpan.Zero), emailVerified)
+        {
+            Aal = aal,
+            Amr = amr,
+            IsAnonymous = isAnonymous,
+        };
     }
 
     private static readonly JsonWebTokenHandler Handler = new() { MapInboundClaims = false };

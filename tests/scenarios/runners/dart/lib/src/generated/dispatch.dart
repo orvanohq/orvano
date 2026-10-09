@@ -89,6 +89,13 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.createAnonymousSession': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createAnonymousSession();
+      return r.toJson();
+    },
+  ),
   'account.createEmailCode': DispatchEntry(
     status: 202,
     client: (o, input) async {
@@ -464,6 +471,17 @@ final Map<String, DispatchEntry> dispatch = {
       return null;
     },
   ),
+  'account.upgradeAnonymous': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.upgradeAnonymous(
+        CreateAnonymousUpgradeRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
   'account.verifyEmail': DispatchEntry(
     status: 200,
     client: (o, input) async {
@@ -769,6 +787,9 @@ final Map<String, DispatchEntry> dispatch = {
             ? null
             : input['emailVerified'] as bool,
         mfa: input['mfa'] == null ? null : input['mfa'] as String,
+        anonymous: input['anonymous'] == null
+            ? null
+            : input['anonymous'] as bool,
         cursor: input['cursor'] == null ? null : input['cursor'] as String,
         limit: input['limit'] == null ? null : (input['limit'] as num).toInt(),
       );
@@ -788,6 +809,9 @@ final Map<String, DispatchEntry> dispatch = {
               ? null
               : input['emailVerified'] as bool,
           mfa: input['mfa'] == null ? null : input['mfa'] as String,
+          anonymous: input['anonymous'] == null
+              ? null
+              : input['anonymous'] as bool,
           limit: input['limit'] == null
               ? null
               : (input['limit'] as num).toInt(),

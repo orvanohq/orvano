@@ -8,9 +8,10 @@ namespace Orvano.Auth.Application;
 /// <summary>
 /// How recently the caller's session proved who it is (spec 0013, AC-17, AC-18): whether the user has MFA on, whether
 /// the session was created within <see cref="AuthTimings.StrongAuthWindow"/>, and whether it passed a second factor or
-/// a passkey within it. Read without locks; the write that follows checks its own rows again under the user lock.
+/// a passkey within it, and whether the user is a guest (spec 0014, AC-29). Read without locks; the write that follows
+/// checks its own rows again under the user lock.
 /// </summary>
-internal sealed record SessionRecency(bool MfaEnabled, bool Fresh, bool Strong);
+internal sealed record SessionRecency(bool MfaEnabled, bool Fresh, bool Strong, bool Anonymous = false);
 
 /// <summary>The enrollment check (AC-17) and the step up check (AC-18), shared by every operation they guard.</summary>
 internal sealed class StepUp(AuthStore store, MethodPolicies policies, PasswordHasher hasher, RateLimits limits)
@@ -23,8 +24,9 @@ internal sealed class StepUp(AuthStore store, MethodPolicies policies, PasswordH
             var state = await MfaFactorState.ReadAsync(policies, conn, null, projectId, userId, token);
             await using var cmd = new NpgsqlCommand(
                 """
-                SELECT created_at > now() - @window, coalesce(strong_auth_at > now() - @window, false)
-                FROM orvano.auth_sessions WHERE id = @id AND user_id = @user AND project_id = @project
+                SELECT s.created_at > now() - @window, coalesce(s.strong_auth_at > now() - @window, false), u.is_anonymous
+                FROM orvano.auth_sessions s JOIN orvano.auth_users u ON u.id = s.user_id
+                WHERE s.id = @id AND s.user_id = @user AND s.project_id = @project
                 """, conn);
             cmd.Parameters.AddWithValue("window", AuthTimings.StrongAuthWindow);
             cmd.Parameters.AddWithValue("id", sessionId);
@@ -32,7 +34,7 @@ internal sealed class StepUp(AuthStore store, MethodPolicies policies, PasswordH
             cmd.Parameters.AddWithValue("project", projectId);
             await using var reader = await cmd.ExecuteReaderAsync(token);
             return await reader.ReadAsync(token)
-                ? new SessionRecency(state.MfaEnabled, reader.GetBoolean(0), reader.GetBoolean(1))
+                ? new SessionRecency(state.MfaEnabled, reader.GetBoolean(0), reader.GetBoolean(1), reader.GetBoolean(2))
                 : new SessionRecency(state.MfaEnabled, false, false);
         }, ct);
 
@@ -44,11 +46,14 @@ internal sealed class StepUp(AuthStore store, MethodPolicies policies, PasswordH
     /// run), and a user without one needs a session created within 10 minutes (403 <c>reauthentication_required</c>).
     /// An access token alone, however fresh, never adds a factor to an account that has a password.
     /// <c>auth.password_check.user</c> is taken only when a sent password is actually checked (spec 0014, AC-24): a
-    /// password the check ignores (MFA on, a strong check already, no password on the account) counts nothing.
+    /// password the check ignores (MFA on, a strong check already, no password on the account) counts nothing. A guest
+    /// (spec 0014, AC-29) adds no factor (403 <c>anonymous_not_allowed</c>), and a <paramref name="link"/> of theirs
+    /// passes at once: their session is their only credential.
     /// </summary>
-    public async Task<Failure?> EnrollmentAsync(string projectId, Guid userId, Guid sessionId, string? password, CancellationToken ct)
+    public async Task<Failure?> EnrollmentAsync(string projectId, Guid userId, Guid sessionId, string? password, CancellationToken ct, bool link = false)
     {
         var recency = await ReadAsync(projectId, userId, sessionId, ct);
+        if (recency.Anonymous) return link ? null : Failure.AnonymousNotAllowed;
         if (recency.MfaEnabled) return recency.Strong ? null : Failure.MfaVerificationRequired;
         if (recency.Strong) return null;
 
@@ -97,6 +102,14 @@ internal sealed class StepUp(AuthStore store, MethodPolicies policies, PasswordH
         if (!recency.MfaEnabled) return Failure.MfaNotEnabled;
         return recency.Strong ? null : Failure.MfaVerificationRequired;
     }
+
+    /// <summary>Whether the user is a guest (spec 0014, AC-29), read without a lock.</summary>
+    public Task<bool> IsAnonymousAsync(string projectId, Guid userId, CancellationToken ct) =>
+        store.ReadAsync((db, token) => db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.ProjectId == projectId && u.IsAnonymous, token), ct);
+
+    /// <summary>403 <c>anonymous_not_allowed</c> for a guest (spec 0014, AC-29), else null.</summary>
+    public async Task<Failure?> RefuseAnonymousAsync(string projectId, Guid userId, CancellationToken ct) =>
+        await IsAnonymousAsync(projectId, userId, ct) ? Failure.AnonymousNotAllowed : null;
 
     /// <summary>
     /// The step up check of a sensitive change (AC-18: <c>updatePassword</c>, <c>updateEmail</c>, <c>delete</c>): for a

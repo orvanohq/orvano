@@ -5,6 +5,12 @@ abstract final class ErrorCode {
   /// `already_member`
   static const alreadyMember = 'already_member';
 
+  /// `anonymous_disabled`
+  static const anonymousDisabled = 'anonymous_disabled';
+
+  /// `anonymous_not_allowed`
+  static const anonymousNotAllowed = 'anonymous_not_allowed';
+
   /// `console_session_required`
   static const consoleSessionRequired = 'console_session_required';
 

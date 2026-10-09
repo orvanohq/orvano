@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using Orvano.Auth.Application;
 using Orvano.Auth.Domain;
 using Orvano.Core.Data;
 
@@ -11,13 +13,20 @@ namespace Orvano.Auth.Jobs;
 /// keys once their 24 hour overlap has passed (AC-22), email tokens past their expiry (spec 0010, AC-29), so an
 /// email address sits in a token row at most its lifetime plus an hour, OAuth flows and used ID tokens past theirs
 /// (spec 0012, AC-19), and MFA tickets, WebAuthn challenges, and authenticator apps never confirmed within 15 minutes
-/// (spec 0013, AC-35). Rows go in batches, so one run never holds a long lock.
+/// (spec 0013, AC-35), and guests idle past their project's <c>anonymousIdleDays</c> (spec 0014, AC-31). Rows go in
+/// batches, so one run never holds a long lock.
 /// </summary>
 internal static class AuthRetention
 {
     public const string Name = "auth.retention";
     public static readonly TimeSpan Interval = TimeSpan.FromHours(1);
     public const int BatchSize = 1000;
+
+    /// <summary>Idle guests deleted per transaction (spec 0014, AC-31).</summary>
+    public const int GuestBatchSize = 5000;
+
+    /// <summary>How long one run deletes idle guests before leaving the rest to the next run (AC-31).</summary>
+    public static readonly TimeSpan GuestTimeBudget = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// Runs one cleanup; <c>Sessions</c>, <c>Keys</c>, and <c>Tokens</c> (email tokens, OAuth flows, used ID tokens, MFA
@@ -90,15 +99,66 @@ internal static class AuthRetention
         return (sessions, retired, tokens);
     }
 
+    /// <summary>
+    /// Spec 0014, AC-31: deletes the guests whose latest activity (the newest <c>greatest(created_at,
+    /// last_refreshed_at)</c> of their sessions, else the user's <c>created_at</c>) is older than their project's
+    /// <c>anonymous_idle_days</c> (30 without a settings row), through the normal delete path, each writing
+    /// <c>auth.user.deleted</c> with reason <c>anonymous_idle</c>. Batches of 5,000 per transaction, ordered by project,
+    /// until none are left or <paramref name="budget"/> has passed; the next run continues. A guest another transaction
+    /// holds is skipped. Returns how many it deleted.
+    /// </summary>
+    public static async Task<int> DeleteIdleGuestsAsync(AuthStore store, CancellationToken ct, TimeSpan? budget = null)
+    {
+        var deadline = Stopwatch.StartNew();
+        var deleted = 0;
+        while (deadline.Elapsed < (budget ?? GuestTimeBudget))
+        {
+            var outcome = await store.WriteAsync<int>(async (uow, token) =>
+            {
+                var idle = new List<(string ProjectId, Guid UserId)>();
+                await using (var find = new NpgsqlCommand(
+                    """
+                    SELECT u.project_id, u.id FROM orvano.auth_users u
+                    LEFT JOIN orvano.auth_method_settings m ON m.project_id = u.project_id
+                    WHERE u.is_anonymous
+                      AND coalesce(
+                            (SELECT max(greatest(s.created_at, s.last_refreshed_at)) FROM orvano.auth_sessions s WHERE s.user_id = u.id),
+                            u.created_at)
+                          < now() - make_interval(days => coalesce(m.anonymous_idle_days, @defaultDays))
+                    ORDER BY u.project_id
+                    LIMIT @batch
+                    FOR UPDATE OF u SKIP LOCKED
+                    """, uow.Tx.Connection, uow.Tx))
+                {
+                    find.Parameters.AddWithValue("defaultDays", MethodSettings.DefaultAnonymousIdleDays);
+                    find.Parameters.AddWithValue("batch", GuestBatchSize);
+                    await using var reader = await find.ExecuteReaderAsync(token);
+                    while (await reader.ReadAsync(token)) idle.Add((reader.GetString(0), reader.GetGuid(1)));
+                }
+
+                foreach (var (projectId, userId) in idle)
+                    await UserRecords.DeleteAsync(uow, projectId, userId, Actor.System, token, AuthEvents.AnonymousIdle);
+                return idle.Count;
+            }, ct);
+
+            deleted += outcome.Value;
+            if (outcome.Value < GuestBatchSize) break;
+        }
+
+        return deleted;
+    }
+
     /// <summary>The schedule's body: resolves the app data source and logs the counts.</summary>
     public static async Task RunScheduledAsync(IServiceProvider services, CancellationToken ct)
     {
         var (sessions, keys, tokens) = await RunAsync(services.GetRequiredKeyedService<NpgsqlDataSource>(OrvanoDb.App), ct);
-        if (sessions + keys + tokens > 0)
+        var guests = await DeleteIdleGuestsAsync(services.GetRequiredService<AuthStore>(), ct);
+        if (sessions + keys + tokens + guests > 0)
         {
             services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(AuthRetention))
                 .LogInformation(
-                    "Deleted {Sessions} old session(s), {Keys} retired signing key(s), and {Tokens} expired email token(s), OAuth flow(s), and used ID token(s)", sessions, keys, tokens);
+                    "Deleted {Sessions} old session(s), {Keys} retired signing key(s), {Tokens} expired email token(s), OAuth flow(s), and used ID token(s), and {Guests} idle guest(s)",
+                    sessions, keys, tokens, guests);
         }
     }
 }

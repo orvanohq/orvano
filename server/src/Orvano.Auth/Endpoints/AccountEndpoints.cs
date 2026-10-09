@@ -50,6 +50,34 @@ internal static class AccountEndpoints
             .WithName(Api.AccountOperations.CreatePasswordSession.Id)
             .RequireProject();
 
+        v1.MapPost(Api.AccountOperations.CreateAnonymousSession.Route, async (HttpContext http, AnonymousService anonymous, RateLimits limits, CancellationToken ct) =>
+        {
+            // Spec 0014, AC-28: both limits come before the project's switches.
+            var projectId = PublicRequests.Project(http);
+            var perIp = limits.Acquire(ProjectLimits.AnonymousPerIp(PublicRequests.Policies(http).Auth), PublicRequests.LimitKey(http));
+            if (!perIp.Allowed) return ApiProblem.RateLimited(http, perIp, Api.ErrorCode.RateLimited);
+            var perProject = limits.Acquire(RateLimitPolicies.AnonymousPerProject, projectId);
+            if (!perProject.Allowed) return ApiProblem.RateLimited(http, perProject, Api.ErrorCode.RateLimited);
+
+            return Created(http, await anonymous.SignInAsync(projectId, PublicRequests.Client(http), ct), AuthResult);
+        })
+            .WithName(Api.AccountOperations.CreateAnonymousSession.Id)
+            .RequireProject();
+
+        v1.MapPost(Api.AccountOperations.UpgradeAnonymous.Route, async (HttpContext http, Api.CreateAnonymousUpgradeRequest request, AnonymousService anonymous, CancellationToken ct) =>
+        {
+            var started = Stopwatch.StartNew();
+            var outcome = await anonymous.UpgradeAsync(
+                PublicRequests.Project(http), PublicRequests.User(http).UserId, request.Email, request.Password, request.Name, request.VerificationRedirectUrl,
+                PublicRequests.LimitKey(http), ct);
+            // Spec 0014, AC-30: the pending answer is the same whether the email was free or taken, in time too.
+            if (outcome.Value is { VerificationRequired: true }) await EmailRequests.HoldToFloorAsync(http, started, ct);
+            return Ok(http, outcome, AnonymousUpgradeResult);
+        })
+            .WithName(Api.AccountOperations.UpgradeAnonymous.Id)
+            .RequireProject()
+            .RequireUser();
+
         v1.MapPost(Api.AccountOperations.CreateRecovery.Route, async (HttpContext http, Api.CreateRecoveryRequest request, RecoveryService recovery, CancellationToken ct) =>
         {
             var started = Stopwatch.StartNew();

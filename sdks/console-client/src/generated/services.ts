@@ -1282,6 +1282,7 @@ export class ConsoleUsersService {
       createdBefore?: string | undefined
       emailVerified?: boolean | undefined
       mfa?: string | undefined
+      anonymous?: boolean | undefined
       cursor?: string | undefined
       limit?: number | undefined
     },
@@ -1302,6 +1303,7 @@ export class ConsoleUsersService {
       createdBefore?: string | undefined
       emailVerified?: boolean | undefined
       mfa?: string | undefined
+      anonymous?: boolean | undefined
       limit?: number | undefined
     },
     options?: RequestOptions,

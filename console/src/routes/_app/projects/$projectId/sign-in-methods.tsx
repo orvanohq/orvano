@@ -24,7 +24,7 @@ import type {
   UpdateAuthMethodSettingsRequest,
 } from '@orvano/console-client'
 
-import { PasskeysCard, TotpCard } from './-sign-in/method-cards'
+import { AnonymousCard, PasskeysCard, TotpCard } from './-sign-in/method-cards'
 import { PasskeysDialog } from './-sign-in/passkeys-dialog'
 import { ProviderCard } from './-sign-in/provider-card'
 import { ProviderDialog } from './-sign-in/provider-dialog'
@@ -35,9 +35,9 @@ export const Route = createFileRoute('/_app/projects/$projectId/sign-in-methods'
 
 /**
  * The project's sign in providers (spec 0012, AC-25): Google, Apple, GitHub, and Microsoft as
- * cards with their state and readiness, each opening its settings; and the Authenticator app and
- * Passkeys cards (spec 0013, AC-43). Owners and developers change them; viewers see everything,
- * disabled.
+ * cards with their state and readiness, each opening its settings; the Authenticator app and
+ * Passkeys cards (spec 0013, AC-43); and the Anonymous users card (spec 0014, AC-35). Owners and
+ * developers change them; viewers see everything, disabled.
  */
 function SignInMethodsPage() {
   const { projectId } = Route.useParams()
@@ -124,6 +124,25 @@ function SignInMethodsPage() {
               />
             </li>
           </ul>
+        )}
+      </section>
+      <section className="flex flex-col gap-3" aria-labelledby="guests-heading">
+        <h2 id="guests-heading" className="text-lg font-semibold">
+          Guests
+        </h2>
+        {methods.data === undefined ? null : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <AnonymousCard
+              // A fresh form once a save changed the settings.
+              key={`${String(methods.data.anonymousEnabled)}:${String(methods.data.anonymousIdleDays)}`}
+              settings={methods.data}
+              readOnlyReason={readOnlyReason}
+              onSave={async (request) => {
+                const saved = await saveMethods(request)
+                notifySuccess('Anonymous users saved', saved.anonymousEnabled ? 'On' : 'Off')
+              }}
+            />
+          </div>
         )}
       </section>
       <h2 className="text-lg font-semibold">Providers</h2>

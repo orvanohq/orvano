@@ -23,6 +23,8 @@ internal sealed class VerificationService(AuthStore store, AuthMailer mailer, Se
         return await store.WriteAsync<Done>(async (uow, token) =>
         {
             if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
+            // Spec 0014, AC-29: a guest has no email until they upgrade.
+            if (user.IsAnonymous) return Failure.AnonymousNotAllowed;
             if (user.EmailVerifiedAt is not null) return Failure.EmailAlreadyVerified;
             if (user.Email is not { } to) return Failure.Invalid("The user has no email to verify.");
             if (mailer.TakeRecipientLimits(projectId, to, EmailTokenKind.Verification, limitKey) is { } limited) return limited;

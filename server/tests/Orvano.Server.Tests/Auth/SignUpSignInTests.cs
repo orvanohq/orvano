@@ -147,7 +147,11 @@ public class SignUpSignInTests(PostgresFixture postgres)
 
         Assert.Equal("ES256", header.RootElement.GetProperty("alg").GetString());
         Assert.Equal(22, header.RootElement.GetProperty("kid").GetString()!.Length);
-        Assert.Equal(["aal", "amr", "aud", "email_verified", "exp", "iat", "iss", "sid", "sub"], claims.RootElement.EnumerateObject().Select(p => p.Name).Order());
+        Assert.Equal(
+            ["aal", "amr", "aud", "email_verified", "exp", "iat", "is_anonymous", "iss", "sid", "sub"],
+            claims.RootElement.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
+        // Spec 0014 AC-28: false for a user who signed up.
+        Assert.Equal(System.Text.Json.JsonValueKind.False, claims.RootElement.GetProperty("is_anonymous").ValueKind);
         // Spec 0013 AC-26: the session's strength, here one password.
         Assert.Equal(1, claims.RootElement.GetProperty("aal").GetInt32());
         Assert.Equal(["pwd"], claims.RootElement.GetProperty("amr").EnumerateArray().Select(a => a.GetString()));

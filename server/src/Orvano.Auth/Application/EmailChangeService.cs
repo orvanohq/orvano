@@ -8,7 +8,8 @@ namespace Orvano.Auth.Application;
 /// Changing the signed in user's email (spec 0010, AC-17, AC-18): a confirmation link goes to the new address, and
 /// the email changes only when that link is opened.
 /// </summary>
-internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, AccountService accounts, PolicySettings policies)
+internal sealed class EmailChangeService(
+    AuthStore store, AuthMailer mailer, AccountService accounts, PolicySettings policies, StepUp stepUp, Sessions sessions, SessionChecks checks)
 {
     /// <summary>
     /// <c>account.updateEmail</c> (AC-17). Checks run in this order: the body (the email rule, the redirect, and not
@@ -18,6 +19,8 @@ internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, Acc
     public async Task<Outcome<Done>> RequestAsync(
         string projectId, Guid userId, Guid sessionId, string? email, string? redirectUrl, string? password, string limitKey, CancellationToken ct)
     {
+        // Spec 0014, AC-29: a guest gets an email only by upgrading.
+        if (await stepUp.RefuseAnonymousAsync(projectId, userId, ct) is { } guest) return guest;
         if (!EmailRule.TryNormalize(email, out var newEmail)) return Failure.Invalid("The email must be an address of at most 320 characters.");
         if (await mailer.CheckRedirectAsync(projectId, redirectUrl, EmailTokenKind.EmailChange, ct) is not { } redirect) return Failure.RedirectUrlNotAllowed;
         var current = await store.ReadAsync((db, token) =>
@@ -44,7 +47,9 @@ internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, Acc
 
     /// <summary>
     /// <c>account.confirmEmailChange</c> (AC-18): consumes the token, checks the new address is still free, sets it as
-    /// the verified email, deletes the user's other live tokens, and keeps every session.
+    /// the verified email, deletes the user's other live tokens, and keeps every session. The link of a guest's upgrade
+    /// under the verified email flow (spec 0014, AC-30) makes them permanent here, which under required MFA ends their
+    /// sessions.
     /// </summary>
     public async Task<Outcome<Data.UserRow>> ConfirmAsync(string projectId, string? tokenValue, CancellationToken ct)
     {
@@ -54,13 +59,15 @@ internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, Acc
         {
             if (await EmailTokens.ConsumeLinkAsync(uow, projectId, EmailTokenKind.EmailChange, link, token) is not { Expired: false, UserId: { } userId } consumed)
                 return Failure.InvalidEmailToken;
-            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is null) return Failure.InvalidEmailToken;
+            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.InvalidEmailToken;
             if (await EmailTakenAsync(uow, projectId, consumed.Email, userId, token)) return Failure.EmailAlreadyInUse;
             if (!await SetEmailAsync(uow, userId, consumed.Email, verified: true, token)) return Failure.EmailAlreadyInUse;
 
             await EmailTokens.DeleteForUserAsync(uow, projectId, userId, kind: null, token);
             await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserUpdated, projectId, Actor.User(userId), userId.ToString(),
                 new Dictionary<string, string> { ["userId"] = userId.ToString() }, ["email", "emailVerified"], ct: token);
+            if (user.IsAnonymous)
+                await GuestUpgrades.BecamePermanentAsync(uow, sessions, checks, policies, projectId, userId, GuestUpgrades.ByPassword, token);
             return await uow.Db.Users.AsNoTracking().SingleAsync(u => u.Id == userId, token);
         }, ct);
     }
@@ -78,7 +85,8 @@ internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, Acc
     }
 
     /// <summary>
-    /// Sets the user's email, and <c>email_verified_at</c> to now or null. False when the unique index on
+    /// Sets the user's email, and <c>email_verified_at</c> to now or null. A user with an email is never a guest, so it
+    /// also sets <c>is_anonymous</c> false (spec 0014, AC-30). False when the unique index on
     /// <c>lower(email)</c> refuses it (a racing change took the address); the savepoint keeps the transaction usable.
     /// </summary>
     internal static async Task<bool> SetEmailAsync(AuthUnitOfWork uow, Guid userId, string email, bool verified, CancellationToken ct)
@@ -88,7 +96,8 @@ internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, Acc
         {
             await using var cmd = new NpgsqlCommand(
                 """
-                UPDATE orvano.auth_users SET email = @email, email_verified_at = CASE WHEN @verified THEN now() END, updated_at = now()
+                UPDATE orvano.auth_users
+                SET email = @email, email_verified_at = CASE WHEN @verified THEN now() END, is_anonymous = false, updated_at = now()
                 WHERE id = @user
                 """, uow.Tx.Connection, uow.Tx);
             cmd.Parameters.AddWithValue("email", email);

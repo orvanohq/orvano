@@ -1,0 +1,63 @@
+# Spec 0014, AC-28 to AC-30, AC-36: in the fixture project (guests on, fixtures.yaml), a guest signs in with no
+# password; may read their account but not set a password; upgrades with an email and password, keeping their user
+# ID and their session, whose token the SDK refreshes; and then signs in with that password.
+name: a guest signs in, upgrades, and keeps their user ID
+requires: []
+steps:
+  - op: account.createAnonymousSession
+    as: client
+    input: {}
+    expect:
+      status: 201
+      body: { isNewUser: true, user: { isAnonymous: true, hasPassword: false } }
+    save:
+      userId: $.user.id
+  - op: account.get
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body: { id: '${userId}', isAnonymous: true }
+  - op: account.updatePassword
+    as: client
+    input:
+      body: { newPassword: another horse battery staple }
+    expect: { status: 403, code: anonymous_not_allowed }
+  - op: account.upgradeAnonymous
+    as: client
+    input:
+      body:
+        {
+          email: 'guest-${unique}@example.com',
+          password: correct horse battery staple,
+          name: Guest,
+        }
+    expect:
+      status: 200
+      body:
+        verificationRequired: false
+        user:
+          {
+            id: '${userId}',
+            isAnonymous: false,
+            email: 'guest-${unique}@example.com',
+            hasPassword: true,
+          }
+  - op: account.listSessions
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body: { items: [{ method: anonymous, current: true }] }
+  - op: account.upgradeAnonymous
+    as: client
+    input:
+      body: { email: 'again-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 403, code: forbidden }
+  - op: signIn
+    as: client
+    input:
+      body: { email: 'guest-${unique}@example.com', password: correct horse battery staple }
+    expect:
+      status: 201
+      body: { user: { id: '${userId}', isAnonymous: false } }

@@ -200,6 +200,7 @@ export class UsersService {
       createdBefore?: string | undefined
       emailVerified?: boolean | undefined
       mfa?: string | undefined
+      anonymous?: boolean | undefined
       cursor?: string | undefined
       limit?: number | undefined
     },
@@ -217,6 +218,7 @@ export class UsersService {
       createdBefore?: string | undefined
       emailVerified?: boolean | undefined
       mfa?: string | undefined
+      anonymous?: boolean | undefined
       limit?: number | undefined
     },
     options?: RequestOptions,

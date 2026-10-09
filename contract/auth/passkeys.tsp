@@ -408,8 +408,8 @@ interface AccountPasskeysApi {
 }
 
 @doc("""
-  A project's second factor and passkey settings, with what the Passkeys card shows beside them. A project that never
-  saved any reads as the defaults: TOTP on, passkeys off.
+  A project's second factor, passkey, and guest settings, with what the Passkeys card shows beside them. A project
+  that never saved any reads as the defaults: TOTP on, passkeys off, guests off.
   """)
 model AuthMethodSettings {
   @doc("Whether users can turn on an authenticator app. Turned off, nobody is asked for MFA; stored factors stay.")
@@ -458,9 +458,17 @@ model AuthMethodSettings {
     """)
   @example(4)
   activeUsersWithoutMfa: int32 | null;
+
+  @doc("Whether guests can sign in with `account.createAnonymousSession`. Off by default.")
+  @example(false)
+  anonymousEnabled: boolean;
+
+  @doc("How many days a guest may stay idle (no sign in or refresh) before it is deleted, 1 to 365. Defaults to 30.")
+  @example(30)
+  anonymousIdleDays: int32;
 }
 
-@doc("Changes to a project's second factor and passkey settings. Fields left out keep their value.")
+@doc("Changes to a project's second factor, passkey, and guest settings. Fields left out keep their value.")
 model UpdateAuthMethodSettingsRequest {
   @doc("Whether users can turn on an authenticator app.")
   @example(true)
@@ -487,6 +495,14 @@ model UpdateAuthMethodSettingsRequest {
     """)
   @example(true)
   mfaRequired?: boolean;
+
+  @doc("Whether guests can sign in with `account.createAnonymousSession`.")
+  @example(true)
+  anonymousEnabled?: boolean;
+
+  @doc("How many days a guest may stay idle before it is deleted, 1 to 365.")
+  @example(30)
+  anonymousIdleDays?: int32;
 
   @doc("Must be true to change `rpId` while passkeys are registered under the current one: they stop working.")
   @example(true)

@@ -112,6 +112,10 @@ interface UsersApi {
     @query
     mfa?: string,
 
+    @doc("Only guests (true) or only permanent users (false).")
+    @query
+    anonymous?: boolean,
+
     @doc("The `nextCursor` of the previous page.")
     @query
     cursor?: string,

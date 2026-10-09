@@ -26,7 +26,9 @@ internal sealed class IdentityService(
     OAuthRedemptions redemptions,
     StepUp stepUp,
     MethodPolicies policies,
-    Orvano.Messaging.Contracts.IEmailQueue email)
+    Orvano.Messaging.Contracts.IEmailQueue email,
+    PolicySettings policySettings,
+    SessionChecks checks)
 {
     public const int MaxIdTokenBytes = 8 * 1024;
     public const int MaxAuthorizationCode = 2048;
@@ -67,7 +69,7 @@ internal sealed class IdentityService(
     {
         // AC-4's start limit comes before the two reads below.
         if (oauth.TakeStartLimit(ipKey) is { } limited) return limited;
-        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, password, ct) is { } stale) return stale;
+        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, password, ct, link: true) is { } stale) return stale;
         if (provider is { } chosen && await HasProviderAsync(userId, chosen, ct)) return Failure.ProviderAlreadyLinked;
         return await oauth.StartAsync(projectId, provider, redirectUrl, codeChallenge, ipKey, ct, linkUserId: userId, limitTaken: true);
     }
@@ -83,7 +85,7 @@ internal sealed class IdentityService(
 
         return await redemptions.WriteRetryingAsync<IdentityRow>(async (uow, token) =>
             await oauth.ConsumeAsync(uow, projectId, code, FlowPurpose.Link, verifier!, userId, token) is { } consumed
-                ? await LinkAsync(uow, projectId, userId, consumed.Provider, consumed.Result, token)
+                ? await LinkAsync(uow, projectId, userId, consumed.Provider, consumed.Result, SessionMethod.OAuth, token)
                 : Failure.InvalidOAuthCode, ct);
     }
 
@@ -94,7 +96,7 @@ internal sealed class IdentityService(
     public async Task<Outcome<IdentityRow>> LinkNativeAsync(
         string projectId, Guid userId, Guid sessionId, NativeRequest request, string? password, CancellationToken ct)
     {
-        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, password, ct) is { } stale) return stale;
+        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, password, ct, link: true) is { } stale) return stale;
         var check = await CheckAsync(projectId, request, ct);
         if (!check.Succeeded) return check.Failure!;
         var native = check.Value!;
@@ -103,7 +105,7 @@ internal sealed class IdentityService(
 
         return await redemptions.WriteRetryingAsync<IdentityRow>(async (uow, token) =>
             await UseAsync(uow, projectId, native, token)
-                ? await LinkAsync(uow, projectId, userId, native.Provider, result, token)
+                ? await LinkAsync(uow, projectId, userId, native.Provider, result, SessionMethod.IdToken, token)
                 : Failure.InvalidIdToken, ct);
     }
 
@@ -154,14 +156,36 @@ internal sealed class IdentityService(
     /// <c>identity_already_linked</c>, a user who already has the provider is 409 <c>provider_already_linked</c>. The
     /// identity's email is never compared with the user's.
     /// </summary>
-    private async Task<Outcome<IdentityRow>> LinkAsync(AuthUnitOfWork uow, string projectId, Guid userId, OAuthProvider provider, ProviderResult result, CancellationToken ct)
+    /// <summary>
+    /// Links the provider account to the user, under the user's lock. A guest (spec 0014, AC-30) becomes permanent with
+    /// it, taking the provider's verified email when no other user has it; that email (or none, against an allowed
+    /// list) must pass the project's domain rule, else 403 <c>email_domain_not_allowed</c> and nothing changes.
+    /// <paramref name="method"/> names the link on <c>auth.user.upgraded</c>.
+    /// </summary>
+    private async Task<Outcome<IdentityRow>> LinkAsync(
+        AuthUnitOfWork uow, string projectId, Guid userId, OAuthProvider provider, ProviderResult result, string method, CancellationToken ct)
     {
         if (await UserLocks.ByIdAsync(uow, projectId, userId, ct) is not { } user) return Failure.UserNotFound;
         if (await Identities.FindBySubjectAsync(uow, projectId, provider, result.Subject, ct) is { } existing)
             return existing.UserId == userId ? Failure.ProviderAlreadyLinked : Failure.IdentityAlreadyLinked;
         if (await SignInResolution.HasProviderAsync(uow, userId, provider, ct)) return Failure.ProviderAlreadyLinked;
 
+        string? guestEmail = null;
+        if (user.IsAnonymous)
+        {
+            guestEmail = result.VerifiedEmail is { } offered && !await EmailChangeService.EmailTakenAsync(uow, projectId, offered, userId, ct) ? offered : null;
+            if ((await policySettings.GetAsync(uow.Tx.Connection!, uow.Tx, projectId, ct)).CheckDomain(guestEmail) is { } refused) return refused;
+        }
+
         var id = await identities.InsertAsync(uow, projectId, userId, provider, result, IdentitySource.Link, Actor.User(userId), ct);
+        if (user.IsAnonymous)
+        {
+            // The index decides a race for the address: the guest then becomes permanent without it.
+            if (guestEmail is null || !await EmailChangeService.SetEmailAsync(uow, userId, guestEmail, verified: true, ct))
+                await GuestUpgrades.ClearAnonymousAsync(uow, userId, ct);
+            await GuestUpgrades.BecamePermanentAsync(uow, sessions, checks, policySettings, projectId, userId, method, ct);
+        }
+
         await SignInResolution.FillAsync(uow, projectId, user, result.Name, verified: false, ct);
         return await uow.Db.Identities.AsNoTracking().SingleAsync(i => i.Id == id, ct);
     }

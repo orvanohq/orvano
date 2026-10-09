@@ -133,6 +133,19 @@ final class AccountService {
     return AuthResult.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Signs a new guest in: creates an anonymous user with no email, name, or password, and their session. Needs the
+  /// project's anonymous users switch. The guest keeps their user ID when they later upgrade or link a provider; a guest
+  /// idle longer than the project's idle days is deleted.
+  Future<AuthResult> createAnonymousSession({RequestOptions? options}) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/sessions/anonymous',
+      session: SessionChange.start,
+      options: options,
+    );
+    return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Emails a 6 digit sign in code that works for 10 minutes. An email without a user gets one that creates the user,
   /// unless `createUser` is false. The answer is the same 202 either way.
   Future<void> createEmailCode(
@@ -677,6 +690,23 @@ final class AccountService {
       body: body.toJson(),
       options: options,
     );
+  }
+
+  /// Turns the signed in guest into a permanent user with an email and password, keeping their user ID and data. While
+  /// the project requires verified emails or MFA, the guest stays a guest until they open the link emailed to the new
+  /// address, and the answer never says whether that email already had an account.
+  Future<AnonymousUpgradeResult> upgradeAnonymous(
+    CreateAnonymousUpgradeRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/anonymous/upgrade',
+      body: body.toJson(),
+      session: SessionChange.user,
+      options: options,
+    );
+    return AnonymousUpgradeResult.fromJson(json as Map<String, dynamic>);
   }
 
   /// Verifies a user's email with the token from a verification link. It needs no session and creates none; a client

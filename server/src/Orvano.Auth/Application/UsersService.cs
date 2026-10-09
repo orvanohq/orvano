@@ -6,9 +6,10 @@ using Orvano.Core.Paging;
 
 namespace Orvano.Auth.Application;
 
-/// <summary>Filters for listing a project's users (AC-17, spec 0010 AC-21). Every one is optional.</summary>
+/// <summary>Filters for listing a project's users (AC-17, spec 0010 AC-21, spec 0014 AC-32). Every one is optional.</summary>
 internal sealed record UserFilter(
-    string? EmailPrefix, string? Status, DateTimeOffset? CreatedAfter, DateTimeOffset? CreatedBefore, bool? EmailVerified = null, string? Mfa = null);
+    string? EmailPrefix, string? Status, DateTimeOffset? CreatedAfter, DateTimeOffset? CreatedBefore, bool? EmailVerified = null, string? Mfa = null,
+    bool? Anonymous = null);
 
 /// <summary>The values of the <c>mfa</c> filter (spec 0013, AC-39).</summary>
 internal static class MfaFilter
@@ -53,6 +54,7 @@ internal sealed class UsersService(
             if (filter.CreatedAfter is { } createdAfter) query = query.Where(u => u.CreatedAt > createdAfter);
             if (filter.CreatedBefore is { } createdBefore) query = query.Where(u => u.CreatedAt < createdBefore);
             if (filter.EmailVerified is { } verified) query = verified ? query.Where(u => u.EmailVerifiedAt != null) : query.Where(u => u.EmailVerifiedAt == null);
+            if (filter.Anonymous is { } anonymous) query = query.Where(u => u.IsAnonymous == anonymous);
             if (filter.Mfa is { } mfa)
             {
                 // Spec 0013, AC-5 and AC-39: MFA is on with a confirmed TOTP factor while the project allows TOTP (no

@@ -26,7 +26,7 @@ import type { User } from '@orvano/console-client'
 
 import { EmailCard } from '../-users/email-parts'
 import { IdentitiesTable } from '../-users/identities'
-import { SessionsTable, UserStatusBadge } from '../-users/parts'
+import { GuestBadge, SessionsTable, UserStatusBadge } from '../-users/parts'
 import { UserSecurity } from '../-users/security'
 
 export const Route = createFileRoute('/_app/projects/$projectId/users/$userId')({
@@ -97,6 +97,7 @@ function UserPage() {
       <div className="flex flex-wrap items-center gap-3">
         <PageHeading>{label}</PageHeading>
         <UserStatusBadge status={user.status} />
+        {user.isAnonymous ? <GuestBadge /> : null}
         <div className="ml-auto flex flex-wrap gap-2">
           <StatusAction user={user} reason={reason} onChange={run} projectId={projectId} />
           <ConfirmDialog
@@ -128,6 +129,13 @@ function UserPage() {
           />
         </div>
       </div>
+      {user.isAnonymous ? (
+        <p className="text-muted-foreground">
+          This user is a guest: they signed in without an email or password. They become a permanent
+          user, with the same ID, when they upgrade or link a provider. A guest who stays idle
+          longer than the project&apos;s idle days is deleted.
+        </p>
+      ) : null}
       <dl className="grid max-w-xl grid-cols-[auto_1fr] items-center gap-x-6 gap-y-3">
         <dt className="text-muted-foreground">User ID</dt>
         <dd>

@@ -39,28 +39,51 @@ const mfaOptions = [
   { value: 'off', label: 'Off' },
 ] as const
 
+/** The kind filter's choices; the URL keeps `anonymous=true` or `false` (spec 0014, AC-32). */
+const kindOptions = [
+  { value: 'all', label: 'All' },
+  { value: 'permanent', label: 'Permanent' },
+  { value: 'guest', label: 'Guests' },
+] as const
+
 interface UsersSearch {
   emailVerified?: boolean
   mfa?: 'on' | 'off'
+  anonymous?: boolean
+}
+
+/** A search with only the filters that are set, so the URL never carries an empty one. */
+function filters(search: {
+  emailVerified?: boolean | undefined
+  mfa?: 'on' | 'off' | undefined
+  anonymous?: boolean | undefined
+}): UsersSearch {
+  return {
+    ...(search.emailVerified === undefined ? {} : { emailVerified: search.emailVerified }),
+    ...(search.mfa === undefined ? {} : { mfa: search.mfa }),
+    ...(search.anonymous === undefined ? {} : { anonymous: search.anonymous }),
+  }
 }
 
 export const Route = createFileRoute('/_app/projects/$projectId/users/')({
-  validateSearch: (search: Record<string, unknown>): UsersSearch => ({
-    ...(typeof search.emailVerified === 'boolean' ? { emailVerified: search.emailVerified } : {}),
-    ...(search.mfa === 'on' || search.mfa === 'off' ? { mfa: search.mfa } : {}),
-  }),
+  validateSearch: (search: Record<string, unknown>): UsersSearch =>
+    filters({
+      ...(typeof search.emailVerified === 'boolean' ? { emailVerified: search.emailVerified } : {}),
+      ...(search.mfa === 'on' || search.mfa === 'off' ? { mfa: search.mfa } : {}),
+      ...(typeof search.anonymous === 'boolean' ? { anonymous: search.anonymous } : {}),
+    }),
   component: UsersPage,
 })
 
 /**
  * The project's users (spec 0004, AC-29): newest first, paged, with a prefix search on email, and
- * verification (spec 0010, AC-22) and MFA (spec 0013, AC-44) filters kept in the URL. Owners and
- * developers create users;
- * viewers see the button with the reason it is not theirs.
+ * verification (spec 0010, AC-22), MFA (spec 0013, AC-44), and guest (spec 0014, AC-32) filters
+ * kept in the URL. Owners and developers create users; viewers see the button with the reason it is
+ * not theirs.
  */
 function UsersPage() {
   const { projectId } = Route.useParams()
-  const { emailVerified, mfa } = Route.useSearch()
+  const { emailVerified, mfa, anonymous } = Route.useSearch()
   const navigate = Route.useNavigate()
   const choice: VerificationChoice =
     emailVerified === undefined ? 'all' : emailVerified ? 'verified' : 'unverified'
@@ -79,7 +102,7 @@ function UsersPage() {
       clearTimeout(timer)
     }
   }, [typed])
-  const users = useInfiniteQuery(usersQuery(projectId, email, emailVerified, 25, mfa))
+  const users = useInfiniteQuery(usersQuery(projectId, email, emailVerified, 25, mfa, anonymous))
   const rows = users.data?.pages.flatMap((page) => page.items) ?? []
 
   return (
@@ -127,10 +150,11 @@ function UsersPage() {
             onValueChange={(next) => {
               if (next === null) return
               void navigate({
-                search: (prev) => ({
-                  ...(prev.mfa === undefined ? {} : { mfa: prev.mfa }),
-                  ...(next === 'all' ? {} : { emailVerified: next === 'verified' }),
-                }),
+                search: (prev) =>
+                  filters({
+                    ...prev,
+                    emailVerified: next === 'all' ? undefined : next === 'verified',
+                  }),
                 replace: true,
               })
             }}
@@ -155,12 +179,8 @@ function UsersPage() {
             onValueChange={(next) => {
               if (next === null) return
               void navigate({
-                search: (prev) => ({
-                  ...(prev.emailVerified === undefined
-                    ? {}
-                    : { emailVerified: prev.emailVerified }),
-                  ...(next === 'on' || next === 'off' ? { mfa: next } : {}),
-                }),
+                search: (prev) =>
+                  filters({ ...prev, mfa: next === 'on' || next === 'off' ? next : undefined }),
                 replace: true,
               })
             }}
@@ -170,6 +190,32 @@ function UsersPage() {
             </SelectTrigger>
             <SelectContent>
               {mfaOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="users-kind">Kind</Label>
+          <Select
+            items={kindOptions}
+            value={anonymous === undefined ? 'all' : anonymous ? 'guest' : 'permanent'}
+            onValueChange={(next) => {
+              if (next === null) return
+              void navigate({
+                search: (prev) =>
+                  filters({ ...prev, anonymous: next === 'all' ? undefined : next === 'guest' }),
+                replace: true,
+              })
+            }}
+          >
+            <SelectTrigger id="users-kind" className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {kindOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
@@ -193,7 +239,14 @@ function UsersPage() {
           void users.fetchNextPage()
         }}
         empty={
-          <NoUsers searching={email !== '' || emailVerified !== undefined || mfa !== undefined} />
+          <NoUsers
+            searching={
+              email !== '' ||
+              emailVerified !== undefined ||
+              mfa !== undefined ||
+              anonymous !== undefined
+            }
+          />
         }
       />
     </div>
