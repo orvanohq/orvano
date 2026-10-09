@@ -46,7 +46,10 @@ async function userWithMfa(request: APIRequestContext, baseURL: string, email: s
   const token = ((await signedIn.json()) as { session: { accessToken: string } }).session
     .accessToken
   const bearer = { ...project, Authorization: `Bearer ${token}` }
-  const setup = await request.post(`${baseURL}/v1/account/mfa/totp`, { headers: bearer })
+  const setup = await request.post(`${baseURL}/v1/account/mfa/totp`, {
+    headers: bearer,
+    data: { password },
+  })
   expect(setup.status()).toBe(201)
   const { secret } = (await setup.json()) as { secret: string }
   const confirmed = await request.post(`${baseURL}/v1/account/mfa/totp/confirm`, {

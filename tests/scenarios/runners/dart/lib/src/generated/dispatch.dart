@@ -91,7 +91,7 @@ final Map<String, DispatchEntry> dispatch = {
     status: 201,
     client: (o, input) async {
       final r = await o.account.createIdTokenIdentity(
-        CreateIdTokenSessionRequest.fromJson(
+        CreateIdTokenIdentityRequest.fromJson(
           input['body'] as Map<String, dynamic>,
         ),
       );
@@ -162,7 +162,9 @@ final Map<String, DispatchEntry> dispatch = {
     status: 200,
     client: (o, input) async {
       final r = await o.account.createOAuthLinkFlow(
-        CreateOAuthFlowRequest.fromJson(input['body'] as Map<String, dynamic>),
+        CreateOAuthLinkFlowRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
       );
       return r.toJson();
     },
@@ -188,7 +190,11 @@ final Map<String, DispatchEntry> dispatch = {
   'account.createPasskeyRegistration': DispatchEntry(
     status: 200,
     client: (o, input) async {
-      final r = await o.account.createPasskeyRegistration();
+      final r = await o.account.createPasskeyRegistration(
+        CreatePasskeyRegistrationRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
       return r.toJson();
     },
   ),
@@ -240,7 +246,9 @@ final Map<String, DispatchEntry> dispatch = {
   'account.createTotp': DispatchEntry(
     status: 201,
     client: (o, input) async {
-      final r = await o.account.createTotp();
+      final r = await o.account.createTotp(
+        CreateTotpRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
       return r.toJson();
     },
   ),

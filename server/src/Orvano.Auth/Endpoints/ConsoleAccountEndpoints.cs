@@ -138,6 +138,13 @@ internal static class ConsoleCookies
     }
 
     /// <summary>
+    /// Replaces only the <c>orvano_console</c> cookie after a second factor raised the session (spec 0013): the refresh
+    /// cookie is unchanged, so it is left as it is.
+    /// </summary>
+    public static void SetAccess(HttpContext http, RaisedSessionView session, PublicUrl publicUrl) =>
+        http.Response.Cookies.Append(OrvanoHeaders.ConsoleCookie, session.AccessToken, Options("/", session.RefreshTokenExpiresAt, Secure(publicUrl)));
+
+    /// <summary>
     /// Sets <c>orvano_console_mfa</c>, the ticket of a console sign in waiting for its second step (spec 0013, AC-41):
     /// <c>HttpOnly</c>, <c>SameSite=Strict</c>, sent only to <c>/v1/console/account/session</c>, for 5 minutes.
     /// </summary>

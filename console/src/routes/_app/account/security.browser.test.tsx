@@ -135,6 +135,56 @@ describe('/account/security', () => {
     expect(sent('DELETE', '/v1/console/account/session')).toHaveLength(1)
   })
 
+  it('asks for the password before turning the app on, and again while it is wrong', async () => {
+    api.failNext('POST', /mfa\/totp$/, 401, 'invalid_credentials', 'Send your password.')
+    api.failNext('POST', /mfa\/totp$/, 401, 'invalid_credentials', 'Wrong password.')
+    const { screen } = await renderApp('/account/security')
+    await screen.getByRole('button', { name: 'Turn on' }).click()
+
+    await expect.poll(dialog).not.toBeNull()
+    expect(dialog()?.textContent).toContain('Enter your password')
+    expect(dialog()?.textContent).not.toContain('That password is wrong.')
+    await noAxeViolations()
+    await userEvent.click(submitOf('step-up-password'))
+    await expect.element(screen.getByText('Enter your password.')).toBeVisible()
+    await userEvent.fill(field('step-up-password'), 'not it')
+    await userEvent.click(submitOf('step-up-password'))
+
+    await expect.element(screen.getByText('That password is wrong.')).toBeVisible()
+    await userEvent.fill(field('step-up-password'), 'correct horse battery staple')
+    await userEvent.click(submitOf('step-up-password'))
+
+    await expect
+      .element(screen.getByRole('img', { name: 'QR code for your authenticator app' }))
+      .toBeVisible()
+    expect(sent('POST', '/v1/console/account/mfa/totp').map((request) => request.body)).toEqual([
+      {},
+      { password: 'not it' },
+      { password: 'correct horse battery staple' },
+    ])
+    await expect.poll(dialog).toBeNull()
+  })
+
+  it('asks for the password before adding a passkey, and closing it adds nothing', async () => {
+    api.failNext(
+      'POST',
+      /passkeys\/registration$/,
+      401,
+      'invalid_credentials',
+      'Send your password.',
+    )
+    const { screen } = await renderApp('/account/security')
+    await screen.getByRole('button', { name: 'Add a passkey' }).click()
+
+    await expect.poll(dialog).not.toBeNull()
+    expect(document.getElementById('step-up-password')).not.toBeNull()
+    await userEvent.keyboard('{Escape}')
+
+    await expect.poll(dialog).toBeNull()
+    expect(sent('POST', '/v1/console/account/passkeys/registration')).toHaveLength(1)
+    expect(sent('POST', '/v1/console/account/passkeys')).toHaveLength(0)
+  })
+
   it('closing the step up dialog leaves things as they are', async () => {
     api.accountMfa = { ...mfaOn, factorsAvailable: ['totp', 'passkey'] }
     api.failNext('DELETE', /mfa\/totp$/, 403, 'mfa_verification_required', 'Step up first.')

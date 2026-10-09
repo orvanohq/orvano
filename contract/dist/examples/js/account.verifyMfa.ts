@@ -3,5 +3,5 @@ import { Client, Orvano } from '@orvano/js'
 
 const orvano = new Orvano(new Client({ endpoint: 'https://orvano.example.com' }))
 
-const sessionTokens = await orvano.account.verifyMfa({})
-console.log(sessionTokens)
+const raisedSession = await orvano.account.verifyMfa({})
+console.log(raisedSession)

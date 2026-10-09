@@ -359,7 +359,7 @@
     "/v1/account/identities/id-token": {
       "post": {
         "operationId": "account.createIdTokenIdentity",
-        "description": "Links a provider to the signed in user with its ID token from a native app. The session must be at most 10 minutes old.",
+        "description": "Links a provider to the signed in user with its ID token from a native app. Needs the user's current password when\nthey have one (or a second factor on this session within 10 minutes); a user without a password needs a session at\nmost 10 minutes old.",
         "parameters": [],
         "responses": {
           "201": {
@@ -391,7 +391,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateIdTokenSessionRequest"
+                "$ref": "#/components/schemas/CreateIdTokenIdentityRequest"
               }
             }
           }
@@ -457,7 +457,7 @@
     "/v1/account/identities/oauth/flows": {
       "post": {
         "operationId": "account.createOAuthLinkFlow",
-        "description": "Starts linking a provider to the signed in user, like `createOAuthFlow`. The session must be at most 10 minutes\nold. The SDKs' `linkIdentity` does all of it.",
+        "description": "Starts linking a provider to the signed in user, like `createOAuthFlow`. Needs the user's current password when\nthey have one (or a second factor on this session within 10 minutes); a user without a password needs a session at\nmost 10 minutes old. The SDKs' `linkIdentity` does all of it.",
         "parameters": [],
         "responses": {
           "200": {
@@ -489,7 +489,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateOAuthFlowRequest"
+                "$ref": "#/components/schemas/CreateOAuthLinkFlowRequest"
               }
             }
           }
@@ -702,7 +702,7 @@
     "/v1/account/mfa/totp": {
       "post": {
         "operationId": "account.createTotp",
-        "description": "Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.\nNeeds a session that signed in within 10 minutes (or passed a second factor within 10 minutes) and, when the user\nhas an email, a verified one.",
+        "description": "Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.\nNeeds the user's current password when they have one (or a second factor on this session within 10 minutes; a\nuser without a password needs a session that signed in within 10 minutes) and, when the user has an email, a\nverified one.",
         "parameters": [],
         "responses": {
           "201": {
@@ -729,6 +729,16 @@
         "tags": [
           "account"
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTotpRequest"
+              }
+            }
+          }
+        },
         "security": [
           {
             "bearer": []
@@ -771,7 +781,7 @@
     "/v1/account/mfa/totp/confirm": {
       "post": {
         "operationId": "account.confirmTotp",
-        "description": "Turns MFA on with the first code from the authenticator app. Answers 10 new recovery codes, ends every other\nsession of the user, and raises this one to level 2 with a new access token. The SDKs keep their stored session,\nwhose next refresh carries `aal` 2 too.",
+        "description": "Turns MFA on with the first code from the authenticator app, within 15 minutes of `account.createTotp`. Answers 10\nnew recovery codes, ends every other session of the user, and raises this one to level 2 with a new access token.\nThe SDKs keep their stored refresh token, whose next refresh carries `aal` 2 too.",
         "parameters": [],
         "responses": {
           "200": {
@@ -820,7 +830,7 @@
     "/v1/account/mfa/verify": {
       "post": {
         "operationId": "account.verifyMfa",
-        "description": "Step up: checks a second factor on the signed in session, so security changes work for the next 10 minutes. Raises\nthe session to level 2 and answers a new access token with the current refresh token, unchanged. The SDK helpers\n(`verifyMfa`) store them.",
+        "description": "Step up: checks a second factor on the signed in session, so security changes work for the next 10 minutes. Raises\nthe session to level 2 and answers a new access token; the refresh token is not sent and stays unchanged. The SDK\nhelpers (`verifyMfa`) store the access token.",
         "parameters": [],
         "responses": {
           "200": {
@@ -828,7 +838,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionTokens"
+                  "$ref": "#/components/schemas/RaisedSession"
                 }
               }
             }
@@ -999,7 +1009,7 @@
     "/v1/account/passkeys/registration": {
       "post": {
         "operationId": "account.createPasskeyRegistration",
-        "description": "Starts adding a passkey: answers the options for `navigator.credentials.create`. Needs passkeys turned on, a\nsession that signed in within 10 minutes (or passed a second factor within 10 minutes), a verified email when the\nuser has one, and fewer than 10 passkeys.",
+        "description": "Starts adding a passkey: answers the options for `navigator.credentials.create`. Needs passkeys turned on, the\nuser's current password when they have one (or a second factor on this session within 10 minutes; a user without a\npassword needs a session that signed in within 10 minutes), a verified email when the user has one, and fewer than\n10 passkeys.",
         "parameters": [],
         "responses": {
           "200": {
@@ -1026,6 +1036,16 @@
         "tags": [
           "account"
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePasskeyRegistrationRequest"
+              }
+            }
+          }
+        },
         "security": [
           {
             "bearer": []
@@ -3394,6 +3414,63 @@
         },
         "description": "A sign in with an emailed code."
       },
+      "CreateIdTokenIdentityRequest": {
+        "type": "object",
+        "required": [
+          "provider",
+          "idToken",
+          "nonce"
+        ],
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/IdTokenProvider",
+            "description": "The provider that issued the token."
+          },
+          "idToken": {
+            "type": "string",
+            "description": "The provider's ID token, at most 8 KB.",
+            "examples": [
+              "eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9.e30.c2ln"
+            ]
+          },
+          "nonce": {
+            "type": "string",
+            "description": "The raw nonce, 16 to 128 characters. Give the provider its lowercase hex SHA-256 (the SDKs' `createNonce` makes\nboth), so the token carries that hash.",
+            "examples": [
+              "q2lV7l3o0W9nE5w6Xk0wq1JmYp8tVb3Z"
+            ]
+          },
+          "authorizationCode": {
+            "type": "string",
+            "description": "Apple only, and required for Apple: the authorization code Sign in with Apple returned with the token.",
+            "examples": [
+              "c1f2e3d4..."
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Apple only: the name Sign in with Apple returned on the first authorization, at most 256 characters.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "description": "The user's current password. A user who has one sends it, unless this session passed a second factor within 10\nminutes. A user without one leaves it out, and must have signed in within 10 minutes.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          }
+        },
+        "description": "A link of a provider to the signed in user with its ID token from a native app."
+      },
       "CreateIdTokenSessionRequest": {
         "type": "object",
         "required": [
@@ -3570,6 +3647,42 @@
         },
         "description": "A request to start signing in with a provider."
       },
+      "CreateOAuthLinkFlowRequest": {
+        "type": "object",
+        "required": [
+          "provider",
+          "redirectUrl",
+          "codeChallenge"
+        ],
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/OAuthProvider",
+            "description": "The provider to sign in with."
+          },
+          "redirectUrl": {
+            "type": "string",
+            "description": "Your page or app that receives the result: a host that is one of the project's web platforms (`http` only on\n`localhost` or `127.0.0.1`), or your app's own scheme (its iOS, Android, or macOS identifier). Orvano adds\n`orvano_type` and then `orvano_code` or `orvano_error` to it.",
+            "examples": [
+              "https://app.example.com/auth/callback"
+            ]
+          },
+          "codeChallenge": {
+            "type": "string",
+            "description": "The S256 PKCE challenge: base64url(SHA-256(verifier)), 43 characters. Keep the verifier; only it redeems the\ncode. The SDKs make both.",
+            "examples": [
+              "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "description": "The user's current password. A user who has one sends it, unless this session passed a second factor within 10\nminutes. A user without one leaves it out, and must have signed in within 10 minutes.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          }
+        },
+        "description": "A request to start linking a provider to the signed in user."
+      },
       "CreateOAuthSessionRequest": {
         "type": "object",
         "required": [
@@ -3593,6 +3706,19 @@
           }
         },
         "description": "A sign in with the code a provider flow returned."
+      },
+      "CreatePasskeyRegistrationRequest": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "The user's current password. A user who has one sends it, unless this session passed a second factor within 10\nminutes. A user without one leaves it out, and must have signed in within 10 minutes.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          }
+        },
+        "description": "A request to start adding a passkey."
       },
       "CreatePasskeySessionRequest": {
         "type": "object",
@@ -3662,6 +3788,19 @@
           }
         },
         "description": "A request to email a password reset link."
+      },
+      "CreateTotpRequest": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "The user's current password. A user who has one sends it, unless this session passed a second factor within 10\nminutes. A user without one leaves it out, and must have signed in within 10 minutes.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          }
+        },
+        "description": "A request to start turning on an authenticator app."
       },
       "CreateUserRecoveryRequest": {
         "type": "object",
@@ -4865,6 +5004,36 @@
         },
         "description": "An RFC 9457 problem details body. Every operation declares it as its `default` response, sent\nas `application/problem+json`."
       },
+      "RaisedSession": {
+        "type": "object",
+        "required": [
+          "accessToken",
+          "accessTokenExpiresAt",
+          "sessionId"
+        ],
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "An ES256 JWT, valid for 15 minutes.",
+            "examples": [
+              "eyJhbGciOiJFUzI1NiIsImtpZCI6Ii4uLiJ9.e30.c2ln"
+            ]
+          },
+          "accessTokenExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the access token expires."
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "The session ID, also the `sid` claim of the access token.",
+            "examples": [
+              "01924f5e-9a1b-7c4d-8e21-3d5e6f7a8b9c"
+            ]
+          }
+        },
+        "description": "The signed in session after a second factor: a new access token carrying the new `aal` and `amr` claims. The refresh\ntoken is not sent; keep the one you hold, which is unchanged and whose next refresh carries the new claims too."
+      },
       "RecoveryCodes": {
         "type": "object",
         "required": [
@@ -5132,8 +5301,8 @@
             ]
           },
           "session": {
-            "$ref": "#/components/schemas/SessionTokens",
-            "description": "This session's tokens: a new access token carrying `aal` 2, and the current refresh token, unchanged."
+            "$ref": "#/components/schemas/RaisedSession",
+            "description": "A new access token for this session, carrying `aal` 2. Keep the refresh token you hold; it is unchanged."
           }
         },
         "description": "MFA is on. Show the recovery codes once and ask the user to keep them safe; they can't be read again. Every other\nsession of the user has ended, and this one is now at level 2."

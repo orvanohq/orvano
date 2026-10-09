@@ -11,16 +11,20 @@ import type {
   CreateAccountRequest,
   CreateEmailCodeRequest,
   CreateEmailCodeSessionRequest,
+  CreateIdTokenIdentityRequest,
   CreateIdTokenSessionRequest,
   CreateMagicLinkRequest,
   CreateMagicLinkSessionRequest,
   CreateMfaPasskeyChallengeRequest,
   CreateMfaSessionRequest,
   CreateOAuthFlowRequest,
+  CreateOAuthLinkFlowRequest,
   CreateOAuthSessionRequest,
+  CreatePasskeyRegistrationRequest,
   CreatePasskeySessionRequest,
   CreatePasswordSessionRequest,
   CreateRecoveryRequest,
+  CreateTotpRequest,
   CreateVerificationRequest,
   DeleteAccountRequest,
   Health,
@@ -34,6 +38,7 @@ import type {
   PasskeyChallenge,
   PasskeyList,
   PasskeyRegistration,
+  RaisedSession,
   RecoveryCodes,
   RefreshSessionRequest,
   Session,
@@ -100,9 +105,9 @@ export class AccountService {
   }
 
   /**
-   * Turns MFA on with the first code from the authenticator app. Answers 10 new recovery codes, ends every other
-   * session of the user, and raises this one to level 2 with a new access token. The SDKs keep their stored session,
-   * whose next refresh carries `aal` 2 too.
+   * Turns MFA on with the first code from the authenticator app, within 15 minutes of `account.createTotp`. Answers 10
+   * new recovery codes, ends every other session of the user, and raises this one to level 2 with a new access token.
+   * The SDKs keep their stored refresh token, whose next refresh carries `aal` 2 too.
    */
   confirmTotp(body: ConfirmTotpRequest, options?: RequestOptions): Promise<TotpConfirmation> {
     return this.#client.request<TotpConfirmation>(
@@ -141,9 +146,13 @@ export class AccountService {
     )
   }
 
-  /** Links a provider to the signed in user with its ID token from a native app. The session must be at most 10 minutes old. */
+  /**
+   * Links a provider to the signed in user with its ID token from a native app. Needs the user's current password when
+   * they have one (or a second factor on this session within 10 minutes); a user without a password needs a session at
+   * most 10 minutes old.
+   */
   createIdTokenIdentity(
-    body: CreateIdTokenSessionRequest,
+    body: CreateIdTokenIdentityRequest,
     options?: RequestOptions,
   ): Promise<Identity> {
     return this.#client.request<Identity>(
@@ -227,10 +236,14 @@ export class AccountService {
   }
 
   /**
-   * Starts linking a provider to the signed in user, like `createOAuthFlow`. The session must be at most 10 minutes
-   * old. The SDKs' `linkIdentity` does all of it.
+   * Starts linking a provider to the signed in user, like `createOAuthFlow`. Needs the user's current password when
+   * they have one (or a second factor on this session within 10 minutes); a user without a password needs a session at
+   * most 10 minutes old. The SDKs' `linkIdentity` does all of it.
    */
-  createOAuthLinkFlow(body: CreateOAuthFlowRequest, options?: RequestOptions): Promise<OAuthFlow> {
+  createOAuthLinkFlow(
+    body: CreateOAuthLinkFlowRequest,
+    options?: RequestOptions,
+  ): Promise<OAuthFlow> {
     return this.#client.request<OAuthFlow>(
       { method: 'POST', path: '/v1/account/identities/oauth/flows', body },
       options,
@@ -263,13 +276,17 @@ export class AccountService {
   }
 
   /**
-   * Starts adding a passkey: answers the options for `navigator.credentials.create`. Needs passkeys turned on, a
-   * session that signed in within 10 minutes (or passed a second factor within 10 minutes), a verified email when the
-   * user has one, and fewer than 10 passkeys.
+   * Starts adding a passkey: answers the options for `navigator.credentials.create`. Needs passkeys turned on, the
+   * user's current password when they have one (or a second factor on this session within 10 minutes; a user without a
+   * password needs a session that signed in within 10 minutes), a verified email when the user has one, and fewer than
+   * 10 passkeys.
    */
-  createPasskeyRegistration(options?: RequestOptions): Promise<PasskeyRegistration> {
+  createPasskeyRegistration(
+    body: CreatePasskeyRegistrationRequest,
+    options?: RequestOptions,
+  ): Promise<PasskeyRegistration> {
     return this.#client.request<PasskeyRegistration>(
-      { method: 'POST', path: '/v1/account/passkeys/registration' },
+      { method: 'POST', path: '/v1/account/passkeys/registration', body },
       options,
     )
   }
@@ -334,12 +351,13 @@ export class AccountService {
 
   /**
    * Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.
-   * Needs a session that signed in within 10 minutes (or passed a second factor within 10 minutes) and, when the user
-   * has an email, a verified one.
+   * Needs the user's current password when they have one (or a second factor on this session within 10 minutes; a
+   * user without a password needs a session that signed in within 10 minutes) and, when the user has an email, a
+   * verified one.
    */
-  createTotp(options?: RequestOptions): Promise<TotpSetup> {
+  createTotp(body: CreateTotpRequest, options?: RequestOptions): Promise<TotpSetup> {
     return this.#client.request<TotpSetup>(
-      { method: 'POST', path: '/v1/account/mfa/totp' },
+      { method: 'POST', path: '/v1/account/mfa/totp', body },
       options,
     )
   }
@@ -525,11 +543,11 @@ export class AccountService {
 
   /**
    * Step up: checks a second factor on the signed in session, so security changes work for the next 10 minutes. Raises
-   * the session to level 2 and answers a new access token with the current refresh token, unchanged. The SDK helpers
-   * (`verifyMfa`) store them.
+   * the session to level 2 and answers a new access token; the refresh token is not sent and stays unchanged. The SDK
+   * helpers (`verifyMfa`) store the access token.
    */
-  verifyMfa(body: VerifyMfaRequest, options?: RequestOptions): Promise<SessionTokens> {
-    return this.#client.request<SessionTokens>(
+  verifyMfa(body: VerifyMfaRequest, options?: RequestOptions): Promise<RaisedSession> {
+    return this.#client.request<RaisedSession>(
       { method: 'POST', path: '/v1/account/mfa/verify', body },
       options,
     )

@@ -403,7 +403,11 @@ internal sealed class WebAuthnVerifier(IWebOriginPolicy origins)
                 StoredSignatureCounter = (uint)passkey.SignCount,
                 IsUserHandleOwnerOfCredentialIdCallback = (p, _) => Task.FromResult(p.UserHandle.AsSpan().SequenceEqual(owner)),
             }, ct);
-            return new AssertionCheck(passkey, verified.SignCount, verified.IsBackedUp, false);
+            // AC-22 is applied here too, so the rule (and its counter_regressed event) never depends on how a Fido2NetLib
+            // version reads it, such as a passkey that stored 5 and now answers 0.
+            return PasskeyRules.CounterRegressed(passkey.SignCount, verified.SignCount)
+                ? new AssertionCheck(passkey, 0, false, true)
+                : new AssertionCheck(passkey, verified.SignCount, verified.IsBackedUp, false);
         }
         catch (Fido2VerificationException e) when (e.Code == Fido2ErrorCode.InvalidSignCount)
         {

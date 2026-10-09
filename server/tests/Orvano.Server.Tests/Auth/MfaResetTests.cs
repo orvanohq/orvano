@@ -74,7 +74,7 @@ public class MfaResetTests(PostgresFixture postgres)
         var ada = await EnrollAsync(api, "ada@x.com");
         // Bob started an authenticator app but never confirmed it: a pending factor is not MFA.
         var bobBearer = await VerifiedUserAsync(api, "bob@x.com");
-        using (var pending = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", bearer: bobBearer))
+        using (var pending = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", WithPassword, bearer: bobBearer))
             Assert.Equal(HttpStatusCode.Created, pending.Status);
         var bobId = (await api.SendAsync(HttpMethod.Get, "/v1/account", bearer: bobBearer)).Body.GetProperty("id").GetString()!;
 

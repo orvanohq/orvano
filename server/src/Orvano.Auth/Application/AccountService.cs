@@ -213,7 +213,10 @@ internal sealed class AccountService(
         var outcome = await store.WriteAsync<(UserRow? User, SessionGrant? Grant, MfaChallengeView? Mfa)>(async (uow, token) =>
         {
             // First, since it locks the user for a user with MFA on: the user row before the password row.
-            var challenge = await MfaGate.ChallengeAsync(policies, uow, projectId, account.Id, SessionMethod.Password, null, client, token);
+            var gate = await MfaGate.ChallengeAsync(policies, uow, projectId, account.Id, SessionMethod.Password, null, client, token);
+            // The account was read before this transaction; deleted since, it is no account at all.
+            if (!gate.Succeeded) return Failure.InvalidCredentials;
+            var challenge = gate.Value;
             if (rehash is not null)
             {
                 await using var update = new NpgsqlCommand(

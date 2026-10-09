@@ -86,6 +86,9 @@ test('a console account turns on its authenticator app and then signs in with a 
 
   await page.goto('/account/security')
   await page.getByRole('button', { name: 'Turn on' }).click()
+  // Adding a way to sign in needs the password, even right after signing in.
+  await page.getByRole('dialog').getByLabel('Password').fill(password)
+  await page.getByRole('dialog').getByRole('button', { name: 'Continue' }).click()
   await expect(page.getByRole('img', { name: 'QR code for your authenticator app' })).toBeVisible()
   const secret = (await page.locator('code').first().textContent()) ?? ''
   expect(secret).toMatch(/^[A-Z2-7]{32}$/)
@@ -124,6 +127,8 @@ test('a console account adds a passkey and signs in with it', async ({
 
   await page.goto('/account/security')
   await page.getByRole('button', { name: 'Add a passkey' }).click()
+  await page.getByRole('dialog').getByLabel('Password').fill(password)
+  await page.getByRole('dialog').getByRole('button', { name: 'Continue' }).click()
   await expect(page.getByRole('cell', { name: 'Device bound' })).toBeVisible()
   await expect(page.getByRole('cell', { name: 'Never' })).toBeVisible()
 

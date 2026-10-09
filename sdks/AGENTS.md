@@ -10,6 +10,7 @@ The five public SDK surfaces (spec 0001). Each is a thin handwritten runtime plu
 | `nextjs/` | `@orvano/nextjs` | none of its own | Wraps `@orvano/js`; root: `createServerClient` per request, `createMiddlewareClient`, `createBrowserClient` shared, the `orvano_access` and `orvano_refresh` cookies; `./server`: `updateSession` for middleware and `createOrvanoRouteHandler` (refresh and sign out, default `/api/orvano`) |
 | `dart/core/` | `orvano_core` | `client` + `both` | `package:http`, hand style JSON mapping, no `build_runner` |
 | `dart/flutter/` | `orvano_flutter` | exports core again | Exports core again, plus `createClient` with the session in secure storage (`flutter_secure_storage`, key `orvano.session.<projectId>`), checked when the app resumes |
+| `dart/flutter_passkeys/` | `orvano_flutter_passkeys` | none of its own | Opt in add on to `orvano_flutter` (spec 0013): exports only `PlatformPasskeys`, built on the `passkeys` package, which an app passes as `createClient(..., passkeys: PlatformPasskeys())`; `orvano_flutter` itself never depends on `passkeys` |
 | `dart/server/` | `orvano_dart` | `server` only, plus core's `both` | Hides core's `Orvano` and client only services; verifies access tokens against the project's JWKS (`dart_jsonwebtoken`) |
 | `dotnet/src/Orvano/` | `Orvano` (NuGet) | `server` + `both` | `net10.0` and `netstandard2.0` |
 | `console-client/` | `@orvano/console-client` (`private`, never published) | `console` only | Built on the `@orvano/js` runtime, used by the console; sends the `orvano_console` cookie |

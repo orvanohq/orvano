@@ -57,7 +57,8 @@ public class MfaEverywhereTests(PostgresFixture postgres)
         using var first = await OAuthDriver.SignInAsync(api, "google", ada);
         Assert.Equal(HttpStatusCode.Created, first.Status);
         var bearer = AuthApi.AccessToken(first);
-        using var setup = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", bearer: bearer);
+        // A user with no password enrolls on a fresh session alone (AC-17).
+        using var setup = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", new { }, bearer: bearer);
         var secret = setup.Body.GetProperty("secret").GetString()!;
         using var confirmed = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp/confirm", new { code = CodeAt(secret, 0) }, bearer: bearer);
         Assert.Equal(HttpStatusCode.OK, confirmed.Status);

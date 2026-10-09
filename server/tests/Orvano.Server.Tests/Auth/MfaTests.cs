@@ -11,7 +11,7 @@ namespace Orvano.Server.Tests.Auth;
 // AC-25, AC-26, AC-33, AC-34. Codes come from the returned secret and the real clock, like an authenticator app's.
 public class MfaTests(PostgresFixture postgres)
 {
-    private const string Password = "correct horse battery";
+    internal const string Password = "correct horse battery";
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -83,7 +83,7 @@ public class MfaTests(PostgresFixture postgres)
         using var other = await api.SignInAsync("ada@x.com");
         var bearer = AuthApi.AccessToken(signUp);
 
-        using var setup = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", bearer: bearer);
+        using var setup = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", new { password = Password }, bearer: bearer);
         Assert.Equal(HttpStatusCode.Created, setup.Status);
         var secret = setup.Body.GetProperty("secret").GetString()!;
         Assert.Matches("^[A-Z2-7]{32}$", secret);
@@ -100,12 +100,15 @@ public class MfaTests(PostgresFixture postgres)
         var codes = confirmed.Body.GetProperty("recoveryCodes").EnumerateArray().Select(c => c.GetString()!).ToList();
         Assert.Equal(10, codes.Count);
         Assert.All(codes, c => Assert.Matches("^[A-Z2-7]{5}-[A-Z2-7]{5}$", c));
+        // A RaisedSession: a new access token and no refresh token (the client keeps the one it holds).
         var session = confirmed.Body.GetProperty("session");
-        Assert.Equal(AuthApi.RefreshToken(signUp), session.GetProperty("refreshToken").GetString());
+        Assert.False(session.TryGetProperty("refreshToken", out _));
+        Assert.False(session.TryGetProperty("refreshTokenExpiresAt", out _));
         Assert.Equal(Sid(signUp), session.GetProperty("sessionId").GetString());
         var claims = Claims(session.GetProperty("accessToken").GetString()!);
         Assert.Equal(2, claims.GetProperty("aal").GetInt32());
         Assert.Equal(["mfa", "otp", "pwd"], claims.GetProperty("amr").EnumerateArray().Select(a => a.GetString()));
+        await AssertRefreshCarriesAal2Async(api, AuthApi.RefreshToken(signUp));
 
         using var otherSession = await api.SendAsync(HttpMethod.Get, "/v1/account", bearer: AuthApi.AccessToken(other));
         Assert.Equal(HttpStatusCode.Unauthorized, otherSession.Status);
@@ -127,26 +130,30 @@ public class MfaTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Enrollment_needs_a_verified_email_a_fresh_session_and_mfa_off()
+    public async Task Enrollment_needs_a_verified_email_the_password_and_mfa_off()
     {
         await using var api = await AuthApi.StartAsync(postgres);
         using var signUp = await api.SignUpAsync("ada@x.com");
         var bearer = AuthApi.AccessToken(signUp);
 
-        using var unverified = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", bearer: bearer);
+        using var unverified = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", new { password = Password }, bearer: bearer);
         Assert.Equal(HttpStatusCode.Conflict, unverified.Status);
         Assert.Equal("email_not_verified", unverified.Code);
 
+        // The body is required, even when it carries nothing.
         await VerifyEmailAsync(api, AuthApi.UserId(signUp));
+        using var noBody = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", bearer: bearer);
+        Assert.Equal(HttpStatusCode.BadRequest, noBody.Status);
+
+        // A session older than 10 minutes passes with the password (the review's fix to AC-17).
         await TestDatabase.ExecuteAsync(api.Database.Superuser,
             "UPDATE orvano.auth_sessions SET created_at = now() - interval '11 minutes' WHERE id = @id", ("id", Guid.Parse(Sid(signUp))));
-        using var stale = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", bearer: bearer);
-        Assert.Equal(HttpStatusCode.Forbidden, stale.Status);
-        Assert.Equal("reauthentication_required", stale.Code);
+        using var stale = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", new { password = Password }, bearer: bearer);
+        Assert.Equal(HttpStatusCode.Created, stale.Status);
 
         var enrolled = await EnrollAsync(api, "grace@x.com");
         using var signIn = await StepTwoAsync(api, Ticket(await api.SignInAsync("grace@x.com")), totpCode: CodeAt(enrolled.Secret, +1));
-        using var already = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", bearer: AuthApi.AccessToken(signIn));
+        using var already = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", new { }, bearer: AuthApi.AccessToken(signIn));
         Assert.Equal(HttpStatusCode.Conflict, already.Status);
         Assert.Equal("mfa_already_enabled", already.Code);
     }
@@ -302,7 +309,7 @@ public class MfaTests(PostgresFixture postgres)
 
         using var grace = await api.SignUpAsync("grace@x.com");
         await VerifyEmailAsync(api, AuthApi.UserId(grace));
-        using var refused = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", bearer: AuthApi.AccessToken(grace));
+        using var refused = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", new { password = Password }, bearer: AuthApi.AccessToken(grace));
         Assert.Equal("factor_not_enabled", refused.Code);
         Assert.NotEmpty(enrolled.Secret);
     }
@@ -325,6 +332,53 @@ public class MfaTests(PostgresFixture postgres)
         Assert.Equal(32, await TestDatabase.ScalarAsync<int>(api.Database.Superuser, "SELECT octet_length(ticket_hash) FROM orvano.auth_mfa_tickets"));
     }
 
+    // AC-10, the spec's "Key rotation" scenario: codes made under master key A still answer after a new key B becomes
+    // the active one (A kept for reading), because each tag records the key ID it was made with; new codes use B.
+    [Fact]
+    public async Task Recovery_codes_made_under_one_master_key_work_after_another_becomes_active()
+    {
+        await using var api = await AuthApi.StartAsync(postgres);
+        var enrolled = await EnrollAsync(api, "ada@x.com");
+        Assert.Equal(["ktest"], await KeyIdsAsync(api));
+
+        var rotated = $"knew:{Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))},{OrvanoProcess.MasterKeys}";
+        await using var process = OrvanoProcess.Start(["api"], new Dictionary<string, string>
+        {
+            ["ORVANO_DB_URL"] = api.Database.AppUrl,
+            ["ASPNETCORE_ENVIRONMENT"] = "Test",
+            ["ORVANO_MASTER_KEYS"] = rotated,
+        }, listen: true);
+        await process.WaitUntilListeningAsync();
+        using var http = process.Http();
+
+        using var stepOne = await SendAsync(http, "/v1/account/sessions/password", new { email = "ada@x.com", password = Password });
+        using var stepTwo = await SendAsync(http, "/v1/account/sessions/mfa", new { ticket = Ticket(stepOne), recoveryCode = enrolled.RecoveryCodes[0] });
+        Assert.Equal(HttpStatusCode.Created, stepTwo.Status);
+        Assert.Equal(["mfa", "pwd", "rec"], Claims(AuthApi.AccessToken(stepTwo)).GetProperty("amr").EnumerateArray().Select(a => a.GetString()));
+
+        // A step up with another old code, then new codes: made under the active key.
+        var bearer = AuthApi.AccessToken(stepTwo);
+        using var verified = await SendAsync(http, "/v1/account/mfa/verify", new { recoveryCode = enrolled.RecoveryCodes[1] }, bearer);
+        Assert.Equal(HttpStatusCode.OK, verified.Status);
+        using var replaced = await SendAsync(http, "/v1/account/mfa/recovery-codes", new { }, bearer);
+        Assert.Equal(HttpStatusCode.Created, replaced.Status);
+        Assert.Equal(["knew"], await KeyIdsAsync(api));
+    }
+
+    private static async Task<string[]> KeyIdsAsync(AuthApi api) =>
+        (await TestDatabase.ScalarAsync<string>(api.Database.Superuser, "SELECT string_agg(DISTINCT mac_key_id, ',') FROM orvano.auth_recovery_codes")).Split(',');
+
+    /// <summary>A JSON call to another api process of the same database, as <see cref="AuthApi.SendAsync"/> makes it.</summary>
+    private static async Task<Reply> SendAsync(HttpClient http, string url, object body, string? bearer = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = System.Net.Http.Json.JsonContent.Create(body) };
+        request.Headers.Add("X-Orvano-Project", AuthApi.Project);
+        if (bearer is not null) request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearer);
+        using var response = await http.SendAsync(request, Ct);
+        var text = await response.Content.ReadAsStringAsync(Ct);
+        return new Reply(response.StatusCode, response.Headers, text.Length > 0 ? JsonDocument.Parse(text) : null);
+    }
+
     internal sealed record Enrolled(string UserId, string Secret, IReadOnlyList<string> RecoveryCodes, DateTime LastSignInAt);
 
     /// <summary>Signs a user up, verifies their email, and turns on TOTP with this step's code.</summary>
@@ -334,13 +388,24 @@ public class MfaTests(PostgresFixture postgres)
         var userId = AuthApi.UserId(signUp);
         await VerifyEmailAsync(api, userId);
         var bearer = AuthApi.AccessToken(signUp);
-        using var setup = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", bearer: bearer);
+        using var setup = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp", new { password = Password }, bearer: bearer);
         Assert.Equal(HttpStatusCode.Created, setup.Status);
         var secret = setup.Body.GetProperty("secret").GetString()!;
         using var confirmed = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/totp/confirm", new { code = CodeAt(secret, 0) }, bearer: bearer);
         Assert.Equal(HttpStatusCode.OK, confirmed.Status);
         var codes = confirmed.Body.GetProperty("recoveryCodes").EnumerateArray().Select(c => c.GetString()!).ToList();
         return new Enrolled(userId, secret, codes, await LastSignInAsync(api, userId));
+    }
+
+    /// <summary>
+    /// The refresh token the client already held still works after a second factor, and its next access token carries
+    /// <c>aal</c> 2, read from the session row.
+    /// </summary>
+    internal static async Task AssertRefreshCarriesAal2Async(AuthApi api, string refreshToken)
+    {
+        using var refreshed = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/refresh", new { refreshToken });
+        Assert.Equal(HttpStatusCode.OK, refreshed.Status);
+        Assert.Equal(2, Claims(refreshed.Body.GetProperty("accessToken").GetString()!).GetProperty("aal").GetInt32());
     }
 
     internal static async Task VerifyEmailAsync(AuthApi api, string userId)

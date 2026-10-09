@@ -152,18 +152,50 @@ public class ConsoleMfaTests(PostgresFixture postgres)
         Assert.Equal((HttpStatusCode.Unauthorized, "invalid_mfa_code"), (wrong.Status, wrong.Code));
         Assert.Equal(HttpStatusCode.NoContent, verified.Status);
         Assert.Contains("rec", Claims(Value(SetCookie(verified, OrvanoHeaders.ConsoleCookie))).GetProperty("amr").EnumerateArray().Select(a => a.GetString()));
+        Assert.Null(SetCookieOrNull(verified, OrvanoHeaders.ConsoleRefreshCookie));
         Assert.Equal(HttpStatusCode.NoContent, off.Status);
         Assert.False(status.Body.GetProperty("mfaEnabled").GetBoolean());
         using var signIn = await SignInAsync(api);
         Assert.Equal(JsonValueKind.Object, signIn.Body.GetProperty("account").ValueKind);
     }
 
+    // AC-17 as the review of 2026-10-08 changed it: a console cookie alone, however fresh, adds no factor to an account
+    // with a password; a wrong password is refused; the right one enrolls, and the confirm (AC-13) works on a session
+    // past 10 minutes, since the pending secret is the proof.
+    [Fact]
+    public async Task A_console_cookie_alone_never_enrolls_and_the_confirm_works_on_an_old_session()
+    {
+        await using var api = await AuthApi.StartAsync(postgres);
+
+        using var totp = await AsAccountAsync(api, HttpMethod.Post, "/v1/console/account/mfa/totp", new { });
+        using var passkey = await AsAccountAsync(api, HttpMethod.Post, "/v1/console/account/passkeys/registration", new { });
+        using var wrong = await AsAccountAsync(api, HttpMethod.Post, "/v1/console/account/mfa/totp", new { password = "wrong horse battery" });
+        foreach (var reply in new[] { totp, passkey, wrong })
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, reply.Status);
+            Assert.Equal("invalid_credentials", reply.Code);
+        }
+
+        using var setup = await AsAccountAsync(api, HttpMethod.Post, "/v1/console/account/mfa/totp", new { password = ConsoleSignIn.Password });
+        Assert.Equal(HttpStatusCode.Created, setup.Status);
+        await TestDatabase.ExecuteAsync(api.Database.Superuser, "UPDATE orvano.auth_sessions SET created_at = created_at - interval '11 minutes'");
+        using var confirmed = await AsAccountAsync(api, HttpMethod.Post, "/v1/console/account/mfa/totp/confirm",
+            new { code = CodeAt(setup.Body.GetProperty("secret").GetString()!, 0) });
+
+        Assert.Equal(HttpStatusCode.OK, confirmed.Status);
+        Assert.Equal(2, Claims(Value(SetCookie(confirmed, OrvanoHeaders.ConsoleCookie))).GetProperty("aal").GetInt32());
+        Assert.Null(SetCookieOrNull(confirmed, OrvanoHeaders.ConsoleRefreshCookie));
+    }
+
     private sealed record ConsoleEnrolled(string Secret, IReadOnlyList<string> RecoveryCodes);
 
-    /// <summary>Turns on TOTP for <see cref="Account"/> through the console twins; the confirm sets a new cookie.</summary>
+    /// <summary>
+    /// Turns on TOTP for <see cref="Account"/> through the console twins, with the account's password (AC-17); the
+    /// confirm sets a new <c>orvano_console</c> cookie and leaves the refresh cookie alone.
+    /// </summary>
     private static async Task<ConsoleEnrolled> EnrollConsoleAsync(AuthApi api)
     {
-        using var setup = await AsAccountAsync(api, HttpMethod.Post, "/v1/console/account/mfa/totp");
+        using var setup = await AsAccountAsync(api, HttpMethod.Post, "/v1/console/account/mfa/totp", new { password = ConsoleSignIn.Password });
         Assert.Equal(HttpStatusCode.Created, setup.Status);
         var secret = setup.Body.GetProperty("secret").GetString()!;
         Assert.Contains("otpauth://totp/Orvano:", setup.Body.GetProperty("uri").GetString(), StringComparison.Ordinal);
@@ -171,12 +203,14 @@ public class ConsoleMfaTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.OK, confirmed.Status);
         Assert.Equal(2, Claims(Value(SetCookie(confirmed, OrvanoHeaders.ConsoleCookie))).GetProperty("aal").GetInt32());
         Assert.False(confirmed.Body.TryGetProperty("session", out _));
+        Assert.Null(SetCookieOrNull(confirmed, OrvanoHeaders.ConsoleRefreshCookie));
         return new ConsoleEnrolled(secret, [.. confirmed.Body.GetProperty("recoveryCodes").EnumerateArray().Select(c => c.GetString()!)]);
     }
 
+    /// <summary>Adds a passkey for <see cref="Account"/> after <see cref="EnrollConsoleAsync"/>, whose confirm was the strong check.</summary>
     private static async Task<Registered> RegisterConsolePasskeyAsync(AuthApi api)
     {
-        using var options = await AsAccountAsync(api, HttpMethod.Post, "/v1/console/account/passkeys/registration");
+        using var options = await AsAccountAsync(api, HttpMethod.Post, "/v1/console/account/passkeys/registration", new { });
         Assert.Equal(HttpStatusCode.OK, options.Status);
         Assert.Equal("Orvano", options.Body.GetProperty("options").GetProperty("rp").GetProperty("name").GetString());
         var credential = await CreateCredentialAsync(api, options.Body.GetProperty("options"), ConsoleOrigin);

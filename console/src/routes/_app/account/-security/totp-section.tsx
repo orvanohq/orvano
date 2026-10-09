@@ -16,7 +16,7 @@ import { SettingsSection } from '@/shell/settings-section'
 import { QrCode } from './qr-code'
 import { RecoveryCodesPanel } from './recovery-codes'
 
-type Run = <T>(action: () => Promise<T>) => Promise<{ value: T } | null>
+type Run = <T>(action: (password?: string) => Promise<T>) => Promise<{ value: T } | null>
 
 /**
  * The authenticator app section of the account Security page (spec 0013, AC-42). Off: Turn on
@@ -42,7 +42,7 @@ export function TotpSection({
     setStarting(true)
     setNotice(null)
     try {
-      const made = await run(() => consoleApi().consoleAccount.createTotp())
+      const made = await run((password) => consoleApi().consoleAccount.createTotp({ password }))
       if (made !== null) setSetup(made.value)
     } catch (error) {
       notifyError("Couldn't start the authenticator app setup", error)

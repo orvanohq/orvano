@@ -64,14 +64,23 @@ internal static class PasskeyEndpoints
             .RequireProject()
             .RequireUser();
 
-        v1.MapPost(Api.AccountOperations.CreatePasskeyRegistration.Route, async (HttpContext http, PasskeyService passkeys, RateLimits limits, CancellationToken ct) =>
+        v1.MapPost(Api.AccountOperations.CreatePasskeyRegistration.Route, async (
+            HttpContext http, Api.CreatePasskeyRegistrationRequest request, PasskeyService passkeys, RateLimits limits, CancellationToken ct) =>
         {
             var user = PublicRequests.User(http);
             var enroll = limits.Acquire(RateLimitPolicies.MfaEnrollPerUser, user.UserId.ToString());
             if (!enroll.Allowed) return ApiProblem.RateLimited(http, enroll, Api.ErrorCode.RateLimited);
             var perUser = limits.Acquire(RateLimitPolicies.PasskeyChallengePerUser, user.UserId.ToString());
             if (!perUser.Allowed) return ApiProblem.RateLimited(http, perUser, Api.ErrorCode.RateLimited);
-            return Ok(http, await passkeys.CreateRegistrationAsync(PublicRequests.Project(http), user.UserId, user.SessionId, ct), PasskeyRegistration);
+            // Every password sent counts, like the other password checks (spec 0004, rate limits).
+            if (request.Password is not null)
+            {
+                var checkLimit = limits.Acquire(RateLimitPolicies.PasswordCheckPerUser, user.UserId.ToString());
+                if (!checkLimit.Allowed) return ApiProblem.RateLimited(http, checkLimit, Api.ErrorCode.RateLimited);
+            }
+
+            return Ok(http, await passkeys.CreateRegistrationAsync(PublicRequests.Project(http), user.UserId, user.SessionId, request.Password, ct),
+                PasskeyRegistration);
         })
             .WithName(Api.AccountOperations.CreatePasskeyRegistration.Id)
             .RequireProject()
@@ -82,7 +91,7 @@ internal static class PasskeyEndpoints
         {
             var user = PublicRequests.User(http);
             var outcome = await passkeys.CompleteRegistrationAsync(
-                PublicRequests.Project(http), user.UserId, user.SessionId, request.ChallengeId, Attestation(request.Credential), request.Name, ct);
+                PublicRequests.Project(http), user.UserId, request.ChallengeId, Attestation(request.Credential), request.Name, ct);
             return Created(http, outcome, Passkey);
         })
             .WithName(Api.AccountOperations.CompletePasskeyRegistration.Id)

@@ -270,6 +270,16 @@ model PasskeyList {
   items: Passkey[];
 }
 
+@doc("A request to start adding a passkey.")
+model CreatePasskeyRegistrationRequest {
+  @doc("""
+    The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+    minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+    """)
+  @example("correct horse battery staple")
+  password?: string;
+}
+
 @doc("A finished passkey registration.")
 model CompletePasskeyRegistrationRequest {
   @doc("The `challengeId` of the `PasskeyRegistration`.")
@@ -331,9 +341,10 @@ interface AccountPasskeysApi {
   } | Problem;
 
   @doc("""
-    Starts adding a passkey: answers the options for `navigator.credentials.create`. Needs passkeys turned on, a
-    session that signed in within 10 minutes (or passed a second factor within 10 minutes), a verified email when the
-    user has one, and fewer than 10 passkeys.
+    Starts adding a passkey: answers the options for `navigator.credentials.create`. Needs passkeys turned on, the
+    user's current password when they have one (or a second factor on this session within 10 minutes; a user without a
+    password needs a session that signed in within 10 minutes), a verified email when the user has one, and fewer than
+    10 passkeys.
     """)
   @operationId("account.createPasskeyRegistration")
   @extension("x-orvano-audience", "client")
@@ -341,7 +352,7 @@ interface AccountPasskeysApi {
   @useAuth(bearer)
   @route("/passkeys/registration")
   @post
-  createPasskeyRegistration(): PasskeyRegistration | Problem;
+  createPasskeyRegistration(@body request: CreatePasskeyRegistrationRequest): PasskeyRegistration | Problem;
 
   @doc("Finishes adding a passkey with the browser's or the platform's answer to `account.createPasskeyRegistration`.")
   @operationId("account.completePasskeyRegistration")
@@ -427,7 +438,8 @@ model AuthMethodSettings {
 
   @doc("""
     The origins a passkey ceremony is accepted from today: the project's web platforms on `rpId` or its subdomains,
-    `https://<rpId>` for iOS and macOS apps, and one `android:apk-key-hash:` origin per fingerprint.
+    `https://<rpId>` for iOS and macOS apps, and one `android:apk-key-hash:` origin per fingerprint. A wildcard web
+    platform shows as a pattern, such as `https://*.example.com`, which accepts any one subdomain level.
     """)
   @example(#["https://app.example.com", "https://example.com"])
   acceptedOrigins: string[];

@@ -36,9 +36,10 @@ with an operationId:
 | `accessToken` | `client` | none | `{ token }`, the access token the client SDK stores now, so a server step can verify a session made by a client helper such as `completeMfa`; .NET skips it |
 | `totpCode` | `client` | `secret`, optional `offset` (steps from now) | `{ code }`, the code an authenticator app shows for that step (spec 0013) |
 | `completeMfa` | `client` | `totpCode`, `recoveryCode`, or `passkey: true` (the runner's test authenticator answers) | `{ user, isNewUser, mfaRequired, factors }` from the client SDK's `completeMfa`, which uses the ticket the last sign in kept (201); .NET skips it |
-| `verifyMfa` | `client` | `totpCode`, `recoveryCode`, or `passkey: true` | `{ verified: true }` after the client SDK's `verifyMfa` stored the new access token |
-| `confirmTotp` | `client` | `code` | `{ recoveryCodes }` from the client SDK's `confirmTotp`, which stores the new access token |
-| `registerPasskey` | `client` | optional `name` | the `Passkey` from the client SDK's `registerPasskey`, whose passkey the server's `Test` only software authenticator makes (201) |
+| `verifyMfa` | `client` | `totpCode`, `recoveryCode`, or `passkey: true` | `{ verified: true, refreshTokenKept }` after the client SDK's `verifyMfa` stored the new access token; Orvano sends no refresh token, so `refreshTokenKept` is true when the client still holds the one it held before (spec 0013) |
+| `confirmTotp` | `client` | `code` | `{ recoveryCodes, refreshTokenKept }` from the client SDK's `confirmTotp`, which stores the new access token; `refreshTokenKept` as for `verifyMfa` |
+| `registerPasskey` | `client` | optional `name`, optional `password` (the user's current password, spec 0013) | the `Passkey` from the client SDK's `registerPasskey`, whose passkey the server's `Test` only software authenticator makes (201) |
+| `oauthSignIn` | `client` | `provider`, `testUser` (the fake provider's user), optional `redirectUrl`, optional `link: true`, and for a link optional `password` | `{ type, ... }` from the client SDK's `signInWithOAuth`, or `linkIdentity` with `link: true` (sending `password`), following the fake provider over HTTP (spec 0012); .NET runs only the sign in |
 | `signInWithPasskey` | `client` | none | `{ user, isNewUser, mfaRequired, factors }` from the client SDK's `signInWithPasskey`, signed by the newest passkey the software authenticator made (201) |
 
 SdkGen writes a test only dispatch table per language (`operationId` to the generated method), so

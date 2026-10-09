@@ -97,7 +97,7 @@ public class SecurityAlertTests(PostgresFixture postgres)
         var cookie = $"orvano_console={await ConsoleSignIn.CookieAsync(api.Http, AuthApi.ConsoleUser, Ct)}";
         var headers = new Dictionary<string, string> { ["Cookie"] = cookie, ["Sec-Fetch-Site"] = "same-origin" };
 
-        using var setup = await api.SendAsync(HttpMethod.Post, "/v1/console/account/mfa/totp", project: null, headers: headers);
+        using var setup = await api.SendAsync(HttpMethod.Post, "/v1/console/account/mfa/totp", new { password = ConsoleSignIn.Password }, project: null, headers: headers);
         using var confirmed = await api.SendAsync(HttpMethod.Post, "/v1/console/account/mfa/totp/confirm",
             new { code = CodeAt(setup.Body.GetProperty("secret").GetString()!, 0) }, project: null, headers: headers);
 

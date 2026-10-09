@@ -189,7 +189,9 @@ base class Client {
   /// session (`account.verifyMfa`), so security changes work for the next 10
   /// minutes. [MfaAnswer.passkey] runs the ceremony against
   /// `account.createStepUpPasskeyChallenge` first. Stores the new access
-  /// token, which carries `aal` 2, and emits [AuthEvent.tokenRefreshed].
+  /// token, which carries `aal` 2, keeps the refresh token the store holds
+  /// (Orvano sends none; it is unchanged), and emits
+  /// [AuthEvent.tokenRefreshed].
   Future<void> verifyMfa(
     MfaAnswer answer, {
     PasskeyAuthenticator? authenticator,
@@ -200,13 +202,32 @@ base class Client {
       authenticator,
       () => AccountService(this).createStepUpPasskeyChallenge(options: options),
     );
-    final tokens = await send(
+    final raised = await send(
       'POST',
       '/v1/account/mfa/verify',
       body: resolved.toJson(),
       options: options,
     );
-    await _save(AuthSession.fromJson(tokens), AuthEvent.tokenRefreshed);
+    await _saveRaised(RaisedSession.fromJson(raised! as Map<String, dynamic>));
+  }
+
+  /// Stores the new access token of a session a second factor raised
+  /// (spec 0013), keeping the refresh token the store holds, and emits
+  /// [AuthEvent.tokenRefreshed]. When the store holds no session, or another
+  /// one, it is left as it is.
+  Future<void> _saveRaised(RaisedSession raised) async {
+    final current = await session.read();
+    if (current == null || current.sessionId != raised.sessionId) return;
+    await _save(
+      AuthSession(
+        accessToken: raised.accessToken,
+        accessTokenExpiresAt: raised.accessTokenExpiresAt,
+        refreshToken: current.refreshToken,
+        refreshTokenExpiresAt: current.refreshTokenExpiresAt,
+        sessionId: raised.sessionId,
+      ),
+      AuthEvent.tokenRefreshed,
+    );
   }
 
   /// [answer], with a passkey's ceremony run when it has no answer yet.
@@ -225,9 +246,11 @@ base class Client {
   }
 
   /// Turns MFA on with the first code from the authenticator app
-  /// (`account.confirmTotp`), after `account.createTotp`. Stores the new
-  /// access token and emits [AuthEvent.tokenRefreshed]; every other session
-  /// of the user has ended. Returns the 10 recovery codes: show them once.
+  /// (`account.confirmTotp`), after `account.createTotp` (which takes the
+  /// user's current password). Stores the new access token, keeps the
+  /// refresh token the store holds (Orvano sends none; it is unchanged), and
+  /// emits [AuthEvent.tokenRefreshed]; every other session of the user has
+  /// ended. Returns the 10 recovery codes: show them once.
   Future<List<String>> confirmTotp(
     String code, {
     RequestOptions? options,
@@ -241,10 +264,7 @@ base class Client {
     final confirmation = TotpConfirmation.fromJson(
       result! as Map<String, dynamic>,
     );
-    await _save(
-      AuthSession.fromJson(confirmation.session.toJson()),
-      AuthEvent.tokenRefreshed,
-    );
+    await _saveRaised(confirmation.session);
     return confirmation.recoveryCodes;
   }
 

@@ -106,8 +106,9 @@ internal sealed class RecoveryService(
 
             // Spec 0013, AC-6: for a user with MFA on, the new password waits on the ticket, and the reset happens at step
             // two, so the inbox alone changes nothing. The link stays used.
-            var challenge = await MfaGate.ChallengeAsync(policies, uow, projectId, userId, SessionMethod.Recovery, null, client, token, pendingPasswordHash: hash);
-            if (challenge is not null) return (userId, null, claimed, challenge);
+            var gate = await MfaGate.ChallengeAsync(policies, uow, projectId, userId, SessionMethod.Recovery, null, client, token, pendingPasswordHash: hash);
+            if (!gate.Succeeded) return gate.Failure!;
+            if (gate.Value is { } challenge) return (userId, null, claimed, challenge);
 
             var actor = Actor.User(userId);
             var ended = await ResetPasswordAsync(uow, sessions, projectId, userId, hash, actor, token);

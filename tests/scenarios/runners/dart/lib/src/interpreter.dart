@@ -115,6 +115,19 @@ String? fixtureApiKey(String fixturesYaml) {
   return null;
 }
 
+/// Runs [raise], a helper that raises the session with a second factor
+/// (spec 0013), and says whether the client still holds the refresh token it
+/// held before: Orvano answers only a new access token.
+Future<bool> _keepsRefreshToken(
+  ClientSurface o,
+  Future<void> Function() raise,
+) async {
+  final before = (await o.client.session.read())?.refreshToken;
+  await raise();
+  final after = (await o.client.session.read())?.refreshToken;
+  return before != null && after == before;
+}
+
 /// Runner operations: calls the scenarios make that are not contract
 /// operations. `signIn` is a plain sign in call that leaves the SDK's stored
 /// session alone, so a runner without client operations (.NET) can get a
@@ -125,9 +138,11 @@ String? fixtureApiKey(String fixturesYaml) {
 /// that follows the fake provider over HTTP, `oauthCode` stops at the code,
 /// `createNonce` is `OrvanoNonce.create` (spec 0012), `totpCode` is an
 /// authenticator app's current code, `completeMfa`, `verifyMfa`, and
-/// `confirmTotp` are the client SDK's MFA helpers, and `registerPasskey` and
+/// `confirmTotp` are the client SDK's MFA helpers (the last two also say
+/// whether the client kept its refresh token), and `registerPasskey` and
 /// `signInWithPasskey` its passkey helpers, on the server's software
-/// authenticator (spec 0013). Their names have no dot, so they never collide
+/// authenticator (spec 0013); `registerPasskey` and a linking `oauthSignIn`
+/// send the step's `password`. Their names have no dot, so they never collide
 /// with an operationId.
 final Map<String, DispatchEntry> _runnerDispatch = {
   'totpCode': DispatchEntry(
@@ -157,17 +172,21 @@ final Map<String, DispatchEntry> _runnerDispatch = {
   'verifyMfa': DispatchEntry(
     status: 200,
     client: (o, input) async {
-      await o.client.verifyMfa(
-        _mfaAnswer(input),
-        authenticator: testPasskeys(o),
+      final refreshTokenKept = await _keepsRefreshToken(
+        o,
+        () => o.client.verifyMfa(
+          _mfaAnswer(input),
+          authenticator: testPasskeys(o),
+        ),
       );
-      return {'verified': true};
+      return {'verified': true, 'refreshTokenKept': refreshTokenKept};
     },
   ),
   'registerPasskey': DispatchEntry(
     status: 201,
     client: (o, input) async => (await o.client.registerPasskey(
       name: input['name'] as String?,
+      password: input['password'] as String?,
       authenticator: testPasskeys(o),
     )).toJson(),
   ),
@@ -187,8 +206,15 @@ final Map<String, DispatchEntry> _runnerDispatch = {
   ),
   'confirmTotp': DispatchEntry(
     status: 200,
-    client: (o, input) async => {
-      'recoveryCodes': await o.client.confirmTotp('${input['code']}'),
+    client: (o, input) async {
+      var recoveryCodes = <String>[];
+      final refreshTokenKept = await _keepsRefreshToken(o, () async {
+        recoveryCodes = await o.client.confirmTotp('${input['code']}');
+      });
+      return {
+        'recoveryCodes': recoveryCodes,
+        'refreshTokenKept': refreshTokenKept,
+      };
     },
   ),
   'now': DispatchEntry(
@@ -225,6 +251,7 @@ final Map<String, DispatchEntry> _runnerDispatch = {
             ? await o.client.linkIdentity(
                 provider,
                 redirectUrl: redirectUrl,
+                password: input['password'] as String?,
                 launcher: launcher,
               )
             : await o.client.signInWithOAuth(

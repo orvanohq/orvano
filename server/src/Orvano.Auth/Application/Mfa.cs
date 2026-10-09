@@ -104,19 +104,21 @@ internal sealed record MfaFactorState(DateTimeOffset? TotpConfirmedAt, int Recov
 internal static class MfaGate
 {
     /// <summary>
-    /// The challenge to answer instead of a session, or null when the user has MFA off and the sign in goes on.
-    /// Keeps the user's live tickets at 5 by deleting the oldest, and drops their expired ones.
+    /// The challenge to answer instead of a session, or a null value when the user has MFA off and the sign in goes on.
+    /// Keeps the user's live tickets at 5 by deleting the oldest, and drops their expired ones. Refuses with
+    /// <see cref="Failure.UserNotFound"/> when the user is gone by the time it takes the lock, so the caller fails
+    /// cleanly in place of a foreign key error on the ticket insert.
     /// </summary>
-    public static async Task<MfaChallengeView?> ChallengeAsync(
+    public static async Task<Outcome<MfaChallengeView?>> ChallengeAsync(
         MethodPolicies policies, AuthUnitOfWork uow, string projectId, Guid userId, string method, string? provider, ClientInfo client, CancellationToken ct,
         string? pendingPasswordHash = null)
     {
         var conn = uow.Tx.Connection!;
-        if (!(await MfaFactorState.ReadAsync(policies, conn, uow.Tx, projectId, userId, ct)).MfaEnabled) return null;
+        if (!(await MfaFactorState.ReadAsync(policies, conn, uow.Tx, projectId, userId, ct)).MfaEnabled) return (MfaChallengeView?)null;
 
-        await UserLocks.ByIdAsync(uow, projectId, userId, ct);
+        if (await UserLocks.ByIdAsync(uow, projectId, userId, ct) is null) return Failure.UserNotFound;
         var state = await MfaFactorState.ReadAsync(policies, conn, uow.Tx, projectId, userId, ct);
-        if (!state.MfaEnabled) return null;
+        if (!state.MfaEnabled) return (MfaChallengeView?)null;
 
         await using (var prune = new NpgsqlCommand(
             """

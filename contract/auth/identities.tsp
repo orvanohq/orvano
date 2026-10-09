@@ -45,6 +45,18 @@ model IdentityList {
   items: Identity[];
 }
 
+@doc("A request to start linking a provider to the signed in user.")
+model CreateOAuthLinkFlowRequest {
+  ...CreateOAuthFlowRequest;
+
+  @doc("""
+    The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+    minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+    """)
+  @example("correct horse battery staple")
+  password?: string;
+}
+
 @doc("A sign in with a provider's ID token from a native app.")
 model CreateIdTokenSessionRequest {
   @doc("The provider that issued the token.")
@@ -68,6 +80,18 @@ model CreateIdTokenSessionRequest {
   @doc("Apple only: the name Sign in with Apple returned on the first authorization, at most 256 characters.")
   @example("Ada Lovelace")
   name?: string | null;
+}
+
+@doc("A link of a provider to the signed in user with its ID token from a native app.")
+model CreateIdTokenIdentityRequest {
+  ...CreateIdTokenSessionRequest;
+
+  @doc("""
+    The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+    minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+    """)
+  @example("correct horse battery staple")
+  password?: string;
 }
 
 @doc("A link of a provider to the signed in user, with the code a link flow returned.")
@@ -101,8 +125,9 @@ interface AccountIdentityApi {
   } | Problem;
 
   @doc("""
-    Starts linking a provider to the signed in user, like `createOAuthFlow`. The session must be at most 10 minutes
-    old. The SDKs' `linkIdentity` does all of it.
+    Starts linking a provider to the signed in user, like `createOAuthFlow`. Needs the user's current password when
+    they have one (or a second factor on this session within 10 minutes); a user without a password needs a session at
+    most 10 minutes old. The SDKs' `linkIdentity` does all of it.
     """)
   @operationId("account.createOAuthLinkFlow")
   @extension("x-orvano-audience", "client")
@@ -110,7 +135,7 @@ interface AccountIdentityApi {
   @useAuth(bearer)
   @route("/identities/oauth/flows")
   @post
-  createOAuthLinkFlow(@body request: CreateOAuthFlowRequest): OAuthFlow | Problem;
+  createOAuthLinkFlow(@body request: CreateOAuthLinkFlowRequest): OAuthFlow | Problem;
 
   @doc("Links the provider with the code a link flow returned and its verifier. Only the user who started the flow can finish it.")
   @operationId("account.completeOAuthLink")
@@ -124,14 +149,18 @@ interface AccountIdentityApi {
     @body body: Identity;
   } | Problem;
 
-  @doc("Links a provider to the signed in user with its ID token from a native app. The session must be at most 10 minutes old.")
+  @doc("""
+    Links a provider to the signed in user with its ID token from a native app. Needs the user's current password when
+    they have one (or a second factor on this session within 10 minutes); a user without a password needs a session at
+    most 10 minutes old.
+    """)
   @operationId("account.createIdTokenIdentity")
   @extension("x-orvano-audience", "client")
   @extension("x-orvano-service", "account")
   @useAuth(bearer)
   @route("/identities/id-token")
   @post
-  createIdTokenIdentity(@body request: CreateIdTokenSessionRequest): {
+  createIdTokenIdentity(@body request: CreateIdTokenIdentityRequest): {
     @statusCode statusCode: 201;
     @body body: Identity;
   } | Problem;

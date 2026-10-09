@@ -3,5 +3,5 @@ import { Client, Orvano } from '@orvano/js'
 
 const orvano = new Orvano(new Client({ endpoint: 'https://orvano.example.com' }))
 
-const totpSetup = await orvano.account.createTotp()
+const totpSetup = await orvano.account.createTotp({})
 console.log(totpSetup)

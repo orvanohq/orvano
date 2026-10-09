@@ -56,13 +56,17 @@ internal sealed class IdentityService(
         return await redemptions.FinishAsync(projectId, outcome, ct);
     }
 
-    /// <summary><c>account.createOAuthLinkFlow</c> (AC-13): the enrollment check (spec 0013, AC-17) and no identity of the provider yet, then AC-4's start.</summary>
+    /// <summary>
+    /// <c>account.createOAuthLinkFlow</c> (AC-13): the enrollment check (spec 0013, AC-17, with the user's current
+    /// <paramref name="password"/>) and no identity of the provider yet, then AC-4's start.
+    /// </summary>
     public async Task<Outcome<string>> StartLinkAsync(
-        string projectId, Guid userId, Guid sessionId, OAuthProvider? provider, string? redirectUrl, string? codeChallenge, string ipKey, CancellationToken ct)
+        string projectId, Guid userId, Guid sessionId, OAuthProvider? provider, string? redirectUrl, string? codeChallenge, string? password,
+        string ipKey, CancellationToken ct)
     {
         // AC-4's start limit comes before the two reads below.
         if (oauth.TakeStartLimit(ipKey) is { } limited) return limited;
-        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, ct) is { } stale) return stale;
+        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, password, ct) is { } stale) return stale;
         if (provider is { } chosen && await HasProviderAsync(userId, chosen, ct)) return Failure.ProviderAlreadyLinked;
         return await oauth.StartAsync(projectId, provider, redirectUrl, codeChallenge, ipKey, ct, linkUserId: userId, limitTaken: true);
     }
@@ -82,10 +86,14 @@ internal sealed class IdentityService(
                 : Failure.InvalidOAuthCode, ct);
     }
 
-    /// <summary><c>account.createIdTokenIdentity</c> (AC-13): the enrollment check (spec 0013, AC-17), AC-9's checks, then the link.</summary>
-    public async Task<Outcome<IdentityRow>> LinkNativeAsync(string projectId, Guid userId, Guid sessionId, NativeRequest request, CancellationToken ct)
+    /// <summary>
+    /// <c>account.createIdTokenIdentity</c> (AC-13): the enrollment check (spec 0013, AC-17, with the user's current
+    /// <paramref name="password"/>), AC-9's checks, then the link.
+    /// </summary>
+    public async Task<Outcome<IdentityRow>> LinkNativeAsync(
+        string projectId, Guid userId, Guid sessionId, NativeRequest request, string? password, CancellationToken ct)
     {
-        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, ct) is { } stale) return stale;
+        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, password, ct) is { } stale) return stale;
         var check = await CheckAsync(projectId, request, ct);
         if (!check.Succeeded) return check.Failure!;
         var native = check.Value!;

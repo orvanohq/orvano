@@ -110,6 +110,16 @@ model TotpSetup {
   expiresAt: utcDateTime;
 }
 
+@doc("A request to start turning on an authenticator app.")
+model CreateTotpRequest {
+  @doc("""
+    The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+    minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+    """)
+  @example("correct horse battery staple")
+  password?: string;
+}
+
 @doc("The first code from the authenticator app, which turns MFA on.")
 model ConfirmTotpRequest {
   @doc("The 6 digit code the authenticator app shows now.")
@@ -126,8 +136,25 @@ model TotpConfirmation {
   @example(#["K7QXM-2RPLD", "A4ZTN-WQ6EB"])
   recoveryCodes: string[];
 
-  @doc("This session's tokens: a new access token carrying `aal` 2, and the current refresh token, unchanged.")
-  session: SessionTokens;
+  @doc("A new access token for this session, carrying `aal` 2. Keep the refresh token you hold; it is unchanged.")
+  session: RaisedSession;
+}
+
+@doc("""
+  The signed in session after a second factor: a new access token carrying the new `aal` and `amr` claims. The refresh
+  token is not sent; keep the one you hold, which is unchanged and whose next refresh carries the new claims too.
+  """)
+model RaisedSession {
+  @doc("An ES256 JWT, valid for 15 minutes.")
+  @example("eyJhbGciOiJFUzI1NiIsImtpZCI6Ii4uLiJ9.e30.c2ln")
+  accessToken: string;
+
+  @doc("When the access token expires.")
+  accessTokenExpiresAt: utcDateTime;
+
+  @doc("The session ID, also the `sid` claim of the access token.")
+  @example("01924f5e-9a1b-7c4d-8e21-3d5e6f7a8b9c")
+  sessionId: string;
 }
 
 @doc("New recovery codes. Show them once and ask the user to keep them safe; every older code stopped working.")
@@ -191,8 +218,9 @@ interface AccountMfaApi {
 
   @doc("""
     Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.
-    Needs a session that signed in within 10 minutes (or passed a second factor within 10 minutes) and, when the user
-    has an email, a verified one.
+    Needs the user's current password when they have one (or a second factor on this session within 10 minutes; a
+    user without a password needs a session that signed in within 10 minutes) and, when the user has an email, a
+    verified one.
     """)
   @operationId("account.createTotp")
   @extension("x-orvano-audience", "client")
@@ -200,15 +228,15 @@ interface AccountMfaApi {
   @useAuth(bearer)
   @route("/mfa/totp")
   @post
-  createTotp(): {
+  createTotp(@body request: CreateTotpRequest): {
     @statusCode statusCode: 201;
     @body body: TotpSetup;
   } | Problem;
 
   @doc("""
-    Turns MFA on with the first code from the authenticator app. Answers 10 new recovery codes, ends every other
-    session of the user, and raises this one to level 2 with a new access token. The SDKs keep their stored session,
-    whose next refresh carries `aal` 2 too.
+    Turns MFA on with the first code from the authenticator app, within 15 minutes of `account.createTotp`. Answers 10
+    new recovery codes, ends every other session of the user, and raises this one to level 2 with a new access token.
+    The SDKs keep their stored refresh token, whose next refresh carries `aal` 2 too.
     """)
   @operationId("account.confirmTotp")
   @extension("x-orvano-audience", "client")
@@ -247,8 +275,8 @@ interface AccountMfaApi {
 
   @doc("""
     Step up: checks a second factor on the signed in session, so security changes work for the next 10 minutes. Raises
-    the session to level 2 and answers a new access token with the current refresh token, unchanged. The SDK helpers
-    (`verifyMfa`) store them.
+    the session to level 2 and answers a new access token; the refresh token is not sent and stays unchanged. The SDK
+    helpers (`verifyMfa`) store the access token.
     """)
   @operationId("account.verifyMfa")
   @extension("x-orvano-audience", "client")
@@ -256,7 +284,7 @@ interface AccountMfaApi {
   @useAuth(bearer)
   @route("/mfa/verify")
   @post
-  verifyMfa(@body request: VerifyMfaRequest): SessionTokens | Problem;
+  verifyMfa(@body request: VerifyMfaRequest): RaisedSession | Problem;
 
   @doc("""
     Starts a step up with a passkey: answers the options for `navigator.credentials.get`, listing the signed in user's

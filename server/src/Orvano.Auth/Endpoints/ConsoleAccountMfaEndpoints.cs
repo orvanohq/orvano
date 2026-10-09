@@ -95,12 +95,19 @@ internal static class ConsoleAccountMfaEndpoints
             Ok(http, await mfa.GetAsync(ConsoleProject.Id, ConsoleUser.Get(http), ct), MfaStatus))
             .WithName(Ops.GetMfa.Id);
 
-        v1.MapPost(Ops.CreateTotp.Route, async (HttpContext http, MfaService mfa, RateLimits limits, CancellationToken ct) =>
+        v1.MapPost(Ops.CreateTotp.Route, async (HttpContext http, Api.CreateTotpRequest request, MfaService mfa, RateLimits limits, CancellationToken ct) =>
         {
             var userId = ConsoleUser.Get(http);
             var limit = limits.Acquire(RateLimitPolicies.MfaEnrollPerUser, userId.ToString());
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
-            return Created(http, await mfa.CreateTotpAsync(ConsoleProject.Id, userId, ConsoleUser.GetSession(http), ct), TotpSetup);
+            // Every password sent counts, like the other password checks (spec 0004, rate limits).
+            if (request.Password is not null)
+            {
+                var checkLimit = limits.Acquire(RateLimitPolicies.PasswordCheckPerUser, userId.ToString());
+                if (!checkLimit.Allowed) return ApiProblem.RateLimited(http, checkLimit, Api.ErrorCode.RateLimited);
+            }
+
+            return Created(http, await mfa.CreateTotpAsync(ConsoleProject.Id, userId, ConsoleUser.GetSession(http), request.Password, ct), TotpSetup);
         })
             .WithName(Ops.CreateTotp.Id);
 
@@ -108,7 +115,7 @@ internal static class ConsoleAccountMfaEndpoints
         {
             var outcome = await mfa.ConfirmTotpAsync(ConsoleProject.Id, ConsoleUser.Get(http), ConsoleUser.GetSession(http), request.Code, ct);
             if (!outcome.Succeeded) return Problem(http, outcome.Failure!);
-            ConsoleCookies.Set(http, outcome.Value!.Session, publicUrl);
+            ConsoleCookies.SetAccess(http, outcome.Value!.Session, publicUrl);
             return TypedResults.Ok(new Api.ConsoleTotpConfirmation(outcome.Value.RecoveryCodes));
         })
             .WithName(Ops.ConfirmTotp.Id);
@@ -132,7 +139,7 @@ internal static class ConsoleAccountMfaEndpoints
             var answer = new FactorAnswer(request.TotpCode, request.RecoveryCode, PasskeyAnswer(request.Passkey));
             var outcome = await mfa.VerifyAsync(ConsoleProject.Id, ConsoleUser.Get(http), ConsoleUser.GetSession(http), answer, ct);
             if (!outcome.Succeeded) return Problem(http, outcome.Failure!);
-            ConsoleCookies.Set(http, outcome.Value!, publicUrl);
+            ConsoleCookies.SetAccess(http, outcome.Value!, publicUrl);
             return TypedResults.NoContent();
         })
             .WithName(Ops.VerifyMfa.Id);
@@ -152,21 +159,30 @@ internal static class ConsoleAccountMfaEndpoints
     /// <summary>The account's passkeys: registration, list, rename, and delete (AC-42).</summary>
     private static void MapPasskeys(RouteGroupBuilder v1)
     {
-        v1.MapPost(Ops.CreatePasskeyRegistration.Route, async (HttpContext http, PasskeyService passkeys, RateLimits limits, CancellationToken ct) =>
+        v1.MapPost(Ops.CreatePasskeyRegistration.Route, async (
+            HttpContext http, Api.CreatePasskeyRegistrationRequest request, PasskeyService passkeys, RateLimits limits, CancellationToken ct) =>
         {
             var userId = ConsoleUser.Get(http);
             var enroll = limits.Acquire(RateLimitPolicies.MfaEnrollPerUser, userId.ToString());
             if (!enroll.Allowed) return ApiProblem.RateLimited(http, enroll, Api.ErrorCode.RateLimited);
             var perUser = limits.Acquire(RateLimitPolicies.PasskeyChallengePerUser, userId.ToString());
             if (!perUser.Allowed) return ApiProblem.RateLimited(http, perUser, Api.ErrorCode.RateLimited);
-            return Ok(http, await passkeys.CreateRegistrationAsync(ConsoleProject.Id, userId, ConsoleUser.GetSession(http), ct), PasskeyRegistration);
+            // Every password sent counts, like the other password checks (spec 0004, rate limits).
+            if (request.Password is not null)
+            {
+                var checkLimit = limits.Acquire(RateLimitPolicies.PasswordCheckPerUser, userId.ToString());
+                if (!checkLimit.Allowed) return ApiProblem.RateLimited(http, checkLimit, Api.ErrorCode.RateLimited);
+            }
+
+            return Ok(http, await passkeys.CreateRegistrationAsync(ConsoleProject.Id, userId, ConsoleUser.GetSession(http), request.Password, ct),
+                PasskeyRegistration);
         })
             .WithName(Ops.CreatePasskeyRegistration.Id);
 
         v1.MapPost(Ops.CompletePasskeyRegistration.Route, async (
             HttpContext http, Api.CompletePasskeyRegistrationRequest request, PasskeyService passkeys, CancellationToken ct) =>
         {
-            var outcome = await passkeys.CompleteRegistrationAsync(ConsoleProject.Id, ConsoleUser.Get(http), ConsoleUser.GetSession(http),
+            var outcome = await passkeys.CompleteRegistrationAsync(ConsoleProject.Id, ConsoleUser.Get(http),
                 request.ChallengeId, Attestation(request.Credential), request.Name, ct);
             return Created(http, outcome, Passkey);
         })

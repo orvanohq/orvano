@@ -14,16 +14,20 @@ import type {
   CreateAccountRequest,
   CreateEmailCodeRequest,
   CreateEmailCodeSessionRequest,
+  CreateIdTokenIdentityRequest,
   CreateIdTokenSessionRequest,
   CreateMagicLinkRequest,
   CreateMagicLinkSessionRequest,
   CreateMfaPasskeyChallengeRequest,
   CreateMfaSessionRequest,
   CreateOAuthFlowRequest,
+  CreateOAuthLinkFlowRequest,
   CreateOAuthSessionRequest,
+  CreatePasskeyRegistrationRequest,
   CreatePasskeySessionRequest,
   CreatePasswordSessionRequest,
   CreateRecoveryRequest,
+  CreateTotpRequest,
   CreateUserRecoveryRequest,
   CreateUserRequest,
   CreateUserVerificationRequest,
@@ -80,7 +84,7 @@ export const dispatch: DispatchTable = {
   'account.createIdTokenIdentity': {
     status: 201,
     client: (o, input) =>
-      o.account.createIdTokenIdentity(input.body as CreateIdTokenSessionRequest),
+      o.account.createIdTokenIdentity(input.body as CreateIdTokenIdentityRequest),
   },
   'account.createIdTokenSession': {
     status: 201,
@@ -110,7 +114,7 @@ export const dispatch: DispatchTable = {
   },
   'account.createOAuthLinkFlow': {
     status: 200,
-    client: (o, input) => o.account.createOAuthLinkFlow(input.body as CreateOAuthFlowRequest),
+    client: (o, input) => o.account.createOAuthLinkFlow(input.body as CreateOAuthLinkFlowRequest),
   },
   'account.createOAuthSession': {
     status: 201,
@@ -122,7 +126,8 @@ export const dispatch: DispatchTable = {
   },
   'account.createPasskeyRegistration': {
     status: 200,
-    client: (o, _input) => o.account.createPasskeyRegistration(),
+    client: (o, input) =>
+      o.account.createPasskeyRegistration(input.body as CreatePasskeyRegistrationRequest),
   },
   'account.createPasskeySession': {
     status: 201,
@@ -147,7 +152,7 @@ export const dispatch: DispatchTable = {
   },
   'account.createTotp': {
     status: 201,
-    client: (o, _input) => o.account.createTotp(),
+    client: (o, input) => o.account.createTotp(input.body as CreateTotpRequest),
   },
   'account.createVerification': {
     status: 202,

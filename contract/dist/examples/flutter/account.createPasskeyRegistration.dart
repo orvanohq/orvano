@@ -3,6 +3,8 @@ import 'package:orvano_flutter/orvano_flutter.dart';
 
 Future<void> main() async {
   final orvano = Orvano(Client(endpoint: 'https://orvano.example.com'));
-  final passkeyRegistration = await orvano.account.createPasskeyRegistration();
+  final passkeyRegistration = await orvano.account.createPasskeyRegistration(
+    CreatePasskeyRegistrationRequest(),
+  );
   print(passkeyRegistration.toJson());
 }

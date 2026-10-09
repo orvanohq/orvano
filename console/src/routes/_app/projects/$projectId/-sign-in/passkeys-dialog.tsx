@@ -233,6 +233,9 @@ export function PasskeysDialog({
                 {settings.acceptedOrigins.map((origin) => (
                   <li key={origin} className="break-all">
                     {origin}
+                    {origin.includes('://*.') ? (
+                      <span className="font-sans text-muted-foreground"> (any one subdomain)</span>
+                    ) : null}
                   </li>
                 ))}
               </ul>

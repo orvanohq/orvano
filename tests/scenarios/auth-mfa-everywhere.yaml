@@ -34,7 +34,8 @@ steps:
       body: { type: verification, user: { emailVerified: true } }
   - op: account.createTotp
     as: client
-    input: {}
+    input:
+      body: { password: correct horse battery staple }
     expect: { status: 201 }
     save:
       secret: $.secret
@@ -47,7 +48,9 @@ steps:
   - op: confirmTotp
     as: client
     input: { code: '${firstCode}' }
-    expect: { status: 200 }
+    expect:
+      status: 200
+      body: { refreshTokenKept: true }
     save:
       codeA: $.recoveryCodes.0
       codeB: $.recoveryCodes.1
@@ -99,7 +102,7 @@ steps:
     input: { recoveryCode: '${codeB}' }
     expect:
       status: 200
-      body: { verified: true }
+      body: { verified: true, refreshTokenKept: true }
   - op: account.createRecoveryCodes
     as: client
     input: {}

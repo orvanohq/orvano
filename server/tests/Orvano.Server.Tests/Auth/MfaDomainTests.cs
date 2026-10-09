@@ -4,7 +4,7 @@ using Orvano.Auth.Domain;
 
 namespace Orvano.Server.Tests.Auth;
 
-// Spec 0013 AC-7, AC-9, AC-10, AC-12, AC-20, AC-25, AC-29: the plain MFA rules, with no database.
+// Spec 0013 AC-7, AC-9, AC-10, AC-12, AC-20, AC-22, AC-25, AC-29: the plain MFA rules, with no database.
 public class MfaDomainTests
 {
     // RFC 6238 appendix B, SHA-1: the 8 digit values end in these 6 digits.
@@ -223,4 +223,16 @@ public class MfaDomainTests
         Assert.False(console.Enabled);
         Assert.Null(console.RpId);
     }
+
+    // AC-22: when either count is above 0, the new one must be larger; two zeros (a synced passkey) pass.
+    [Theory]
+    [InlineData(0L, 0u, false)]
+    [InlineData(0L, 1u, false)]
+    [InlineData(5L, 6u, false)]
+    [InlineData(5L, 5u, true)]
+    [InlineData(5L, 3u, true)]
+    [InlineData(5L, 0u, true)]
+    [InlineData(4294967295L, 0u, true)]
+    public void A_counter_that_does_not_move_forward_is_a_regression(long stored, uint next, bool regressed) =>
+        Assert.Equal(regressed, PasskeyRules.CounterRegressed(stored, next));
 }

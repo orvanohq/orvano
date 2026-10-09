@@ -3,6 +3,7 @@ import {
   MemorySessionStore,
   authorizationHeader,
   hasLocalStorage,
+  raisedSessionFrom,
   readAccessClaims,
   sessionFrom,
 } from './auth.js'
@@ -22,7 +23,9 @@ import {
 import type {
   IdTokenCredentials,
   IdTokenSignInResult,
+  IdentityLinkOptions,
   IdentityLinkResult,
+  LinkIdentityOptions,
   OAuthOptions,
   OAuthSignInResult,
   OAuthTransport,
@@ -340,12 +343,15 @@ export class Client {
   }
 
   /**
-   * Links a provider to the signed in user by redirect, like {@link signInWithOAuth}. The session
-   * must be at most 10 minutes old (`reauthentication_required`).
+   * Links a provider to the signed in user by redirect, like {@link signInWithOAuth}. A user with a
+   * password passes it as `password` (missing or wrong: `invalid_credentials`), unless this
+   * session passed a second factor within 10 minutes (and a user with MFA on must have:
+   * `mfa_verification_required`); a user without a password needs a session at most 10 minutes
+   * old (`reauthentication_required`).
    */
   async linkIdentity(
     provider: OAuthProvider,
-    options: OAuthOptions,
+    options: LinkIdentityOptions,
   ): Promise<IdentityLinkResult | null> {
     return (await this.#oauth.start(
       'oauth_link',
@@ -366,10 +372,13 @@ export class Client {
     return signInWithIdToken(this, credentials, options)
   }
 
-  /** Links a provider to the signed in user with its native ID token, and says `userUpdated`. */
+  /**
+   * Links a provider to the signed in user with its native ID token, and says `userUpdated`. Pass
+   * the user's current password as `password` when they have one, as for {@link linkIdentity}.
+   */
   linkIdentityWithIdToken(
     credentials: IdTokenCredentials,
-    options?: RequestOptions,
+    options?: IdentityLinkOptions,
   ): Promise<Identity> {
     return linkIdentityWithIdToken(this, credentials, options)
   }
@@ -450,7 +459,8 @@ export class Client {
    * Step up (spec 0013, AC-19): proves a second factor on the signed in session
    * (`account.verifyMfa`), so security changes such as `deleteTotp` work for the next 10 minutes.
    * `{ passkey: true }` runs the ceremony against `account.createStepUpPasskeyChallenge` first.
-   * Stores the new access token, which carries `aal` 2, and says `tokenRefreshed`.
+   * Stores the new access token, which carries `aal` 2, keeps the refresh token this client
+   * holds (the server sends none; it is unchanged), and says `tokenRefreshed`.
    *
    * @throws {@link OrvanoError} for a wrong code (`invalid_mfa_code`) or passkey
    * (`invalid_passkey`), or a factor the user can't use now (`factor_not_enabled`).
@@ -462,14 +472,16 @@ export class Client {
       options,
     )
     if (this.#mfaTransport !== undefined) return this.#mfaTransport.verifyMfa(wire, this, options)
-    const tokens = await new AccountService(this).verifyMfa(wire, options)
-    await this.#save(sessionFrom(tokens), 'tokenRefreshed')
+    const raised = await new AccountService(this).verifyMfa(wire, options)
+    await this.#saveRaised(raised)
   }
 
   /**
    * Turns MFA on with the first code from the authenticator app (`account.confirmTotp`), after
-   * `account.createTotp`. Stores the new access token and says `tokenRefreshed`; every other
-   * session of the user has ended. Answers the 10 recovery codes: show them once.
+   * `account.createTotp` (which takes the user's current password). Stores the new access token,
+   * keeps the refresh token this client holds (the server sends none; it is unchanged), and says
+   * `tokenRefreshed`; every other session of the user has ended. Answers the 10 recovery codes:
+   * show them once.
    *
    * @throws {@link OrvanoError} for a wrong code (`invalid_mfa_code`) or no secret waiting for
    * its first code (`totp_not_pending`).
@@ -477,7 +489,7 @@ export class Client {
   async confirmTotp(code: string, options?: RequestOptions): Promise<string[]> {
     if (this.#mfaTransport !== undefined) return this.#mfaTransport.confirmTotp(code, this, options)
     const confirmation = await new AccountService(this).confirmTotp({ code }, options)
-    await this.#save(sessionFrom(confirmation.session), 'tokenRefreshed')
+    await this.#saveRaised(confirmation.session)
     return confirmation.recoveryCodes
   }
 
@@ -510,16 +522,22 @@ export class Client {
   /**
    * Adds a passkey to the signed in user (spec 0013, AC-20, AC-21):
    * `account.createPasskeyRegistration`, the passkey authenticator, then
-   * `account.completePasskeyRegistration`. Needs a session that signed in (or passed a second
-   * factor) within 10 minutes and, when the user has an email, a verified one.
+   * `account.completePasskeyRegistration`. A user with a password passes it as `password`, unless
+   * this session passed a second factor within 10 minutes (and a user with MFA on must have); a
+   * user without a password needs a session that signed in within 10 minutes. When the user has
+   * an email, it must be verified.
    *
-   * @throws {@link OrvanoError} for `reauthentication_required`, `mfa_verification_required`,
-   * `email_not_verified`, `passkey_limit`, `passkey_already_registered`, or `invalid_passkey`.
+   * @throws {@link OrvanoError} for `invalid_credentials` (a missing or wrong password),
+   * `reauthentication_required`, `mfa_verification_required`, `email_not_verified`,
+   * `passkey_limit`, `passkey_already_registered`, or `invalid_passkey`.
    */
   async registerPasskey(options: PasskeyRegistrationOptions = {}): Promise<Passkey> {
     const request: RequestOptions = options.signal === undefined ? {} : { signal: options.signal }
     const account = new AccountService(this)
-    const registration = await account.createPasskeyRegistration(request)
+    const registration = await account.createPasskeyRegistration(
+      options.password === undefined ? {} : { password: options.password },
+      request,
+    )
     const credential = await this.#passkeys.create(registration.options, options.signal)
     return account.completePasskeyRegistration(
       {
@@ -774,6 +792,14 @@ export class Client {
       }
     }
     this.#emit('userUpdated', await this.session.get())
+  }
+
+  /**
+   * Stores the new access token of a session raised by a second factor (spec 0013), keeping the
+   * refresh token held now, and says `tokenRefreshed`.
+   */
+  async #saveRaised(raised: unknown): Promise<void> {
+    await this.#save(raisedSessionFrom(raised, await this.session.get()), 'tokenRefreshed')
   }
 
   async #save(session: AuthSession | null, event: AuthEvent): Promise<void> {

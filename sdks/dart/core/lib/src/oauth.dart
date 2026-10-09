@@ -92,11 +92,17 @@ extension OAuthSignIn on Client {
           as OAuthSignInResult;
 
   /// Links [provider] to the signed in user by redirect, like
-  /// [signInWithOAuth]. The session must be at most 10 minutes old
-  /// (`reauthentication_required`).
+  /// [signInWithOAuth].
+  ///
+  /// A user with a password passes it as [password] (missing or wrong:
+  /// `invalid_credentials`), unless this session passed a second factor
+  /// within 10 minutes (and a user with MFA on must have:
+  /// `mfa_verification_required`); a user without a password needs a session
+  /// at most 10 minutes old (`reauthentication_required`).
   Future<IdentityLinkResult> linkIdentity(
     OAuthProvider provider, {
     required Uri redirectUrl,
+    String? password,
     OAuthLauncher? launcher,
     RequestOptions? options,
   }) async =>
@@ -106,6 +112,7 @@ extension OAuthSignIn on Client {
             redirectUrl,
             launcher,
             options,
+            password: password,
           )
           as IdentityLinkResult;
 
@@ -135,22 +142,25 @@ extension OAuthSignIn on Client {
   }
 
   /// Links a provider to the signed in user with its native ID token, and
-  /// emits [AuthEvent.userUpdated].
+  /// emits [AuthEvent.userUpdated]. Pass the user's current [password] when
+  /// they have one, as for [linkIdentity].
   Future<Identity> linkIdentityWithIdToken({
     required IdTokenProvider provider,
     required String idToken,
     required String nonce,
     String? authorizationCode,
     String? name,
+    String? password,
     RequestOptions? options,
   }) async {
     final identity = await AccountService(this).createIdTokenIdentity(
-      CreateIdTokenSessionRequest(
+      CreateIdTokenIdentityRequest(
         provider: provider,
         idToken: idToken,
         nonce: nonce,
         authorizationCode: authorizationCode,
         name: name,
+        password: password,
       ),
       options: options,
     );
@@ -216,8 +226,9 @@ extension OAuthSignIn on Client {
     OAuthProvider provider,
     Uri redirectUrl,
     OAuthLauncher? launcher,
-    RequestOptions? options,
-  ) async {
+    RequestOptions? options, {
+    String? password,
+  }) async {
     final open = launcher ?? _launchers[this];
     if (open == null) {
       throw ArgumentError(
@@ -227,14 +238,24 @@ extension OAuthSignIn on Client {
     final verifier = _base64Url(_randomBytes(32));
     final challenge = _base64Url(sha256.convert(ascii.encode(verifier)).bytes);
     final account = AccountService(this);
-    final body = CreateOAuthFlowRequest(
-      provider: provider,
-      redirectUrl: redirectUrl.toString(),
-      codeChallenge: challenge,
-    );
     final flow = type == OAuthLinkType.oauth
-        ? await account.createOAuthFlow(body, options: options)
-        : await account.createOAuthLinkFlow(body, options: options);
+        ? await account.createOAuthFlow(
+            CreateOAuthFlowRequest(
+              provider: provider,
+              redirectUrl: redirectUrl.toString(),
+              codeChallenge: challenge,
+            ),
+            options: options,
+          )
+        : await account.createOAuthLinkFlow(
+            CreateOAuthLinkFlowRequest(
+              provider: provider,
+              redirectUrl: redirectUrl.toString(),
+              codeChallenge: challenge,
+              password: password,
+            ),
+            options: options,
+          );
     _verifiers[this] = verifier;
     final back = await open(Uri.parse(flow.url), redirectUrl);
     final result = await handleOAuthRedirect(back, options: options);

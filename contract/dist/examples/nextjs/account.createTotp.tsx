@@ -8,6 +8,6 @@ export default async function Page() {
     endpoint: process.env.ORVANO_ENDPOINT!,
     cookies: await cookies(),
   })
-  const totpSetup = await orvano.account.createTotp()
+  const totpSetup = await orvano.account.createTotp({})
   return <pre>{JSON.stringify(totpSetup, null, 2)}</pre>
 }

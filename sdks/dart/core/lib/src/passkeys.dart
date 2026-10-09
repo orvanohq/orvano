@@ -88,17 +88,24 @@ extension PasskeySignIn on Client {
 
   /// Adds a passkey to the signed in user (`account.createPasskeyRegistration`,
   /// the authenticator, then `account.completePasskeyRegistration`), named
-  /// [name] (1 to 64 characters; `Passkey` when left out). Needs a session
-  /// that signed in, or passed a second factor, within 10 minutes and, when
-  /// the user has an email, a verified one.
+  /// [name] (1 to 64 characters; `Passkey` when left out).
+  ///
+  /// A user with a password passes it as [password] (missing or wrong:
+  /// `invalid_credentials`), unless this session passed a second factor
+  /// within 10 minutes (and a user with MFA on must have:
+  /// `mfa_verification_required`); a user without a password needs a session
+  /// that signed in within 10 minutes (`reauthentication_required`). When the
+  /// user has an email, it must be verified.
   Future<Passkey> registerPasskey({
     String? name,
+    String? password,
     PasskeyAuthenticator? authenticator,
     RequestOptions? options,
   }) async {
     final passkeys = passkeyAuthenticatorFor(this, authenticator);
     final account = AccountService(this);
     final registration = await account.createPasskeyRegistration(
+      CreatePasskeyRegistrationRequest(password: password),
       options: options,
     );
     final credential = await passkeys.create(registration.options);

@@ -138,7 +138,7 @@ public class OAuthIdentityTests(PostgresFixture postgres)
         // An unverified email with a password: unlinking the only identity is allowed.
         using var signedUp = await api.SignUpAsync("password-user@x.com");
         var bearer = AuthApi.AccessToken(signedUp);
-        var (start, verifier) = await OAuthDriver.StartAsync(api, "github", bearer: bearer, path: "/v1/account/identities/oauth/flows");
+        var (start, verifier) = await OAuthDriver.StartAsync(api, "github", bearer: bearer, path: "/v1/account/identities/oauth/flows", password: MfaTests.Password);
         var back = await OAuthDriver.FollowAsync(api, start.Body.GetProperty("url").GetString()!, new { sub = "4242", email = "gh-pw@x.com", emailVerified = true });
         start.Dispose();
         using var linked = await api.SendAsync(HttpMethod.Post, "/v1/account/identities/oauth",

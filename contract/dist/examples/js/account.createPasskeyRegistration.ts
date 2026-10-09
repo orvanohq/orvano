@@ -3,5 +3,5 @@ import { Client, Orvano } from '@orvano/js'
 
 const orvano = new Orvano(new Client({ endpoint: 'https://orvano.example.com' }))
 
-const passkeyRegistration = await orvano.account.createPasskeyRegistration()
+const passkeyRegistration = await orvano.account.createPasskeyRegistration({})
 console.log(passkeyRegistration)

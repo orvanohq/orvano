@@ -1,5 +1,7 @@
 # Spec 0012, AC-13, AC-14, AC-24: a signed in user links GitHub by redirect and Apple natively,
-# lists them, unlinks down to one, and can't remove the last way in.
+# lists them, unlinks down to one, and can't remove the last way in. This user has no password, so
+# the links send none and rest on a session created within 10 minutes (spec 0013, AC-17);
+# auth-identities-password covers a user with one.
 name: a user links and unlinks providers and keeps a way in
 requires: []
 steps:

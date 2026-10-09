@@ -36,6 +36,28 @@ export interface OAuthOptions extends RequestOptions {
 }
 
 /**
+ * Options for {@link Client.linkIdentity}: those of a sign in, plus the user's current password.
+ */
+export interface LinkIdentityOptions extends OAuthOptions {
+  /**
+   * The user's current password. A user who has one passes it, unless this session passed a
+   * second factor within 10 minutes; a user without one leaves it out, and must have signed in
+   * within 10 minutes.
+   */
+  password?: string
+}
+
+/** Options for {@link Client.linkIdentityWithIdToken}: the call's options plus the user's current password. */
+export interface IdentityLinkOptions extends RequestOptions {
+  /**
+   * The user's current password. A user who has one passes it, unless this session passed a
+   * second factor within 10 minutes; a user without one leaves it out, and must have signed in
+   * within 10 minutes.
+   */
+  password?: string
+}
+
+/**
  * A finished provider sign in: the user, and whether it created them, or the MFA step it stopped
  * at (`mfaRequired`).
  */
@@ -86,11 +108,14 @@ export interface Nonce {
  * posts to the app's route handler, which keeps it in a cookie.
  */
 export interface OAuthTransport {
-  /** Starts a sign in or link flow and opens the provider; null when the page navigated away. */
+  /**
+   * Starts a sign in or link flow and opens the provider; null when the page navigated away. A
+   * link's `options` may carry the user's `password`.
+   */
   start(
     purpose: OAuthLinkType,
     provider: OAuthProvider,
-    options: OAuthOptions,
+    options: LinkIdentityOptions,
     client: Client,
   ): Promise<OAuthSignInResult | IdentityLinkResult | null>
   /** Redeems a provider redirect's code with the stored verifier. */
@@ -112,7 +137,7 @@ const memoryVerifiers = new WeakMap<Client, string>()
 /** The default {@link OAuthTransport}: the `account` operations, called from this runtime. */
 export const directOAuth: OAuthTransport = {
   async start(purpose, provider, options, client) {
-    const { redirectUrl, open, ...request } = options
+    const { redirectUrl, open, password, ...request } = options
     const opener = open ?? defaultOpener()
     if (opener === undefined)
       throw new TypeError('Orvano: pass an open function; this runtime has no location to assign.')
@@ -123,7 +148,10 @@ export const directOAuth: OAuthTransport = {
     const flow =
       purpose === 'oauth'
         ? await account.createOAuthFlow(body, request)
-        : await account.createOAuthLinkFlow(body, request)
+        : await account.createOAuthLinkFlow(
+            password === undefined ? body : { ...body, password },
+            request,
+          )
     saveVerifier(client, verifier)
     const final = await opener(flow.url)
     if (final === undefined) return null
@@ -221,15 +249,19 @@ export async function signInWithIdToken(
   return signInOutcome(result)
 }
 
-/** Links a provider natively (`account.createIdTokenIdentity`) and says `userUpdated`. */
+/**
+ * Links a provider natively (`account.createIdTokenIdentity`), sending the user's `password` when
+ * given, and says `userUpdated`.
+ */
 export async function linkIdentityWithIdToken(
   client: Client,
   credentials: IdTokenCredentials,
-  options?: RequestOptions,
+  options: IdentityLinkOptions = {},
 ): Promise<Identity> {
+  const { password, ...request } = options
   const identity = await new AccountService(client).createIdTokenIdentity(
-    body(credentials),
-    options,
+    password === undefined ? body(credentials) : { ...body(credentials), password },
+    request,
   )
   await client.reloadSession('userUpdated')
   return identity

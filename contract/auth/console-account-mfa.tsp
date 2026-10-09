@@ -119,7 +119,8 @@ interface ConsoleAccountMfaApi {
 
   @doc("""
     Starts turning on an authenticator app for the console account: answers a new secret, replacing any that still
-    waits for its first code. Needs a session that signed in, or passed a second factor, within 10 minutes.
+    waits for its first code. Needs the account's current password (or a second factor on this session within 10
+    minutes).
     """)
   @operationId("consoleAccount.createTotp")
   @extension("x-orvano-audience", "console")
@@ -127,7 +128,7 @@ interface ConsoleAccountMfaApi {
   @useAuth(consoleSession)
   @route("/mfa/totp")
   @post
-  createTotp(): {
+  createTotp(@body request: CreateTotpRequest): {
     @statusCode statusCode: 201;
     @body body: TotpSetup;
   } | Problem;
@@ -197,8 +198,8 @@ interface ConsoleAccountMfaApi {
 
   @doc("""
     Starts adding a passkey to the console account: answers the options for `navigator.credentials.create`. Needs
-    console passkeys (https with a host name, or localhost), a session that signed in or passed a second factor within
-    10 minutes, and fewer than 10 passkeys.
+    console passkeys (https with a host name, or localhost), the account's current password (or a second factor on
+    this session within 10 minutes), and fewer than 10 passkeys.
     """)
   @operationId("consoleAccount.createPasskeyRegistration")
   @extension("x-orvano-audience", "console")
@@ -206,7 +207,7 @@ interface ConsoleAccountMfaApi {
   @useAuth(consoleSession)
   @route("/passkeys/registration")
   @post
-  createPasskeyRegistration(): PasskeyRegistration | Problem;
+  createPasskeyRegistration(@body request: CreatePasskeyRegistrationRequest): PasskeyRegistration | Problem;
 
   @doc("Finishes adding a passkey to the console account with the browser's answer to `consoleAccount.createPasskeyRegistration`.")
   @operationId("consoleAccount.completePasskeyRegistration")

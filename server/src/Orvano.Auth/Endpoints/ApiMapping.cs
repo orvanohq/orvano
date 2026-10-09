@@ -122,6 +122,8 @@ internal static class ApiMapping
         view.RefreshTokenExpiresAt,
         view.SessionId.ToString());
 
+    public static Api.RaisedSession RaisedSession(RaisedSessionView view) => new(view.AccessToken, view.AccessTokenExpiresAt, view.SessionId.ToString());
+
     public static Api.Session Session(SessionView view) => new(
         view.Id.ToString(),
         view.CreatedAt,
@@ -205,7 +207,7 @@ internal static class ApiMapping
 
     public static Api.TotpSetup TotpSetup(TotpSetupView view) => new(view.Secret, view.Uri, view.ExpiresAt);
 
-    public static Api.TotpConfirmation TotpConfirmation(TotpConfirmationView view) => new(view.RecoveryCodes, SessionTokens(view.Session));
+    public static Api.TotpConfirmation TotpConfirmation(TotpConfirmationView view) => new(view.RecoveryCodes, RaisedSession(view.Session));
 
     public static Api.Passkey Passkey(PasskeyView view) =>
         new(view.Id.ToString(), view.Name, view.CreatedAt, view.LastUsedAt, view.Synced, view.Active);

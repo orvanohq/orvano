@@ -87,7 +87,7 @@ public class PasskeyTests(PostgresFixture postgres)
         using var strong = await api.SignInAsync("ada@x.com");
         using var stepTwo = await StepTwoAsync(api, Ticket(strong), totpCode: CodeAt(enrolled.Secret, +1));
 
-        using var options = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", bearer: AuthApi.AccessToken(stepTwo));
+        using var options = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", new { }, bearer: AuthApi.AccessToken(stepTwo));
         Assert.Equal(HttpStatusCode.OK, options.Status);
         var creation = options.Body.GetProperty("options");
         Assert.Equal("localhost", creation.GetProperty("rp").GetProperty("id").GetString());
@@ -127,7 +127,7 @@ public class PasskeyTests(PostgresFixture postgres)
         var registered = await RegisterAsync(api, bearer);
 
         // A credential the authenticator made but nobody registered.
-        using var stranger = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", bearer: await VerifiedUserAsync(api, "bob@x.com"));
+        using var stranger = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", WithPassword, bearer: await VerifiedUserAsync(api, "bob@x.com"));
         var unregistered = await CreateCredentialAsync(api, stranger.Body.GetProperty("options"));
 
         var cases = new (string Name, string CredentialId, object? Extra)[]
@@ -171,7 +171,13 @@ public class PasskeyTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.Unauthorized, three.Status);
         using var same = await PasskeySignInAsync(api, counting.CredentialId, new { signCount = 5 });
         Assert.Equal(HttpStatusCode.Unauthorized, same.Status);
-        Assert.Equal(2, await TestDatabase.ScalarAsync<long>(api.Database.Superuser,
+        // A clone that reset its counter to 0 is a regression too (AC-22), recorded like the others.
+        using var reset = await PasskeySignInAsync(api, counting.CredentialId, new { signCount = 0 });
+        Assert.Equal(HttpStatusCode.Unauthorized, reset.Status);
+        Assert.Equal("invalid_passkey", reset.Code);
+        Assert.Equal(5L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser,
+            "SELECT sign_count FROM orvano.auth_passkeys WHERE id = @id::uuid", ("id", counting.Passkey.GetProperty("id").GetString()!)));
+        Assert.Equal(3, await TestDatabase.ScalarAsync<long>(api.Database.Superuser,
             "SELECT count(*) FROM orvano.events WHERE type = 'auth.passkey.counter_regressed' AND payload->>'passkeyId' = @id",
             ("id", counting.Passkey.GetProperty("id").GetString()!)));
 
@@ -303,7 +309,7 @@ public class PasskeyTests(PostgresFixture postgres)
         using var challenge = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/passkey-challenge");
         Assert.Equal(HttpStatusCode.Conflict, challenge.Status);
         Assert.Equal("factor_not_enabled", challenge.Code);
-        using var registration = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", bearer: bearer);
+        using var registration = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", WithPassword, bearer: bearer);
         Assert.Equal("factor_not_enabled", registration.Code);
         using var stepUp = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/passkey-challenge", bearer: bearer);
         Assert.Equal("factor_not_enabled", stepUp.Code);
@@ -330,7 +336,7 @@ public class PasskeyTests(PostgresFixture postgres)
         using var signUp = await api.SignUpAsync("ada@x.com");
         var bearer = AuthApi.AccessToken(signUp);
 
-        using var unverified = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", bearer: bearer);
+        using var unverified = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", WithPassword, bearer: bearer);
         Assert.Equal(HttpStatusCode.Conflict, unverified.Status);
         Assert.Equal("email_not_verified", unverified.Code);
 
@@ -339,7 +345,7 @@ public class PasskeyTests(PostgresFixture postgres)
         Assert.Equal("Phone", first.Passkey.GetProperty("name").GetString());
 
         // The same authenticator answering an old challenge's options again is refused: the challenge is spent.
-        using var options = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", bearer: bearer);
+        using var options = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", WithPassword, bearer: bearer);
         Assert.Equal([first.CredentialId], options.Body.GetProperty("options").GetProperty("excludeCredentials").EnumerateArray().Select(c => c.GetProperty("id").GetString()));
         var credential = await CreateCredentialAsync(api, options.Body.GetProperty("options"));
         var body = new { challengeId = options.Body.GetProperty("challengeId").GetString(), credential };
@@ -355,9 +361,55 @@ public class PasskeyTests(PostgresFixture postgres)
             SELECT project_id, id, uuid_send(gen_random_uuid()), '\x00', 0, 'Seeded', false, false, 'localhost'
             FROM orvano.auth_users, generate_series(1, 8) WHERE email = 'ada@x.com'
             """);
-        using var full = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", bearer: bearer);
+        using var full = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", WithPassword, bearer: bearer);
         Assert.Equal(HttpStatusCode.Conflict, full.Status);
         Assert.Equal("passkey_limit", full.Code);
+    }
+
+    // AC-21: a registration without the user verified flag, for another RP ID, on another user's register challenge, or
+    // with a credential ID the project already has is refused, and nothing is stored.
+    [Fact]
+    public async Task Registration_refuses_no_user_verification_a_wrong_rp_id_another_users_challenge_and_a_known_credential()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, email: true);
+        await EnablePasskeysAsync(api);
+        var ada = await VerifiedUserAsync(api, "ada@x.com");
+        var bob = await VerifiedUserAsync(api, "bob@x.com");
+
+        foreach (var (name, userVerified, rpId) in new[] { ("no user verification", (bool?)false, (string?)null), ("wrong RP ID", null, "example.com") })
+        {
+            using var options = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", WithPassword, bearer: ada);
+            var credential = await CreateCredentialAsync(api, options.Body.GetProperty("options"), userVerified: userVerified, rpId: rpId);
+            using var refused = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys",
+                new { challengeId = options.Body.GetProperty("challengeId").GetString(), credential }, bearer: ada);
+            Assert.True(refused.Status == HttpStatusCode.Unauthorized, name);
+            Assert.Equal("invalid_passkey", refused.Code);
+        }
+
+        // Bob can't spend Ada's register challenge, and trying leaves it for Ada.
+        using var adaOptions = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", WithPassword, bearer: ada);
+        var adaCredential = await CreateCredentialAsync(api, adaOptions.Body.GetProperty("options"));
+        var adaBody = new { challengeId = adaOptions.Body.GetProperty("challengeId").GetString(), credential = adaCredential };
+        using var stolen = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys", adaBody, bearer: bob);
+        Assert.Equal(HttpStatusCode.BadRequest, stolen.Status);
+        Assert.Equal("invalid_passkey_challenge", stolen.Code);
+        using var own = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys", adaBody, bearer: ada);
+        Assert.Equal(HttpStatusCode.Created, own.Status);
+
+        // A credential ID the project already has (here another user's row, seeded with the new credential's ID).
+        using var bobOptions = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", WithPassword, bearer: bob);
+        var bobCredential = await CreateCredentialAsync(api, bobOptions.Body.GetProperty("options"));
+        await TestDatabase.ExecuteAsync(api.Database.Superuser, """
+            INSERT INTO orvano.auth_passkeys (project_id, user_id, credential_id, public_key, sign_count, name, backup_eligible, backed_up, rp_id)
+            SELECT project_id, id, @credential, '\x00', 0, 'Seeded', false, false, 'localhost' FROM orvano.auth_users WHERE email = 'ada@x.com'
+            """, ("credential", System.Buffers.Text.Base64Url.DecodeFromChars(bobCredential.GetProperty("id").GetString()!)));
+        using var duplicate = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys",
+            new { challengeId = bobOptions.Body.GetProperty("challengeId").GetString(), credential = bobCredential }, bearer: bob);
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.Status);
+        Assert.Equal("passkey_already_registered", duplicate.Code);
+
+        Assert.Equal(2L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, "SELECT count(*) FROM orvano.auth_passkeys"));
+        Assert.Equal(1L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, "SELECT count(*) FROM orvano.events WHERE type = 'auth.passkey.added'"));
     }
 
     [Fact]
@@ -376,7 +428,7 @@ public class PasskeyTests(PostgresFixture postgres)
 
         foreach (var refusedOrigin in new[] { "https://other.example.com", "http://localhost:3000", "android:apk-key-hash:AAAA", "https://example.com:8443" })
         {
-            using var options = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", bearer: bearer);
+            using var options = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", WithPassword, bearer: bearer);
             var credential = await CreateCredentialAsync(api, options.Body.GetProperty("options"), refusedOrigin);
             using var refused = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys",
                 new { challengeId = options.Body.GetProperty("challengeId").GetString(), credential }, bearer: bearer);
@@ -409,6 +461,9 @@ public class PasskeyTests(PostgresFixture postgres)
 
     internal sealed record Registered(string CredentialId, JsonElement Passkey);
 
+    /// <summary>The body of an enrollment call by a user with a password and no MFA (AC-17).</summary>
+    internal static readonly object WithPassword = new { password = Password };
+
     internal static async Task EnablePasskeysAsync(AuthApi api, string rpId = "localhost", string[]? fingerprints = null)
     {
         using var saved = await api.AsConsoleAsync(HttpMethod.Patch, MethodsUrl,
@@ -438,7 +493,7 @@ public class PasskeyTests(PostgresFixture postgres)
 
     internal static async Task<Registered> RegisterAsync(AuthApi api, string bearer, string origin = Origin, bool backedUp = false, string? name = null)
     {
-        using var options = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", bearer: bearer);
+        using var options = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", WithPassword, bearer: bearer);
         Assert.Equal(HttpStatusCode.OK, options.Status);
         return await CompleteRegistrationAsync(api, bearer, options, origin, backedUp, name);
     }
@@ -454,9 +509,16 @@ public class PasskeyTests(PostgresFixture postgres)
         return new Registered(credential.GetProperty("id").GetString()!, made.Body.Clone());
     }
 
-    internal static async Task<JsonElement> CreateCredentialAsync(AuthApi api, JsonElement options, string origin = Origin, bool backedUp = false)
+    /// <summary>
+    /// The software authenticator's new passkey for <paramref name="options"/>; <paramref name="userVerified"/> false
+    /// drops the user verified flag, and <paramref name="rpId"/> hashes another RP ID into the authenticator data.
+    /// </summary>
+    internal static async Task<JsonElement> CreateCredentialAsync(
+        AuthApi api, JsonElement options, string origin = Origin, bool backedUp = false, bool? userVerified = null, string? rpId = null)
     {
-        using var made = await api.SendAsync(HttpMethod.Post, "/v1/test/passkeys/credentials", new { options, origin, backedUp });
+        var body = new Dictionary<string, object?> { ["options"] = options, ["origin"] = origin, ["backedUp"] = backedUp, ["userVerified"] = userVerified, ["rpId"] = rpId }
+            .Where(p => p.Value is not null).ToDictionary();
+        using var made = await api.SendAsync(HttpMethod.Post, "/v1/test/passkeys/credentials", body);
         Assert.Equal(HttpStatusCode.OK, made.Status);
         return made.Body.Clone();
     }

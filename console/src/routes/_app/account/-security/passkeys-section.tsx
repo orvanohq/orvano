@@ -26,7 +26,7 @@ import { notifyError, notifySuccess } from '@/lib/toast'
 import { passkeyCancelled, passkeyErrorMessage } from '@/routes/-auth/passkeys'
 import { SettingsSection } from '@/shell/settings-section'
 
-type Run = <T>(action: () => Promise<T>) => Promise<{ value: T } | null>
+type Run = <T>(action: (password?: string) => Promise<T>) => Promise<{ value: T } | null>
 
 /**
  * The passkeys section of the account Security page (spec 0013, AC-42): your passkeys with when
@@ -59,9 +59,9 @@ export function PasskeysSection({
     setAdding(true)
     setAddError(null)
     try {
-      const made = await run(async () => {
+      const made = await run(async (password) => {
         const api = consoleApi().consoleAccount
-        const registration = await api.createPasskeyRegistration()
+        const registration = await api.createPasskeyRegistration({ password })
         const credential = await browserPasskeys.create(registration.options)
         return api.completePasskeyRegistration({
           challengeId: registration.challengeId,

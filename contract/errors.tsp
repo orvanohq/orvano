@@ -85,7 +85,7 @@ enum ErrorCode {
   @doc("The password is not 8 to 256 characters after Unicode NFKC normalization (400).")
   invalid_password,
 
-  @doc("The email and password do not match a user, or the password given to confirm an action is wrong (401).")
+  @doc("The email and password do not match a user, or the password given to confirm an action is missing or wrong (401).")
   invalid_credentials,
 
   @doc("The operation needs a signed in user's access token in `Authorization: Bearer` (401).")
@@ -178,7 +178,7 @@ enum ErrorCode {
   @doc("The email code is wrong, expired, or used up; ask for a new one after 5 wrong tries (401).")
   invalid_code,
 
-  @doc("Sign in again within 10 minutes before this action: a user without a password, or anyone linking a provider (403).")
+  @doc("Sign in again within 10 minutes before this action: a user without a password, or an old session removing a passkey (403).")
   reauthentication_required,
 
   @doc("The email is already verified (409).")

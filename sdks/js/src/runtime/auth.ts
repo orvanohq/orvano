@@ -217,3 +217,32 @@ export function sessionFrom(value: unknown): AuthSession {
     sessionId: text('sessionId'),
   }
 }
+
+/**
+ * The session after a second factor (spec 0013): a `RaisedSession` from `account.verifyMfa` or
+ * `account.confirmTotp` carries only a new access token, so the refresh token of `current` (the
+ * session held now) is kept, unchanged. When `current` is null or another session, the result has
+ * no refresh token. Throws when a field is missing, which would mean the server broke the contract.
+ */
+export function raisedSessionFrom(value: unknown, current: AuthSession | null): AuthSession {
+  const raised = value as {
+    accessToken?: unknown
+    accessTokenExpiresAt?: unknown
+    sessionId?: unknown
+  } | null
+  const text = (key: 'accessToken' | 'accessTokenExpiresAt' | 'sessionId'): string => {
+    const field = raised?.[key]
+    if (typeof field !== 'string' || field === '')
+      throw new TypeError(`Orvano: the session in the response has no ${key}`)
+    return field
+  }
+  const sessionId = text('sessionId')
+  const same = current !== null && current.sessionId === sessionId
+  return {
+    accessToken: text('accessToken'),
+    accessTokenExpiresAt: text('accessTokenExpiresAt'),
+    refreshToken: same ? current.refreshToken : null,
+    refreshTokenExpiresAt: same ? current.refreshTokenExpiresAt : null,
+    sessionId,
+  }
+}

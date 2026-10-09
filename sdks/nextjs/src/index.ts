@@ -507,8 +507,9 @@ function announce(client: Client, result: HandlerAnswer<SignInOutcome>): void {
 /**
  * The browser's {@link MfaTransport} (spec 0013, AC-37): `completeMfa`, `verifyMfa`, and
  * `confirmTotp` post to the app's route handler (`.../mfa`, `.../mfa-verify`, `.../totp-confirm`),
- * which reads the `orvano_mfa` cookie or the session cookies, calls Orvano, and sets the cookies,
- * so the browser never holds a refresh token or a ticket. Passkeys run in the browser; their
+ * which reads the `orvano_mfa` cookie or the session cookies, calls Orvano, and sets the cookies
+ * (after `verifyMfa` and `confirmTotp`, only the access cookie: the refresh cookie stays as it
+ * was), so the browser never holds a refresh token or a ticket. Passkeys run in the browser; their
  * challenges come from `.../mfa-passkey` and `.../passkey-challenge`, and a passkey sign in
  * finishes at `.../passkey`.
  */
@@ -580,7 +581,8 @@ export const oauthCookie = 'orvano_oauth'
 
 /**
  * The browser client's {@link OAuthTransport} (spec 0012, AC-21): `signInWithOAuth` and
- * `linkIdentity` post `{ provider, next, link }` to the app's route handler (`.../oauth`), which
+ * `linkIdentity` post `{ provider, next, link, password? }` to the app's route handler
+ * (`.../oauth`; `password` is the user's current password, for a link only), which
  * keeps the verifier in an `HttpOnly` cookie and answers the provider's URL, and the browser goes
  * there. The provider comes back to the handler's `.../oauth-callback`, which sets the session
  * cookies and redirects to `next`: the `redirectUrl` option, a path in the app. Both helpers
@@ -597,6 +599,9 @@ export function oauthThroughHandler(handlerPath = defaultHandlerPath): OAuthTran
           provider,
           next: options.redirectUrl,
           link: purpose === 'oauth_link',
+          ...(purpose === 'oauth_link' && options.password !== undefined
+            ? { password: options.password }
+            : {}),
         }),
       }
       if (options.signal !== undefined) init.signal = options.signal

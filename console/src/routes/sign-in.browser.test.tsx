@@ -81,6 +81,43 @@ describe('/sign-in', () => {
       .toHaveAttribute('autocomplete', 'username webauthn')
   })
 
+  describe('passkey autofill', () => {
+    const original = Object.getOwnPropertyDescriptor(
+      PublicKeyCredential,
+      'isConditionalMediationAvailable',
+    )
+    beforeEach(() => {
+      Object.defineProperty(PublicKeyCredential, 'isConditionalMediationAvailable', {
+        configurable: true,
+        value: () => Promise.resolve(true),
+      })
+      return () => {
+        if (original !== undefined) {
+          Object.defineProperty(PublicKeyCredential, 'isConditionalMediationAvailable', original)
+        }
+      }
+    })
+
+    it('shows a refusal, such as too many attempts, like the button does', async () => {
+      api.failNext('POST', /session\/passkey-challenge$/, 429, 'rate_limited', 'Slow down.')
+      const { screen } = await renderApp('/sign-in')
+
+      await expect.element(screen.getByText("Couldn't sign in with a passkey")).toBeVisible()
+      expect(text()).toContain('Too many attempts.')
+    })
+
+    it('ends quietly on a server without console passkeys', async () => {
+      api.failNext('POST', /session\/passkey-challenge$/, 409, 'factor_not_enabled', 'No.')
+      const { screen } = await renderApp('/sign-in')
+
+      await expect
+        .poll(() => sent('POST', '/v1/console/account/session/passkey-challenge').length)
+        .toBe(1)
+      await expect.element(screen.getByLabelText('Password')).toBeVisible()
+      expect(text()).not.toContain("Couldn't sign in with a passkey")
+    })
+  })
+
   it('signs in at once for an account without MFA', async () => {
     const { router } = await signInWithPassword()
 

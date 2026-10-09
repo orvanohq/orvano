@@ -72,7 +72,7 @@
   {
     "code": "invalid_credentials",
     "status": 401,
-    "description": "The email and password do not match a user, or the password given to confirm an action is wrong."
+    "description": "The email and password do not match a user, or the password given to confirm an action is missing or wrong."
   },
   {
     "code": "session_required",
@@ -227,7 +227,7 @@
   {
     "code": "reauthentication_required",
     "status": 403,
-    "description": "Sign in again within 10 minutes before this action: a user without a password, or anyone linking a provider."
+    "description": "Sign in again within 10 minutes before this action: a user without a password, or an old session removing a passkey."
   },
   {
     "code": "email_already_verified",

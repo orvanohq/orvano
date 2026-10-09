@@ -70,9 +70,9 @@ final class AccountService {
     return User.fromJson(json as Map<String, dynamic>);
   }
 
-  /// Turns MFA on with the first code from the authenticator app. Answers 10 new recovery codes, ends every other
-  /// session of the user, and raises this one to level 2 with a new access token. The SDKs keep their stored session,
-  /// whose next refresh carries `aal` 2 too.
+  /// Turns MFA on with the first code from the authenticator app, within 15 minutes of `account.createTotp`. Answers 10
+  /// new recovery codes, ends every other session of the user, and raises this one to level 2 with a new access token.
+  /// The SDKs keep their stored refresh token, whose next refresh carries `aal` 2 too.
   Future<TotpConfirmation> confirmTotp(
     ConfirmTotpRequest body, {
     RequestOptions? options,
@@ -130,9 +130,11 @@ final class AccountService {
     return AuthResult.fromJson(json as Map<String, dynamic>);
   }
 
-  /// Links a provider to the signed in user with its ID token from a native app. The session must be at most 10 minutes old.
+  /// Links a provider to the signed in user with its ID token from a native app. Needs the user's current password when
+  /// they have one (or a second factor on this session within 10 minutes); a user without a password needs a session at
+  /// most 10 minutes old.
   Future<Identity> createIdTokenIdentity(
-    CreateIdTokenSessionRequest body, {
+    CreateIdTokenIdentityRequest body, {
     RequestOptions? options,
   }) async {
     final json = await _client.send(
@@ -237,10 +239,11 @@ final class AccountService {
     return OAuthFlow.fromJson(json as Map<String, dynamic>);
   }
 
-  /// Starts linking a provider to the signed in user, like `createOAuthFlow`. The session must be at most 10 minutes
-  /// old. The SDKs' `linkIdentity` does all of it.
+  /// Starts linking a provider to the signed in user, like `createOAuthFlow`. Needs the user's current password when
+  /// they have one (or a second factor on this session within 10 minutes); a user without a password needs a session at
+  /// most 10 minutes old. The SDKs' `linkIdentity` does all of it.
   Future<OAuthFlow> createOAuthLinkFlow(
-    CreateOAuthFlowRequest body, {
+    CreateOAuthLinkFlowRequest body, {
     RequestOptions? options,
   }) async {
     final json = await _client.send(
@@ -281,15 +284,18 @@ final class AccountService {
     return PasskeyChallenge.fromJson(json as Map<String, dynamic>);
   }
 
-  /// Starts adding a passkey: answers the options for `navigator.credentials.create`. Needs passkeys turned on, a
-  /// session that signed in within 10 minutes (or passed a second factor within 10 minutes), a verified email when the
-  /// user has one, and fewer than 10 passkeys.
-  Future<PasskeyRegistration> createPasskeyRegistration({
+  /// Starts adding a passkey: answers the options for `navigator.credentials.create`. Needs passkeys turned on, the
+  /// user's current password when they have one (or a second factor on this session within 10 minutes; a user without a
+  /// password needs a session that signed in within 10 minutes), a verified email when the user has one, and fewer than
+  /// 10 passkeys.
+  Future<PasskeyRegistration> createPasskeyRegistration(
+    CreatePasskeyRegistrationRequest body, {
     RequestOptions? options,
   }) async {
     final json = await _client.send(
       'POST',
       '/v1/account/passkeys/registration',
+      body: body.toJson(),
       options: options,
     );
     return PasskeyRegistration.fromJson(json as Map<String, dynamic>);
@@ -365,12 +371,17 @@ final class AccountService {
   }
 
   /// Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.
-  /// Needs a session that signed in within 10 minutes (or passed a second factor within 10 minutes) and, when the user
-  /// has an email, a verified one.
-  Future<TotpSetup> createTotp({RequestOptions? options}) async {
+  /// Needs the user's current password when they have one (or a second factor on this session within 10 minutes; a
+  /// user without a password needs a session that signed in within 10 minutes) and, when the user has an email, a
+  /// verified one.
+  Future<TotpSetup> createTotp(
+    CreateTotpRequest body, {
+    RequestOptions? options,
+  }) async {
     final json = await _client.send(
       'POST',
       '/v1/account/mfa/totp',
+      body: body.toJson(),
       options: options,
     );
     return TotpSetup.fromJson(json as Map<String, dynamic>);
@@ -606,9 +617,9 @@ final class AccountService {
   }
 
   /// Step up: checks a second factor on the signed in session, so security changes work for the next 10 minutes. Raises
-  /// the session to level 2 and answers a new access token with the current refresh token, unchanged. The SDK helpers
-  /// (`verifyMfa`) store them.
-  Future<SessionTokens> verifyMfa(
+  /// the session to level 2 and answers a new access token; the refresh token is not sent and stays unchanged. The SDK
+  /// helpers (`verifyMfa`) store the access token.
+  Future<RaisedSession> verifyMfa(
     VerifyMfaRequest body, {
     RequestOptions? options,
   }) async {
@@ -618,7 +629,7 @@ final class AccountService {
       body: body.toJson(),
       options: options,
     );
-    return SessionTokens.fromJson(json as Map<String, dynamic>);
+    return RaisedSession.fromJson(json as Map<String, dynamic>);
   }
 }
 

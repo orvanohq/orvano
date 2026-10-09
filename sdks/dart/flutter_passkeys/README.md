@@ -27,7 +27,8 @@ final orvano = Orvano(
 );
 
 await orvano.client.signInWithPasskey();
-await orvano.client.registerPasskey(name: 'My phone');
+// A user with a password confirms it to add a passkey.
+await orvano.client.registerPasskey(name: 'My phone', password: password);
 ```
 
 `signInWithPasskey`, `registerPasskey`, and a passkey answer to `completeMfa` or `verifyMfa` (`MfaAnswer.passkey()`) all use it. Without it, those helpers throw an `ArgumentError` that names this package.

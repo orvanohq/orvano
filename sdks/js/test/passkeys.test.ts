@@ -146,6 +146,7 @@ describe('passkey sign in and registration (AC-36)', () => {
     const passkey = await c.registerPasskey({ name: 'Laptop' })
 
     expect(sent[0]?.url).toBe(`${endpoint}/v1/account/passkeys/registration`)
+    expect(bodyOf(sent[0]?.body)).toEqual({})
     expect(sent[1]?.url).toBe(`${endpoint}/v1/account/passkeys`)
     expect(bodyOf(sent[1]?.body)).toEqual({
       challengeId: 'reg1',
@@ -153,6 +154,24 @@ describe('passkey sign in and registration (AC-36)', () => {
       name: 'Laptop',
     })
     expect(passkey).toEqual({ id: 'p1', name: 'Laptop' })
+  })
+
+  it('registerPasskey sends the current password to start the registration', async () => {
+    const { fetch, sent } = fakeFetch(
+      () =>
+        Response.json({
+          challengeId: 'reg1',
+          options: { rp: { id: 'example.com', name: 'Acme' } },
+        }),
+      () => Response.json({ id: 'p1', name: 'Passkey' }, { status: 201 }),
+    )
+    const c = client(fetch, { passkeys: fakePasskeys() })
+
+    await c.registerPasskey({ password: 'correct horse' })
+
+    expect(sent[0]?.url).toBe(`${endpoint}/v1/account/passkeys/registration`)
+    expect(bodyOf(sent[0]?.body)).toEqual({ password: 'correct horse' })
+    expect(bodyOf(sent[1]?.body)).not.toHaveProperty('password')
   })
 
   it('completeMfa with a passkey asks for the ticket challenge and answers with the passkey', async () => {
@@ -172,7 +191,13 @@ describe('passkey sign in and registration (AC-36)', () => {
   })
 
   it('verifyMfa with a passkey steps up through the step up challenge', async () => {
-    const { fetch, sent } = fakeFetch(challenge, () => Response.json(tokens('s1')))
+    const { fetch, sent } = fakeFetch(challenge, () =>
+      Response.json({
+        accessToken: 'access',
+        accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+        sessionId: 's1',
+      }),
+    )
     const c = client(fetch, { passkeys: fakePasskeys() })
     await c.session.set({ ...tokens('s1'), accessToken: 'old' })
 
@@ -184,6 +209,7 @@ describe('passkey sign in and registration (AC-36)', () => {
       passkey: { challengeId: 'ch1', credential: assertion },
     })
     expect((await c.session.get())?.accessToken).toBe('access')
+    expect((await c.session.get())?.refreshToken).toBe('orv_rt_s1')
   })
 })
 

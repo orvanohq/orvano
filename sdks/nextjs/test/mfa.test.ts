@@ -37,6 +37,13 @@ const session = {
   refreshTokenExpiresAt: new Date(Date.now() + 30 * 86_400_000).toISOString(),
   sessionId: 's1',
 }
+// Spec 0013: verifyMfa and confirmTotp answer a RaisedSession, with no refresh token.
+const raisedAccess = jwt({ sub: 'u1', sid: 's1', aal: 2, exp: Math.floor(Date.now() / 1000) + 900 })
+const raised = {
+  accessToken: raisedAccess,
+  accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+  sessionId: 's1',
+}
 const user = { id: 'u1', email: 'ada@example.com', emailVerified: true }
 const challenged = (): Response =>
   Response.json(
@@ -173,6 +180,35 @@ describe('a server side sign in that stops at the MFA step (AC-37)', () => {
     expect(cookies.values.get(mfaCookie)).toBeUndefined()
     expect(cookies.values.get(refreshCookie)).toBe('orv_rt_new.secret')
   })
+
+  it('verifyMfa and confirmTotp on the server set the new access cookie and keep the refresh cookie', async () => {
+    const cookies = jar()
+    cookies.values.set(accessCookie, session.accessToken)
+    cookies.values.set(refreshCookie, 'orv_rt_kept.secret')
+    const sent: string[] = []
+    const fetch = (input: string | URL | Request): Promise<Response> => {
+      const path = new URL(input instanceof Request ? input.url : input.toString()).pathname
+      sent.push(path)
+      return Promise.resolve(
+        path.endsWith('/totp/confirm')
+          ? Response.json({ recoveryCodes: ['AAAAA-BBBBB'], session: raised })
+          : Response.json(raised),
+      )
+    }
+    const orvano = createServerClient({ endpoint, project: 'shop', fetch, logger: quiet, cookies })
+    const events: string[] = []
+    orvano.client.onAuthStateChange((event) => events.push(event))
+
+    await orvano.client.verifyMfa({ totpCode: '123456' })
+    expect(cookies.values.get(accessCookie)).toBe(raisedAccess)
+    expect(cookies.values.get(refreshCookie)).toBe('orv_rt_kept.secret')
+
+    expect(await orvano.client.confirmTotp('123456')).toEqual(['AAAAA-BBBBB'])
+    expect(cookies.values.get(refreshCookie)).toBe('orv_rt_kept.secret')
+    expect((await orvano.client.session.get())?.refreshToken).toBe('orv_rt_kept.secret')
+    expect(sent).toEqual(['/v1/account/mfa/verify', '/v1/account/mfa/totp/confirm'])
+    expect(events).toEqual(['tokenRefreshed', 'tokenRefreshed'])
+  })
 })
 
 describe('the route handler MFA actions (AC-37)', () => {
@@ -242,31 +278,60 @@ describe('the route handler MFA actions (AC-37)', () => {
     expect((await POST(post('mfa', { totpCode: '1', recoveryCode: '2' }))).status).toBe(400)
   })
 
-  it('totp-confirm turns MFA on as the user and sets the new access cookie', async () => {
+  it('totp-confirm turns MFA on as the user, sets the new access cookie, and leaves the refresh cookie', async () => {
     const { POST, calls } = handler({
       '/v1/account/mfa/totp/confirm': () =>
-        Response.json({ recoveryCodes: ['AAAAA-BBBBB'], session }),
+        Response.json({ recoveryCodes: ['AAAAA-BBBBB'], session: raised }),
     })
 
     const response = await POST(
-      post('totp-confirm', { code: '123456' }, { [accessCookie]: session.accessToken }),
+      post(
+        'totp-confirm',
+        { code: '123456' },
+        { [accessCookie]: session.accessToken, [refreshCookie]: 'orv_rt_kept.secret' },
+      ),
     )
 
     expect(await response.json()).toEqual({ recoveryCodes: ['AAAAA-BBBBB'] })
     expect(calls[0]?.headers.get('Authorization')).toBe(`Bearer ${session.accessToken}`)
-    expect(setCookie(response, accessCookie)).toBe(session.accessToken)
+    expect(setCookie(response, accessCookie)).toBe(raisedAccess)
+    expect(setCookie(response, refreshCookie)).toBeUndefined()
   })
 
-  it('mfa-verify steps up as the user and answers 204', async () => {
-    const { POST, calls } = handler({ '/v1/account/mfa/verify': () => Response.json(session) })
+  it('mfa-verify steps up as the user, answers 204, and leaves the refresh cookie', async () => {
+    const { POST, calls } = handler({ '/v1/account/mfa/verify': () => Response.json(raised) })
 
     const response = await POST(
-      post('mfa-verify', { totpCode: '123456' }, { [accessCookie]: session.accessToken }),
+      post(
+        'mfa-verify',
+        { totpCode: '123456' },
+        { [accessCookie]: session.accessToken, [refreshCookie]: 'orv_rt_kept.secret' },
+      ),
     )
 
     expect(response.status).toBe(204)
     expect(calls[0]?.body).toEqual({ totpCode: '123456' })
-    expect(setCookie(response, accessCookie)).toBe(session.accessToken)
+    expect(setCookie(response, accessCookie)).toBe(raisedAccess)
+    expect(setCookie(response, refreshCookie)).toBeUndefined()
+  })
+
+  it('mfa-verify with an expired access cookie refreshes first and sets the refreshed refresh cookie', async () => {
+    const { POST, calls } = handler({
+      '/v1/account/sessions/refresh': () => Response.json(session),
+      '/v1/account/mfa/verify': () => Response.json(raised),
+    })
+
+    const response = await POST(
+      post('mfa-verify', { totpCode: '123456' }, { [refreshCookie]: 'orv_rt_old.secret' }),
+    )
+
+    expect(response.status).toBe(204)
+    expect(calls.map((c) => c.path)).toEqual([
+      '/v1/account/sessions/refresh',
+      '/v1/account/mfa/verify',
+    ])
+    expect(setCookie(response, accessCookie)).toBe(raisedAccess)
+    expect(setCookie(response, refreshCookie)).toBe(session.refreshToken)
   })
 
   it('mfa-verify with nobody signed in is 401 before calling Orvano', async () => {
@@ -397,7 +462,7 @@ describe('the route handler passkey actions (AC-37)', () => {
   })
 
   it('mfa-verify passes a nested passkey answer through', async () => {
-    const { POST, calls } = handler({ '/v1/account/mfa/verify': () => Response.json(session) })
+    const { POST, calls } = handler({ '/v1/account/mfa/verify': () => Response.json(raised) })
 
     const response = await POST(
       post(

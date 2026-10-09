@@ -1059,7 +1059,7 @@ public sealed record ApiKeyPage(
 /// <param name="RpName">The name authenticators show, 1 to 64 characters; null means the project name.</param>
 /// <param name="AndroidCertFingerprints">SHA-256 fingerprints of the Android app's signing certificates (uppercase hex pairs joined by colons), at most 10.</param>
 /// <param name="ActivePasskeyCount">How many passkeys can sign in now: those made for the current <c>rpId</c>.</param>
-/// <param name="AcceptedOrigins">The origins a passkey ceremony is accepted from today: the project's web platforms on <c>rpId</c> or its subdomains, <c>https://&lt;rpId&gt;</c> for iOS and macOS apps, and one <c>android:apk-key-hash:</c> origin per fingerprint.</param>
+/// <param name="AcceptedOrigins">The origins a passkey ceremony is accepted from today: the project's web platforms on <c>rpId</c> or its subdomains, <c>https://&lt;rpId&gt;</c> for iOS and macOS apps, and one <c>android:apk-key-hash:</c> origin per fingerprint. A wildcard web platform shows as a pattern, such as <c>https://*.example.com</c>, which accepts any one subdomain level.</param>
 public sealed record AuthMethodSettings(
     [property: JsonPropertyName("totpEnabled")] bool TotpEnabled,
     [property: JsonPropertyName("passkeysEnabled")] bool PasskeysEnabled,
@@ -1228,6 +1228,21 @@ public sealed record CreateEmailCodeSessionRequest(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("code")] string Code);
 
+/// <summary>A link of a provider to the signed in user with its ID token from a native app.</summary>
+/// <param name="Provider">The provider that issued the token.</param>
+/// <param name="IdToken">The provider's ID token, at most 8 KB.</param>
+/// <param name="Nonce">The raw nonce, 16 to 128 characters. Give the provider its lowercase hex SHA-256 (the SDKs' <c>createNonce</c> makes both), so the token carries that hash.</param>
+/// <param name="AuthorizationCode">Apple only, and required for Apple: the authorization code Sign in with Apple returned with the token.</param>
+/// <param name="Name">Apple only: the name Sign in with Apple returned on the first authorization, at most 256 characters.</param>
+/// <param name="Password">The user's current password. A user who has one sends it, unless this session passed a second factor within 10 minutes. A user without one leaves it out, and must have signed in within 10 minutes.</param>
+public sealed record CreateIdTokenIdentityRequest(
+    [property: JsonPropertyName("provider")] IdTokenProvider Provider,
+    [property: JsonPropertyName("idToken")] string IdToken,
+    [property: JsonPropertyName("nonce")] string Nonce,
+    [property: JsonPropertyName("authorizationCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? AuthorizationCode = null,
+    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null,
+    [property: JsonPropertyName("password"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Password = null);
+
 /// <summary>A sign in with a provider's ID token from a native app.</summary>
 /// <param name="Provider">The provider that issued the token.</param>
 /// <param name="IdToken">The provider's ID token, at most 8 KB.</param>
@@ -1287,6 +1302,17 @@ public sealed record CreateOAuthFlowRequest(
     [property: JsonPropertyName("redirectUrl")] string RedirectUrl,
     [property: JsonPropertyName("codeChallenge")] string CodeChallenge);
 
+/// <summary>A request to start linking a provider to the signed in user.</summary>
+/// <param name="Provider">The provider to sign in with.</param>
+/// <param name="RedirectUrl">Your page or app that receives the result: a host that is one of the project's web platforms (<c>http</c> only on <c>localhost</c> or <c>127.0.0.1</c>), or your app's own scheme (its iOS, Android, or macOS identifier). Orvano adds <c>orvano_type</c> and then <c>orvano_code</c> or <c>orvano_error</c> to it.</param>
+/// <param name="CodeChallenge">The S256 PKCE challenge: base64url(SHA-256(verifier)), 43 characters. Keep the verifier; only it redeems the code. The SDKs make both.</param>
+/// <param name="Password">The user's current password. A user who has one sends it, unless this session passed a second factor within 10 minutes. A user without one leaves it out, and must have signed in within 10 minutes.</param>
+public sealed record CreateOAuthLinkFlowRequest(
+    [property: JsonPropertyName("provider")] OAuthProvider Provider,
+    [property: JsonPropertyName("redirectUrl")] string RedirectUrl,
+    [property: JsonPropertyName("codeChallenge")] string CodeChallenge,
+    [property: JsonPropertyName("password"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Password = null);
+
 /// <summary>A sign in with the code a provider flow returned.</summary>
 /// <param name="Code">The <c>orvano_code</c> parameter Orvano added to your redirect URL. It works once, for 2 minutes.</param>
 /// <param name="CodeVerifier">The PKCE verifier whose challenge started the flow: 43 to 128 characters of <c>[A-Za-z0-9-._~]</c>.</param>
@@ -1298,6 +1324,11 @@ public sealed record CreateOAuthSessionRequest(
 /// <param name="Name">The org name; trimmed, 1 to 100 characters.</param>
 public sealed record CreateOrgRequest(
     [property: JsonPropertyName("name")] string Name);
+
+/// <summary>A request to start adding a passkey.</summary>
+/// <param name="Password">The user's current password. A user who has one sends it, unless this session passed a second factor within 10 minutes. A user without one leaves it out, and must have signed in within 10 minutes.</param>
+public sealed record CreatePasskeyRegistrationRequest(
+    [property: JsonPropertyName("password"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Password = null);
 
 /// <summary>A sign in with a passkey.</summary>
 /// <param name="ChallengeId">The <c>challengeId</c> of the <c>PasskeyChallenge</c>.</param>
@@ -1333,6 +1364,11 @@ public sealed record CreateProjectRequest(
 public sealed record CreateRecoveryRequest(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("redirectUrl")] string RedirectUrl);
+
+/// <summary>A request to start turning on an authenticator app.</summary>
+/// <param name="Password">The user's current password. A user who has one sends it, unless this session passed a second factor within 10 minutes. A user without one leaves it out, and must have signed in within 10 minutes.</param>
+public sealed record CreateTotpRequest(
+    [property: JsonPropertyName("password"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Password = null);
 
 /// <summary>A request to email a user a password reset link.</summary>
 /// <param name="RedirectUrl">The page that receives the link, on a host that is one of the project's web platforms (<c>http</c> only on <c>localhost</c> or <c>127.0.0.1</c>). The link adds <c>orvano_type=recovery</c> and <c>orvano_token</c> to it.</param>
@@ -1952,6 +1988,15 @@ public sealed record ProjectSmtp(
     [property: JsonPropertyName("settings")] SmtpSettings? Settings,
     [property: JsonPropertyName("installSender")] EmailSender? InstallSender);
 
+/// <summary>The signed in session after a second factor: a new access token carrying the new <c>aal</c> and <c>amr</c> claims. The refresh token is not sent; keep the one you hold, which is unchanged and whose next refresh carries the new claims too.</summary>
+/// <param name="AccessToken">An ES256 JWT, valid for 15 minutes.</param>
+/// <param name="AccessTokenExpiresAt">When the access token expires.</param>
+/// <param name="SessionId">The session ID, also the <c>sid</c> claim of the access token.</param>
+public sealed record RaisedSession(
+    [property: JsonPropertyName("accessToken")] string AccessToken,
+    [property: JsonPropertyName("accessTokenExpiresAt")] DateTimeOffset AccessTokenExpiresAt,
+    [property: JsonPropertyName("sessionId")] string SessionId);
+
 /// <summary>New recovery codes. Show them once and ask the user to keep them safe; every older code stopped working.</summary>
 /// <param name="Codes">10 recovery codes, each <c>XXXXX-XXXXX</c>, each working once.</param>
 public sealed record RecoveryCodes(
@@ -2190,10 +2235,10 @@ public sealed record TestPinged(
 
 /// <summary>MFA is on. Show the recovery codes once and ask the user to keep them safe; they can't be read again. Every other session of the user has ended, and this one is now at level 2.</summary>
 /// <param name="RecoveryCodes">10 recovery codes, each <c>XXXXX-XXXXX</c>, each working once.</param>
-/// <param name="Session">This session's tokens: a new access token carrying <c>aal</c> 2, and the current refresh token, unchanged.</param>
+/// <param name="Session">A new access token for this session, carrying <c>aal</c> 2. Keep the refresh token you hold; it is unchanged.</param>
 public sealed record TotpConfirmation(
     [property: JsonPropertyName("recoveryCodes")] IReadOnlyList<string> RecoveryCodes,
-    [property: JsonPropertyName("session")] SessionTokens Session);
+    [property: JsonPropertyName("session")] RaisedSession Session);
 
 /// <summary>A new authenticator app secret, waiting for its first code. Show <c>uri</c> as a QR code and <c>secret</c> for typing in, then confirm with <c>account.confirmTotp</c> within 15 minutes.</summary>
 /// <param name="Secret">The secret: 20 random bytes as unpadded base32 (32 characters). Never log it.</param>

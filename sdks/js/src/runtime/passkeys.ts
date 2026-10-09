@@ -254,6 +254,11 @@ export interface PasskeySignInOptions {
 export interface PasskeyRegistrationOptions {
   /** 1 to 64 characters, shown in the user's passkey list. Left out, it is named `Passkey`. */
   name?: string
+  /**
+   * The user's current password. A user who has one passes it, unless this session passed a
+   * second factor within 10 minutes; a user without one leaves it out.
+   */
+  password?: string
   /** Cancels the ceremony and the calls. */
   signal?: AbortSignal
 }

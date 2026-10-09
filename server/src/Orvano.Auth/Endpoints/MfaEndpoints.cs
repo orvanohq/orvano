@@ -31,13 +31,19 @@ internal static class MfaEndpoints
             .RequireProject()
             .RequireUser();
 
-        v1.MapPost(Api.AccountOperations.CreateTotp.Route, async (HttpContext http, MfaService mfa, RateLimits limits, CancellationToken ct) =>
+        v1.MapPost(Api.AccountOperations.CreateTotp.Route, async (HttpContext http, Api.CreateTotpRequest request, MfaService mfa, RateLimits limits, CancellationToken ct) =>
         {
             var user = PublicRequests.User(http);
             var limit = limits.Acquire(RateLimitPolicies.MfaEnrollPerUser, user.UserId.ToString());
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
+            // Every password sent counts, like the other password checks (spec 0004, rate limits).
+            if (request.Password is not null)
+            {
+                var checkLimit = limits.Acquire(RateLimitPolicies.PasswordCheckPerUser, user.UserId.ToString());
+                if (!checkLimit.Allowed) return ApiProblem.RateLimited(http, checkLimit, Api.ErrorCode.RateLimited);
+            }
 
-            return Created(http, await mfa.CreateTotpAsync(PublicRequests.Project(http), user.UserId, user.SessionId, ct), TotpSetup);
+            return Created(http, await mfa.CreateTotpAsync(PublicRequests.Project(http), user.UserId, user.SessionId, request.Password, ct), TotpSetup);
         })
             .WithName(Api.AccountOperations.CreateTotp.Id)
             .RequireProject()
@@ -78,7 +84,7 @@ internal static class MfaEndpoints
         {
             var user = PublicRequests.User(http);
             var answer = new FactorAnswer(request.TotpCode, request.RecoveryCode, PasskeyAnswer(request.Passkey));
-            return Ok(http, await mfa.VerifyAsync(PublicRequests.Project(http), user.UserId, user.SessionId, answer, ct), SessionTokens);
+            return Ok(http, await mfa.VerifyAsync(PublicRequests.Project(http), user.UserId, user.SessionId, answer, ct), RaisedSession);
         })
             .WithName(Api.AccountOperations.VerifyMfa.Id)
             .RequireProject()

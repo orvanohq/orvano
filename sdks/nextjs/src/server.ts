@@ -40,6 +40,8 @@ import type {
   MfaWireAnswer,
   PasskeyAnswer,
   PendingMfaStore,
+  RaisedSession,
+  TotpConfirmation,
 } from '@orvano/js'
 import { NextResponse } from 'next/server.js'
 import type { NextRequest } from 'next/server.js'
@@ -417,10 +419,11 @@ async function linkSession(
 }
 
 /**
- * `POST .../oauth` (spec 0012, AC-21): `{ provider, next?, link? }`. Makes the PKCE verifier, keeps
- * it with `next` and the purpose in the `orvano_oauth` cookie, starts the flow with Orvano as the
- * browser (for a link, as the signed in user), with the handler's own `.../oauth-callback` as the
- * redirect URL, and answers `{ url }`.
+ * `POST .../oauth` (spec 0012, AC-21): `{ provider, next?, link?, password? }`. Makes the PKCE
+ * verifier, keeps it with `next` and the purpose in the `orvano_oauth` cookie, starts the flow with
+ * Orvano as the browser (for a link, as the signed in user, sending `password`, the user's current
+ * password, spec 0013), with the handler's own `.../oauth-callback` as the redirect URL, and
+ * answers `{ url }`. The password is never stored.
  */
 async function oauthStart(
   request: NextRequest,
@@ -434,8 +437,9 @@ async function oauthStart(
     typeof provider !== 'string' ||
     !(oauthProviders as readonly string[]).includes(provider)
   )
-    return problem(400, 'invalid_request', 'Send { provider, next?, link? }.')
+    return problem(400, 'invalid_request', 'Send { provider, next?, link?, password? }.')
   const link = body.link === true
+  const password = link && typeof body.password === 'string' ? body.password : undefined
   const { verifier, challenge } = await createPkce()
   const redirectUrl = `${request.nextUrl.origin}${handlerBase(request)}/oauth-callback`
 
@@ -449,7 +453,12 @@ async function oauthStart(
     const flow = await client.request<{ url: string }>({
       method: 'POST',
       path: link ? '/v1/account/identities/oauth/flows' : '/v1/account/oauth/flows',
-      body: { provider, redirectUrl, codeChallenge: challenge },
+      body: {
+        provider,
+        redirectUrl,
+        codeChallenge: challenge,
+        ...(password === undefined ? {} : { password }),
+      },
       ...(session === null ? {} : { bearer: session.access }),
     })
     url = flow.url
@@ -693,8 +702,23 @@ async function passkeySignIn(
 }
 
 /**
+ * The session to write after a second factor (spec 0013): the raised access token, with the
+ * refresh token `linkSession` refreshed to when it did (Orvano sends none back), else no refresh
+ * token, so `writeResponse` leaves the refresh cookie as it was.
+ */
+function raised(answer: RaisedSession, fresh: AuthSession | null): AuthSession {
+  return {
+    accessToken: answer.accessToken,
+    accessTokenExpiresAt: answer.accessTokenExpiresAt,
+    refreshToken: fresh?.refreshToken ?? null,
+    refreshTokenExpiresAt: fresh?.refreshTokenExpiresAt ?? null,
+    sessionId: answer.sessionId,
+  }
+}
+
+/**
  * `POST .../totp-confirm` (spec 0013, AC-37): `{ code }`. Turns MFA on as the signed in user,
- * sets the new access cookie (the refresh token stays as it was), and answers
+ * sets the new access cookie (the refresh cookie stays as it was), and answers
  * `{ recoveryCodes }`.
  */
 async function confirmTotp(
@@ -708,14 +732,14 @@ async function confirmTotp(
   try {
     const session = await linkSession(request, client)
     if (session === null) return problem(401, 'session_required', 'Sign in first.')
-    const confirmation = await client.request<{ recoveryCodes: string[]; session: AuthSession }>({
+    const confirmation = await client.request<TotpConfirmation>({
       method: 'POST',
       path: '/v1/account/mfa/totp/confirm',
       body: { code: body.code },
       bearer: session.access,
     })
     const response = NextResponse.json({ recoveryCodes: confirmation.recoveryCodes })
-    writeResponse(response, confirmation.session, secure)
+    writeResponse(response, raised(confirmation.session, session.fresh), secure)
     return response
   } catch (error) {
     if (error instanceof OrvanoError) return passThrough(error)
@@ -726,7 +750,7 @@ async function confirmTotp(
 /**
  * `POST .../mfa-verify` (spec 0013, AC-37): the `account.verifyMfa` body (`{ totpCode }`,
  * `{ recoveryCode }`, or `{ passkey }`). Step up as the signed in user: sets the new access cookie
- * and answers 204.
+ * (the refresh cookie stays as it was) and answers 204.
  */
 async function verifyMfa(
   request: NextRequest,
@@ -738,14 +762,14 @@ async function verifyMfa(
   try {
     const session = await linkSession(request, client)
     if (session === null) return problem(401, 'session_required', 'Sign in first.')
-    const tokens = await client.request<AuthSession>({
+    const answered = await client.request<RaisedSession>({
       method: 'POST',
       path: '/v1/account/mfa/verify',
       body: answer,
       bearer: session.access,
     })
     const response = new NextResponse(null, { status: 204 })
-    writeResponse(response, tokens, secure)
+    writeResponse(response, raised(answered, session.fresh), secure)
     return response
   } catch (error) {
     if (error instanceof OrvanoError) return passThrough(error)
@@ -769,8 +793,9 @@ async function verifyMfa(
  *
  * MFA (spec 0013, AC-37): a sign in that stops at the MFA step sets the `HttpOnly` `orvano_mfa`
  * cookie (`redeem` and `email-code` answer `{ mfaRequired: true, factors, expiresAt }`; the
- * provider callback redirects to `mfaPath`). `POST .../mfa` finishes it, `POST .../totp-confirm`
- * turns MFA on, and `POST .../mfa-verify` steps up, each setting the session cookies. Passkeys:
+ * provider callback redirects to `mfaPath`). `POST .../mfa` finishes it and sets both session
+ * cookies; `POST .../totp-confirm` turns MFA on and `POST .../mfa-verify` steps up, each setting
+ * the new access cookie and leaving the refresh cookie as it was (spec 0013). Passkeys:
  * `POST .../mfa-passkey` answers the challenge for the waiting sign in, `POST .../passkey-challenge`
  * starts a passkey sign in, and `POST .../passkey` finishes it and sets the cookies.
  */

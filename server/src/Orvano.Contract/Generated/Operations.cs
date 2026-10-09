@@ -68,7 +68,7 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
-    /// <summary>POST /v1/account/mfa/totp/confirm: Turns MFA on with the first code from the authenticator app. Answers 10 new recovery codes, ends every other</summary>
+    /// <summary>POST /v1/account/mfa/totp/confirm: Turns MFA on with the first code from the authenticator app, within 15 minutes of <c>account.createTotp</c>. Answers 10</summary>
     public static class ConfirmTotp
     {
         /// <summary>The operationId, also the endpoint name.</summary>
@@ -132,7 +132,7 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
-    /// <summary>POST /v1/account/identities/id-token: Links a provider to the signed in user with its ID token from a native app. The session must be at most 10 minutes old.</summary>
+    /// <summary>POST /v1/account/identities/id-token: Links a provider to the signed in user with its ID token from a native app. Needs the user's current password when</summary>
     public static class CreateIdTokenIdentity
     {
         /// <summary>The operationId, also the endpoint name.</summary>
@@ -244,7 +244,7 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
-    /// <summary>POST /v1/account/identities/oauth/flows: Starts linking a provider to the signed in user, like <c>createOAuthFlow</c>. The session must be at most 10 minutes</summary>
+    /// <summary>POST /v1/account/identities/oauth/flows: Starts linking a provider to the signed in user, like <c>createOAuthFlow</c>. Needs the user's current password when</summary>
     public static class CreateOAuthLinkFlow
     {
         /// <summary>The operationId, also the endpoint name.</summary>
@@ -292,7 +292,7 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
-    /// <summary>POST /v1/account/passkeys/registration: Starts adding a passkey: answers the options for <c>navigator.credentials.create</c>. Needs passkeys turned on, a</summary>
+    /// <summary>POST /v1/account/passkeys/registration: Starts adding a passkey: answers the options for <c>navigator.credentials.create</c>. Needs passkeys turned on, the</summary>
     public static class CreatePasskeyRegistration
     {
         /// <summary>The operationId, also the endpoint name.</summary>

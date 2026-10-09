@@ -84,13 +84,13 @@ internal sealed class PasskeyService(
     }
 
     /// <summary>
-    /// Starts adding a passkey (AC-20) after the enrollment check (AC-17): passkeys on, a verified email when the user
-    /// has one, and fewer than 10 passkeys, under the user lock. Answers the creation options with a 5 minute
-    /// <c>register</c> challenge.
+    /// Starts adding a passkey (AC-20) after the enrollment check (AC-17, with the user's current
+    /// <paramref name="password"/>): passkeys on, a verified email when the user has one, and fewer than 10 passkeys,
+    /// under the user lock. Answers the creation options with a 5 minute <c>register</c> challenge.
     /// </summary>
-    public async Task<Outcome<RegistrationView>> CreateRegistrationAsync(string projectId, Guid userId, Guid sessionId, CancellationToken ct)
+    public async Task<Outcome<RegistrationView>> CreateRegistrationAsync(string projectId, Guid userId, Guid sessionId, string? password, CancellationToken ct)
     {
-        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, ct) is { } refused) return refused;
+        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, password, ct) is { } refused) return refused;
         var rpName = await RpNameAsync(projectId, await ReadPolicyAsync(projectId, ct), ct);
 
         return await store.WriteAsync<RegistrationView>(async (uow, token) =>
@@ -118,12 +118,13 @@ internal sealed class PasskeyService(
     /// <summary>
     /// Finishes adding a passkey (AC-21): takes the user's <c>register</c> challenge out (else 400
     /// <c>invalid_passkey_challenge</c>), verifies the registration, and stores the passkey under the user lock with the
-    /// RP ID it was made for. A credential ID the project already has is 409 <c>passkey_already_registered</c>.
+    /// RP ID it was made for. A credential ID the project already has is 409 <c>passkey_already_registered</c>. The
+    /// challenge is the proof: only the caller of <see cref="CreateRegistrationAsync"/>, which passed the enrollment
+    /// check, has it, so the session's age is not checked again.
     /// </summary>
     public async Task<Outcome<PasskeyView>> CompleteRegistrationAsync(
-        string projectId, Guid userId, Guid sessionId, string? challengeId, AttestationInput? credential, string? name, CancellationToken ct)
+        string projectId, Guid userId, string? challengeId, AttestationInput? credential, string? name, CancellationToken ct)
     {
-        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, ct) is { } refused) return refused;
         string? given = null;
         if (name is not null)
         {
@@ -190,12 +191,12 @@ internal sealed class PasskeyService(
     }
 
     /// <summary>
-    /// Removes one of the user's own passkeys (AC-18): with MFA on, a strong check within 10 minutes; without it, AC-17's
-    /// rule. Works with passkeys off (AC-30).
+    /// Removes one of the user's own passkeys (AC-18): with MFA on, a strong check within 10 minutes; without it, a
+    /// session created or strongly checked within 10 minutes. Works with passkeys off (AC-30).
     /// </summary>
     public async Task<Outcome<Done>> DeleteOwnAsync(string projectId, Guid userId, Guid sessionId, string passkeyId, CancellationToken ct)
     {
-        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, ct) is { } refused) return refused;
+        if (await stepUp.RecentAsync(projectId, userId, sessionId, ct) is { } refused) return refused;
         return await DeleteAsync(projectId, userId, passkeyId, Actor.User(userId), AuthEvents.RemovedByUser, ct);
     }
 
@@ -237,11 +238,13 @@ internal sealed class PasskeyService(
         var perUser = limits.Acquire(RateLimitPolicies.PasskeyChallengePerUser, found.UserId.ToString());
         if (!perUser.Allowed) return Failure.RateLimited(perUser.RetryAfter);
 
-        return await store.WriteAsync<PasskeyChallengeView>(async (uow, token) =>
+        var vanished = false;
+        var outcome = await store.WriteAsync<PasskeyChallengeView>(async (uow, token) =>
         {
             if (await UserLocks.ByIdAsync(uow, projectId, found.UserId, token) is null
                 || await MfaFactorStore.ReadTicketAsync(uow.Tx.Connection!, uow.Tx, projectId, ticket.Hash, lockRow: false, token) is not { } row)
             {
+                vanished = true;
                 return Failure.InvalidMfaTicket;
             }
 
@@ -251,6 +254,10 @@ internal sealed class PasskeyService(
             var (id, challenge) = await PasskeyRows.CreateChallengeAsync(uow, projectId, ChallengePurposes.Mfa, row.UserId, row.Id, token);
             return new PasskeyChallengeView(id, new RequestOptionsView(Base64Codec.Encode(challenge), state.Policy.RpId!, allow));
         }, ct);
+
+        // A ticket gone between the two reads counts against the IP like an unknown one at the first read.
+        if (vanished) limits.Acquire(RateLimitPolicies.FailedMfaTicketPerIp, ipKey);
+        return outcome;
     }
 
     /// <summary>

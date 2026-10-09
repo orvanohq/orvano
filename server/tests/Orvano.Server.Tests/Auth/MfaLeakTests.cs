@@ -30,7 +30,7 @@ public class MfaLeakTests(PostgresFixture postgres)
         using (var reused = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/verify", new { recoveryCode = ada.RecoveryCodes[0] }, bearer: bearer))
             problems.Append(reused.Body.GetRawText());
 
-        using var registration = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", bearer: bearer);
+        using var registration = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys/registration", new { }, bearer: bearer);
         var challenge = registration.Body.GetProperty("options").GetProperty("challenge").GetString()!;
         var credential = await CreateCredentialAsync(api, registration.Body.GetProperty("options"));
         using (var made = await api.SendAsync(HttpMethod.Post, "/v1/account/passkeys",

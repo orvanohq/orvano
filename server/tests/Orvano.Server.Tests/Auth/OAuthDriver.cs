@@ -27,12 +27,17 @@ public static class OAuthDriver
     /// <summary>The fake provider's <c>test_user</c>: base64url JSON of the user it approves.</summary>
     public static string TestUser(object user) => Base64Url.EncodeToString(JsonSerializer.SerializeToUtf8Bytes(user, JsonSerializerOptions.Web));
 
-    /// <summary>Starts a flow (<c>account.createOAuthFlow</c>, or the link flow with a bearer) and returns the reply and the verifier.</summary>
+    /// <summary>
+    /// Starts a flow (<c>account.createOAuthFlow</c>, or the link flow with a bearer and, for a user with a password,
+    /// <paramref name="password"/>) and returns the reply and the verifier.
+    /// </summary>
     public static async Task<(Reply Reply, string Verifier)> StartAsync(
-        AuthApi api, string provider, string redirectUrl = Redirect, string? bearer = null, string path = "/v1/account/oauth/flows")
+        AuthApi api, string provider, string redirectUrl = Redirect, string? bearer = null, string path = "/v1/account/oauth/flows", string? password = null)
     {
         var (verifier, challenge) = Pkce();
-        var reply = await api.SendAsync(HttpMethod.Post, path, new { provider, redirectUrl, codeChallenge = challenge }, bearer: bearer);
+        var body = new Dictionary<string, string?> { ["provider"] = provider, ["redirectUrl"] = redirectUrl, ["codeChallenge"] = challenge, ["password"] = password }
+            .Where(p => p.Value is not null).ToDictionary();
+        var reply = await api.SendAsync(HttpMethod.Post, path, body, bearer: bearer);
         return (reply, verifier);
     }
 

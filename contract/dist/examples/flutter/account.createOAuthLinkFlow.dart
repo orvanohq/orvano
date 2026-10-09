@@ -4,7 +4,7 @@ import 'package:orvano_flutter/orvano_flutter.dart';
 Future<void> main() async {
   final orvano = Orvano(Client(endpoint: 'https://orvano.example.com'));
   final oAuthFlow = await orvano.account.createOAuthLinkFlow(
-    CreateOAuthFlowRequest(
+    CreateOAuthLinkFlowRequest(
       provider: OAuthProvider.google,
       redirectUrl: 'https://app.example.com/auth/callback',
       codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',

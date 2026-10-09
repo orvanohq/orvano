@@ -12,7 +12,8 @@ import { fakeFetch, problem } from './fake-fetch.js'
 
 // Spec 0013 AC-36: a sign in that stops at the MFA step stores nothing, keeps the ticket in
 // memory, says mfaRequired, and completeMfa finishes it. verifyMfa and confirmTotp store the new
-// access token; a store that hides the ticket blanks it in the result (AC-37).
+// access token and keep the refresh token the client holds, since the server sends none; a store
+// that hides the ticket blanks it in the result (AC-37).
 
 const endpoint = 'https://orvano.example.com'
 const quiet = { warn: vi.fn() }
@@ -24,6 +25,16 @@ const tokens = (sessionId: string, accessToken = 'access'): Record<string, strin
   accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
   refreshToken: `orv_rt_${sessionId}`,
   refreshTokenExpiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+  sessionId,
+})
+
+// Spec 0013: verifyMfa and confirmTotp answer a RaisedSession, with no refresh token.
+const raised = (
+  sessionId: string,
+  accessToken: string,
+): { accessToken: string; accessTokenExpiresAt: string; sessionId: string } => ({
+  accessToken,
+  accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
   sessionId,
 })
 
@@ -149,10 +160,12 @@ describe('the MFA step (AC-36)', () => {
 })
 
 describe('step up and turning MFA on (AC-19, AC-13, AC-36)', () => {
-  it('verifyMfa sends the factor as the user, stores the new access token, and says tokenRefreshed', async () => {
-    const { fetch, sent } = fakeFetch(() => Response.json(tokens('s1', 'stronger')))
+  it('verifyMfa sends the factor as the user, stores the new access token, keeps the refresh token, and says tokenRefreshed', async () => {
+    const answer = raised('s1', 'stronger')
+    const { fetch, sent } = fakeFetch(() => Response.json(answer))
     const sessions = new MemorySessionStore()
-    sessions.set(session('s1', 'weaker'))
+    const before = session('s1', 'weaker')
+    sessions.set(before)
     const c = client(fetch, { session: sessions })
     const seen = listen(c)
 
@@ -161,23 +174,49 @@ describe('step up and turning MFA on (AC-19, AC-13, AC-36)', () => {
     expect(sent[0]?.url).toBe(`${endpoint}/v1/account/mfa/verify`)
     expect(sent[0]?.headers.get('Authorization')).toBe('Bearer weaker')
     expect(JSON.parse(sent[0]?.body ?? '{}')).toEqual({ recoveryCode: 'AAAAA-BBBBB' })
-    expect((await c.session.get())?.accessToken).toBe('stronger')
-    expect((await c.session.get())?.refreshToken).toBe('orv_rt_s1')
+    expect(await c.session.get()).toEqual({
+      accessToken: 'stronger',
+      accessTokenExpiresAt: answer.accessTokenExpiresAt,
+      refreshToken: before.refreshToken,
+      refreshTokenExpiresAt: before.refreshTokenExpiresAt,
+      sessionId: 's1',
+    })
     expect(seen.events).toEqual(['tokenRefreshed'])
   })
 
-  it('confirmTotp answers the recovery codes and stores the new access token', async () => {
+  it('confirmTotp answers the recovery codes, stores the new access token, and keeps the refresh token', async () => {
     const codes = ['AAAAA-BBBBB', 'CCCCC-DDDDD']
     const { fetch, sent } = fakeFetch(() =>
-      Response.json({ recoveryCodes: codes, session: tokens('s1', 'level2') }),
+      Response.json({ recoveryCodes: codes, session: raised('s1', 'level2') }),
+    )
+    const sessions = new MemorySessionStore()
+    const before = session('s1', 'level1')
+    sessions.set(before)
+    const c = client(fetch, { session: sessions })
+    const seen = listen(c)
+
+    expect(await c.confirmTotp('123456')).toEqual(codes)
+    expect(sent[0]?.url).toBe(`${endpoint}/v1/account/mfa/totp/confirm`)
+    expect(JSON.parse(sent[0]?.body ?? '{}')).toEqual({ code: '123456' })
+    const after = await c.session.get()
+    expect(after?.accessToken).toBe('level2')
+    expect(after?.refreshToken).toBe(before.refreshToken)
+    expect(after?.refreshTokenExpiresAt).toBe(before.refreshTokenExpiresAt)
+    expect(seen.events).toEqual(['tokenRefreshed'])
+  })
+
+  it('createTotp sends the current password in its body', async () => {
+    const { fetch, sent } = fakeFetch(() =>
+      Response.json({ secret: 'S', uri: 'otpauth://totp/x', expiresAt }, { status: 201 }),
     )
     const sessions = new MemorySessionStore()
     sessions.set(session('s1', 'level1'))
     const c = client(fetch, { session: sessions })
 
-    expect(await c.confirmTotp('123456')).toEqual(codes)
-    expect(sent[0]?.url).toBe(`${endpoint}/v1/account/mfa/totp/confirm`)
-    expect((await c.session.get())?.accessToken).toBe('level2')
+    await new AccountService(c).createTotp({ password: 'correct horse' })
+
+    expect(sent[0]?.url).toBe(`${endpoint}/v1/account/mfa/totp`)
+    expect(JSON.parse(sent[0]?.body ?? '{}')).toEqual({ password: 'correct horse' })
   })
 
   it('goes through a transport when one is set, and announceMfa says mfaRequired', async () => {

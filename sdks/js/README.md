@@ -45,7 +45,7 @@ await orvano.client.signInWithOAuth('google', { redirectUrl: `${location.origin}
 const result = await orvano.client.redeemLink()
 ```
 
-The PKCE verifier waits in `sessionStorage` until the user comes back, so only this browser can finish. `linkIdentity` adds a provider to the signed in user. A native wrapper that gets a Google or Apple ID token itself calls `signInWithIdToken` with a nonce from `createNonce()`. Guides: https://orvano.dev/docs/auth/sign-in-with-google/
+The PKCE verifier waits in `sessionStorage` until the user comes back, so only this browser can finish. `linkIdentity` adds a provider to the signed in user; a user with a password passes it as `password`. A native wrapper that gets a Google or Apple ID token itself calls `signInWithIdToken` with a nonce from `createNonce()`. Guides: https://orvano.dev/docs/auth/sign-in-with-google/
 
 ## About
 

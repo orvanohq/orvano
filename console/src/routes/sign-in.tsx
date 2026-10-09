@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { OrvanoError } from '@orvano/console-client'
 import type { MfaChallenge } from '@orvano/console-client'
 import { useEffect, useRef, useState } from 'react'
 
@@ -14,7 +15,12 @@ import { PageHeading } from '@/shell/page-heading'
 
 import { SignInForm } from './-auth/auth-form'
 import { MfaStep } from './-auth/mfa-step'
-import { passkeyErrorMessage, passkeysSupported, signInWithPasskey } from './-auth/passkeys'
+import {
+  passkeyCancelled,
+  passkeyErrorMessage,
+  passkeysSupported,
+  signInWithPasskey,
+} from './-auth/passkeys'
 
 export const Route = createFileRoute('/sign-in')({
   // `redirect` is kept only as a path on this origin (spec 0005, AC-20).
@@ -52,7 +58,8 @@ function SignIn() {
   }
 
   // Offer passkeys in the email field's autofill while the form shows. A closed prompt, a server
-  // without console passkeys (an IP address or plain http), or leaving the page just ends it.
+  // without console passkeys (an IP address or plain http), or leaving the page just ends it; any
+  // other refusal, such as a blocked account or a passkey that didn't work, shows like the button's.
   useEffect(() => {
     if (!showForm) return
     const controller = new AbortController()
@@ -62,7 +69,8 @@ function SignIn() {
       if (!supported || controller.signal.aborted) return
       try {
         await signInWithPasskey({ autofill: true, signal: controller.signal })
-      } catch {
+      } catch (error) {
+        if (!autofillEnded(error, controller.signal)) setPasskeyError(passkeyErrorMessage(error))
         return
       }
       queryClient.clear()
@@ -157,5 +165,17 @@ function SignIn() {
       <PageHeading>Sign in</PageHeading>
       {content()}
     </main>
+  )
+}
+
+/**
+ * Whether an autofill passkey attempt ended quietly: you left the page, the prompt closed, or this
+ * server has no console passkeys.
+ */
+function autofillEnded(error: unknown, signal: AbortSignal): boolean {
+  return (
+    signal.aborted ||
+    passkeyCancelled(error) ||
+    (error instanceof OrvanoError && error.code === 'factor_not_enabled')
   )
 }

@@ -3,6 +3,6 @@ import 'package:orvano_flutter/orvano_flutter.dart';
 
 Future<void> main() async {
   final orvano = Orvano(Client(endpoint: 'https://orvano.example.com'));
-  final totpSetup = await orvano.account.createTotp();
+  final totpSetup = await orvano.account.createTotp(CreateTotpRequest());
   print(totpSetup.toJson());
 }

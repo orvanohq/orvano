@@ -11,7 +11,8 @@ import 'fake_orvano.dart';
 
 // Spec 0013 AC-38: a sign in that stops at the MFA step stores nothing,
 // keeps the ticket in memory, and emits mfaRequired; completeMfa finishes it;
-// verifyMfa and confirmTotp store the new access token.
+// verifyMfa and confirmTotp store the new access token and keep the refresh
+// token the store holds, since Orvano sends none (a RaisedSession).
 
 const ticket = 'orv_mt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
@@ -28,6 +29,23 @@ Map<String, Object?> tokens(String access, {String sid = 's1'}) => {
       .toIso8601String(),
   'sessionId': sid,
 };
+
+Map<String, Object?> raised(String access, {String sid = 's1'}) => {
+  'accessToken': access,
+  'accessTokenExpiresAt': DateTime.now()
+      .toUtc()
+      .add(const Duration(minutes: 15))
+      .toIso8601String(),
+  'sessionId': sid,
+};
+
+final kept = AuthSession(
+  accessToken: 'weaker',
+  accessTokenExpiresAt: DateTime.now().toUtc().add(const Duration(minutes: 5)),
+  refreshToken: 'orv_rt_kept',
+  refreshTokenExpiresAt: DateTime.utc(2030, 1, 2, 3, 4, 5),
+  sessionId: 's1',
+);
 
 final user = {
   'id': 'u1',
@@ -167,39 +185,130 @@ void main() {
     },
   );
 
+  test('verifyMfa steps up as the user, stores the new access token, and keeps '
+      'the refresh token', () async {
+    await serve([json(raised('stronger'))], signedIn: kept);
+    final events = <AuthEvent>[];
+    client.authStateChanges.listen((c) => events.add(c.event));
+
+    await client.verifyMfa(const MfaAnswer.recoveryCode('AAAAA-BBBBB'));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(server.paths, ['/v1/account/mfa/verify']);
+    expect(server.requests[0].value('Authorization'), 'Bearer weaker');
+    expect(jsonDecode(server.bodies[0]), {'recoveryCode': 'AAAAA-BBBBB'});
+    final after = await client.session.read();
+    expect(after?.accessToken, 'stronger');
+    expect(after?.refreshToken, 'orv_rt_kept');
+    expect(after?.refreshTokenExpiresAt, kept.refreshTokenExpiresAt);
+    expect(after?.sessionId, 's1');
+    expect(events, [AuthEvent.tokenRefreshed]);
+  });
+
   test(
-    'verifyMfa steps up as the user and stores the new access token',
-    () async {
-      await serve([
-        json(tokens('stronger')),
-      ], signedIn: AuthSession.fromJson(tokens('weaker')));
-      final events = <AuthEvent>[];
-      client.authStateChanges.listen((c) => events.add(c.event));
-
-      await client.verifyMfa(const MfaAnswer.recoveryCode('AAAAA-BBBBB'));
-      await Future<void>.delayed(Duration.zero);
-
-      expect(server.paths, ['/v1/account/mfa/verify']);
-      expect(server.requests[0].value('Authorization'), 'Bearer weaker');
-      expect(jsonDecode(server.bodies[0]), {'recoveryCode': 'AAAAA-BBBBB'});
-      expect((await client.session.read())?.accessToken, 'stronger');
-      expect(events, [AuthEvent.tokenRefreshed]);
-    },
-  );
-
-  test(
-    'confirmTotp returns the recovery codes and stores the new access token',
+    'confirmTotp returns the recovery codes, stores the new access token, and '
+    'keeps the refresh token',
     () async {
       await serve([
         json({
           'recoveryCodes': ['AAAAA-BBBBB'],
-          'session': tokens('level2'),
+          'session': raised('level2'),
         }),
-      ], signedIn: AuthSession.fromJson(tokens('level1')));
+      ], signedIn: kept);
+      final events = <AuthEvent>[];
+      client.authStateChanges.listen((c) => events.add(c.event));
 
       expect(await client.confirmTotp('123456'), ['AAAAA-BBBBB']);
+      await Future<void>.delayed(Duration.zero);
+
       expect(server.paths, ['/v1/account/mfa/totp/confirm']);
-      expect((await client.session.read())?.accessToken, 'level2');
+      expect(jsonDecode(server.bodies[0]), {'code': '123456'});
+      final after = await client.session.read();
+      expect(after?.accessToken, 'level2');
+      expect(after?.refreshToken, 'orv_rt_kept');
+      expect(after?.refreshTokenExpiresAt, kept.refreshTokenExpiresAt);
+      expect(events, [AuthEvent.tokenRefreshed]);
     },
   );
+
+  test('createTotp sends the current password in its body', () async {
+    await serve([
+      json({
+        'secret': 'S',
+        'uri': 'otpauth://totp/x',
+        'expiresAt': '2026-10-07T12:05:00Z',
+      }, status: 201),
+    ], signedIn: kept);
+
+    await Orvano(
+      client,
+    ).account.createTotp(const CreateTotpRequest(password: 'correct horse'));
+
+    expect(server.paths, ['/v1/account/mfa/totp']);
+    expect(jsonDecode(server.bodies[0]), {'password': 'correct horse'});
+  });
+
+  test(
+    'registerPasskey sends the current password to start the registration',
+    () async {
+      await serve([
+        json({
+          'challengeId': 'reg1',
+          'options': {
+            'rp': {'id': 'example.com', 'name': 'Acme'},
+            'user': {
+              'id': 'dTE',
+              'name': 'ada@example.com',
+              'displayName': 'Ada',
+            },
+            'challenge': 'Y2hhbGxlbmdl',
+            'pubKeyCredParams': [
+              {'type': 'public-key', 'alg': -7},
+            ],
+            'timeout': 300000,
+            'excludeCredentials': <Object>[],
+            'authenticatorSelection': {
+              'residentKey': 'required',
+              'requireResidentKey': true,
+              'userVerification': 'required',
+            },
+            'attestation': 'none',
+          },
+        }),
+      ], signedIn: kept);
+
+      await expectLater(
+        client.registerPasskey(
+          password: 'correct horse',
+          authenticator: const _NoPasskeys(),
+        ),
+        throwsA(isA<_Stopped>()),
+      );
+
+      expect(server.paths, ['/v1/account/passkeys/registration']);
+      expect(jsonDecode(server.bodies[0]), {'password': 'correct horse'});
+    },
+  );
+}
+
+/// Thrown by [_NoPasskeys] to stop a ceremony after the first call.
+final class _Stopped implements Exception {
+  const _Stopped();
+}
+
+/// A passkey authenticator that stops every ceremony, for tests that only
+/// check what the first call sent.
+final class _NoPasskeys implements PasskeyAuthenticator {
+  const _NoPasskeys();
+
+  @override
+  Future<PasskeyRegistrationCredential> create(
+    PasskeyCreationOptions options,
+  ) => throw const _Stopped();
+
+  @override
+  Future<PasskeyAssertionCredential> get(
+    PasskeyRequestOptions options, {
+    bool autofill = false,
+  }) => throw const _Stopped();
 }

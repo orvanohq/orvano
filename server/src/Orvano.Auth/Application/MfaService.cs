@@ -14,8 +14,15 @@ internal sealed record MfaStatusView(
 /// <summary>A new authenticator app secret waiting for its first code (the contract's <c>TotpSetup</c>). Never log it.</summary>
 internal sealed record TotpSetupView(string Secret, string Uri, DateTimeOffset ExpiresAt);
 
+/// <summary>
+/// A session after a second factor (the contract's <c>RaisedSession</c>): a new access token. The refresh token is never
+/// sent back, so proving an access token can't yield one; <paramref name="RefreshTokenExpiresAt"/> is for the console's
+/// cookie lifetime only.
+/// </summary>
+internal sealed record RaisedSessionView(string AccessToken, DateTimeOffset AccessTokenExpiresAt, DateTimeOffset RefreshTokenExpiresAt, Guid SessionId);
+
 /// <summary>MFA turned on (the contract's <c>TotpConfirmation</c>): the recovery codes, shown once, and the stronger session.</summary>
-internal sealed record TotpConfirmationView(IReadOnlyList<string> RecoveryCodes, SessionTokensView Session);
+internal sealed record TotpConfirmationView(IReadOnlyList<string> RecoveryCodes, RaisedSessionView Session);
 
 /// <summary>The second factor a step two or step up answers with: exactly one is set.</summary>
 internal sealed record FactorAnswer(string? TotpCode, string? RecoveryCode, PasskeyAnswerInput? Passkey = null)
@@ -77,13 +84,14 @@ internal sealed class MfaService(
     }
 
     /// <summary>
-    /// Starts TOTP enrollment (AC-12): after the enrollment check (AC-17), a new 20 byte secret replaces any pending
-    /// one of the user, under the user lock. Refused while TOTP is confirmed, while the project has TOTP off, and while
-    /// the user's email is not verified (a user without an email may enroll).
+    /// Starts TOTP enrollment (AC-12): after the enrollment check (AC-17, with the user's current
+    /// <paramref name="password"/>), a new 20 byte secret replaces any pending one of the user, under the user lock.
+    /// Refused while TOTP is confirmed, while the project has TOTP off, and while the user's email is not verified (a
+    /// user without an email may enroll).
     /// </summary>
-    public async Task<Outcome<TotpSetupView>> CreateTotpAsync(string projectId, Guid userId, Guid sessionId, CancellationToken ct)
+    public async Task<Outcome<TotpSetupView>> CreateTotpAsync(string projectId, Guid userId, Guid sessionId, string? password, CancellationToken ct)
     {
-        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, ct) is { } refused) return refused;
+        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, password, ct) is { } refused) return refused;
         var issuer = await alerts.ProjectNameAsync(projectId, ct);
 
         return await store.WriteAsync<TotpSetupView>(async (uow, token) =>
@@ -116,19 +124,20 @@ internal sealed class MfaService(
     }
 
     /// <summary>
-    /// Turns MFA on with the pending factor's first code (AC-13). In one transaction: confirms the factor, replaces the
-    /// recovery codes, ends every other session (<c>mfa_enabled</c>), and raises the caller's session to level 2.
-    /// Answers a new access token and the current refresh token, unrotated.
+    /// Turns MFA on with the pending factor's first code (AC-13). The pending secret is the proof: only the caller of
+    /// <see cref="CreateTotpAsync"/>, which passed the enrollment check, has it, so the session's age is not checked
+    /// again. In one transaction: confirms the factor, replaces the recovery codes, ends every other session
+    /// (<c>mfa_enabled</c>), and raises the caller's session to level 2. Answers a new access token, never the refresh
+    /// token.
     /// </summary>
     public async Task<Outcome<TotpConfirmationView>> ConfirmTotpAsync(string projectId, Guid userId, Guid sessionId, string? code, CancellationToken ct)
     {
-        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, ct) is { } refused) return refused;
         var userKey = userId.ToString();
         var limit = limits.Check(RateLimitPolicies.FailedMfaPerUser, userKey);
         if (!limit.Allowed) return Failure.RateLimited(limit.RetryAfter);
         var projectName = await alerts.ProjectNameAsync(projectId, ct);
 
-        var outcome = await store.WriteAsync<(IReadOnlyList<string> Codes, Guid[] Ended, SessionStrength Strength, string Refresh, DateTimeOffset EndsAt, bool EmailVerified)>(
+        var outcome = await store.WriteAsync<(IReadOnlyList<string> Codes, Guid[] Ended, SessionStrength Strength, DateTimeOffset EndsAt, bool EmailVerified)>(
             async (uow, token) =>
             {
                 if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
@@ -161,14 +170,14 @@ internal sealed class MfaService(
                 await AuthEvents.WriteAsync(uow.Tx, AuthEvents.MfaEnabled, projectId, actor, userKey, ids, fields: Factor(MfaFactors.Totp), ct: token);
                 await AuthEvents.WriteAsync(uow.Tx, AuthEvents.RecoveryCodesCreated, projectId, actor, userKey, ids, ct: token);
                 await alerts.QueueAsync(uow, projectId, projectName, user.Email, SecurityAlertKind.MfaEnabled, token);
-                return (codes, ended.ToArray(), raised.Strength, raised.Refresh, raised.EndsAt, user.EmailVerifiedAt is not null);
+                return (codes, ended.ToArray(), raised.Strength, raised.EndsAt, user.EmailVerifiedAt is not null);
             }, ct);
 
         if (!outcome.Succeeded) return outcome.Failure!;
         var done = outcome.Value;
         foreach (var id in done.Ended) await checks.EvictAsync(id, ct);
         var access = await tokens.IssueAsync(projectId, userId, sessionId, done.EmailVerified, done.Strength, ct);
-        return new TotpConfirmationView(done.Codes, new SessionTokensView(access.Token, access.ExpiresAt, done.Refresh, done.EndsAt, sessionId));
+        return new TotpConfirmationView(done.Codes, new RaisedSessionView(access.Token, access.ExpiresAt, done.EndsAt, sessionId));
     }
 
     /// <summary>
@@ -218,9 +227,9 @@ internal sealed class MfaService(
     /// <summary>
     /// Step up (AC-19) with a TOTP code or a recovery code: the user's limit, the body, that the factor is usable now
     /// (both need MFA on), then the factor. A right one raises the caller's session to level 2, adds the factor to
-    /// <c>amr</c>, sets <c>strong_auth_at</c>, and answers a new access token with the current refresh token, unrotated.
+    /// <c>amr</c>, sets <c>strong_auth_at</c>, and answers a new access token, never the refresh token.
     /// </summary>
-    public async Task<Outcome<SessionTokensView>> VerifyAsync(string projectId, Guid userId, Guid sessionId, FactorAnswer answer, CancellationToken ct)
+    public async Task<Outcome<RaisedSessionView>> VerifyAsync(string projectId, Guid userId, Guid sessionId, FactorAnswer answer, CancellationToken ct)
     {
         var userKey = userId.ToString();
         var limit = limits.Check(RateLimitPolicies.FailedMfaPerUser, userKey);
@@ -242,7 +251,7 @@ internal sealed class MfaService(
         }
 
         var wrong = false;
-        var outcome = await store.WriteAsync<(SessionStrength Strength, string Refresh, DateTimeOffset EndsAt, bool EmailVerified)>(async (uow, token) =>
+        var outcome = await store.WriteAsync<(SessionStrength Strength, DateTimeOffset EndsAt, bool EmailVerified)>(async (uow, token) =>
         {
             if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
             var state = await MfaFactorState.ReadAsync(policies, uow.Tx.Connection!, uow.Tx, projectId, userId, token);
@@ -263,14 +272,14 @@ internal sealed class MfaService(
 
             if (await StrengthenAsync(uow, projectId, userId, sessionId, Amr(factor, check), aal2: true, token) is not { } raised)
                 return Failure.SessionNotFound;
-            return (raised.Strength, raised.Refresh, raised.EndsAt, user.EmailVerifiedAt is not null);
+            return (raised.Strength, raised.EndsAt, user.EmailVerifiedAt is not null);
         }, ct);
 
         if (wrong) limits.Acquire(RateLimitPolicies.FailedMfaPerUser, userKey);
         if (!outcome.Succeeded) return outcome.Failure!;
         var done = outcome.Value;
         var access = await tokens.IssueAsync(projectId, userId, sessionId, done.EmailVerified, done.Strength, ct);
-        return new SessionTokensView(access.Token, access.ExpiresAt, done.Refresh, done.EndsAt, sessionId);
+        return new RaisedSessionView(access.Token, access.ExpiresAt, done.EndsAt, sessionId);
     }
 
     /// <summary>
@@ -320,11 +329,15 @@ internal sealed class MfaService(
 
         var wrong = false;
         var ticketGone = false;
+        var vanished = false;
         var outcome = await store.WriteDecidingAsync<(Data.UserRow User, SessionGrant Grant, Guid[] Ended)>(async (uow, token) =>
         {
             var locked = await UserLocks.ByIdAsync(uow, projectId, found.UserId, token);
             if (locked is null || await MfaFactorStore.ReadTicketAsync(uow.Tx.Connection!, uow.Tx, projectId, ticket.Hash, lockRow: true, token) is not { } row)
+            {
+                vanished = true;
                 return (Failure.InvalidMfaTicket, false);
+            }
 
             var state = await MfaFactorState.ReadAsync(policies, uow.Tx.Connection!, uow.Tx, projectId, row.UserId, token);
             if (!state.Factors.Contains(factor)) return (Failure.FactorNotEnabled, false);
@@ -361,6 +374,8 @@ internal sealed class MfaService(
         }, ct);
 
         if (wrong) limits.Acquire(RateLimitPolicies.FailedMfaPerUser, userKey);
+        // A ticket gone between the two reads counts against the IP like an unknown one at the first read.
+        if (vanished) limits.Acquire(RateLimitPolicies.FailedMfaTicketPerIp, ipKey);
         if (!outcome.Succeeded)
         {
             if (ticketGone) ticketEnded?.Invoke();
@@ -373,10 +388,10 @@ internal sealed class MfaService(
 
     /// <summary>
     /// Raises the caller's session after a verified factor: adds its <c>amr</c> values, level 2 when asked, and
-    /// <c>strong_auth_at = now()</c>. Answers the new strength and the current refresh token, decrypted, unrotated; null
-    /// when the session is not the user's open session anymore.
+    /// <c>strong_auth_at = now()</c>. Answers the new strength and when the session ends; null when the session is not
+    /// the user's open session anymore.
     /// </summary>
-    private async Task<(SessionStrength Strength, string Refresh, DateTimeOffset EndsAt)?> StrengthenAsync(
+    private static async Task<(SessionStrength Strength, DateTimeOffset EndsAt)?> StrengthenAsync(
         AuthUnitOfWork uow, string projectId, Guid userId, Guid sessionId, IEnumerable<string> added, bool aal2, CancellationToken ct)
     {
         SessionStrength current;
@@ -400,15 +415,13 @@ internal sealed class MfaService(
             """
             UPDATE orvano.auth_sessions SET aal = @aal, amr = @amr, strong_auth_at = now()
             WHERE id = @id
-            RETURNING refresh_ciphertext, least(idle_expires_at, expires_at)
+            RETURNING least(idle_expires_at, expires_at)
             """, uow.Tx.Connection, uow.Tx);
         update.Parameters.AddWithValue("aal", NpgsqlDbType.Smallint, next.Aal);
         update.Parameters.AddWithValue("amr", NpgsqlDbType.Array | NpgsqlDbType.Text, next.Amr.ToArray());
         update.Parameters.AddWithValue("id", sessionId);
-        await using var updated = await update.ExecuteReaderAsync(ct);
-        await updated.ReadAsync(ct);
-        var refresh = sessions.Open(updated.GetFieldValue<byte[]>(0), sessionId);
-        return (next, refresh, new DateTimeOffset(updated.GetFieldValue<DateTime>(1), TimeSpan.Zero));
+        var endsAt = (DateTime)(await update.ExecuteScalarAsync(ct))!;
+        return (next, new DateTimeOffset(endsAt, TimeSpan.Zero));
     }
 
     /// <summary>

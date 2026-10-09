@@ -12,7 +12,7 @@ namespace Orvano.Auth.Application;
 internal sealed record SessionRecency(bool MfaEnabled, bool Fresh, bool Strong);
 
 /// <summary>The enrollment check (AC-17) and the step up check (AC-18), shared by every operation they guard.</summary>
-internal sealed class StepUp(AuthStore store, MethodPolicies policies)
+internal sealed class StepUp(AuthStore store, MethodPolicies policies, PasswordHasher hasher)
 {
     /// <summary>The caller's <see cref="SessionRecency"/>; an unknown session reads as neither fresh nor strong.</summary>
     public Task<SessionRecency> ReadAsync(string projectId, Guid userId, Guid sessionId, CancellationToken ct) =>
@@ -36,10 +36,34 @@ internal sealed class StepUp(AuthStore store, MethodPolicies policies)
         }, ct);
 
     /// <summary>
-    /// The enrollment check (AC-17): a user with MFA on needs a strong check on this session within 10 minutes; a user
-    /// without MFA needs a session created, or strongly checked, within 10 minutes.
+    /// The enrollment check (AC-17) of the operations that add a way in (<c>createTotp</c>,
+    /// <c>createPasskeyRegistration</c>, and the two link operations): a user with MFA on needs a strong check on this
+    /// session within 10 minutes (403 <c>mfa_verification_required</c>). A user without MFA passes with a strong check;
+    /// otherwise a user with a password must send it (missing or wrong: 401 <c>invalid_credentials</c>, one Argon2id
+    /// run), and a user without one needs a session created within 10 minutes (403 <c>reauthentication_required</c>).
+    /// An access token alone, however fresh, never adds a factor to an account that has a password.
     /// </summary>
-    public async Task<Failure?> EnrollmentAsync(string projectId, Guid userId, Guid sessionId, CancellationToken ct)
+    public async Task<Failure?> EnrollmentAsync(string projectId, Guid userId, Guid sessionId, string? password, CancellationToken ct)
+    {
+        var recency = await ReadAsync(projectId, userId, sessionId, ct);
+        if (recency.MfaEnabled) return recency.Strong ? null : Failure.MfaVerificationRequired;
+        if (recency.Strong) return null;
+
+        var hash = await store.ReadAsync((db, token) =>
+            db.Passwords.AsNoTracking().Where(p => p.UserId == userId && p.ProjectId == projectId).Select(p => p.Hash).SingleOrDefaultAsync(token), ct);
+        if (hash is null) return recency.Fresh ? null : Failure.ReauthenticationRequired;
+
+        var wellFormed = PasswordPolicy.TryNormalize(password, out var normalized);
+        var check = await hasher.TryVerifyAsync(normalized, wellFormed ? hash : null, ct);
+        if (check is null) return Failure.Busy;
+        return check.Value.Matches ? null : Failure.InvalidCredentials;
+    }
+
+    /// <summary>
+    /// The recency rule of <c>deletePasskey</c> (AC-18): a user with MFA on needs a strong check on this session within
+    /// 10 minutes; a user without MFA needs a session created, or strongly checked, within 10 minutes.
+    /// </summary>
+    public async Task<Failure?> RecentAsync(string projectId, Guid userId, Guid sessionId, CancellationToken ct)
     {
         var recency = await ReadAsync(projectId, userId, sessionId, ct);
         if (recency.MfaEnabled) return recency.Strong ? null : Failure.MfaVerificationRequired;

@@ -57,7 +57,9 @@ import type {
   Client,
   CompletePasskeyRegistrationRequest,
   ConfirmTotpRequest,
+  CreatePasskeyRegistrationRequest,
   CreatePasskeySessionRequest,
+  CreateTotpRequest,
   CreateUserRecoveryRequest,
   CreateUserRequest,
   CreateUserVerificationRequest,
@@ -165,12 +167,15 @@ export class ConsoleAccountService {
 
   /**
    * Starts adding a passkey to the console account: answers the options for `navigator.credentials.create`. Needs
-   * console passkeys (https with a host name, or localhost), a session that signed in or passed a second factor within
-   * 10 minutes, and fewer than 10 passkeys.
+   * console passkeys (https with a host name, or localhost), the account's current password (or a second factor on
+   * this session within 10 minutes), and fewer than 10 passkeys.
    */
-  createPasskeyRegistration(options?: RequestOptions): Promise<PasskeyRegistration> {
+  createPasskeyRegistration(
+    body: CreatePasskeyRegistrationRequest,
+    options?: RequestOptions,
+  ): Promise<PasskeyRegistration> {
     return this.#client.request<PasskeyRegistration>(
-      { method: 'POST', path: '/v1/console/account/passkeys/registration' },
+      { method: 'POST', path: '/v1/console/account/passkeys/registration', body },
       options,
     )
   }
@@ -228,11 +233,12 @@ export class ConsoleAccountService {
 
   /**
    * Starts turning on an authenticator app for the console account: answers a new secret, replacing any that still
-   * waits for its first code. Needs a session that signed in, or passed a second factor, within 10 minutes.
+   * waits for its first code. Needs the account's current password (or a second factor on this session within 10
+   * minutes).
    */
-  createTotp(options?: RequestOptions): Promise<TotpSetup> {
+  createTotp(body: CreateTotpRequest, options?: RequestOptions): Promise<TotpSetup> {
     return this.#client.request<TotpSetup>(
-      { method: 'POST', path: '/v1/console/account/mfa/totp' },
+      { method: 'POST', path: '/v1/console/account/mfa/totp', body },
       options,
     )
   }

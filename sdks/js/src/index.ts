@@ -77,7 +77,9 @@ export {
 export type {
   IdTokenCredentials,
   IdTokenSignInResult,
+  IdentityLinkOptions,
   IdentityLinkResult,
+  LinkIdentityOptions,
   Nonce,
   OAuthLinkType,
   OAuthOpener,

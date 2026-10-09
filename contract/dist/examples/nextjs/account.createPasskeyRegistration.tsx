@@ -8,6 +8,6 @@ export default async function Page() {
     endpoint: process.env.ORVANO_ENDPOINT!,
     cookies: await cookies(),
   })
-  const passkeyRegistration = await orvano.account.createPasskeyRegistration()
+  const passkeyRegistration = await orvano.account.createPasskeyRegistration({})
   return <pre>{JSON.stringify(passkeyRegistration, null, 2)}</pre>
 }

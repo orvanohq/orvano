@@ -115,6 +115,28 @@ export interface CreateEmailCodeSessionRequest {
   code: string
 }
 
+/** A link of a provider to the signed in user with its ID token from a native app. */
+export interface CreateIdTokenIdentityRequest {
+  /** The provider that issued the token. */
+  provider: IdTokenProvider
+  /** The provider's ID token, at most 8 KB. */
+  idToken: string
+  /**
+   * The raw nonce, 16 to 128 characters. Give the provider its lowercase hex SHA-256 (the SDKs' `createNonce` makes
+   * both), so the token carries that hash.
+   */
+  nonce: string
+  /** Apple only, and required for Apple: the authorization code Sign in with Apple returned with the token. */
+  authorizationCode?: string
+  /** Apple only: the name Sign in with Apple returned on the first authorization, at most 256 characters. */
+  name?: string | null
+  /**
+   * The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+   * minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+   */
+  password?: string
+}
+
 /** A sign in with a provider's ID token from a native app. */
 export interface CreateIdTokenSessionRequest {
   /** The provider that issued the token. */
@@ -186,12 +208,43 @@ export interface CreateOAuthFlowRequest {
   codeChallenge: string
 }
 
+/** A request to start linking a provider to the signed in user. */
+export interface CreateOAuthLinkFlowRequest {
+  /** The provider to sign in with. */
+  provider: OAuthProvider
+  /**
+   * Your page or app that receives the result: a host that is one of the project's web platforms (`http` only on
+   * `localhost` or `127.0.0.1`), or your app's own scheme (its iOS, Android, or macOS identifier). Orvano adds
+   * `orvano_type` and then `orvano_code` or `orvano_error` to it.
+   */
+  redirectUrl: string
+  /**
+   * The S256 PKCE challenge: base64url(SHA-256(verifier)), 43 characters. Keep the verifier; only it redeems the
+   * code. The SDKs make both.
+   */
+  codeChallenge: string
+  /**
+   * The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+   * minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+   */
+  password?: string
+}
+
 /** A sign in with the code a provider flow returned. */
 export interface CreateOAuthSessionRequest {
   /** The `orvano_code` parameter Orvano added to your redirect URL. It works once, for 2 minutes. */
   code: string
   /** The PKCE verifier whose challenge started the flow: 43 to 128 characters of `[A-Za-z0-9-._~]`. */
   codeVerifier: string
+}
+
+/** A request to start adding a passkey. */
+export interface CreatePasskeyRegistrationRequest {
+  /**
+   * The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+   * minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+   */
+  password?: string
 }
 
 /** A sign in with a passkey. */
@@ -219,6 +272,15 @@ export interface CreateRecoveryRequest {
    * `localhost` or `127.0.0.1`). The link adds `orvano_type=recovery` and `orvano_token` to it.
    */
   redirectUrl: string
+}
+
+/** A request to start turning on an authenticator app. */
+export interface CreateTotpRequest {
+  /**
+   * The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+   * minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+   */
+  password?: string
 }
 
 /** A request to email a user a password reset link. */
@@ -560,6 +622,19 @@ export interface PasskeyUserEntity {
   displayName: string
 }
 
+/**
+ * The signed in session after a second factor: a new access token carrying the new `aal` and `amr` claims. The refresh
+ * token is not sent; keep the one you hold, which is unchanged and whose next refresh carries the new claims too.
+ */
+export interface RaisedSession {
+  /** An ES256 JWT, valid for 15 minutes. */
+  accessToken: string
+  /** When the access token expires. */
+  accessTokenExpiresAt: string
+  /** The session ID, also the `sid` claim of the access token. */
+  sessionId: string
+}
+
 /** New recovery codes. Show them once and ask the user to keep them safe; every older code stopped working. */
 export interface RecoveryCodes {
   /** 10 recovery codes, each `XXXXX-XXXXX`, each working once. */
@@ -636,8 +711,8 @@ export interface SessionTokens {
 export interface TotpConfirmation {
   /** 10 recovery codes, each `XXXXX-XXXXX`, each working once. */
   recoveryCodes: string[]
-  /** This session's tokens: a new access token carrying `aal` 2, and the current refresh token, unchanged. */
-  session: SessionTokens
+  /** A new access token for this session, carrying `aal` 2. Keep the refresh token you hold; it is unchanged. */
+  session: RaisedSession
 }
 
 /**

@@ -1,5 +1,5 @@
 # Spec 0013, AC-19 to AC-24, AC-36 to AC-38, AC-45: a user with a verified email adds a passkey through the SDK's
-# registerPasskey, signs in with it and no email typed (level 2, never challenged), renames it, steps up with it,
+# registerPasskey (with their current password), signs in with it and no email typed (level 2, never challenged), renames it, steps up with it,
 # and removes it, after which it no longer signs in. Passkeys come from the server's Test only software
 # authenticator, which the runners plug in as the client's passkey authenticator.
 name: a user adds a passkey, signs in with it, steps up with it, and removes it
@@ -37,7 +37,7 @@ steps:
       body: { type: verification, user: { emailVerified: true } }
   - op: registerPasskey
     as: client
-    input: { name: Laptop }
+    input: { name: Laptop, password: correct horse battery staple }
     expect:
       status: 201
       body: { name: Laptop, active: true, synced: false, lastUsedAt: null }
@@ -79,7 +79,7 @@ steps:
     input: { passkey: true }
     expect:
       status: 200
-      body: { verified: true }
+      body: { verified: true, refreshTokenKept: true }
   - op: account.deletePasskey
     as: client
     input: { passkeyId: '${passkeyId}' }

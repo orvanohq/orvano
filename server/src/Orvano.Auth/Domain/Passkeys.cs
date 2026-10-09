@@ -51,6 +51,12 @@ internal static class PasskeyRules
 
     private static readonly IReadOnlyDictionary<Guid, string> KnownAuthenticators = new Dictionary<Guid, string>();
 
+    /// <summary>
+    /// The counter rule (AC-22): when the stored count or the new count is above 0, the new count must be larger than
+    /// the stored one, or the passkey may be a clone. Two zeros pass, since a synced passkey keeps its counter at 0.
+    /// </summary>
+    public static bool CounterRegressed(long stored, uint next) => (stored > 0 || next > 0) && next <= stored;
+
     /// <summary>A passkey's user handle (AC-20): the user ID's 16 bytes in RFC 9562 order.</summary>
     public static byte[] UserHandle(Guid userId) => userId.ToByteArray(bigEndian: true);
 }

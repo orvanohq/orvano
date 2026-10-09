@@ -123,7 +123,8 @@ export interface AuthMethodSettings {
   activePasskeyCount: number
   /**
    * The origins a passkey ceremony is accepted from today: the project's web platforms on `rpId` or its subdomains,
-   * `https://<rpId>` for iOS and macOS apps, and one `android:apk-key-hash:` origin per fingerprint.
+   * `https://<rpId>` for iOS and macOS apps, and one `android:apk-key-hash:` origin per fingerprint. A wildcard web
+   * platform shows as a pattern, such as `https://*.example.com`, which accepts any one subdomain level.
    */
   acceptedOrigins: string[]
 }

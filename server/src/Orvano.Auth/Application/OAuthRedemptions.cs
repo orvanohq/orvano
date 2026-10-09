@@ -24,8 +24,13 @@ internal sealed class OAuthRedemptions(
     public async Task<OAuthRedeemed> SignInAsync(
         AuthUnitOfWork uow, Sessions sessions, string projectId, Resolved resolved, ClientInfo client, string method, string provider, CancellationToken ct)
     {
-        if (!resolved.IsNewUser && await MfaGate.ChallengeAsync(policies, uow, projectId, resolved.UserId, method, provider, client, ct) is { } challenge)
-            return new OAuthRedeemed(resolved, null, challenge);
+        if (!resolved.IsNewUser)
+        {
+            // SignInResolution locked the resolved user in this transaction, so it can't be gone here.
+            var gate = await MfaGate.ChallengeAsync(policies, uow, projectId, resolved.UserId, method, provider, client, ct);
+            if (!gate.Succeeded) throw new InvalidOperationException("A user that just existed is gone.");
+            if (gate.Value is { } challenge) return new OAuthRedeemed(resolved, null, challenge);
+        }
         var grant = await sessions.CreateAsync(uow, projectId, resolved.UserId, client, Actor.User(resolved.UserId), method, ct, provider);
         return new OAuthRedeemed(resolved, grant);
     }

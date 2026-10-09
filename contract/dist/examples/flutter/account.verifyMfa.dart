@@ -3,6 +3,6 @@ import 'package:orvano_flutter/orvano_flutter.dart';
 
 Future<void> main() async {
   final orvano = Orvano(Client(endpoint: 'https://orvano.example.com'));
-  final sessionTokens = await orvano.account.verifyMfa(VerifyMfaRequest());
-  print(sessionTokens.toJson());
+  final raisedSession = await orvano.account.verifyMfa(VerifyMfaRequest());
+  print(raisedSession.toJson());
 }

@@ -1,7 +1,8 @@
 # Spec 0013, AC-5 to AC-9, AC-12, AC-13, AC-16, AC-25, AC-26: a user with a verified email turns on an
 # authenticator app (the runner computes its codes from the secret), then a password sign in stops at the MFA step
 # with no tokens, and a TOTP code finishes it at level 2 through the SDK's completeMfa (AC-36 to AC-38). Turning MFA on
-# also emails the security alert (AC-31).
+# also emails the security alert (AC-31). Starting the enrollment needs the user's current password: without it, or
+# with a wrong one, it is refused with invalid_credentials (AC-17), however fresh the session.
 name: a user turns on TOTP, and password sign in then needs a code
 requires: []
 steps:
@@ -43,7 +44,18 @@ steps:
       body: { mfaEnabled: false, totpConfirmed: false, factorsAvailable: [totp, passkey] }
   - op: account.createTotp
     as: client
-    input: {}
+    input:
+      body: {}
+    expect: { status: 401, code: invalid_credentials }
+  - op: account.createTotp
+    as: client
+    input:
+      body: { password: not my password at all }
+    expect: { status: 401, code: invalid_credentials }
+  - op: account.createTotp
+    as: client
+    input:
+      body: { password: correct horse battery staple }
     expect: { status: 201 }
     save:
       secret: $.secret

@@ -431,6 +431,62 @@ final class CreateEmailCodeSessionRequest {
   Map<String, dynamic> toJson() => {'email': email, 'code': code};
 }
 
+/// A link of a provider to the signed in user with its ID token from a native app.
+final class CreateIdTokenIdentityRequest {
+  /// Creates a [CreateIdTokenIdentityRequest].
+  const CreateIdTokenIdentityRequest({
+    required this.provider,
+    required this.idToken,
+    required this.nonce,
+    this.authorizationCode,
+    this.name,
+    this.password,
+  });
+
+  /// Decodes a [CreateIdTokenIdentityRequest] from JSON.
+  factory CreateIdTokenIdentityRequest.fromJson(Map<String, dynamic> json) =>
+      CreateIdTokenIdentityRequest(
+        provider: IdTokenProvider.fromJson(json['provider'] as String),
+        idToken: json['idToken'] as String,
+        nonce: json['nonce'] as String,
+        authorizationCode: json['authorizationCode'] == null
+            ? null
+            : json['authorizationCode'] as String,
+        name: json['name'] == null ? null : json['name'] as String,
+        password: json['password'] == null ? null : json['password'] as String,
+      );
+
+  /// The provider that issued the token.
+  final IdTokenProvider provider;
+
+  /// The provider's ID token, at most 8 KB.
+  final String idToken;
+
+  /// The raw nonce, 16 to 128 characters. Give the provider its lowercase hex SHA-256 (the SDKs' `createNonce` makes
+  /// both), so the token carries that hash.
+  final String nonce;
+
+  /// Apple only, and required for Apple: the authorization code Sign in with Apple returned with the token.
+  final String? authorizationCode;
+
+  /// Apple only: the name Sign in with Apple returned on the first authorization, at most 256 characters.
+  final String? name;
+
+  /// The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+  /// minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+  final String? password;
+
+  /// Encodes this [CreateIdTokenIdentityRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'provider': provider.value,
+    'idToken': idToken,
+    'nonce': nonce,
+    'authorizationCode': ?authorizationCode,
+    'name': ?name,
+    'password': ?password,
+  };
+}
+
 /// A sign in with a provider's ID token from a native app.
 final class CreateIdTokenSessionRequest {
   /// Creates a [CreateIdTokenSessionRequest].
@@ -631,6 +687,50 @@ final class CreateOAuthFlowRequest {
   };
 }
 
+/// A request to start linking a provider to the signed in user.
+final class CreateOAuthLinkFlowRequest {
+  /// Creates a [CreateOAuthLinkFlowRequest].
+  const CreateOAuthLinkFlowRequest({
+    required this.provider,
+    required this.redirectUrl,
+    required this.codeChallenge,
+    this.password,
+  });
+
+  /// Decodes a [CreateOAuthLinkFlowRequest] from JSON.
+  factory CreateOAuthLinkFlowRequest.fromJson(Map<String, dynamic> json) =>
+      CreateOAuthLinkFlowRequest(
+        provider: OAuthProvider.fromJson(json['provider'] as String),
+        redirectUrl: json['redirectUrl'] as String,
+        codeChallenge: json['codeChallenge'] as String,
+        password: json['password'] == null ? null : json['password'] as String,
+      );
+
+  /// The provider to sign in with.
+  final OAuthProvider provider;
+
+  /// Your page or app that receives the result: a host that is one of the project's web platforms (`http` only on
+  /// `localhost` or `127.0.0.1`), or your app's own scheme (its iOS, Android, or macOS identifier). Orvano adds
+  /// `orvano_type` and then `orvano_code` or `orvano_error` to it.
+  final String redirectUrl;
+
+  /// The S256 PKCE challenge: base64url(SHA-256(verifier)), 43 characters. Keep the verifier; only it redeems the
+  /// code. The SDKs make both.
+  final String codeChallenge;
+
+  /// The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+  /// minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+  final String? password;
+
+  /// Encodes this [CreateOAuthLinkFlowRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'provider': provider.value,
+    'redirectUrl': redirectUrl,
+    'codeChallenge': codeChallenge,
+    'password': ?password,
+  };
+}
+
 /// A sign in with the code a provider flow returned.
 final class CreateOAuthSessionRequest {
   /// Creates a [CreateOAuthSessionRequest].
@@ -654,6 +754,26 @@ final class CreateOAuthSessionRequest {
 
   /// Encodes this [CreateOAuthSessionRequest] as JSON.
   Map<String, dynamic> toJson() => {'code': code, 'codeVerifier': codeVerifier};
+}
+
+/// A request to start adding a passkey.
+final class CreatePasskeyRegistrationRequest {
+  /// Creates a [CreatePasskeyRegistrationRequest].
+  const CreatePasskeyRegistrationRequest({this.password});
+
+  /// Decodes a [CreatePasskeyRegistrationRequest] from JSON.
+  factory CreatePasskeyRegistrationRequest.fromJson(
+    Map<String, dynamic> json,
+  ) => CreatePasskeyRegistrationRequest(
+    password: json['password'] == null ? null : json['password'] as String,
+  );
+
+  /// The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+  /// minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+  final String? password;
+
+  /// Encodes this [CreatePasskeyRegistrationRequest] as JSON.
+  Map<String, dynamic> toJson() => {'password': ?password};
 }
 
 /// A sign in with a passkey.
@@ -732,6 +852,25 @@ final class CreateRecoveryRequest {
 
   /// Encodes this [CreateRecoveryRequest] as JSON.
   Map<String, dynamic> toJson() => {'email': email, 'redirectUrl': redirectUrl};
+}
+
+/// A request to start turning on an authenticator app.
+final class CreateTotpRequest {
+  /// Creates a [CreateTotpRequest].
+  const CreateTotpRequest({this.password});
+
+  /// Decodes a [CreateTotpRequest] from JSON.
+  factory CreateTotpRequest.fromJson(Map<String, dynamic> json) =>
+      CreateTotpRequest(
+        password: json['password'] == null ? null : json['password'] as String,
+      );
+
+  /// The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+  /// minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+  final String? password;
+
+  /// Encodes this [CreateTotpRequest] as JSON.
+  Map<String, dynamic> toJson() => {'password': ?password};
 }
 
 /// A request to email a user a password reset link.
@@ -1812,6 +1951,42 @@ final class PasskeyUserEntity {
   };
 }
 
+/// The signed in session after a second factor: a new access token carrying the new `aal` and `amr` claims. The refresh
+/// token is not sent; keep the one you hold, which is unchanged and whose next refresh carries the new claims too.
+final class RaisedSession {
+  /// Creates a [RaisedSession].
+  const RaisedSession({
+    required this.accessToken,
+    required this.accessTokenExpiresAt,
+    required this.sessionId,
+  });
+
+  /// Decodes a [RaisedSession] from JSON.
+  factory RaisedSession.fromJson(Map<String, dynamic> json) => RaisedSession(
+    accessToken: json['accessToken'] as String,
+    accessTokenExpiresAt: DateTime.parse(
+      json['accessTokenExpiresAt'] as String,
+    ),
+    sessionId: json['sessionId'] as String,
+  );
+
+  /// An ES256 JWT, valid for 15 minutes.
+  final String accessToken;
+
+  /// When the access token expires.
+  final DateTime accessTokenExpiresAt;
+
+  /// The session ID, also the `sid` claim of the access token.
+  final String sessionId;
+
+  /// Encodes this [RaisedSession] as JSON.
+  Map<String, dynamic> toJson() => {
+    'accessToken': accessToken,
+    'accessTokenExpiresAt': accessTokenExpiresAt.toUtc().toIso8601String(),
+    'sessionId': sessionId,
+  };
+}
+
 /// New recovery codes. Show them once and ask the user to keep them safe; every older code stopped working.
 final class RecoveryCodes {
   /// Creates a [RecoveryCodes].
@@ -2023,7 +2198,7 @@ final class TotpConfirmation {
         recoveryCodes: (json['recoveryCodes'] as List<dynamic>)
             .map((e) => e as String)
             .toList(),
-        session: SessionTokens.fromJson(
+        session: RaisedSession.fromJson(
           json['session'] as Map<String, dynamic>,
         ),
       );
@@ -2031,8 +2206,8 @@ final class TotpConfirmation {
   /// 10 recovery codes, each `XXXXX-XXXXX`, each working once.
   final List<String> recoveryCodes;
 
-  /// This session's tokens: a new access token carrying `aal` 2, and the current refresh token, unchanged.
-  final SessionTokens session;
+  /// A new access token for this session, carrying `aal` 2. Keep the refresh token you hold; it is unchanged.
+  final RaisedSession session;
 
   /// Encodes this [TotpConfirmation] as JSON.
   Map<String, dynamic> toJson() => {

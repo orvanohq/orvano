@@ -25,7 +25,8 @@ steps:
       body: { mfa: null }
   - op: account.createTotp
     as: client
-    input: {}
+    input:
+      body: { password: correct horse battery staple }
     expect: { status: 201 }
     save:
       secret: $.secret
@@ -38,7 +39,9 @@ steps:
   - op: confirmTotp
     as: client
     input: { code: '${firstCode}' }
-    expect: { status: 200 }
+    expect:
+      status: 200
+      body: { refreshTokenKept: true }
   - op: users.get
     as: server
     input: { userId: '${userId}' }

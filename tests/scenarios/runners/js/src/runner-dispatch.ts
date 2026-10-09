@@ -2,6 +2,7 @@ import { createNonce, createPkce } from '@orvano/js'
 import type { MfaAnswer } from '@orvano/js'
 import type { Client as ServerClient } from '@orvano/js/server'
 import type { DispatchTable } from './dispatch-table.js'
+import type { ClientSurface } from './generated/client.js'
 
 /** The fake provider's headers for Apple's form post (spec 0012, AC-27): its target and urlencoded body. */
 const formActionHeader = 'x-orvano-test-form-action'
@@ -102,6 +103,22 @@ export async function totpCode(secret: string, offset: number): Promise<string> 
   return String(binary % 1_000_000).padStart(6, '0')
 }
 
+/** A step's optional `password`, the user's current password (spec 0013), as helper options. */
+function passwordOf(input: Record<string, unknown>): { password?: string } {
+  return typeof input.password === 'string' ? { password: input.password } : {}
+}
+
+/**
+ * Runs a helper that raises the session with a second factor (spec 0013) and says whether the
+ * client still holds the refresh token it held before: Orvano answers only a new access token.
+ */
+async function keepsRefreshToken(o: ClientSurface, raise: () => Promise<void>): Promise<boolean> {
+  const before = (await o.client.session.get())?.refreshToken ?? null
+  await raise()
+  const after = (await o.client.session.get())?.refreshToken ?? null
+  return before !== null && after === before
+}
+
 /** The one factor of an MFA runner step: `totpCode`, `recoveryCode`, or `passkey: true`. */
 function mfaAnswer(input: Record<string, unknown>): MfaAnswer {
   if (input.passkey === true) return { passkey: true }
@@ -119,9 +136,11 @@ function mfaAnswer(input: Record<string, unknown>): MfaAnswer {
  * `signInWithOAuth` or `linkIdentity` with an `open` that follows the fake provider over HTTP,
  * `oauthCode` stops at the code so a scenario can redeem it itself, `createNonce` is the SDK's
  * native nonce (spec 0012), `totpCode` is an authenticator app's current code, `completeMfa`,
- * `verifyMfa`, and `confirmTotp` are the client SDK's MFA helpers, and `registerPasskey` and
- * `signInWithPasskey` its passkey helpers, on the server's software authenticator (spec 0013), and
- * `accessToken` hands the client's stored access token to a server step.
+ * `verifyMfa`, and `confirmTotp` are the client SDK's MFA helpers (the last two also say whether the
+ * client kept its refresh token), and `registerPasskey` and `signInWithPasskey` its passkey
+ * helpers, on the server's software authenticator (spec 0013); `registerPasskey` and a linking
+ * `oauthSignIn` send the step's `password`. `accessToken` hands the client's stored access token to
+ * a server step.
  * Their names have no dot, so they never collide with an operationId.
  */
 export const runnerDispatch: DispatchTable = {
@@ -141,14 +160,19 @@ export const runnerDispatch: DispatchTable = {
   verifyMfa: {
     status: 200,
     client: async (o, input) => {
-      await o.client.verifyMfa(mfaAnswer(input))
-      return { verified: true }
+      const refreshTokenKept = await keepsRefreshToken(o, () =>
+        o.client.verifyMfa(mfaAnswer(input)),
+      )
+      return { verified: true, refreshTokenKept }
     },
   },
   registerPasskey: {
     status: 201,
     client: async (o, input) =>
-      o.client.registerPasskey(typeof input.name === 'string' ? { name: input.name } : {}),
+      o.client.registerPasskey({
+        ...(typeof input.name === 'string' ? { name: input.name } : {}),
+        ...passwordOf(input),
+      }),
   },
   signInWithPasskey: {
     status: 201,
@@ -156,7 +180,13 @@ export const runnerDispatch: DispatchTable = {
   },
   confirmTotp: {
     status: 200,
-    client: async (o, input) => ({ recoveryCodes: await o.client.confirmTotp(String(input.code)) }),
+    client: async (o, input) => {
+      let recoveryCodes: string[] = []
+      const refreshTokenKept = await keepsRefreshToken(o, async () => {
+        recoveryCodes = await o.client.confirmTotp(String(input.code))
+      })
+      return { recoveryCodes, refreshTokenKept }
+    },
   },
   now: {
     status: 200,
@@ -185,7 +215,7 @@ export const runnerDispatch: DispatchTable = {
       }
       const provider = String(input.provider) as 'google' | 'apple' | 'github' | 'microsoft'
       return input.link === true
-        ? await o.client.linkIdentity(provider, options)
+        ? await o.client.linkIdentity(provider, { ...options, ...passwordOf(input) })
         : await o.client.signInWithOAuth(provider, options)
     },
   },

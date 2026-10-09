@@ -23,7 +23,9 @@ import type {
 import type {
   CompletePasskeyRegistrationRequest,
   ConfirmTotpRequest,
+  CreatePasskeyRegistrationRequest,
   CreatePasskeySessionRequest,
+  CreateTotpRequest,
   CreateUserRecoveryRequest,
   CreateUserRequest,
   CreateUserVerificationRequest,
@@ -66,7 +68,8 @@ export const consoleDispatch: DispatchTable = {
   },
   'consoleAccount.createPasskeyRegistration': {
     status: 200,
-    console: (o, _input) => o.consoleAccount.createPasskeyRegistration(),
+    console: (o, input) =>
+      o.consoleAccount.createPasskeyRegistration(input.body as CreatePasskeyRegistrationRequest),
   },
   'consoleAccount.createPasskeySession': {
     status: 201,
@@ -88,7 +91,7 @@ export const consoleDispatch: DispatchTable = {
   },
   'consoleAccount.createTotp': {
     status: 201,
-    console: (o, _input) => o.consoleAccount.createTotp(),
+    console: (o, input) => o.consoleAccount.createTotp(input.body as CreateTotpRequest),
   },
   'consoleAccount.deletePasskey': {
     status: 204,

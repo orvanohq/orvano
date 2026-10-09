@@ -8,6 +8,6 @@ export default async function Page() {
     endpoint: process.env.ORVANO_ENDPOINT!,
     cookies: await cookies(),
   })
-  const sessionTokens = await orvano.account.verifyMfa({})
-  return <pre>{JSON.stringify(sessionTokens, null, 2)}</pre>
+  const raisedSession = await orvano.account.verifyMfa({})
+  return <pre>{JSON.stringify(raisedSession, null, 2)}</pre>
 }

@@ -18,7 +18,7 @@ const settings: AuthMethodSettings = {
   rpName: null,
   androidCertFingerprints: ['AA:BB'],
   activePasskeyCount: 3,
-  acceptedOrigins: ['https://example.com', 'https://app.example.com'],
+  acceptedOrigins: ['https://example.com', 'https://app.example.com', 'https://*.example.com'],
 }
 
 const at = '2026-10-08T00:00:00Z'
@@ -122,6 +122,7 @@ describe('PasskeysDialog', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Passkeys' })
     await expect.element(dialog.getByText('https://app.example.com')).toBeVisible()
+    await expect.element(dialog.getByText('(any one subdomain)')).toBeVisible()
     await expect.element(dialog.getByText(/"<TeamID>\.com\.acme\.shop"/)).toBeVisible()
     await expect.element(dialog.getByText(/common\.get_login_creds/)).toBeVisible()
     await expect
