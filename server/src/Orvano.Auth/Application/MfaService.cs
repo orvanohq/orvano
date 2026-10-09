@@ -91,7 +91,7 @@ internal sealed class MfaService(
     /// </summary>
     public async Task<Outcome<TotpSetupView>> CreateTotpAsync(string projectId, Guid userId, Guid sessionId, string? password, CancellationToken ct)
     {
-        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, password, ct) is { } refused) return refused;
+        if ((await stepUp.EnrollmentAsync(projectId, userId, sessionId, password, ct) ?? stepUp.TakeEnrollLimit(userId)) is { } refused) return refused;
         var issuer = await alerts.ProjectNameAsync(projectId, ct);
 
         return await store.WriteAsync<TotpSetupView>(async (uow, token) =>
@@ -130,11 +130,12 @@ internal sealed class MfaService(
     /// (<c>mfa_enabled</c>), and raises the caller's session to level 2. Answers a new access token, never the refresh
     /// token.
     /// </summary>
-    public async Task<Outcome<TotpConfirmationView>> ConfirmTotpAsync(string projectId, Guid userId, Guid sessionId, string? code, CancellationToken ct)
+    public async Task<Outcome<TotpConfirmationView>> ConfirmTotpAsync(
+        string projectId, Guid userId, Guid sessionId, string? code, string ipKey, CancellationToken ct)
     {
         var userKey = userId.ToString();
-        var limit = limits.Check(RateLimitPolicies.FailedMfaPerUser, userKey);
-        if (!limit.Allowed) return Failure.RateLimited(limit.RetryAfter);
+        using var failures = ReserveFactor(userId, ipKey, MfaFactors.Totp);
+        if (!failures.Allowed) return Failure.RateLimited(failures.Decision.RetryAfter);
         var projectName = await alerts.ProjectNameAsync(projectId, ct);
 
         var outcome = await store.WriteAsync<(IReadOnlyList<string> Codes, Guid[] Ended, SessionStrength Strength, DateTimeOffset EndsAt, bool EmailVerified)>(
@@ -157,7 +158,7 @@ internal sealed class MfaService(
                 if (ciphertext is null) return Failure.TotpNotPending;
                 if (!await factors.ConfirmTotpAsync(uow, userId, ciphertext, code, token))
                 {
-                    limits.Acquire(RateLimitPolicies.FailedMfaPerUser, userKey);
+                    failures.Fail();
                     return Failure.InvalidMfaCode;
                 }
 
@@ -208,7 +209,7 @@ internal sealed class MfaService(
     /// </summary>
     public async Task<Outcome<string[]>> CreateRecoveryCodesAsync(string projectId, Guid userId, Guid sessionId, CancellationToken ct)
     {
-        if (await stepUp.MfaChangeAsync(projectId, userId, sessionId, ct) is { } refused) return refused;
+        if ((await stepUp.MfaChangeAsync(projectId, userId, sessionId, ct) ?? stepUp.TakeEnrollLimit(userId)) is { } refused) return refused;
         var projectName = await alerts.ProjectNameAsync(projectId, ct);
 
         return await store.WriteAsync<string[]>(async (uow, token) =>
@@ -229,13 +230,14 @@ internal sealed class MfaService(
     /// (both need MFA on), then the factor. A right one raises the caller's session to level 2, adds the factor to
     /// <c>amr</c>, sets <c>strong_auth_at</c>, and answers a new access token, never the refresh token.
     /// </summary>
-    public async Task<Outcome<RaisedSessionView>> VerifyAsync(string projectId, Guid userId, Guid sessionId, FactorAnswer answer, CancellationToken ct)
+    public async Task<Outcome<RaisedSessionView>> VerifyAsync(
+        string projectId, Guid userId, Guid sessionId, FactorAnswer answer, string ipKey, CancellationToken ct)
     {
         var userKey = userId.ToString();
-        var limit = limits.Check(RateLimitPolicies.FailedMfaPerUser, userKey);
-        if (!limit.Allowed) return Failure.RateLimited(limit.RetryAfter);
         if (answer.Malformed() is { } malformed) return malformed;
         var factor = answer.Factor!;
+        using var failures = ReserveFactor(userId, ipKey, factor);
+        if (!failures.Allowed) return Failure.RateLimited(failures.Decision.RetryAfter);
         var projectName = await alerts.ProjectNameAsync(projectId, ct);
 
         // A passkey's challenge is spent and its answer verified before the transaction (AC-19): only a step_up
@@ -275,7 +277,7 @@ internal sealed class MfaService(
             return (raised.Strength, raised.EndsAt, user.EmailVerifiedAt is not null);
         }, ct);
 
-        if (wrong) limits.Acquire(RateLimitPolicies.FailedMfaPerUser, userKey);
+        if (wrong) failures.Fail();
         if (!outcome.Succeeded) return outcome.Failure!;
         var done = outcome.Value;
         var access = await tokens.IssueAsync(projectId, userId, sessionId, done.EmailVerified, done.Strength, ct);
@@ -310,8 +312,8 @@ internal sealed class MfaService(
         }
 
         var userKey = found.UserId.ToString();
-        var userLimit = limits.Check(RateLimitPolicies.FailedMfaPerUser, userKey);
-        if (!userLimit.Allowed) return Failure.RateLimited(userLimit.RetryAfter);
+        using var failures = ReserveFactor(found.UserId, ipKey, factor);
+        if (!failures.Allowed) return Failure.RateLimited(failures.Decision.RetryAfter);
         await keys.GetActiveAsync(projectId, ct);
         var projectName = await alerts.ProjectNameAsync(projectId, ct);
 
@@ -373,7 +375,7 @@ internal sealed class MfaService(
             return ((user, grant, ended), true);
         }, ct);
 
-        if (wrong) limits.Acquire(RateLimitPolicies.FailedMfaPerUser, userKey);
+        if (wrong) failures.Fail();
         // A ticket gone between the two reads counts against the IP like an unknown one at the first read.
         if (vanished) limits.Acquire(RateLimitPolicies.FailedMfaTicketPerIp, ipKey);
         if (!outcome.Succeeded)
@@ -384,6 +386,20 @@ internal sealed class MfaService(
 
         foreach (var id in outcome.Value.Ended) await checks.EvictAsync(id, ct);
         return await accounts.SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant, ct);
+    }
+
+    /// <summary>
+    /// Reserves a wrong factor's slots (spec 0014, AC-18): <c>auth.mfa_failed.user_ip</c> for every factor, keyed by
+    /// the user and the limit IP, so someone who knows the password can't block step two for the owner on another
+    /// network; and for a TOTP code also <c>auth.mfa_totp_failed.user</c>, the per account ceiling of 6 digit codes,
+    /// which leaves recovery codes and passkeys open. Count a wrong factor with <see cref="FailureReservation.Fail"/>.
+    /// </summary>
+    private FailureReservation ReserveFactor(Guid userId, string ipKey, string factor)
+    {
+        var perUserIp = (RateLimitPolicies.FailedMfaPerUserIp, $"{userId}\n{ipKey}");
+        return factor == MfaFactors.Totp
+            ? limits.Reserve(perUserIp, (RateLimitPolicies.FailedTotpPerUser, userId.ToString()))
+            : limits.Reserve(perUserIp);
     }
 
     /// <summary>

@@ -1,0 +1,83 @@
+# Spec 0014, AC-16, AC-17, AC-36: ten wrong passwords for one email from one visitor address lock that address out,
+# even with the right password, while the owner signs in from another network. The fixture project lists the scenario
+# network as a trusted app server (fixtures.yaml, trustedServerCidrs), so signInFrom's X-Orvano-Client-IP counts.
+name: failed sign ins lock one email from one address only
+requires: []
+steps:
+  - op: account.create
+    as: client
+    input:
+      body: { email: 'lockout-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }
+  - op: signInFrom
+    as: client
+    input:
+      clientIp: 198.51.100.7
+      body: { email: 'lockout-${unique}@example.com', password: wrong horse battery staple }
+    expect: { status: 401, code: invalid_credentials }
+  - op: signInFrom
+    as: client
+    input:
+      clientIp: 198.51.100.7
+      body: { email: 'lockout-${unique}@example.com', password: wrong horse battery staple }
+    expect: { status: 401, code: invalid_credentials }
+  - op: signInFrom
+    as: client
+    input:
+      clientIp: 198.51.100.7
+      body: { email: 'lockout-${unique}@example.com', password: wrong horse battery staple }
+    expect: { status: 401, code: invalid_credentials }
+  - op: signInFrom
+    as: client
+    input:
+      clientIp: 198.51.100.7
+      body: { email: 'lockout-${unique}@example.com', password: wrong horse battery staple }
+    expect: { status: 401, code: invalid_credentials }
+  - op: signInFrom
+    as: client
+    input:
+      clientIp: 198.51.100.7
+      body: { email: 'lockout-${unique}@example.com', password: wrong horse battery staple }
+    expect: { status: 401, code: invalid_credentials }
+  - op: signInFrom
+    as: client
+    input:
+      clientIp: 198.51.100.7
+      body: { email: 'lockout-${unique}@example.com', password: wrong horse battery staple }
+    expect: { status: 401, code: invalid_credentials }
+  - op: signInFrom
+    as: client
+    input:
+      clientIp: 198.51.100.7
+      body: { email: 'lockout-${unique}@example.com', password: wrong horse battery staple }
+    expect: { status: 401, code: invalid_credentials }
+  - op: signInFrom
+    as: client
+    input:
+      clientIp: 198.51.100.7
+      body: { email: 'lockout-${unique}@example.com', password: wrong horse battery staple }
+    expect: { status: 401, code: invalid_credentials }
+  - op: signInFrom
+    as: client
+    input:
+      clientIp: 198.51.100.7
+      body: { email: 'lockout-${unique}@example.com', password: wrong horse battery staple }
+    expect: { status: 401, code: invalid_credentials }
+  - op: signInFrom
+    as: client
+    input:
+      clientIp: 198.51.100.7
+      body: { email: 'lockout-${unique}@example.com', password: wrong horse battery staple }
+    expect: { status: 401, code: invalid_credentials }
+  - op: signInFrom
+    as: client
+    input:
+      clientIp: 198.51.100.7
+      body: { email: 'lockout-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 429, code: rate_limited }
+  - op: signInFrom
+    as: client
+    input:
+      clientIp: 203.0.113.9
+      body: { email: 'lockout-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }

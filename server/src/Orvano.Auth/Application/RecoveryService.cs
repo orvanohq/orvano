@@ -29,8 +29,8 @@ internal sealed class RecoveryService(
     {
         if (!EmailRule.TryNormalize(email, out var trimmed)) return Failure.Invalid("The email must be an address of at most 320 characters.");
         if (await mailer.CheckRedirectAsync(projectId, redirectUrl, EmailTokenKind.Recovery, ct) is not { } redirect) return Failure.RedirectUrlNotAllowed;
-        var refused = mailer.TakeIpLimit(ipKey)
-            ?? mailer.TakeRecipientLimits(projectId, trimmed, EmailTokenKind.Recovery)
+        var refused = await mailer.TakeIpLimitAsync(projectId, ipKey, ct)
+            ?? mailer.TakeRecipientLimits(projectId, trimmed, EmailTokenKind.Recovery, ipKey)
             ?? await mailer.CheckAvailabilityAsync(projectId, ct);
         if (refused is not null) return refused;
 
@@ -55,7 +55,7 @@ internal sealed class RecoveryService(
     /// <c>users.createRecovery</c> and its console twin (AC-21): a reset link for a known user, so no privacy padding;
     /// 403 <c>user_blocked</c> for a blocked user, then the two recipient limits and the queue's answer.
     /// </summary>
-    public async Task<Outcome<Done>> SendForUserAsync(string projectId, Guid userId, string? redirectUrl, Actor actor, CancellationToken ct)
+    public async Task<Outcome<Done>> SendForUserAsync(string projectId, Guid userId, string? redirectUrl, Actor actor, string limitKey, CancellationToken ct)
     {
         if (await mailer.CheckRedirectAsync(projectId, redirectUrl, EmailTokenKind.Recovery, ct) is not { } redirect) return Failure.RedirectUrlNotAllowed;
         var projectName = await mailer.ProjectNameAsync(projectId, ct);
@@ -65,7 +65,7 @@ internal sealed class RecoveryService(
             if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
             if (user.Status != UserStatuses.Active) return Failure.UserBlocked;
             if (user.Email is not { } to) return Failure.Invalid("The user has no email.");
-            if (mailer.TakeRecipientLimits(projectId, to, EmailTokenKind.Recovery) is { } limited) return limited;
+            if (mailer.TakeRecipientLimits(projectId, to, EmailTokenKind.Recovery, limitKey) is { } limited) return limited;
 
             var target = new AuthEmailTarget(projectId, projectName, user.Id, to, user.Name);
             if (await mailer.SendLinkAsync(uow, target, EmailTokenKind.Recovery, redirect, actor, token) is { } refused) return refused;

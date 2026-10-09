@@ -88,3 +88,6 @@ authPolicies:
   - project: scenarios0000000000a
     passwordMinLength: 12
     passwordBreachedCheck: true
+    # The networks a runner reaches the api from (Docker bridges and Docker Desktop, and loopback for a server run
+    # outside Compose), so the runner operation signInFrom can name a visitor (auth-lockout).
+    trustedServerCidrs: [172.16.0.0/12, 192.168.0.0/16, 10.0.0.0/12, 127.0.0.0/12, '::1/128']

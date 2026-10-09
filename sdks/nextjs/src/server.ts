@@ -57,6 +57,7 @@ import {
   accessCookie,
   cookieOptions,
   forwardedClientHeaders,
+  type ClientIpResolver,
   mfaCookie,
   mfaCookieOptions,
   oauthCookie,
@@ -65,7 +66,13 @@ import {
 } from './index.js'
 
 /** Settings for {@link updateSession} and {@link createOrvanoRouteHandler}. */
-export type OrvanoNextConfig = Omit<ClientConfig, 'session' | 'refresh' | 'mfaStore' | 'mfa'>
+export type OrvanoNextConfig = Omit<ClientConfig, 'session' | 'refresh' | 'mfaStore' | 'mfa'> & {
+  /**
+   * Finds the visitor's IP in the request (spec 0014, AC-36), sent as `X-Orvano-Client-IP`;
+   * defaults to `x-real-ip`, else the rightmost `x-forwarded-for` value.
+   */
+  clientIp?: ClientIpResolver
+}
 
 /** Settings for {@link createOrvanoRouteHandler}. */
 export interface OrvanoRouteHandlerConfig extends OrvanoNextConfig {
@@ -88,9 +95,10 @@ function clientFor(
   request: NextRequest,
   mfaStore: PendingMfaStore = new MemoryPendingMfaStore(),
 ): Client {
+  const { clientIp, ...rest } = config
   return new Client({
-    ...config,
-    headers: { ...config.headers, ...forwardedClientHeaders(request.headers) },
+    ...rest,
+    headers: { ...rest.headers, ...forwardedClientHeaders(request.headers, clientIp) },
     session: new MemorySessionStore(),
     mfaStore,
   })

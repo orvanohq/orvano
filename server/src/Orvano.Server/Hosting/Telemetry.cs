@@ -5,6 +5,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Orvano.Auth.Application;
 using Orvano.Core.Events;
+using Orvano.Core.RateLimiting;
 using Orvano.Messaging.Application;
 
 namespace Orvano.Server.Hosting;
@@ -40,7 +41,7 @@ internal static class Telemetry
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
-                .AddMeter("Npgsql", EventTelemetry.MeterName, RealtimeFanout.MeterName, MessagingTelemetry.MeterName,
+                .AddMeter("Npgsql", EventTelemetry.MeterName, RateLimitTelemetry.MeterName, RealtimeFanout.MeterName, MessagingTelemetry.MeterName,
                     AuthTelemetry.MeterName));
 
         if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))

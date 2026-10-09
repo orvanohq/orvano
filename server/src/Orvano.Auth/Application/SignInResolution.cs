@@ -20,7 +20,7 @@ internal sealed class ResolutionRaceException() : Exception("A row changed while
 /// finds, creates, or verifies a user by an email the provider did not verify, and never moves an existing link by
 /// email alone.
 /// </summary>
-internal sealed class SignInResolution(Identities identities, Sessions sessions, RateLimits limits)
+internal sealed class SignInResolution(Identities identities, Sessions sessions, RateLimits limits, PolicySettings policies)
 {
     /// <summary>Whether <paramref name="ex"/> is a race the caller reruns the transaction for (AC-10).</summary>
     public static bool IsRace(Exception ex) =>
@@ -72,7 +72,7 @@ internal sealed class SignInResolution(Identities identities, Sessions sessions,
         }
 
         // Third: a new user, with the verified email or none.
-        var signUp = limits.Acquire(RateLimitPolicies.SignUpPerIp, ipKey);
+        var signUp = limits.Acquire(ProjectLimits.SignUpPerIp((await policies.GetAsync(uow.Tx.Connection!, uow.Tx, projectId, ct)).Auth), ipKey);
         if (!signUp.Allowed) return Failure.RateLimited(signUp.RetryAfter);
         Guid created;
         await using (var insert = new NpgsqlCommand(

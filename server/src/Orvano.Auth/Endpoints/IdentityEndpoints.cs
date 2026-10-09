@@ -22,10 +22,10 @@ internal static class IdentityEndpoints
         v1.MapPost(Account.CreateIdTokenSession.Route, (HttpContext http, IdentityService identities, RateLimits limits, CancellationToken ct) =>
             EmailRequests.RedeemAsync<Api.CreateIdTokenSessionRequest>(http, limits, ct, async request =>
             {
-                var signIn = limits.Acquire(RateLimitPolicies.SignInPerIp, ConnectionIp.Key(http));
+                var signIn = limits.Acquire(RateLimitPolicies.SignInPerIp, PublicRequests.LimitKey(http));
                 if (!signIn.Allowed) return ApiProblem.RateLimited(http, signIn, Api.ErrorCode.RateLimited);
                 return Created(http, await identities.SignInAsync(
-                    PublicRequests.Project(http), Native(request), PublicRequests.Client(http), ConnectionIp.Key(http), ct), AuthResult);
+                    PublicRequests.Project(http), Native(request), PublicRequests.Client(http), PublicRequests.LimitKey(http), ct), AuthResult);
             }, RateLimitPolicies.FailedOAuthRedeemPerIp))
             .WithName(Account.CreateIdTokenSession.Id)
             .RequireProject();
@@ -34,15 +34,9 @@ internal static class IdentityEndpoints
             HttpContext http, Api.CreateOAuthLinkFlowRequest request, IdentityService identities, RateLimits limits, CancellationToken ct) =>
         {
             var user = PublicRequests.User(http);
-            // Every password sent counts, like the other password checks (spec 0004, rate limits).
-            if (request.Password is not null)
-            {
-                var checkLimit = limits.Acquire(RateLimitPolicies.PasswordCheckPerUser, user.UserId.ToString());
-                if (!checkLimit.Allowed) return ApiProblem.RateLimited(http, checkLimit, Api.ErrorCode.RateLimited);
-            }
 
             var outcome = await identities.StartLinkAsync(PublicRequests.Project(http), user.UserId, user.SessionId, ProviderOrNull(request.Provider),
-                request.RedirectUrl, request.CodeChallenge, request.Password, ConnectionIp.Key(http), ct);
+                request.RedirectUrl, request.CodeChallenge, request.Password, PublicRequests.LimitKey(http), ct);
             return Ok(http, outcome, url => new Api.OAuthFlow(url));
         })
             .WithName(Account.CreateOAuthLinkFlow.Id)
@@ -62,12 +56,6 @@ internal static class IdentityEndpoints
             EmailRequests.RedeemAsync<Api.CreateIdTokenIdentityRequest>(http, limits, ct, async request =>
             {
                 var user = PublicRequests.User(http);
-                // Every password sent counts, like the other password checks (spec 0004, rate limits).
-                if (request.Password is not null)
-                {
-                    var checkLimit = limits.Acquire(RateLimitPolicies.PasswordCheckPerUser, user.UserId.ToString());
-                    if (!checkLimit.Allowed) return ApiProblem.RateLimited(http, checkLimit, Api.ErrorCode.RateLimited);
-                }
 
                 var native = new NativeRequest(ProviderOf(request.Provider), request.IdToken, request.Nonce, request.AuthorizationCode, request.Name);
                 return Created(http, await identities.LinkNativeAsync(PublicRequests.Project(http), user.UserId, user.SessionId, native, request.Password, ct),

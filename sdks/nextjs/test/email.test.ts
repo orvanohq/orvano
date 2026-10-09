@@ -73,7 +73,7 @@ function post(
     headers: {
       origin,
       'content-type': 'application/json',
-      'x-forwarded-for': '203.0.113.7, 10.0.0.1',
+      'x-forwarded-for': '6.6.6.6, 203.0.113.7',
       'user-agent': 'Browser/1.0',
       ...(cookie === '' ? {} : { cookie }),
     },

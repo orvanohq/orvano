@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Orvano.Auth.Application;
 using Orvano.Core.Http;
+using Orvano.Core.RateLimiting;
 using Orvano.Platform.Contracts;
 using Api = Orvano.Contract;
 
@@ -25,6 +26,8 @@ internal static class PublicRequests
     private static readonly object ProjectKey = new();
     private static readonly object UserKey = new();
     private static readonly object ApiKeyKey = new();
+    private static readonly object LimitKeyKey = new();
+    private static readonly object PoliciesKey = new();
 
     /// <summary>The servable project this request is for; set by <see cref="RequireProject"/>.</summary>
     public static string Project(HttpContext http) =>
@@ -33,6 +36,20 @@ internal static class PublicRequests
     /// <summary>The signed in user; set by <see cref="RequireUser"/>.</summary>
     public static CurrentUser User(HttpContext http) =>
         http.Items[UserKey] as CurrentUser ?? throw new InvalidOperationException("The route has no bearer filter.");
+
+    /// <summary>
+    /// The request's project plus its limit IP (spec 0014, AC-16), the key of every IP keyed auth limit of an app
+    /// project; set by <see cref="RequireProject"/>.
+    /// </summary>
+    public static string LimitKey(HttpContext http) =>
+        http.Items[LimitKeyKey] as string ?? throw new InvalidOperationException("The route has no project filter.");
+
+    /// <summary>The project's rules, read once by <see cref="RequireProject"/> through <c>PolicySettings</c> (spec 0014, AC-3).</summary>
+    public static ProjectPolicies Policies(HttpContext http) =>
+        http.Items[PoliciesKey] as ProjectPolicies ?? throw new InvalidOperationException("The route has no project filter.");
+
+    /// <summary>The <c>console</c> project's limit key: the connection IP, since it trusts no app servers (AC-16).</summary>
+    public static string ConsoleLimitKey(HttpContext http) => $"{ConsoleProject.Id}\n{LimitIp.Key(ConnectionIp.Of(http))}";
 
     /// <summary>The API key; set by <see cref="RequireApiKey"/>.</summary>
     public static CurrentKey Key(HttpContext http) =>
@@ -53,6 +70,9 @@ internal static class PublicRequests
             var refusal = await ServableAsync(http, projectId) ?? await OriginRefusalAsync(http, projectId);
             if (refusal is not null) return refusal;
             http.Items[ProjectKey] = projectId;
+            var policies = await http.RequestServices.GetRequiredService<PolicySettings>().GetAsync(projectId, http.RequestAborted);
+            http.Items[PoliciesKey] = policies;
+            http.Items[LimitKeyKey] = $"{projectId}\n{LimitIp.Key(LimitIp.Of(http, policies.Auth.TrustedServerCidrs))}";
             return await next(context);
         });
 
@@ -112,7 +132,13 @@ internal static class PublicRequests
                 return InvalidApiKey();
 
             var key = await http.RequestServices.GetRequiredService<IApiKeyVerifier>().VerifyAsync(Project(http), secret, http.RequestAborted);
-            if (!key.Valid || key.KeyId is not { } keyId) return InvalidApiKey();
+            if (!key.Valid || key.KeyId is not { } keyId)
+            {
+                // Spec 0014, AC-22: a failing key spends a permit of its connection IP, install wide; past the limit it
+                // gets 429 in place of 401. A valid key never reaches this, so it always passes.
+                var limit = http.RequestServices.GetRequiredService<RateLimits>().Acquire(RateLimitPolicies.FailedApiKeyPerIp, ConnectionIp.Key(http));
+                return limit.Allowed ? InvalidApiKey() : ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
+            }
             if (!key.Scopes.Contains(scope))
                 return ApiProblem.Result(StatusCodes.Status403Forbidden, Api.ErrorCode.InsufficientScope, $"The API key lacks the {scope} scope.");
 

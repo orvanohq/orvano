@@ -20,7 +20,7 @@ internal static class PasskeyEndpoints
     {
         v1.MapPost(Api.AccountOperations.CreatePasskeyChallenge.Route, async (HttpContext http, PasskeyService passkeys, RateLimits limits, CancellationToken ct) =>
         {
-            var limit = limits.Acquire(RateLimitPolicies.PasskeyPerIp, ConnectionIp.Key(http));
+            var limit = limits.Acquire(RateLimitPolicies.PasskeyPerIp, PublicRequests.LimitKey(http));
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
             return Ok(http, await passkeys.CreateSignInChallengeAsync(PublicRequests.Project(http), ct), PasskeyChallenge);
         })
@@ -30,7 +30,7 @@ internal static class PasskeyEndpoints
         v1.MapPost(Api.AccountOperations.CreatePasskeySession.Route, async (
             HttpContext http, Api.CreatePasskeySessionRequest request, PasskeyService passkeys, RateLimits limits, CancellationToken ct) =>
         {
-            var ip = ConnectionIp.Key(http);
+            var ip = PublicRequests.LimitKey(http);
             var limit = limits.Acquire(RateLimitPolicies.PasskeyPerIp, ip);
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
             var outcome = await passkeys.SignInAsync(
@@ -43,7 +43,7 @@ internal static class PasskeyEndpoints
         v1.MapPost(Api.AccountOperations.CreateMfaPasskeyChallenge.Route, async (
             HttpContext http, Api.CreateMfaPasskeyChallengeRequest request, PasskeyService passkeys, RateLimits limits, CancellationToken ct) =>
         {
-            var ip = ConnectionIp.Key(http);
+            var ip = PublicRequests.LimitKey(http);
             var limit = limits.Acquire(RateLimitPolicies.PasskeyPerIp, ip);
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
             return Ok(http, await passkeys.CreateMfaChallengeAsync(PublicRequests.Project(http), request.Ticket, ip, ct), PasskeyChallenge);
@@ -54,7 +54,7 @@ internal static class PasskeyEndpoints
         v1.MapPost(Api.AccountOperations.CreateStepUpPasskeyChallenge.Route, async (HttpContext http, PasskeyService passkeys, RateLimits limits, CancellationToken ct) =>
         {
             var user = PublicRequests.User(http);
-            var perIp = limits.Acquire(RateLimitPolicies.PasskeyPerIp, ConnectionIp.Key(http));
+            var perIp = limits.Acquire(RateLimitPolicies.PasskeyPerIp, PublicRequests.LimitKey(http));
             if (!perIp.Allowed) return ApiProblem.RateLimited(http, perIp, Api.ErrorCode.RateLimited);
             var perUser = limits.Acquire(RateLimitPolicies.PasskeyChallengePerUser, user.UserId.ToString());
             if (!perUser.Allowed) return ApiProblem.RateLimited(http, perUser, Api.ErrorCode.RateLimited);
@@ -68,16 +68,8 @@ internal static class PasskeyEndpoints
             HttpContext http, Api.CreatePasskeyRegistrationRequest request, PasskeyService passkeys, RateLimits limits, CancellationToken ct) =>
         {
             var user = PublicRequests.User(http);
-            var enroll = limits.Acquire(RateLimitPolicies.MfaEnrollPerUser, user.UserId.ToString());
-            if (!enroll.Allowed) return ApiProblem.RateLimited(http, enroll, Api.ErrorCode.RateLimited);
             var perUser = limits.Acquire(RateLimitPolicies.PasskeyChallengePerUser, user.UserId.ToString());
             if (!perUser.Allowed) return ApiProblem.RateLimited(http, perUser, Api.ErrorCode.RateLimited);
-            // Every password sent counts, like the other password checks (spec 0004, rate limits).
-            if (request.Password is not null)
-            {
-                var checkLimit = limits.Acquire(RateLimitPolicies.PasswordCheckPerUser, user.UserId.ToString());
-                if (!checkLimit.Allowed) return ApiProblem.RateLimited(http, checkLimit, Api.ErrorCode.RateLimited);
-            }
 
             return Ok(http, await passkeys.CreateRegistrationAsync(PublicRequests.Project(http), user.UserId, user.SessionId, request.Password, ct),
                 PasskeyRegistration);

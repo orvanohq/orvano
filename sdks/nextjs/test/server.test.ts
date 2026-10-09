@@ -75,7 +75,7 @@ describe('updateSession (AC-23)', () => {
     const incoming = request(
       `${app}/dashboard`,
       { [accessCookie]: accessExpiringIn(30), [refreshCookie]: 'orv_rt_old.secret' },
-      { 'x-forwarded-for': '203.0.113.7, 10.0.0.1', 'user-agent': 'Browser/1' },
+      { 'x-forwarded-for': '6.6.6.6, 203.0.113.7', 'user-agent': 'Browser/1' },
     )
 
     const response = await updateSession(incoming, {
@@ -249,21 +249,36 @@ describe('createOrvanoRouteHandler (AC-23)', () => {
   })
 })
 
-describe('forwardedClientHeaders (AC-31)', () => {
-  it('takes the first x-forwarded-for value, else x-real-ip, and the user agent', () => {
-    const headers = (values: Record<string, string>) => new Headers(values)
+describe('forwardedClientHeaders (spec 0004 AC-31, spec 0014 AC-36)', () => {
+  const headers = (values: Record<string, string>) => new Headers(values)
 
+  it('takes x-real-ip, else the rightmost x-forwarded-for value, and the user agent', () => {
+    // The first value is whatever the visitor sent; the last is what the nearest proxy appended.
     expect(
       forwardedClientHeaders(
-        headers({ 'x-forwarded-for': ' 198.51.100.1 , 10.0.0.2', 'user-agent': 'UA' }),
+        headers({ 'x-forwarded-for': ' 6.6.6.6 , 198.51.100.1 ', 'user-agent': 'UA' }),
       ),
     ).toEqual({
       'X-Orvano-Client-IP': '198.51.100.1',
       'X-Orvano-Client-UA': 'UA',
     })
-    expect(forwardedClientHeaders(headers({ 'x-real-ip': '198.51.100.2' }))).toEqual({
-      'X-Orvano-Client-IP': '198.51.100.2',
-    })
+    expect(
+      forwardedClientHeaders(
+        headers({ 'x-real-ip': '198.51.100.2', 'x-forwarded-for': '6.6.6.6, 10.0.0.9' }),
+      ),
+    ).toEqual({ 'X-Orvano-Client-IP': '198.51.100.2' })
     expect(forwardedClientHeaders(headers({}))).toEqual({})
+  })
+
+  it('uses a clientIp option in place of the default', () => {
+    const fromCdn = (request: { headers: { get(name: string): string | null } }) =>
+      request.headers.get('cf-connecting-ip')
+    expect(
+      forwardedClientHeaders(
+        headers({ 'cf-connecting-ip': '203.0.113.9', 'x-real-ip': '10.0.0.1' }),
+        fromCdn,
+      ),
+    ).toEqual({ 'X-Orvano-Client-IP': '203.0.113.9' })
+    expect(forwardedClientHeaders(headers({ 'x-real-ip': '10.0.0.1' }), () => null)).toEqual({})
   })
 })

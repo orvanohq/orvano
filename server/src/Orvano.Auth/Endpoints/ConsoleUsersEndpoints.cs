@@ -48,7 +48,9 @@ internal static class ConsoleUsersEndpoints
 
         v1.MapPost(Ops.Create.Route, async (HttpContext http, Api.CreateUserRequest request, UsersService users, RateLimits limits, CancellationToken ct) =>
         {
-            var limit = limits.Acquire(RateLimitPolicies.SignUpPerIp, ConnectionIp.Key(http));
+            var limit = limits.Acquire(
+                ProjectLimits.SignUpPerIp((await http.RequestServices.GetRequiredService<PolicySettings>().GetAsync(Project(http), ct)).Auth),
+                ConsoleRequestKey(http));
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
             return Created(http, await users.CreateAsync(
                 Project(http), request.Email, request.Password, request.Name, Me(http), ct, request.EmailVerified ?? false), User);
@@ -100,12 +102,12 @@ internal static class ConsoleUsersEndpoints
             .RequireRole(Need.Write);
 
         v1.MapPost(Ops.CreateVerification.Route, async (HttpContext http, string userId, Api.CreateUserVerificationRequest request, UsersService users, CancellationToken ct) =>
-            Accepted(http, await users.CreateVerificationAsync(Project(http), userId, request.RedirectUrl, Me(http), ct)))
+            Accepted(http, await users.CreateVerificationAsync(Project(http), userId, request.RedirectUrl, Me(http), ConsoleRequestKey(http), ct)))
             .WithName(Ops.CreateVerification.Id)
             .RequireRole(Need.Write);
 
         v1.MapPost(Ops.CreateRecovery.Route, async (HttpContext http, string userId, Api.CreateUserRecoveryRequest request, UsersService users, CancellationToken ct) =>
-            Accepted(http, await users.CreateRecoveryAsync(Project(http), userId, request.RedirectUrl, Me(http), ct)))
+            Accepted(http, await users.CreateRecoveryAsync(Project(http), userId, request.RedirectUrl, Me(http), ConsoleRequestKey(http), ct)))
             .WithName(Ops.CreateRecovery.Id)
             .RequireRole(Need.Write);
 
@@ -326,6 +328,12 @@ internal static class ConsoleUsersEndpoints
         http.Items[ProjectKey] as string ?? throw new InvalidOperationException("The route has no role filter.");
 
     private static Actor Me(HttpContext http) => Actor.User(ConsoleUser.Get(http));
+
+    /// <summary>
+    /// The limit key of a console call that acts on an app project: the project plus the console user's connection IP
+    /// (the console is never a trusted app server, spec 0014, AC-16).
+    /// </summary>
+    private static string ConsoleRequestKey(HttpContext http) => $"{Project(http)}\n{LimitIp.Key(ConnectionIp.Of(http))}";
 
     private static Api.SigningKeys SigningKeysView(IReadOnlyList<SigningKeyRow> rows) => new(
         [.. rows.Select(k => new Api.SigningKey(

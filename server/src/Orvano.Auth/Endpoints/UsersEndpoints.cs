@@ -35,7 +35,7 @@ internal static class UsersEndpoints
 
         v1.MapPost(Ops.Create.Route, async (HttpContext http, Api.CreateUserRequest request, UsersService users, RateLimits limits, CancellationToken ct) =>
         {
-            var limit = limits.Acquire(RateLimitPolicies.SignUpPerIp, ConnectionIp.Key(http));
+            var limit = limits.Acquire(ProjectLimits.SignUpPerIp(PublicRequests.Policies(http).Auth), PublicRequests.LimitKey(http));
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
 
             var outcome = await users.CreateAsync(
@@ -71,13 +71,13 @@ internal static class UsersEndpoints
             .RequireApiKey(Ops.UpdateEmailVerification.Scope);
 
         v1.MapPost(Ops.CreateVerification.Route, async (HttpContext http, string userId, Api.CreateUserVerificationRequest request, UsersService users, CancellationToken ct) =>
-            Accepted(http, await users.CreateVerificationAsync(PublicRequests.Project(http), userId, request.RedirectUrl, KeyActor(http), ct)))
+            Accepted(http, await users.CreateVerificationAsync(PublicRequests.Project(http), userId, request.RedirectUrl, KeyActor(http), PublicRequests.LimitKey(http), ct)))
             .WithName(Ops.CreateVerification.Id)
             .RequireProject()
             .RequireApiKey(Ops.CreateVerification.Scope);
 
         v1.MapPost(Ops.CreateRecovery.Route, async (HttpContext http, string userId, Api.CreateUserRecoveryRequest request, UsersService users, CancellationToken ct) =>
-            Accepted(http, await users.CreateRecoveryAsync(PublicRequests.Project(http), userId, request.RedirectUrl, KeyActor(http), ct)))
+            Accepted(http, await users.CreateRecoveryAsync(PublicRequests.Project(http), userId, request.RedirectUrl, KeyActor(http), PublicRequests.LimitKey(http), ct)))
             .WithName(Ops.CreateRecovery.Id)
             .RequireProject()
             .RequireApiKey(Ops.CreateRecovery.Scope);

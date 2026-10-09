@@ -12,7 +12,9 @@ import { ErrorPanel } from '@/shell/error-panel'
 import { PageHeading } from '@/shell/page-heading'
 import type { UpdateAuthPoliciesRequest } from '@orvano/console-client'
 
+import { AppServersCard } from './-security/app-servers-card'
 import { PasswordsCard } from './-security/passwords-card'
+import { RateLimitsCard } from './-security/rate-limits-card'
 
 export const Route = createFileRoute('/_app/projects/$projectId/security')({
   component: SecurityPage,
@@ -71,6 +73,24 @@ function SecurityPage() {
             policies={policies.data}
             readOnlyReason={readOnlyReason}
             onSave={save('Passwords')}
+          />
+          <AppServersCard
+            key={JSON.stringify(policies.data.trustedServerCidrs)}
+            policies={policies.data}
+            readOnlyReason={readOnlyReason}
+            onSave={save('App servers')}
+          />
+          <RateLimitsCard
+            key={JSON.stringify([
+              policies.data.signInFailedPerEmailIp,
+              policies.data.signInFailedPerIp,
+              policies.data.signUpPerIp,
+              policies.data.anonymousPerIp,
+              policies.data.emailSendPerIp,
+            ])}
+            policies={policies.data}
+            readOnlyReason={readOnlyReason}
+            onSave={save('Rate limits')}
           />
         </>
       )}

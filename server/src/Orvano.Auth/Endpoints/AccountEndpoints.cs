@@ -22,12 +22,12 @@ internal static class AccountEndpoints
     {
         v1.MapPost(Api.AccountOperations.Create.Route, async (HttpContext http, Api.CreateAccountRequest request, AccountService accounts, RateLimits limits, CancellationToken ct) =>
         {
-            var limit = limits.Acquire(RateLimitPolicies.SignUpPerIp, ConnectionIp.Key(http));
+            var limit = limits.Acquire(ProjectLimits.SignUpPerIp(PublicRequests.Policies(http).Auth), PublicRequests.LimitKey(http));
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
 
             var outcome = await accounts.SignUpAsync(
                 PublicRequests.Project(http), request.Email, request.Password, request.Name, PublicRequests.Client(http), ct,
-                verificationRedirectUrl: request.VerificationRedirectUrl);
+                verificationRedirectUrl: request.VerificationRedirectUrl, limitKey: PublicRequests.LimitKey(http));
             return Created(http, outcome, AuthResult);
         })
             .WithName(Api.AccountOperations.Create.Id)
@@ -36,13 +36,11 @@ internal static class AccountEndpoints
         v1.MapPost(Api.AccountOperations.CreatePasswordSession.Route, async (HttpContext http, Api.CreatePasswordSessionRequest request, AccountService accounts, RateLimits limits, CancellationToken ct) =>
         {
             var projectId = PublicRequests.Project(http);
-            // Both limits count every attempt, right or wrong (spec 0004, rate limits).
-            var perEmail = limits.Acquire(RateLimitPolicies.SignInPerEmail, $"{projectId}\n{(request.Email ?? "").Trim().ToLowerInvariant()}");
-            var perIp = limits.Acquire(RateLimitPolicies.SignInPerIp, ConnectionIp.Key(http));
-            if (!perEmail.Allowed) return ApiProblem.RateLimited(http, perEmail, Api.ErrorCode.RateLimited);
-            if (!perIp.Allowed) return ApiProblem.RateLimited(http, perIp, Api.ErrorCode.RateLimited);
+            using var failures = SignInLimits.Take(http, limits, PublicRequests.LimitKey(http), PublicRequests.Policies(http).Auth, request.Email, out var refused);
+            if (refused is not null) return refused;
 
             var outcome = await accounts.SignInAsync(projectId, request.Email, request.Password, PublicRequests.Client(http), ct);
+            SignInLimits.Settle(failures!, outcome.Failure);
             return Created(http, outcome, AuthResult);
         })
             .WithName(Api.AccountOperations.CreatePasswordSession.Id)
@@ -51,7 +49,7 @@ internal static class AccountEndpoints
         v1.MapPost(Api.AccountOperations.CreateRecovery.Route, async (HttpContext http, Api.CreateRecoveryRequest request, RecoveryService recovery, CancellationToken ct) =>
         {
             var started = Stopwatch.StartNew();
-            var outcome = await recovery.RequestAsync(PublicRequests.Project(http), request.Email, request.RedirectUrl, ConnectionIp.Key(http), ct);
+            var outcome = await recovery.RequestAsync(PublicRequests.Project(http), request.Email, request.RedirectUrl, PublicRequests.LimitKey(http), ct);
             return await EmailRequests.OpenAcceptedAsync(http, outcome, started, ct);
         })
             .WithName(Api.AccountOperations.CreateRecovery.Id)
@@ -66,7 +64,7 @@ internal static class AccountEndpoints
         v1.MapPost(Api.AccountOperations.CreateVerification.Route, async (HttpContext http, Api.CreateVerificationRequest request, VerificationService verification, CancellationToken ct) =>
         {
             var user = PublicRequests.User(http);
-            return Accepted(http, await verification.RequestAsync(PublicRequests.Project(http), user.UserId, request.RedirectUrl, Actor.User(user.UserId), ct));
+            return Accepted(http, await verification.RequestAsync(PublicRequests.Project(http), user.UserId, request.RedirectUrl, Actor.User(user.UserId), PublicRequests.LimitKey(http), ct));
         })
             .WithName(Api.AccountOperations.CreateVerification.Id)
             .RequireProject()
@@ -82,7 +80,7 @@ internal static class AccountEndpoints
         {
             var started = Stopwatch.StartNew();
             var outcome = await passwordless.RequestLinkAsync(
-                PublicRequests.Project(http), request.Email, request.RedirectUrl, request.CreateUser, ConnectionIp.Key(http), ct);
+                PublicRequests.Project(http), request.Email, request.RedirectUrl, request.CreateUser, PublicRequests.LimitKey(http), ct);
             return await EmailRequests.OpenAcceptedAsync(http, outcome, started, ct);
         })
             .WithName(Api.AccountOperations.CreateMagicLink.Id)
@@ -91,14 +89,14 @@ internal static class AccountEndpoints
         v1.MapPost(Api.AccountOperations.CreateMagicLinkSession.Route, (HttpContext http, PasswordlessService passwordless, RateLimits limits, CancellationToken ct) =>
             EmailRequests.RedeemAsync<Api.CreateMagicLinkSessionRequest>(http, limits, ct, async request =>
                 Created(http, await passwordless.SignInWithLinkAsync(
-                    PublicRequests.Project(http), request.Token, PublicRequests.Client(http), ConnectionIp.Key(http), ct), AuthResult)))
+                    PublicRequests.Project(http), request.Token, PublicRequests.Client(http), PublicRequests.LimitKey(http), ct), AuthResult)))
             .WithName(Api.AccountOperations.CreateMagicLinkSession.Id)
             .RequireProject();
 
         v1.MapPost(Api.AccountOperations.CreateEmailCode.Route, async (HttpContext http, Api.CreateEmailCodeRequest request, PasswordlessService passwordless, CancellationToken ct) =>
         {
             var started = Stopwatch.StartNew();
-            var outcome = await passwordless.RequestCodeAsync(PublicRequests.Project(http), request.Email, request.CreateUser, ConnectionIp.Key(http), ct);
+            var outcome = await passwordless.RequestCodeAsync(PublicRequests.Project(http), request.Email, request.CreateUser, PublicRequests.LimitKey(http), ct);
             return await EmailRequests.OpenAcceptedAsync(http, outcome, started, ct);
         })
             .WithName(Api.AccountOperations.CreateEmailCode.Id)
@@ -107,7 +105,7 @@ internal static class AccountEndpoints
         v1.MapPost(Api.AccountOperations.CreateEmailCodeSession.Route, (HttpContext http, PasswordlessService passwordless, RateLimits limits, CancellationToken ct) =>
             EmailRequests.RedeemAsync<Api.CreateEmailCodeSessionRequest>(http, limits, ct, async request =>
                 Created(http, await passwordless.SignInWithCodeAsync(
-                    PublicRequests.Project(http), request.Email, request.Code, PublicRequests.Client(http), ConnectionIp.Key(http), ct), AuthResult)))
+                    PublicRequests.Project(http), request.Email, request.Code, PublicRequests.Client(http), PublicRequests.LimitKey(http), ct), AuthResult)))
             .WithName(Api.AccountOperations.CreateEmailCodeSession.Id)
             .RequireProject();
 
@@ -119,7 +117,7 @@ internal static class AccountEndpoints
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
 
             return Accepted(http, await emailChange.RequestAsync(
-                PublicRequests.Project(http), user.UserId, user.SessionId, request.Email, request.RedirectUrl, request.Password, ct));
+                PublicRequests.Project(http), user.UserId, user.SessionId, request.Email, request.RedirectUrl, request.Password, PublicRequests.LimitKey(http), ct));
         })
             .WithName(Api.AccountOperations.UpdateEmail.Id)
             .RequireProject()
@@ -182,7 +180,7 @@ internal static class AccountEndpoints
         v1.MapPost(Api.AccountOperations.RefreshSession.Route, async (HttpContext http, Api.RefreshSessionRequest request, SessionService sessions, RateLimits limits, CancellationToken ct) =>
         {
             // Only refreshes answered 401 count against the IP, so a busy server's good refreshes never do.
-            var ip = ConnectionIp.Key(http);
+            var ip = PublicRequests.LimitKey(http);
             var failures = limits.Check(RateLimitPolicies.FailedRefreshPerIp, ip);
             if (!failures.Allowed) return ApiProblem.RateLimited(http, failures, Api.ErrorCode.RateLimited);
             if (RefreshToken.TryParse(request.RefreshToken, out var token))

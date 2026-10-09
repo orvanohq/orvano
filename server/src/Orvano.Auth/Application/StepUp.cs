@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Orvano.Auth.Domain;
+using Orvano.Core.RateLimiting;
 
 namespace Orvano.Auth.Application;
 
@@ -12,7 +13,7 @@ namespace Orvano.Auth.Application;
 internal sealed record SessionRecency(bool MfaEnabled, bool Fresh, bool Strong);
 
 /// <summary>The enrollment check (AC-17) and the step up check (AC-18), shared by every operation they guard.</summary>
-internal sealed class StepUp(AuthStore store, MethodPolicies policies, PasswordHasher hasher)
+internal sealed class StepUp(AuthStore store, MethodPolicies policies, PasswordHasher hasher, RateLimits limits)
 {
     /// <summary>The caller's <see cref="SessionRecency"/>; an unknown session reads as neither fresh nor strong.</summary>
     public Task<SessionRecency> ReadAsync(string projectId, Guid userId, Guid sessionId, CancellationToken ct) =>
@@ -42,6 +43,8 @@ internal sealed class StepUp(AuthStore store, MethodPolicies policies, PasswordH
     /// otherwise a user with a password must send it (missing or wrong: 401 <c>invalid_credentials</c>, one Argon2id
     /// run), and a user without one needs a session created within 10 minutes (403 <c>reauthentication_required</c>).
     /// An access token alone, however fresh, never adds a factor to an account that has a password.
+    /// <c>auth.password_check.user</c> is taken only when a sent password is actually checked (spec 0014, AC-24): a
+    /// password the check ignores (MFA on, a strong check already, no password on the account) counts nothing.
     /// </summary>
     public async Task<Failure?> EnrollmentAsync(string projectId, Guid userId, Guid sessionId, string? password, CancellationToken ct)
     {
@@ -53,10 +56,24 @@ internal sealed class StepUp(AuthStore store, MethodPolicies policies, PasswordH
             db.Passwords.AsNoTracking().Where(p => p.UserId == userId && p.ProjectId == projectId).Select(p => p.Hash).SingleOrDefaultAsync(token), ct);
         if (hash is null) return recency.Fresh ? null : Failure.ReauthenticationRequired;
 
+        if (password is null) return Failure.InvalidCredentials;
+        var limit = limits.Acquire(RateLimitPolicies.PasswordCheckPerUser, userId.ToString());
+        if (!limit.Allowed) return Failure.RateLimited(limit.RetryAfter);
+
         var wellFormed = PasswordPolicy.TryNormalize(password, out var normalized);
         var check = await hasher.TryVerifyAsync(normalized, wellFormed ? hash : null, ct);
         if (check is null) return Failure.Busy;
         return check.Value.Matches ? null : Failure.InvalidCredentials;
+    }
+
+    /// <summary>
+    /// <c>auth.mfa_enroll.user</c>, taken only once the enrollment or step up check passed (spec 0014, AC-24), so
+    /// refused checks never spend the user's enrollments.
+    /// </summary>
+    public Failure? TakeEnrollLimit(Guid userId)
+    {
+        var limit = limits.Acquire(RateLimitPolicies.MfaEnrollPerUser, userId.ToString());
+        return limit.Allowed ? null : Failure.RateLimited(limit.RetryAfter);
     }
 
     /// <summary>

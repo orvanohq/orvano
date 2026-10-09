@@ -70,10 +70,10 @@ internal sealed class AccountService(
     /// </summary>
     public async Task<Outcome<SignedIn>> SignUpAsync(
         string projectId, string? email, string? password, string? name, ClientInfo client, CancellationToken ct, ConsoleGate? gate = null,
-        string? verificationRedirectUrl = null)
+        string? verificationRedirectUrl = null, string? limitKey = null)
     {
         await keys.GetActiveAsync(projectId, ct); // the first token of a project creates its key, before any commit
-        var outcome = await CreateAsync(projectId, email, password, name, userId => Actor.User(userId), client, ct, gate, verificationRedirectUrl);
+        var outcome = await CreateAsync(projectId, email, password, name, userId => Actor.User(userId), client, ct, gate, verificationRedirectUrl, limitKey: limitKey);
         if (!outcome.Succeeded) return outcome.Failure!;
         var signedIn = await SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant!, ct, isNewUser: true);
         return signedIn with { VerificationEmail = outcome.Value.Verification };
@@ -104,7 +104,7 @@ internal sealed class AccountService(
     /// </summary>
     private async Task<Outcome<(UserRow User, SessionGrant? Grant, VerificationEmail? Verification)>> CreateAsync(
         string projectId, string? email, string? password, string? name, Func<Guid, Actor> actorOf, ClientInfo? client, CancellationToken ct,
-        ConsoleGate? gate = null, string? verificationRedirectUrl = null, bool verified = false)
+        ConsoleGate? gate = null, string? verificationRedirectUrl = null, bool verified = false, string? limitKey = null)
     {
         if (!EmailRule.TryNormalize(email, out var trimmed)) return Failure.Invalid("The email must be an address of at most 320 characters.");
         if (!UserName.IsValid(name)) return Failure.Invalid($"The name must be at most {UserName.MaxLength} characters.");
@@ -165,7 +165,7 @@ internal sealed class AccountService(
                 fields: new Dictionary<string, string?> { ["method"] = client is null ? null : SessionMethod.SignUp }, ct: token);
             var grant = client is null ? null : await sessions.CreateAsync(uow, projectId, userId, client, actor, SessionMethod.SignUp, token);
             var sent = verification is null ? (VerificationEmail?)null
-                : await SendSignUpVerificationAsync(uow, projectId, projectName!, userId, trimmed, name, verification, actor, token);
+                : await SendSignUpVerificationAsync(uow, projectId, projectName!, userId, trimmed, name, verification, actor, limitKey ?? $"{projectId}\nunknown", token);
             return (await ReloadAsync(uow.Db, userId, token), grant, sent);
         }, ct);
     }
@@ -175,9 +175,10 @@ internal sealed class AccountService(
     /// token, and the email, behind a savepoint, so a refusal leaves no token and never fails the sign up.
     /// </summary>
     private async Task<VerificationEmail> SendSignUpVerificationAsync(
-        AuthUnitOfWork uow, string projectId, string projectName, Guid userId, string email, string? name, RedirectUrl redirect, Actor actor, CancellationToken ct)
+        AuthUnitOfWork uow, string projectId, string projectName, Guid userId, string email, string? name, RedirectUrl redirect, Actor actor,
+        string limitKey, CancellationToken ct)
     {
-        if (mailer.TakeRecipientLimits(projectId, email, EmailTokenKind.Verification) is not null) return VerificationEmail.RateLimited;
+        if (mailer.TakeRecipientLimits(projectId, email, EmailTokenKind.Verification, limitKey) is not null) return VerificationEmail.RateLimited;
 
         await uow.Tx.SaveAsync("verification_email", ct);
         var target = new AuthEmailTarget(projectId, projectName, userId, email, name);
