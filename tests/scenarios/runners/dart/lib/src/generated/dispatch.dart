@@ -680,6 +680,14 @@ final Map<String, DispatchEntry> dispatch = {
     },
     scope: 'users.read',
   ),
+  'users.getMfa': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.users.getMfa(input['userId'] as String);
+      return r.toJson();
+    },
+    scope: 'users.read',
+  ),
   'users.list': DispatchEntry(
     status: 200,
     server: (o, input) async {

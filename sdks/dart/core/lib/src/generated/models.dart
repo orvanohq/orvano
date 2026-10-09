@@ -1065,7 +1065,7 @@ final class MfaChallenge {
   };
 }
 
-/// The signed in user's MFA state.
+/// A user's MFA state.
 final class MfaStatus {
   /// Creates a [MfaStatus].
   const MfaStatus({

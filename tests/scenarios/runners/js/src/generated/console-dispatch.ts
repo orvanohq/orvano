@@ -391,6 +391,10 @@ export const consoleDispatch: DispatchTable = {
     status: 200,
     console: (o, input) => o.consoleUsers.get(input.userId as string),
   },
+  'consoleUsers.getMfa': {
+    status: 200,
+    console: (o, input) => o.consoleUsers.getMfa(input.userId as string),
+  },
   'consoleUsers.list': {
     status: 200,
     console: (o, input) =>

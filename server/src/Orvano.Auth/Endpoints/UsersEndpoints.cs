@@ -106,7 +106,13 @@ internal static class UsersEndpoints
             .RequireProject()
             .RequireApiKey(Ops.DeleteSession.Scope);
 
-        // Spec 0013, AC-27: a user who lost every factor, and their passkeys.
+        // Spec 0013, AC-27: a user's MFA state, a user who lost every factor, and their passkeys.
+        v1.MapGet(Ops.GetMfa.Route, async (HttpContext http, string userId, MfaService mfa, CancellationToken ct) =>
+            Ok(http, Guid.TryParse(userId, out var id) ? await mfa.GetAsync(PublicRequests.Project(http), id, ct) : Failure.UserNotFound, MfaStatus))
+            .WithName(Ops.GetMfa.Id)
+            .RequireProject()
+            .RequireApiKey(Ops.GetMfa.Scope);
+
         v1.MapPost(Ops.ResetMfa.Route, async (HttpContext http, string userId, MfaResets resets, CancellationToken ct) =>
             NoContent(http, await resets.ResetAsync(PublicRequests.Project(http), userId, KeyActor(http), ct)))
             .WithName(Ops.ResetMfa.Id)

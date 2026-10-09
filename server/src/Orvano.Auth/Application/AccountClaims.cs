@@ -19,10 +19,16 @@ internal static class AccountClaims
     /// <c>auth.identity.unlinked</c>, reason <c>claimed</c>), and ends the user's sessions when <paramref name="endSessions"/>
     /// says so or anything was removed. <paramref name="removePassword"/> false keeps the password (the email link proves
     /// the inbox, not who chose the password). The caller marks the email verified and writes <c>auth.user.updated</c>.
+    /// Refuses project <c>console</c> (spec 0013, AC-29): console accounts enroll factors with an unverified email, which
+    /// is safe only while nothing claims one. A change that adds a console claim must drop this guard and bring the
+    /// verified email rule back for <c>console</c> in the same pull request.
     /// </summary>
     public static async Task<Claimed> ClaimAsync(
         AuthUnitOfWork uow, Sessions sessions, string projectId, LockedUser user, Actor actor, bool endSessions, CancellationToken ct, bool removePassword = true)
     {
+        if (projectId == ConsoleProject.Id)
+            throw new InvalidOperationException("Console accounts are never claimed (spec 0013, AC-29).");
+
         var removed = false;
         if (removePassword && user.HasPassword)
         {

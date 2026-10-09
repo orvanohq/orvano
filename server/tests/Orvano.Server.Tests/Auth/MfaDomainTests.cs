@@ -1,9 +1,10 @@
 using System.Text;
+using Orvano.Auth.Application;
 using Orvano.Auth.Domain;
 
 namespace Orvano.Server.Tests.Auth;
 
-// Spec 0013 AC-7, AC-9, AC-10, AC-12, AC-25: the plain MFA rules, with no database.
+// Spec 0013 AC-7, AC-9, AC-10, AC-12, AC-20, AC-25, AC-29: the plain MFA rules, with no database.
 public class MfaDomainTests
 {
     // RFC 6238 appendix B, SHA-1: the 8 digit values end in these 6 digits.
@@ -167,4 +168,26 @@ public class MfaDomainTests
         Assert.Equal(
             ["hwk", "mfa", "pwd", "user"],
             SessionStrength.StepOne(SessionMethod.Password).With(SessionStrength.ForPasskey(backedUp: false), aal2: true).Amr);
+
+    [Fact]
+    public void The_verified_email_rule_blocks_only_an_unverified_email_in_an_app_project()
+    {
+        var verified = DateTimeOffset.UnixEpoch;
+
+        Assert.True(VerifiedEmailRule.Blocks("p_app", "ada@x.com", null));
+        Assert.False(VerifiedEmailRule.Blocks("p_app", "ada@x.com", verified));
+        Assert.False(VerifiedEmailRule.Blocks("p_app", null, null));
+        Assert.False(VerifiedEmailRule.Blocks("console", "ada@x.com", null));
+    }
+
+    [Fact]
+    public async Task Claiming_refuses_a_console_account()
+    {
+        var user = new LockedUser(Guid.NewGuid(), "ada@x.com", null, "active", null, HasPassword: true);
+
+        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            AccountClaims.ClaimAsync(null!, null!, "console", user, Actor.User(user.Id), endSessions: true, CancellationToken.None));
+
+        Assert.Contains("AC-29", refused.Message, StringComparison.Ordinal);
+    }
 }

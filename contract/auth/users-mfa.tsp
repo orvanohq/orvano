@@ -1,10 +1,11 @@
 // MFA and passkeys of a project's users, for a server holding an API key and for the console (spec 0013, AC-27):
-// resetting a user's MFA when they lost every factor, and listing and removing their passkeys.
+// reading a user's MFA state, resetting it when they lost every factor, and listing and removing their passkeys.
 import "@typespec/http";
 import "@typespec/openapi";
 import "../errors.tsp";
 import "./security.tsp";
 import "./passkeys.tsp";
+import "./mfa.tsp";
 
 using Http;
 using OpenAPI;
@@ -15,6 +16,19 @@ namespace Orvano;
 @tag("users")
 @useAuth(apiKey)
 interface UsersMfaApi {
+  @doc("A user's MFA state: whether sign in asks them for a second factor, their recovery codes left, and their passkeys.")
+  @operationId("users.getMfa")
+  @extension("x-orvano-audience", "server")
+  @extension("x-orvano-service", "users")
+  @extension("x-orvano-scope", "users.read")
+  @route("/{userId}/mfa")
+  @get
+  getMfa(
+    @doc("The user ID.")
+    @path
+    userId: string,
+  ): MfaStatus | Problem;
+
   @doc("""
     Turns MFA off for a user who lost every factor: deletes their authenticator app and recovery codes and ends all
     their sessions. Their passkeys stay. A user without MFA is left as they are.
@@ -67,6 +81,21 @@ interface UsersMfaApi {
 @tag("console")
 @useAuth(consoleSession)
 interface ConsoleUsersMfaApi {
+  @doc("""
+    The MFA state of a user of the project named by `X-Orvano-Project`: whether sign in asks them for a second factor,
+    their recovery codes left, and their passkeys. Every role.
+    """)
+  @operationId("consoleUsers.getMfa")
+  @extension("x-orvano-audience", "console")
+  @extension("x-orvano-service", "consoleUsers")
+  @route("/{userId}/mfa")
+  @get
+  getMfa(
+    @doc("The user ID.")
+    @path
+    userId: string,
+  ): MfaStatus | Problem;
+
   @doc("""
     Turns MFA off for a user of the project named by `X-Orvano-Project`: deletes their authenticator app and recovery
     codes and ends all their sessions. Passkeys stay. Owners and developers.

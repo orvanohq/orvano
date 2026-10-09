@@ -56,6 +56,7 @@ import type {
   CreateUserRequest,
   CreateUserVerificationRequest,
   IdentityList,
+  MfaStatus,
   PasskeyList,
   RequestOptions,
   Session,
@@ -1021,6 +1022,17 @@ export class ConsoleUsersService {
   get(userId: string, options?: RequestOptions): Promise<User> {
     return this.#client.request<User>(
       { method: 'GET', path: `/v1/console/project/users/${encodeURIComponent(userId)}` },
+      options,
+    )
+  }
+
+  /**
+   * The MFA state of a user of the project named by `X-Orvano-Project`: whether sign in asks them for a second factor,
+   * their recovery codes left, and their passkeys. Every role.
+   */
+  getMfa(userId: string, options?: RequestOptions): Promise<MfaStatus> {
+    return this.#client.request<MfaStatus>(
+      { method: 'GET', path: `/v1/console/project/users/${encodeURIComponent(userId)}/mfa` },
       options,
     )
   }

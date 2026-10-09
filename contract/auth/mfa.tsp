@@ -68,7 +68,7 @@ model CreateMfaPasskeyChallengeRequest {
   ticket: string;
 }
 
-@doc("The signed in user's MFA state.")
+@doc("A user's MFA state.")
 model MfaStatus {
   @doc("Whether sign in asks for a second factor: a confirmed authenticator app, while the project allows TOTP.")
   @example(true)

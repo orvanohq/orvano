@@ -14,6 +14,21 @@ internal static class MfaFactors
 }
 
 /// <summary>
+/// The verified email rule (spec 0013, AC-12, AC-20): in an app project, a user who has an email enrolls TOTP or a
+/// passkey only once it is verified, so a factor planted on an unverified account never outlives a claim. Project
+/// <c>console</c> skips it: nothing can claim a console account (AC-29), so the rule guards nothing there.
+/// </summary>
+internal static class VerifiedEmailRule
+{
+    /// <summary>The console accounts' project, the one project the rule skips.</summary>
+    public const string ExemptProject = "console";
+
+    /// <summary>True when the email blocks enrollment: an app project, an email, and no verification yet.</summary>
+    public static bool Blocks(string projectId, string? email, DateTimeOffset? emailVerifiedAt) =>
+        projectId != ExemptProject && email is not null && emailVerifiedAt is null;
+}
+
+/// <summary>
 /// RFC 4648 base32 without padding, the alphabet of TOTP secrets and recovery codes. Only uppercase letters and the
 /// digits 2 to 7.
 /// </summary>

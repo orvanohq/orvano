@@ -16,6 +16,7 @@ export type {
   CreateUserRequest,
   Identity,
   IdentityList,
+  MfaStatus,
   OAuthProvider,
   Passkey,
   PasskeyList,

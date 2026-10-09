@@ -1,5 +1,6 @@
-# Spec 0013, AC-27 and AC-39: a user turns on an authenticator app, a server sees aal 2 from requireMfa, the filter
-# finds them, then a server resets their MFA: every session ends, and a password alone signs them in again.
+# Spec 0013, AC-27 and AC-39: a user turns on an authenticator app, a server reads their MFA state and sees aal 2 from
+# requireMfa, the filter finds them, then a server resets their MFA: every session ends, and a password alone signs
+# them in again.
 name: a server verifies an MFA session and resets a user who lost their factors
 requires: []
 steps:
@@ -44,6 +45,12 @@ steps:
     expect:
       status: 200
       body: { mfaEnabled: true }
+  - op: users.getMfa
+    as: server
+    input: { userId: '${userId}' }
+    expect:
+      status: 200
+      body: { mfaEnabled: true, totpConfirmed: true, recoveryCodesRemaining: 10 }
   - op: users.list
     as: server
     input: { email: 'reset-${unique}@example.com', mfa: 'on' }
@@ -101,6 +108,18 @@ steps:
     expect:
       status: 200
       body: { mfaEnabled: false }
+  - op: users.getMfa
+    as: server
+    input: { userId: '${userId}' }
+    expect:
+      status: 200
+      body:
+        {
+          mfaEnabled: false,
+          totpConfirmed: false,
+          totpConfirmedAt: null,
+          recoveryCodesRemaining: 0,
+        }
   - op: signIn
     as: client
     input:

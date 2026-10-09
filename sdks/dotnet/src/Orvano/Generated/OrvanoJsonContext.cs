@@ -16,6 +16,8 @@ namespace Orvano;
 [JsonSerializable(typeof(IdentityList))]
 [JsonSerializable(typeof(Jwk))]
 [JsonSerializable(typeof(Jwks))]
+[JsonSerializable(typeof(MfaFactor))]
+[JsonSerializable(typeof(MfaStatus))]
 [JsonSerializable(typeof(OAuthProvider))]
 [JsonSerializable(typeof(OpenIdConfiguration))]
 [JsonSerializable(typeof(Passkey))]

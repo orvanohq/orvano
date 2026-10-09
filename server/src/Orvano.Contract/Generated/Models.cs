@@ -1581,7 +1581,7 @@ public sealed record MfaChallenge(
     [property: JsonPropertyName("factors")] IReadOnlyList<MfaFactor> Factors,
     [property: JsonPropertyName("expiresAt")] DateTimeOffset ExpiresAt);
 
-/// <summary>The signed in user's MFA state.</summary>
+/// <summary>A user's MFA state.</summary>
 /// <param name="MfaEnabled">Whether sign in asks for a second factor: a confirmed authenticator app, while the project allows TOTP.</param>
 /// <param name="TotpConfirmed">Whether an authenticator app is confirmed, even while the project has TOTP turned off.</param>
 /// <param name="TotpConfirmedAt">When the authenticator app was confirmed; null when none is.</param>

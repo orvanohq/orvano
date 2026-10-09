@@ -339,7 +339,7 @@ export interface MfaChallenge {
   expiresAt: string
 }
 
-/** The signed in user's MFA state. */
+/** A user's MFA state. */
 export interface MfaStatus {
   /** Whether sign in asks for a second factor: a confirmed authenticator app, while the project allows TOTP. */
   mfaEnabled: boolean

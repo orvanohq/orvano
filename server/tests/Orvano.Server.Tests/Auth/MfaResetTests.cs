@@ -7,8 +7,8 @@ using static Orvano.Server.Tests.Auth.PasskeyTests;
 
 namespace Orvano.Server.Tests.Auth;
 
-// Spec 0013 build task 4 over HTTP against the real binary: a server or the console resets a user's MFA and manages
-// their passkeys (AC-27), User.mfaEnabled and the mfa filter (AC-39, AC-5), and `orvano mfa reset` (AC-28).
+// Spec 0013 build task 4 over HTTP against the real binary: a server or the console reads and resets a user's MFA and
+// manages their passkeys (AC-27), User.mfaEnabled and the mfa filter (AC-39, AC-5), and `orvano mfa reset` (AC-28).
 public class MfaResetTests(PostgresFixture postgres)
 {
     private const string MethodsUrl = "/v1/console/project/auth/methods";
@@ -154,6 +154,43 @@ public class MfaResetTests(PostgresFixture postgres)
         using var resetEvents = await EventsAsync(api, "auth.mfa.reset");
         Assert.Equal("user", Assert.Single(resetEvents.RootElement.EnumerateArray()).GetProperty("actor").GetProperty("type").GetString());
         Assert.Equal(1L, await CountAsync(api, "SELECT count(*) FROM orvano.events WHERE type = 'auth.passkey.removed' AND payload->>'reason' = 'console'"));
+    }
+
+    [Fact]
+    public async Task A_server_and_every_console_role_read_a_users_mfa_state_as_the_user_does()
+    {
+        await using var api = await AuthApi.StartAsync(postgres);
+        var ada = await EnrollAsync(api, "ada@x.com");
+        using (var stepOne = await api.SignInAsync("ada@x.com"))
+        using (var stepTwo = await StepTwoAsync(api, Ticket(stepOne), recoveryCode: ada.RecoveryCodes[0]))
+            Assert.Equal(HttpStatusCode.Created, stepTwo.Status);
+        var viewer = AuthApi.OtherConsoleUsers[1];
+        await api.GrantAsync(viewer, "viewer");
+
+        using var server = await api.AsServerAsync(HttpMethod.Get, $"/v1/users/{ada.UserId}/mfa", key: AuthApi.ReadKey);
+        using var console = await api.AsConsoleAsync(HttpMethod.Get, $"/v1/console/project/users/{ada.UserId}/mfa", account: viewer);
+        using var unknown = await api.AsServerAsync(HttpMethod.Get, $"/v1/users/{Guid.CreateVersion7()}/mfa");
+        using var junk = await api.AsConsoleAsync(HttpMethod.Get, "/v1/console/project/users/nope/mfa");
+        using var elsewhere = await api.AsServerAsync(HttpMethod.Get, $"/v1/users/{ada.UserId}/mfa",
+            key: AuthApi.OtherProjectKey, project: AuthApi.OtherProject);
+
+        Assert.Equal(HttpStatusCode.OK, server.Status);
+        Assert.True(server.Body.GetProperty("mfaEnabled").GetBoolean());
+        Assert.True(server.Body.GetProperty("totpConfirmed").GetBoolean());
+        Assert.Equal(JsonValueKind.String, server.Body.GetProperty("totpConfirmedAt").ValueKind);
+        Assert.Equal(9, server.Body.GetProperty("recoveryCodesRemaining").GetInt32());
+        Assert.Equal(server.Body.GetRawText(), console.Body.GetRawText());
+        Assert.Equal((HttpStatusCode.NotFound, "user_not_found"), (unknown.Status, unknown.Code));
+        Assert.Equal((HttpStatusCode.NotFound, "user_not_found"), (junk.Status, junk.Code));
+        Assert.Equal("user_not_found", elsewhere.Code);
+        // Reading writes no event: the one auth.mfa event is the enrollment's.
+        Assert.Equal(1L, await CountAsync(api, "SELECT count(*) FROM orvano.events WHERE type LIKE 'auth.mfa%'"));
+
+        using var off = await api.AsConsoleAsync(HttpMethod.Patch, MethodsUrl, new { totpEnabled = false });
+        Assert.Equal(HttpStatusCode.OK, off.Status);
+        using var switchedOff = await api.AsConsoleAsync(HttpMethod.Get, $"/v1/console/project/users/{ada.UserId}/mfa", account: viewer);
+        Assert.False(switchedOff.Body.GetProperty("mfaEnabled").GetBoolean());
+        Assert.True(switchedOff.Body.GetProperty("totpConfirmed").GetBoolean());
     }
 
     [Fact]

@@ -4,6 +4,47 @@ using System.Text.Json.Serialization;
 
 namespace Orvano;
 
+/// <summary>A second factor.</summary>
+[JsonConverter(typeof(MfaFactorJsonConverter))]
+public enum MfaFactor
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>totp</c>.</summary>
+    Totp,
+
+    /// <summary>The wire value <c>recovery_code</c>.</summary>
+    RecoveryCode,
+
+    /// <summary>The wire value <c>passkey</c>.</summary>
+    Passkey,
+}
+
+/// <summary>Reads and writes <see cref="MfaFactor"/> by wire value; unknown values read as <see cref="MfaFactor.Unknown"/>.</summary>
+public sealed class MfaFactorJsonConverter : JsonConverter<MfaFactor>
+{
+    /// <inheritdoc/>
+    public override MfaFactor Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "totp" => MfaFactor.Totp,
+            "recovery_code" => MfaFactor.RecoveryCode,
+            "passkey" => MfaFactor.Passkey,
+            _ => MfaFactor.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, MfaFactor value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            MfaFactor.Totp => "totp",
+            MfaFactor.RecoveryCode => "recovery_code",
+            MfaFactor.Passkey => "passkey",
+            _ => throw new JsonException($"MfaFactor.{value} has no wire value"),
+        });
+}
+
 /// <summary>A sign in provider.</summary>
 [JsonConverter(typeof(OAuthProviderJsonConverter))]
 public enum OAuthProvider
@@ -223,6 +264,21 @@ public sealed record Jwk(
 /// <param name="Keys">The keys.</param>
 public sealed record Jwks(
     [property: JsonPropertyName("keys")] IReadOnlyList<Jwk> Keys);
+
+/// <summary>A user's MFA state.</summary>
+/// <param name="MfaEnabled">Whether sign in asks for a second factor: a confirmed authenticator app, while the project allows TOTP.</param>
+/// <param name="TotpConfirmed">Whether an authenticator app is confirmed, even while the project has TOTP turned off.</param>
+/// <param name="TotpConfirmedAt">When the authenticator app was confirmed; null when none is.</param>
+/// <param name="RecoveryCodesRemaining">How many unused recovery codes are left, 0 to 10.</param>
+/// <param name="PasskeyCount">How many of the user's passkeys can sign in now.</param>
+/// <param name="FactorsAvailable">What the project lets users turn on now: <c>totp</c> and <c>passkey</c>.</param>
+public sealed record MfaStatus(
+    [property: JsonPropertyName("mfaEnabled")] bool MfaEnabled,
+    [property: JsonPropertyName("totpConfirmed")] bool TotpConfirmed,
+    [property: JsonPropertyName("totpConfirmedAt")] DateTimeOffset? TotpConfirmedAt,
+    [property: JsonPropertyName("recoveryCodesRemaining")] int RecoveryCodesRemaining,
+    [property: JsonPropertyName("passkeyCount")] int PasskeyCount,
+    [property: JsonPropertyName("factorsAvailable")] IReadOnlyList<MfaFactor> FactorsAvailable);
 
 /// <summary>The discovery document standard JWT libraries configure themselves from. Orvano is not an OpenID provider; this exists so tools that take an issuer URL find the keys. Its names are the standard snake case ones.</summary>
 /// <param name="Issuer">The issuer, the <c>iss</c> of every access token of the project.</param>

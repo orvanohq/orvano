@@ -33,6 +33,8 @@ export const keys = {
   authProviders: (projectId: string) =>
     ['console', 'projects', projectId, 'auth-providers'] as const,
   authMethods: (projectId: string) => ['console', 'projects', projectId, 'auth-methods'] as const,
+  userMfa: (projectId: string, userId: string) =>
+    ['console', 'projects', projectId, 'users', userId, 'mfa'] as const,
   userPasskeys: (projectId: string, userId: string) =>
     ['console', 'projects', projectId, 'users', userId, 'passkeys'] as const,
   userSessions: (projectId: string, userId: string) =>
@@ -245,6 +247,14 @@ export function authProvidersQuery(projectId: string) {
   return queryOptions({
     queryKey: keys.authProviders(projectId),
     queryFn: ({ signal }) => projectClient(projectId).consoleAuthProviders.list({ signal }),
+  })
+}
+
+/** A user's MFA state: on or off, when it was turned on, and recovery codes left (spec 0013, AC-27, AC-44). */
+export function userMfaQuery(projectId: string, userId: string) {
+  return queryOptions({
+    queryKey: keys.userMfa(projectId, userId),
+    queryFn: ({ signal }) => projectClient(projectId).consoleUsers.getMfa(userId, { signal }),
   })
 }
 

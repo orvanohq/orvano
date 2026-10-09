@@ -8,6 +8,7 @@ import type {
   Health,
   IdentityList,
   Jwks,
+  MfaStatus,
   OpenIdConfiguration,
   PasskeyList,
   Session,
@@ -178,6 +179,14 @@ export class UsersService {
   get(userId: string, options?: RequestOptions): Promise<User> {
     return this.#client.request<User>(
       { method: 'GET', path: `/v1/users/${encodeURIComponent(userId)}` },
+      options,
+    )
+  }
+
+  /** A user's MFA state: whether sign in asks them for a second factor, their recovery codes left, and their passkeys. */
+  getMfa(userId: string, options?: RequestOptions): Promise<MfaStatus> {
+    return this.#client.request<MfaStatus>(
+      { method: 'GET', path: `/v1/users/${encodeURIComponent(userId)}/mfa` },
       options,
     )
   }

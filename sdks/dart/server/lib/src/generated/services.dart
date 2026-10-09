@@ -139,6 +139,16 @@ final class UsersService {
     return User.fromJson(json as Map<String, dynamic>);
   }
 
+  /// A user's MFA state: whether sign in asks them for a second factor, their recovery codes left, and their passkeys.
+  Future<MfaStatus> getMfa(String userId, {RequestOptions? options}) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/users/${Uri.encodeComponent(userId)}/mfa',
+      options: options,
+    );
+    return MfaStatus.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Lists the project's users, newest first.
   Future<UserPage> list({
     String? email,

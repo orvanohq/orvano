@@ -5,18 +5,20 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { DataTable } from '@/components/ui/data-table'
 import { formatDateTime } from '@/lib/format'
-import type { Passkey, User } from '@orvano/console-client'
+import type { MfaStatus, Passkey, User } from '@orvano/console-client'
 
 import { MfaBadge } from './parts'
 
 /**
- * A user's Security section (spec 0013, AC-44): whether MFA is on, Reset MFA behind a confirmation
+ * A user's Security section (spec 0013, AC-44): whether MFA is on, when it was turned on and how
+ * many recovery codes are left (from `consoleUsers.getMfa`), Reset MFA behind a confirmation
  * that says every session ends, and their passkeys (name, when added and last used in the viewer's
  * local time, synced or device bound, and whether it can sign in now), each with Remove. Owners
  * and developers act; viewers see the same buttons with `actionReason`.
  */
 export function UserSecurity({
   user,
+  mfa,
   passkeys,
   loading,
   error,
@@ -26,6 +28,8 @@ export function UserSecurity({
   onRemove,
 }: {
   user: User
+  /** The user's MFA state; undefined while it loads. */
+  mfa: MfaStatus | undefined
   passkeys: readonly Passkey[]
   loading: boolean
   error: unknown
@@ -109,9 +113,24 @@ export function UserSecurity({
       </div>
       <dl className="grid max-w-xl grid-cols-[auto_1fr] items-center gap-x-6 gap-y-3">
         <dt className="text-muted-foreground">MFA</dt>
-        <dd>
-          <MfaBadge enabled={user.mfaEnabled} />
+        <dd className="flex flex-wrap items-center gap-2">
+          <MfaBadge enabled={mfa?.mfaEnabled ?? user.mfaEnabled} />
+          {mfa?.totpConfirmed === true && !mfa.mfaEnabled && (
+            <span className="text-muted-foreground">
+              (authenticator app set up, project has TOTP off)
+            </span>
+          )}
         </dd>
+        {mfa?.totpConfirmed === true && (
+          <>
+            <dt className="text-muted-foreground">Turned on</dt>
+            <dd>
+              {mfa.totpConfirmedAt === null ? 'Unknown' : formatDateTime(mfa.totpConfirmedAt)}
+            </dd>
+            <dt className="text-muted-foreground">Recovery codes left</dt>
+            <dd>{mfa.recoveryCodesRemaining} of 10</dd>
+          </>
+        )}
       </dl>
       <h3 className="text-h3">Passkeys</h3>
       <DataTable

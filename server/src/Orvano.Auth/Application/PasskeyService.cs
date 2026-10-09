@@ -96,7 +96,7 @@ internal sealed class PasskeyService(
             if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
             var policy = await policies.ReadAsync(uow.Tx.Connection!, uow.Tx, projectId, token);
             if (!policy.PasskeysEnabled || policy.RpId is not { } rpId) return Failure.FactorNotEnabled;
-            if (user.Email is not null && user.EmailVerifiedAt is null) return Failure.EmailNotVerified;
+            if (VerifiedEmailRule.Blocks(projectId, user.Email, user.EmailVerifiedAt)) return Failure.EmailNotVerified;
             if (await PasskeyRows.CountAsync(uow, userId, token) >= PasskeyRules.MaxPerUser) return Failure.PasskeyLimit;
 
             var exclude = await PasskeyRows.RefsAsync(uow.Tx.Connection!, uow.Tx, userId, rpId, token);
@@ -145,7 +145,7 @@ internal sealed class PasskeyService(
             if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
             var now = await policies.ReadAsync(uow.Tx.Connection!, uow.Tx, projectId, token);
             if (!now.PasskeysEnabled) return Failure.FactorNotEnabled;
-            if (user.Email is not null && user.EmailVerifiedAt is null) return Failure.EmailNotVerified;
+            if (VerifiedEmailRule.Blocks(projectId, user.Email, user.EmailVerifiedAt)) return Failure.EmailNotVerified;
             if (await PasskeyRows.CountAsync(uow, userId, token) >= PasskeyRules.MaxPerUser) return Failure.PasskeyLimit;
 
             if (await PasskeyRows.InsertAsync(uow, projectId, userId, made, PasskeyRules.NameFor(given, made.AaGuid), rpId, token) is not { } passkey)

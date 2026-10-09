@@ -355,6 +355,11 @@ export const dispatch: DispatchTable = {
     server: (o, input) => o.users.get(input.userId as string),
     scope: 'users.read',
   },
+  'users.getMfa': {
+    status: 200,
+    server: (o, input) => o.users.getMfa(input.userId as string),
+    scope: 'users.read',
+  },
   'users.list': {
     status: 200,
     server: (o, input) =>

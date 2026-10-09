@@ -2610,6 +2610,56 @@
         "x-orvano-audience": "server"
       }
     },
+    "/v1/users/{userId}/mfa": {
+      "get": {
+        "operationId": "users.getMfa",
+        "description": "A user's MFA state: whether sign in asks them for a second factor, their recovery codes left, and their passkeys.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.read",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
     "/v1/users/{userId}/mfa/reset": {
       "post": {
         "operationId": "users.resetMfa",
@@ -4110,7 +4160,7 @@
             "description": "What the project lets users turn on now: `totp` and `passkey`."
           }
         },
-        "description": "The signed in user's MFA state."
+        "description": "A user's MFA state."
       },
       "OAuthFlow": {
         "type": "object",

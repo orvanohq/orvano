@@ -71,6 +71,11 @@ internal static class ConsoleUsersEndpoints
             .RequireRole(Need.Write);
 
         // Spec 0013, AC-27 and AC-44: the user detail's Security section.
+        v1.MapGet(Ops.GetMfa.Route, async (HttpContext http, string userId, MfaService mfa, CancellationToken ct) =>
+            Ok(http, Guid.TryParse(userId, out var id) ? await mfa.GetAsync(Project(http), id, ct) : Failure.UserNotFound, MfaStatus))
+            .WithName(Ops.GetMfa.Id)
+            .RequireRole(Need.Read);
+
         v1.MapPost(Ops.ResetMfa.Route, async (HttpContext http, string userId, MfaResets resets, CancellationToken ct) =>
             NoContent(http, await resets.ResetAsync(Project(http), userId, Me(http), ct)))
             .WithName(Ops.ResetMfa.Id)

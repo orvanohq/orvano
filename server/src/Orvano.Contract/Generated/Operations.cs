@@ -1904,6 +1904,22 @@ public static class ConsoleUsersOperations
         public const string Audience = "console";
     }
 
+    /// <summary>GET /v1/console/project/users/{userId}/mfa: The MFA state of a user of the project named by <c>X-Orvano-Project</c>: whether sign in asks them for a second factor,</summary>
+    public static class GetMfa
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.getMfa";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/mfa";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>GET /v1/console/project/users: Lists the users of the project named by <c>X-Orvano-Project</c>, newest first. Every role.</summary>
     public static class List
     {
@@ -2406,6 +2422,25 @@ public static class UsersOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/users/{userId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.read";
+    }
+
+    /// <summary>GET /v1/users/{userId}/mfa: A user's MFA state: whether sign in asks them for a second factor, their recovery codes left, and their passkeys.</summary>
+    public static class GetMfa
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.getMfa";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/mfa";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "server";

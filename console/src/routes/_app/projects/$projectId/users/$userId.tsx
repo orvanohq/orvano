@@ -11,6 +11,7 @@ import {
   keys,
   platformsQuery,
   userIdentitiesQuery,
+  userMfaQuery,
   userPasskeysQuery,
   userQuery,
   userSessionsQuery,
@@ -61,6 +62,7 @@ function UserPage() {
   const sessions = useInfiniteQuery(userSessionsQuery(projectId, userId))
   const identities = useQuery(userIdentitiesQuery(projectId, userId))
   const passkeys = useQuery(userPasskeysQuery(projectId, userId))
+  const mfa = useQuery(userMfaQuery(projectId, userId))
   const platforms = useInfiniteQuery(platformsQuery(projectId))
   const webHosts = (platforms.data?.pages.flatMap((page) => page.items) ?? [])
     .filter((platform) => platform.type === 'web')
@@ -166,6 +168,7 @@ function UserPage() {
       />
       <UserSecurity
         user={user}
+        mfa={mfa.data}
         passkeys={passkeys.data?.items ?? []}
         loading={passkeys.isPending}
         error={passkeys.isError ? passkeys.error : undefined}

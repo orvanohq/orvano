@@ -129,6 +129,12 @@ public sealed class UsersService
     public Task<User> GetAsync(string userId, CancellationToken cancellationToken = default) =>
         _client.SendAsync(new OrvanoRequest("GET", $"/v1/users/{Uri.EscapeDataString(userId)}", null, null, false), OrvanoJsonContext.Default.User, cancellationToken);
 
+    /// <summary>A user's MFA state: whether sign in asks them for a second factor, their recovery codes left, and their passkeys.</summary>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task<MfaStatus> GetMfaAsync(string userId, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("GET", $"/v1/users/{Uri.EscapeDataString(userId)}/mfa", null, null, false), OrvanoJsonContext.Default.MfaStatus, cancellationToken);
+
     /// <summary>Lists the project's users, newest first.</summary>
     /// <param name="email">Only users whose email starts with this, ignoring case.</param>
     /// <param name="status">Only users with this status: <c>active</c> or <c>blocked</c>.</param>

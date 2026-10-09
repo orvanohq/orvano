@@ -5342,6 +5342,55 @@
         "x-orvano-audience": "console"
       }
     },
+    "/v1/console/project/users/{userId}/mfa": {
+      "get": {
+        "operationId": "consoleUsers.getMfa",
+        "description": "The MFA state of a user of the project named by `X-Orvano-Project`: whether sign in asks them for a second factor,\ntheir recovery codes left, and their passkeys. Every role.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
     "/v1/console/project/users/{userId}/mfa/reset": {
       "post": {
         "operationId": "consoleUsers.resetMfa",
@@ -7032,6 +7081,56 @@
           }
         ],
         "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/mfa": {
+      "get": {
+        "operationId": "users.getMfa",
+        "description": "A user's MFA state: whether sign in asks them for a second factor, their recovery codes left, and their passkeys.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.read",
         "x-orvano-service": "users",
         "x-orvano-audience": "server"
       }
@@ -9906,7 +10005,7 @@
             "description": "What the project lets users turn on now: `totp` and `passkey`."
           }
         },
-        "description": "The signed in user's MFA state."
+        "description": "A user's MFA state."
       },
       "OAuthCallbackForm": {
         "type": "object",

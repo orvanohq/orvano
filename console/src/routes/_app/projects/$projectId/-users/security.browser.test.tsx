@@ -1,4 +1,4 @@
-import type { Passkey, User } from '@orvano/console-client'
+import type { MfaStatus, Passkey, User } from '@orvano/console-client'
 import axe from 'axe-core'
 import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
@@ -7,7 +7,7 @@ import { settleStyles } from '@/test/settle'
 
 import { UserSecurity } from './security'
 
-// Spec 0013 AC-44: the user detail's Security section, for writers and viewers, at WCAG AA.
+// Spec 0013 AC-27, AC-44: the user detail's Security section, for writers and viewers, at WCAG AA.
 
 const user: User = {
   id: 'user-1',
@@ -22,6 +22,15 @@ const user: User = {
   providers: [],
   hasPassword: true,
   mfaEnabled: true,
+}
+
+const mfa: MfaStatus = {
+  mfaEnabled: true,
+  totpConfirmed: true,
+  totpConfirmedAt: '2026-09-03T10:00:00Z',
+  recoveryCodesRemaining: 7,
+  passkeyCount: 1,
+  factorsAvailable: ['totp', 'passkey'],
 }
 
 const passkeys: Passkey[] = [
@@ -56,6 +65,7 @@ async function renderSecurity(overrides: Partial<Parameters<typeof UserSecurity>
     <main>
       <UserSecurity
         user={user}
+        mfa={mfa}
         passkeys={passkeys}
         loading={false}
         error={undefined}
@@ -81,6 +91,44 @@ describe('UserSecurity', () => {
     await expect.element(screen.getByText('Inactive')).toBeVisible()
     await expect.element(screen.getByRole('cell', { name: 'Never' })).toBeVisible()
     await noAxeViolations()
+  })
+
+  it('shows when MFA was turned on and the recovery codes left', async () => {
+    const { screen } = await renderSecurity()
+
+    await expect.element(screen.getByText('Turned on')).toBeVisible()
+    await expect.element(screen.getByText('7 of 10')).toBeVisible()
+  })
+
+  it('says an authenticator app is set up while the project has TOTP off', async () => {
+    const { screen } = await renderSecurity({
+      user: { ...user, mfaEnabled: false },
+      mfa: { ...mfa, mfaEnabled: false },
+    })
+
+    await expect.element(screen.getByText('Off', { exact: true })).toBeVisible()
+    await expect
+      .element(screen.getByText('(authenticator app set up, project has TOTP off)'))
+      .toBeVisible()
+    await expect.element(screen.getByText('7 of 10')).toBeVisible()
+    await noAxeViolations()
+  })
+
+  it('shows only Off, with no date or codes, for a user who never set up an app', async () => {
+    const { screen } = await renderSecurity({
+      user: { ...user, mfaEnabled: false },
+      mfa: {
+        ...mfa,
+        mfaEnabled: false,
+        totpConfirmed: false,
+        totpConfirmedAt: null,
+        recoveryCodesRemaining: 0,
+      },
+    })
+
+    await expect.element(screen.getByText('Off', { exact: true })).toBeVisible()
+    expect(screen.getByText('Turned on').query()).toBeNull()
+    expect(screen.getByText(/authenticator app set up/).query()).toBeNull()
   })
 
   it('resets MFA only after a confirmation that says every session ends', async () => {
@@ -115,8 +163,12 @@ describe('UserSecurity', () => {
     await noAxeViolations()
   })
 
-  it('says when there is no passkey', async () => {
-    const { screen } = await renderSecurity({ passkeys: [], user: { ...user, mfaEnabled: false } })
+  it('says when there is no passkey, and reads MFA from the user row until its state loads', async () => {
+    const { screen } = await renderSecurity({
+      passkeys: [],
+      user: { ...user, mfaEnabled: false },
+      mfa: undefined,
+    })
 
     await expect.element(screen.getByText('No passkey yet.')).toBeVisible()
     await expect.element(screen.getByText('Off', { exact: true })).toBeVisible()

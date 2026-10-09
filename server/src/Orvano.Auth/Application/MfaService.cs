@@ -7,7 +7,7 @@ using Orvano.Platform.Contracts;
 
 namespace Orvano.Auth.Application;
 
-/// <summary>The signed in user's MFA state (the contract's <c>MfaStatus</c>).</summary>
+/// <summary>A user's MFA state (the contract's <c>MfaStatus</c>).</summary>
 internal sealed record MfaStatusView(
     bool MfaEnabled, bool TotpConfirmed, DateTimeOffset? TotpConfirmedAt, int RecoveryCodesRemaining, int PasskeyCount, IReadOnlyList<string> FactorsAvailable);
 
@@ -58,11 +58,17 @@ internal sealed class MfaService(
     MethodPolicies policies,
     PasskeyService passkeys)
 {
-    /// <summary>The user's MFA state (AC-16).</summary>
+    /// <summary>
+    /// A user's MFA state (AC-16), the one read behind <c>account.getMfa</c>, <c>users.getMfa</c>, and
+    /// <c>consoleUsers.getMfa</c> (AC-27). A user not in the project is 404 <c>user_not_found</c>.
+    /// </summary>
     public async Task<Outcome<MfaStatusView>> GetAsync(string projectId, Guid userId, CancellationToken ct)
     {
-        var state = await store.ReadAsync((db, token) =>
-            MfaFactorState.ReadAsync(policies, (NpgsqlConnection)db.Database.GetDbConnection(), null, projectId, userId, token), ct);
+        var state = await store.ReadAsync(async (db, token) =>
+            await db.Users.AnyAsync(u => u.Id == userId && u.ProjectId == projectId, token)
+                ? await MfaFactorState.ReadAsync(policies, (NpgsqlConnection)db.Database.GetDbConnection(), null, projectId, userId, token)
+                : null, ct);
+        if (state is null) return Failure.UserNotFound;
         var available = new List<string>();
         if (state.Policy.TotpEnabled) available.Add(MfaFactors.Totp);
         if (state.Policy.PasskeysEnabled) available.Add(MfaFactors.Passkey);
@@ -86,7 +92,7 @@ internal sealed class MfaService(
             var state = await MfaFactorState.ReadAsync(policies, uow.Tx.Connection!, uow.Tx, projectId, userId, token);
             if (state.TotpConfirmedAt is not null) return Failure.MfaAlreadyEnabled;
             if (!state.Policy.TotpEnabled) return Failure.FactorNotEnabled;
-            if (user.Email is not null && user.EmailVerifiedAt is null) return Failure.EmailNotVerified;
+            if (VerifiedEmailRule.Blocks(projectId, user.Email, user.EmailVerifiedAt)) return Failure.EmailNotVerified;
 
             var secret = Totp.NewSecret();
             await using var upsert = new NpgsqlCommand(
