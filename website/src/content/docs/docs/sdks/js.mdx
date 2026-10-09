@@ -59,7 +59,7 @@ Listen for changes, including those from other tabs:
 
 ```ts
 const stop = orvano.client.onAuthStateChange((event, session) => {
-  // event is 'signedIn', 'signedOut', 'tokenRefreshed', or 'userUpdated'
+  // event is 'signedIn', 'signedOut', 'tokenRefreshed', 'userUpdated', or 'mfaRequired'
 })
 ```
 
@@ -69,11 +69,13 @@ const stop = orvano.client.onAuthStateChange((event, session) => {
 
 | Service | Methods |
 |---|---|
-| `account` | `create`, `createPasswordSession`, `get`, `update`, `updatePassword`, `delete`, `deleteCurrentSession` (sign out), `listSessions`, `listSessionsAll`, `deleteSession`, `deleteOtherSessions`, `refreshSession`, and the email flows: `createVerification`, `verifyEmail`, `createRecovery`, `completeRecovery`, `createMagicLink`, `createMagicLinkSession`, `createEmailCode`, `createEmailCodeSession`, `updateEmail`, `confirmEmailChange` |
+| `account` | `create`, `createPasswordSession`, `get`, `update`, `updatePassword`, `delete`, `deleteCurrentSession` (sign out), `listSessions`, `listSessionsAll`, `deleteSession`, `deleteOtherSessions`, `refreshSession`, and the email flows: `createVerification`, `verifyEmail`, `createRecovery`, `completeRecovery`, `createMagicLink`, `createMagicLinkSession`, `createEmailCode`, `createEmailCodeSession`, `updateEmail`, `confirmEmailChange`, MFA: `getMfa`, `createTotp`, `confirmTotp`, `deleteTotp`, `createRecoveryCodes`, `verifyMfa`, `createMfaSession`, and passkeys: `listPasskeys`, `updatePasskey`, `deletePasskey`, and the ceremony operations the helpers below call |
 | `health` | `get` |
 | `keys` | `getJwks`, `getOpenIdConfiguration` |
 
 The client also has two helpers for email sign in: `orvano.client.redeemLink()` finishes any emailed link on the page it lands on, and `orvano.client.signInWithEmailCode(email, code)` signs in with an emailed code. The [auth guides](/docs/auth/email-and-password/) show each flow.
+
+For [MFA](/docs/auth/mfa/) and [passkeys](/docs/auth/passkeys/), the client adds `confirmTotp`, `completeMfa`, `verifyMfa`, `signInWithPasskey`, `registerPasskey`, and `isPasskeySupported`, and `orvano.client.pendingMfa` holds the second step a sign in is waiting for (in memory only).
 
 ## On your server
 
@@ -96,7 +98,7 @@ The server client sends your [API key](/docs/concepts/api-keys/) with every call
 
 | Service | Methods |
 |---|---|
-| `users` | `create`, `get`, `list`, `listAll`, `delete`, `block`, `unblock`, `updateEmail`, `updateEmailVerification`, `createVerification`, `createRecovery`, `listSessions`, `listSessionsAll`, `deleteSession`, `deleteSessions` |
+| `users` | `create`, `get`, `list`, `listAll`, `delete`, `block`, `unblock`, `updateEmail`, `updateEmailVerification`, `createVerification`, `createRecovery`, `listSessions`, `listSessionsAll`, `deleteSession`, `deleteSessions`, `getMfa`, `resetMfa`, `listPasskeys`, `deletePasskey` |
 | `account` | `get` (for a user's own token) |
 | `health`, `keys` | as above |
 

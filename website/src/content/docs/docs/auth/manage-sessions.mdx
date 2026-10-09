@@ -47,10 +47,20 @@ Each session has:
 |---|---|
 | `id` | The session's ID. |
 | `current` | True for the session making this call: label it "This device". |
-| `method` | How it started: `password`, `sign_up`, `magic_link`, `email_code`, or `recovery`. |
+| `method` | How it started: `password`, `sign_up`, `magic_link`, `email_code`, `recovery`, `oauth`, `id_token`, or `passkey`. |
+| `aal`, `amr` | How strongly it signed in: `aal` is 2 once it passed a second factor or a passkey, else 1, and `amr` lists the factors (see [below](#how-strongly-a-session-signed-in)). |
 | `createdAt`, `lastRefreshedAt` | When it started, and was last used. |
 | `userAgent`, `ipAddress` | The device it started on. For a Next.js app, the user's browser, not your server. |
 | `sdk` | The SDK and version that started it. |
+
+## How strongly a session signed in
+
+Every session, and every access token it issues, says how the user proved who they are:
+
+- `aal` is 1 for one factor (a password, an emailed link or code, a provider), and 2 once the session passed a second factor at sign in ([MFA](/docs/auth/mfa/)), signed in with a [passkey](/docs/auth/passkeys/), or stepped up later. It never goes back to 1.
+- `amr` lists what was used: `pwd` (password), `email` (magic link or email code), `fed` (a provider), `otp` (authenticator app), `rec` (recovery code), `hwk` or `swk` (a device bound or a synced passkey) with `user` (the device checked it was the user), and `mfa` whenever `aal` is 2.
+
+Show it in your session list ("Password and authenticator app"), and check it on your server with [`requireMfa`](/docs/auth/verify-tokens/#require-mfa).
 
 ## End sessions
 

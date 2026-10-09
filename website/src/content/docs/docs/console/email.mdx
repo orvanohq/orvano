@@ -21,7 +21,7 @@ A project's server must be on a public address ([`smtp_host_not_allowed`](/error
 
 ## Templates
 
-Orvano sends four emails, each from a template you can rewrite in your product's own words:
+Orvano sends five emails, each from a template you can rewrite in your product's own words:
 
 <Screenshot name="email-templates" alt="The Templates tab listing Email verification, Password reset, Magic link, and Email code, each marked Default." />
 
@@ -31,6 +31,7 @@ Orvano sends four emails, each from a template you can rewrite in your product's
 | Password reset | [password reset](/docs/auth/password-reset/) |
 | Magic link | [magic links](/docs/auth/magic-links/) |
 | Email code | [email codes](/docs/auth/email-codes/) |
+| Security alert | a change to a user's sign in security: [MFA](/docs/auth/mfa/) turned on or off, a [passkey](/docs/auth/passkeys/) added or removed, recovery codes made or used |
 
 Open one to edit its **Subject**, **HTML**, and **Text**. The preview on the right updates as you type, with your project's name and your own email as sample values. **Send test** emails the preview to you, and **Reset to default** brings back Orvano's version. Leave **Text** empty to generate it from the HTML.
 
@@ -41,11 +42,13 @@ Templates use [Liquid](https://shopify.github.io/liquid/). Each template offers 
 | Variable | What it holds |
 |---|---|
 | `project.name` | Your project's name. |
-| `user.email` | The address the email is sent to. |
-| `user.name` | The user's name; empty when they haven't set one. |
-| `action_url` | The link the user opens to finish (every template but Email code). |
+| `user.email` | The address the email is sent to (not in Security alert). |
+| `user.name` | The user's name; empty when they haven't set one (not in Security alert). |
+| `action_url` | The link the user opens to finish (Email verification, Password reset, and Magic link). |
 | `code` | The 6 digit code (Email code only). |
-| `expires_in_minutes` | How many minutes the link or code works. |
+| `expires_in_minutes` | How many minutes the link or code works (not in Security alert). |
+| `alert` | What changed, for Security alert only: `mfa_enabled`, `mfa_disabled`, `passkey_added`, `passkey_removed`, `recovery_codes_created`, or `recovery_code_used`. Word each with a Liquid `case`. |
+| `occurred_at` | When it changed, in UTC, such as `2026-06-01 10:00 UTC` (Security alert only). |
 
 A template that uses any other variable can't be saved ([`template_invalid`](/errors/template_invalid/)). Values are HTML encoded in the HTML part, and `include` and `render` aren't allowed. If a saved template ever fails when an email is sent, Orvano sends the default instead, so the user still gets their link.
 

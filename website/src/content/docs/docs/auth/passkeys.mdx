@@ -1,0 +1,188 @@
+---
+title: Passkeys
+description: "Sign users in with their face, fingerprint, or device PIN, with no password."
+sidebar:
+  order: 17
+---
+
+import { Code, TabItem, Tabs } from '@astrojs/starlight/components'
+import { version } from '../../../../lib/site'
+
+A passkey is a key kept by the user's phone, browser, or password manager, and unlocked with their face, fingerprint, or PIN. Signing in with one needs no typing, can't be phished, and counts as both steps of [MFA](/docs/auth/mfa/) at once. Passkeys work on the web, in Next.js, and in Flutter apps on iOS, macOS, Android, and the web.
+
+## 1. Turn passkeys on for the project
+
+Passkeys belong to a domain, the **RP ID**, such as `example.com`. On the console's [Sign in methods](/docs/console/sign-in-methods/#mfa-and-passkeys) page, open **Passkeys**, set the RP ID to your app's domain, and turn on **Enabled**. On your machine, use `localhost`.
+
+A passkey is accepted from:
+
+- a website that is a [web platform](/docs/console/platforms/) of the project, on the RP ID or one of its subdomains (`https://app.example.com` for `example.com`), or `http://localhost` for the RP ID `localhost`;
+- an iOS or macOS app, through Associated Domains on the RP ID ([below](#flutter));
+- an Android app whose signing certificate fingerprint is on the Passkeys card.
+
+The card lists every origin it accepts today. Changing the RP ID later stops the passkeys made for the old one from working (they come back if you change it back), so the console asks you to confirm it.
+
+## 2. Add a passkey
+
+A signed in user adds a passkey from your settings screen. `registerPasskey` runs the browser's or the phone's prompt and saves it.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+if (await orvano.client.isPasskeySupported()) {
+  const passkey = await orvano.client.registerPasskey({ name: 'My laptop' })
+}
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```tsx
+'use client'
+const passkey = await orvano.client.registerPasskey({ name: 'My laptop' })
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final passkey = await orvano.client.registerPasskey(name: 'My phone');
+```
+
+  </TabItem>
+</Tabs>
+
+- The user must have signed in within the last 10 minutes (or, with MFA on, passed a second factor within 10 minutes): [`reauthentication_required`](/errors/reauthentication_required/) or [`mfa_verification_required`](/errors/mfa_verification_required/) otherwise. A user with an unverified email gets [`email_not_verified`](/errors/email_not_verified/).
+- A user can have 10 passkeys ([`passkey_limit`](/errors/passkey_limit/)). A passkey already saved gets [`passkey_already_registered`](/errors/passkey_already_registered/).
+- Without a `name`, Orvano names it `Passkey`. Each passkey says whether it is `synced` (kept by a password manager or a phone's keychain) or bound to one device, such as a security key.
+
+## 3. Sign in with a passkey
+
+A **Sign in with a passkey** button needs no email:
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.client.signInWithPasskey()
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```tsx
+'use client'
+// The route handler sets the session cookies.
+await orvano.client.signInWithPasskey()
+router.push('/')
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+await orvano.client.signInWithPasskey();
+```
+
+  </TabItem>
+</Tabs>
+
+A passkey sign in is never asked for a second step: the session starts at two factors. A refused passkey, an unknown one, or one made for another RP ID gets [`invalid_passkey`](/errors/invalid_passkey/); a project with passkeys off gets [`factor_not_enabled`](/errors/factor_not_enabled/). When the user closes the prompt, the browser throws `NotAllowedError`.
+
+On the web, the browser can also offer passkeys in the email field's suggestions. Give the field `autocomplete="username webauthn"` and start an autofill sign in when the page opens; it waits until the user picks a passkey:
+
+```ts
+if (await orvano.client.isPasskeySupported({ autofill: true })) {
+  const controller = new AbortController() // abort it when the user leaves, or before a button sign in
+  orvano.client.signInWithPasskey({ autofill: true, signal: controller.signal }).then(goHome, () => {})
+}
+```
+
+## Use a passkey for the second step
+
+A user with MFA on and a passkey can answer the [second step](/docs/auth/mfa/#2-pass-the-second-step-at-sign-in) with it, and [step up](/docs/auth/mfa/#step-up-before-security-changes) with it:
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.client.completeMfa({ passkey: true })
+await orvano.client.verifyMfa({ passkey: true })
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```tsx
+'use client'
+await orvano.client.completeMfa({ passkey: true })
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+await orvano.client.completeMfa(MfaAnswer.passkey());
+await orvano.client.verifyMfa(MfaAnswer.passkey());
+```
+
+  </TabItem>
+</Tabs>
+
+## Rename and remove
+
+[`account.listPasskeys`](/docs/api/operations/accountlistpasskeys/) lists the user's passkeys, oldest first, with `name`, `createdAt`, `lastUsedAt`, `synced`, and `active` (false after an RP ID change). [`account.updatePasskey`](/docs/api/operations/accountupdatepasskey/) renames one, and [`account.deletePasskey`](/docs/api/operations/accountdeletepasskey/) removes it; removing needs a recent sign in, or with MFA on a step up.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const { items } = await orvano.account.listPasskeys()
+await orvano.account.updatePasskey(items[0].id, { name: 'Work laptop' })
+await orvano.account.deletePasskey(items[0].id)
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+const { items } = await (await orvano()).account.listPasskeys()
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final passkeys = (await orvano.account.listPasskeys()).items;
+await orvano.account.updatePasskey(passkeys.first.id, UpdatePasskeyRequest(name: 'Work phone'));
+await orvano.account.deletePasskey(passkeys.first.id);
+```
+
+  </TabItem>
+</Tabs>
+
+Your server lists and removes a user's passkeys with [`users.listPasskeys`](/docs/api/operations/userslistpasskeys/) and [`users.deletePasskey`](/docs/api/operations/usersdeletepasskey/), for example after a lost device. Adding or removing a passkey emails the user a security alert when the project can send email.
+
+## Flutter
+
+Native passkeys come in a separate package, so apps that don't use them stay small and start on the web with no extra script. Add it:
+
+<Code code={`flutter pub add orvano_flutter_passkeys:${version}`} lang="sh" />
+
+and pass `PlatformPasskeys()` to the client:
+
+```dart
+import 'package:orvano_flutter/orvano_flutter.dart';
+import 'package:orvano_flutter_passkeys/orvano_flutter_passkeys.dart';
+
+final orvano = Orvano(
+  createClient(endpoint: 'https://orvano.example.com', project: 'your-project-id', passkeys: PlatformPasskeys()),
+);
+```
+
+Without it, the passkey helpers throw an `ArgumentError` that names the package. Then set up each platform; the Passkeys card shows both files below filled in with your apps' IDs:
+
+- **iOS and macOS**: add the Associated Domains capability with `webcredentials:<RP ID>`, and serve `https://<RP ID>/.well-known/apple-app-site-association` listing `<Team ID>.<bundle ID>` under `webcredentials`.
+- **Android**: serve `https://<RP ID>/.well-known/assetlinks.json` with `delegate_permission/common.get_login_creds` for your package name and signing certificate's SHA-256 fingerprint, and add that fingerprint (one for debug and one for release builds) to the Passkeys card.
+- **Web**: download the `bundle.js` of the corbado/flutter-passkeys release that matches the `passkeys_web` version in your `pubspec.lock`, put it in `web/`, and load it in `web/index.html` before `flutter_bootstrap.js`: `<script src="bundle.js" type="application/javascript"></script>`. Serve it yourself, and update it when `passkeys_web` changes. Serve the app from a web platform on the RP ID or one of its subdomains.
