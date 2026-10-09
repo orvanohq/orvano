@@ -113,4 +113,25 @@ public class KernelSettingsTests
         Assert.Equal((60, TimeSpan.FromMinutes(15)), (RateLimitPolicies.FailedRefreshPerIp.PermitLimit, RateLimitPolicies.FailedRefreshPerIp.Window));
         Assert.Equal((60, TimeSpan.FromMinutes(1)), (RateLimitPolicies.ConsoleSetupPerIp.PermitLimit, RateLimitPolicies.ConsoleSetupPerIp.Window));
     }
+
+    // Spec 0013 AC-32: the MFA and passkey limits of its Rate limits table, by name, limit, and window.
+    [Theory]
+    [InlineData("auth.mfa_failed.user", 10)]
+    [InlineData("auth.mfa_ticket_failed.ip", 60)]
+    [InlineData("auth.passkey.ip", 300)]
+    [InlineData("auth.passkey_challenge.user", 30)]
+    [InlineData("auth.passkey_failed.ip", 60)]
+    [InlineData("auth.mfa_enroll.user", 10)]
+    public void Mfa_and_passkey_policies_match_spec_0013(string name, int limit)
+    {
+        RateLimitPolicy[] policies =
+        [
+            RateLimitPolicies.FailedMfaPerUser, RateLimitPolicies.FailedMfaTicketPerIp, RateLimitPolicies.PasskeyPerIp,
+            RateLimitPolicies.PasskeyChallengePerUser, RateLimitPolicies.FailedPasskeyPerIp, RateLimitPolicies.MfaEnrollPerUser,
+        ];
+
+        var policy = Assert.Single(policies, p => p.Name == name);
+
+        Assert.Equal((limit, TimeSpan.FromMinutes(15)), (policy.PermitLimit, policy.Window));
+    }
 }

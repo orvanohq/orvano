@@ -190,4 +190,37 @@ public class MfaDomainTests
 
         Assert.Contains("AC-29", refused.Message, StringComparison.Ordinal);
     }
+
+    // AC-3: console passkeys follow ORVANO_PUBLIC_URL alone. On for https with a host name or http://localhost on any
+    // port; the RP ID is that host and the only origin is the URL's own.
+    [Theory]
+    [InlineData("https://orvano.example.com", "orvano.example.com")]
+    [InlineData("https://orvano.example.com:8443", "orvano.example.com")]
+    [InlineData("https://localhost", "localhost")]
+    [InlineData("http://localhost", "localhost")]
+    [InlineData("http://localhost:8081", "localhost")]
+    public void Console_passkeys_are_on_for_https_with_a_host_name_or_http_localhost(string publicOrigin, string rpId)
+    {
+        var console = ConsolePasskeys.From(publicOrigin);
+
+        Assert.True(console.Enabled);
+        Assert.Equal(rpId, console.RpId);
+        Assert.Equal(publicOrigin, console.Origin);
+        Assert.Equal("Orvano", ConsolePasskeys.RpName);
+    }
+
+    // AC-3: an IP address (no RP ID can name one) or plain http on any other host turns console passkeys off.
+    [Theory]
+    [InlineData("https://10.0.0.5")]
+    [InlineData("https://[2001:db8::1]")]
+    [InlineData("http://orvano.example.com")]
+    [InlineData("http://127.0.0.1:8080")]
+    [InlineData("http://[::1]:8080")]
+    public void Console_passkeys_are_off_for_an_ip_address_or_plain_http_elsewhere(string publicOrigin)
+    {
+        var console = ConsolePasskeys.From(publicOrigin);
+
+        Assert.False(console.Enabled);
+        Assert.Null(console.RpId);
+    }
 }

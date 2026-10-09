@@ -176,6 +176,37 @@ public class MfaTests(PostgresFixture postgres)
         Assert.Equal(0L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, "SELECT count(*) FROM orvano.auth_mfa_tickets"));
     }
 
+    // AC-32: auth.mfa_failed.user allows 10 wrong factors per user in 15 minutes, across tickets. Over it, even a right
+    // code gets 429 rate_limited with Retry-After, counts no attempt on the ticket, and leaves other users alone.
+    [Fact]
+    public async Task The_11th_wrong_factor_window_of_one_user_answers_429_and_counts_nothing()
+    {
+        await using var api = await AuthApi.StartAsync(postgres);
+        var enrolled = await EnrollAsync(api, "ada@x.com");
+        var other = await EnrollAsync(api, "grace@x.com");
+        for (var ticket = 0; ticket < 2; ticket++)
+        {
+            using var stepOne = await api.SignInAsync("ada@x.com");
+            for (var i = 0; i < 5; i++)
+            {
+                using var wrong = await StepTwoAsync(api, Ticket(stepOne), totpCode: WrongCode(enrolled.Secret));
+                Assert.Equal("invalid_mfa_code", wrong.Code);
+            }
+        }
+        using var third = await api.SignInAsync("ada@x.com");
+        using var otherStepOne = await api.SignInAsync("grace@x.com");
+
+        using var limited = await StepTwoAsync(api, Ticket(third), totpCode: CodeAt(enrolled.Secret, +1));
+        using var otherUser = await StepTwoAsync(api, Ticket(otherStepOne), totpCode: CodeAt(other.Secret, +1));
+
+        Assert.Equal((HttpStatusCode)429, limited.Status);
+        Assert.Equal("rate_limited", limited.Code);
+        Assert.NotNull(limited.Headers.RetryAfter);
+        Assert.Equal((short)0, await TestDatabase.ScalarAsync<short>(api.Database.Superuser,
+            "SELECT attempts FROM orvano.auth_mfa_tickets t JOIN orvano.auth_users u ON u.id = t.user_id WHERE u.email = 'ada@x.com'"));
+        Assert.Equal(HttpStatusCode.Created, otherUser.Status);
+    }
+
     [Fact]
     public async Task A_recovery_code_answers_once_in_any_case_and_spacing()
     {

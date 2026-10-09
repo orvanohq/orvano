@@ -74,7 +74,7 @@ Authenticator app codes, recovery codes, passkeys, and letting users see and rev
    - [x] Servers and console: `users.resetMfa` and passkey operations, `aal` and `requireMfa` in the server SDKs, `orvano mfa reset`, the console MFA step and passkey sign in, the account Security page, the Sign in methods cards, and the Users pages (AC-27, 28, 39, 41 to 45)
    - [ ] Alerts, hardening, and docs: the `security_alert` email, events, retention and purge, the leak scan, docs and fix pages, and the real device checks in verify.md (AC-31, 33 to 35, 46, 47)
 - [ ] Verify it: `/check verify MFA, passkeys & sessions`
-- [ ] Test it: `/test MFA, passkeys & sessions`
+- [x] Test it: `/test MFA, passkeys & sessions`
 - [ ] Review it (fresh model): `/check review MFA, passkeys & sessions`
 - [ ] Document it: `/document MFA, passkeys & sessions`
 Spec [0013](../specs/0013-mfa-passkeys-sessions/index.md) · code in `server/src/Orvano.Auth/`, `server/src/Orvano.Messaging/`, `contract/auth/`, `sdks/`, `console/`, `tests/scenarios/`, `website/`
