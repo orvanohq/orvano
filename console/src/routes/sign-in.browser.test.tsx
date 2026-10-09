@@ -1,5 +1,5 @@
 import axe from 'axe-core'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
 
 import { renderApp, setMode } from '@/test/app'
@@ -115,6 +115,32 @@ describe('/sign-in', () => {
         .toBe(1)
       await expect.element(screen.getByLabelText('Password')).toBeVisible()
       expect(text()).not.toContain("Couldn't sign in with a passkey")
+    })
+
+    it('ends quietly when the browser has no authenticator to offer', async () => {
+      // Headless Chromium rejects an autofill request this way when it has no authenticator.
+      const get = vi
+        .spyOn(navigator.credentials, 'get')
+        .mockRejectedValue(new DOMException('No authenticator.', 'NotSupportedError'))
+      api.answerNext('POST', /session\/passkey-challenge$/, {
+        challengeId: 'ch1',
+        options: {
+          challenge: 'Y2hhbGxlbmdlY2hhbGxlbmdlY2hhbGxlbmdlMTIzNDU',
+          rpId: 'localhost',
+          timeout: 300000,
+          userVerification: 'required',
+          allowCredentials: [],
+        },
+      })
+      try {
+        const { screen } = await renderApp('/sign-in')
+
+        await expect.poll(() => get.mock.calls.length).toBe(1)
+        await expect.element(screen.getByLabelText('Password')).toBeVisible()
+        expect(text()).not.toContain("Couldn't sign in with a passkey")
+      } finally {
+        get.mockRestore()
+      }
     })
   })
 

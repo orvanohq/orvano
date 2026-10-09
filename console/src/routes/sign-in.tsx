@@ -15,12 +15,7 @@ import { PageHeading } from '@/shell/page-heading'
 
 import { SignInForm } from './-auth/auth-form'
 import { MfaStep } from './-auth/mfa-step'
-import {
-  passkeyCancelled,
-  passkeyErrorMessage,
-  passkeysSupported,
-  signInWithPasskey,
-} from './-auth/passkeys'
+import { passkeyErrorMessage, passkeysSupported, signInWithPasskey } from './-auth/passkeys'
 
 export const Route = createFileRoute('/sign-in')({
   // `redirect` is kept only as a path on this origin (spec 0005, AC-20).
@@ -57,9 +52,9 @@ function SignIn() {
     await navigate({ href: redirect ?? '/', replace: true })
   }
 
-  // Offer passkeys in the email field's autofill while the form shows. A closed prompt, a server
-  // without console passkeys (an IP address or plain http), or leaving the page just ends it; any
-  // other refusal, such as a blocked account or a passkey that didn't work, shows like the button's.
+  // Offer passkeys in the email field's autofill while the form shows. Only Orvano refusing a
+  // passkey you picked (a blocked account, too many attempts, a passkey that didn't work) shows, like
+  // the button's; anything else just ends it (see `autofillEnded`).
   useEffect(() => {
     if (!showForm) return
     const controller = new AbortController()
@@ -169,13 +164,12 @@ function SignIn() {
 }
 
 /**
- * Whether an autofill passkey attempt ended quietly: you left the page, the prompt closed, or this
- * server has no console passkeys.
+ * Whether an autofill passkey attempt ended quietly. Autofill runs in the background, so only
+ * Orvano refusing a passkey you picked is worth showing. Everything else ends it without a word: you
+ * left the page, the prompt closed, the browser can't offer passkeys here (a browser with no
+ * authenticator rejects with `NotSupportedError`), the network failed, or this server has no console
+ * passkeys. The button still reports every failure.
  */
 function autofillEnded(error: unknown, signal: AbortSignal): boolean {
-  return (
-    signal.aborted ||
-    passkeyCancelled(error) ||
-    (error instanceof OrvanoError && error.code === 'factor_not_enabled')
-  )
+  return signal.aborted || !(error instanceof OrvanoError) || error.code === 'factor_not_enabled'
 }
