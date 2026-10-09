@@ -275,9 +275,17 @@ export const dispatch: DispatchTable = {
   'test.getLatestEmail': {
     status: 200,
     client: (o, input) =>
-      o.test.getLatestEmail({ to: input.to as string, after: input.after as string | undefined }),
+      o.test.getLatestEmail({
+        to: input.to as string,
+        after: input.after as string | undefined,
+        subject: input.subject as string | undefined,
+      }),
     server: (o, input) =>
-      o.test.getLatestEmail({ to: input.to as string, after: input.after as string | undefined }),
+      o.test.getLatestEmail({
+        to: input.to as string,
+        after: input.after as string | undefined,
+        subject: input.subject as string | undefined,
+      }),
   },
   'test.list': {
     status: 200,

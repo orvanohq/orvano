@@ -6911,7 +6911,7 @@
     "/v1/test/emails/latest": {
       "get": {
         "operationId": "test.getLatestEmail",
-        "description": "Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after`, and reads it.",
+        "description": "Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after` (and whose subject contains\n`subject`, when given), and reads it.",
         "parameters": [
           {
             "name": "to",
@@ -6931,6 +6931,16 @@
             "schema": {
               "type": "string",
               "format": "date-time"
+            },
+            "explode": false
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": false,
+            "description": "Only an email whose subject contains this, so a step waits for that email even when the runner's clock is off.",
+            "schema": {
+              "type": "string"
             },
             "explode": false
           }

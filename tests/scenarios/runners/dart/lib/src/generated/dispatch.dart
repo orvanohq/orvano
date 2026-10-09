@@ -516,6 +516,7 @@ final Map<String, DispatchEntry> dispatch = {
         after: input['after'] == null
             ? null
             : DateTime.parse(input['after'] as String),
+        subject: input['subject'] == null ? null : input['subject'] as String,
       );
       return r.toJson();
     },
@@ -525,6 +526,7 @@ final Map<String, DispatchEntry> dispatch = {
         after: input['after'] == null
             ? null
             : DateTime.parse(input['after'] as String),
+        subject: input['subject'] == null ? null : input['subject'] as String,
       );
       return r.toJson();
     },

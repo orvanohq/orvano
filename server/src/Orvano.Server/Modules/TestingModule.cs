@@ -38,10 +38,10 @@ internal sealed class TestingModule : IOrvanoModule
         v1.MapGet(TestOperations.List.Route, List).WithName(TestOperations.List.Id);
 
         v1.MapGet(TestOperations.GetLatestEmail.Route, async Task<Results<Ok<TestEmail>, ProblemHttpResult>> (
-                string? to, DateTimeOffset? after, TestEmails emails, CancellationToken ct) =>
+                string? to, DateTimeOffset? after, string? subject, TestEmails emails, CancellationToken ct) =>
             string.IsNullOrWhiteSpace(to)
                 ? Problems.Result(StatusCodes.Status400BadRequest, ErrorCode.InvalidRequest, "Send the recipient as to.")
-                : await emails.FindLatestAsync(to, after, ct) is { } email
+                : await emails.FindLatestAsync(to, after, subject, ct) is { } email
                     ? TypedResults.Ok(email)
                     : Problems.Result(StatusCodes.Status404NotFound, ErrorCode.NotFound, "No email to that address arrived within 15 seconds."))
             .WithName(TestOperations.GetLatestEmail.Id);

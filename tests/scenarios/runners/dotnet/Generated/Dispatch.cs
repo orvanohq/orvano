@@ -59,7 +59,7 @@ internal static class Dispatch
         ["test.createIdToken"] = new(200, async (client, input, ct) => Args.ToJson(await new TestService(client).CreateIdTokenAsync(Args.Required<TestCreateIdTokenRequest>(input, "body"), cancellationToken: ct)), null),
         ["test.createPasskeyAssertion"] = new(200, null, null),
         ["test.createPasskeyCredential"] = new(200, null, null),
-        ["test.getLatestEmail"] = new(200, async (client, input, ct) => Args.ToJson(await new TestService(client).GetLatestEmailAsync(Args.Required<string>(input, "to"), after: Args.Optional<DateTimeOffset?>(input, "after"), cancellationToken: ct)), null),
+        ["test.getLatestEmail"] = new(200, async (client, input, ct) => Args.ToJson(await new TestService(client).GetLatestEmailAsync(Args.Required<string>(input, "to"), after: Args.Optional<DateTimeOffset?>(input, "after"), subject: Args.Optional<string?>(input, "subject"), cancellationToken: ct)), null),
         ["test.list"] = new(200, async (client, input, ct) => Args.ToJson(await new TestService(client).ListAsync(cursor: Args.Optional<string?>(input, "cursor"), limit: Args.Optional<int?>(input, "limit"), cancellationToken: ct)), (client, input, ct) => Args.CollectAsync(new TestService(client).ListAllAsync(limit: Args.Optional<int?>(input, "limit"), cancellationToken: ct), ct)),
         ["test.listAppleRevocations"] = new(200, async (client, input, ct) => Args.ToJson(await new TestService(client).ListAppleRevocationsAsync(after: Args.Optional<DateTimeOffset?>(input, "after"), cancellationToken: ct)), null),
         ["users.block"] = new(200, async (client, input, ct) => Args.ToJson(await client.Users.BlockAsync(Args.Required<string>(input, "userId"), cancellationToken: ct)), null),

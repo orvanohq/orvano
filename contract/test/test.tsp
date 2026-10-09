@@ -239,7 +239,10 @@ interface TestApi {
     after?: utcDateTime,
   ): TestAppleRevocationList | Problem;
 
-  @doc("Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after`, and reads it.")
+  @doc("""
+    Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after` (and whose subject contains
+    `subject`, when given), and reads it.
+    """)
   @operationId("test.getLatestEmail")
   @extension("x-orvano-audience", "both")
   @extension("x-orvano-service", "test")
@@ -254,6 +257,10 @@ interface TestApi {
     @doc("Only an email received after this time.")
     @query
     after?: utcDateTime,
+
+    @doc("Only an email whose subject contains this, so a step waits for that email even when the runner's clock is off.")
+    @query
+    subject?: string,
   ): TestEmail | Problem;
 
   @doc("Always answers 409 with code `test_conflict`.")

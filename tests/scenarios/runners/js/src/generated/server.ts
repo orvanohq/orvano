@@ -32,9 +32,12 @@ export class TestService {
     )
   }
 
-  /** Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after`, and reads it. */
+  /**
+   * Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after` (and whose subject contains
+   * `subject`, when given), and reads it.
+   */
   getLatestEmail(
-    query: { to: string; after?: string | undefined },
+    query: { to: string; after?: string | undefined; subject?: string | undefined },
     options?: RequestOptions,
   ): Promise<TestEmail> {
     return this.#client.request<TestEmail>(

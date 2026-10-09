@@ -2444,7 +2444,7 @@ public static class TestOperations
         public const string Audience = "client";
     }
 
-    /// <summary>GET /v1/test/emails/latest: Waits up to 15 seconds for the newest email to <c>to</c> that Mailpit caught after <c>after</c>, and reads it.</summary>
+    /// <summary>GET /v1/test/emails/latest: Waits up to 15 seconds for the newest email to <c>to</c> that Mailpit caught after <c>after</c> (and whose subject contains</summary>
     public static class GetLatestEmail
     {
         /// <summary>The operationId, also the endpoint name.</summary>

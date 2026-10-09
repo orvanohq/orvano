@@ -64,10 +64,11 @@ steps:
     input:
       body: { code: '${firstCode}' }
     expect: { status: 200 }
-  # AC-31: turning MFA on sends the security alert, through the project's SMTP (Mailpit here).
+  # AC-31: turning MFA on sends the security alert, through the project's SMTP (Mailpit here). The subject filter
+  # waits for the alert itself, since a device's clock (the Android emulator's) can lag the server's.
   - op: test.getLatestEmail
     as: client
-    input: { to: 'mfa-${unique}@example.com', after: '${beforeConfirm}' }
+    input: { to: 'mfa-${unique}@example.com', after: '${beforeConfirm}', subject: Security alert }
     expect:
       status: 200
       body: { subject: Security alert for Scenarios, type: null, url: null }
