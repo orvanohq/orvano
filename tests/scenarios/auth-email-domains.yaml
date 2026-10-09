@@ -1,0 +1,32 @@
+# Spec 0014, AC-8, AC-9, AC-36: the fixture project blocks blocked.example and disposable addresses (fixtures.yaml,
+# authPolicies), so a sign up or a server's users.create with such an address gets the typed 403, a subdomain counts,
+# and an address on any other domain still signs up.
+name: new users' emails pass the project's domain rule
+requires: []
+steps:
+  - op: account.create
+    as: client
+    input:
+      body: { email: 'dom-${unique}@blocked.example', password: correct horse battery staple }
+    expect: { status: 403, code: email_domain_not_allowed }
+  - op: account.create
+    as: client
+    input:
+      body: { email: 'dom-${unique}@mail.blocked.example', password: correct horse battery staple }
+    expect: { status: 403, code: email_domain_not_allowed }
+  - op: account.create
+    as: client
+    input:
+      body: { email: 'dom-${unique}@mailinator.com', password: correct horse battery staple }
+    expect: { status: 403, code: email_domain_not_allowed }
+  - op: users.create
+    as: server
+    input:
+      body:
+        { email: 'dom-server-${unique}@blocked.example', password: correct horse battery staple }
+    expect: { status: 403, code: email_domain_not_allowed }
+  - op: account.create
+    as: client
+    input:
+      body: { email: 'dom-ok-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201, body: { verificationRequired: false } }

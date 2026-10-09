@@ -212,6 +212,61 @@ How the app receives the link on iOS and Android is in [Flutter deep links](#flu
 
 A used, expired, or replaced link gets [`invalid_email_token`](/errors/invalid_email_token/): offer to send a new one.
 
+## Require a verified email
+
+By default Orvano lets unverified users sign in and leaves the gate to you. To make verification a rule instead, turn on **Require a verified email** on the Sign ups card of the project's **Security** page in the console (it needs an email server). Then:
+
+- [`account.create`](/docs/api/operations/accountcreate/) needs `verificationRedirectUrl` and signs no one in. It answers `verificationRequired: true` with no user and no session, and the answer is the same, in content and in time, whether or not the email already has an account, so sign up never tells anyone who uses your app. Show "check your inbox" for every such answer. The SDKs store nothing for it.
+- Password sign in for a user who hasn't verified yet answers [`email_verification_required`](/errors/email_verification_required/), only after the password is right. Pass `verificationRedirectUrl` with the sign in to send them a fresh link.
+- A provider sign in creates a user only when the provider vouches for the email.
+- If the email already has a verified account, its owner gets a security alert saying someone tried to sign up with their address. If it has an unverified account, the inbox gets a fresh verification link.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const result = await orvano.account.create({
+  email,
+  password,
+  verificationRedirectUrl: `${location.origin}/confirm.html`,
+})
+if (result.verificationRequired) showCheckYourInbox()
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+'use server'
+const result = await (await orvano()).account.create({
+  email,
+  password,
+  verificationRedirectUrl: `${appUrl}/auth/confirm`,
+})
+if (result.verificationRequired) redirect('/check-your-inbox')
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final result = await orvano.account.create(
+  CreateAccountRequest(
+    email: email,
+    password: password,
+    verificationRedirectUrl: 'https://app.example.com/auth/confirm',
+  ),
+);
+if (result.verificationRequired) showCheckYourInbox();
+```
+
+  </TabItem>
+</Tabs>
+
+## When it wasn't them
+
+Every verification email also carries a second link, "Tell us it wasn't you", with `orvano_type=verification_reject` and the same token. It is for the inbox owner when someone else signed up with their address. `redeemLink` (`handleLink` in Flutter) finishes it with [`account.rejectEmailVerification`](/docs/api/operations/accountrejectemailverification/): while the email is unverified, the account loses its password, linked providers, second factors, and sessions, so whoever signed up can't use it. The user and their ID stay, with any data your app keeps for them. The result has no user; tell the person the account is theirs now, and that they can sign in with a [magic link](/docs/auth/magic-links/) or an [email code](/docs/auth/email-codes/). The link works once, and verifying the email uses it up too.
+
 ## Gate features on a verified email
 
 In your app, read `emailVerified` from the user:

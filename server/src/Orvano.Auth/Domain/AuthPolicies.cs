@@ -361,6 +361,27 @@ internal static class AuthPolicyRules
 }
 
 /// <summary>
+/// AC-8's rule for the email of a new user or a new address: with an allowed list, only a matching domain passes (and
+/// skips the other two checks); otherwise a domain on the blocked list fails, then, with disposable blocking on, a
+/// disposable domain fails. A user with no email (a provider without one) fails only while the allowed list is set.
+/// A project with no domain rule at all lets every address through, so the rule changes nothing until one is set.
+/// </summary>
+internal static class EmailDomainRule
+{
+    /// <summary>Whether <paramref name="email"/> may be set on a user of a project with <paramref name="policies"/>.</summary>
+    public static bool Allows(AuthPolicies policies, string? email)
+    {
+        var allowList = policies.AllowedEmailDomains.Count > 0;
+        if (!allowList && policies.BlockedEmailDomains.Count == 0 && !policies.BlockDisposableEmails) return true;
+        if (email is null) return !allowList;
+        if (!EmailDomains.TryGetDomain(email, out var domain)) return false;
+        if (allowList) return policies.AllowedEmailDomains.Any(entry => EmailDomains.Matches(domain, entry));
+        if (policies.BlockedEmailDomains.Any(entry => EmailDomains.Matches(domain, entry))) return false;
+        return !(policies.BlockDisposableEmails && BundledLists.IsDisposableDomain(domain));
+    }
+}
+
+/// <summary>
 /// Email domains by AC-8: the part after the last <c>@</c>, lowercased, converted to ASCII by
 /// <see cref="IdnMapping.GetAscii(string)"/>, with a trailing dot removed. A list entry is stored in the same form.
 /// </summary>

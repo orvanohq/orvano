@@ -501,6 +501,12 @@ base class Client {
         return;
       case SessionChange.start:
         final body = result is Map<String, dynamic> ? result : null;
+        // Spec 0014, AC-12: a pending sign up (the project requires verified
+        // emails) has no session and stores nothing.
+        if (body?['verificationRequired'] == true) {
+          _mfa = null;
+          return;
+        }
         // Spec 0013, AC-38: a sign in that stopped at the MFA step stores
         // nothing and keeps the ticket in memory only.
         final challenge = body?['mfa'];

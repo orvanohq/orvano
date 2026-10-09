@@ -221,6 +221,9 @@ public enum EmailLinkType
 
     /// <summary>The wire value <c>email_change</c>.</summary>
     EmailChange,
+
+    /// <summary>The wire value <c>verification_reject</c>.</summary>
+    VerificationReject,
 }
 
 /// <summary>Reads and writes <see cref="EmailLinkType"/> by wire value; unknown values read as <see cref="EmailLinkType.Unknown"/>.</summary>
@@ -234,6 +237,7 @@ public sealed class EmailLinkTypeJsonConverter : JsonConverter<EmailLinkType>
             "recovery" => EmailLinkType.Recovery,
             "magic_link" => EmailLinkType.MagicLink,
             "email_change" => EmailLinkType.EmailChange,
+            "verification_reject" => EmailLinkType.VerificationReject,
             _ => EmailLinkType.Unknown,
         };
 
@@ -245,6 +249,7 @@ public sealed class EmailLinkTypeJsonConverter : JsonConverter<EmailLinkType>
             EmailLinkType.Recovery => "recovery",
             EmailLinkType.MagicLink => "magic_link",
             EmailLinkType.EmailChange => "email_change",
+            EmailLinkType.VerificationReject => "verification_reject",
             _ => throw new JsonException($"EmailLinkType.{value} has no wire value"),
         });
 }
@@ -1153,18 +1158,20 @@ public sealed record AuthPolicyValues(
     [property: JsonPropertyName("anonymousPerIp")] int AnonymousPerIp,
     [property: JsonPropertyName("emailSendPerIp")] int EmailSendPerIp);
 
-/// <summary>A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of <c>session</c> and <c>mfa</c> is set.</summary>
-/// <param name="User">The user; null while <c>mfa</c> is set.</param>
-/// <param name="Session">The new session's tokens; null while <c>mfa</c> is set.</param>
+/// <summary>A signed in user and their new session; for a user with MFA on, the challenge to answer first; or, for a sign up in a project that requires verified emails, a pending answer that says to check the inbox. Exactly one of <c>session</c>, <c>mfa</c>, or <c>verificationRequired</c> true is set.</summary>
+/// <param name="User">The user; null while <c>mfa</c> is set or <c>verificationRequired</c> is true.</param>
+/// <param name="Session">The new session's tokens; null while <c>mfa</c> is set or <c>verificationRequired</c> is true.</param>
 /// <param name="Mfa">Set when the user has MFA on: no session exists yet. Finish with <c>account.createMfaSession</c> and the ticket before it expires. The SDKs' <c>completeMfa</c> does it. Null otherwise.</param>
-/// <param name="IsNewUser">Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user.</param>
-/// <param name="VerificationEmail">What happened to the verification email sign up was asked to send; null when none was asked for.</param>
+/// <param name="IsNewUser">Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user. False on a pending answer, even when the user was created.</param>
+/// <param name="VerificationEmail">What happened to the verification email sign up was asked to send; null when none was asked for, and null on a pending answer.</param>
+/// <param name="VerificationRequired">True on the pending answer of a sign up while the project requires verified emails: no session exists, and the answer is the same whether or not the email already had an account. Tell the user to open the link in their inbox, then sign in. False on every other answer.</param>
 public sealed record AuthResult(
     [property: JsonPropertyName("user")] User? User,
     [property: JsonPropertyName("session")] SessionTokens? Session,
     [property: JsonPropertyName("mfa")] MfaChallenge? Mfa,
     [property: JsonPropertyName("isNewUser")] bool IsNewUser,
-    [property: JsonPropertyName("verificationEmail")] VerificationEmailStatus? VerificationEmail);
+    [property: JsonPropertyName("verificationEmail")] VerificationEmailStatus? VerificationEmail,
+    [property: JsonPropertyName("verificationRequired")] bool VerificationRequired);
 
 /// <summary>A link of a provider to the signed in user, with the code a link flow returned.</summary>
 /// <param name="Code">The <c>orvano_code</c> parameter Orvano added to your redirect URL. It works once, for 2 minutes.</param>
@@ -1253,7 +1260,7 @@ public sealed record ConsoleUserRef(
 /// <param name="Email">The email, trimmed, at most 320 characters. Unique in the project, ignoring case.</param>
 /// <param name="Password">8 to 256 characters after Unicode NFKC normalization.</param>
 /// <param name="Name">A display name, at most 256 characters.</param>
-/// <param name="VerificationRedirectUrl">When set, also emails a verification link that opens here: a host that is one of the project's web platforms, or your app's own scheme. <c>AuthResult.verificationEmail</c> says whether it was sent.</param>
+/// <param name="VerificationRedirectUrl">When set, also emails a verification link that opens here: a host that is one of the project's web platforms, or your app's own scheme. <c>AuthResult.verificationEmail</c> says whether it was sent. Required while the project requires verified emails or MFA: the answer is then pending and never says whether the email was sent.</param>
 public sealed record CreateAccountRequest(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("password")] string Password,
@@ -1424,9 +1431,11 @@ public sealed record CreatePasskeySessionRequest(
 /// <summary>A sign in with an email and password.</summary>
 /// <param name="Email">The email the user signed up with; case does not matter.</param>
 /// <param name="Password">The user's password.</param>
+/// <param name="VerificationRedirectUrl">Where a fresh verification link opens when the project requires verified emails and this user's email is not verified yet: a host that is one of the project's web platforms, or your app's own scheme. The sign in still answers 403 <c>email_verification_required</c>, whether or not the email was sent.</param>
 public sealed record CreatePasswordSessionRequest(
     [property: JsonPropertyName("email")] string Email,
-    [property: JsonPropertyName("password")] string Password);
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("verificationRedirectUrl"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? VerificationRedirectUrl = null);
 
 /// <summary>A new platform. Unique per project, type, and identifier, ignoring case.</summary>
 /// <param name="Type">Where the app runs.</param>
@@ -2090,6 +2099,11 @@ public sealed record RecoveryCodes(
 /// <param name="RefreshToken">The session's current refresh token.</param>
 public sealed record RefreshSessionRequest(
     [property: JsonPropertyName("refreshToken")] string RefreshToken);
+
+/// <summary>A rejection of a sign up, with the token from the emailed link that says it wasn't you.</summary>
+/// <param name="Token">The <c>orvano_token</c> parameter of the emailed link.</param>
+public sealed record RejectEmailVerificationRequest(
+    [property: JsonPropertyName("token")] string Token);
 
 /// <summary>A template rendered with the sample values.</summary>
 /// <param name="Subject">The rendered subject.</param>

@@ -16,7 +16,12 @@ enum EmailLinkType {
   magicLink('magic_link'),
 
   /// Confirms an email change (`account.confirmEmailChange`).
-  emailChange('email_change');
+  emailChange('email_change'),
+
+  /// Says the sign up wasn't the inbox owner's
+  /// (`account.rejectEmailVerification`, spec 0014): the second link of every
+  /// verification email.
+  verificationReject('verification_reject');
 
   const EmailLinkType(this.wire);
 
@@ -107,7 +112,10 @@ final class IdentityLinkResult extends HandledLink {
 
 /// What a redeemed link did: its type, the user, and whether the call created
 /// them. A magic link or reset for a user with MFA on stops at the MFA step:
-/// [mfaRequired] is true and [user] null.
+/// [mfaRequired] is true and [user] null. A
+/// [EmailLinkType.verificationReject] link signs no one in, so [user] is null:
+/// tell the person the account is secured and they can sign in with a magic
+/// link or an email code.
 final class LinkResult extends HandledLink {
   /// Creates a result.
   const LinkResult({
@@ -130,7 +138,8 @@ final class LinkResult extends HandledLink {
   /// What the link was for.
   final EmailLinkType type;
 
-  /// The user, as it is now; null while [mfaRequired] is true.
+  /// The user, as it is now; null while [mfaRequired] is true, and after a
+  /// rejected sign up.
   final User? user;
 
   /// True only when a magic link created the user.
@@ -230,6 +239,12 @@ extension EmailLinks on Client {
           options: options,
         );
         return LinkResult(type: link.type, user: user, isNewUser: false);
+      case EmailLinkType.verificationReject:
+        await account.rejectEmailVerification(
+          RejectEmailVerificationRequest(token: link.token),
+          options: options,
+        );
+        return LinkResult(type: link.type, user: null, isNewUser: false);
     }
   }
 }

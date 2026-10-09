@@ -66,3 +66,39 @@ _Steps derived from spec 0014's acceptance criteria for what has landed: passwor
 ## Acceptance criteria coverage (landed so far)
 
 - AC-1, AC-3: Security page and API steps · AC-4 to AC-7: password steps and bundled list checks above · AC-16 to AC-24: limit steps · AC-25, AC-26: session steps · AC-34: the cards built so far · AC-36: the Next.js `clientIp` step · AC-37: the console project step · AC-40: the migration applies (drift check in CI)
+
+# Verify: auth policies and abuse protection (milestone 4 of the build: sign up policies and verified email) · spec 0014 · updated 2026-10-09
+_Steps derived from spec 0014's AC-7 to AC-15, AC-33, and AC-34 (Sign ups, Email domains). `/check verify` runs these; `/test` locks the durable ones. Server HTTP tests: `SignUpPolicyTests`; shared scenarios: `auth-email-domains`, `auth-reject-link`._
+
+## UI / manual
+
+- [ ] As an owner, open **Security**: the Sign ups card (Allow sign ups on, Require a verified email off) and the Email domains card (disposable off, both lists empty) come first → AC-34
+- [ ] With no email server anywhere, turn on **Require a verified email** and save: the card says it needs an email server, with a link to Email settings, and nothing is saved → AC-11, AC-34
+- [ ] Type `ok.example` on line 1 and `*.bad.example` on line 3 of Blocked domains, save: the field says "Line 3: ..." and nothing is saved → AC-1, AC-8, AC-34
+- [ ] With verified emails required, remove the email server: both the Sign ups card and Email settings warn that sign ups are failing → AC-11
+- [ ] As a viewer, both cards show every value with the controls disabled; axe finds nothing in light and dark → AC-34
+
+## Commands
+
+- [ ] With sign ups off: `POST /v1/account` → 403 `sign_up_disabled` (also for a taken email); a magic link for a new email → 403 at redemption and the same link works once sign ups are back on; an existing user signs in; `POST /v1/users` with a key → 201 → AC-10
+- [ ] With `example.com` blocked: sign up as `a@mail.example.com`, `users.create`, `users.updateEmail`, `account.updateEmail` to an `example.com` address, and a magic link redemption that would create a user → 403 `email_domain_not_allowed`; an existing `@example.com` user still signs in → AC-8, AC-9
+- [ ] With the allowed list `xn--bcher-kva.example`: `a@bücher.example` signs up, `c@x.com` → 403; a GitHub sign in without an email → 403 → AC-8
+- [ ] With disposable blocking on: `someone@mailinator.com` → 403 → AC-7, AC-8
+- [ ] With verified emails required: a sign up without `verificationRedirectUrl` → 400 `invalid_request`; a new email and a verified account's email both answer the same 201 body (`verificationRequired: true`, everything else null or false) in at least 500 ms, with no session; the new inbox gets a verification email with a `verification_reject` link, the owner gets the sign up attempt alert, and the owner's row is unchanged → AC-12
+- [ ] The new user's right password → 403 `email_verification_required`, a wrong one → 401; with `verificationRedirectUrl` a fresh link is queued; after the link, sign in works → AC-13
+- [ ] A GitHub sign in whose email is not verified, for a new user → 403 `email_verification_required`; an already linked user signs in → AC-14
+- [ ] An impostor signs up with Ada's address; Ada's reject link → 204, the password and sessions are gone (`account_claimed`), the user ID stays; the same token → 401 `invalid_email_token`, and verifying with it too; Ada then signs in by magic link as the same user → AC-15
+- [ ] With no email server, unlinking the only identity of a verified user without a password → 409 `last_sign_in_method`; with one → 204 → AC-33
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests --filter-class "*SignUpPolicyTests"` → all pass → AC-8 to AC-15, AC-33
+- [ ] The shared scenarios in every runner → `auth-email-domains` and `auth-reject-link` pass (the .NET runner skips both) → AC-8, AC-9, AC-15, AC-36
+
+## Value sourcing
+
+- [ ] The domain comes from the request's email, or the provider's email at redemption, by AC-8's form: an uppercase or IDN address matches its lowercase ASCII entry → AC-8
+- [ ] `smtpAvailable` and the AC-11 refusal follow Messaging's check, project then install: a project with its own SMTP and no install SMTP can turn the switch on → AC-11
+- [ ] The alert to an existing owner is the `security_alert` template with `alert` `sign_up_attempt`, and a project that edited that template keeps its own words → AC-12
+- [ ] `reject_url` is the verification link's own token with `orvano_type=verification_reject` on the same redirect URL; an email change email has none → AC-15
+
+## Acceptance criteria coverage (milestone 4)
+
+- AC-7 (disposable list, already bundled) · AC-8, AC-9: domain steps · AC-10: sign ups off step · AC-11: SMTP steps · AC-12 to AC-14: verified email steps · AC-15: reject link step · AC-33: last method step · AC-34: Sign ups and Email domains cards · AC-36: `signUp`'s pending answer stores nothing and `redeemLink`/`handleLink` route `verification_reject` (SDK unit tests); closed sign ups and hidden sign up run only in the server tests, since every scenario shares one fixture project

@@ -8,7 +8,7 @@ namespace Orvano.Auth.Application;
 /// Changing the signed in user's email (spec 0010, AC-17, AC-18): a confirmation link goes to the new address, and
 /// the email changes only when that link is opened.
 /// </summary>
-internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, AccountService accounts)
+internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, AccountService accounts, PolicySettings policies)
 {
     /// <summary>
     /// <c>account.updateEmail</c> (AC-17). Checks run in this order: the body (the email rule, the redirect, and not
@@ -23,6 +23,8 @@ internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, Acc
         var current = await store.ReadAsync((db, token) =>
             db.Users.AsNoTracking().Where(u => u.Id == userId && u.ProjectId == projectId).Select(u => u.Email).SingleOrDefaultAsync(token), ct);
         if (EmailRule.SameAddress(current, newEmail)) return Failure.Invalid("The new email is the current one.");
+        // Spec 0014, AC-9: the new address passes the project's domain rule, before the credential check.
+        if ((await policies.GetAsync(projectId, ct)).CheckDomain(newEmail) is { } domainRefused) return domainRefused;
 
         var credential = await accounts.CheckCredentialAsync(projectId, userId, sessionId, password, ct);
         if (credential.Failure is not null) return credential.Failure;

@@ -147,8 +147,12 @@ internal sealed class PasswordlessService(
         var created = false;
         if (user is null)
         {
-            var signUp = limits.Acquire(ProjectLimits.SignUpPerIp((await policySettings.GetAsync(uow.Tx.Connection!, uow.Tx, projectId, ct)).Auth), ipKey);
+            var project = await policySettings.GetAsync(uow.Tx.Connection!, uow.Tx, projectId, ct);
+            var signUp = limits.Acquire(ProjectLimits.SignUpPerIp(project.Auth), ipKey);
             if (!signUp.Allowed) return Failure.RateLimited(signUp.RetryAfter);
+            // Spec 0014, AC-9 and AC-10: decided here, once the inbox proved the address; the refusal rolls back, so the
+            // link or code stays unspent.
+            if (project.CheckSignUp(tokenEmail) is { } refused) return refused;
             if (await UserRecords.TryInsertAsync(uow, projectId, tokenEmail, name: null, verified: true, ct) is { } newId)
             {
                 created = true;

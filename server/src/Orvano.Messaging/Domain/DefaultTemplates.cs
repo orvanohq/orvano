@@ -27,11 +27,27 @@ internal static class DefaultTemplates
 
     private const string Greeting = """{% if user.name != "" %}Hi {{ user.name }},{% else %}Hi,{% endif %}""";
 
+    /// <summary>
+    /// The verification email's second link (spec 0014, AC-15), shown only when the email carries one: an email change
+    /// uses the same template without it.
+    /// </summary>
+    private const string RejectHtml =
+        """{% if reject_url %}<p style="margin:0 0 16px;">Didn't sign up for {{ project.name }}? <a href="{{ reject_url }}">Tell us it wasn't you</a>, and whoever used your address loses access to the account.</p>{% endif %}""";
+
+    private const string RejectText =
+        """
+        {% if reject_url %}
+        Didn't sign up for {{ project.name }}? Tell us it wasn't you, and whoever used your address loses access to the account: {{ reject_url }}
+        {% endif %}
+        """;
+
     private static readonly TemplateSource Verification = Link(
         "Verify your email for {{ project.name }}",
         "Verify your email",
         "Confirm that {{ user.email }} is your email address for {{ project.name }}.",
-        "Verify email");
+        "Verify email",
+        RejectHtml,
+        RejectText);
 
     private static readonly TemplateSource Recovery = Link(
         "Reset your password for {{ project.name }}",
@@ -84,6 +100,9 @@ internal static class DefaultTemplates
         {%- when "passkey_removed" -%}
         {%- capture what -%}A passkey was removed{%- endcapture -%}
         {%- capture detail -%}A passkey can no longer sign in to your {{ project.name }} account.{%- endcapture -%}
+        {%- when "sign_up_attempt" -%}
+        {%- capture what -%}Someone tried to sign up with your email{%- endcapture -%}
+        {%- capture detail -%}Someone tried to create a {{ project.name }} account with this address, which already has one. Nothing changed, and no one signed in. If it was you, sign in or reset your password instead.{%- endcapture -%}
         {%- when "recovery_codes_created" -%}
         {%- capture what -%}New recovery codes were made{%- endcapture -%}
         {%- capture detail -%}Your {{ project.name }} account has 10 new recovery codes, and the older ones stopped working.{%- endcapture -%}
@@ -135,7 +154,7 @@ internal static class DefaultTemplates
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 
-    private static TemplateSource Link(string subject, string heading, string intro, string button) => new(
+    private static TemplateSource Link(string subject, string heading, string intro, string button, string extraHtml = "", string extraText = "") => new(
         subject,
         Html(
             subject,
@@ -143,7 +162,8 @@ internal static class DefaultTemplates
             heading,
             intro,
             $$$"""<p style="margin:0 0 24px;"><a href="{{ action_url }}" style="display:inline-block;padding:12px 24px;font-size:16px;line-height:20px;font-weight:600;color:#ffffff;background-color:#18181b;border-radius:6px;text-decoration:none;">{{{button}}}</a></p>""",
-            "This link works for {{ expires }} and can be used once."),
+            "This link works for {{ expires }} and can be used once.",
+            extraHtml),
         Expires + Greeting +
         $$$"""
 
@@ -153,12 +173,12 @@ internal static class DefaultTemplates
         {{{button}}}: {{ action_url }}
 
         This link works for {{ expires }} and can be used once.
-
+        {{{extraText}}}
         {{{Ignore}}}
 
         """);
 
-    private static string Html(string title, string preheader, string heading, string intro, string action, string expiry) =>
+    private static string Html(string title, string preheader, string heading, string intro, string action, string expiry, string extra = "") =>
         Expires + Frame(
             title,
             preheader,
@@ -168,6 +188,7 @@ internal static class DefaultTemplates
             <p style="margin:0 0 24px;">{{{intro}}}</p>
             {{{action}}}
             <p style="margin:0 0 16px;">{{{expiry}}}</p>
+            {{{extra}}}
             <p style="margin:0;color:#52525b;">{{{Ignore}}}</p>
             """);
 

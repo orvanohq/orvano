@@ -22,12 +22,17 @@ internal enum VerificationEmail
 /// A signed in user and their new session (the contract's <c>AuthResult</c>); <paramref name="IsNewUser"/> when this
 /// call created them, and <paramref name="VerificationEmail"/> when a sign up asked for a verification email. For a
 /// user with MFA on, step one answers <see cref="Challenged"/> instead: no user, no session, only the
-/// <paramref name="Mfa"/> challenge (spec 0013, AC-6).
+/// <paramref name="Mfa"/> challenge (spec 0013, AC-6). A sign up under the verified email flow answers
+/// <see cref="Pending"/>: nothing but <paramref name="VerificationRequired"/> (spec 0014, AC-12).
 /// </summary>
 internal sealed record SignedIn(
-    UserRow? User, SessionTokensView? Session, bool IsNewUser = false, VerificationEmail? VerificationEmail = null, MfaChallengeView? Mfa = null)
+    UserRow? User, SessionTokensView? Session, bool IsNewUser = false, VerificationEmail? VerificationEmail = null, MfaChallengeView? Mfa = null,
+    bool VerificationRequired = false)
 {
     public static SignedIn Challenged(MfaChallengeView mfa) => new(null, null, Mfa: mfa);
+
+    /// <summary>The one answer of a sign up under the verified email flow, whatever happened (spec 0014, AC-12).</summary>
+    public static SignedIn Pending { get; } = new(null, null, VerificationRequired: true);
 }
 
 /// <summary>
@@ -58,20 +63,38 @@ internal sealed class AccountService(
     AuthMailer mailer,
     StepUp stepUp,
     MethodPolicies policies,
-    PasswordRules passwordRules)
+    PasswordRules passwordRules,
+    PolicySettings policySettings,
+    SecurityAlerts alerts)
 {
     public const string EmailIndex = UserRecords.EmailIndex;
+
+    /// <summary>The <c>kind</c> the <c>sign_up_attempt</c> alert's recipient limits are keyed by (spec 0014, AC-12).</summary>
+    private const string SignUpAttemptKind = "sign_up_attempt";
+
+    private static Failure InvalidEmail => Failure.Invalid("The email must be an address of at most 320 characters.");
+
+    private static Failure InvalidName => Failure.Invalid($"The name must be at most {UserName.MaxLength} characters.");
 
     /// <summary>
     /// Sign up (AC-1 to AC-3): creates the user, their password row, and a session in one transaction. The password is
     /// hashed before the transaction opens, so no connection waits on Argon2id. With
     /// <paramref name="verificationRedirectUrl"/>, the same transaction also queues a verification email (spec 0010,
-    /// AC-11); the user and session are created whatever happens to it.
+    /// AC-11); the user and session are created whatever happens to it. Spec 0014: after the body, closed sign ups get
+    /// 403 <c>sign_up_disabled</c> (AC-10) before any account is read, and under the verified email flow the sign up
+    /// answers <see cref="SignedIn.Pending"/> (AC-12). Console sign up runs the same rules on its fixed defaults (AC-37).
     /// </summary>
     public async Task<Outcome<SignedIn>> SignUpAsync(
         string projectId, string? email, string? password, string? name, ClientInfo client, CancellationToken ct, ConsoleGate? gate = null,
         string? verificationRedirectUrl = null, string? limitKey = null)
     {
+        if (!EmailRule.TryNormalize(email, out var trimmed)) return InvalidEmail;
+        if (!UserName.IsValid(name)) return InvalidName;
+        var project = await policySettings.GetAsync(projectId, ct);
+        if (!project.Auth.SignUpsEnabled) return Failure.SignUpDisabled;
+        if (project.VerifiedEmailFlow)
+            return await SignUpPendingAsync(projectId, project, trimmed, password, name, verificationRedirectUrl, limitKey ?? $"{projectId}\nunknown", ct);
+
         await keys.GetActiveAsync(projectId, ct); // the first token of a project creates its key, before any commit
         var outcome = await CreateAsync(projectId, email, password, name, userId => Actor.User(userId), client, ct, gate, verificationRedirectUrl, limitKey: limitKey);
         if (!outcome.Succeeded) return outcome.Failure!;
@@ -106,8 +129,10 @@ internal sealed class AccountService(
         string projectId, string? email, string? password, string? name, Func<Guid, Actor> actorOf, ClientInfo? client, CancellationToken ct,
         ConsoleGate? gate = null, string? verificationRedirectUrl = null, bool verified = false, string? limitKey = null)
     {
-        if (!EmailRule.TryNormalize(email, out var trimmed)) return Failure.Invalid("The email must be an address of at most 320 characters.");
-        if (!UserName.IsValid(name)) return Failure.Invalid($"The name must be at most {UserName.MaxLength} characters.");
+        if (!EmailRule.TryNormalize(email, out var trimmed)) return InvalidEmail;
+        if (!UserName.IsValid(name)) return InvalidName;
+        // Spec 0014, AC-9: the domain rule before the password rules and before any account is read.
+        if ((await policySettings.GetAsync(projectId, ct)).CheckDomain(trimmed) is { } domainRefused) return domainRefused;
         var rules = await passwordRules.CheckNewAsync(projectId, password, ct);
         if (!rules.Succeeded) return rules.Failure!;
         var normalized = rules.Value!;
@@ -171,6 +196,70 @@ internal sealed class AccountService(
     }
 
     /// <summary>
+    /// Sign up under the verified email flow (spec 0014, AC-12): <paramref name="redirectUrl"/> is required and the
+    /// project or the install must have SMTP (409 <c>email_not_configured</c>); then every branch answers
+    /// <see cref="SignedIn.Pending"/> and sets no session. A new email gets an unverified user with the password and a
+    /// verification email. An email whose account is verified changes nothing and gets the <c>sign_up_attempt</c>
+    /// alert; one whose account is still unverified (maybe someone else's pre registration) changes nothing and gets a
+    /// fresh verification email, whose reject link lets the owner claim it (AC-15). Both existing branches check the
+    /// password against the dummy hash, so each branch costs one Argon2id run. A sign up that loses the race on the
+    /// email index takes the existing branch. The endpoint holds the answer to the 500 ms floor.
+    /// </summary>
+    private async Task<Outcome<SignedIn>> SignUpPendingAsync(
+        string projectId, ProjectPolicies project, string email, string? password, string? name, string? redirectUrl, string limitKey, CancellationToken ct)
+    {
+        if (project.CheckDomain(email) is { } domainRefused) return domainRefused;
+        var rules = await passwordRules.CheckNewAsync(projectId, password, ct);
+        if (!rules.Succeeded) return rules.Failure!;
+        if (redirectUrl is null) return Failure.Invalid("verificationRedirectUrl is required while the project requires verified emails or MFA.");
+        if (await mailer.CheckRedirectAsync(projectId, redirectUrl, EmailTokenKind.Verification, ct) is not { } redirect) return Failure.RedirectUrlNotAllowed;
+        // Only a missing SMTP refuses (AC-11): it says nothing about the email. The project's hourly cap and the
+        // recipient limits never change the answer.
+        if (await mailer.CheckAvailabilityAsync(projectId, ct) is { Code: Orvano.Contract.ErrorCode.EmailNotConfigured } notConfigured) return notConfigured;
+
+        var projectName = await mailer.ProjectNameAsync(projectId, ct);
+        string? hash = null;
+        if (await FindByEmailAsync(projectId, email, ct) is null)
+        {
+            hash = await hasher.TryHashAsync(rules.Value!, ct);
+            if (hash is null) return Failure.Busy;
+        }
+        else if (await hasher.TryVerifyAsync(rules.Value!, null, ct) is null)
+        {
+            return Failure.Busy;
+        }
+
+        var outcome = await store.WriteAsync<Done>(async (uow, token) =>
+        {
+            if (hash is not null && await UserRecords.TryInsertAsync(uow, projectId, email, name, verified: false, token) is { } userId)
+            {
+                await InsertPasswordAsync(uow, userId, projectId, hash, token);
+                var actor = Actor.User(userId);
+                await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserCreated, projectId, actor, userId.ToString(),
+                    new Dictionary<string, string> { ["userId"] = userId.ToString() },
+                    fields: new Dictionary<string, string?> { ["method"] = SessionMethod.SignUp }, ct: token);
+                await SendSignUpVerificationAsync(uow, projectId, projectName, userId, email, name, redirect, actor, limitKey, token);
+                return default(Done);
+            }
+
+            // The email has an account (or just got one in a racing sign up). A blocked user gets nothing.
+            if (await UserLocks.ByEmailAsync(uow, projectId, email, token) is not { Status: UserStatuses.Active, Email: { } to } user) return default(Done);
+            if (user.EmailVerifiedAt is not null)
+            {
+                if (mailer.TakeRecipientLimits(projectId, to, SignUpAttemptKind, limitKey) is null)
+                    await alerts.QueueAsync(uow, projectId, projectName, to, Orvano.Messaging.Contracts.SecurityAlertKind.SignUpAttempt, token);
+            }
+            else
+            {
+                await SendSignUpVerificationAsync(uow, projectId, projectName, user.Id, to, user.Name, redirect, Actor.UnknownUser, limitKey, token);
+            }
+
+            return default(Done);
+        }, ct);
+        return outcome.Succeeded ? SignedIn.Pending : outcome.Failure!;
+    }
+
+    /// <summary>
     /// The verification email of a sign up (spec 0010, AC-11), inside its transaction: the recipient limits, the
     /// token, and the email, behind a savepoint, so a refusal leaves no token and never fails the sign up.
     /// </summary>
@@ -196,9 +285,12 @@ internal sealed class AccountService(
     /// Password sign in (AC-4, AC-5). An unknown email is checked against the dummy hash, so a wrong password and an
     /// unknown email cost one Argon2id run each and answer the same. Block status shows only with the right password.
     /// A hash made with older parameters is replaced (rehash on sign in). A user with MFA on gets a challenge in place
-    /// of a session (spec 0013, AC-6).
+    /// of a session (spec 0013, AC-6). Under the verified email flow, an unverified user with the right password gets 403
+    /// <c>email_verification_required</c>, and a fresh verification email when <paramref name="verificationRedirectUrl"/>
+    /// is given (spec 0014, AC-13); whether it was sent never changes the answer.
     /// </summary>
-    public async Task<Outcome<SignedIn>> SignInAsync(string projectId, string? email, string? password, ClientInfo client, CancellationToken ct)
+    public async Task<Outcome<SignedIn>> SignInAsync(
+        string projectId, string? email, string? password, ClientInfo client, CancellationToken ct, string? verificationRedirectUrl = null, string? limitKey = null)
     {
         var known = EmailRule.TryNormalize(email, out var trimmed);
         var wellFormed = PasswordPolicy.TryNormalize(password, out var normalized);
@@ -210,6 +302,11 @@ internal sealed class AccountService(
         if (check is null) return Failure.Busy;
         if (!check.Value.Matches || account is null) return Failure.InvalidCredentials;
         if (account.Status == UserStatuses.Blocked) return Failure.UserBlocked;
+        if (account.EmailVerifiedAt is null && (await policySettings.GetAsync(projectId, ct)).VerifiedEmailFlow)
+        {
+            await ResendVerificationAsync(projectId, account.Id, verificationRedirectUrl, limitKey ?? $"{projectId}\nunknown", ct);
+            return Failure.EmailVerificationRequired;
+        }
 
         var rehash = check.Value.NeedsRehash ? await hasher.TryHashAsync(normalized, ct) : null;
         await keys.GetActiveAsync(projectId, ct);
@@ -238,6 +335,22 @@ internal sealed class AccountService(
         if (!outcome.Succeeded) return outcome.Failure!;
         var (user, signedIn, mfa) = outcome.Value;
         return mfa is not null ? SignedIn.Challenged(mfa) : await SignedInAsync(projectId, user!, signedIn!, ct);
+    }
+
+    /// <summary>
+    /// AC-13's resend: a fresh verification email to a still unverified, active user, under the recipient limits. A bad
+    /// redirect, a limit, or no SMTP sends nothing and changes nothing for the caller.
+    /// </summary>
+    private async Task ResendVerificationAsync(string projectId, Guid userId, string? redirectUrl, string limitKey, CancellationToken ct)
+    {
+        if (redirectUrl is null || await mailer.CheckRedirectAsync(projectId, redirectUrl, EmailTokenKind.Verification, ct) is not { } redirect) return;
+        var projectName = await mailer.ProjectNameAsync(projectId, ct);
+        await store.WriteAsync<Done>(async (uow, token) =>
+        {
+            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is { Status: UserStatuses.Active, EmailVerifiedAt: null, Email: { } to } user)
+                await SendSignUpVerificationAsync(uow, projectId, projectName, user.Id, to, user.Name, redirect, Actor.User(user.Id), limitKey, token);
+            return default(Done);
+        }, ct);
     }
 
     /// <summary>The signed in user (AC-12).</summary>
@@ -403,7 +516,7 @@ internal sealed class AccountService(
         return new SignedIn(user, new SessionTokensView(access.Token, access.ExpiresAt, grant.RefreshToken.Value, grant.RefreshTokenExpiresAt, grant.SessionId), isNewUser);
     }
 
-    private sealed record Account(Guid Id, string Status, string? Hash);
+    private sealed record Account(Guid Id, string Status, string? Hash, DateTimeOffset? EmailVerifiedAt);
 
     private Task<Account?> FindByEmailAsync(string projectId, string email, CancellationToken ct) =>
         store.ReadAsync(async (db, token) =>
@@ -411,7 +524,7 @@ internal sealed class AccountService(
             var conn = (NpgsqlConnection)db.Database.GetDbConnection();
             await using var cmd = new NpgsqlCommand(
                 """
-                SELECT u.id, u.status, p.hash
+                SELECT u.id, u.status, p.hash, u.email_verified_at
                 FROM orvano.auth_users u
                 LEFT JOIN orvano.auth_passwords p ON p.user_id = u.id
                 WHERE u.project_id = @project AND lower(u.email) = lower(@email)
@@ -420,7 +533,8 @@ internal sealed class AccountService(
             cmd.Parameters.AddWithValue("email", email);
             await using var reader = await cmd.ExecuteReaderAsync(token);
             return await reader.ReadAsync(token)
-                ? new Account(reader.GetGuid(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2))
+                ? new Account(reader.GetGuid(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.IsDBNull(3) ? null : reader.GetFieldValue<DateTimeOffset>(3))
                 : null;
         }, ct);
 

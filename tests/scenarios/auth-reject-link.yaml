@@ -1,0 +1,48 @@
+# Spec 0014, AC-15, AC-36: every verification email carries a second link with the same token and
+# orvano_type=verification_reject. Redeemed through the client SDK's link helper, it claims the still unverified
+# account for the inbox owner: whoever signed up loses the password, so a password sign in fails, and the token is
+# spent, so verifying with it fails too.
+name: the inbox owner rejects a sign up made with their email
+requires: []
+steps:
+  - op: now
+    as: client
+    input: {}
+    expect: { status: 200 }
+    save:
+      beforeSignUp: $.now
+  - op: account.create
+    as: client
+    input:
+      body:
+        email: 'rej-${unique}@example.com'
+        password: correct horse battery staple
+        verificationRedirectUrl: 'http://localhost:3000/auth/callback'
+    expect:
+      status: 201
+      body: { verificationEmail: queued, verificationRequired: false }
+  - op: test.getLatestEmail
+    as: client
+    input: { to: 'rej-${unique}@example.com', after: '${beforeSignUp}' }
+    expect:
+      status: 200
+      body: { type: verification }
+    save:
+      token: $.token
+  - op: redeemLink
+    as: client
+    input:
+      url: 'http://localhost:3000/auth/callback?orvano_type=verification_reject&orvano_token=${token}'
+    expect:
+      status: 200
+      body: { type: verification_reject, user: null, isNewUser: false }
+  - op: signIn
+    as: client
+    input:
+      body: { email: 'rej-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 401, code: invalid_credentials }
+  - op: account.verifyEmail
+    as: client
+    input:
+      body: { token: '${token}' }
+    expect: { status: 401, code: invalid_email_token }

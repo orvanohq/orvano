@@ -23,7 +23,7 @@ internal static class MfaFilter
 /// </summary>
 internal sealed class UsersService(
     AuthStore store, AccountService accounts, SessionService sessionService, Sessions sessions, SessionChecks checks,
-    VerificationService verification, RecoveryService recovery)
+    VerificationService verification, RecoveryService recovery, PolicySettings policies)
 {
     /// <summary>The project's users, newest first, cursor paged, optionally filtered.</summary>
     public async Task<Outcome<Page<UserRow>>> ListAsync(string projectId, UserFilter filter, string? cursor, int? limit, CancellationToken ct)
@@ -137,6 +137,8 @@ internal sealed class UsersService(
     {
         if (!EmailRule.TryNormalize(email, out var trimmed)) return Failure.Invalid("The email must be an address of at most 320 characters.");
         if (!Guid.TryParse(userId, out var id)) return Failure.UserNotFound;
+        // Spec 0014, AC-9: the new address passes the project's domain rule; current emails are never checked again.
+        if ((await policies.GetAsync(projectId, ct)).CheckDomain(trimmed) is { } domainRefused) return domainRefused;
 
         return await store.WriteAsync<UserRow>(async (uow, token) =>
         {

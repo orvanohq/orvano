@@ -1,0 +1,7 @@
+## Why it happens
+
+The project requires a verified email (**Require a verified email** on the Sign ups card of its **Security** page, or **Require MFA**), and this user hasn't opened their verification link yet. Password sign in answers this only after the password is right, so a wrong password still gets `invalid_credentials`. A provider sign in gets it when it would create a user and the provider didn't vouch for an email.
+
+## How to fix
+
+Tell the person to open the link in their inbox, then sign in again. Pass `verificationRedirectUrl` with the sign in, and Orvano sends a fresh link (within the usual send limits), with the same answer either way. A magic link or an email code also verifies the email and signs in at once. For a provider, ask the person to verify their email with the provider, or to sign up with email instead. See [Email verification](/docs/auth/email-verification/#require-a-verified-email).

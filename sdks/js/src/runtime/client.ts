@@ -741,7 +741,15 @@ export class Client {
       case 'start': {
         // Spec 0013, AC-36: a sign in that stopped at the MFA step stores nothing and keeps the
         // ticket in memory only.
-        const body = result as { session?: unknown; mfa?: { ticket?: unknown } | null } | undefined
+        const body = result as
+          | { session?: unknown; mfa?: { ticket?: unknown } | null; verificationRequired?: unknown }
+          | undefined
+        // Spec 0014, AC-12: a pending sign up (the project requires verified emails) has no session
+        // and stores nothing; the app tells the user to check their inbox.
+        if (body?.verificationRequired === true) {
+          this.#mfaStore.set(null)
+          return
+        }
         const mfa = pendingMfaFrom(body?.mfa)
         if (mfa !== null) {
           this.#mfaStore.set(mfa)

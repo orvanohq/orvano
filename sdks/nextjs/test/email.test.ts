@@ -133,6 +133,23 @@ describe('the redeem action (AC-25)', () => {
     expect(response.headers.getSetCookie()).toHaveLength(2)
   })
 
+  it('rejects a sign up without refreshing or setting any cookie (spec 0014, AC-15)', async () => {
+    const { POST, calls } = handler(() => new Response(null, { status: 204 }))
+
+    const response = await POST(
+      post(
+        'redeem',
+        { type: 'verification_reject', token },
+        { [refreshCookie]: 'orv_rt_old.secret' },
+      ),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ type: 'verification_reject', user: null })
+    expect(calls.map((c) => c.path)).toEqual(['/v1/account/verification/reject'])
+    expect(response.headers.getSetCookie()).toEqual([])
+  })
+
   it('verifies without touching cookies when there is no session', async () => {
     const { POST, calls } = handler(() => Response.json(user))
 

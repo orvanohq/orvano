@@ -86,7 +86,9 @@ final class AccountService {
     return TotpConfirmation.fromJson(json as Map<String, dynamic>);
   }
 
-  /// Signs a new user up with an email and password, and signs them in.
+  /// Signs a new user up with an email and password, and signs them in. While the project requires verified emails or
+  /// MFA, it signs no one in: it answers `verificationRequired` true and emails a link instead, the same answer whether
+  /// or not the email already had an account.
   Future<AuthResult> create(
     CreateAccountRequest body, {
     RequestOptions? options,
@@ -115,7 +117,7 @@ final class AccountService {
     );
   }
 
-  /// Signs a user in with an emailed code. After 5 wrong tries the code stops working; ask for a new one.
+  /// Signs a user in with an emailed code. After 10 wrong tries the code stops working; ask for a new one.
   Future<AuthResult> createEmailCodeSession(
     CreateEmailCodeSessionRequest body, {
     RequestOptions? options,
@@ -541,6 +543,22 @@ final class AccountService {
       options: options,
     );
     return SessionTokens.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Says a sign up with this email wasn't you, with the token from the second link of a verification email. While the
+  /// email is not verified, the account loses its password, linked providers, second factors, and sessions, so whoever
+  /// signed up with your address can't use it; you can then sign in with a magic link or an email code. It needs no
+  /// session. The token works once, and verifying the email uses it up too.
+  Future<void> rejectEmailVerification(
+    RejectEmailVerificationRequest body, {
+    RequestOptions? options,
+  }) async {
+    await _client.send(
+      'POST',
+      '/v1/account/verification/reject',
+      body: body.toJson(),
+      options: options,
+    );
   }
 
   /// Changes the signed in user's name or metadata.

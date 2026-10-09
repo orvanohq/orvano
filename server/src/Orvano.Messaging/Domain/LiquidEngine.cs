@@ -131,6 +131,7 @@ internal static class LiquidEngine
         context.SetValue("expires_in_minutes", NumberValue.Create(values.ExpiresInMinutes));
         if (values.Alert is not null) context.SetValue("alert", new StringValue(values.Alert));
         if (values.OccurredAt is not null) context.SetValue("occurred_at", new StringValue(values.OccurredAt));
+        if (values.RejectUrl is not null) context.SetValue("reject_url", new StringValue(values.RejectUrl));
 
         using var writer = new BoundedWriter();
         try

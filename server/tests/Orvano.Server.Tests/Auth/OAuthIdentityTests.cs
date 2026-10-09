@@ -125,7 +125,8 @@ public class OAuthIdentityTests(PostgresFixture postgres)
     [Fact]
     public async Task A_verified_email_or_an_email_with_a_password_is_another_way_in_but_an_unverified_email_alone_is_not()
     {
-        await using var api = await AuthApi.StartAsync(postgres, oauth: true);
+        // Spec 0014, AC-33: a verified email counts only while an SMTP server can send it a link or code.
+        await using var api = await AuthApi.StartAsync(postgres, oauth: true, smtp: true);
 
         // A verified email from the provider: the user may unlink their only identity (AC-14, verify.md check 12).
         using var verified = await OAuthOnlyUserAsync(api, "verified-google", emailVerified: true);

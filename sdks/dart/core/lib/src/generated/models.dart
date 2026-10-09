@@ -156,8 +156,9 @@ enum VerificationEmailStatus {
       values.firstWhere((e) => e.value == value, orElse: () => unknown);
 }
 
-/// A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of
-/// `session` and `mfa` is set.
+/// A signed in user and their new session; for a user with MFA on, the challenge to answer first; or, for a sign up in
+/// a project that requires verified emails, a pending answer that says to check the inbox. Exactly one of `session`,
+/// `mfa`, or `verificationRequired` true is set.
 final class AuthResult {
   /// Creates a [AuthResult].
   const AuthResult({
@@ -166,6 +167,7 @@ final class AuthResult {
     this.mfa,
     required this.isNewUser,
     this.verificationEmail,
+    required this.verificationRequired,
   });
 
   /// Decodes a [AuthResult] from JSON.
@@ -183,23 +185,31 @@ final class AuthResult {
     verificationEmail: json['verificationEmail'] == null
         ? null
         : VerificationEmailStatus.fromJson(json['verificationEmail'] as String),
+    verificationRequired: json['verificationRequired'] as bool,
   );
 
-  /// The user; null while `mfa` is set.
+  /// The user; null while `mfa` is set or `verificationRequired` is true.
   final User? user;
 
-  /// The new session's tokens; null while `mfa` is set.
+  /// The new session's tokens; null while `mfa` is set or `verificationRequired` is true.
   final SessionTokens? session;
 
   /// Set when the user has MFA on: no session exists yet. Finish with `account.createMfaSession` and the ticket before
   /// it expires. The SDKs' `completeMfa` does it. Null otherwise.
   final MfaChallenge? mfa;
 
-  /// Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user.
+  /// Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a
+  /// provider sign in that created the user. False on a pending answer, even when the user was created.
   final bool isNewUser;
 
-  /// What happened to the verification email sign up was asked to send; null when none was asked for.
+  /// What happened to the verification email sign up was asked to send; null when none was asked for, and null on a
+  /// pending answer.
   final VerificationEmailStatus? verificationEmail;
+
+  /// True on the pending answer of a sign up while the project requires verified emails: no session exists, and the
+  /// answer is the same whether or not the email already had an account. Tell the user to open the link in their
+  /// inbox, then sign in. False on every other answer.
+  final bool verificationRequired;
 
   /// Encodes this [AuthResult] as JSON.
   Map<String, dynamic> toJson() => {
@@ -220,6 +230,7 @@ final class AuthResult {
       final v? => v.value,
       null => null,
     },
+    'verificationRequired': verificationRequired,
   };
 }
 
@@ -370,7 +381,8 @@ final class CreateAccountRequest {
   final String? name;
 
   /// When set, also emails a verification link that opens here: a host that is one of the project's web platforms, or
-  /// your app's own scheme. `AuthResult.verificationEmail` says whether it was sent.
+  /// your app's own scheme. `AuthResult.verificationEmail` says whether it was sent. Required while the project
+  /// requires verified emails or MFA: the answer is then pending and never says whether the email was sent.
   final String? verificationRedirectUrl;
 
   /// Encodes this [CreateAccountRequest] as JSON.
@@ -812,6 +824,7 @@ final class CreatePasswordSessionRequest {
   const CreatePasswordSessionRequest({
     required this.email,
     required this.password,
+    this.verificationRedirectUrl,
   });
 
   /// Decodes a [CreatePasswordSessionRequest] from JSON.
@@ -819,6 +832,9 @@ final class CreatePasswordSessionRequest {
       CreatePasswordSessionRequest(
         email: json['email'] as String,
         password: json['password'] as String,
+        verificationRedirectUrl: json['verificationRedirectUrl'] == null
+            ? null
+            : json['verificationRedirectUrl'] as String,
       );
 
   /// The email the user signed up with; case does not matter.
@@ -827,8 +843,17 @@ final class CreatePasswordSessionRequest {
   /// The user's password.
   final String password;
 
+  /// Where a fresh verification link opens when the project requires verified emails and this user's email is not
+  /// verified yet: a host that is one of the project's web platforms, or your app's own scheme. The sign in still
+  /// answers 403 `email_verification_required`, whether or not the email was sent.
+  final String? verificationRedirectUrl;
+
   /// Encodes this [CreatePasswordSessionRequest] as JSON.
-  Map<String, dynamic> toJson() => {'email': email, 'password': password};
+  Map<String, dynamic> toJson() => {
+    'email': email,
+    'password': password,
+    'verificationRedirectUrl': ?verificationRedirectUrl,
+  };
 }
 
 /// A request to email a password reset link.
@@ -2018,6 +2043,22 @@ final class RefreshSessionRequest {
 
   /// Encodes this [RefreshSessionRequest] as JSON.
   Map<String, dynamic> toJson() => {'refreshToken': refreshToken};
+}
+
+/// A rejection of a sign up, with the token from the emailed link that says it wasn't you.
+final class RejectEmailVerificationRequest {
+  /// Creates a [RejectEmailVerificationRequest].
+  const RejectEmailVerificationRequest({required this.token});
+
+  /// Decodes a [RejectEmailVerificationRequest] from JSON.
+  factory RejectEmailVerificationRequest.fromJson(Map<String, dynamic> json) =>
+      RejectEmailVerificationRequest(token: json['token'] as String);
+
+  /// The `orvano_token` parameter of the emailed link.
+  final String token;
+
+  /// Encodes this [RejectEmailVerificationRequest] as JSON.
+  Map<String, dynamic> toJson() => {'token': token};
 }
 
 /// An active session of a user: one signed in device or browser.

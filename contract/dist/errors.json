@@ -80,6 +80,21 @@
     "description": "The new password appears in a known data breach, by the Have I Been Pwned check the project turned on."
   },
   {
+    "code": "sign_up_disabled",
+    "status": 403,
+    "description": "The project closed sign ups, so this request can't create a user; existing users still sign in."
+  },
+  {
+    "code": "email_domain_not_allowed",
+    "status": 403,
+    "description": "The email's domain is not allowed by the project's rules: not on its allowed list, on its blocked list, or a disposable address."
+  },
+  {
+    "code": "email_verification_required",
+    "status": 403,
+    "description": "The project requires a verified email before sign in, and this user's email is not verified yet."
+  },
+  {
     "code": "invalid_credentials",
     "status": 401,
     "description": "The email and password do not match a user, or the password given to confirm an action is missing or wrong."
@@ -232,7 +247,7 @@
   {
     "code": "invalid_code",
     "status": 401,
-    "description": "The email code is wrong, expired, or used up; ask for a new one after 5 wrong tries."
+    "description": "The email code is wrong, expired, or used up; ask for a new one after 10 wrong tries."
   },
   {
     "code": "reauthentication_required",

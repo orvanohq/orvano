@@ -14,6 +14,21 @@ internal sealed record ProjectPolicies(AuthPolicies Auth, MethodSettings Methods
 {
     /// <summary>The <c>console</c> project's fixed rules (AC-37); its method switches come from <see cref="MethodPolicies.Console"/>.</summary>
     public static ProjectPolicies Console { get; } = new(AuthPolicies.Defaults, MethodSettings.Defaults, null);
+
+    /// <summary>
+    /// Whether sign up and password sign in follow the verified email flow (AC-12, AC-13): the project requires verified
+    /// emails, or requires MFA, which only verified emails can enroll (AC-27).
+    /// </summary>
+    public bool VerifiedEmailFlow => Auth.RequireVerifiedEmail || Methods.MfaRequired;
+
+    /// <summary>
+    /// The checks every client path that would create a user runs, in order (AC-9, AC-10): sign ups open (403
+    /// <c>sign_up_disabled</c>), then the domain rule on its email (403 <c>email_domain_not_allowed</c>).
+    /// </summary>
+    public Failure? CheckSignUp(string? email) => Auth.SignUpsEnabled ? CheckDomain(email) : Failure.SignUpDisabled;
+
+    /// <summary>AC-8's domain rule on an email set on a user (403 <c>email_domain_not_allowed</c>), else null.</summary>
+    public Failure? CheckDomain(string? email) => EmailDomainRule.Allows(Auth, email) ? null : Failure.EmailDomainNotAllowed;
 }
 
 /// <summary>

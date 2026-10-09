@@ -22,12 +22,15 @@ internal static class AccountEndpoints
     {
         v1.MapPost(Api.AccountOperations.Create.Route, async (HttpContext http, Api.CreateAccountRequest request, AccountService accounts, RateLimits limits, CancellationToken ct) =>
         {
+            var started = Stopwatch.StartNew();
             var limit = limits.Acquire(ProjectLimits.SignUpPerIp(PublicRequests.Policies(http).Auth), PublicRequests.LimitKey(http));
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
 
             var outcome = await accounts.SignUpAsync(
                 PublicRequests.Project(http), request.Email, request.Password, request.Name, PublicRequests.Client(http), ct,
                 verificationRedirectUrl: request.VerificationRedirectUrl, limitKey: PublicRequests.LimitKey(http));
+            // Spec 0014, AC-12: the pending answer is the same for a new and a known email, in time too.
+            if (outcome.Value is { VerificationRequired: true }) await EmailRequests.HoldToFloorAsync(http, started, ct);
             return Created(http, outcome, AuthResult);
         })
             .WithName(Api.AccountOperations.Create.Id)
@@ -39,7 +42,8 @@ internal static class AccountEndpoints
             using var failures = SignInLimits.Take(http, limits, PublicRequests.LimitKey(http), PublicRequests.Policies(http).Auth, request.Email, out var refused);
             if (refused is not null) return refused;
 
-            var outcome = await accounts.SignInAsync(projectId, request.Email, request.Password, PublicRequests.Client(http), ct);
+            var outcome = await accounts.SignInAsync(
+                projectId, request.Email, request.Password, PublicRequests.Client(http), ct, request.VerificationRedirectUrl, PublicRequests.LimitKey(http));
             SignInLimits.Settle(failures!, outcome.Failure);
             return Created(http, outcome, AuthResult);
         })
@@ -74,6 +78,12 @@ internal static class AccountEndpoints
             EmailRequests.RedeemAsync<Api.VerifyEmailRequest>(http, limits, ct, async request =>
                 Ok(http, await verification.VerifyAsync(PublicRequests.Project(http), request.Token, ct), User)))
             .WithName(Api.AccountOperations.VerifyEmail.Id)
+            .RequireProject();
+
+        v1.MapPost(Api.AccountOperations.RejectEmailVerification.Route, (HttpContext http, VerificationService verification, RateLimits limits, CancellationToken ct) =>
+            EmailRequests.RedeemAsync<Api.RejectEmailVerificationRequest>(http, limits, ct, async request =>
+                NoContent(http, await verification.RejectAsync(PublicRequests.Project(http), request.Token, ct))))
+            .WithName(Api.AccountOperations.RejectEmailVerification.Id)
             .RequireProject();
 
         v1.MapPost(Api.AccountOperations.CreateMagicLink.Route, async (HttpContext http, Api.CreateMagicLinkRequest request, PasswordlessService passwordless, CancellationToken ct) =>

@@ -25,7 +25,8 @@ internal sealed class IdentityService(
     OAuthService oauth,
     OAuthRedemptions redemptions,
     StepUp stepUp,
-    MethodPolicies policies)
+    MethodPolicies policies,
+    Orvano.Messaging.Contracts.IEmailQueue email)
 {
     public const int MaxIdTokenBytes = 8 * 1024;
     public const int MaxAuthorizationCode = 2048;
@@ -119,13 +120,15 @@ internal sealed class IdentityService(
 
     /// <summary>
     /// Unlinks one identity (AC-14), under the user's lock: another user's or an unknown identity is 404, and the
-    /// last way in is 409 <c>last_sign_in_method</c>. Another way in is another identity, a verified email, an
-    /// email with a password, or an active passkey. Sessions stay; an Apple identity gets its revoke queued.
+    /// last way in is 409 <c>last_sign_in_method</c>. Another way in is another identity, a verified email while the
+    /// project or the install has SMTP to send a link or code to it (spec 0014, AC-33), an email with a password, or an
+    /// active passkey. Sessions stay; an Apple identity gets its revoke queued.
     /// </summary>
     public async Task<Outcome<Done>> DeleteAsync(string projectId, string userId, string identityId, string reason, Actor actor, CancellationToken ct)
     {
         if (!Guid.TryParse(userId, out var uid)) return Failure.UserNotFound;
         if (!Guid.TryParse(identityId, out var iid)) return Failure.IdentityNotFound;
+        var canEmail = await email.CheckAvailabilityAsync(projectId, ct) is not Orvano.Messaging.Contracts.EmailAvailability.NotConfigured;
 
         return await store.WriteAsync<Done>(async (uow, token) =>
         {
@@ -136,7 +139,7 @@ internal sealed class IdentityService(
             // An active passkey is a way in too (spec 0013), while the project's passkeys are on.
             var passkeysState = await MfaFactorState.ReadAsync(policies, uow.Tx.Connection!, uow.Tx, projectId, uid, token);
             var anotherWayIn = all.Count > 1
-                || (user.Email is not null && user.EmailVerifiedAt is not null)
+                || (canEmail && user.Email is not null && user.EmailVerifiedAt is not null)
                 || (user.Email is not null && user.HasPassword)
                 || (passkeysState.Policy.PasskeysEnabled && passkeysState.ActivePasskeys > 0);
             if (!anotherWayIn) return Failure.LastSignInMethod;

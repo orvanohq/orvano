@@ -177,8 +177,14 @@ internal static class LinkUrl
     public const string TypeParameter = "orvano_type";
     public const string TokenParameter = "orvano_token";
 
-    public static string Build(Uri redirect, EmailTokenKind kind, LinkToken token) =>
-        With(redirect, [TypeParameter, TokenParameter], [(TypeParameter, EmailTokenKinds.Wire(kind)), (TokenParameter, token.Value)]);
+    /// <summary>The <c>orvano_type</c> of a verification email's second link (spec 0014, AC-15).</summary>
+    public const string VerificationRejectType = "verification_reject";
+
+    public static string Build(Uri redirect, EmailTokenKind kind, LinkToken token) => Build(redirect, EmailTokenKinds.Wire(kind), token);
+
+    /// <summary>A link of <paramref name="type"/>, such as <see cref="VerificationRejectType"/> for the same token's second link.</summary>
+    public static string Build(Uri redirect, string type, LinkToken token) =>
+        With(redirect, [TypeParameter, TokenParameter], [(TypeParameter, type), (TokenParameter, token.Value)]);
 
     /// <summary>
     /// The redirect URL's normalized form with every parameter named in <paramref name="strip"/> removed and

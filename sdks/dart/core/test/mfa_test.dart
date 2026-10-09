@@ -80,6 +80,7 @@ Answer challenged() => json({
   },
   'isNewUser': false,
   'verificationEmail': null,
+  'verificationRequired': false,
 }, status: 201);
 
 Answer signedIn() => json({
@@ -88,6 +89,7 @@ Answer signedIn() => json({
   'mfa': null,
   'isNewUser': false,
   'verificationEmail': null,
+  'verificationRequired': false,
 }, status: 201);
 
 void main() {

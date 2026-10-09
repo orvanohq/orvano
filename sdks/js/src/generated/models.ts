@@ -27,23 +27,36 @@ export type UserStatus = 'active' | 'blocked'
 export type VerificationEmailStatus = 'queued' | 'not_configured' | 'rate_limited'
 
 /**
- * A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of
- * `session` and `mfa` is set.
+ * A signed in user and their new session; for a user with MFA on, the challenge to answer first; or, for a sign up in
+ * a project that requires verified emails, a pending answer that says to check the inbox. Exactly one of `session`,
+ * `mfa`, or `verificationRequired` true is set.
  */
 export interface AuthResult {
-  /** The user; null while `mfa` is set. */
+  /** The user; null while `mfa` is set or `verificationRequired` is true. */
   user: User | null
-  /** The new session's tokens; null while `mfa` is set. */
+  /** The new session's tokens; null while `mfa` is set or `verificationRequired` is true. */
   session: SessionTokens | null
   /**
    * Set when the user has MFA on: no session exists yet. Finish with `account.createMfaSession` and the ticket before
    * it expires. The SDKs' `completeMfa` does it. Null otherwise.
    */
   mfa: MfaChallenge | null
-  /** Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user. */
+  /**
+   * Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a
+   * provider sign in that created the user. False on a pending answer, even when the user was created.
+   */
   isNewUser: boolean
-  /** What happened to the verification email sign up was asked to send; null when none was asked for. */
+  /**
+   * What happened to the verification email sign up was asked to send; null when none was asked for, and null on a
+   * pending answer.
+   */
   verificationEmail: VerificationEmailStatus | null
+  /**
+   * True on the pending answer of a sign up while the project requires verified emails: no session exists, and the
+   * answer is the same whether or not the email already had an account. Tell the user to open the link in their
+   * inbox, then sign in. False on every other answer.
+   */
+  verificationRequired: boolean
 }
 
 /** A link of a provider to the signed in user, with the code a link flow returned. */
@@ -94,7 +107,8 @@ export interface CreateAccountRequest {
   name?: string | null
   /**
    * When set, also emails a verification link that opens here: a host that is one of the project's web platforms, or
-   * your app's own scheme. `AuthResult.verificationEmail` says whether it was sent.
+   * your app's own scheme. `AuthResult.verificationEmail` says whether it was sent. Required while the project
+   * requires verified emails or MFA: the answer is then pending and never says whether the email was sent.
    */
   verificationRedirectUrl?: string
 }
@@ -261,6 +275,12 @@ export interface CreatePasswordSessionRequest {
   email: string
   /** The user's password. */
   password: string
+  /**
+   * Where a fresh verification link opens when the project requires verified emails and this user's email is not
+   * verified yet: a host that is one of the project's web platforms, or your app's own scheme. The sign in still
+   * answers 403 `email_verification_required`, whether or not the email was sent.
+   */
+  verificationRedirectUrl?: string
 }
 
 /** A request to email a password reset link. */
@@ -645,6 +665,12 @@ export interface RecoveryCodes {
 export interface RefreshSessionRequest {
   /** The session's current refresh token. */
   refreshToken: string
+}
+
+/** A rejection of a sign up, with the token from the emailed link that says it wasn't you. */
+export interface RejectEmailVerificationRequest {
+  /** The `orvano_token` parameter of the emailed link. */
+  token: string
 }
 
 /** An active session of a user: one signed in device or browser. */

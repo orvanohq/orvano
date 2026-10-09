@@ -14,12 +14,16 @@ export const ErrorCode = {
   emailAlreadyInUse: 'email_already_in_use',
   /** `email_already_verified` */
   emailAlreadyVerified: 'email_already_verified',
+  /** `email_domain_not_allowed` */
+  emailDomainNotAllowed: 'email_domain_not_allowed',
   /** `email_not_configured` */
   emailNotConfigured: 'email_not_configured',
   /** `email_not_verified` */
   emailNotVerified: 'email_not_verified',
   /** `email_rate_limited` */
   emailRateLimited: 'email_rate_limited',
+  /** `email_verification_required` */
+  emailVerificationRequired: 'email_verification_required',
   /** `factor_not_enabled` */
   factorNotEnabled: 'factor_not_enabled',
   /** `forbidden` */
@@ -132,6 +136,8 @@ export const ErrorCode = {
   sessionRequired: 'session_required',
   /** `setup_token_invalid` */
   setupTokenInvalid: 'setup_token_invalid',
+  /** `sign_up_disabled` */
+  signUpDisabled: 'sign_up_disabled',
   /** `signup_closed` */
   signupClosed: 'signup_closed',
   /** `smtp_auth_failed` */

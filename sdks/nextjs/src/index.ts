@@ -496,7 +496,8 @@ export function emailAuthThroughHandler(handlerPath = defaultHandlerPath): Email
         announce(client, result)
       } else if (link.type === 'magic_link' || link.type === 'recovery')
         await client.reloadSession('signedIn')
-      else if ((await client.session.get()) !== null) await client.reloadSession('userUpdated')
+      else if (link.type !== 'verification_reject' && (await client.session.get()) !== null)
+        await client.reloadSession('userUpdated')
       return outcome(result, { type: result.type })
     },
     async signInWithEmailCode(email, code, client, options): Promise<EmailCodeResult> {

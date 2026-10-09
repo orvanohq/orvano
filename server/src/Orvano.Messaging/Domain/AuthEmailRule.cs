@@ -35,6 +35,9 @@ internal static class AuthEmailRule
         if (email.ExpiresInMinutes is < 1 or > MaxExpiresInMinutes)
             throw Broken(nameof(email.ExpiresInMinutes), $"must be 1 to {MaxExpiresInMinutes}");
 
+        if (email.RejectUrl is not null && (email.Kind != AuthEmailKind.Verification || !IsSafeLink(email.RejectUrl)))
+            throw Broken(nameof(email.RejectUrl), "must be null except for a verification email, and then a link like ActionUrl");
+
         if (email.Kind == AuthEmailKind.EmailCode)
         {
             if (email.ActionUrl is not null) throw Broken(nameof(email.ActionUrl), "must be null for an email code");
@@ -44,16 +47,17 @@ internal static class AuthEmailRule
         else
         {
             if (email.Code is not null) throw Broken(nameof(email.Code), "must be null for a link email");
-            if (!Uri.TryCreate(email.ActionUrl, UriKind.Absolute, out var url)
-                || url.UserInfo.Length > 0
-                || RefusedSchemes.Contains(url.Scheme, StringComparer.OrdinalIgnoreCase))
-            {
+            if (!IsSafeLink(email.ActionUrl))
                 throw Broken(nameof(email.ActionUrl), "must be an absolute URL with no user info, and not a javascript, data, vbscript, file, blob, or about URL");
-            }
         }
 
-        return new TemplateValues(email.ProjectName, to, email.UserName ?? "", email.ActionUrl, email.Code, email.ExpiresInMinutes);
+        return new TemplateValues(email.ProjectName, to, email.UserName ?? "", email.ActionUrl, email.Code, email.ExpiresInMinutes, RejectUrl: email.RejectUrl);
     }
+
+    private static bool IsSafeLink(string? link) =>
+        Uri.TryCreate(link, UriKind.Absolute, out var url)
+        && url.UserInfo.Length == 0
+        && !RefusedSchemes.Contains(url.Scheme, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Checks a security alert (spec 0013, AC-31) and returns the values its template is rendered with: no link, no
