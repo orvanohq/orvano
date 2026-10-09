@@ -9,9 +9,9 @@ namespace Orvano.Auth.Jobs;
 /// <summary>
 /// The hourly cleanup on the leader worker: session rows 30 days after they end or expire (AC-32), retiring signing
 /// keys once their 24 hour overlap has passed (AC-22), email tokens past their expiry (spec 0010, AC-29), so an
-/// email address sits in a token row at most its lifetime plus an hour, and OAuth flows and used ID tokens past theirs
-/// (spec 0012, AC-19). Rows go in batches, so one run never holds a
-/// long lock.
+/// email address sits in a token row at most its lifetime plus an hour, OAuth flows and used ID tokens past theirs
+/// (spec 0012, AC-19), and MFA tickets, WebAuthn challenges, and authenticator apps never confirmed within 15 minutes
+/// (spec 0013, AC-35). Rows go in batches, so one run never holds a long lock.
 /// </summary>
 internal static class AuthRetention
 {
@@ -19,7 +19,10 @@ internal static class AuthRetention
     public static readonly TimeSpan Interval = TimeSpan.FromHours(1);
     public const int BatchSize = 1000;
 
-    /// <summary>Runs one cleanup; <c>Sessions</c>, <c>Keys</c>, and <c>Tokens</c> (email tokens, OAuth flows, and used ID tokens) are how many rows it deleted.</summary>
+    /// <summary>
+    /// Runs one cleanup; <c>Sessions</c>, <c>Keys</c>, and <c>Tokens</c> (email tokens, OAuth flows, used ID tokens, MFA
+    /// tickets, WebAuthn challenges, and pending authenticator apps) are how many rows it deleted.
+    /// </summary>
     public static async Task<(int Sessions, int Keys, int Tokens)> RunAsync(NpgsqlDataSource db, CancellationToken ct)
     {
         var sessions = 0;
@@ -60,14 +63,24 @@ internal static class AuthRetention
         }
         while (batch == BatchSize);
 
-        // Spec 0012, AC-19: OAuth flows and used ID tokens past their expiry. Both match their expires_at index.
-        foreach (var (table, key) in new[] { ("auth_oauth_flows", "id"), ("auth_id_token_uses", "token_hash") })
+        // Spec 0012, AC-19: OAuth flows and used ID tokens past their expiry. Spec 0013, AC-35: MFA tickets and WebAuthn
+        // challenges past theirs (a ticket's mfa challenges go with it), and authenticator apps still waiting for their
+        // first code after 15 minutes. Each expires_at matches its index; pending factors are few.
+        foreach (var (table, key, expired) in new[]
+                 {
+                     ("auth_oauth_flows", "id", "expires_at < now()"),
+                     ("auth_id_token_uses", "token_hash", "expires_at < now()"),
+                     ("auth_webauthn_challenges", "id", "expires_at < now()"),
+                     ("auth_mfa_tickets", "id", "expires_at < now()"),
+                     ("auth_totp_factors", "user_id", "confirmed_at IS NULL AND created_at < now() - @pending"),
+                 })
         {
             do
             {
                 await using var cmd = db.CreateCommand(
-                    $"DELETE FROM orvano.{table} WHERE {key} IN (SELECT {key} FROM orvano.{table} WHERE expires_at < now() LIMIT @batch)");
+                    $"DELETE FROM orvano.{table} WHERE {key} IN (SELECT {key} FROM orvano.{table} WHERE {expired} LIMIT @batch)");
                 cmd.Parameters.AddWithValue("batch", BatchSize);
+                if (expired.Contains("@pending", StringComparison.Ordinal)) cmd.Parameters.AddWithValue("pending", AuthTimings.PendingTotp);
                 batch = await cmd.ExecuteNonQueryAsync(ct);
                 tokens += batch;
             }

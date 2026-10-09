@@ -7,8 +7,9 @@ import type { MfaChallenge, OAuthProvider, PasskeyAnswer, UserStatus } from '@or
  */
 export type ApiKeyScope = 'users.read' | 'users.write'
 
-/** One of the four auth email templates a project can edit. */
-export type AuthEmailKind = 'verification' | 'recovery' | 'magic_link' | 'email_code'
+/** One of the five auth email templates a project can edit. */
+export type AuthEmailKind =
+  'verification' | 'recovery' | 'magic_link' | 'email_code' | 'security_alert'
 
 /** Who may create a console account. */
 export type ConsoleSignupMode = 'invite' | 'open'
@@ -29,9 +30,14 @@ export type EmailFailureCode =
 /** Where an email is in its delivery. */
 export type EmailStatus = 'queued' | 'sent' | 'failed'
 
-/** Which email was sent: one of the four auth templates, or the console's own invite. */
+/** Which email was sent: one of the five auth templates, or the console's own invite. */
 export type EmailTemplateName =
-  'verification' | 'recovery' | 'magic_link' | 'email_code' | 'console_invitation'
+  | 'verification'
+  | 'recovery'
+  | 'magic_link'
+  | 'email_code'
+  | 'security_alert'
+  | 'console_invitation'
 
 /** Whether an invitation can still be accepted. */
 export type InvitationStatus = 'pending' | 'expired'
@@ -339,9 +345,9 @@ export interface EmailTemplate {
   variables: TemplateVariable[]
 }
 
-/** The auth email templates of a project. Always all four, so it is not paged. */
+/** The auth email templates of a project. Always all five, so it is not paged. */
 export interface EmailTemplateCatalog {
-  /** The four templates. */
+  /** The five templates. */
   templates: EmailTemplateSummary[]
 }
 

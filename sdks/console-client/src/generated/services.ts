@@ -493,7 +493,7 @@ export class ConsoleEmailTemplatesService {
     )
   }
 
-  /** Lists the four auth email templates of the project named by `X-Orvano-Project`. Any member. */
+  /** Lists the five auth email templates of the project named by `X-Orvano-Project`. Any member. */
   getCatalog(options?: RequestOptions): Promise<EmailTemplateCatalog> {
     return this.#client.request<EmailTemplateCatalog>(
       { method: 'GET', path: '/v1/console/project/email/templates' },

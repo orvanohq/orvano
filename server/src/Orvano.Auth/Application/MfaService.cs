@@ -3,7 +3,7 @@ using Npgsql;
 using NpgsqlTypes;
 using Orvano.Auth.Domain;
 using Orvano.Core.RateLimiting;
-using Orvano.Platform.Contracts;
+using Orvano.Messaging.Contracts;
 
 namespace Orvano.Auth.Application;
 
@@ -52,11 +52,11 @@ internal sealed class MfaService(
     SigningKeys keys,
     AccountService accounts,
     MfaFactorStore factors,
-    IProjectDirectory projects,
     RateLimits limits,
     StepUp stepUp,
     MethodPolicies policies,
-    PasskeyService passkeys)
+    PasskeyService passkeys,
+    SecurityAlerts alerts)
 {
     /// <summary>
     /// A user's MFA state (AC-16), the one read behind <c>account.getMfa</c>, <c>users.getMfa</c>, and
@@ -84,7 +84,7 @@ internal sealed class MfaService(
     public async Task<Outcome<TotpSetupView>> CreateTotpAsync(string projectId, Guid userId, Guid sessionId, CancellationToken ct)
     {
         if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, ct) is { } refused) return refused;
-        var issuer = projectId == ConsoleProject.Id ? "Orvano" : await ProjectNameAsync(projectId, ct);
+        var issuer = await alerts.ProjectNameAsync(projectId, ct);
 
         return await store.WriteAsync<TotpSetupView>(async (uow, token) =>
         {
@@ -126,6 +126,7 @@ internal sealed class MfaService(
         var userKey = userId.ToString();
         var limit = limits.Check(RateLimitPolicies.FailedMfaPerUser, userKey);
         if (!limit.Allowed) return Failure.RateLimited(limit.RetryAfter);
+        var projectName = await alerts.ProjectNameAsync(projectId, ct);
 
         var outcome = await store.WriteAsync<(IReadOnlyList<string> Codes, Guid[] Ended, SessionStrength Strength, string Refresh, DateTimeOffset EndsAt, bool EmailVerified)>(
             async (uow, token) =>
@@ -159,6 +160,7 @@ internal sealed class MfaService(
                 var ids = new Dictionary<string, string> { ["userId"] = userKey };
                 await AuthEvents.WriteAsync(uow.Tx, AuthEvents.MfaEnabled, projectId, actor, userKey, ids, fields: Factor(MfaFactors.Totp), ct: token);
                 await AuthEvents.WriteAsync(uow.Tx, AuthEvents.RecoveryCodesCreated, projectId, actor, userKey, ids, ct: token);
+                await alerts.QueueAsync(uow, projectId, projectName, user.Email, SecurityAlertKind.MfaEnabled, token);
                 return (codes, ended.ToArray(), raised.Strength, raised.Refresh, raised.EndsAt, user.EmailVerifiedAt is not null);
             }, ct);
 
@@ -176,15 +178,17 @@ internal sealed class MfaService(
     public async Task<Outcome<Done>> DeleteTotpAsync(string projectId, Guid userId, Guid sessionId, CancellationToken ct)
     {
         if (await stepUp.MfaChangeAsync(projectId, userId, sessionId, ct) is { } refused) return refused;
+        var projectName = await alerts.ProjectNameAsync(projectId, ct);
 
         return await store.WriteAsync<Done>(async (uow, token) =>
         {
-            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is null) return Failure.UserNotFound;
+            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
             if (!(await MfaFactorState.ReadAsync(policies, uow.Tx.Connection!, uow.Tx, projectId, userId, token)).MfaEnabled) return Failure.MfaNotEnabled;
 
             await MfaFactorStore.DeleteFactorsAsync(uow, userId, token);
             await AuthEvents.WriteAsync(uow.Tx, AuthEvents.MfaDisabled, projectId, Actor.User(userId), userId.ToString(),
                 new Dictionary<string, string> { ["userId"] = userId.ToString() }, fields: Reason(AuthEvents.MfaDisabledByUser), ct: token);
+            await alerts.QueueAsync(uow, projectId, projectName, user.Email, SecurityAlertKind.MfaDisabled, token);
             return default(Done);
         }, ct);
     }
@@ -196,15 +200,17 @@ internal sealed class MfaService(
     public async Task<Outcome<string[]>> CreateRecoveryCodesAsync(string projectId, Guid userId, Guid sessionId, CancellationToken ct)
     {
         if (await stepUp.MfaChangeAsync(projectId, userId, sessionId, ct) is { } refused) return refused;
+        var projectName = await alerts.ProjectNameAsync(projectId, ct);
 
         return await store.WriteAsync<string[]>(async (uow, token) =>
         {
-            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is null) return Failure.UserNotFound;
+            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
             if (!(await MfaFactorState.ReadAsync(policies, uow.Tx.Connection!, uow.Tx, projectId, userId, token)).MfaEnabled) return Failure.MfaNotEnabled;
 
             var codes = await factors.ReplaceRecoveryCodesAsync(uow, projectId, userId, token);
             await AuthEvents.WriteAsync(uow.Tx, AuthEvents.RecoveryCodesCreated, projectId, Actor.User(userId), userId.ToString(),
                 new Dictionary<string, string> { ["userId"] = userId.ToString() }, ct: token);
+            await alerts.QueueAsync(uow, projectId, projectName, user.Email, SecurityAlertKind.RecoveryCodesCreated, token);
             return codes.ToArray();
         }, ct);
     }
@@ -221,6 +227,7 @@ internal sealed class MfaService(
         if (!limit.Allowed) return Failure.RateLimited(limit.RetryAfter);
         if (answer.Malformed() is { } malformed) return malformed;
         var factor = answer.Factor!;
+        var projectName = await alerts.ProjectNameAsync(projectId, ct);
 
         // A passkey's challenge is spent and its answer verified before the transaction (AC-19): only a step_up
         // challenge of this user, and only a passkey of this user, can raise this session.
@@ -251,6 +258,7 @@ internal sealed class MfaService(
             {
                 await AuthEvents.WriteAsync(uow.Tx, AuthEvents.RecoveryCodeUsed, projectId, Actor.User(userId), userKey,
                     new Dictionary<string, string> { ["userId"] = userKey }, ct: token);
+                await alerts.QueueAsync(uow, projectId, projectName, user.Email, SecurityAlertKind.RecoveryCodeUsed, token);
             }
 
             if (await StrengthenAsync(uow, projectId, userId, sessionId, Amr(factor, check), aal2: true, token) is not { } raised)
@@ -296,6 +304,7 @@ internal sealed class MfaService(
         var userLimit = limits.Check(RateLimitPolicies.FailedMfaPerUser, userKey);
         if (!userLimit.Allowed) return Failure.RateLimited(userLimit.RetryAfter);
         await keys.GetActiveAsync(projectId, ct);
+        var projectName = await alerts.ProjectNameAsync(projectId, ct);
 
         // A passkey's mfa challenge is spent and its answer verified before the transaction (AC-11): only a challenge
         // made for this ticket counts, and the passkey must be the ticket's user's, checked below.
@@ -342,6 +351,7 @@ internal sealed class MfaService(
             {
                 await AuthEvents.WriteAsync(uow.Tx, AuthEvents.RecoveryCodeUsed, projectId, actor, userKey,
                     new Dictionary<string, string> { ["userId"] = userKey }, ct: token);
+                await alerts.QueueAsync(uow, projectId, projectName, locked.Email, SecurityAlertKind.RecoveryCodeUsed, token);
             }
 
             var strength = SessionStrength.StepOne(row.Method).With(Amr(factor, check), aal2: true);
@@ -450,7 +460,4 @@ internal sealed class MfaService(
     private static Dictionary<string, string?> Factor(string factor) => new() { ["factor"] = factor };
 
     private static Dictionary<string, string?> Reason(string reason) => new() { ["reason"] = reason };
-
-    private async Task<string> ProjectNameAsync(string projectId, CancellationToken ct) =>
-        (await projects.GetAsync(projectId, ct))?.Name ?? throw new InvalidOperationException($"Project {projectId} vanished during MFA enrollment.");
 }

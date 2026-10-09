@@ -1,4 +1,5 @@
 using Orvano.Auth.Domain;
+using Orvano.Messaging.Contracts;
 
 namespace Orvano.Auth.Application;
 
@@ -16,7 +17,7 @@ internal sealed record MfaResetResult(bool HadFactor, Guid[] PasskeysRemoved, Gu
 /// (<c>users.resetMfa</c>), the console (<c>consoleUsers.resetMfa</c>), and <c>orvano mfa reset</c> differ only in the
 /// actor and the passkey reason.
 /// </summary>
-internal sealed class MfaResets(AuthStore store, Sessions sessions, SessionChecks checks)
+internal sealed class MfaResets(AuthStore store, Sessions sessions, SessionChecks checks, SecurityAlerts alerts)
 {
     /// <summary>The <c>reason</c> of <c>auth.passkey.removed</c> for each caller (AC-33).</summary>
     public const string ByServer = "server";
@@ -44,6 +45,7 @@ internal sealed class MfaResets(AuthStore store, Sessions sessions, SessionCheck
         string projectId, Func<AuthUnitOfWork, CancellationToken, Task<LockedUser?>> find, Actor actor, bool removePasskeys, string passkeyReason,
         CancellationToken ct)
     {
+        var projectName = await alerts.ProjectNameAsync(projectId, ct);
         var outcome = await store.WriteAsync<MfaResetResult>(async (uow, token) =>
         {
             if (await find(uow, token) is not { } user) return Failure.UserNotFound;
@@ -64,6 +66,10 @@ internal sealed class MfaResets(AuthStore store, Sessions sessions, SessionCheck
                 await AuthEvents.WriteAsync(uow.Tx, AuthEvents.PasskeyRemoved, projectId, actor, userKey,
                     new Dictionary<string, string> { ["userId"] = userKey, ["passkeyId"] = passkeyId.ToString() }, reason: passkeyReason, ct: token);
             }
+
+            // One alert per change (AC-31): MFA off, and the passkeys gone when `orvano mfa reset --passkeys` took them.
+            if (hadFactor) await alerts.QueueAsync(uow, projectId, projectName, user.Email, SecurityAlertKind.MfaDisabled, token);
+            if (passkeys.Length > 0) await alerts.QueueAsync(uow, projectId, projectName, user.Email, SecurityAlertKind.PasskeyRemoved, token);
 
             var ended = await sessions.EndAllAsync(uow, projectId, user.Id, SessionEndReason.MfaReset, actor, keep: null, token);
             return new MfaResetResult(hadFactor, passkeys, [.. ended]);

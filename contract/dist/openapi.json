@@ -4633,7 +4633,7 @@
     "/v1/console/project/email/templates": {
       "get": {
         "operationId": "consoleEmailTemplates.getCatalog",
-        "description": "Lists the four auth email templates of the project named by `X-Orvano-Project`. Any member.",
+        "description": "Lists the five auth email templates of the project named by `X-Orvano-Project`. Any member.",
         "parameters": [],
         "responses": {
           "200": {
@@ -8414,9 +8414,10 @@
           "verification",
           "recovery",
           "magic_link",
-          "email_code"
+          "email_code",
+          "security_alert"
         ],
-        "description": "One of the four auth email templates a project can edit."
+        "description": "One of the five auth email templates a project can edit."
       },
       "AuthMethodSettings": {
         "type": "object",
@@ -9919,10 +9920,10 @@
             "items": {
               "$ref": "#/components/schemas/EmailTemplateSummary"
             },
-            "description": "The four templates."
+            "description": "The five templates."
           }
         },
-        "description": "The auth email templates of a project. Always all four, so it is not paged."
+        "description": "The auth email templates of a project. Always all five, so it is not paged."
       },
       "EmailTemplateInput": {
         "type": "object",
@@ -9967,9 +9968,10 @@
           "recovery",
           "magic_link",
           "email_code",
+          "security_alert",
           "console_invitation"
         ],
-        "description": "Which email was sent: one of the four auth templates, or the console's own invite."
+        "description": "Which email was sent: one of the five auth templates, or the console's own invite."
       },
       "EmailTemplateSummary": {
         "type": "object",

@@ -52,6 +52,7 @@ internal sealed class AuthModule : IOrvanoModule
         services.AddSingleton<PasskeyService>();
         services.AddSingleton<MethodSettingsService>();
         services.AddSingleton<MfaService>();
+        services.AddSingleton<SecurityAlerts>();
         services.AddSingleton<SessionService>();
         services.AddSingleton<UsersService>();
         services.AddSingleton<MfaResets>();

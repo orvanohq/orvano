@@ -27,8 +27,8 @@ public class EmailTemplateApiTests(PostgresFixture postgres, MailpitFixture mail
         using var catalog = await SendAsync(http, HttpMethod.Get, Path, null, owner);
         Assert.Equal(HttpStatusCode.OK, catalog.Status);
         var templates = catalog.Body.GetProperty("templates").EnumerateArray().ToList();
-        Assert.Equal(["verification", "recovery", "magic_link", "email_code"], templates.Select(t => t.GetProperty("kind").GetString()));
-        Assert.Equal(["Email verification", "Password reset", "Magic link", "Email code"], templates.Select(t => t.GetProperty("name").GetString()));
+        Assert.Equal(["verification", "recovery", "magic_link", "email_code", "security_alert"], templates.Select(t => t.GetProperty("kind").GetString()));
+        Assert.Equal(["Email verification", "Password reset", "Magic link", "Email code", "Security alert"], templates.Select(t => t.GetProperty("name").GetString()));
         Assert.All(templates, t => Assert.False(t.GetProperty("isCustom").GetBoolean()));
         Assert.All(templates, t => Assert.Equal(JsonValueKind.Null, t.GetProperty("updatedAt").ValueKind));
 
@@ -69,7 +69,7 @@ public class EmailTemplateApiTests(PostgresFixture postgres, MailpitFixture mail
         Assert.Equal(saved.Body.GetProperty("html").GetString(), read.Body.GetProperty("html").GetString());
         Assert.Equal(saved.Body.GetProperty("updatedAt").GetString(), read.Body.GetProperty("updatedAt").GetString());
         using var listed = await SendAsync(http, HttpMethod.Get, Path, null, owner);
-        Assert.Equal([false, true, false, false], listed.Body.GetProperty("templates").EnumerateArray().Select(t => t.GetProperty("isCustom").GetBoolean()));
+        Assert.Equal([false, true, false, false, false], listed.Body.GetProperty("templates").EnumerateArray().Select(t => t.GetProperty("isCustom").GetBoolean()));
 
         // Last write wins: a second save replaces the first and names only what changed.
         using var again = await SendAsync(http, HttpMethod.Put, Recovery, Template("Reset it, {{ project.name }}", "<p>{{ action_url }}</p>", "Go: {{ action_url }}"), owner);

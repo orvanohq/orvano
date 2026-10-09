@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Orvano.Auth.Domain;
 using Orvano.Core.RateLimiting;
+using Orvano.Messaging.Contracts;
 using Orvano.Platform.Contracts;
 
 namespace Orvano.Auth.Application;
@@ -21,7 +22,8 @@ internal sealed class PasskeyService(
     SigningKeys keys,
     AccountService accounts,
     IProjectDirectory projects,
-    RateLimits limits)
+    RateLimits limits,
+    SecurityAlerts alerts)
 {
     /// <summary>
     /// Starts a passkey sign in (AC-23): a <c>sign_in</c> challenge with no user and an empty <c>allowCredentials</c>,
@@ -139,6 +141,7 @@ internal sealed class PasskeyService(
         }
 
         if (await verifier.VerifyRegistrationAsync(policy, projectId, challenge, userId, credential, ct) is not { } made) return Failure.InvalidPasskey;
+        var projectName = await alerts.ProjectNameAsync(projectId, ct);
 
         return await store.WriteAsync<PasskeyView>(async (uow, token) =>
         {
@@ -151,6 +154,7 @@ internal sealed class PasskeyService(
             if (await PasskeyRows.InsertAsync(uow, projectId, userId, made, PasskeyRules.NameFor(given, made.AaGuid), rpId, token) is not { } passkey)
                 return Failure.PasskeyAlreadyRegistered;
             await AuthEvents.WriteAsync(uow.Tx, AuthEvents.PasskeyAdded, projectId, Actor.User(userId), userId.ToString(), Ids(userId, passkey.Id), ct: token);
+            await alerts.QueueAsync(uow, projectId, projectName, user.Email, SecurityAlertKind.PasskeyAdded, token);
             return passkey;
         }, ct);
     }
@@ -199,12 +203,14 @@ internal sealed class PasskeyService(
     public async Task<Outcome<Done>> DeleteAsync(string projectId, Guid userId, string passkeyId, Actor actor, string reason, CancellationToken ct)
     {
         if (!Guid.TryParse(passkeyId, out var id)) return Failure.PasskeyNotFound;
+        var projectName = await alerts.ProjectNameAsync(projectId, ct);
 
         return await store.WriteAsync<Done>(async (uow, token) =>
         {
-            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is null) return Failure.UserNotFound;
+            if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
             if (!await PasskeyRows.DeleteAsync(uow, userId, id, token)) return Failure.PasskeyNotFound;
             await AuthEvents.WriteAsync(uow.Tx, AuthEvents.PasskeyRemoved, projectId, actor, userId.ToString(), Ids(userId, id), reason: reason, ct: token);
+            await alerts.QueueAsync(uow, projectId, projectName, user.Email, SecurityAlertKind.PasskeyRemoved, token);
             return default(Done);
         }, ct);
     }

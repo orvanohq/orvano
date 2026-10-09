@@ -371,7 +371,7 @@ export function smtpQuery(projectId: string) {
   })
 }
 
-/** A project's four auth email templates, each marked Default or Custom (spec 0009, AC-8). */
+/** A project's five auth email templates, each marked Default or Custom (spec 0009, AC-8). */
 export function emailTemplatesQuery(projectId: string) {
   return queryOptions({
     // Shares its prefix with the single templates, so one invalidation refreshes the list and the editor.

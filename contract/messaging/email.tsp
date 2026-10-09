@@ -137,7 +137,7 @@ model EmailTestResult {
   sentTo: string;
 }
 
-@doc("Which email was sent: one of the four auth templates, or the console's own invite.")
+@doc("Which email was sent: one of the five auth templates, or the console's own invite.")
 enum EmailTemplateName {
   @doc("Confirms a user owns their email address.")
   verification,
@@ -150,6 +150,9 @@ enum EmailTemplateName {
 
   @doc("Signs a user in with a one time code.")
   email_code,
+
+  @doc("Tells a user their sign in security changed: MFA turned on or off, a passkey added or removed, recovery codes made or used.")
+  security_alert,
 
   @doc("Invites someone to an org in the console.")
   console_invitation,
@@ -242,7 +245,7 @@ model EmailPage {
   nextCursor: string | null;
 }
 
-@doc("One of the four auth email templates a project can edit.")
+@doc("One of the five auth email templates a project can edit.")
 enum AuthEmailKind {
   @doc("Confirms a user owns their email address.")
   verification,
@@ -255,6 +258,9 @@ enum AuthEmailKind {
 
   @doc("Signs a user in with a one time code.")
   email_code,
+
+  @doc("Tells a user their sign in security changed: MFA turned on or off, a passkey added or removed, recovery codes made or used.")
+  security_alert,
 }
 
 @doc("A template's content to save, preview, or test. Each part is a Liquid template.")
@@ -337,9 +343,9 @@ model EmailTemplateSummary {
   updatedAt: utcDateTime | null;
 }
 
-@doc("The auth email templates of a project. Always all four, so it is not paged.")
+@doc("The auth email templates of a project. Always all five, so it is not paged.")
 model EmailTemplateCatalog {
-  @doc("The four templates.")
+  @doc("The five templates.")
   templates: EmailTemplateSummary[];
 }
 
@@ -426,7 +432,7 @@ interface ConsoleSmtpApi {
 @tag("console")
 @useAuth(consoleSession)
 interface ConsoleEmailTemplatesApi {
-  @doc("Lists the four auth email templates of the project named by `X-Orvano-Project`. Any member.")
+  @doc("Lists the five auth email templates of the project named by `X-Orvano-Project`. Any member.")
   @operationId("consoleEmailTemplates.getCatalog")
   @extension("x-orvano-audience", "console")
   @extension("x-orvano-service", "consoleEmailTemplates")

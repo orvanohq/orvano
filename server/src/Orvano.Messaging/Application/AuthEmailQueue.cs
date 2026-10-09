@@ -8,7 +8,7 @@ using Orvano.Messaging.Domain;
 namespace Orvano.Messaging.Application;
 
 /// <summary>
-/// Queues an auth email for another module (spec 0009, AC-14): it checks the request, resolves the SMTP and the
+/// Queues an auth email or a security alert for another module (spec 0009, AC-14; spec 0013, AC-31): it checks the request, resolves the SMTP and the
 /// install cap, renders the project's template (or the default) with the caller's values, and inserts the sealed
 /// row and its job, all on the caller's transaction in raw Npgsql.
 /// </summary>
@@ -30,9 +30,21 @@ internal sealed class AuthEmailQueue(EmailQueue queue, [FromKeyedServices(Orvano
     public async Task<EmailQueueResult> QueueAuthEmailAsync(NpgsqlTransaction tx, AuthEmail email, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(tx);
-        var values = AuthEmailRule.Check(email);
+        return await QueueAsync(tx, email.ProjectId, email.Kind, AuthEmailRule.Check(email), ct);
+    }
 
-        switch (await queue.AdmitAsync(tx, email.ProjectId, ct))
+    public async Task<EmailQueueResult> QueueSecurityAlertAsync(
+        NpgsqlTransaction tx, string projectId, string to, string projectName, SecurityAlertKind alert, DateTimeOffset occurredAt, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(tx);
+        var values = AuthEmailRule.CheckAlert(projectId, to, projectName, alert, occurredAt);
+        return await QueueAsync(tx, projectId, AuthEmailKind.SecurityAlert, values, ct);
+    }
+
+    /// <summary>The one queue path: admit, render the project's template or the default, insert the sealed row.</summary>
+    private async Task<EmailQueueResult> QueueAsync(NpgsqlTransaction tx, string projectId, AuthEmailKind kind, TemplateValues values, CancellationToken ct)
+    {
+        switch (await queue.AdmitAsync(tx, projectId, ct))
         {
             case QueueRefusal.NotConfigured:
                 return new EmailQueueResult.NotConfigured();
@@ -40,19 +52,19 @@ internal sealed class AuthEmailQueue(EmailQueue queue, [FromKeyedServices(Orvano
                 return new EmailQueueResult.RateLimited(limited.RetryAfter);
         }
 
-        var info = EmailTemplateCatalog.Get(email.Kind);
-        var custom = await FindCustomAsync(tx, email.ProjectId, info.Wire, ct);
+        var info = EmailTemplateCatalog.Get(kind);
+        var custom = await FindCustomAsync(tx, projectId, info.Wire, ct);
         var content = custom is null ? null : await TryRenderAsync(info, custom, values);
         var fellBack = custom is not null && content is null;
         content ??= await RenderDefaultAsync(info, values);
 
-        var id = await queue.InsertAsync(tx, email.ProjectId, info.Wire, values.UserEmail, content, ct);
+        var id = await queue.InsertAsync(tx, projectId, info.Wire, values.UserEmail, content, ct);
         // AC-18: the project's own template can't be sent as it is, so the user still gets the default.
         if (fellBack)
         {
             logger.LogWarning(
                 "Email {EmailId} of project {ProjectId} used the default {TemplateKind} template: the project's own failed to render",
-                id, email.ProjectId, info.Wire);
+                id, projectId, info.Wire);
         }
 
         return new EmailQueueResult.Queued(id);

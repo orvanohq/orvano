@@ -40,7 +40,7 @@ public sealed class ApiKeyScopeJsonConverter : JsonConverter<ApiKeyScope>
         });
 }
 
-/// <summary>One of the four auth email templates a project can edit.</summary>
+/// <summary>One of the five auth email templates a project can edit.</summary>
 [JsonConverter(typeof(AuthEmailKindJsonConverter))]
 public enum AuthEmailKind
 {
@@ -58,6 +58,9 @@ public enum AuthEmailKind
 
     /// <summary>The wire value <c>email_code</c>.</summary>
     EmailCode,
+
+    /// <summary>The wire value <c>security_alert</c>.</summary>
+    SecurityAlert,
 }
 
 /// <summary>Reads and writes <see cref="AuthEmailKind"/> by wire value; unknown values read as <see cref="AuthEmailKind.Unknown"/>.</summary>
@@ -71,6 +74,7 @@ public sealed class AuthEmailKindJsonConverter : JsonConverter<AuthEmailKind>
             "recovery" => AuthEmailKind.Recovery,
             "magic_link" => AuthEmailKind.MagicLink,
             "email_code" => AuthEmailKind.EmailCode,
+            "security_alert" => AuthEmailKind.SecurityAlert,
             _ => AuthEmailKind.Unknown,
         };
 
@@ -82,6 +86,7 @@ public sealed class AuthEmailKindJsonConverter : JsonConverter<AuthEmailKind>
             AuthEmailKind.Recovery => "recovery",
             AuthEmailKind.MagicLink => "magic_link",
             AuthEmailKind.EmailCode => "email_code",
+            AuthEmailKind.SecurityAlert => "security_alert",
             _ => throw new JsonException($"AuthEmailKind.{value} has no wire value"),
         });
 }
@@ -285,7 +290,7 @@ public sealed class EmailStatusJsonConverter : JsonConverter<EmailStatus>
         });
 }
 
-/// <summary>Which email was sent: one of the four auth templates, or the console's own invite.</summary>
+/// <summary>Which email was sent: one of the five auth templates, or the console's own invite.</summary>
 [JsonConverter(typeof(EmailTemplateNameJsonConverter))]
 public enum EmailTemplateName
 {
@@ -304,6 +309,9 @@ public enum EmailTemplateName
     /// <summary>The wire value <c>email_code</c>.</summary>
     EmailCode,
 
+    /// <summary>The wire value <c>security_alert</c>.</summary>
+    SecurityAlert,
+
     /// <summary>The wire value <c>console_invitation</c>.</summary>
     ConsoleInvitation,
 }
@@ -319,6 +327,7 @@ public sealed class EmailTemplateNameJsonConverter : JsonConverter<EmailTemplate
             "recovery" => EmailTemplateName.Recovery,
             "magic_link" => EmailTemplateName.MagicLink,
             "email_code" => EmailTemplateName.EmailCode,
+            "security_alert" => EmailTemplateName.SecurityAlert,
             "console_invitation" => EmailTemplateName.ConsoleInvitation,
             _ => EmailTemplateName.Unknown,
         };
@@ -331,6 +340,7 @@ public sealed class EmailTemplateNameJsonConverter : JsonConverter<EmailTemplate
             EmailTemplateName.Recovery => "recovery",
             EmailTemplateName.MagicLink => "magic_link",
             EmailTemplateName.EmailCode => "email_code",
+            EmailTemplateName.SecurityAlert => "security_alert",
             EmailTemplateName.ConsoleInvitation => "console_invitation",
             _ => throw new JsonException($"EmailTemplateName.{value} has no wire value"),
         });
@@ -1425,8 +1435,8 @@ public sealed record EmailTemplate(
     [property: JsonPropertyName("updatedAt")] DateTimeOffset? UpdatedAt,
     [property: JsonPropertyName("variables")] IReadOnlyList<TemplateVariable> Variables);
 
-/// <summary>The auth email templates of a project. Always all four, so it is not paged.</summary>
-/// <param name="Templates">The four templates.</param>
+/// <summary>The auth email templates of a project. Always all five, so it is not paged.</summary>
+/// <param name="Templates">The five templates.</param>
 public sealed record EmailTemplateCatalog(
     [property: JsonPropertyName("templates")] IReadOnlyList<EmailTemplateSummary> Templates);
 

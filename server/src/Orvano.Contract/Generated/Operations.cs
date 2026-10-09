@@ -1260,7 +1260,7 @@ public static class ConsoleEmailTemplatesOperations
         public const string Audience = "console";
     }
 
-    /// <summary>GET /v1/console/project/email/templates: Lists the four auth email templates of the project named by <c>X-Orvano-Project</c>. Any member.</summary>
+    /// <summary>GET /v1/console/project/email/templates: Lists the five auth email templates of the project named by <c>X-Orvano-Project</c>. Any member.</summary>
     public static class GetCatalog
     {
         /// <summary>The operationId, also the endpoint name.</summary>

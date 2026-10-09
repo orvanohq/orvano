@@ -118,7 +118,7 @@ export const fakeRecoveryCodes = [
   'JJJJJ-55555',
 ]
 
-/** The four templates as the catalog lists them (spec 0009, Template variables). */
+/** The five templates as the catalog lists them (spec 0009, Template variables; spec 0013, AC-31). */
 export const fakeTemplates: Record<AuthEmailKind, { name: string; description: string }> = {
   verification: {
     name: 'Email verification',
@@ -136,12 +136,24 @@ export const fakeTemplates: Record<AuthEmailKind, { name: string; description: s
     name: 'Email code',
     description: 'Sent when a user signs in with a one time code.',
   },
+  security_alert: {
+    name: 'Security alert',
+    description:
+      "Sent when a user's sign in security changes: MFA on or off, a passkey added or removed, recovery codes made or used.",
+  },
 }
 
 const sampleUrl = 'https://example.com/auth/confirm?token=sample'
 
 /** A short default template: enough Liquid for a preview to have something to fill in. */
 function defaultTemplate(kind: AuthEmailKind): EmailTemplateInput {
+  if (kind === 'security_alert') {
+    return {
+      subject: 'Security alert for {{ project.name }}',
+      html: '<h1>{{ alert }}</h1>\n<p>When: {{ occurred_at }}</p>',
+      text: '{{ alert }} at {{ occurred_at }}',
+    }
+  }
   const action = kind === 'email_code' ? '{{ code }}' : '<a href="{{ action_url }}">Open</a>'
   return {
     subject: `${fakeTemplates[kind].name} for {{ project.name }}`,
@@ -304,6 +316,7 @@ export function installFakeApi(): FakeApi {
     'recovery',
     'magic_link',
     'email_code',
+    'security_alert',
   ]
   const orgById = (id: string) => api.orgs.find((org) => org.id === id)
   const projectById = (id: string | null) => api.projects.find((project) => project.id === id)
