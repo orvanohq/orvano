@@ -103,7 +103,7 @@ _Steps derived from spec 0014's AC-7 to AC-15, AC-33, and AC-34 (Sign ups, Email
 
 - AC-7 (disposable list, already bundled) · AC-8, AC-9: domain steps · AC-10: sign ups off step · AC-11: SMTP steps · AC-12 to AC-14: verified email steps · AC-15: reject link step · AC-33: last method step · AC-34: Sign ups and Email domains cards · AC-36: `signUp`'s pending answer stores nothing and `redeemLink`/`handleLink` route `verification_reject` (SDK unit tests); closed sign ups and hidden sign up run only in the server tests, since every scenario shares one fixture project
 
-# Verify: auth policies and abuse protection (milestone 4 of the build: sessions and require MFA) · spec 0014 · updated 2026-10-09
+# Verify: auth policies and abuse protection (build tasks 5 and 6: sessions and require MFA) · spec 0014 · updated 2026-10-09
 _Steps derived from spec 0014's AC-2 (MFA), AC-25 to AC-27, AC-35 (MFA card), and AC-36 (enrollment helpers). The session lifetime and cap steps are in the first block above. `/check verify` runs these; `/test` locks the durable ones. Server HTTP tests: `RequireMfaTests`, `SessionPolicyTests`; shared scenarios: `auth-require-mfa`, `auth-require-mfa-passkey`, `auth-session-limit` (on their own fixture projects, `scenarios0000000000b` and `c`)._
 
 ## UI / manual
@@ -133,6 +133,6 @@ _Steps derived from spec 0014's AC-2 (MFA), AC-25 to AC-27, AC-35 (MFA card), an
 - [ ] The enrolled session's `amr` is the step one method's plus the factor's: a magic link user enrolling a passkey gets `[email, hwk or swk, mfa, user]`, a password user enrolling TOTP `[mfa, otp, pwd]` → AC-27
 - [ ] `activeUsersWithoutMfa` counts users with a live session and no factor that counts now: turning passkeys off raises it for users whose only factor is a passkey; guests are not counted → AC-27, AC-35
 
-## Acceptance criteria coverage (milestone 4: sessions and require MFA)
+## Acceptance criteria coverage (build tasks 5 and 6: sessions and require MFA)
 
 - AC-2 (mfaRequired): switch steps and `RequireMfaTests.The_switch_needs_a_factor_users_can_enroll_and_an_email_server` · AC-25, AC-26: the session steps in the first block, `SessionPolicyTests`, and `auth-session-limit` · AC-27: enrollment steps and `RequireMfaTests` · AC-35 (MFA card): card steps · AC-36 (enrollment helpers): SDK steps and the three scenarios
