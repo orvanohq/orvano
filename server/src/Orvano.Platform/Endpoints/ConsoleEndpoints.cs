@@ -203,6 +203,14 @@ internal static class ConsoleEndpoints
         {
             var limit = limits.Acquire(RateLimitPolicies.ConsoleInviteCreatePerUser, User(http).ToString());
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
+            // Spec 0014, AC-23: every invitation email (a new one and a resend alike) spends one of the address's permits,
+            // kept in memory only, so no one floods an inbox through the console.
+            if (Domain.InviteEmail.TryNormalize(request.Email, out var recipient))
+            {
+                var perRecipient = limits.Acquire(RateLimitPolicies.ConsoleInviteEmailPerRecipient, recipient.ToLowerInvariant());
+                if (!perRecipient.Allowed) return ApiProblem.RateLimited(http, perRecipient, Api.ErrorCode.RateLimited);
+            }
+
             // An org ID that is not a UUID names no org: the body is still checked first (AC-3), then it answers 404.
             var id = Guid.TryParse(orgId, out var parsed) ? parsed : Guid.Empty;
             return Created(await invitations.CreateAsync(User(http), id, request.Email, ToRole(request.Role), ct), CreatedInvitation);

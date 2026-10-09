@@ -4,6 +4,7 @@ import type {
   ApiKey,
   ApiKeyPage,
   AuthMethodSettings,
+  AuthPolicies,
   ConsoleAccount,
   ConsoleAuthResult,
   ConsoleTotpConfirmation,
@@ -46,6 +47,7 @@ import type {
   SmtpSettings,
   SmtpSettingsInput,
   UpdateAuthMethodSettingsRequest,
+  UpdateAuthPoliciesRequest,
   UpdateInstallSettingsRequest,
   UpdateMemberRequest,
   UpdateOAuthProviderRequest,
@@ -434,6 +436,31 @@ export class ConsoleAuthMethodsService {
   ): Promise<AuthMethodSettings> {
     return this.#client.request<AuthMethodSettings>(
       { method: 'PATCH', path: '/v1/console/project/auth/methods', body },
+      options,
+    )
+  }
+}
+
+/** Operations in the `consoleAuthPolicies` service. */
+export class ConsoleAuthPoliciesService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /** Gets the project's auth rules; any member. */
+  get(options?: RequestOptions): Promise<AuthPolicies> {
+    return this.#client.request<AuthPolicies>(
+      { method: 'GET', path: '/v1/console/project/auth/policies' },
+      options,
+    )
+  }
+
+  /** Changes the project's auth rules; owners and developers only. */
+  update(body: UpdateAuthPoliciesRequest, options?: RequestOptions): Promise<AuthPolicies> {
+    return this.#client.request<AuthPolicies>(
+      { method: 'PATCH', path: '/v1/console/project/auth/policies', body },
       options,
     )
   }
@@ -1397,6 +1424,8 @@ export class Orvano {
   readonly consoleAuthKeys: ConsoleAuthKeysService
   /** Operations in the `consoleAuthMethods` service. */
   readonly consoleAuthMethods: ConsoleAuthMethodsService
+  /** Operations in the `consoleAuthPolicies` service. */
+  readonly consoleAuthPolicies: ConsoleAuthPoliciesService
   /** Operations in the `consoleAuthProviders` service. */
   readonly consoleAuthProviders: ConsoleAuthProvidersService
   /** Operations in the `consoleEmailTemplates` service. */
@@ -1426,6 +1455,7 @@ export class Orvano {
     this.consoleApiKeys = new ConsoleApiKeysService(client)
     this.consoleAuthKeys = new ConsoleAuthKeysService(client)
     this.consoleAuthMethods = new ConsoleAuthMethodsService(client)
+    this.consoleAuthPolicies = new ConsoleAuthPoliciesService(client)
     this.consoleAuthProviders = new ConsoleAuthProvidersService(client)
     this.consoleEmailTemplates = new ConsoleEmailTemplatesService(client)
     this.consoleEmails = new ConsoleEmailsService(client)

@@ -118,15 +118,15 @@ internal sealed class UsersService(
     }
 
     /// <summary>Emails the user a verification link (spec 0010, AC-21): 409 <c>email_already_verified</c> for a verified user.</summary>
-    public async Task<Outcome<Done>> CreateVerificationAsync(string projectId, string userId, string? redirectUrl, Actor actor, CancellationToken ct) =>
+    public async Task<Outcome<Done>> CreateVerificationAsync(string projectId, string userId, string? redirectUrl, Actor actor, string limitKey, CancellationToken ct) =>
         Guid.TryParse(userId, out var id) && await FindAsync(projectId, id, ct) is not null
-            ? await verification.RequestAsync(projectId, id, redirectUrl, actor, ct)
+            ? await verification.RequestAsync(projectId, id, redirectUrl, actor, limitKey, ct)
             : Failure.UserNotFound;
 
     /// <summary>Emails the user a password reset link (spec 0010, AC-21): 403 <c>user_blocked</c> for a blocked user.</summary>
-    public async Task<Outcome<Done>> CreateRecoveryAsync(string projectId, string userId, string? redirectUrl, Actor actor, CancellationToken ct) =>
+    public async Task<Outcome<Done>> CreateRecoveryAsync(string projectId, string userId, string? redirectUrl, Actor actor, string limitKey, CancellationToken ct) =>
         Guid.TryParse(userId, out var id) && await FindAsync(projectId, id, ct) is not null
-            ? await recovery.SendForUserAsync(projectId, id, redirectUrl, actor, ct)
+            ? await recovery.SendForUserAsync(projectId, id, redirectUrl, actor, limitKey, ct)
             : Failure.UserNotFound;
 
     /// <summary>

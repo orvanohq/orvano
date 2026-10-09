@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orvano.Auth.Application;
@@ -52,7 +53,7 @@ internal static class EmailRequests
     /// <summary>
     /// A redemption (AC-28): over <c>auth.email_redeem_failed.ip</c>, 429 before the body is read, even for a valid
     /// token; otherwise reads the body, runs <paramref name="redeem"/>, and counts the answer against the IP only
-    /// when it is a 401.
+    /// when it is a 401 about the token (spec 0014, AC-24). The key is the limit IP (AC-16).
     /// </summary>
     /// <remarks>The OAuth redemptions (spec 0012, AC-7, AC-9) pass their own <paramref name="failedPolicy"/>, <c>auth.oauth_failed.ip</c>.</remarks>
     public static async Task<IResult> RedeemAsync<TRequest>(
@@ -60,7 +61,7 @@ internal static class EmailRequests
         where TRequest : class
     {
         var policy = failedPolicy ?? RateLimitPolicies.FailedEmailRedeemPerIp;
-        var ip = ConnectionIp.Key(http);
+        var ip = PublicRequests.LimitKey(http);
         var failures = limits.Check(policy, ip);
         if (!failures.Allowed) return ApiProblem.RateLimited(http, failures, Api.ErrorCode.RateLimited);
 
@@ -77,7 +78,15 @@ internal static class EmailRequests
         if (request is null) return ApiProblem.Result(StatusCodes.Status400BadRequest, Api.ErrorCode.InvalidRequest, "Send a JSON object as the body.");
 
         var result = await redeem(request);
-        if (result is IStatusCodeHttpResult { StatusCode: StatusCodes.Status401Unauthorized }) limits.Acquire(policy, ip);
+        // Only a refused token or code counts: a 401 invalid_credentials is a step up's wrong password (spec 0014, AC-24),
+        // which auth.password_check.user already counts.
+        if (result is IStatusCodeHttpResult { StatusCode: StatusCodes.Status401Unauthorized } && Code(result) != Api.ErrorCode.InvalidCredentials)
+            limits.Acquire(policy, ip);
         return result;
     }
+
+    private static string? Code(IResult result) =>
+        result is ProblemHttpResult { ProblemDetails.Extensions: var extensions } && extensions.TryGetValue(ApiProblem.CodeKey, out var code)
+            ? code as string
+            : null;
 }

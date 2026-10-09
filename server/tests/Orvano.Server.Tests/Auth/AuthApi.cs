@@ -64,7 +64,7 @@ public sealed class AuthApi : IAsyncDisposable
     /// </remarks>
     public static async Task<AuthApi> StartAsync(
         PostgresFixture postgres, IReadOnlyDictionary<string, string>? env = null, bool fixtures = true, bool email = false, bool smtp = false,
-        bool oauth = false)
+        bool oauth = false, bool pwned = false)
     {
         email |= oauth;
         var database = await postgres.NewDatabaseAsync();
@@ -106,10 +106,11 @@ public sealed class AuthApi : IAsyncDisposable
         };
         if (fixtures) settings["ORVANO_TEST_FIXTURES"] = fixturesPath;
 
-        int? port = null;
+        int? port = oauth || pwned ? OrvanoProcess.FreePort() : null;
+        // Spec 0014, AC-6: the breached password check calls the process's own fake range API, never the real one.
+        if (pwned) settings["ORVANO_TEST_HIBP_URL"] = $"http://127.0.0.1:{port}/v1/test/pwned";
         if (oauth)
         {
-            port = OrvanoProcess.FreePort();
             settings["ORVANO_PUBLIC_URL"] = $"http://127.0.0.1:{port}";
             settings["ORVANO_TEST_OAUTH_PROVIDER_URL"] = $"http://127.0.0.1:{port}/v1/test/oauth";
         }

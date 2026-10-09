@@ -3936,6 +3936,8 @@
           "signup_closed",
           "setup_token_invalid",
           "invalid_password",
+          "password_too_common",
+          "password_breached",
           "invalid_credentials",
           "session_required",
           "invalid_token",

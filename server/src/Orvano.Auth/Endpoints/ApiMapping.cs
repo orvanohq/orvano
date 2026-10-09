@@ -265,6 +265,53 @@ internal static class ApiMapping
         view.ActivePasskeyCount,
         [.. view.AcceptedOrigins]);
 
+    public static Api.AuthPolicies AuthPolicies(AuthPoliciesView view)
+    {
+        var values = AuthPolicyValues(view.Policies);
+        return new Api.AuthPolicies(
+            values.SignUpsEnabled,
+            values.RequireVerifiedEmail,
+            values.BlockDisposableEmails,
+            values.BlockedEmailDomains,
+            values.AllowedEmailDomains,
+            values.PasswordMinLength,
+            values.PasswordCommonCheck,
+            values.PasswordBreachedCheck,
+            values.AccessTokenSeconds,
+            values.SessionIdleSeconds,
+            values.SessionAbsoluteSeconds,
+            values.MaxSessionsPerUser,
+            values.TrustedServerCidrs,
+            values.SignInFailedPerEmailIp,
+            values.SignInFailedPerIp,
+            values.SignUpPerIp,
+            values.AnonymousPerIp,
+            values.EmailSendPerIp,
+            view.UpdatedAt,
+            view.SmtpAvailable,
+            AuthPolicyValues(Domain.AuthPolicies.Defaults));
+    }
+
+    private static Api.AuthPolicyValues AuthPolicyValues(Domain.AuthPolicies policies) => new(
+        policies.SignUpsEnabled,
+        policies.RequireVerifiedEmail,
+        policies.BlockDisposableEmails,
+        [.. policies.BlockedEmailDomains],
+        [.. policies.AllowedEmailDomains],
+        policies.PasswordMinLength,
+        policies.PasswordCommonCheck,
+        policies.PasswordBreachedCheck,
+        policies.AccessTokenSeconds,
+        policies.SessionIdleSeconds,
+        policies.SessionAbsoluteSeconds,
+        policies.MaxSessionsPerUser,
+        [.. policies.TrustedServerCidrs.Select(cidr => cidr.ToString())],
+        new Api.SignInFailedLimit(policies.SignInFailedPerEmailIp.Limit, policies.SignInFailedPerEmailIp.WindowMinutes),
+        policies.SignInFailedPerIp,
+        policies.SignUpPerIp,
+        policies.AnonymousPerIp,
+        policies.EmailSendPerIp);
+
     public static Api.Jwk Jwk(PublicSigningKey key) =>
         JsonSerializer.Deserialize<Api.Jwk>(key.PublicJwk) ?? throw new InvalidOperationException($"Signing key {key.Kid} has no public JWK.");
 

@@ -23,6 +23,7 @@ namespace Orvano.Server.Hosting;
 /// <param name="InstallSmtp">The install's SMTP server to seed, if any: a mail catcher that needs no sign in.</param>
 /// <param name="OAuthProviders">Sign in provider settings to seed (spec 0012), through the console's own settings code.</param>
 /// <param name="MethodSettings">TOTP and passkey settings to seed (spec 0013), through the console's own settings code.</param>
+/// <param name="AuthPolicies">Projects' auth rules to seed (spec 0014), through the console's own settings code.</param>
 /// <param name="Problem">Why the fixtures can't be used; the role refuses to start when set.</param>
 internal sealed record TestFixtures(
     IReadOnlyList<FixtureConsoleUser> ConsoleUsers,
@@ -33,6 +34,7 @@ internal sealed record TestFixtures(
     FixtureInstallSmtp? InstallSmtp = null,
     IReadOnlyList<FixtureOAuthProvider>? OAuthProviders = null,
     IReadOnlyList<FixtureMethodSettings>? MethodSettings = null,
+    IReadOnlyList<FixtureAuthPolicies>? AuthPolicies = null,
     string? Problem = null)
 {
     public const string Setting = "ORVANO_TEST_FIXTURES";
@@ -149,7 +151,33 @@ internal sealed record TestFixtures(
             methods.Add(new FixtureMethodSettings(m.Project!, update));
         }
 
-        return new TestFixtures(consoleUsers, projects, keys, platforms, users, installSmtp, providers, methods);
+        var policies = new List<FixtureAuthPolicies>();
+        foreach (var a in file?.AuthPolicies ?? [])
+        {
+            if (!projects.Any(project => project.Id == a.Project)) return Fail($"{Setting}: authPolicies project '{a.Project}' is not one of the fixture projects");
+            var update = new AuthPoliciesUpdate
+            {
+                SignUpsEnabled = a.SignUpsEnabled,
+                RequireVerifiedEmail = a.RequireVerifiedEmail,
+                BlockDisposableEmails = a.BlockDisposableEmails,
+                BlockedEmailDomains = a.BlockedEmailDomains,
+                AllowedEmailDomains = a.AllowedEmailDomains,
+                PasswordMinLength = a.PasswordMinLength,
+                PasswordCommonCheck = a.PasswordCommonCheck,
+                PasswordBreachedCheck = a.PasswordBreachedCheck,
+                AccessTokenSeconds = a.AccessTokenSeconds,
+                SessionIdleSeconds = a.SessionIdleSeconds,
+                SessionAbsoluteSeconds = a.SessionAbsoluteSeconds,
+                MaxSessionsPerUser = a.MaxSessionsPerUser is { } max ? Patch<int?>.To(max) : Patch<int?>.Keep,
+                TrustedServerCidrs = a.TrustedServerCidrs,
+                SignUpPerIp = a.SignUpPerIp,
+            };
+            if (AuthPolicyRules.Apply(Auth.Domain.AuthPolicies.Defaults, update) is (null, var problem))
+                return Fail($"{Setting}: authPolicies of '{a.Project}': {problem}");
+            policies.Add(new FixtureAuthPolicies(a.Project!, update));
+        }
+
+        return new TestFixtures(consoleUsers, projects, keys, platforms, users, installSmtp, providers, methods, policies);
     }
 
     private static TestFixtures Fail(string problem) => None with { Problem = problem };
@@ -183,6 +211,57 @@ internal sealed record TestFixtures(
 
         [YamlMember(Alias = "methodSettings")]
         public List<MethodSettingsEntry>? MethodSettings { get; set; }
+
+        [YamlMember(Alias = "authPolicies")]
+        public List<AuthPoliciesEntry>? AuthPolicies { get; set; }
+    }
+
+    private sealed class AuthPoliciesEntry
+    {
+        [YamlMember(Alias = "project")]
+        public string? Project { get; set; }
+
+        [YamlMember(Alias = "signUpsEnabled")]
+        public bool? SignUpsEnabled { get; set; }
+
+        [YamlMember(Alias = "requireVerifiedEmail")]
+        public bool? RequireVerifiedEmail { get; set; }
+
+        [YamlMember(Alias = "blockDisposableEmails")]
+        public bool? BlockDisposableEmails { get; set; }
+
+        [YamlMember(Alias = "blockedEmailDomains")]
+        public List<string>? BlockedEmailDomains { get; set; }
+
+        [YamlMember(Alias = "allowedEmailDomains")]
+        public List<string>? AllowedEmailDomains { get; set; }
+
+        [YamlMember(Alias = "passwordMinLength")]
+        public int? PasswordMinLength { get; set; }
+
+        [YamlMember(Alias = "passwordCommonCheck")]
+        public bool? PasswordCommonCheck { get; set; }
+
+        [YamlMember(Alias = "passwordBreachedCheck")]
+        public bool? PasswordBreachedCheck { get; set; }
+
+        [YamlMember(Alias = "accessTokenSeconds")]
+        public int? AccessTokenSeconds { get; set; }
+
+        [YamlMember(Alias = "sessionIdleSeconds")]
+        public int? SessionIdleSeconds { get; set; }
+
+        [YamlMember(Alias = "sessionAbsoluteSeconds")]
+        public int? SessionAbsoluteSeconds { get; set; }
+
+        [YamlMember(Alias = "maxSessionsPerUser")]
+        public int? MaxSessionsPerUser { get; set; }
+
+        [YamlMember(Alias = "trustedServerCidrs")]
+        public List<string>? TrustedServerCidrs { get; set; }
+
+        [YamlMember(Alias = "signUpPerIp")]
+        public int? SignUpPerIp { get; set; }
     }
 
     private sealed class MethodSettingsEntry

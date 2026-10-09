@@ -25,7 +25,8 @@ internal static class ConsoleAccountEndpoints
             HttpContext http, Api.CreateConsoleAccountRequest request, AccountService accounts, IInstallAdmins admins, RateLimits limits, PublicUrl publicUrl,
             CancellationToken ct) =>
         {
-            var limit = limits.Acquire(RateLimitPolicies.SignUpPerIp, ConnectionIp.Key(http));
+            // The console project keeps the fixed defaults (spec 0014, AC-37).
+            var limit = limits.Acquire(RateLimitPolicies.SignUpPerIp, PublicRequests.ConsoleLimitKey(http));
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
 
             var outcome = await accounts.SignUpAsync(ConsoleProject.Id, request.Email, request.Password, request.Name, PublicRequests.Client(http), ct,
@@ -41,13 +42,12 @@ internal static class ConsoleAccountEndpoints
             HttpContext http, Api.CreateConsoleSessionRequest request, AccountService accounts, IInstallAdmins admins, RateLimits limits, PublicUrl publicUrl,
             CancellationToken ct) =>
         {
-            // Both limits count every attempt, right or wrong (spec 0004, rate limits).
-            var perEmail = limits.Acquire(RateLimitPolicies.SignInPerEmail, $"{ConsoleProject.Id}\n{(request.Email ?? "").Trim().ToLowerInvariant()}");
-            var perIp = limits.Acquire(RateLimitPolicies.SignInPerIp, ConnectionIp.Key(http));
-            if (!perEmail.Allowed) return ApiProblem.RateLimited(http, perEmail, Api.ErrorCode.RateLimited);
-            if (!perIp.Allowed) return ApiProblem.RateLimited(http, perIp, Api.ErrorCode.RateLimited);
+            // The console project's limits at their defaults (spec 0014, AC-17, AC-37).
+            using var failures = SignInLimits.Take(http, limits, PublicRequests.ConsoleLimitKey(http), Domain.AuthPolicies.Defaults, request.Email, out var refused);
+            if (refused is not null) return refused;
 
             var outcome = await accounts.SignInAsync(ConsoleProject.Id, request.Email, request.Password, PublicRequests.Client(http), ct);
+            SignInLimits.Settle(failures!, outcome.Failure);
             if (!outcome.Succeeded) return Problem(http, outcome.Failure!);
             // With MFA on (spec 0013, AC-41) no session cookie is set or changed: the ticket goes in its own cookie, and
             // the body carries the factors with an empty ticket.
@@ -65,7 +65,7 @@ internal static class ConsoleAccountEndpoints
         v1.MapPost(Ops.RefreshSession.Route, async (HttpContext http, SessionService sessions, RateLimits limits, PublicUrl publicUrl, CancellationToken ct) =>
         {
             // The same two limits as account.refreshSession: per session, and failed refreshes per IP.
-            var ip = ConnectionIp.Key(http);
+            var ip = PublicRequests.ConsoleLimitKey(http);
             var failures = limits.Check(RateLimitPolicies.FailedRefreshPerIp, ip);
             if (!failures.Allowed) return ApiProblem.RateLimited(http, failures, Api.ErrorCode.RateLimited);
             var refreshToken = http.Request.Cookies[OrvanoHeaders.ConsoleRefreshCookie];

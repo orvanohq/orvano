@@ -1,4 +1,4 @@
-import { createNonce, createPkce } from '@orvano/js'
+import { Client, createNonce, createPkce } from '@orvano/js'
 import type { MfaAnswer } from '@orvano/js'
 import type { Client as ServerClient } from '@orvano/js/server'
 import type { DispatchTable } from './dispatch-table.js'
@@ -140,7 +140,8 @@ function mfaAnswer(input: Record<string, unknown>): MfaAnswer {
  * client kept its refresh token), and `registerPasskey` and `signInWithPasskey` its passkey
  * helpers, on the server's software authenticator (spec 0013); `registerPasskey` and a linking
  * `oauthSignIn` send the step's `password`. `accessToken` hands the client's stored access token to
- * a server step.
+ * a server step. `signInFrom` is `signIn` as a trusted app server sends it for the visitor at
+ * `clientIp` (spec 0014).
  * Their names have no dot, so they never collide with an operationId.
  */
 export const runnerDispatch: DispatchTable = {
@@ -243,6 +244,21 @@ export const runnerDispatch: DispatchTable = {
     status: 201,
     client: (o, input) =>
       o.client.request<unknown>({
+        method: 'POST',
+        path: '/v1/account/sessions/password',
+        body: input.body,
+      }),
+  },
+  // A plain sign in sent as a trusted app server would send it for a visitor at `clientIp`
+  // (spec 0014, AC-16): the fixture project lists the scenario network's addresses.
+  signInFrom: {
+    status: 201,
+    client: (o, input) =>
+      new Client({
+        endpoint: o.client.endpoint,
+        ...(o.client.project === undefined ? {} : { project: o.client.project }),
+        headers: { 'X-Orvano-Client-IP': String(input.clientIp) },
+      }).request<unknown>({
         method: 'POST',
         path: '/v1/account/sessions/password',
         body: input.body,

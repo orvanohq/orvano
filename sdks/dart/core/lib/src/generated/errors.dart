@@ -149,6 +149,12 @@ abstract final class ErrorCode {
   /// `passkeys_exist`
   static const passkeysExist = 'passkeys_exist';
 
+  /// `password_breached`
+  static const passwordBreached = 'password_breached';
+
+  /// `password_too_common`
+  static const passwordTooCommon = 'password_too_common';
+
   /// `project_not_found`
   static const projectNotFound = 'project_not_found';
 

@@ -105,7 +105,6 @@ public class KernelSettingsTests
     [Fact]
     public void Built_in_policies_match_the_spec()
     {
-        Assert.Equal((10, TimeSpan.FromMinutes(15)), (RateLimitPolicies.SignInPerEmail.PermitLimit, RateLimitPolicies.SignInPerEmail.Window));
         Assert.Equal((300, TimeSpan.FromMinutes(15)), (RateLimitPolicies.SignInPerIp.PermitLimit, RateLimitPolicies.SignInPerIp.Window));
         Assert.Equal((60, TimeSpan.FromHours(1)), (RateLimitPolicies.SignUpPerIp.PermitLimit, RateLimitPolicies.SignUpPerIp.Window));
         Assert.Equal((10, TimeSpan.FromMinutes(15)), (RateLimitPolicies.PasswordCheckPerUser.PermitLimit, RateLimitPolicies.PasswordCheckPerUser.Window));
@@ -116,7 +115,7 @@ public class KernelSettingsTests
 
     // Spec 0013 AC-32: the MFA and passkey limits of its Rate limits table, by name, limit, and window.
     [Theory]
-    [InlineData("auth.mfa_failed.user", 10)]
+    [InlineData("auth.mfa_failed.user_ip", 10)]
     [InlineData("auth.mfa_ticket_failed.ip", 60)]
     [InlineData("auth.passkey.ip", 300)]
     [InlineData("auth.passkey_challenge.user", 30)]
@@ -126,12 +125,126 @@ public class KernelSettingsTests
     {
         RateLimitPolicy[] policies =
         [
-            RateLimitPolicies.FailedMfaPerUser, RateLimitPolicies.FailedMfaTicketPerIp, RateLimitPolicies.PasskeyPerIp,
+            RateLimitPolicies.FailedMfaPerUserIp, RateLimitPolicies.FailedMfaTicketPerIp, RateLimitPolicies.PasskeyPerIp,
             RateLimitPolicies.PasskeyChallengePerUser, RateLimitPolicies.FailedPasskeyPerIp, RateLimitPolicies.MfaEnrollPerUser,
         ];
 
         var policy = Assert.Single(policies, p => p.Name == name);
 
         Assert.Equal((limit, TimeSpan.FromMinutes(15)), (policy.PermitLimit, policy.Window));
+    }
+
+    // Spec 0014's Rate limits table: the new and rekeyed policies, by name, default limit, and window.
+    [Theory]
+    [InlineData("auth.sign_in.ip", 300, 15)]
+    [InlineData("auth.sign_in_failed.email_ip", 10, 15)]
+    [InlineData("auth.sign_in_failed.ip", 100, 15)]
+    [InlineData("auth.sign_up.ip", 60, 60)]
+    [InlineData("auth.anonymous.ip", 30, 60)]
+    [InlineData("auth.anonymous.project", 1000, 60)]
+    [InlineData("auth.email_send.ip", 300, 60)]
+    [InlineData("auth.email_send.recipient", 5, 60)]
+    [InlineData("auth.email_send.recipient_total", 20, 60)]
+    [InlineData("auth.email_code_failed.recipient_ip", 5, 15)]
+    [InlineData("auth.email_code_failed.recipient", 30, 60)]
+    [InlineData("auth.mfa_totp_failed.user", 60, 60)]
+    [InlineData("auth.api_key_failed.ip", 60, 15)]
+    [InlineData("console.invite_email.recipient", 5, 60)]
+    public void Policies_match_spec_0014(string name, int limit, int windowMinutes)
+    {
+        var policy = Assert.Single(
+            typeof(RateLimitPolicies).GetProperties().Select(p => (RateLimitPolicy)p.GetValue(null)!), p => p.Name == name);
+        Assert.Equal((limit, TimeSpan.FromMinutes(windowMinutes)), (policy.PermitLimit, policy.Window));
+    }
+
+    [Fact]
+    public void The_replaced_spec_0013_and_0010_policies_are_gone()
+    {
+        var names = typeof(RateLimitPolicies).GetProperties().Select(p => ((RateLimitPolicy)p.GetValue(null)!).Name).ToList();
+        Assert.DoesNotContain("auth.sign_in.email", names);
+        Assert.DoesNotContain("auth.mfa_failed.user", names);
+        Assert.DoesNotContain("auth.email_code.recipient", names);
+    }
+
+    [Fact]
+    public void A_reservation_counts_while_in_flight_and_only_a_failure_stays()
+    {
+        using var limits = new RateLimits();
+        var policy = new RateLimitPolicy("test.reserve", 2, TimeSpan.FromMinutes(15));
+
+        using (var first = limits.Reserve((policy, "a")))
+        using (var second = limits.Reserve((policy, "a")))
+        {
+            Assert.True(first.Allowed);
+            Assert.True(second.Allowed);
+            // Two in flight fill the limit, so a parallel third is refused.
+            using var third = limits.Reserve((policy, "a"));
+            Assert.False(third.Allowed);
+            Assert.InRange(third.Decision.RetryAfterSeconds, 1, 15 * 60);
+            first.Fail();
+        }
+
+        // The released one freed its slot; the failure stays.
+        Assert.True(limits.Check(policy, "a").Allowed);
+        using (var again = limits.Reserve((policy, "a"))) again.Fail();
+        Assert.False(limits.Check(policy, "a").Allowed);
+    }
+
+    [Fact]
+    public void A_refused_reservation_holds_nothing_and_fail_can_name_one_policy()
+    {
+        using var limits = new RateLimits();
+        var wide = new RateLimitPolicy("test.wide", 10, TimeSpan.FromMinutes(15));
+        var narrow = new RateLimitPolicy("test.narrow", 1, TimeSpan.FromMinutes(15));
+        using (var hold = limits.Reserve((narrow, "k"))) hold.Fail();
+
+        using (var refused = limits.Reserve((wide, "k"), (narrow, "k"))) Assert.False(refused.Allowed);
+        using (var both = limits.Reserve((wide, "k"))) both.Fail(wide);
+
+        // The refused reservation released its slot under "wide": one failure only, so nine are left.
+        for (var i = 0; i < 9; i++) Assert.True(limits.Acquire(wide, "k").Allowed);
+        Assert.False(limits.Acquire(wide, "k").Allowed);
+    }
+
+    [Fact]
+    public void A_window_ends_and_a_changed_limit_starts_fresh_counters()
+    {
+        var clock = new ManualClock(DateTimeOffset.Parse("2026-10-09T10:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
+        using var limits = new RateLimits(clock, 100);
+        var policy = new RateLimitPolicy("test.window", 1, TimeSpan.FromMinutes(15));
+        Assert.True(limits.Acquire(policy, "a").Allowed);
+        Assert.False(limits.Acquire(policy, "a").Allowed);
+        Assert.True(limits.Acquire(policy with { PermitLimit = 2 }, "a").Allowed);
+
+        clock.Advance(TimeSpan.FromMinutes(15));
+        Assert.True(limits.Acquire(policy, "a").Allowed);
+    }
+
+    [Fact]
+    public void A_policy_keeps_at_most_its_key_cap_dropping_the_oldest_windows()
+    {
+        var clock = new ManualClock(DateTimeOffset.Parse("2026-10-09T10:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
+        using var limits = new RateLimits(clock, 50);
+        var policy = new RateLimitPolicy("test.cap", 1, TimeSpan.FromHours(1));
+        Assert.True(limits.Acquire(policy, "oldest").Allowed);
+        for (var i = 0; i < 200; i++)
+        {
+            clock.Advance(TimeSpan.FromSeconds(1));
+            limits.Acquire(policy, $"key-{i}");
+        }
+
+        Assert.InRange(limits.KeyCount(policy), 1, 50);
+        // The oldest key was dropped, so it starts again; the newest is still counted.
+        Assert.True(limits.Acquire(policy, "oldest").Allowed);
+        Assert.False(limits.Acquire(policy, "key-199").Allowed);
+    }
+
+    private sealed class ManualClock(DateTimeOffset now) : TimeProvider
+    {
+        private DateTimeOffset current = now;
+
+        public override DateTimeOffset GetUtcNow() => current;
+
+        public void Advance(TimeSpan by) => current += by;
     }
 }

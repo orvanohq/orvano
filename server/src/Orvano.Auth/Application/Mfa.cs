@@ -20,10 +20,11 @@ internal sealed record MethodPolicy(
 }
 
 /// <summary>
-/// Reads a project's <see cref="MethodPolicy"/>: the <c>auth_method_settings</c> row, else the defaults. The
-/// <c>console</c> project has no row: TOTP is always on, and passkeys follow <c>ORVANO_PUBLIC_URL</c> (AC-3).
+/// Reads a project's <see cref="MethodPolicy"/>: the <c>auth_method_settings</c> row, else the defaults, through
+/// <see cref="PolicySettings"/> (spec 0014, AC-3, so up to 30 seconds old on another instance). The <c>console</c>
+/// project has no row: TOTP is always on, and passkeys follow <c>ORVANO_PUBLIC_URL</c> (AC-3).
 /// </summary>
-internal sealed class MethodPolicies(PublicUrl publicUrl)
+internal sealed class MethodPolicies(PublicUrl publicUrl, PolicySettings settings)
 {
     private readonly ConsolePasskeys console = ConsolePasskeys.From(publicUrl.Origin);
 
@@ -32,14 +33,15 @@ internal sealed class MethodPolicies(PublicUrl publicUrl)
 
     /// <summary>The project's policy, read on the caller's connection (and transaction, when given).</summary>
     public async Task<MethodPolicy> ReadAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, string projectId, CancellationToken ct) =>
-        projectId == ConsoleProject.Id ? Console : MethodPolicy.Of(await ReadSettingsAsync(conn, tx, projectId, lockRow: false, ct));
+        projectId == ConsoleProject.Id ? Console : MethodPolicy.Of((await settings.GetAsync(conn, tx, projectId, ct)).Methods);
 
     /// <summary>An app project's stored settings, else the defaults; locked when asked (the update holds the lock).</summary>
     public static async Task<MethodSettings> ReadSettingsAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, string projectId, bool lockRow, CancellationToken ct)
     {
         await using var cmd = new NpgsqlCommand(
             $"""
-            SELECT totp_enabled, passkeys_enabled, rp_id, rp_name, android_cert_fingerprints
+            SELECT totp_enabled, passkeys_enabled, rp_id, rp_name, android_cert_fingerprints,
+                   anonymous_enabled, anonymous_idle_days, mfa_required
             FROM orvano.auth_method_settings WHERE project_id = @project
             {(lockRow ? "FOR UPDATE" : "")}
             """, conn, tx);
@@ -51,7 +53,10 @@ internal sealed class MethodPolicies(PublicUrl publicUrl)
                 reader.GetBoolean(1),
                 reader.IsDBNull(2) ? null : reader.GetString(2),
                 reader.IsDBNull(3) ? null : reader.GetString(3),
-                reader.GetFieldValue<string[]>(4))
+                reader.GetFieldValue<string[]>(4),
+                reader.GetBoolean(5),
+                reader.GetInt16(6),
+                reader.GetBoolean(7))
             : MethodSettings.Defaults;
     }
 }

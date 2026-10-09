@@ -13,6 +13,9 @@ internal sealed record FixtureOAuthProvider(string Project, Domain.OAuthProvider
 /// <summary>A project's TOTP and passkey settings to seed (spec 0013).</summary>
 internal sealed record FixtureMethodSettings(string Project, Domain.MethodSettingsUpdate Settings);
 
+/// <summary>A project's auth rules to seed (spec 0014).</summary>
+internal sealed record FixtureAuthPolicies(string Project, Domain.AuthPoliciesUpdate Settings);
+
 /// <summary>A console account to seed: its email, password, and optional name.</summary>
 internal sealed record FixtureConsoleUser(string Email, string Password, string? Name);
 
@@ -93,6 +96,22 @@ internal static class AuthFixtures
         }
 
         logger.LogInformation("Seeded {Count} fixture method setting(s)", projects.Count);
+    }
+
+    /// <summary>
+    /// Saves projects' auth rules through the console's own settings code (spec 0014), after the users and the
+    /// install's SMTP, so the fixture users are created under the defaults and a verified email rule finds its SMTP.
+    /// </summary>
+    public static async Task SeedPoliciesAsync(AuthPoliciesService settings, IReadOnlyList<FixtureAuthPolicies> projects, ILogger logger, CancellationToken ct)
+    {
+        foreach (var project in projects)
+        {
+            var outcome = await settings.UpdateAsync(project.Project, project.Settings, Actor.System, ct);
+            if (!outcome.Succeeded)
+                throw new InvalidOperationException($"Fixture auth policies of project {project.Project} could not be saved: {outcome.Failure!.Detail}");
+        }
+
+        logger.LogInformation("Seeded {Count} fixture auth policies", projects.Count);
     }
 
     public static async Task SeedAsync(AuthStore store, AccountService accounts, IReadOnlyList<FixtureUser> users, ILogger logger, CancellationToken ct)

@@ -7,6 +7,7 @@ import {
   Mail,
   MonitorSmartphone,
   Settings,
+  ShieldCheck,
   Users,
   UsersRound,
   type LucideIcon,
@@ -60,6 +61,7 @@ export const projectNav: readonly NavEntry[] = [
     icon: LogIn,
     to: '/projects/$projectId/sign-in-methods',
   },
+  { id: 'security', label: 'Security', icon: ShieldCheck, to: '/projects/$projectId/security' },
   { id: 'email', label: 'Email', icon: Mail, to: '/projects/$projectId/email' },
   { id: 'keys', label: 'API keys', icon: KeyRound, to: '/projects/$projectId/keys' },
   {

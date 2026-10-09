@@ -3,7 +3,10 @@ using System.Text.RegularExpressions;
 
 namespace Orvano.Auth.Domain;
 
-/// <summary>The password rule of v0.1 (AC-2): Unicode NFKC, then 8 to 256 code points. Row 14 adds per project rules.</summary>
+/// <summary>
+/// The password floor of v0.1 (AC-2): Unicode NFKC, then 8 to 256 code points. Spec 0014's per project rules
+/// (<c>PasswordRules</c>) build on it for every new password.
+/// </summary>
 internal static class PasswordPolicy
 {
     public const int MinLength = 8;
@@ -24,12 +27,18 @@ internal static class PasswordPolicy
             return false; // a lone surrogate is not text
         }
 
-        var codePoints = 0;
-        foreach (var _ in form.EnumerateRunes()) codePoints++;
-        if (codePoints is < MinLength or > MaxLength) return false;
+        if (CodePoints(form) is < MinLength or > MaxLength) return false;
 
         normalized = form;
         return true;
+    }
+
+    /// <summary>The number of Unicode code points in <paramref name="text"/>, the unit every length rule counts.</summary>
+    public static int CodePoints(string text)
+    {
+        var count = 0;
+        foreach (var _ in text.EnumerateRunes()) count++;
+        return count;
     }
 
     // A lone surrogate is not text: refuse it rather than let it turn into U+FFFD on the way to the hash.

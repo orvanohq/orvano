@@ -16,7 +16,7 @@ internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, Acc
     /// being free, the two recipient limits keyed by the new address, then the queue's answer.
     /// </summary>
     public async Task<Outcome<Done>> RequestAsync(
-        string projectId, Guid userId, Guid sessionId, string? email, string? redirectUrl, string? password, CancellationToken ct)
+        string projectId, Guid userId, Guid sessionId, string? email, string? redirectUrl, string? password, string limitKey, CancellationToken ct)
     {
         if (!EmailRule.TryNormalize(email, out var newEmail)) return Failure.Invalid("The email must be an address of at most 320 characters.");
         if (await mailer.CheckRedirectAsync(projectId, redirectUrl, EmailTokenKind.EmailChange, ct) is not { } redirect) return Failure.RedirectUrlNotAllowed;
@@ -32,7 +32,7 @@ internal sealed class EmailChangeService(AuthStore store, AuthMailer mailer, Acc
         {
             if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
             if (await EmailTakenAsync(uow, projectId, newEmail, userId, token)) return Failure.EmailAlreadyInUse;
-            if (mailer.TakeRecipientLimits(projectId, newEmail, EmailTokenKind.EmailChange) is { } limited) return limited;
+            if (mailer.TakeRecipientLimits(projectId, newEmail, EmailTokenKind.EmailChange, limitKey) is { } limited) return limited;
 
             var target = new AuthEmailTarget(projectId, projectName, userId, newEmail, user.Name);
             if (await mailer.SendLinkAsync(uow, target, EmailTokenKind.EmailChange, redirect, Actor.User(userId), token) is { } refused) return refused;

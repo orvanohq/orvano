@@ -100,6 +100,10 @@ export const ErrorCode = {
   passkeyNotFound: 'passkey_not_found',
   /** `passkeys_exist` */
   passkeysExist: 'passkeys_exist',
+  /** `password_breached` */
+  passwordBreached: 'password_breached',
+  /** `password_too_common` */
+  passwordTooCommon: 'password_too_common',
   /** `project_not_found` */
   projectNotFound: 'project_not_found',
   /** `project_not_ready` */

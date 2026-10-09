@@ -13,6 +13,7 @@ import type {
   InvitationTokenRequest,
   SmtpSettingsInput,
   UpdateAuthMethodSettingsRequest,
+  UpdateAuthPoliciesRequest,
   UpdateInstallSettingsRequest,
   UpdateMemberRequest,
   UpdateOAuthProviderRequest,
@@ -164,6 +165,14 @@ export const consoleDispatch: DispatchTable = {
     status: 200,
     console: (o, input) =>
       o.consoleAuthMethods.update(input.body as UpdateAuthMethodSettingsRequest),
+  },
+  'consoleAuthPolicies.get': {
+    status: 200,
+    console: (o, _input) => o.consoleAuthPolicies.get(),
+  },
+  'consoleAuthPolicies.update': {
+    status: 200,
+    console: (o, input) => o.consoleAuthPolicies.update(input.body as UpdateAuthPoliciesRequest),
   },
   'consoleAuthProviders.delete': {
     status: 204,

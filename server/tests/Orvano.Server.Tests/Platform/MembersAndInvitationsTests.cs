@@ -131,7 +131,8 @@ public class MembersAndInvitationsTests(PostgresFixture postgres)
         await using var t = await StartAsync();
         var orgId = await t.CreateOrgAsync();
 
-        var replies = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ =>
+        // Five, the most one address may be invited in an hour (spec 0014, AC-23).
+        var replies = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ =>
             t.SendAsync(HttpMethod.Post, $"/v1/console/orgs/{orgId}/invitations", new { email = "race@x.com", role = "developer" })));
 
         Assert.All(replies, r => Assert.Equal(HttpStatusCode.Created, r.Status));

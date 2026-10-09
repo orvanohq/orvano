@@ -140,14 +140,35 @@ export function secureCookies(appUrl: string | URL): boolean {
 }
 
 /**
- * The browser's IP (the first `x-forwarded-for` value, else `x-real-ip`) and user agent, as the
- * headers Orvano records on the session instead of the Next.js server's own. Shown only; Orvano
- * never uses them for limits or checks.
+ * Finds the visitor's IP address in the request that reached your Next.js server (spec 0014,
+ * AC-36), or `null` when there is none. Orvano records it on new sessions, and, once your server's
+ * address is listed on the project's App servers card, counts its rate limits by it.
  */
-export function forwardedClientHeaders(headers: HeadersLike): Record<string, string> {
-  const forwarded = headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-  const ip =
-    forwarded === undefined || forwarded === '' ? headers.get('x-real-ip')?.trim() : forwarded
+export type ClientIpResolver = (request: { headers: HeadersLike }) => string | null | undefined
+
+/**
+ * The default {@link ClientIpResolver}: `x-real-ip`, else the last (rightmost) `x-forwarded-for`
+ * value, the one the proxy nearest your server appended. Never the first value, which the visitor
+ * can set to anything. Behind several proxies or a CDN, pass your own `clientIp` that reads the
+ * header your host guarantees (the docs list one per host).
+ */
+export function defaultClientIp(request: { headers: HeadersLike }): string | null {
+  const realIp = request.headers.get('x-real-ip')?.trim()
+  if (realIp !== undefined && realIp !== '') return realIp
+  const last = request.headers.get('x-forwarded-for')?.split(',').at(-1)?.trim()
+  return last === undefined || last === '' ? null : last
+}
+
+/**
+ * The visitor's IP (from `clientIp`, by default {@link defaultClientIp}) and user agent, as the
+ * headers Orvano reads instead of this server's own: `X-Orvano-Client-IP` and
+ * `X-Orvano-Client-UA`.
+ */
+export function forwardedClientHeaders(
+  headers: HeadersLike,
+  clientIp: ClientIpResolver = defaultClientIp,
+): Record<string, string> {
+  const ip = clientIp({ headers })?.trim()
   const userAgent = headers.get('user-agent')
   return {
     ...(ip === undefined || ip === '' ? {} : { [clientIpHeader]: ip }),
@@ -302,6 +323,8 @@ export interface ServerClientConfig extends Omit<ClientConfig, 'session' | 'refr
   requestHeaders?: HeadersLike
   /** Your app's own URL; cookies skip `Secure` only when it is `http://localhost`. */
   appUrl?: string | URL
+  /** Finds the visitor's IP in `requestHeaders`; defaults to {@link defaultClientIp}. */
+  clientIp?: ClientIpResolver
 }
 
 /**
@@ -311,14 +334,14 @@ export interface ServerClientConfig extends Omit<ClientConfig, 'session' | 'refr
  * per request; never share it across requests.
  */
 export function createServerClient(config: ServerClientConfig): Orvano {
-  const { cookies, requestHeaders, appUrl, ...rest } = config
+  const { cookies, requestHeaders, appUrl, clientIp, ...rest } = config
   const secure = appUrl === undefined ? true : secureCookies(appUrl)
   return new Orvano(
     new Client({
       ...rest,
       headers: {
         ...rest.headers,
-        ...(requestHeaders === undefined ? {} : forwardedClientHeaders(requestHeaders)),
+        ...(requestHeaders === undefined ? {} : forwardedClientHeaders(requestHeaders, clientIp)),
       },
       session: new CookieSessionStore(cookies, [cookies], { secure }),
       mfaStore: new CookiePendingMfaStore(cookies, [cookies], { secure }),
@@ -332,6 +355,8 @@ export interface MiddlewareClientConfig extends Omit<ClientConfig, 'session' | '
   request: { cookies: CookieStore; headers?: HeadersLike; url?: string }
   /** The outgoing response (`NextResponse`); a new session is written to it too. */
   response: { cookies: CookieStore }
+  /** Finds the visitor's IP in the request; defaults to {@link defaultClientIp}. */
+  clientIp?: ClientIpResolver
 }
 
 /**
@@ -340,7 +365,7 @@ export interface MiddlewareClientConfig extends Omit<ClientConfig, 'session' | '
  * apps only need `updateSession` from `@orvano/nextjs/server`.
  */
 export function createMiddlewareClient(config: MiddlewareClientConfig): Orvano {
-  const { request, response, ...rest } = config
+  const { request, response, clientIp, ...rest } = config
   const secure = request.url === undefined ? true : secureCookies(request.url)
   const session = new CookieSessionStore(request.cookies, [request.cookies, response.cookies], {
     secure,
@@ -350,7 +375,7 @@ export function createMiddlewareClient(config: MiddlewareClientConfig): Orvano {
       ...rest,
       headers: {
         ...rest.headers,
-        ...(request.headers === undefined ? {} : forwardedClientHeaders(request.headers)),
+        ...(request.headers === undefined ? {} : forwardedClientHeaders(request.headers, clientIp)),
       },
       session,
     }),

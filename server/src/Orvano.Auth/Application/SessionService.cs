@@ -19,7 +19,7 @@ internal sealed record SessionView(
 /// The signed in user's sessions (spec 0004, <c>account</c> service): refresh with rotation, grace, and reuse
 /// detection (AC-8), sign out (AC-10), and listing and ending sessions (AC-16).
 /// </summary>
-internal sealed class SessionService(AuthStore store, Sessions sessions, SessionChecks checks, AccessTokens tokens)
+internal sealed class SessionService(AuthStore store, Sessions sessions, SessionChecks checks, AccessTokens tokens, PolicySettings policies)
 {
     /// <summary>What the locked refresh decided; a reuse is committed (the session ended) and still answers 401.</summary>
     private sealed record Refreshed(
@@ -87,7 +87,9 @@ internal sealed class SessionService(AuthStore store, Sessions sessions, Session
                     {
                         rotate.Parameters.AddWithValue("hash", next.SecretHash);
                         rotate.Parameters.AddWithValue("ciphertext", sessions.Seal(next, presented.SessionId));
-                        rotate.Parameters.AddWithValue("idle", AuthTimings.IdleExpiry);
+                        // Spec 0014, AC-25: the project's idle lifetime, never past the session's expires_at.
+                        var idle = (await policies.GetAsync(uow.Tx.Connection!, uow.Tx, projectId, token)).Auth.SessionIdleSeconds;
+                        rotate.Parameters.AddWithValue("idle", TimeSpan.FromSeconds(idle));
                         rotate.Parameters.AddWithValue("ip", NpgsqlDbType.Inet, (object?)client.Ip ?? DBNull.Value);
                         rotate.Parameters.AddWithValue("id", presented.SessionId);
                         var endsAt = (DateTime)(await rotate.ExecuteScalarAsync(token))!;

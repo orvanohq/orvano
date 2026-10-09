@@ -74,6 +74,8 @@ jobs:
           ORVANO_TEST_MAILPIT_URL: http://localhost:8025
           # The fake sign in provider (spec 0012, AC-27), served by this api; as in tests/scenarios/compose.yml.
           ORVANO_TEST_OAUTH_PROVIDER_URL: http://localhost:8080/v1/test/oauth
+          # The fake breached password range API (spec 0014, AC-6), served by this api; as in tests/scenarios/compose.yml.
+          ORVANO_TEST_HIBP_URL: http://localhost:8080/v1/test/pwned
       # The worker provisions the fixture projects the api seeded; until then every project call is 409
       # project_not_ready. It sends the queued emails to Mailpit too.
       - name: Start the worker role and wait for the fixture projects

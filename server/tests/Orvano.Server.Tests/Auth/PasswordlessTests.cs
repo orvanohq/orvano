@@ -73,7 +73,7 @@ public class PasswordlessTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Four_wrong_codes_leave_the_right_one_working_and_five_use_it_up()
+    public async Task Four_wrong_codes_leave_the_right_one_working_and_five_from_one_address_are_limited()
     {
         await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
 
@@ -88,6 +88,8 @@ public class PasswordlessTests(PostgresFixture postgres)
         using (var right = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/email-code", new { email = "four@x.com", code = four }))
             Assert.Equal(HttpStatusCode.Created, right.Status);
 
+        // Spec 0014, AC-19: five wrong codes from one address limit that address, and the code survives them (it goes
+        // only at the 10th wrong guess, which AbuseLimitTests covers from several addresses).
         var five = await EmailCodeAsync(api, "five@x.com");
         for (var i = 0; i < 5; i++)
         {
@@ -95,9 +97,9 @@ public class PasswordlessTests(PostgresFixture postgres)
             Assert.Equal("invalid_code", wrong.Code);
         }
 
-        using var usedUp = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/email-code", new { email = "five@x.com", code = five });
-        Assert.Equal("invalid_code", usedUp.Code);
-        Assert.Equal(0L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, "SELECT count(*) FROM orvano.auth_email_tokens WHERE kind = 'email_code'"));
+        using var limited = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/email-code", new { email = "five@x.com", code = five });
+        Assert.Equal("rate_limited", limited.Code);
+        Assert.Equal(1L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, "SELECT count(*) FROM orvano.auth_email_tokens WHERE kind = 'email_code'"));
 
         // Malformed input is a 400 that counts nothing, and an unknown email answers like a wrong code.
         using var shortCode = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/email-code", new { email = "four@x.com", code = "12345" });
@@ -109,20 +111,20 @@ public class PasswordlessTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Ten_parallel_wrong_guesses_never_count_more_than_five_attempts_and_an_expired_code_counts_none()
+    public async Task Ten_parallel_wrong_guesses_from_one_address_reach_the_code_at_most_five_times_and_an_expired_code_counts_none()
     {
         await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
         var code = await EmailCodeAsync(api, "race@x.com");
 
+        // Spec 0014, AC-19: reservations let at most five of them reach the code; the rest answer 429.
         var replies = await Task.WhenAll(Enumerable.Range(0, 10).Select(i =>
             api.SendAsync(HttpMethod.Post, "/v1/account/sessions/email-code", new { email = "race@x.com", code = Wrong(code, i) })));
-        foreach (var reply in replies)
-        {
-            Assert.Equal("invalid_code", reply.Code);
-            reply.Dispose();
-        }
+        Assert.InRange(replies.Count(r => r.Code == "invalid_code"), 1, 5);
+        Assert.All(replies, r => Assert.Contains(r.Code, new[] { "invalid_code", "rate_limited" }));
+        foreach (var reply in replies) reply.Dispose();
 
-        Assert.Equal(0L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, "SELECT count(*) FROM orvano.auth_email_tokens"));
+        Assert.InRange(await TestDatabase.ScalarAsync<short>(api.Database.Superuser, "SELECT attempts FROM orvano.auth_email_tokens"), (short)1, (short)5);
+        await TestDatabase.ExecuteAsync(api.Database.Superuser, "DELETE FROM orvano.auth_email_tokens");
 
         var expiring = await EmailCodeAsync(api, "late@x.com");
         await TestDatabase.ExecuteAsync(api.Database.Superuser, "UPDATE orvano.auth_email_tokens SET expires_at = now() - interval '1 second'");
@@ -276,19 +278,20 @@ public class PasswordlessTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Every_code_attempt_for_an_email_counts_and_the_eleventh_in_15_minutes_is_limited_even_when_right()
+    public async Task Wrong_codes_for_an_email_from_one_address_are_limited_after_five_even_when_right()
     {
-        // AC-28: auth.email_code.recipient, 10 per 15 minutes per project and lowercased email, on every attempt.
+        // Spec 0014, AC-19: auth.email_code_failed.recipient_ip, 5 failures per 15 minutes per project, lowercased email,
+        // and limit IP; a right code never counts.
         await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
-        for (var i = 0; i < 6; i++)
+        for (var i = 0; i < 3; i++)
         {
-            // No code is live yet: the same 401 as a wrong code, and it still counts.
+            // No code is live yet: the same 401 as a wrong code, and it counts as a failure.
             using var early = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/email-code", new { email = i % 2 == 0 ? "ADA@x.com" : "ada@x.com", code = "000000" });
             Assert.Equal("invalid_code", early.Code);
         }
 
         var code = await EmailCodeAsync(api, "ada@x.com");
-        for (var i = 0; i < 4; i++)
+        for (var i = 0; i < 2; i++)
         {
             using var wrong = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/email-code", new { email = "ada@x.com", code = Wrong(code, i) });
             Assert.Equal("invalid_code", wrong.Code);

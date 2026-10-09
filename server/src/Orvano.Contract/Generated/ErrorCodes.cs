@@ -151,6 +151,12 @@ public static class ErrorCode
     /// <summary>The <c>passkeys_exist</c> error code.</summary>
     public const string PasskeysExist = "passkeys_exist";
 
+    /// <summary>The <c>password_breached</c> error code.</summary>
+    public const string PasswordBreached = "password_breached";
+
+    /// <summary>The <c>password_too_common</c> error code.</summary>
+    public const string PasswordTooCommon = "password_too_common";
+
     /// <summary>The <c>project_not_found</c> error code.</summary>
     public const string ProjectNotFound = "project_not_found";
 

@@ -297,8 +297,9 @@ public class MfaTests(PostgresFixture postgres)
     {
         await using var api = await AuthApi.StartAsync(postgres);
         var enrolled = await EnrollAsync(api, "ada@x.com");
-        await TestDatabase.ExecuteAsync(api.Database.Superuser,
-            "INSERT INTO orvano.auth_method_settings (project_id, totp_enabled) VALUES (@project, false)", ("project", AuthApi.Project));
+        // Through the console, which evicts the cached settings at once (spec 0014, AC-3).
+        using (var off = await api.AsConsoleAsync(HttpMethod.Patch, "/v1/console/project/auth/methods", new { totpEnabled = false }))
+            Assert.Equal(HttpStatusCode.OK, off.Status);
 
         using var signIn = await api.SignInAsync("ada@x.com");
         Assert.Equal(JsonValueKind.Null, signIn.Body.GetProperty("mfa").ValueKind);

@@ -30,6 +30,7 @@ with an operationId:
 | `op` | `as` | Input | Body |
 |---|---|---|---|
 | `signIn` | `client` | `body: { email, password }` | the sign in answer; the SDK's stored session is left alone, so a runner without client operations (.NET) gets a token too |
+| `signInFrom` | `client` | `clientIp`, `body: { email, password }` | `signIn` sent as a trusted app server sends it for the visitor at `clientIp` (`X-Orvano-Client-IP`, spec 0014); the fixture project trusts the scenario network; .NET skips it |
 | `redeemLink` | `client` | `url`, optional `password` | `{ type, user, isNewUser }` from the client SDK's link helper (`redeemLink` in JS, `handleLink` in Dart), or null for a URL without Orvano's parameters; .NET skips it |
 | `now` | `client` or `server` | none | `{ now }`, the runner's clock as an ISO 8601 time; save it before a send and pass it to `test.getLatestEmail` as `after` |
 | `verifyAccessToken` | `server` | `token`, optional `online: true`, optional `requireMfa: true` | `{ userId, sessionId, emailVerified, expiresAt, aal, amr }` from the server SDK's own check, or its `token_expired` / `invalid_token` / `mfa_required` error |

@@ -71,6 +71,14 @@ internal static class StartupChecks
         return false;
     }
 
+    /// <summary><c>ORVANO_TEST_HIBP_URL</c> is refused outside <c>Test</c> and must be an absolute http or https URL (spec 0014, AC-6).</summary>
+    public static bool TestPwnedPasswordsUsable(TestPwnedPasswords setting, ILogger logger)
+    {
+        if (setting.Problem is null) return true;
+        logger.LogCritical("Test breached password setting refused: {Problem}", setting.Problem);
+        return false;
+    }
+
     /// <summary>
     /// Waits briefly for Postgres, then refuses to start unless the database schema version equals
     /// the highest migration embedded in this binary.

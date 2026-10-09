@@ -13,6 +13,7 @@ using Api = Orvano.Contract;
 using Keys = Orvano.Contract.ConsoleAuthKeysOperations;
 using Methods = Orvano.Contract.ConsoleAuthMethodsOperations;
 using Ops = Orvano.Contract.ConsoleUsersOperations;
+using Policies = Orvano.Contract.ConsoleAuthPoliciesOperations;
 using Providers = Orvano.Contract.ConsoleAuthProvidersOperations;
 
 namespace Orvano.Auth.Endpoints;
@@ -47,7 +48,9 @@ internal static class ConsoleUsersEndpoints
 
         v1.MapPost(Ops.Create.Route, async (HttpContext http, Api.CreateUserRequest request, UsersService users, RateLimits limits, CancellationToken ct) =>
         {
-            var limit = limits.Acquire(RateLimitPolicies.SignUpPerIp, ConnectionIp.Key(http));
+            var limit = limits.Acquire(
+                ProjectLimits.SignUpPerIp((await http.RequestServices.GetRequiredService<PolicySettings>().GetAsync(Project(http), ct)).Auth),
+                ConsoleRequestKey(http));
             if (!limit.Allowed) return ApiProblem.RateLimited(http, limit, Api.ErrorCode.RateLimited);
             return Created(http, await users.CreateAsync(
                 Project(http), request.Email, request.Password, request.Name, Me(http), ct, request.EmailVerified ?? false), User);
@@ -99,12 +102,12 @@ internal static class ConsoleUsersEndpoints
             .RequireRole(Need.Write);
 
         v1.MapPost(Ops.CreateVerification.Route, async (HttpContext http, string userId, Api.CreateUserVerificationRequest request, UsersService users, CancellationToken ct) =>
-            Accepted(http, await users.CreateVerificationAsync(Project(http), userId, request.RedirectUrl, Me(http), ct)))
+            Accepted(http, await users.CreateVerificationAsync(Project(http), userId, request.RedirectUrl, Me(http), ConsoleRequestKey(http), ct)))
             .WithName(Ops.CreateVerification.Id)
             .RequireRole(Need.Write);
 
         v1.MapPost(Ops.CreateRecovery.Route, async (HttpContext http, string userId, Api.CreateUserRecoveryRequest request, UsersService users, CancellationToken ct) =>
-            Accepted(http, await users.CreateRecoveryAsync(Project(http), userId, request.RedirectUrl, Me(http), ct)))
+            Accepted(http, await users.CreateRecoveryAsync(Project(http), userId, request.RedirectUrl, Me(http), ConsoleRequestKey(http), ct)))
             .WithName(Ops.CreateRecovery.Id)
             .RequireRole(Need.Write);
 
@@ -177,6 +180,19 @@ internal static class ConsoleUsersEndpoints
                 : ApiProblem.Result(StatusCodes.Status400BadRequest, Api.ErrorCode.InvalidRequest,
                     "Send a JSON object with any of totpEnabled, passkeysEnabled, rpId, rpName, androidCertFingerprints, and confirmRpIdChange."))
             .WithName(Methods.Update.Id)
+            .RequireRole(Need.Write);
+
+        v1.MapGet(Policies.Get.Route, async (HttpContext http, AuthPoliciesService policies, CancellationToken ct) =>
+            Ok(http, await policies.GetAsync(Project(http), ct), AuthPolicies))
+            .WithName(Policies.Get.Id)
+            .RequireRole(Need.Read);
+
+        v1.MapPatch(Policies.Update.Route, async (HttpContext http, JsonElement body, AuthPoliciesService policies, CancellationToken ct) =>
+            TryReadPoliciesUpdate(body, out var update)
+                ? Ok(http, await policies.UpdateAsync(Project(http), update, Me(http), ct), AuthPolicies)
+                : ApiProblem.Result(StatusCodes.Status400BadRequest, Api.ErrorCode.InvalidRequest,
+                    "Send a JSON object with any of the auth policy fields, each of its type."))
+            .WithName(Policies.Update.Id)
             .RequireRole(Need.Write);
 
         v1.MapGet(Keys.List.Route, async (HttpContext http, SigningKeys keys, CancellationToken ct) =>
@@ -256,6 +272,51 @@ internal static class ConsoleUsersEndpoints
         return true;
     }
 
+    /// <summary>
+    /// Reads <c>consoleAuthPolicies.update</c>'s body (spec 0014, AC-1): bound as JSON first, so
+    /// <c>maxSessionsPerUser</c> left out keeps the stored value while <c>null</c> clears it.
+    /// </summary>
+    private static bool TryReadPoliciesUpdate(JsonElement body, out Domain.AuthPoliciesUpdate update)
+    {
+        update = null!;
+        if (body.ValueKind != JsonValueKind.Object) return false;
+
+        Api.UpdateAuthPoliciesRequest? request;
+        try
+        {
+            request = body.Deserialize<Api.UpdateAuthPoliciesRequest>(JsonSerializerOptions.Web);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+
+        if (request is null) return false;
+        update = new Domain.AuthPoliciesUpdate
+        {
+            SignUpsEnabled = request.SignUpsEnabled,
+            RequireVerifiedEmail = request.RequireVerifiedEmail,
+            BlockDisposableEmails = request.BlockDisposableEmails,
+            BlockedEmailDomains = request.BlockedEmailDomains,
+            AllowedEmailDomains = request.AllowedEmailDomains,
+            PasswordMinLength = request.PasswordMinLength,
+            PasswordCommonCheck = request.PasswordCommonCheck,
+            PasswordBreachedCheck = request.PasswordBreachedCheck,
+            AccessTokenSeconds = request.AccessTokenSeconds,
+            SessionIdleSeconds = request.SessionIdleSeconds,
+            SessionAbsoluteSeconds = request.SessionAbsoluteSeconds,
+            MaxSessionsPerUser = body.TryGetProperty("maxSessionsPerUser", out _) ? Domain.Patch<int?>.To(request.MaxSessionsPerUser) : Domain.Patch<int?>.Keep,
+            TrustedServerCidrs = request.TrustedServerCidrs,
+            SignInFailedPerEmailIpLimit = request.SignInFailedPerEmailIp?.Limit,
+            SignInFailedPerEmailIpWindowMinutes = request.SignInFailedPerEmailIp?.WindowMinutes,
+            SignInFailedPerIp = request.SignInFailedPerIp,
+            SignUpPerIp = request.SignUpPerIp,
+            AnonymousPerIp = request.AnonymousPerIp,
+            EmailSendPerIp = request.EmailSendPerIp,
+        };
+        return true;
+    }
+
     private static Domain.SecretChange Secret(JsonElement body, string name, string? value) =>
         !body.TryGetProperty(name, out _) ? Domain.SecretChange.Keep
         : value is null ? Domain.SecretChange.Clear
@@ -267,6 +328,12 @@ internal static class ConsoleUsersEndpoints
         http.Items[ProjectKey] as string ?? throw new InvalidOperationException("The route has no role filter.");
 
     private static Actor Me(HttpContext http) => Actor.User(ConsoleUser.Get(http));
+
+    /// <summary>
+    /// The limit key of a console call that acts on an app project: the project plus the console user's connection IP
+    /// (the console is never a trusted app server, spec 0014, AC-16).
+    /// </summary>
+    private static string ConsoleRequestKey(HttpContext http) => $"{Project(http)}\n{LimitIp.Key(ConnectionIp.Of(http))}";
 
     private static Api.SigningKeys SigningKeysView(IReadOnlyList<SigningKeyRow> rows) => new(
         [.. rows.Select(k => new Api.SigningKey(

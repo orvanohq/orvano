@@ -15,7 +15,7 @@ internal sealed class VerificationService(AuthStore store, AuthMailer mailer, Se
     /// recipient limits, then the queue's answer. A signed in caller already knows the account exists, so no privacy
     /// padding applies.
     /// </summary>
-    public async Task<Outcome<Done>> RequestAsync(string projectId, Guid userId, string? redirectUrl, Actor actor, CancellationToken ct)
+    public async Task<Outcome<Done>> RequestAsync(string projectId, Guid userId, string? redirectUrl, Actor actor, string limitKey, CancellationToken ct)
     {
         if (await mailer.CheckRedirectAsync(projectId, redirectUrl, EmailTokenKind.Verification, ct) is not { } redirect) return Failure.RedirectUrlNotAllowed;
         var projectName = await mailer.ProjectNameAsync(projectId, ct);
@@ -25,7 +25,7 @@ internal sealed class VerificationService(AuthStore store, AuthMailer mailer, Se
             if (await UserLocks.ByIdAsync(uow, projectId, userId, token) is not { } user) return Failure.UserNotFound;
             if (user.EmailVerifiedAt is not null) return Failure.EmailAlreadyVerified;
             if (user.Email is not { } to) return Failure.Invalid("The user has no email to verify.");
-            if (mailer.TakeRecipientLimits(projectId, to, EmailTokenKind.Verification) is { } limited) return limited;
+            if (mailer.TakeRecipientLimits(projectId, to, EmailTokenKind.Verification, limitKey) is { } limited) return limited;
 
             var target = new AuthEmailTarget(projectId, projectName, user.Id, to, user.Name);
             if (await mailer.SendLinkAsync(uow, target, EmailTokenKind.Verification, redirect, actor, token) is { } refused) return refused;

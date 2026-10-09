@@ -92,12 +92,12 @@ internal sealed class LinkToken
 
 /// <summary>
 /// A 6 digit email code (AC-1, AC-5): drawn uniformly, stored only as an HMAC over <c>&lt;row id&gt;:&lt;code&gt;</c>
-/// keyed from the master key, and deleted after the 5th wrong guess.
+/// keyed from the master key, and deleted after the 10th wrong guess (spec 0014, AC-19).
 /// </summary>
 internal static class EmailCode
 {
     public const int Length = 6;
-    public const int MaxAttempts = 5;
+    public const int MaxAttempts = 10;
 
     /// <summary>The <c>SecretBox.Mac</c> purpose, which is also the HKDF info.</summary>
     public const string MacPurpose = "orvano.auth.email-code";

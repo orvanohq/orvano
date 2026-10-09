@@ -12,7 +12,8 @@ internal sealed record AuthEmailTarget(string ProjectId, string ProjectName, Gui
 /// What every auth email shares (spec 0010): the redirect check, the send limits, Messaging's availability, and
 /// queueing the email in the caller's transaction. Use cases decide when; this decides how.
 /// </summary>
-internal sealed class AuthMailer(IEmailQueue queue, IProjectDirectory projects, IWebOriginPolicy origins, RateLimits limits, EmailTokens tokens)
+internal sealed class AuthMailer(
+    IEmailQueue queue, IProjectDirectory projects, IWebOriginPolicy origins, RateLimits limits, EmailTokens tokens, PolicySettings policies)
 {
     /// <summary>
     /// The redirect URL, when its shape passes <see cref="RedirectUrlRule"/> and the project's platforms allow it
@@ -24,18 +25,26 @@ internal sealed class AuthMailer(IEmailQueue queue, IProjectDirectory projects, 
             ? redirect
             : null;
 
-    /// <summary>The open sends' per IP limit (AC-7): 300 an hour across <c>createRecovery</c>, <c>createMagicLink</c>, and <c>createEmailCode</c>.</summary>
-    public Failure? TakeIpLimit(string ipKey) => Refused(limits.Acquire(RateLimitPolicies.EmailSendPerIp, ipKey));
+    /// <summary>
+    /// The open sends' per IP limit (AC-7): the project's <c>emailSendPerIp</c> an hour (300 by default, spec 0014,
+    /// AC-21) across <c>createRecovery</c>, <c>createMagicLink</c>, and <c>createEmailCode</c>, keyed by the limit key.
+    /// </summary>
+    public async Task<Failure?> TakeIpLimitAsync(string projectId, string limitKey, CancellationToken ct) =>
+        Refused(limits.Acquire(ProjectLimits.EmailSendPerIp((await policies.GetAsync(projectId, ct)).Auth), limitKey));
 
     /// <summary>
-    /// The two recipient limits every send takes (AC-7), keyed by project, lowercased address, and kind: one a minute
-    /// and five an hour.
+    /// The recipient limits every send takes (spec 0014, AC-20): one a minute and five an hour per project, lowercased
+    /// address, kind, and limit IP, so a stranger elsewhere can't spend the owner's allowance; then 20 an hour per
+    /// project, address, and kind whatever the IP, so one inbox can't be flooded. <paramref name="limitKey"/> is the
+    /// project plus the limit IP of the request that sends.
     /// </summary>
-    public Failure? TakeRecipientLimits(string projectId, string email, EmailTokenKind kind)
+    public Failure? TakeRecipientLimits(string projectId, string email, EmailTokenKind kind, string limitKey)
     {
-        var key = $"{projectId}\n{email.ToLowerInvariant()}\n{EmailTokenKinds.Wire(kind)}";
-        return Refused(limits.Acquire(RateLimitPolicies.EmailSendPerRecipientShort, key))
-            ?? Refused(limits.Acquire(RateLimitPolicies.EmailSendPerRecipient, key));
+        var recipient = $"{projectId}\n{email.ToLowerInvariant()}\n{EmailTokenKinds.Wire(kind)}";
+        var fromHere = $"{recipient}\n{limitKey}";
+        return Refused(limits.Acquire(RateLimitPolicies.EmailSendPerRecipientShort, fromHere))
+            ?? Refused(limits.Acquire(RateLimitPolicies.EmailSendPerRecipient, fromHere))
+            ?? Refused(limits.Acquire(RateLimitPolicies.EmailSendPerRecipientTotal, recipient));
     }
 
     /// <summary>Messaging's answer before anything is looked up (AC-7): 409 <c>email_not_configured</c> or 429 <c>email_rate_limited</c>.</summary>

@@ -71,8 +71,9 @@ internal static class AuthJobs
             while (deleted == BatchSize);
         }
 
-        // Last: the provider settings, which the Apple revokes above needed, and the MFA and passkey settings.
-        foreach (var settings in new[] { "auth_oauth_providers", "auth_method_settings" })
+        // Last: the provider settings, which the Apple revokes above needed, the MFA and passkey settings, and the
+        // project's auth rules (spec 0014).
+        foreach (var settings in new[] { "auth_oauth_providers", "auth_method_settings", "auth_policies" })
         {
             await using var cmd = db.CreateCommand($"DELETE FROM orvano.{settings} WHERE project_id = @project");
             cmd.Parameters.AddWithValue("project", projectId);

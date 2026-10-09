@@ -20,6 +20,7 @@ internal sealed class PasswordlessService(
     AccountService accounts,
     RateLimits limits,
     MethodPolicies policies,
+    PolicySettings policySettings,
     ILogger<PasswordlessService> logger)
 {
     /// <summary>What a redemption decided: the user, their new session, whether it created them, and sessions to evict.</summary>
@@ -57,15 +58,19 @@ internal sealed class PasswordlessService(
 
     /// <summary>
     /// <c>account.createEmailCodeSession</c> (AC-5, AC-15): checks the code against the email's live code rows,
-    /// locked, in fixed time. A wrong code counts an attempt on every live row and deletes those that reached 5; those
-    /// writes commit even though the answer is 401 <c>invalid_code</c>, so parallel guesses can't exceed 5.
+    /// locked, in fixed time. A wrong code counts an attempt on every live row and deletes those that reached 10 (spec
+    /// 0014, AC-19); those writes commit even though the answer is 401 <c>invalid_code</c>, so parallel guesses can't exceed it.
     /// </summary>
     public async Task<Outcome<SignedIn>> SignInWithCodeAsync(string projectId, string? email, string? code, ClientInfo client, string ipKey, CancellationToken ct)
     {
         if (!EmailRule.TryNormalize(email, out var trimmed)) return InvalidEmail;
         if (!EmailCode.IsWellFormed(code)) return Failure.Invalid($"The code must be exactly {EmailCode.Length} digits.");
-        var perEmail = limits.Acquire(RateLimitPolicies.EmailCodePerRecipient, $"{projectId}\n{trimmed.ToLowerInvariant()}");
-        if (!perEmail.Allowed) return Failure.RateLimited(perEmail.RetryAfter);
+        // Spec 0014, AC-19: wrong codes count per email and limit IP, so a stranger elsewhere can't use up the owner's
+        // tries, and per email overall as the ceiling of a 6 digit code. Reserved while in flight; only 401 counts.
+        using var failures = limits.Reserve(
+            (RateLimitPolicies.FailedEmailCodePerRecipientIp, ProjectLimits.EmailKey(ipKey, trimmed)),
+            (RateLimitPolicies.FailedEmailCodePerRecipient, $"{projectId}\n{trimmed.ToLowerInvariant()}"));
+        if (!failures.Allowed) return Failure.RateLimited(failures.Decision.RetryAfter);
         await keys.GetActiveAsync(projectId, ct);
 
         var outcome = await store.WriteDecidingAsync<Redeemed>(async (uow, token) =>
@@ -83,6 +88,7 @@ internal sealed class PasswordlessService(
             var redeemed = await SignInAsync(uow, projectId, match.UserId, match.Email, SessionMethod.EmailCode, Failure.InvalidCode, client, ipKey, token);
             return (redeemed, redeemed.Succeeded);
         }, ct);
+        if (outcome.Failure?.Code == Contract.ErrorCode.InvalidCode) failures.Fail();
         return await FinishAsync(projectId, outcome, ct);
     }
 
@@ -92,8 +98,8 @@ internal sealed class PasswordlessService(
     private async Task<Outcome<Done>> RequestAsync(
         string projectId, string email, EmailTokenKind kind, RedirectUrl? redirect, bool createUser, string ipKey, CancellationToken ct)
     {
-        var refused = mailer.TakeIpLimit(ipKey)
-            ?? mailer.TakeRecipientLimits(projectId, email, kind)
+        var refused = await mailer.TakeIpLimitAsync(projectId, ipKey, ct)
+            ?? mailer.TakeRecipientLimits(projectId, email, kind, ipKey)
             ?? await mailer.CheckAvailabilityAsync(projectId, ct);
         if (refused is not null) return refused;
 
@@ -141,7 +147,7 @@ internal sealed class PasswordlessService(
         var created = false;
         if (user is null)
         {
-            var signUp = limits.Acquire(RateLimitPolicies.SignUpPerIp, ipKey);
+            var signUp = limits.Acquire(ProjectLimits.SignUpPerIp((await policySettings.GetAsync(uow.Tx.Connection!, uow.Tx, projectId, ct)).Auth), ipKey);
             if (!signUp.Allowed) return Failure.RateLimited(signUp.RetryAfter);
             if (await UserRecords.TryInsertAsync(uow, projectId, tokenEmail, name: null, verified: true, ct) is { } newId)
             {

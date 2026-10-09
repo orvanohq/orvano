@@ -41,6 +41,8 @@ internal sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : D
 
     public DbSet<WebAuthnChallengeRow> WebAuthnChallenges => Set<WebAuthnChallengeRow>();
 
+    public DbSet<AuthPoliciesRow> Policies => Set<AuthPoliciesRow>();
+
     /// <summary>A context on an open connection the caller owns; it never opens or closes it.</summary>
     public static AuthDbContext On(NpgsqlConnection connection) =>
         new(new DbContextOptionsBuilder<AuthDbContext>().UseNpgsql(connection).Options);
@@ -65,6 +67,7 @@ internal sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : D
             e.Property(x => x.LastSignInAt).HasColumnName("last_sign_in_at");
             e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+            e.Property(x => x.IsAnonymous).HasColumnName("is_anonymous");
         });
 
         model.Entity<PasswordRow>(e =>
@@ -201,6 +204,36 @@ internal sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : D
             e.Property(x => x.RpName).HasColumnName("rp_name");
             e.Property(x => x.AndroidCertFingerprints).HasColumnName("android_cert_fingerprints");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+            e.Property(x => x.AnonymousEnabled).HasColumnName("anonymous_enabled");
+            e.Property(x => x.AnonymousIdleDays).HasColumnName("anonymous_idle_days").HasDefaultValue((short)30);
+            e.Property(x => x.MfaRequired).HasColumnName("mfa_required");
+        });
+
+        model.Entity<AuthPoliciesRow>(e =>
+        {
+            e.ToTable("auth_policies");
+            e.HasKey(x => x.ProjectId);
+            e.Property(x => x.ProjectId).HasColumnName("project_id");
+            e.Property(x => x.SignUpsEnabled).HasColumnName("sign_ups_enabled").HasDefaultValue(true);
+            e.Property(x => x.RequireVerifiedEmail).HasColumnName("require_verified_email");
+            e.Property(x => x.BlockDisposableEmails).HasColumnName("block_disposable_emails");
+            e.Property(x => x.BlockedEmailDomains).HasColumnName("blocked_email_domains");
+            e.Property(x => x.AllowedEmailDomains).HasColumnName("allowed_email_domains");
+            e.Property(x => x.PasswordMinLength).HasColumnName("password_min_length").HasDefaultValue((short)8);
+            e.Property(x => x.PasswordCommonCheck).HasColumnName("password_common_check").HasDefaultValue(true);
+            e.Property(x => x.PasswordBreachedCheck).HasColumnName("password_breached_check");
+            e.Property(x => x.AccessTokenSeconds).HasColumnName("access_token_seconds").HasDefaultValue(900);
+            e.Property(x => x.SessionIdleSeconds).HasColumnName("session_idle_seconds").HasDefaultValue(2592000);
+            e.Property(x => x.SessionAbsoluteSeconds).HasColumnName("session_absolute_seconds").HasDefaultValue(31536000);
+            e.Property(x => x.MaxSessionsPerUser).HasColumnName("max_sessions_per_user");
+            e.Property(x => x.TrustedServerCidrs).HasColumnName("trusted_server_cidrs").HasColumnType("cidr[]");
+            e.Property(x => x.SignInFailedEmailIpLimit).HasColumnName("sign_in_failed_email_ip_limit").HasDefaultValue((short)10);
+            e.Property(x => x.SignInFailedEmailIpWindowMinutes).HasColumnName("sign_in_failed_email_ip_window_minutes").HasDefaultValue((short)15);
+            e.Property(x => x.SignInFailedIpLimit).HasColumnName("sign_in_failed_ip_limit").HasDefaultValue(100);
+            e.Property(x => x.SignUpIpLimit).HasColumnName("sign_up_ip_limit").HasDefaultValue(60);
+            e.Property(x => x.AnonymousIpLimit).HasColumnName("anonymous_ip_limit").HasDefaultValue(30);
+            e.Property(x => x.EmailSendIpLimit).HasColumnName("email_send_ip_limit").HasDefaultValue(300);
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
         });
 
         model.Entity<TotpFactorRow>(e =>
@@ -269,6 +302,7 @@ internal sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : D
             e.Property(x => x.Attempts).HasColumnName("attempts");
             e.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
+            e.Property(x => x.Purpose).HasColumnName("purpose").HasDefaultValueSql("'challenge'");
             e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -333,6 +367,9 @@ internal sealed class UserRow
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }
+
+    /// <summary>A guest (spec 0014, AC-28): no email while true, and it only ever turns false.</summary>
+    public bool IsAnonymous { get; set; }
 }
 
 /// <summary><c>auth_passwords</c>: the Argon2id hash of a user's password.</summary>
@@ -574,6 +611,64 @@ internal sealed class MethodSettingsRow
     public string[] AndroidCertFingerprints { get; set; } = [];
 
     public DateTimeOffset UpdatedAt { get; set; }
+
+    /// <summary>Whether guests may sign in (spec 0014, AC-2, AC-28).</summary>
+    public bool AnonymousEnabled { get; set; }
+
+    /// <summary>Days a guest may stay idle before the hourly retention deletes them (AC-31).</summary>
+    public short AnonymousIdleDays { get; set; } = 30;
+
+    /// <summary>Every permanent user must enroll a factor before holding a session (AC-27).</summary>
+    public bool MfaRequired { get; set; }
+}
+
+/// <summary>
+/// <c>auth_policies</c> (spec 0014, AC-1): a project's password, sign up, session, and limit rules. A missing row reads
+/// as the defaults; read and written with raw Npgsql in <c>PolicySettings</c>, mapped here for the drift check.
+/// </summary>
+internal sealed class AuthPoliciesRow
+{
+    public required string ProjectId { get; set; }
+
+    public bool SignUpsEnabled { get; set; } = true;
+
+    public bool RequireVerifiedEmail { get; set; }
+
+    public bool BlockDisposableEmails { get; set; }
+
+    public string[] BlockedEmailDomains { get; set; } = [];
+
+    public string[] AllowedEmailDomains { get; set; } = [];
+
+    public short PasswordMinLength { get; set; } = 8;
+
+    public bool PasswordCommonCheck { get; set; } = true;
+
+    public bool PasswordBreachedCheck { get; set; }
+
+    public int AccessTokenSeconds { get; set; } = 900;
+
+    public int SessionIdleSeconds { get; set; } = 2592000;
+
+    public int SessionAbsoluteSeconds { get; set; } = 31536000;
+
+    public int? MaxSessionsPerUser { get; set; }
+
+    public IPNetwork[] TrustedServerCidrs { get; set; } = [];
+
+    public short SignInFailedEmailIpLimit { get; set; } = 10;
+
+    public short SignInFailedEmailIpWindowMinutes { get; set; } = 15;
+
+    public int SignInFailedIpLimit { get; set; } = 100;
+
+    public int SignUpIpLimit { get; set; } = 60;
+
+    public int AnonymousIpLimit { get; set; } = 30;
+
+    public int EmailSendIpLimit { get; set; } = 300;
+
+    public DateTimeOffset UpdatedAt { get; set; }
 }
 
 /// <summary><c>auth_totp_factors</c> (spec 0013): a user's authenticator app secret, pending until confirmed.</summary>
@@ -678,6 +773,9 @@ internal sealed class MfaTicketRow
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset ExpiresAt { get; set; }
+
+    /// <summary><c>challenge</c> (spec 0013) or <c>enroll</c> (spec 0014, AC-27).</summary>
+    public string Purpose { get; set; } = "challenge";
 }
 
 /// <summary><c>auth_webauthn_challenges</c> (spec 0013): one WebAuthn ceremony's challenge, only as SHA-256.</summary>

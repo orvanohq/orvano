@@ -34,6 +34,17 @@ internal sealed record Failure(FailureKind Kind, string Code, string Detail, Tim
     public static Failure InvalidPassword { get; } =
         new(FailureKind.Invalid, ErrorCode.InvalidPassword, "The password must be 8 to 256 characters.");
 
+    public static Failure PasswordTooCommon { get; } =
+        new(FailureKind.Invalid, ErrorCode.PasswordTooCommon, "This password is too common. Choose one that is harder to guess.");
+
+    public static Failure PasswordBreached { get; } =
+        new(FailureKind.Invalid, ErrorCode.PasswordBreached, "This password appears in a known data breach. Choose another one.");
+
+    /// <summary>A new password under the project's minimum (spec 0014, AC-4); the detail names the minimum.</summary>
+    public static Failure PasswordTooShort(int minLength) =>
+        new(FailureKind.Invalid, ErrorCode.InvalidPassword,
+            $"The password must be {minLength.ToString(System.Globalization.CultureInfo.InvariantCulture)} to 256 characters.");
+
     public static Failure InvalidCredentials { get; } =
         new(FailureKind.Unauthorized, ErrorCode.InvalidCredentials, "The email or password is wrong.");
 

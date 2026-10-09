@@ -36,6 +36,7 @@ export const keys = {
   authProviders: (projectId: string) =>
     ['console', 'projects', projectId, 'auth-providers'] as const,
   authMethods: (projectId: string) => ['console', 'projects', projectId, 'auth-methods'] as const,
+  authPolicies: (projectId: string) => ['console', 'projects', projectId, 'auth-policies'] as const,
   userMfa: (projectId: string, userId: string) =>
     ['console', 'projects', projectId, 'users', userId, 'mfa'] as const,
   userPasskeys: (projectId: string, userId: string) =>
@@ -290,6 +291,14 @@ export function authMethodsQuery(projectId: string) {
   return queryOptions({
     queryKey: keys.authMethods(projectId),
     queryFn: ({ signal }) => projectClient(projectId).consoleAuthMethods.get({ signal }),
+  })
+}
+
+/** The project's auth rules, with their defaults and whether SMTP is set up (spec 0014, AC-1). */
+export function authPoliciesQuery(projectId: string) {
+  return queryOptions({
+    queryKey: keys.authPolicies(projectId),
+    queryFn: ({ signal }) => projectClient(projectId).consoleAuthPolicies.get({ signal }),
   })
 }
 

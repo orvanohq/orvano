@@ -1069,6 +1069,90 @@ public sealed record AuthMethodSettings(
     [property: JsonPropertyName("activePasskeyCount")] int ActivePasskeyCount,
     [property: JsonPropertyName("acceptedOrigins")] IReadOnlyList<string> AcceptedOrigins);
 
+/// <summary>A project's auth rules with what the Security page shows beside them.</summary>
+/// <param name="SignUpsEnabled">Whether new users can sign up from an app. Servers and the console can always create users.</param>
+/// <param name="RequireVerifiedEmail">Whether users must verify their email before a password sign in. Sign up then hides which emails have accounts.</param>
+/// <param name="BlockDisposableEmails">Whether sign ups from known disposable email domains are refused.</param>
+/// <param name="BlockedEmailDomains">Email domains whose new users are refused, at most 500. A domain also covers its subdomains.</param>
+/// <param name="AllowedEmailDomains">When not empty, the only email domains new users may have, at most 500. A domain also covers its subdomains.</param>
+/// <param name="PasswordMinLength">The shortest new password, in characters, 8 to 64.</param>
+/// <param name="PasswordCommonCheck">Whether new passwords on a list of common passwords are refused.</param>
+/// <param name="PasswordBreachedCheck">Whether new passwords are checked against Have I Been Pwned, which receives 5 characters of the password's SHA-1.</param>
+/// <param name="AccessTokenSeconds">How long an access token lasts, in seconds, 300 to 3600.</param>
+/// <param name="SessionIdleSeconds">How long a session lasts without a refresh, in seconds, 3600 to 7776000, at most <c>sessionAbsoluteSeconds</c>.</param>
+/// <param name="SessionAbsoluteSeconds">How long a session lasts at most, in seconds, 86400 to 31536000.</param>
+/// <param name="MaxSessionsPerUser">The most live sessions one user may hold, 1 to 1000; a new one ends the least recently used. Null means no limit.</param>
+/// <param name="TrustedServerCidrs">The app servers (address ranges such as <c>203.0.113.0/24</c>, at most 20) whose <c>X-Orvano-Client-IP</c> header names the visitor's address for rate limits.</param>
+/// <param name="SignInFailedPerEmailIp">Failed password sign ins per email and address.</param>
+/// <param name="SignInFailedPerIp">Failed password sign ins per address in 15 minutes, 10 to 10000.</param>
+/// <param name="SignUpPerIp">Sign ups per address in an hour, 1 to 10000.</param>
+/// <param name="AnonymousPerIp">Guest sign ins per address in an hour, 1 to 10000.</param>
+/// <param name="EmailSendPerIp">Emails a public request may send per address in an hour, 10 to 100000.</param>
+/// <param name="UpdatedAt">When the rules last changed; null while the project uses the defaults.</param>
+/// <param name="SmtpAvailable">Whether the project or the install has an email server, which requiring verified emails needs.</param>
+/// <param name="Defaults">Every rule at its default value, for the reset buttons.</param>
+public sealed record AuthPolicies(
+    [property: JsonPropertyName("signUpsEnabled")] bool SignUpsEnabled,
+    [property: JsonPropertyName("requireVerifiedEmail")] bool RequireVerifiedEmail,
+    [property: JsonPropertyName("blockDisposableEmails")] bool BlockDisposableEmails,
+    [property: JsonPropertyName("blockedEmailDomains")] IReadOnlyList<string> BlockedEmailDomains,
+    [property: JsonPropertyName("allowedEmailDomains")] IReadOnlyList<string> AllowedEmailDomains,
+    [property: JsonPropertyName("passwordMinLength")] int PasswordMinLength,
+    [property: JsonPropertyName("passwordCommonCheck")] bool PasswordCommonCheck,
+    [property: JsonPropertyName("passwordBreachedCheck")] bool PasswordBreachedCheck,
+    [property: JsonPropertyName("accessTokenSeconds")] int AccessTokenSeconds,
+    [property: JsonPropertyName("sessionIdleSeconds")] int SessionIdleSeconds,
+    [property: JsonPropertyName("sessionAbsoluteSeconds")] int SessionAbsoluteSeconds,
+    [property: JsonPropertyName("maxSessionsPerUser")] int? MaxSessionsPerUser,
+    [property: JsonPropertyName("trustedServerCidrs")] IReadOnlyList<string> TrustedServerCidrs,
+    [property: JsonPropertyName("signInFailedPerEmailIp")] SignInFailedLimit SignInFailedPerEmailIp,
+    [property: JsonPropertyName("signInFailedPerIp")] int SignInFailedPerIp,
+    [property: JsonPropertyName("signUpPerIp")] int SignUpPerIp,
+    [property: JsonPropertyName("anonymousPerIp")] int AnonymousPerIp,
+    [property: JsonPropertyName("emailSendPerIp")] int EmailSendPerIp,
+    [property: JsonPropertyName("updatedAt")] DateTimeOffset? UpdatedAt,
+    [property: JsonPropertyName("smtpAvailable")] bool SmtpAvailable,
+    [property: JsonPropertyName("defaults")] AuthPolicyValues Defaults);
+
+/// <summary>A project's auth rules, as stored or at their defaults.</summary>
+/// <param name="SignUpsEnabled">Whether new users can sign up from an app. Servers and the console can always create users.</param>
+/// <param name="RequireVerifiedEmail">Whether users must verify their email before a password sign in. Sign up then hides which emails have accounts.</param>
+/// <param name="BlockDisposableEmails">Whether sign ups from known disposable email domains are refused.</param>
+/// <param name="BlockedEmailDomains">Email domains whose new users are refused, at most 500. A domain also covers its subdomains.</param>
+/// <param name="AllowedEmailDomains">When not empty, the only email domains new users may have, at most 500. A domain also covers its subdomains.</param>
+/// <param name="PasswordMinLength">The shortest new password, in characters, 8 to 64.</param>
+/// <param name="PasswordCommonCheck">Whether new passwords on a list of common passwords are refused.</param>
+/// <param name="PasswordBreachedCheck">Whether new passwords are checked against Have I Been Pwned, which receives 5 characters of the password's SHA-1.</param>
+/// <param name="AccessTokenSeconds">How long an access token lasts, in seconds, 300 to 3600.</param>
+/// <param name="SessionIdleSeconds">How long a session lasts without a refresh, in seconds, 3600 to 7776000, at most <c>sessionAbsoluteSeconds</c>.</param>
+/// <param name="SessionAbsoluteSeconds">How long a session lasts at most, in seconds, 86400 to 31536000.</param>
+/// <param name="MaxSessionsPerUser">The most live sessions one user may hold, 1 to 1000; a new one ends the least recently used. Null means no limit.</param>
+/// <param name="TrustedServerCidrs">The app servers (address ranges such as <c>203.0.113.0/24</c>, at most 20) whose <c>X-Orvano-Client-IP</c> header names the visitor's address for rate limits.</param>
+/// <param name="SignInFailedPerEmailIp">Failed password sign ins per email and address.</param>
+/// <param name="SignInFailedPerIp">Failed password sign ins per address in 15 minutes, 10 to 10000.</param>
+/// <param name="SignUpPerIp">Sign ups per address in an hour, 1 to 10000.</param>
+/// <param name="AnonymousPerIp">Guest sign ins per address in an hour, 1 to 10000.</param>
+/// <param name="EmailSendPerIp">Emails a public request may send per address in an hour, 10 to 100000.</param>
+public sealed record AuthPolicyValues(
+    [property: JsonPropertyName("signUpsEnabled")] bool SignUpsEnabled,
+    [property: JsonPropertyName("requireVerifiedEmail")] bool RequireVerifiedEmail,
+    [property: JsonPropertyName("blockDisposableEmails")] bool BlockDisposableEmails,
+    [property: JsonPropertyName("blockedEmailDomains")] IReadOnlyList<string> BlockedEmailDomains,
+    [property: JsonPropertyName("allowedEmailDomains")] IReadOnlyList<string> AllowedEmailDomains,
+    [property: JsonPropertyName("passwordMinLength")] int PasswordMinLength,
+    [property: JsonPropertyName("passwordCommonCheck")] bool PasswordCommonCheck,
+    [property: JsonPropertyName("passwordBreachedCheck")] bool PasswordBreachedCheck,
+    [property: JsonPropertyName("accessTokenSeconds")] int AccessTokenSeconds,
+    [property: JsonPropertyName("sessionIdleSeconds")] int SessionIdleSeconds,
+    [property: JsonPropertyName("sessionAbsoluteSeconds")] int SessionAbsoluteSeconds,
+    [property: JsonPropertyName("maxSessionsPerUser")] int? MaxSessionsPerUser,
+    [property: JsonPropertyName("trustedServerCidrs")] IReadOnlyList<string> TrustedServerCidrs,
+    [property: JsonPropertyName("signInFailedPerEmailIp")] SignInFailedLimit SignInFailedPerEmailIp,
+    [property: JsonPropertyName("signInFailedPerIp")] int SignInFailedPerIp,
+    [property: JsonPropertyName("signUpPerIp")] int SignUpPerIp,
+    [property: JsonPropertyName("anonymousPerIp")] int AnonymousPerIp,
+    [property: JsonPropertyName("emailSendPerIp")] int EmailSendPerIp);
+
 /// <summary>A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of <c>session</c> and <c>mfa</c> is set.</summary>
 /// <param name="User">The user; null while <c>mfa</c> is set.</param>
 /// <param name="Session">The new session's tokens; null while <c>mfa</c> is set.</param>
@@ -2061,6 +2145,13 @@ public sealed record SessionTokens(
     [property: JsonPropertyName("refreshTokenExpiresAt")] DateTimeOffset RefreshTokenExpiresAt,
     [property: JsonPropertyName("sessionId")] string SessionId);
 
+/// <summary>How many failed password sign ins one email may have from one address in a window.</summary>
+/// <param name="Limit">Failed sign ins allowed per window, 3 to 100.</param>
+/// <param name="WindowMinutes">The window in minutes, 1 to 1440.</param>
+public sealed record SignInFailedLimit(
+    [property: JsonPropertyName("limit")] int Limit,
+    [property: JsonPropertyName("windowMinutes")] int WindowMinutes);
+
 /// <summary>A project's token signing key as the console shows it; never the key itself.</summary>
 /// <param name="Id">The key ID, the <c>kid</c> of the tokens it signs.</param>
 /// <param name="Status"><c>active</c> signs new tokens; <c>retiring</c> only verifies them until <c>retireAfter</c>.</param>
@@ -2271,6 +2362,45 @@ public sealed record UpdateAuthMethodSettingsRequest(
     [property: JsonPropertyName("androidCertFingerprints"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? AndroidCertFingerprints = null,
     [property: JsonPropertyName("confirmRpIdChange"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? ConfirmRpIdChange = null);
 
+/// <summary>Changes to a project's auth rules. Fields left out keep their value; the result must meet every bound.</summary>
+/// <param name="SignUpsEnabled">Whether new users can sign up from an app.</param>
+/// <param name="RequireVerifiedEmail">Whether users must verify their email before a password sign in; turning it on needs an email server.</param>
+/// <param name="BlockDisposableEmails">Whether sign ups from known disposable email domains are refused.</param>
+/// <param name="BlockedEmailDomains">Email domains whose new users are refused; replaces the list.</param>
+/// <param name="AllowedEmailDomains">The only email domains new users may have; replaces the list, and empty allows any.</param>
+/// <param name="PasswordMinLength">The shortest new password, in characters, 8 to 64.</param>
+/// <param name="PasswordCommonCheck">Whether new passwords on a list of common passwords are refused.</param>
+/// <param name="PasswordBreachedCheck">Whether new passwords are checked against Have I Been Pwned.</param>
+/// <param name="AccessTokenSeconds">How long an access token lasts, in seconds, 300 to 3600.</param>
+/// <param name="SessionIdleSeconds">How long a session lasts without a refresh, in seconds.</param>
+/// <param name="SessionAbsoluteSeconds">How long a session lasts at most, in seconds.</param>
+/// <param name="MaxSessionsPerUser">The most live sessions one user may hold, 1 to 1000; null clears the limit.</param>
+/// <param name="TrustedServerCidrs">The app servers whose <c>X-Orvano-Client-IP</c> header is trusted; replaces the list.</param>
+/// <param name="SignInFailedPerEmailIp">Failed password sign ins per email and address; each field left out keeps its value.</param>
+/// <param name="SignInFailedPerIp">Failed password sign ins per address in 15 minutes.</param>
+/// <param name="SignUpPerIp">Sign ups per address in an hour.</param>
+/// <param name="AnonymousPerIp">Guest sign ins per address in an hour.</param>
+/// <param name="EmailSendPerIp">Emails a public request may send per address in an hour.</param>
+public sealed record UpdateAuthPoliciesRequest(
+    [property: JsonPropertyName("signUpsEnabled"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? SignUpsEnabled = null,
+    [property: JsonPropertyName("requireVerifiedEmail"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? RequireVerifiedEmail = null,
+    [property: JsonPropertyName("blockDisposableEmails"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? BlockDisposableEmails = null,
+    [property: JsonPropertyName("blockedEmailDomains"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? BlockedEmailDomains = null,
+    [property: JsonPropertyName("allowedEmailDomains"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? AllowedEmailDomains = null,
+    [property: JsonPropertyName("passwordMinLength"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? PasswordMinLength = null,
+    [property: JsonPropertyName("passwordCommonCheck"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? PasswordCommonCheck = null,
+    [property: JsonPropertyName("passwordBreachedCheck"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? PasswordBreachedCheck = null,
+    [property: JsonPropertyName("accessTokenSeconds"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? AccessTokenSeconds = null,
+    [property: JsonPropertyName("sessionIdleSeconds"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? SessionIdleSeconds = null,
+    [property: JsonPropertyName("sessionAbsoluteSeconds"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? SessionAbsoluteSeconds = null,
+    [property: JsonPropertyName("maxSessionsPerUser"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? MaxSessionsPerUser = null,
+    [property: JsonPropertyName("trustedServerCidrs"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? TrustedServerCidrs = null,
+    [property: JsonPropertyName("signInFailedPerEmailIp"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] UpdateSignInFailedLimit? SignInFailedPerEmailIp = null,
+    [property: JsonPropertyName("signInFailedPerIp"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? SignInFailedPerIp = null,
+    [property: JsonPropertyName("signUpPerIp"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? SignUpPerIp = null,
+    [property: JsonPropertyName("anonymousPerIp"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? AnonymousPerIp = null,
+    [property: JsonPropertyName("emailSendPerIp"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? EmailSendPerIp = null);
+
 /// <summary>A request to change the signed in user's email. It changes once the link sent to the new address is opened.</summary>
 /// <param name="Email">The new email, trimmed, at most 320 characters.</param>
 /// <param name="RedirectUrl">Your page that receives the confirmation link: a host that is one of the project's web platforms, or your app's own scheme. The link adds <c>orvano_type=email_change</c> and <c>orvano_token</c> to it.</param>
@@ -2342,6 +2472,13 @@ public sealed record UpdatePlatformRequest(
 /// <param name="Name">The new project name; trimmed, 1 to 100 characters.</param>
 public sealed record UpdateProjectRequest(
     [property: JsonPropertyName("name")] string Name);
+
+/// <summary>A change to failed password sign ins per email and address. Fields left out keep their value.</summary>
+/// <param name="Limit">Failed sign ins allowed per window, 3 to 100.</param>
+/// <param name="WindowMinutes">The window in minutes, 1 to 1440.</param>
+public sealed record UpdateSignInFailedLimit(
+    [property: JsonPropertyName("limit"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? Limit = null,
+    [property: JsonPropertyName("windowMinutes"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? WindowMinutes = null);
 
 /// <summary>Changes a user's email at once, without a confirmation email.</summary>
 /// <param name="Email">The new email, trimmed, at most 320 characters. Unique in the project, ignoring case.</param>

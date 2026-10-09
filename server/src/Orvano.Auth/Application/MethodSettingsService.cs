@@ -13,7 +13,7 @@ internal sealed record MethodSettingsView(MethodSettings Settings, int ActivePas
 /// The TOTP and Passkeys switches of an app project (spec 0013, AC-1, AC-2), behind <c>consoleAuthMethods.*</c>. The
 /// <c>console</c> project has no row and is never edited here (AC-3).
 /// </summary>
-internal sealed class MethodSettingsService(AuthStore store, IWebOriginPolicy origins)
+internal sealed class MethodSettingsService(AuthStore store, IWebOriginPolicy origins, PolicySettings policies)
 {
     /// <summary>The project's settings (defaults when it saved none), its active passkeys, and the origins AC-4 accepts today.</summary>
     public async Task<Outcome<MethodSettingsView>> GetAsync(string projectId, CancellationToken ct)
@@ -76,6 +76,7 @@ internal sealed class MethodSettingsService(AuthStore store, IWebOriginPolicy or
         }, ct);
 
         if (!outcome.Succeeded) return outcome.Failure!;
+        policies.Evict(projectId);
         var (settings, active) = outcome.Value;
         return new MethodSettingsView(settings, active, await AcceptedOriginsAsync(projectId, settings, ct));
     }

@@ -298,6 +298,16 @@ final Map<String, DispatchEntry> _runnerDispatch = {
       body: input['body'],
     ),
   ),
+  // A plain sign in sent as a trusted app server would send it for a visitor
+  // at `clientIp` (spec 0014, AC-16).
+  'signInFrom': DispatchEntry(
+    status: 201,
+    client: (o, input) => core.Client(
+      endpoint: o.client.endpoint,
+      project: o.client.project,
+      headers: {'X-Orvano-Client-IP': '${input['clientIp']}'},
+    ).send('POST', '/v1/account/sessions/password', body: input['body']),
+  ),
   'verifyAccessToken': DispatchEntry(
     status: 200,
     server: (o, input) async {

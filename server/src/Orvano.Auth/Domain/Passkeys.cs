@@ -240,9 +240,22 @@ internal static class Base64Codec
     public static string Encode(ReadOnlySpan<byte> bytes) => Base64Url.EncodeToString(bytes);
 }
 
-/// <summary>A project's second factor and passkey settings (AC-1). A project without a row reads as <see cref="Defaults"/>.</summary>
-internal sealed record MethodSettings(bool TotpEnabled, bool PasskeysEnabled, string? RpId, string? RpName, IReadOnlyList<string> AndroidCertFingerprints)
+/// <summary>
+/// A project's second factor and passkey settings (AC-1), plus spec 0014's guest and required MFA switches (AC-2). A
+/// project without a row reads as <see cref="Defaults"/>.
+/// </summary>
+internal sealed record MethodSettings(
+    bool TotpEnabled,
+    bool PasskeysEnabled,
+    string? RpId,
+    string? RpName,
+    IReadOnlyList<string> AndroidCertFingerprints,
+    bool AnonymousEnabled = false,
+    int AnonymousIdleDays = MethodSettings.DefaultAnonymousIdleDays,
+    bool MfaRequired = false)
 {
+    public const int DefaultAnonymousIdleDays = 30;
+
     public static MethodSettings Defaults { get; } = new(true, false, null, null, []);
 }
 
@@ -300,12 +313,14 @@ internal static class MethodSettingsRules
             fingerprints = normalized;
         }
 
-        var next = new MethodSettings(
-            update.TotpEnabled ?? current.TotpEnabled,
-            update.PasskeysEnabled ?? current.PasskeysEnabled,
-            rpId,
-            rpName,
-            fingerprints);
+        var next = current with
+        {
+            TotpEnabled = update.TotpEnabled ?? current.TotpEnabled,
+            PasskeysEnabled = update.PasskeysEnabled ?? current.PasskeysEnabled,
+            RpId = rpId,
+            RpName = rpName,
+            AndroidCertFingerprints = fingerprints,
+        };
         if (next.PasskeysEnabled && next.RpId is null) return (null, "Set rpId to turn passkeys on.");
 
         var changed = new List<string>();

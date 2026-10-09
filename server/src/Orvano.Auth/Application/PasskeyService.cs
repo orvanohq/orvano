@@ -90,7 +90,7 @@ internal sealed class PasskeyService(
     /// </summary>
     public async Task<Outcome<RegistrationView>> CreateRegistrationAsync(string projectId, Guid userId, Guid sessionId, string? password, CancellationToken ct)
     {
-        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, password, ct) is { } refused) return refused;
+        if ((await stepUp.EnrollmentAsync(projectId, userId, sessionId, password, ct) ?? stepUp.TakeEnrollLimit(userId)) is { } refused) return refused;
         var rpName = await RpNameAsync(projectId, await ReadPolicyAsync(projectId, ct), ct);
 
         return await store.WriteAsync<RegistrationView>(async (uow, token) =>

@@ -35,7 +35,7 @@ internal static class OAuthEndpoints
     {
         v1.MapPost(Api.AccountOperations.CreateOAuthFlow.Route, async (HttpContext http, Api.CreateOAuthFlowRequest request, OAuthService oauth, CancellationToken ct) =>
         {
-            var outcome = await oauth.StartAsync(PublicRequests.Project(http), ProviderOrNull(request.Provider), request.RedirectUrl, request.CodeChallenge, ConnectionIp.Key(http), ct);
+            var outcome = await oauth.StartAsync(PublicRequests.Project(http), ProviderOrNull(request.Provider), request.RedirectUrl, request.CodeChallenge, PublicRequests.LimitKey(http), ct);
             return Ok(http, outcome, url => new Api.OAuthFlow(url));
         })
             .WithName(Api.AccountOperations.CreateOAuthFlow.Id)
@@ -44,10 +44,10 @@ internal static class OAuthEndpoints
         v1.MapPost(Api.AccountOperations.CreateOAuthSession.Route, (HttpContext http, OAuthService oauth, RateLimits limits, CancellationToken ct) =>
             EmailRequests.RedeemAsync<Api.CreateOAuthSessionRequest>(http, limits, ct, async request =>
             {
-                var signIn = limits.Acquire(RateLimitPolicies.SignInPerIp, ConnectionIp.Key(http));
+                var signIn = limits.Acquire(RateLimitPolicies.SignInPerIp, PublicRequests.LimitKey(http));
                 if (!signIn.Allowed) return ApiProblem.RateLimited(http, signIn, Api.ErrorCode.RateLimited);
                 return Created(http, await oauth.RedeemAsync(
-                    PublicRequests.Project(http), request.Code, request.CodeVerifier, PublicRequests.Client(http), ConnectionIp.Key(http), ct), AuthResult);
+                    PublicRequests.Project(http), request.Code, request.CodeVerifier, PublicRequests.Client(http), PublicRequests.LimitKey(http), ct), AuthResult);
             }, RateLimitPolicies.FailedOAuthRedeemPerIp))
             .WithName(Api.AccountOperations.CreateOAuthSession.Id)
             .RequireProject();
@@ -56,7 +56,7 @@ internal static class OAuthEndpoints
         {
             var query = http.Request.Query;
             var answer = await oauth.CallbackAsync(
-                projectId, provider, Single(query["state"]), Single(query["code"]), Single(query["error"]), appleUser: null, ConnectionIp.Key(http), ct);
+                projectId, provider, Single(query["state"]), Single(query["code"]), Single(query["error"]), appleUser: null, CallbackLimitKey(http, projectId), ct);
             return Answer(http, answer, StatusCodes.Status302Found);
         })
             .WithName(CallbackId);
@@ -66,7 +66,7 @@ internal static class OAuthEndpoints
             if (!http.Request.HasFormContentType) return Answer(http, new CallbackAnswer.Page(StatusCodes.Status400BadRequest), StatusCodes.Status303SeeOther);
             var form = await http.Request.ReadFormAsync(ct);
             var answer = await oauth.CallbackAsync(
-                projectId, provider, Single(form["state"]), Single(form["code"]), Single(form["error"]), Single(form["user"]), ConnectionIp.Key(http), ct);
+                projectId, provider, Single(form["state"]), Single(form["code"]), Single(form["error"]), Single(form["user"]), CallbackLimitKey(http, projectId), ct);
             return Answer(http, answer, StatusCodes.Status303SeeOther);
         })
             .WithName(CallbackFormId);
@@ -99,4 +99,10 @@ internal static class OAuthEndpoints
     }
 
     private static string? Single(Microsoft.Extensions.Primitives.StringValues values) => values.Count == 1 ? values[0] : null;
+
+    /// <summary>
+    /// A callback is a browser's navigation straight from the provider, never an app server's call, so its limit IP is
+    /// the connection IP (spec 0014, AC-16), keyed with the project in the path.
+    /// </summary>
+    private static string CallbackLimitKey(HttpContext http, string projectId) => $"{projectId}\n{LimitIp.Key(ConnectionIp.Of(http))}";
 }

@@ -54,7 +54,10 @@ internal sealed class RefreshToken
     }
 }
 
-/// <summary>Session expiry (AC-9): 30 days after the last refresh, 365 days after creation, whichever comes first.</summary>
+/// <summary>
+/// Session expiry (AC-9) at the default lifetimes: 30 days after the last refresh, 365 days after creation, whichever
+/// comes first. A project may set its own (spec 0014, AC-25); the database computes those from its policy.
+/// </summary>
 internal static class SessionLifetime
 {
     /// <summary>The absolute expiry of a session created at <paramref name="createdAt"/>.</summary>
@@ -94,6 +97,12 @@ internal static class SessionEndReason
 
     /// <summary>A server, console, or CLI reset of a user's MFA ends every session (spec 0013, AC-27).</summary>
     public const string MfaReset = "mfa_reset";
+
+    /// <summary>A new session ended the user's least recently used one past the project's cap (spec 0014, AC-26).</summary>
+    public const string SessionLimit = "session_limit";
+
+    /// <summary>A guest became permanent while the project requires MFA (spec 0014, AC-30).</summary>
+    public const string MfaRequired = "mfa_required";
 }
 
 /// <summary>How a session began (spec 0010, the <c>method</c> column, AC-20).</summary>
