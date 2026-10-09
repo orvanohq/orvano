@@ -9,6 +9,10 @@ import { expect, scenariosProject, test } from './fixtures.ts'
 // page's MFA filter, sees their session at two factors, and resets their MFA from the Security
 // section, which ends every session.
 
+// One test turns the project's authenticator app off for a moment, which would hide the other's MFA user from the
+// MFA filter, so they run one after the other.
+test.describe.configure({ mode: 'serial' })
+
 const serverKey = 'orv_sk_scenarioScenarioScenarioScenarioScenario000'
 const password = 'correct horse battery staple'
 
