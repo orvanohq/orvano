@@ -19,7 +19,8 @@ public enum ConsoleSessionStatus
 /// <summary>The result of checking a console session cookie.</summary>
 /// <param name="Status">What the cookie amounts to.</param>
 /// <param name="UserId">The console account, when <see cref="ConsoleSessionStatus.Valid"/>.</param>
-public sealed record ConsoleSessionCheck(ConsoleSessionStatus Status, Guid UserId);
+/// <param name="SessionId">The console session, when <see cref="ConsoleSessionStatus.Valid"/>.</param>
+public sealed record ConsoleSessionCheck(ConsoleSessionStatus Status, Guid UserId, Guid SessionId = default);
 
 /// <summary>Checks the <c>orvano_console</c> cookie for the host's <c>/v1/console</c> rule.</summary>
 public interface IConsoleSessions

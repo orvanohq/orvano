@@ -198,7 +198,13 @@ public class MfaResetTests(PostgresFixture postgres)
     {
         await using var api = await AuthApi.StartAsync(postgres);
         await SeedConsoleFactorAsync(api, AuthApi.ConsoleUser);
-        Assert.Equal(HttpStatusCode.Forbidden, (await ConsoleSignInAsync(api, AuthApi.ConsoleUser)).StatusCode);
+        using (var challenged = await ConsoleSignInAsync(api, AuthApi.ConsoleUser))
+        {
+            Assert.Equal(HttpStatusCode.Created, challenged.StatusCode);
+            using var body = JsonDocument.Parse(await challenged.Content.ReadAsStringAsync(Ct));
+            Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("account").ValueKind);
+            Assert.Equal(JsonValueKind.Object, body.RootElement.GetProperty("mfa").ValueKind);
+        }
 
         await using var unknown = await MfaResetAsync(api, "--email", "nobody@x.com");
         await using var badArgs = await MfaResetAsync(api, "--email");
@@ -217,6 +223,8 @@ public class MfaResetTests(PostgresFixture postgres)
 
         using var signedIn = await ConsoleSignInAsync(api, AuthApi.ConsoleUser);
         Assert.Equal(HttpStatusCode.Created, signedIn.StatusCode);
+        using (var body = JsonDocument.Parse(await signedIn.Content.ReadAsStringAsync(Ct)))
+            Assert.Equal(JsonValueKind.Object, body.RootElement.GetProperty("account").ValueKind);
         using var events = await EventsAsync(api, "auth.mfa.reset");
         var actor = Assert.Single(events.RootElement.EnumerateArray()).GetProperty("actor");
         Assert.Equal("system", actor.GetProperty("type").GetString());

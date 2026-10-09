@@ -24,7 +24,7 @@ internal sealed class ConsoleSessionChecks(AccessTokens tokens, SessionChecks se
         }
 
         return await sessions.IsActiveAsync(identity.SessionId, identity.UserId, ConsoleProject.Id, ct)
-            ? new ConsoleSessionCheck(ConsoleSessionStatus.Valid, identity.UserId)
+            ? new ConsoleSessionCheck(ConsoleSessionStatus.Valid, identity.UserId, identity.SessionId)
             : new ConsoleSessionCheck(ConsoleSessionStatus.Invalid, Guid.Empty);
     }
 }

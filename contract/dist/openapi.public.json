@@ -5514,7 +5514,7 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "orvano_console",
-        "description": "A console account's session: the `orvano_console` cookie (`HttpOnly`, `SameSite=Strict`), set by\n`consoleAccount.create` and `consoleAccount.createSession`. Browsers send it themselves."
+        "description": "A console account's session: the `orvano_console` cookie (`HttpOnly`, `SameSite=Strict`), set by\n`consoleAccount.create`, `consoleAccount.createSession` (when the account has no MFA), and the second step and\npasskey sign in that finish it. Browsers send it themselves."
       },
       "bearer": {
         "type": "http",

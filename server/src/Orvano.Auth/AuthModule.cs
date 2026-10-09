@@ -93,6 +93,7 @@ internal sealed class AuthModule : IOrvanoModule
         KeysEndpoints.Map(auth);
         UsersEndpoints.Map(auth);
         ConsoleAccountEndpoints.Map(auth);
+        ConsoleAccountMfaEndpoints.Map(auth);
         ConsoleUsersEndpoints.Map(auth);
     }
 

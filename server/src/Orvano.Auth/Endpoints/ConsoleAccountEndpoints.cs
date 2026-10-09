@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Orvano.Auth.Application;
+using Orvano.Auth.Domain;
 using Orvano.Core.Http;
 using Orvano.Core.RateLimiting;
 using Orvano.Platform.Contracts;
@@ -48,11 +49,16 @@ internal static class ConsoleAccountEndpoints
 
             var outcome = await accounts.SignInAsync(ConsoleProject.Id, request.Email, request.Password, PublicRequests.Client(http), ct);
             if (!outcome.Succeeded) return Problem(http, outcome.Failure!);
-            // Console accounts can't turn MFA on until the console's MFA step exists (spec 0013, AC-41); until then a
-            // challenge here fails closed rather than signing in with one factor.
-            if (outcome.Value!.Session is not { } session) return Problem(http, Failure.MfaVerificationRequired);
-            ConsoleCookies.Set(http, session, publicUrl);
-            return TypedResults.Created((string?)null, await AccountAsync(outcome.Value.User!, admins, ct));
+            // With MFA on (spec 0013, AC-41) no session cookie is set or changed: the ticket goes in its own cookie, and
+            // the body carries the factors with an empty ticket.
+            if (outcome.Value!.Mfa is { } mfa)
+            {
+                ConsoleCookies.SetMfa(http, mfa.Ticket, publicUrl);
+                return TypedResults.Created((string?)null, new Api.ConsoleAuthResult(null, MfaChallenge(mfa with { Ticket = "" })));
+            }
+
+            ConsoleCookies.Set(http, outcome.Value.Session!, publicUrl);
+            return TypedResults.Created((string?)null, new Api.ConsoleAuthResult(await AccountAsync(outcome.Value.User!, admins, ct), null));
         })
             .WithName(Ops.CreateSession.Id);
 
@@ -130,6 +136,25 @@ internal static class ConsoleCookies
         http.Response.Cookies.Append(OrvanoHeaders.ConsoleRefreshCookie, session.RefreshToken,
             Options(OrvanoHeaders.ConsoleRefreshPath, session.RefreshTokenExpiresAt, secure));
     }
+
+    /// <summary>
+    /// Sets <c>orvano_console_mfa</c>, the ticket of a console sign in waiting for its second step (spec 0013, AC-41):
+    /// <c>HttpOnly</c>, <c>SameSite=Strict</c>, sent only to <c>/v1/console/account/session</c>, for 5 minutes.
+    /// </summary>
+    public static void SetMfa(HttpContext http, string ticket, PublicUrl publicUrl)
+    {
+        var options = Options(OrvanoHeaders.ConsoleRefreshPath, null, Secure(publicUrl));
+        options.MaxAge = AuthTimings.MfaTicket;
+        http.Response.Cookies.Append(OrvanoHeaders.ConsoleMfaCookie, ticket, options);
+    }
+
+    /// <summary>The ticket cookie's value, or null when the browser sent none.</summary>
+    public static string? MfaTicket(HttpContext http) =>
+        http.Request.Cookies[OrvanoHeaders.ConsoleMfaCookie] is { Length: > 0 } ticket ? ticket : null;
+
+    /// <summary>Clears the ticket cookie once the ticket is spent or gone.</summary>
+    public static void ClearMfa(HttpContext http, PublicUrl publicUrl) =>
+        http.Response.Cookies.Delete(OrvanoHeaders.ConsoleMfaCookie, Options(OrvanoHeaders.ConsoleRefreshPath, null, Secure(publicUrl)));
 
     public static void Clear(HttpContext http, PublicUrl publicUrl)
     {

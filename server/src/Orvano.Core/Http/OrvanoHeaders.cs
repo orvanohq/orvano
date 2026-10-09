@@ -26,6 +26,12 @@ public static class OrvanoHeaders
     /// <summary>The console session cookie (the access token), the only credential <c>/v1/console</c> accepts.</summary>
     public const string ConsoleCookie = "orvano_console";
 
+    /// <summary>
+    /// The ticket of a console sign in waiting for its second step (spec 0013, AC-41), sent only to
+    /// <see cref="ConsoleRefreshPath"/>.
+    /// </summary>
+    public const string ConsoleMfaCookie = "orvano_console_mfa";
+
     /// <summary>The console's refresh token cookie, sent only to <see cref="ConsoleRefreshPath"/>.</summary>
     public const string ConsoleRefreshCookie = "orvano_console_refresh";
 

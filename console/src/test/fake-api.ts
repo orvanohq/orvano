@@ -10,6 +10,7 @@ import type {
   Invitation,
   InvitationPreview,
   Member,
+  MfaFactor,
   Org,
   OrgRole,
   Platform,
@@ -83,6 +84,11 @@ export interface FakeApi {
   requests: SentRequest[]
   /** Whether the install still waits for its first admin, as `consoleInstall.getSetup` answers. */
   setupRequired: boolean
+  /**
+   * The factors a password sign in is challenged with (spec 0013, AC-41); null signs in at once.
+   * The second step accepts any well formed factor; refuse one with `failNext`.
+   */
+  consoleMfa: MfaFactor[] | null
   /** Makes the next `method` request whose path matches answer with this problem, once. */
   failNext: (method: string, path: RegExp, status: number, code: string, detail: string) => void
   /** Makes the next `method` request whose path matches answer 200 with this JSON body, once. */
@@ -254,6 +260,7 @@ export function installFakeApi(): FakeApi {
     platforms: [],
     requests: [],
     setupRequired: false,
+    consoleMfa: null,
     failNext: (method, path, status, code, detail) => {
       failures.push({ method, path, status, code, detail })
     },
@@ -335,8 +342,16 @@ export function installFakeApi(): FakeApi {
       return Response.json({ settings: api.installSmtp })
     }
     if (path === '/v1/console/account/session' && method === 'POST') {
-      api.signedIn = true
       api.account = { ...api.account, email: String(input.email) }
+      if (api.consoleMfa !== null) {
+        const mfa = { ticket: '', factors: api.consoleMfa, expiresAt: now }
+        return Response.json({ account: null, mfa }, { status: 201 })
+      }
+      api.signedIn = true
+      return Response.json({ account: api.account, mfa: null }, { status: 201 })
+    }
+    if (path === '/v1/console/account/session/mfa' && method === 'POST') {
+      api.signedIn = true
       return Response.json(api.account, { status: 201 })
     }
     if (path === '/v1/console/account/session' && method === 'DELETE') {

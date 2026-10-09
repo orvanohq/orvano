@@ -270,9 +270,12 @@ internal sealed class MfaService(
     /// the ticket (read without a lock), the user's limit, then under the user lock and the ticket's row lock, the
     /// factor. A wrong factor commits its attempt with the refusal (the second permitted use of
     /// <see cref="AuthStore.WriteDecidingAsync"/>); the fifth deletes the ticket. A right one deletes the ticket, applies
-    /// a recovery's pending password, and creates the session at level 2 in one transaction.
+    /// a recovery's pending password, and creates the session at level 2 in one transaction. <paramref name="ticketEnded"/>
+    /// runs when a refusal also ended the ticket (the fifth wrong factor), so the console can clear its ticket cookie
+    /// (AC-41).
     /// </summary>
-    public async Task<Outcome<SignedIn>> CompleteAsync(string projectId, string? ticketValue, FactorAnswer answer, string ipKey, CancellationToken ct)
+    public async Task<Outcome<SignedIn>> CompleteAsync(
+        string projectId, string? ticketValue, FactorAnswer answer, string ipKey, CancellationToken ct, Action? ticketEnded = null)
     {
         var ipLimit = limits.Check(RateLimitPolicies.FailedMfaTicketPerIp, ipKey);
         if (!ipLimit.Allowed) return Failure.RateLimited(ipLimit.RetryAfter);
@@ -307,6 +310,7 @@ internal sealed class MfaService(
         }
 
         var wrong = false;
+        var ticketGone = false;
         var outcome = await store.WriteDecidingAsync<(Data.UserRow User, SessionGrant Grant, Guid[] Ended)>(async (uow, token) =>
         {
             var locked = await UserLocks.ByIdAsync(uow, projectId, found.UserId, token);
@@ -319,7 +323,7 @@ internal sealed class MfaService(
             if (row.Id != found.Id || !await UseFactorAsync(uow, row.UserId, answer, check, state.Policy, token))
             {
                 wrong = true;
-                await CountWrongAsync(uow, row, token);
+                ticketGone = await CountWrongAsync(uow, row, token);
                 return (factor == MfaFactors.Passkey ? Failure.InvalidPasskey : Failure.InvalidMfaCode, true);
             }
 
@@ -347,7 +351,12 @@ internal sealed class MfaService(
         }, ct);
 
         if (wrong) limits.Acquire(RateLimitPolicies.FailedMfaPerUser, userKey);
-        if (!outcome.Succeeded) return outcome.Failure!;
+        if (!outcome.Succeeded)
+        {
+            if (ticketGone) ticketEnded?.Invoke();
+            return outcome.Failure!;
+        }
+
         foreach (var id in outcome.Value.Ended) await checks.EvictAsync(id, ct);
         return await accounts.SignedInAsync(projectId, outcome.Value.User, outcome.Value.Grant, ct);
     }
@@ -416,17 +425,19 @@ internal sealed class MfaService(
     private static string[] Amr(string factor, AssertionCheck? check) =>
         factor == MfaFactors.Passkey ? SessionStrength.ForPasskey(check!.BackedUp) : SessionStrength.ForFactor(factor);
 
-    private static async Task CountWrongAsync(AuthUnitOfWork uow, TicketRow row, CancellationToken ct)
+    /// <summary>Counts a wrong factor on the ticket; true when it was the last allowed and the ticket is gone.</summary>
+    private static async Task<bool> CountWrongAsync(AuthUnitOfWork uow, TicketRow row, CancellationToken ct)
     {
         if (row.Attempts + 1 >= AuthTimings.MfaTicketAttempts)
         {
             await DeleteTicketAsync(uow, row.Id, ct);
-            return;
+            return true;
         }
 
         await using var count = new NpgsqlCommand("UPDATE orvano.auth_mfa_tickets SET attempts = attempts + 1 WHERE id = @id", uow.Tx.Connection, uow.Tx);
         count.Parameters.AddWithValue("id", row.Id);
         await count.ExecuteNonQueryAsync(ct);
+        return false;
     }
 
     private static async Task DeleteTicketAsync(AuthUnitOfWork uow, Guid ticketId, CancellationToken ct)

@@ -3,6 +3,7 @@
 import type {
   CreateApiKeyRequest,
   CreateConsoleAccountRequest,
+  CreateConsoleMfaSessionRequest,
   CreateConsoleSessionRequest,
   CreateInvitationRequest,
   CreateOrgRequest,
@@ -20,36 +21,111 @@ import type {
   UpdateProjectRequest,
 } from '@orvano/console-client'
 import type {
+  CompletePasskeyRegistrationRequest,
+  ConfirmTotpRequest,
+  CreatePasskeySessionRequest,
   CreateUserRecoveryRequest,
   CreateUserRequest,
   CreateUserVerificationRequest,
   UpdateEmailVerificationRequest,
+  UpdatePasskeyRequest,
   UpdateUserEmailRequest,
+  VerifyMfaRequest,
 } from '@orvano/js'
 import type { DispatchTable } from '../dispatch-table.js'
 
 /** Every console operation, called through `@orvano/console-client`. */
 export const consoleDispatch: DispatchTable = {
+  'consoleAccount.completePasskeyRegistration': {
+    status: 201,
+    console: (o, input) =>
+      o.consoleAccount.completePasskeyRegistration(
+        input.body as CompletePasskeyRegistrationRequest,
+      ),
+  },
+  'consoleAccount.confirmTotp': {
+    status: 200,
+    console: (o, input) => o.consoleAccount.confirmTotp(input.body as ConfirmTotpRequest),
+  },
   'consoleAccount.create': {
     status: 201,
     console: (o, input) => o.consoleAccount.create(input.body as CreateConsoleAccountRequest),
+  },
+  'consoleAccount.createMfaPasskeyChallenge': {
+    status: 200,
+    console: (o, _input) => o.consoleAccount.createMfaPasskeyChallenge(),
+  },
+  'consoleAccount.createMfaSession': {
+    status: 201,
+    console: (o, input) =>
+      o.consoleAccount.createMfaSession(input.body as CreateConsoleMfaSessionRequest),
+  },
+  'consoleAccount.createPasskeyChallenge': {
+    status: 200,
+    console: (o, _input) => o.consoleAccount.createPasskeyChallenge(),
+  },
+  'consoleAccount.createPasskeyRegistration': {
+    status: 200,
+    console: (o, _input) => o.consoleAccount.createPasskeyRegistration(),
+  },
+  'consoleAccount.createPasskeySession': {
+    status: 201,
+    console: (o, input) =>
+      o.consoleAccount.createPasskeySession(input.body as CreatePasskeySessionRequest),
+  },
+  'consoleAccount.createRecoveryCodes': {
+    status: 201,
+    console: (o, _input) => o.consoleAccount.createRecoveryCodes(),
   },
   'consoleAccount.createSession': {
     status: 201,
     console: (o, input) =>
       o.consoleAccount.createSession(input.body as CreateConsoleSessionRequest),
   },
+  'consoleAccount.createStepUpPasskeyChallenge': {
+    status: 200,
+    console: (o, _input) => o.consoleAccount.createStepUpPasskeyChallenge(),
+  },
+  'consoleAccount.createTotp': {
+    status: 201,
+    console: (o, _input) => o.consoleAccount.createTotp(),
+  },
+  'consoleAccount.deletePasskey': {
+    status: 204,
+    console: (o, input) => o.consoleAccount.deletePasskey(input.passkeyId as string),
+  },
   'consoleAccount.deleteSession': {
     status: 204,
     console: (o, _input) => o.consoleAccount.deleteSession(),
+  },
+  'consoleAccount.deleteTotp': {
+    status: 204,
+    console: (o, _input) => o.consoleAccount.deleteTotp(),
   },
   'consoleAccount.get': {
     status: 200,
     console: (o, _input) => o.consoleAccount.get(),
   },
+  'consoleAccount.getMfa': {
+    status: 200,
+    console: (o, _input) => o.consoleAccount.getMfa(),
+  },
+  'consoleAccount.listPasskeys': {
+    status: 200,
+    console: (o, _input) => o.consoleAccount.listPasskeys(),
+  },
   'consoleAccount.refreshSession': {
     status: 204,
     console: (o, _input) => o.consoleAccount.refreshSession(),
+  },
+  'consoleAccount.updatePasskey': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleAccount.updatePasskey(input.passkeyId as string, input.body as UpdatePasskeyRequest),
+  },
+  'consoleAccount.verifyMfa': {
+    status: 204,
+    console: (o, input) => o.consoleAccount.verifyMfa(input.body as VerifyMfaRequest),
   },
   'consoleApiKeys.create': {
     status: 201,

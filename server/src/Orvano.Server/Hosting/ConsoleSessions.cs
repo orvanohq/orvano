@@ -28,6 +28,10 @@ internal static class ConsoleSessions
         (ConsoleAccountOperations.CreateSession.Method, "/v1" + ConsoleAccountOperations.CreateSession.Route),
         (ConsoleAccountOperations.RefreshSession.Method, "/v1" + ConsoleAccountOperations.RefreshSession.Route),
         (ConsoleAccountOperations.DeleteSession.Method, "/v1" + ConsoleAccountOperations.DeleteSession.Route),
+        (ConsoleAccountOperations.CreateMfaSession.Method, "/v1" + ConsoleAccountOperations.CreateMfaSession.Route),
+        (ConsoleAccountOperations.CreateMfaPasskeyChallenge.Method, "/v1" + ConsoleAccountOperations.CreateMfaPasskeyChallenge.Route),
+        (ConsoleAccountOperations.CreatePasskeyChallenge.Method, "/v1" + ConsoleAccountOperations.CreatePasskeyChallenge.Route),
+        (ConsoleAccountOperations.CreatePasskeySession.Method, "/v1" + ConsoleAccountOperations.CreatePasskeySession.Route),
     ];
 
     public static IApplicationBuilder UseConsoleSessions(this IApplicationBuilder app)
@@ -63,7 +67,7 @@ internal static class ConsoleSessions
             switch (check.Status)
             {
                 case ConsoleSessionStatus.Valid:
-                    ConsoleUser.Set(context, check.UserId);
+                    ConsoleUser.Set(context, check.UserId, check.SessionId);
                     await next(context);
                     return;
                 case ConsoleSessionStatus.Expired:

@@ -1134,6 +1134,18 @@ public sealed record ConsoleAccount(
     [property: JsonPropertyName("mfaEnabled")] bool MfaEnabled,
     [property: JsonPropertyName("isInstallAdmin")] bool IsInstallAdmin);
 
+/// <summary>A console sign in's answer: <c>account</c> when the account is signed in, or <c>mfa</c> when it has MFA on and must pass a second step first. Exactly one of them is set.</summary>
+/// <param name="Account">The signed in account, with both session cookies set; null while a second step is needed.</param>
+/// <param name="Mfa">The second step to pass with <c>consoleAccount.createMfaSession</c>; null when signed in. Its <c>ticket</c> is empty: the ticket travels in the <c>orvano_console_mfa</c> cookie.</param>
+public sealed record ConsoleAuthResult(
+    [property: JsonPropertyName("account")] ConsoleAccount? Account,
+    [property: JsonPropertyName("mfa")] MfaChallenge? Mfa);
+
+/// <summary>MFA is on for the console account. Show the recovery codes once and ask to keep them safe; they can't be read again. Every other session of the account has ended, and the <c>orvano_console</c> cookie now carries level 2.</summary>
+/// <param name="RecoveryCodes">10 recovery codes, each <c>XXXXX-XXXXX</c>, each working once.</param>
+public sealed record ConsoleTotpConfirmation(
+    [property: JsonPropertyName("recoveryCodes")] IReadOnlyList<string> RecoveryCodes);
+
 /// <summary>A console account and the name and email it goes by, for showing who did something.</summary>
 /// <param name="Id">The console user ID.</param>
 /// <param name="Name">The display name; null when none was given.</param>
@@ -1175,6 +1187,15 @@ public sealed record CreateConsoleAccountRequest(
     [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null,
     [property: JsonPropertyName("inviteToken"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? InviteToken = null,
     [property: JsonPropertyName("setupToken"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SetupToken = null);
+
+/// <summary>The second step of a console sign in: exactly one factor. The ticket comes from the <c>orvano_console_mfa</c> cookie.</summary>
+/// <param name="TotpCode">The 6 digit code the authenticator app shows now.</param>
+/// <param name="RecoveryCode">A recovery code; case, spaces, and hyphens do not matter. Each works once.</param>
+/// <param name="Passkey">A passkey's answer to <c>consoleAccount.createMfaPasskeyChallenge</c>.</param>
+public sealed record CreateConsoleMfaSessionRequest(
+    [property: JsonPropertyName("totpCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TotpCode = null,
+    [property: JsonPropertyName("recoveryCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RecoveryCode = null,
+    [property: JsonPropertyName("passkey"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PasskeyAnswer? Passkey = null);
 
 /// <summary>A console sign in with an email and password.</summary>
 /// <param name="Email">The console account's email; case does not matter.</param>

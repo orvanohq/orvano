@@ -47,6 +47,7 @@ beforeEach(() => {
   api.preview = { ...preview }
   api.signedIn = false
   api.account = { ...api.account, email: 'grace@example.com' }
+  api.consoleMfa = null
   api.requests = []
 })
 
@@ -169,6 +170,43 @@ describe('signed out (AC-22)', () => {
     await userEvent.fill(field('invite-sign-in-password'), 'correct horse battery')
     await userEvent.click(submitOf('invite-sign-in-password'))
     await expect.poll(() => button('Join')).toBeDefined()
+  })
+
+  it('passes the second step in place for an account with MFA, then offers Join (spec 0013, AC-41)', async () => {
+    api.consoleMfa = ['totp', 'recovery_code']
+    await openInvite()
+    await expect.poll(text).toContain('invited you to join')
+    await userEvent.click(
+      [...document.querySelectorAll<HTMLElement>('[role=tab]')].at(1) ?? document.body,
+    )
+    await userEvent.fill(field('invite-sign-in-password'), 'correct horse battery')
+    await userEvent.click(submitOf('invite-sign-in-password'))
+
+    await expect.poll(text).toContain('Two step verification')
+    expect(text()).toContain('invited you to join')
+    await userEvent.fill(field('mfa-code'), '123456')
+    await userEvent.click(submitOf('mfa-code'))
+
+    await expect.poll(() => button('Join')).toBeDefined()
+    expect(sent('POST', '/v1/console/account/session/mfa')[0]?.body).toEqual({ totpCode: '123456' })
+  })
+
+  it('goes back to the Sign in tab with a reason when the second step expired', async () => {
+    api.consoleMfa = ['totp']
+    await openInvite()
+    await expect.poll(text).toContain('invited you to join')
+    await userEvent.click(
+      [...document.querySelectorAll<HTMLElement>('[role=tab]')].at(1) ?? document.body,
+    )
+    await userEvent.fill(field('invite-sign-in-password'), 'correct horse battery')
+    await userEvent.click(submitOf('invite-sign-in-password'))
+    await expect.poll(text).toContain('Two step verification')
+    api.failNext('POST', /session\/mfa$/, 401, 'invalid_mfa_ticket', 'The ticket expired.')
+    await userEvent.fill(field('mfa-code'), '123456')
+    await userEvent.click(submitOf('mfa-code'))
+
+    await expect.poll(text).toContain('That sign in expired. Sign in again.')
+    expect(document.getElementById('invite-sign-in-password')).not.toBeNull()
   })
 })
 

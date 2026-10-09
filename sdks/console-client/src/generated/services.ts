@@ -5,8 +5,11 @@ import type {
   ApiKeyPage,
   AuthMethodSettings,
   ConsoleAccount,
+  ConsoleAuthResult,
+  ConsoleTotpConfirmation,
   CreateApiKeyRequest,
   CreateConsoleAccountRequest,
+  CreateConsoleMfaSessionRequest,
   CreateConsoleSessionRequest,
   CreateInvitationRequest,
   CreateOrgRequest,
@@ -52,19 +55,29 @@ import type {
 } from './models.js'
 import type {
   Client,
+  CompletePasskeyRegistrationRequest,
+  ConfirmTotpRequest,
+  CreatePasskeySessionRequest,
   CreateUserRecoveryRequest,
   CreateUserRequest,
   CreateUserVerificationRequest,
   IdentityList,
   MfaStatus,
+  Passkey,
+  PasskeyChallenge,
   PasskeyList,
+  PasskeyRegistration,
+  RecoveryCodes,
   RequestOptions,
   Session,
   SessionPage,
+  TotpSetup,
   UpdateEmailVerificationRequest,
+  UpdatePasskeyRequest,
   UpdateUserEmailRequest,
   User,
   UserPage,
+  VerifyMfaRequest,
 } from '@orvano/js'
 import { paginate } from '@orvano/js'
 
@@ -74,6 +87,31 @@ export class ConsoleAccountService {
 
   constructor(client: Client) {
     this.#client = client
+  }
+
+  /** Finishes adding a passkey to the console account with the browser's answer to `consoleAccount.createPasskeyRegistration`. */
+  completePasskeyRegistration(
+    body: CompletePasskeyRegistrationRequest,
+    options?: RequestOptions,
+  ): Promise<Passkey> {
+    return this.#client.request<Passkey>(
+      { method: 'POST', path: '/v1/console/account/passkeys', body },
+      options,
+    )
+  }
+
+  /**
+   * Turns MFA on for the console account with the first code from the authenticator app. Answers 10 new recovery
+   * codes, ends every other session of the account, and sets a new `orvano_console` cookie at level 2.
+   */
+  confirmTotp(
+    body: ConfirmTotpRequest,
+    options?: RequestOptions,
+  ): Promise<ConsoleTotpConfirmation> {
+    return this.#client.request<ConsoleTotpConfirmation>(
+      { method: 'POST', path: '/v1/console/account/mfa/totp/confirm', body },
+      options,
+    )
   }
 
   /**
@@ -88,13 +126,124 @@ export class ConsoleAccountService {
     )
   }
 
-  /** Signs a console account in with its email and password, setting the session cookies. */
-  createSession(
-    body: CreateConsoleSessionRequest,
+  /**
+   * Starts answering a console MFA challenge with a passkey: answers the options for `navigator.credentials.get`,
+   * listing the account's passkeys. Reads the `orvano_console_mfa` ticket. Never counts as a wrong attempt.
+   */
+  createMfaPasskeyChallenge(options?: RequestOptions): Promise<PasskeyChallenge> {
+    return this.#client.request<PasskeyChallenge>(
+      { method: 'POST', path: '/v1/console/account/session/mfa/passkey-challenge' },
+      options,
+    )
+  }
+
+  /**
+   * Finishes a console sign in that answered an MFA challenge: checks the `orvano_console_mfa` ticket and one factor,
+   * then sets both session cookies. Clears the ticket cookie on success, on an expired ticket, and after the fifth
+   * wrong factor.
+   */
+  createMfaSession(
+    body: CreateConsoleMfaSessionRequest,
     options?: RequestOptions,
   ): Promise<ConsoleAccount> {
     return this.#client.request<ConsoleAccount>(
+      { method: 'POST', path: '/v1/console/account/session/mfa', body },
+      options,
+    )
+  }
+
+  /**
+   * Starts a console passkey sign in: answers a challenge with an empty `allowCredentials`, so the browser offers every
+   * passkey for the console, including through autofill. Needs the install on https with a host name, or on localhost.
+   */
+  createPasskeyChallenge(options?: RequestOptions): Promise<PasskeyChallenge> {
+    return this.#client.request<PasskeyChallenge>(
+      { method: 'POST', path: '/v1/console/account/session/passkey-challenge' },
+      options,
+    )
+  }
+
+  /**
+   * Starts adding a passkey to the console account: answers the options for `navigator.credentials.create`. Needs
+   * console passkeys (https with a host name, or localhost), a session that signed in or passed a second factor within
+   * 10 minutes, and fewer than 10 passkeys.
+   */
+  createPasskeyRegistration(options?: RequestOptions): Promise<PasskeyRegistration> {
+    return this.#client.request<PasskeyRegistration>(
+      { method: 'POST', path: '/v1/console/account/passkeys/registration' },
+      options,
+    )
+  }
+
+  /**
+   * Signs a console account in with a passkey's answer to `consoleAccount.createPasskeyChallenge`, setting both
+   * session cookies at level 2. Never asked for MFA.
+   */
+  createPasskeySession(
+    body: CreatePasskeySessionRequest,
+    options?: RequestOptions,
+  ): Promise<ConsoleAccount> {
+    return this.#client.request<ConsoleAccount>(
+      { method: 'POST', path: '/v1/console/account/session/passkey', body },
+      options,
+    )
+  }
+
+  /**
+   * Replaces the console account's recovery codes with 10 new ones; every older code stops working. Needs MFA on and a
+   * second factor on this session within 10 minutes (`consoleAccount.verifyMfa`).
+   */
+  createRecoveryCodes(options?: RequestOptions): Promise<RecoveryCodes> {
+    return this.#client.request<RecoveryCodes>(
+      { method: 'POST', path: '/v1/console/account/mfa/recovery-codes' },
+      options,
+    )
+  }
+
+  /**
+   * Signs a console account in with its email and password. Without MFA it sets the session cookies and answers
+   * `account`. With MFA it sets no session cookie, sets the `orvano_console_mfa` ticket cookie, and answers `mfa`;
+   * finish with `consoleAccount.createMfaSession`.
+   */
+  createSession(
+    body: CreateConsoleSessionRequest,
+    options?: RequestOptions,
+  ): Promise<ConsoleAuthResult> {
+    return this.#client.request<ConsoleAuthResult>(
       { method: 'POST', path: '/v1/console/account/session', body },
+      options,
+    )
+  }
+
+  /**
+   * Starts a console step up with a passkey: answers the options for `navigator.credentials.get`, listing the account's
+   * passkeys. Send the passkey's answer to `consoleAccount.verifyMfa`.
+   */
+  createStepUpPasskeyChallenge(options?: RequestOptions): Promise<PasskeyChallenge> {
+    return this.#client.request<PasskeyChallenge>(
+      { method: 'POST', path: '/v1/console/account/mfa/passkey-challenge' },
+      options,
+    )
+  }
+
+  /**
+   * Starts turning on an authenticator app for the console account: answers a new secret, replacing any that still
+   * waits for its first code. Needs a session that signed in, or passed a second factor, within 10 minutes.
+   */
+  createTotp(options?: RequestOptions): Promise<TotpSetup> {
+    return this.#client.request<TotpSetup>(
+      { method: 'POST', path: '/v1/console/account/mfa/totp' },
+      options,
+    )
+  }
+
+  /**
+   * Removes one of the console account's passkeys. An account with MFA on needs a second factor on this session within
+   * 10 minutes (`consoleAccount.verifyMfa`); one without it needs a session that signed in within 10 minutes.
+   */
+  deletePasskey(passkeyId: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'DELETE', path: `/v1/console/account/passkeys/${encodeURIComponent(passkeyId)}` },
       options,
     )
   }
@@ -107,6 +256,17 @@ export class ConsoleAccountService {
     )
   }
 
+  /**
+   * Turns MFA off for the console account: removes the authenticator app and every recovery code. Sessions stay. Needs
+   * a second factor on this session within 10 minutes (`consoleAccount.verifyMfa`).
+   */
+  deleteTotp(options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'DELETE', path: '/v1/console/account/mfa/totp' },
+      options,
+    )
+  }
+
   /** Gets the signed in console account. */
   get(options?: RequestOptions): Promise<ConsoleAccount> {
     return this.#client.request<ConsoleAccount>(
@@ -115,10 +275,53 @@ export class ConsoleAccountService {
     )
   }
 
+  /** Gets the signed in console account's MFA state. */
+  getMfa(options?: RequestOptions): Promise<MfaStatus> {
+    return this.#client.request<MfaStatus>(
+      { method: 'GET', path: '/v1/console/account/mfa' },
+      options,
+    )
+  }
+
+  /** Lists the console account's passkeys, oldest first, including inactive ones. */
+  listPasskeys(options?: RequestOptions): Promise<PasskeyList> {
+    return this.#client.request<PasskeyList>(
+      { method: 'GET', path: '/v1/console/account/passkeys' },
+      options,
+    )
+  }
+
   /** Trades the refresh cookie for a new pair of session cookies. The console client calls it after `token_expired`. */
   refreshSession(options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
       { method: 'POST', path: '/v1/console/account/session/refresh', idempotent: true },
+      options,
+    )
+  }
+
+  /** Renames one of the console account's passkeys. */
+  updatePasskey(
+    passkeyId: string,
+    body: UpdatePasskeyRequest,
+    options?: RequestOptions,
+  ): Promise<Passkey> {
+    return this.#client.request<Passkey>(
+      {
+        method: 'PATCH',
+        path: `/v1/console/account/passkeys/${encodeURIComponent(passkeyId)}`,
+        body,
+      },
+      options,
+    )
+  }
+
+  /**
+   * Step up for the console account: checks a second factor on this session, so security changes work for the next
+   * 10 minutes, and sets a new `orvano_console` cookie at the new strength.
+   */
+  verifyMfa(body: VerifyMfaRequest, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'POST', path: '/v1/console/account/mfa/verify', body },
       options,
     )
   }
