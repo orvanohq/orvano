@@ -44,7 +44,7 @@ function SignIn() {
   const [passkeys, setPasskeys] = useState(false)
   const [passkeyBusy, setPasskeyBusy] = useState(false)
   const autofill = useRef<AbortController | null>(null)
-  const showForm = setup.data?.setupRequired === false && mfa === null
+  const showForm = setup.data?.setupRequired !== true && mfa === null
 
   const signedIn = async () => {
     queryClient.clear()

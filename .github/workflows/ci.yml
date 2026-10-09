@@ -156,6 +156,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
+    env:
+      # The api's public URL is the gateway's, so console passkeys work in the browser (spec 0013, AC-3, AC-45).
+      ORVANO_SCENARIOS_PUBLIC_URL: http://localhost:8081
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

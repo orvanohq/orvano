@@ -13,6 +13,9 @@ export const keys = {
    * is `sessionOptional`, so a 401 means "signed out" and never redirects (spec 0008, AC-21).
    */
   accountOptional: ['console', 'account', 'optional'] as const,
+  /** The signed in account's MFA state and passkeys (spec 0013, AC-42). */
+  accountMfa: ['console', 'account', 'mfa'] as const,
+  accountPasskeys: ['console', 'account', 'passkeys'] as const,
   setup: ['console', 'install', 'setup'] as const,
   installSettings: ['console', 'install', 'settings'] as const,
   installSmtp: ['console', 'install', 'smtp'] as const,
@@ -71,6 +74,22 @@ export function accountQuery() {
   return queryOptions({
     queryKey: keys.account,
     queryFn: ({ signal }) => consoleApi().consoleAccount.get({ signal }),
+  })
+}
+
+/** The signed in account's MFA state: on or off, recovery codes left, passkeys (spec 0013, AC-42). */
+export function accountMfaQuery() {
+  return queryOptions({
+    queryKey: keys.accountMfa,
+    queryFn: ({ signal }) => consoleApi().consoleAccount.getMfa({ signal }),
+  })
+}
+
+/** The signed in account's passkeys, oldest first (spec 0013, AC-42). */
+export function accountPasskeysQuery() {
+  return queryOptions({
+    queryKey: keys.accountPasskeys,
+    queryFn: ({ signal }) => consoleApi().consoleAccount.listPasskeys({ signal }),
   })
 }
 

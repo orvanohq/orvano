@@ -17,6 +17,7 @@ import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppInstallRouteImport } from './routes/_app/install'
 import { Route as DevComponentsRouteImport } from './routes/dev.components'
+import { Route as AppAccountSecurityRouteImport } from './routes/_app/account/security'
 import { Route as AppOrgsIndexRouteImport } from './routes/_app/orgs/index'
 import { Route as AppOrgsOrgIdRouteRouteImport } from './routes/_app/orgs/$orgId/route'
 import { Route as AppProjectsProjectIdRouteRouteImport } from './routes/_app/projects/$projectId/route'
@@ -75,6 +76,11 @@ const DevComponentsRoute = DevComponentsRouteImport.update({
   id: '/dev/components',
   path: '/dev/components',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppAccountSecurityRoute = AppAccountSecurityRouteImport.update({
+  id: '/account/security',
+  path: '/account/security',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppOrgsIndexRoute = AppOrgsIndexRouteImport.update({
   id: '/orgs/',
@@ -196,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/dev/components': typeof DevComponentsRoute
   '/orgs/$orgId': typeof AppOrgsOrgIdRouteRouteWithChildren
   '/projects/$projectId': typeof AppProjectsProjectIdRouteRouteWithChildren
+  '/account/security': typeof AppAccountSecurityRoute
   '/orgs/': typeof AppOrgsIndexRoute
   '/projects/$projectId/email': typeof AppProjectsProjectIdEmailRouteRouteWithChildren
   '/orgs/$orgId/members': typeof AppOrgsOrgIdMembersRoute
@@ -222,6 +229,7 @@ export interface FileRoutesByTo {
   '/install': typeof AppInstallRoute
   '/dev/components': typeof DevComponentsRoute
   '/': typeof AppIndexRoute
+  '/account/security': typeof AppAccountSecurityRoute
   '/orgs': typeof AppOrgsIndexRoute
   '/orgs/$orgId/members': typeof AppOrgsOrgIdMembersRoute
   '/orgs/$orgId/settings': typeof AppOrgsOrgIdSettingsRoute
@@ -251,6 +259,7 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/orgs/$orgId': typeof AppOrgsOrgIdRouteRouteWithChildren
   '/_app/projects/$projectId': typeof AppProjectsProjectIdRouteRouteWithChildren
+  '/_app/account/security': typeof AppAccountSecurityRoute
   '/_app/orgs/': typeof AppOrgsIndexRoute
   '/_app/projects/$projectId/email': typeof AppProjectsProjectIdEmailRouteRouteWithChildren
   '/_app/orgs/$orgId/members': typeof AppOrgsOrgIdMembersRoute
@@ -281,6 +290,7 @@ export interface FileRouteTypes {
     | '/dev/components'
     | '/orgs/$orgId'
     | '/projects/$projectId'
+    | '/account/security'
     | '/orgs/'
     | '/projects/$projectId/email'
     | '/orgs/$orgId/members'
@@ -307,6 +317,7 @@ export interface FileRouteTypes {
     | '/install'
     | '/dev/components'
     | '/'
+    | '/account/security'
     | '/orgs'
     | '/orgs/$orgId/members'
     | '/orgs/$orgId/settings'
@@ -335,6 +346,7 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/orgs/$orgId'
     | '/_app/projects/$projectId'
+    | '/_app/account/security'
     | '/_app/orgs/'
     | '/_app/projects/$projectId/email'
     | '/_app/orgs/$orgId/members'
@@ -420,6 +432,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dev/components'
       preLoaderRoute: typeof DevComponentsRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/account/security': {
+      id: '/_app/account/security'
+      path: '/account/security'
+      fullPath: '/account/security'
+      preLoaderRoute: typeof AppAccountSecurityRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/orgs/': {
       id: '/_app/orgs/'
@@ -632,6 +651,7 @@ interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppOrgsOrgIdRouteRoute: typeof AppOrgsOrgIdRouteRouteWithChildren
   AppProjectsProjectIdRouteRoute: typeof AppProjectsProjectIdRouteRouteWithChildren
+  AppAccountSecurityRoute: typeof AppAccountSecurityRoute
   AppOrgsIndexRoute: typeof AppOrgsIndexRoute
 }
 
@@ -640,6 +660,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppOrgsOrgIdRouteRoute: AppOrgsOrgIdRouteRouteWithChildren,
   AppProjectsProjectIdRouteRoute: AppProjectsProjectIdRouteRouteWithChildren,
+  AppAccountSecurityRoute: AppAccountSecurityRoute,
   AppOrgsIndexRoute: AppOrgsIndexRoute,
 }
 

@@ -83,6 +83,7 @@ Tailwind's 4 px scale for everything else. Top bar `--topbar-h` 48 px. Sidebar 2
 
 - Radius: `--radius` is 0.5rem, so `rounded-sm` is 4 px (badges), `rounded-md` 6 px (controls), `rounded-lg` 8 px (cards, dialogs, popovers), `rounded-xl` 12 px (empty state illustrations).
 - Elevation: surfaces step up in lightness (background, card, popover) with a 1 px `--border`. Shadows only on overlays, through `--shadow-overlay`.
+- QR codes (the account Security page's authenticator app setup, spec 0013) draw with `--qr-dark` on `--qr-light`, the same in both themes, so scanners always see dark modules on a light quiet zone.
 - Motion: overlays only. Enter 150 ms (drawer 200 ms), exit 100 ms, easing `--ease` (`cubic-bezier(0.2, 0, 0, 1)`), through `tw-animate-css`. With `prefers-reduced-motion: reduce` every duration is 0. Page changes never animate.
 
 ## Focus

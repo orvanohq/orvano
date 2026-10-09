@@ -11,7 +11,9 @@ import type {
   InvitationPreview,
   Member,
   MfaFactor,
+  MfaStatus,
   Org,
+  Passkey,
   OrgRole,
   Platform,
   PlatformType,
@@ -89,6 +91,10 @@ export interface FakeApi {
    * The second step accepts any well formed factor; refuse one with `failNext`.
    */
   consoleMfa: MfaFactor[] | null
+  /** The signed in account's MFA state, as `consoleAccount.getMfa` answers (spec 0013, AC-42). */
+  accountMfa: MfaStatus
+  /** The signed in account's passkeys. */
+  accountPasskeys: Passkey[]
   /** Makes the next `method` request whose path matches answer with this problem, once. */
   failNext: (method: string, path: RegExp, status: number, code: string, detail: string) => void
   /** Makes the next `method` request whose path matches answer 200 with this JSON body, once. */
@@ -96,6 +102,21 @@ export interface FakeApi {
 }
 
 export const accountId = 'user00000000000000001'
+
+/** What the fake answers for a new authenticator app secret and for new recovery codes. */
+export const fakeTotpSecret = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP'
+export const fakeRecoveryCodes = [
+  'AAAAA-22222',
+  'BBBBB-33333',
+  'CCCCC-44444',
+  'DDDDD-55555',
+  'EEEEE-66666',
+  'FFFFF-77777',
+  'GGGGG-22222',
+  'HHHHH-33333',
+  'IIIII-44444',
+  'JJJJJ-55555',
+]
 
 /** The four templates as the catalog lists them (spec 0009, Template variables). */
 export const fakeTemplates: Record<AuthEmailKind, { name: string; description: string }> = {
@@ -261,6 +282,15 @@ export function installFakeApi(): FakeApi {
     requests: [],
     setupRequired: false,
     consoleMfa: null,
+    accountMfa: {
+      mfaEnabled: false,
+      totpConfirmed: false,
+      totpConfirmedAt: null,
+      recoveryCodesRemaining: 0,
+      passkeyCount: 0,
+      factorsAvailable: ['totp', 'passkey'],
+    },
+    accountPasskeys: [],
     failNext: (method, path, status, code, detail) => {
       failures.push({ method, path, status, code, detail })
     },
@@ -311,6 +341,59 @@ export function installFakeApi(): FakeApi {
       return api.signedIn
         ? Response.json(api.account)
         : problem(401, 'console_session_required', 'Sign in first.')
+    }
+    // The account's MFA and passkeys (spec 0013, AC-42). Step up refusals come from failNext.
+    if (path === '/v1/console/account/mfa' && method === 'GET') return Response.json(api.accountMfa)
+    if (path === '/v1/console/account/mfa/totp' && method === 'POST') {
+      return Response.json(
+        {
+          secret: fakeTotpSecret,
+          uri: `otpauth://totp/Orvano:ada%40example.com?secret=${fakeTotpSecret}&issuer=Orvano&algorithm=SHA1&digits=6&period=30`,
+          expiresAt: now,
+        },
+        { status: 201 },
+      )
+    }
+    if (path === '/v1/console/account/mfa/totp/confirm' && method === 'POST') {
+      api.accountMfa = {
+        ...api.accountMfa,
+        mfaEnabled: true,
+        totpConfirmed: true,
+        totpConfirmedAt: now,
+        recoveryCodesRemaining: 10,
+      }
+      return Response.json({ recoveryCodes: fakeRecoveryCodes })
+    }
+    if (path === '/v1/console/account/mfa/totp' && method === 'DELETE') {
+      api.accountMfa = {
+        ...api.accountMfa,
+        mfaEnabled: false,
+        totpConfirmed: false,
+        totpConfirmedAt: null,
+        recoveryCodesRemaining: 0,
+      }
+      return new Response(null, { status: 204 })
+    }
+    if (path === '/v1/console/account/mfa/recovery-codes' && method === 'POST') {
+      api.accountMfa = { ...api.accountMfa, recoveryCodesRemaining: 10 }
+      return Response.json({ codes: fakeRecoveryCodes }, { status: 201 })
+    }
+    if (path === '/v1/console/account/mfa/verify' && method === 'POST') {
+      return new Response(null, { status: 204 })
+    }
+    if (path === '/v1/console/account/passkeys' && method === 'GET') {
+      return Response.json({ items: api.accountPasskeys })
+    }
+    const accountPasskey = /^\/v1\/console\/account\/passkeys\/([^/]+)$/.exec(path)?.[1]
+    if (accountPasskey !== undefined) {
+      const found = api.accountPasskeys.find((passkey) => passkey.id === accountPasskey)
+      if (found === undefined) return problem(404, 'passkey_not_found', 'No such passkey.')
+      if (method === 'DELETE') {
+        api.accountPasskeys = api.accountPasskeys.filter((passkey) => passkey !== found)
+        api.accountMfa = { ...api.accountMfa, passkeyCount: api.accountPasskeys.length }
+        return new Response(null, { status: 204 })
+      }
+      return Response.json(replace(api.accountPasskeys, { ...found, name: String(input.name) }))
     }
     if (path === '/v1/console/install/setup' && method === 'GET') {
       return Response.json({

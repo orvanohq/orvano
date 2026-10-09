@@ -56,7 +56,9 @@ services:
     environment:
       ORVANO_ROLE: api
       ORVANO_DB_URL: Host=postgres;Port=5432;Username=orvano_app;Password=scenarios-app;Database=orvano
-      ORVANO_PUBLIC_URL: http://localhost:8080
+      # The console end to end job sets ORVANO_SCENARIOS_PUBLIC_URL to the gateway (http://localhost:8081):
+      # console passkeys accept only this origin (spec 0013, AC-3), and the browser there is on the gateway.
+      ORVANO_PUBLIC_URL: ${ORVANO_SCENARIOS_PUBLIC_URL:-http://localhost:8080}
       # A throwaway master key; secrets in this database are test values only.
       ORVANO_MASTER_KEYS: kscenarios:b3J2YW5vLXNjZW5hcmlvcy10ZXN0LW1hc3Rlci1rZXk=
       ASPNETCORE_ENVIRONMENT: Test
