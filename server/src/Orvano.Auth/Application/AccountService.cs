@@ -57,7 +57,8 @@ internal sealed class AccountService(
     IConsoleAccountCreated accountCreated,
     AuthMailer mailer,
     StepUp stepUp,
-    MethodPolicies policies)
+    MethodPolicies policies,
+    PasswordRules passwordRules)
 {
     public const string EmailIndex = UserRecords.EmailIndex;
 
@@ -107,7 +108,9 @@ internal sealed class AccountService(
     {
         if (!EmailRule.TryNormalize(email, out var trimmed)) return Failure.Invalid("The email must be an address of at most 320 characters.");
         if (!UserName.IsValid(name)) return Failure.Invalid($"The name must be at most {UserName.MaxLength} characters.");
-        if (!PasswordPolicy.TryNormalize(password, out var normalized)) return Failure.InvalidPassword;
+        var rules = await passwordRules.CheckNewAsync(projectId, password, ct);
+        if (!rules.Succeeded) return rules.Failure!;
+        var normalized = rules.Value!;
         // Spec 0010 AC-11: checked with the rest of the body, before the 409 and before anything is created.
         RedirectUrl? verification = null;
         if (verificationRedirectUrl is not null)
@@ -303,7 +306,9 @@ internal sealed class AccountService(
     /// </summary>
     public async Task<Outcome<Done>> UpdatePasswordAsync(string projectId, Guid userId, Guid sessionId, string? currentPassword, string? newPassword, CancellationToken ct)
     {
-        if (!PasswordPolicy.TryNormalize(newPassword, out var normalized)) return Failure.InvalidPassword;
+        var rules = await passwordRules.CheckNewAsync(projectId, newPassword, ct);
+        if (!rules.Succeeded) return rules.Failure!;
+        var normalized = rules.Value!;
         var check = await CheckCredentialAsync(projectId, userId, sessionId, currentPassword, ct);
         if (check.Failure is not null) return check.Failure;
         var verified = check.Value!.Hash;

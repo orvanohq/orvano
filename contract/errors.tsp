@@ -82,8 +82,14 @@ enum ErrorCode {
   @doc("The first console sign up on an install needs its setup token, and none or the wrong one was given (403).")
   setup_token_invalid,
 
-  @doc("The password is not 8 to 256 characters after Unicode NFKC normalization (400).")
+  @doc("The new password is shorter than the project's minimum (8 to 64 characters, at least 8), or longer than 256, after Unicode NFKC normalization (400).")
   invalid_password,
+
+  @doc("The new password is on the list of common passwords the project refuses (400).")
+  password_too_common,
+
+  @doc("The new password appears in a known data breach, by the Have I Been Pwned check the project turned on (400).")
+  password_breached,
 
   @doc("The email and password do not match a user, or the password given to confirm an action is missing or wrong (401).")
   invalid_credentials,

@@ -72,6 +72,8 @@ services:
       # Every sign in provider is the api's own fake (spec 0012): the api calls itself on 8080, and
       # runners reach the same address through the published port.
       ORVANO_TEST_OAUTH_PROVIDER_URL: http://localhost:8080/v1/test/oauth
+      # The breached password check (spec 0014, AC-6) calls the api's own fake range API, never the real one.
+      ORVANO_TEST_HIBP_URL: http://localhost:8080/v1/test/pwned
     volumes:
       - ./fixtures.yaml:/fixtures/fixtures.yaml:ro
     ports:

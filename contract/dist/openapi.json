@@ -4365,6 +4365,92 @@
         "x-orvano-audience": "console"
       }
     },
+    "/v1/console/project/auth/policies": {
+      "get": {
+        "operationId": "consoleAuthPolicies.get",
+        "description": "Gets the project's auth rules; any member.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthPolicies"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAuthPolicies",
+        "x-orvano-audience": "console"
+      },
+      "patch": {
+        "operationId": "consoleAuthPolicies.update",
+        "description": "Changes the project's auth rules; owners and developers only.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthPolicies"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAuthPoliciesRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAuthPolicies",
+        "x-orvano-audience": "console"
+      }
+    },
     "/v1/console/project/auth/providers": {
       "get": {
         "operationId": "consoleAuthProviders.list",
@@ -8559,6 +8645,388 @@
         },
         "description": "A project's second factor and passkey settings, with what the Passkeys card shows beside them. A project that never\nsaved any reads as the defaults: TOTP on, passkeys off."
       },
+      "AuthPolicies": {
+        "type": "object",
+        "required": [
+          "signUpsEnabled",
+          "requireVerifiedEmail",
+          "blockDisposableEmails",
+          "blockedEmailDomains",
+          "allowedEmailDomains",
+          "passwordMinLength",
+          "passwordCommonCheck",
+          "passwordBreachedCheck",
+          "accessTokenSeconds",
+          "sessionIdleSeconds",
+          "sessionAbsoluteSeconds",
+          "maxSessionsPerUser",
+          "trustedServerCidrs",
+          "signInFailedPerEmailIp",
+          "signInFailedPerIp",
+          "signUpPerIp",
+          "anonymousPerIp",
+          "emailSendPerIp",
+          "updatedAt",
+          "smtpAvailable",
+          "defaults"
+        ],
+        "properties": {
+          "signUpsEnabled": {
+            "type": "boolean",
+            "description": "Whether new users can sign up from an app. Servers and the console can always create users.",
+            "examples": [
+              true
+            ]
+          },
+          "requireVerifiedEmail": {
+            "type": "boolean",
+            "description": "Whether users must verify their email before a password sign in. Sign up then hides which emails have accounts.",
+            "examples": [
+              false
+            ]
+          },
+          "blockDisposableEmails": {
+            "type": "boolean",
+            "description": "Whether sign ups from known disposable email domains are refused.",
+            "examples": [
+              false
+            ]
+          },
+          "blockedEmailDomains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Email domains whose new users are refused, at most 500. A domain also covers its subdomains.",
+            "examples": [
+              [
+                "example.com"
+              ]
+            ]
+          },
+          "allowedEmailDomains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "When not empty, the only email domains new users may have, at most 500. A domain also covers its subdomains.",
+            "examples": [
+              []
+            ]
+          },
+          "passwordMinLength": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The shortest new password, in characters, 8 to 64.",
+            "examples": [
+              8
+            ]
+          },
+          "passwordCommonCheck": {
+            "type": "boolean",
+            "description": "Whether new passwords on a list of common passwords are refused.",
+            "examples": [
+              true
+            ]
+          },
+          "passwordBreachedCheck": {
+            "type": "boolean",
+            "description": "Whether new passwords are checked against Have I Been Pwned, which receives 5 characters of the password's SHA-1.",
+            "examples": [
+              false
+            ]
+          },
+          "accessTokenSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How long an access token lasts, in seconds, 300 to 3600.",
+            "examples": [
+              900
+            ]
+          },
+          "sessionIdleSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How long a session lasts without a refresh, in seconds, 3600 to 7776000, at most `sessionAbsoluteSeconds`.",
+            "examples": [
+              2592000
+            ]
+          },
+          "sessionAbsoluteSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How long a session lasts at most, in seconds, 86400 to 31536000.",
+            "examples": [
+              31536000
+            ]
+          },
+          "maxSessionsPerUser": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int32"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The most live sessions one user may hold, 1 to 1000; a new one ends the least recently used. Null means no limit.",
+            "examples": [
+              null
+            ]
+          },
+          "trustedServerCidrs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The app servers (address ranges such as `203.0.113.0/24`, at most 20) whose `X-Orvano-Client-IP` header names the\nvisitor's address for rate limits.",
+            "examples": [
+              [
+                "203.0.113.0/24"
+              ]
+            ]
+          },
+          "signInFailedPerEmailIp": {
+            "$ref": "#/components/schemas/SignInFailedLimit",
+            "description": "Failed password sign ins per email and address."
+          },
+          "signInFailedPerIp": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Failed password sign ins per address in 15 minutes, 10 to 10000.",
+            "examples": [
+              100
+            ]
+          },
+          "signUpPerIp": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Sign ups per address in an hour, 1 to 10000.",
+            "examples": [
+              60
+            ]
+          },
+          "anonymousPerIp": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Guest sign ins per address in an hour, 1 to 10000.",
+            "examples": [
+              30
+            ]
+          },
+          "emailSendPerIp": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Emails a public request may send per address in an hour, 10 to 100000.",
+            "examples": [
+              300
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the rules last changed; null while the project uses the defaults."
+          },
+          "smtpAvailable": {
+            "type": "boolean",
+            "description": "Whether the project or the install has an email server, which requiring verified emails needs.",
+            "examples": [
+              true
+            ]
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/AuthPolicyValues",
+            "description": "Every rule at its default value, for the reset buttons."
+          }
+        },
+        "description": "A project's auth rules with what the Security page shows beside them."
+      },
+      "AuthPolicyValues": {
+        "type": "object",
+        "required": [
+          "signUpsEnabled",
+          "requireVerifiedEmail",
+          "blockDisposableEmails",
+          "blockedEmailDomains",
+          "allowedEmailDomains",
+          "passwordMinLength",
+          "passwordCommonCheck",
+          "passwordBreachedCheck",
+          "accessTokenSeconds",
+          "sessionIdleSeconds",
+          "sessionAbsoluteSeconds",
+          "maxSessionsPerUser",
+          "trustedServerCidrs",
+          "signInFailedPerEmailIp",
+          "signInFailedPerIp",
+          "signUpPerIp",
+          "anonymousPerIp",
+          "emailSendPerIp"
+        ],
+        "properties": {
+          "signUpsEnabled": {
+            "type": "boolean",
+            "description": "Whether new users can sign up from an app. Servers and the console can always create users.",
+            "examples": [
+              true
+            ]
+          },
+          "requireVerifiedEmail": {
+            "type": "boolean",
+            "description": "Whether users must verify their email before a password sign in. Sign up then hides which emails have accounts.",
+            "examples": [
+              false
+            ]
+          },
+          "blockDisposableEmails": {
+            "type": "boolean",
+            "description": "Whether sign ups from known disposable email domains are refused.",
+            "examples": [
+              false
+            ]
+          },
+          "blockedEmailDomains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Email domains whose new users are refused, at most 500. A domain also covers its subdomains.",
+            "examples": [
+              [
+                "example.com"
+              ]
+            ]
+          },
+          "allowedEmailDomains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "When not empty, the only email domains new users may have, at most 500. A domain also covers its subdomains.",
+            "examples": [
+              []
+            ]
+          },
+          "passwordMinLength": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The shortest new password, in characters, 8 to 64.",
+            "examples": [
+              8
+            ]
+          },
+          "passwordCommonCheck": {
+            "type": "boolean",
+            "description": "Whether new passwords on a list of common passwords are refused.",
+            "examples": [
+              true
+            ]
+          },
+          "passwordBreachedCheck": {
+            "type": "boolean",
+            "description": "Whether new passwords are checked against Have I Been Pwned, which receives 5 characters of the password's SHA-1.",
+            "examples": [
+              false
+            ]
+          },
+          "accessTokenSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How long an access token lasts, in seconds, 300 to 3600.",
+            "examples": [
+              900
+            ]
+          },
+          "sessionIdleSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How long a session lasts without a refresh, in seconds, 3600 to 7776000, at most `sessionAbsoluteSeconds`.",
+            "examples": [
+              2592000
+            ]
+          },
+          "sessionAbsoluteSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How long a session lasts at most, in seconds, 86400 to 31536000.",
+            "examples": [
+              31536000
+            ]
+          },
+          "maxSessionsPerUser": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int32"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The most live sessions one user may hold, 1 to 1000; a new one ends the least recently used. Null means no limit.",
+            "examples": [
+              null
+            ]
+          },
+          "trustedServerCidrs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The app servers (address ranges such as `203.0.113.0/24`, at most 20) whose `X-Orvano-Client-IP` header names the\nvisitor's address for rate limits.",
+            "examples": [
+              [
+                "203.0.113.0/24"
+              ]
+            ]
+          },
+          "signInFailedPerEmailIp": {
+            "$ref": "#/components/schemas/SignInFailedLimit",
+            "description": "Failed password sign ins per email and address."
+          },
+          "signInFailedPerIp": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Failed password sign ins per address in 15 minutes, 10 to 10000.",
+            "examples": [
+              100
+            ]
+          },
+          "signUpPerIp": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Sign ups per address in an hour, 1 to 10000.",
+            "examples": [
+              60
+            ]
+          },
+          "anonymousPerIp": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Guest sign ins per address in an hour, 1 to 10000.",
+            "examples": [
+              30
+            ]
+          },
+          "emailSendPerIp": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Emails a public request may send per address in an hour, 10 to 100000.",
+            "examples": [
+              300
+            ]
+          }
+        },
+        "description": "A project's auth rules, as stored or at their defaults."
+      },
       "AuthResult": {
         "type": "object",
         "required": [
@@ -10226,6 +10694,8 @@
           "signup_closed",
           "setup_token_invalid",
           "invalid_password",
+          "password_too_common",
+          "password_breached",
           "invalid_credentials",
           "session_required",
           "invalid_token",
@@ -12482,6 +12952,32 @@
         },
         "description": "A session's tokens. Send the access token as `Authorization: Bearer`; trade the refresh token for a new pair\nbefore the access token expires. The SDKs do both for you."
       },
+      "SignInFailedLimit": {
+        "type": "object",
+        "required": [
+          "limit",
+          "windowMinutes"
+        ],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Failed sign ins allowed per window, 3 to 100.",
+            "examples": [
+              10
+            ]
+          },
+          "windowMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The window in minutes, 1 to 1440.",
+            "examples": [
+              15
+            ]
+          }
+        },
+        "description": "How many failed password sign ins one email may have from one address in a window."
+      },
       "SigningKey": {
         "type": "object",
         "required": [
@@ -13350,6 +13846,164 @@
         },
         "description": "Changes to a project's second factor and passkey settings. Fields left out keep their value."
       },
+      "UpdateAuthPoliciesRequest": {
+        "type": "object",
+        "properties": {
+          "signUpsEnabled": {
+            "type": "boolean",
+            "description": "Whether new users can sign up from an app.",
+            "examples": [
+              true
+            ]
+          },
+          "requireVerifiedEmail": {
+            "type": "boolean",
+            "description": "Whether users must verify their email before a password sign in; turning it on needs an email server.",
+            "examples": [
+              true
+            ]
+          },
+          "blockDisposableEmails": {
+            "type": "boolean",
+            "description": "Whether sign ups from known disposable email domains are refused.",
+            "examples": [
+              true
+            ]
+          },
+          "blockedEmailDomains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Email domains whose new users are refused; replaces the list.",
+            "examples": [
+              [
+                "example.com"
+              ]
+            ]
+          },
+          "allowedEmailDomains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The only email domains new users may have; replaces the list, and empty allows any.",
+            "examples": [
+              []
+            ]
+          },
+          "passwordMinLength": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The shortest new password, in characters, 8 to 64.",
+            "examples": [
+              12
+            ]
+          },
+          "passwordCommonCheck": {
+            "type": "boolean",
+            "description": "Whether new passwords on a list of common passwords are refused.",
+            "examples": [
+              true
+            ]
+          },
+          "passwordBreachedCheck": {
+            "type": "boolean",
+            "description": "Whether new passwords are checked against Have I Been Pwned.",
+            "examples": [
+              true
+            ]
+          },
+          "accessTokenSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How long an access token lasts, in seconds, 300 to 3600.",
+            "examples": [
+              900
+            ]
+          },
+          "sessionIdleSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How long a session lasts without a refresh, in seconds.",
+            "examples": [
+              2592000
+            ]
+          },
+          "sessionAbsoluteSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How long a session lasts at most, in seconds.",
+            "examples": [
+              31536000
+            ]
+          },
+          "maxSessionsPerUser": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int32"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The most live sessions one user may hold, 1 to 1000; null clears the limit.",
+            "examples": [
+              5
+            ]
+          },
+          "trustedServerCidrs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The app servers whose `X-Orvano-Client-IP` header is trusted; replaces the list.",
+            "examples": [
+              [
+                "203.0.113.0/24"
+              ]
+            ]
+          },
+          "signInFailedPerEmailIp": {
+            "$ref": "#/components/schemas/UpdateSignInFailedLimit",
+            "description": "Failed password sign ins per email and address; each field left out keeps its value."
+          },
+          "signInFailedPerIp": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Failed password sign ins per address in 15 minutes.",
+            "examples": [
+              100
+            ]
+          },
+          "signUpPerIp": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Sign ups per address in an hour.",
+            "examples": [
+              60
+            ]
+          },
+          "anonymousPerIp": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Guest sign ins per address in an hour.",
+            "examples": [
+              30
+            ]
+          },
+          "emailSendPerIp": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Emails a public request may send per address in an hour.",
+            "examples": [
+              300
+            ]
+          }
+        },
+        "description": "Changes to a project's auth rules. Fields left out keep their value; the result must meet every bound."
+      },
       "UpdateEmailRequest": {
         "type": "object",
         "required": [
@@ -13617,6 +14271,28 @@
           }
         },
         "description": "Changes to a project."
+      },
+      "UpdateSignInFailedLimit": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Failed sign ins allowed per window, 3 to 100.",
+            "examples": [
+              10
+            ]
+          },
+          "windowMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The window in minutes, 1 to 1440.",
+            "examples": [
+              15
+            ]
+          }
+        },
+        "description": "A change to failed password sign ins per email and address. Fields left out keep their value."
       },
       "UpdateUserEmailRequest": {
         "type": "object",

@@ -1189,6 +1189,42 @@ public static class ConsoleAuthMethodsOperations
     }
 }
 
+/// <summary>Route constants for the <c>consoleAuthPolicies</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleAuthPoliciesOperations
+{
+    /// <summary>GET /v1/console/project/auth/policies: Gets the project's auth rules; any member.</summary>
+    public static class Get
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAuthPolicies.get";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/auth/policies";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>PATCH /v1/console/project/auth/policies: Changes the project's auth rules; owners and developers only.</summary>
+    public static class Update
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAuthPolicies.update";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PATCH";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/auth/policies";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
 /// <summary>Route constants for the <c>consoleAuthProviders</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class ConsoleAuthProvidersOperations
 {

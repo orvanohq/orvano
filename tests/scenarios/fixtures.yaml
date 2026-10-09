@@ -18,6 +18,10 @@
 # methodSettings: TOTP and passkey settings (spec 0013), saved through the console's settings code. Passkeys
 #   are on with the RP ID localhost, so the server's Test only software authenticator can make passkeys for
 #   the http://localhost web platform.
+# authPolicies: project auth rules (spec 0014), saved through the console's settings code after the users and
+#   the install's SMTP. A 12 character minimum, which every scenario password meets, and the breached check, which
+#   compose.yml points at the api's own fake range API (ORVANO_TEST_HIBP_URL), so auth-password-rules can prove
+#   both in every runner. The common list is on by default.
 consoleUsers:
   - email: fixture-admin@example.com
     password: fixture console password
@@ -80,3 +84,7 @@ methodSettings:
   - project: scenarios0000000000a
     passkeysEnabled: true
     rpId: localhost
+authPolicies:
+  - project: scenarios0000000000a
+    passwordMinLength: 12
+    passwordBreachedCheck: true

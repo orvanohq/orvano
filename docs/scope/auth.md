@@ -84,7 +84,7 @@ Password rules, sign up email policies (block disposable domains), anonymous gue
 **Done when:** each policy is set per project in the console and enforced by the API; repeated failed sign ins are throttled.
 - [x] Design it (spec): `/architect auth policies & abuse protection`
 - [ ] Build it: `/develop auth policies & abuse protection`
-   - [ ] Thin thread and password rules: the migration, `PolicySettings`, the Security page, minimum length, the common list, and the breached check (AC-1, 3 to 7, 37, 40)
+   - [x] Thin thread and password rules: the migration, `PolicySettings`, the Security page, minimum length, the common list, and the breached check (AC-1, 3 to 7, 37, 40)
    - [ ] Failed attempts and limits: `FailureCounter`, the limit IP with trusted servers and Next.js `clientIp`, the rekeyed and editable limits, API key and invite limits, and the spec 0013 review fixes (AC-16 to 24, 36)
    - [ ] Sign up policies and verified email: closed sign ups, email domain rules, require verified email with hidden sign up, the reject link, and the last method rule (AC-8 to 15, 33)
    - [ ] Sessions and require MFA: per project lifetimes, the session cap, and enrollment before a session (AC-2, 25 to 27, 35)

@@ -76,6 +76,9 @@ internal static class AuthEvents
     /// <summary>A project's second factor and passkey settings changed (spec 0013, AC-1); <c>changed</c> names the fields.</summary>
     public const string MethodSettingsUpdated = "auth.method_settings.updated";
 
+    /// <summary>A project's auth rules changed (spec 0014, AC-1, AC-39); <c>changed</c> lists the field names only.</summary>
+    public const string PoliciesUpdated = "auth.policies.updated";
+
     /// <summary>A user's recovery codes were replaced by 10 new ones (spec 0013, AC-33).</summary>
     public const string RecoveryCodesCreated = "auth.recovery_codes.created";
 

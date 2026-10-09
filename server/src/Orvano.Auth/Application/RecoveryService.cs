@@ -18,6 +18,7 @@ internal sealed class RecoveryService(
     SigningKeys keys,
     AccountService accounts,
     MethodPolicies policies,
+    PasswordRules passwordRules,
     ILogger<RecoveryService> logger)
 {
     /// <summary>
@@ -80,7 +81,9 @@ internal sealed class RecoveryService(
     /// </summary>
     public async Task<Outcome<SignedIn>> CompleteAsync(string projectId, string? tokenValue, string? password, ClientInfo client, CancellationToken ct)
     {
-        if (!PasswordPolicy.TryNormalize(password, out var normalized)) return Failure.InvalidPassword;
+        var rules = await passwordRules.CheckNewAsync(projectId, password, ct);
+        if (!rules.Succeeded) return rules.Failure!;
+        var normalized = rules.Value!;
         if (!LinkToken.TryParse(tokenValue, out var link)) return Failure.InvalidEmailToken;
         var live = await store.ReadAsync((db, token) =>
             EmailTokens.IsLiveAsync((NpgsqlConnection)db.Database.GetDbConnection(), projectId, EmailTokenKind.Recovery, link, token), ct);

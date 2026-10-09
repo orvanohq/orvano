@@ -59,6 +59,7 @@ public class MfaJobsTests(PostgresFixture postgres)
             await TestDatabase.ExecuteAsync(api.Database.Superuser,
                 """
                 INSERT INTO orvano.auth_method_settings (project_id, passkeys_enabled, rp_id) VALUES (@p, true, 'example.com');
+                INSERT INTO orvano.auth_policies (project_id, password_min_length) VALUES (@p, 12);
                 INSERT INTO orvano.auth_totp_factors (user_id, project_id, secret_ciphertext, confirmed_at) VALUES (@u, @p, '\x00'::bytea, now());
                 INSERT INTO orvano.auth_recovery_codes (project_id, user_id, code_mac, mac_key_id) VALUES (@p, @u, '\x00'::bytea, 'k');
                 INSERT INTO orvano.auth_passkeys (project_id, user_id, credential_id, public_key, sign_count, name, backup_eligible, backed_up, rp_id)
@@ -74,7 +75,7 @@ public class MfaJobsTests(PostgresFixture postgres)
 
         foreach (var table in new[]
                  {
-                     "auth_method_settings", "auth_totp_factors", "auth_recovery_codes", "auth_passkeys", "auth_mfa_tickets",
+                     "auth_method_settings", "auth_policies", "auth_totp_factors", "auth_recovery_codes", "auth_passkeys", "auth_mfa_tickets",
                      "auth_webauthn_challenges",
                  })
         {

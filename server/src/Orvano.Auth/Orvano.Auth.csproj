@@ -26,6 +26,12 @@
     <PackageReference Include="NSec.Cryptography" />
   </ItemGroup>
 
+  <!-- Spec 0014, AC-7: the common password list and the disposable domain list, loaded once per process. Refreshed by
+       tools/lists/refresh.mjs; their sources and licenses are in THIRD_PARTY_NOTICES.md. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Lists\*.txt" LogicalName="Orvano.Auth.Lists.%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="orvano" />
     <InternalsVisibleTo Include="Orvano.Server.Tests" />

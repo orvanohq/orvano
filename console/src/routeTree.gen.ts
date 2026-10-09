@@ -28,6 +28,7 @@ import { Route as AppProjectsProjectIdIndexRouteImport } from './routes/_app/pro
 import { Route as AppProjectsProjectIdEmailRouteRouteImport } from './routes/_app/projects/$projectId/email/route'
 import { Route as AppProjectsProjectIdKeysRouteImport } from './routes/_app/projects/$projectId/keys'
 import { Route as AppProjectsProjectIdPlatformsRouteImport } from './routes/_app/projects/$projectId/platforms'
+import { Route as AppProjectsProjectIdSecurityRouteImport } from './routes/_app/projects/$projectId/security'
 import { Route as AppProjectsProjectIdSettingsRouteImport } from './routes/_app/projects/$projectId/settings'
 import { Route as AppProjectsProjectIdSignInMethodsRouteImport } from './routes/_app/projects/$projectId/sign-in-methods'
 import { Route as AppProjectsProjectIdEmailIndexRouteImport } from './routes/_app/projects/$projectId/email/index'
@@ -137,6 +138,12 @@ const AppProjectsProjectIdPlatformsRoute =
     path: '/platforms',
     getParentRoute: () => AppProjectsProjectIdRouteRoute,
   } as any)
+const AppProjectsProjectIdSecurityRoute =
+  AppProjectsProjectIdSecurityRouteImport.update({
+    id: '/security',
+    path: '/security',
+    getParentRoute: () => AppProjectsProjectIdRouteRoute,
+  } as any)
 const AppProjectsProjectIdSettingsRoute =
   AppProjectsProjectIdSettingsRouteImport.update({
     id: '/settings',
@@ -209,6 +216,7 @@ export interface FileRoutesByFullPath {
   '/orgs/$orgId/settings': typeof AppOrgsOrgIdSettingsRoute
   '/projects/$projectId/keys': typeof AppProjectsProjectIdKeysRoute
   '/projects/$projectId/platforms': typeof AppProjectsProjectIdPlatformsRoute
+  '/projects/$projectId/security': typeof AppProjectsProjectIdSecurityRoute
   '/projects/$projectId/settings': typeof AppProjectsProjectIdSettingsRoute
   '/projects/$projectId/sign-in-methods': typeof AppProjectsProjectIdSignInMethodsRoute
   '/orgs/$orgId/': typeof AppOrgsOrgIdIndexRoute
@@ -235,6 +243,7 @@ export interface FileRoutesByTo {
   '/orgs/$orgId/settings': typeof AppOrgsOrgIdSettingsRoute
   '/projects/$projectId/keys': typeof AppProjectsProjectIdKeysRoute
   '/projects/$projectId/platforms': typeof AppProjectsProjectIdPlatformsRoute
+  '/projects/$projectId/security': typeof AppProjectsProjectIdSecurityRoute
   '/projects/$projectId/settings': typeof AppProjectsProjectIdSettingsRoute
   '/projects/$projectId/sign-in-methods': typeof AppProjectsProjectIdSignInMethodsRoute
   '/orgs/$orgId': typeof AppOrgsOrgIdIndexRoute
@@ -266,6 +275,7 @@ export interface FileRoutesById {
   '/_app/orgs/$orgId/settings': typeof AppOrgsOrgIdSettingsRoute
   '/_app/projects/$projectId/keys': typeof AppProjectsProjectIdKeysRoute
   '/_app/projects/$projectId/platforms': typeof AppProjectsProjectIdPlatformsRoute
+  '/_app/projects/$projectId/security': typeof AppProjectsProjectIdSecurityRoute
   '/_app/projects/$projectId/settings': typeof AppProjectsProjectIdSettingsRoute
   '/_app/projects/$projectId/sign-in-methods': typeof AppProjectsProjectIdSignInMethodsRoute
   '/_app/orgs/$orgId/': typeof AppOrgsOrgIdIndexRoute
@@ -297,6 +307,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/settings'
     | '/projects/$projectId/keys'
     | '/projects/$projectId/platforms'
+    | '/projects/$projectId/security'
     | '/projects/$projectId/settings'
     | '/projects/$projectId/sign-in-methods'
     | '/orgs/$orgId/'
@@ -323,6 +334,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/settings'
     | '/projects/$projectId/keys'
     | '/projects/$projectId/platforms'
+    | '/projects/$projectId/security'
     | '/projects/$projectId/settings'
     | '/projects/$projectId/sign-in-methods'
     | '/orgs/$orgId'
@@ -353,6 +365,7 @@ export interface FileRouteTypes {
     | '/_app/orgs/$orgId/settings'
     | '/_app/projects/$projectId/keys'
     | '/_app/projects/$projectId/platforms'
+    | '/_app/projects/$projectId/security'
     | '/_app/projects/$projectId/settings'
     | '/_app/projects/$projectId/sign-in-methods'
     | '/_app/orgs/$orgId/'
@@ -510,6 +523,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectsProjectIdPlatformsRouteImport
       parentRoute: typeof AppProjectsProjectIdRouteRoute
     }
+    '/_app/projects/$projectId/security': {
+      id: '/_app/projects/$projectId/security'
+      path: '/security'
+      fullPath: '/projects/$projectId/security'
+      preLoaderRoute: typeof AppProjectsProjectIdSecurityRouteImport
+      parentRoute: typeof AppProjectsProjectIdRouteRoute
+    }
     '/_app/projects/$projectId/settings': {
       id: '/_app/projects/$projectId/settings'
       path: '/settings'
@@ -620,6 +640,7 @@ interface AppProjectsProjectIdRouteRouteChildren {
   AppProjectsProjectIdEmailRouteRoute: typeof AppProjectsProjectIdEmailRouteRouteWithChildren
   AppProjectsProjectIdKeysRoute: typeof AppProjectsProjectIdKeysRoute
   AppProjectsProjectIdPlatformsRoute: typeof AppProjectsProjectIdPlatformsRoute
+  AppProjectsProjectIdSecurityRoute: typeof AppProjectsProjectIdSecurityRoute
   AppProjectsProjectIdSettingsRoute: typeof AppProjectsProjectIdSettingsRoute
   AppProjectsProjectIdSignInMethodsRoute: typeof AppProjectsProjectIdSignInMethodsRoute
   AppProjectsProjectIdIndexRoute: typeof AppProjectsProjectIdIndexRoute
@@ -633,6 +654,7 @@ const AppProjectsProjectIdRouteRouteChildren: AppProjectsProjectIdRouteRouteChil
       AppProjectsProjectIdEmailRouteRouteWithChildren,
     AppProjectsProjectIdKeysRoute: AppProjectsProjectIdKeysRoute,
     AppProjectsProjectIdPlatformsRoute: AppProjectsProjectIdPlatformsRoute,
+    AppProjectsProjectIdSecurityRoute: AppProjectsProjectIdSecurityRoute,
     AppProjectsProjectIdSettingsRoute: AppProjectsProjectIdSettingsRoute,
     AppProjectsProjectIdSignInMethodsRoute:
       AppProjectsProjectIdSignInMethodsRoute,

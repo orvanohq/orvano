@@ -26,6 +26,7 @@ internal sealed class TestingModule : IOrvanoModule
     {
         services.AddSingleton<TestEmails>();
         services.AddSingleton<FakeOAuthProvider>();
+        services.AddSingleton<FakePwnedPasswords>();
         services.AddSingleton<SoftwareAuthenticator>();
     }
 
@@ -51,6 +52,7 @@ internal sealed class TestingModule : IOrvanoModule
 
         var fake = ((IEndpointRouteBuilder)v1).ServiceProvider.GetRequiredService<FakeOAuthProvider>();
         fake.Map(v1);
+        ((IEndpointRouteBuilder)v1).ServiceProvider.GetRequiredService<FakePwnedPasswords>().Map(v1);
 
         v1.MapPost(TestOperations.CreateIdToken.Route, Results<Ok<TestIdToken>, ProblemHttpResult> (TestCreateIdTokenRequest request) =>
         {

@@ -35,7 +35,7 @@ public class MigrationRunnerTests(PostgresFixture postgres)
         Assert.Equal(
         [
             "auth_email_tokens", "auth_id_token_uses", "auth_identities", "auth_method_settings", "auth_mfa_tickets", "auth_oauth_flows",
-            "auth_oauth_providers", "auth_passkeys", "auth_passwords", "auth_recovery_codes", "auth_sessions", "auth_signing_keys",
+            "auth_oauth_providers", "auth_passkeys", "auth_passwords", "auth_policies", "auth_recovery_codes", "auth_sessions", "auth_signing_keys",
             "auth_totp_factors", "auth_users", "auth_webauthn_challenges",
             "events", "jobs", "messaging_email_templates", "messaging_emails", "messaging_smtp_settings",
             "platform_api_keys", "platform_install_admins", "platform_install_settings", "platform_invitations",

@@ -67,7 +67,17 @@
   {
     "code": "invalid_password",
     "status": 400,
-    "description": "The password is not 8 to 256 characters after Unicode NFKC normalization."
+    "description": "The new password is shorter than the project's minimum (8 to 64 characters, at least 8), or longer than 256, after Unicode NFKC normalization."
+  },
+  {
+    "code": "password_too_common",
+    "status": 400,
+    "description": "The new password is on the list of common passwords the project refuses."
+  },
+  {
+    "code": "password_breached",
+    "status": 400,
+    "description": "The new password appears in a known data breach, by the Have I Been Pwned check the project turned on."
   },
   {
     "code": "invalid_credentials",

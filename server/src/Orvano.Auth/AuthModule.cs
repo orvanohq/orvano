@@ -33,6 +33,8 @@ internal sealed class AuthModule : IOrvanoModule
         services.AddSingleton(_ => new ProviderCatalog(TestProviderUrl(config)));
         services.AddSingleton<ProviderKeys>();
         services.AddSingleton<AppleSecrets>();
+        services.AddSingleton<PolicySettings>();
+        services.AddBreachedPasswords(TestUrl(config, TestHibpSetting));
     }
 
     /// <summary>
@@ -51,6 +53,8 @@ internal sealed class AuthModule : IOrvanoModule
         services.AddSingleton<WebAuthnVerifier>();
         services.AddSingleton<PasskeyService>();
         services.AddSingleton<MethodSettingsService>();
+        services.AddSingleton<PasswordRules>();
+        services.AddSingleton<AuthPoliciesService>();
         services.AddSingleton<MfaService>();
         services.AddSingleton<SecurityAlerts>();
         services.AddSingleton<SessionService>();
@@ -80,8 +84,16 @@ internal sealed class AuthModule : IOrvanoModule
     /// </summary>
     public const string TestProviderSetting = "ORVANO_TEST_OAUTH_PROVIDER_URL";
 
-    private static Uri? TestProviderUrl(IConfiguration config) =>
-        config[TestProviderSetting] is { Length: > 0 } value && Uri.TryCreate(value, UriKind.Absolute, out var url) ? url : null;
+    private static Uri? TestProviderUrl(IConfiguration config) => TestUrl(config, TestProviderSetting);
+
+    /// <summary>
+    /// <c>ORVANO_TEST_HIBP_URL</c> (spec 0014, AC-6): the <c>Test</c> only fake range endpoint the breached password
+    /// check calls in place of <c>api.pwnedpasswords.com</c>. The host refuses it outside <c>Test</c>.
+    /// </summary>
+    public const string TestHibpSetting = "ORVANO_TEST_HIBP_URL";
+
+    private static Uri? TestUrl(IConfiguration config, string setting) =>
+        config[setting] is { Length: > 0 } value && Uri.TryCreate(value, UriKind.Absolute, out var url) ? url : null;
 
     public void MapApi(RouteGroupBuilder v1)
     {

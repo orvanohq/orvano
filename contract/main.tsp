@@ -33,6 +33,7 @@ import "./auth/console-users.tsp";
 import "./auth/oauth.tsp";
 import "./auth/identities.tsp";
 import "./auth/users-mfa.tsp";
+import "./auth/policies.tsp";
 import "./messaging/email.tsp";
 import "./test/test.tsp";
 
