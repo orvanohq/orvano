@@ -44,7 +44,7 @@ public class EmailTemplateDomainTests
         Assert.Equal("Security alert for Acme Shop", email.Subject);
         Assert.StartsWith("<!doctype html>\n<html lang=\"en\" dir=\"ltr\">", html, StringComparison.Ordinal);
         Assert.Contains($"<title>{email.Subject}</title>", html, StringComparison.Ordinal);
-        Assert.Matches($"""<div style="display:none[^"]*">{heading} on 2026-06-01 10:30 UTC\.</div>""", html);
+        Assert.Matches($"""<div style="display:none[^"]*">{heading} \(2026-06-01 10:30 UTC\)\.</div>""", html);
         Assert.Single(Regex.Matches(html, "<h1[ >]"));
         Assert.Contains($">{heading}</h1>", html, StringComparison.Ordinal);
         Assert.Contains("When: 2026-06-01 10:30 UTC", html, StringComparison.Ordinal);

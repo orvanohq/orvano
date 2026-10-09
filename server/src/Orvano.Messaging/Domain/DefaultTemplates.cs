@@ -105,7 +105,7 @@ internal static class DefaultTemplates
         "Security alert for {{ project.name }}",
         AlertWords + Frame(
             "Security alert for {{ project.name }}",
-            "{{ what }} on {{ occurred_at }}.",
+            "{{ what }} ({{ occurred_at }}).",
             $$$"""
             <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;">{{ what }}</h1>
             <p style="margin:0 0 16px;">{{ detail }}</p>
