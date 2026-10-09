@@ -2,12 +2,19 @@
 import type {
   TestAppleRevocationList,
   TestCreateIdTokenRequest,
+  TestCreatePasskeyAssertionRequest,
+  TestCreatePasskeyCredentialRequest,
   TestEmail,
   TestIdToken,
   TestItem,
   TestItemPage,
 } from './test-models.js'
-import type { Client, RequestOptions } from '@orvano/js'
+import type {
+  Client,
+  PasskeyAssertionCredential,
+  PasskeyRegistrationCredential,
+  RequestOptions,
+} from '@orvano/js'
 import { Orvano, paginate } from '@orvano/js'
 
 /** Operations in the `test` service. */
@@ -31,9 +38,34 @@ export class TestService {
     )
   }
 
-  /** Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after`, and reads it. */
+  /** Signs a challenge with a passkey the software authenticator made. */
+  createPasskeyAssertion(
+    body: TestCreatePasskeyAssertionRequest,
+    options?: RequestOptions,
+  ): Promise<PasskeyAssertionCredential> {
+    return this.#client.request<PasskeyAssertionCredential>(
+      { method: 'POST', path: '/v1/test/passkeys/assertions', body },
+      options,
+    )
+  }
+
+  /** Makes a passkey with the software authenticator: a new P-256 key, kept in memory for the run. */
+  createPasskeyCredential(
+    body: TestCreatePasskeyCredentialRequest,
+    options?: RequestOptions,
+  ): Promise<PasskeyRegistrationCredential> {
+    return this.#client.request<PasskeyRegistrationCredential>(
+      { method: 'POST', path: '/v1/test/passkeys/credentials', body },
+      options,
+    )
+  }
+
+  /**
+   * Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after` (and whose subject contains
+   * `subject`, when given), and reads it.
+   */
   getLatestEmail(
-    query: { to: string; after?: string | undefined },
+    query: { to: string; after?: string | undefined; subject?: string | undefined },
     options?: RequestOptions,
   ): Promise<TestEmail> {
     return this.#client.request<TestEmail>(

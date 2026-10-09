@@ -49,6 +49,10 @@
   /* Elevation: shadows only on overlays */
   --shadow-overlay: 0 8px 24px oklch(0 0 0 / 0.45);
 
+  /* QR codes stay dark on light in both themes, so every authenticator app can scan them */
+  --qr-dark: oklch(0.15 0 0);
+  --qr-light: oklch(1 0 0);
+
   /* Density, compact (the default) */
   --control-h: 2rem;
   --control-h-sm: 1.75rem;

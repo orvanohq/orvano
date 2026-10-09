@@ -1,0 +1,100 @@
+# Spec 0013, AC-19 to AC-24, AC-36 to AC-38, AC-45: a user with a verified email adds a passkey through the SDK's
+# registerPasskey (with their current password), signs in with it and no email typed (level 2, never challenged), renames it, steps up with it,
+# and removes it, after which it no longer signs in. Passkeys come from the server's Test only software
+# authenticator, which the runners plug in as the client's passkey authenticator.
+name: a user adds a passkey, signs in with it, steps up with it, and removes it
+requires: []
+steps:
+  - op: now
+    as: client
+    input: {}
+    expect: { status: 200 }
+    save:
+      beforeSignUp: $.now
+  - op: account.create
+    as: client
+    input:
+      body:
+        email: 'passkey-${unique}@example.com'
+        password: correct horse battery staple
+        verificationRedirectUrl: 'http://localhost:3000/auth/callback'
+    expect:
+      status: 201
+      body: { verificationEmail: queued }
+  - op: test.getLatestEmail
+    as: client
+    input: { to: 'passkey-${unique}@example.com', after: '${beforeSignUp}' }
+    expect:
+      status: 200
+      body: { type: verification }
+    save:
+      link: $.url
+  - op: redeemLink
+    as: client
+    input: { url: '${link}' }
+    expect:
+      status: 200
+      body: { type: verification, user: { emailVerified: true } }
+  - op: registerPasskey
+    as: client
+    input: { name: Laptop, password: correct horse battery staple }
+    expect:
+      status: 201
+      body: { name: Laptop, active: true, synced: false, lastUsedAt: null }
+    save:
+      passkeyId: $.id
+  - op: account.getMfa
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body: { mfaEnabled: false, passkeyCount: 1, factorsAvailable: [totp, passkey] }
+  - op: account.deleteCurrentSession
+    as: client
+    input: {}
+    expect: { status: 204 }
+  - op: signInWithPasskey
+    as: client
+    input: {}
+    expect:
+      status: 201
+      body: { user: { email: 'passkey-${unique}@example.com' }, mfaRequired: false }
+  - op: account.listSessions
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body:
+        items: [{ current: true, method: passkey, aal: 2, amr: [hwk, mfa, user] }]
+  - op: account.updatePasskey
+    as: client
+    input:
+      passkeyId: '${passkeyId}'
+      body: { name: Work laptop }
+    expect:
+      status: 200
+      body: { name: Work laptop }
+  - op: verifyMfa
+    as: client
+    input: { passkey: true }
+    expect:
+      status: 200
+      body: { verified: true, refreshTokenKept: true }
+  - op: account.deletePasskey
+    as: client
+    input: { passkeyId: '${passkeyId}' }
+    expect: { status: 204 }
+  - op: account.listPasskeys
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body: { items: [] }
+  - op: account.deleteCurrentSession
+    as: client
+    input: {}
+    expect: { status: 204 }
+  - op: signInWithPasskey
+    as: client
+    input: {}
+    expect: { status: 401, code: invalid_passkey }

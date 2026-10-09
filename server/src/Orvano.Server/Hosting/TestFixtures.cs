@@ -22,6 +22,7 @@ namespace Orvano.Server.Hosting;
 /// <param name="Users">App users to seed with known passwords.</param>
 /// <param name="InstallSmtp">The install's SMTP server to seed, if any: a mail catcher that needs no sign in.</param>
 /// <param name="OAuthProviders">Sign in provider settings to seed (spec 0012), through the console's own settings code.</param>
+/// <param name="MethodSettings">TOTP and passkey settings to seed (spec 0013), through the console's own settings code.</param>
 /// <param name="Problem">Why the fixtures can't be used; the role refuses to start when set.</param>
 internal sealed record TestFixtures(
     IReadOnlyList<FixtureConsoleUser> ConsoleUsers,
@@ -31,6 +32,7 @@ internal sealed record TestFixtures(
     IReadOnlyList<FixtureUser> Users,
     FixtureInstallSmtp? InstallSmtp = null,
     IReadOnlyList<FixtureOAuthProvider>? OAuthProviders = null,
+    IReadOnlyList<FixtureMethodSettings>? MethodSettings = null,
     string? Problem = null)
 {
     public const string Setting = "ORVANO_TEST_FIXTURES";
@@ -135,7 +137,19 @@ internal sealed record TestFixtures(
             providers.Add(new FixtureOAuthProvider(o.Project!, provider, update));
         }
 
-        return new TestFixtures(consoleUsers, projects, keys, platforms, users, installSmtp, providers);
+        var methods = new List<FixtureMethodSettings>();
+        foreach (var m in file?.MethodSettings ?? [])
+        {
+            if (!projects.Any(project => project.Id == m.Project)) return Fail($"{Setting}: methodSettings project '{m.Project}' is not one of the fixture projects");
+            var update = new MethodSettingsUpdate(
+                m.TotpEnabled, m.PasskeysEnabled, m.RpId is null ? FieldChange.Keep : FieldChange.To(m.RpId),
+                m.RpName is null ? FieldChange.Keep : FieldChange.To(m.RpName), m.AndroidCertFingerprints, ConfirmRpIdChange: true);
+            if (MethodSettingsRules.Apply(Auth.Domain.MethodSettings.Defaults, update) is (null, var problem))
+                return Fail($"{Setting}: methodSettings of '{m.Project}': {problem}");
+            methods.Add(new FixtureMethodSettings(m.Project!, update));
+        }
+
+        return new TestFixtures(consoleUsers, projects, keys, platforms, users, installSmtp, providers, methods);
     }
 
     private static TestFixtures Fail(string problem) => None with { Problem = problem };
@@ -166,6 +180,30 @@ internal sealed record TestFixtures(
 
         [YamlMember(Alias = "oauthProviders")]
         public List<OAuthProviderEntry>? OAuthProviders { get; set; }
+
+        [YamlMember(Alias = "methodSettings")]
+        public List<MethodSettingsEntry>? MethodSettings { get; set; }
+    }
+
+    private sealed class MethodSettingsEntry
+    {
+        [YamlMember(Alias = "project")]
+        public string? Project { get; set; }
+
+        [YamlMember(Alias = "totpEnabled")]
+        public bool? TotpEnabled { get; set; }
+
+        [YamlMember(Alias = "passkeysEnabled")]
+        public bool? PasskeysEnabled { get; set; }
+
+        [YamlMember(Alias = "rpId")]
+        public string? RpId { get; set; }
+
+        [YamlMember(Alias = "rpName")]
+        public string? RpName { get; set; }
+
+        [YamlMember(Alias = "androidCertFingerprints")]
+        public List<string>? AndroidCertFingerprints { get; set; }
     }
 
     private sealed class OAuthProviderEntry

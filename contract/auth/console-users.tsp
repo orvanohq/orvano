@@ -96,6 +96,10 @@ interface ConsoleUsersApi {
     @query
     emailVerified?: boolean,
 
+    @doc("Only users with MFA `on` or `off`. With the project's authenticator app switch off, every user counts as `off`.")
+    @query
+    mfa?: string,
+
     @doc("The `nextCursor` of the previous page.")
     @query
     cursor?: string,

@@ -18,7 +18,7 @@ internal sealed partial class TestEmails(TestMailpit mailpit) : IDisposable
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(5) };
 
     /// <summary>The newest matching email, or null when none arrived within 15 seconds (or no Mailpit is set).</summary>
-    public async Task<TestEmail?> FindLatestAsync(string to, DateTimeOffset? after, CancellationToken ct)
+    public async Task<TestEmail?> FindLatestAsync(string to, DateTimeOffset? after, string? subject, CancellationToken ct)
     {
         if (mailpit.Url is not { } baseUrl) return null;
         var deadline = DateTimeOffset.UtcNow + Wait;
@@ -30,6 +30,7 @@ internal sealed partial class TestEmails(TestMailpit mailpit) : IDisposable
             foreach (var summary in search.GetProperty("messages").EnumerateArray())
             {
                 if (after is { } since && summary.GetProperty("Created").GetDateTimeOffset() <= since) break;
+                if (subject is not null && summary.GetProperty("Subject").GetString()?.Contains(subject, StringComparison.Ordinal) != true) continue;
                 var message = await _http.GetFromJsonAsync<JsonElement>(new Uri(baseUrl, $"/api/v1/message/{summary.GetProperty("ID").GetString()}"), ct);
                 return Read(message.GetProperty("Subject").GetString() ?? "", message.GetProperty("Text").GetString() ?? "");
             }

@@ -28,16 +28,50 @@ final class TestService {
     return TestIdToken.fromJson(json as Map<String, dynamic>);
   }
 
-  /// Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after`, and reads it.
+  /// Signs a challenge with a passkey the software authenticator made.
+  Future<PasskeyAssertionCredential> createPasskeyAssertion(
+    TestCreatePasskeyAssertionRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/test/passkeys/assertions',
+      body: body.toJson(),
+      options: options,
+    );
+    return PasskeyAssertionCredential.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Makes a passkey with the software authenticator: a new P-256 key, kept in memory for the run.
+  Future<PasskeyRegistrationCredential> createPasskeyCredential(
+    TestCreatePasskeyCredentialRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/test/passkeys/credentials',
+      body: body.toJson(),
+      options: options,
+    );
+    return PasskeyRegistrationCredential.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after` (and whose subject contains
+  /// `subject`, when given), and reads it.
   Future<TestEmail> getLatestEmail({
     required String to,
     DateTime? after,
+    String? subject,
     RequestOptions? options,
   }) async {
     final json = await _client.send(
       'GET',
       '/v1/test/emails/latest',
-      query: {'to': to, 'after': after?.toUtc().toIso8601String()},
+      query: {
+        'to': to,
+        'after': after?.toUtc().toIso8601String(),
+        'subject': subject,
+      },
       options: options,
     );
     return TestEmail.fromJson(json as Map<String, dynamic>);

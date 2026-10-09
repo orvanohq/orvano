@@ -24,8 +24,11 @@ internal static class RunnerDispatch
             var text = await client.SendForTextAsync(new OrvanoRequest("POST", "/v1/account/sessions/password", null, body, false), ct);
             return JsonNode.Parse(text);
         }, null),
-        // Client SDK helpers the .NET SDK doesn't have (spec 0012), so their scenarios skip.
+        // Client SDK helpers the .NET SDK doesn't have (spec 0012), so their scenarios skip. TOTP scenarios (spec 0013) enroll
+        // through client operations, so they skip here too.
         ["createNonce"] = new(200, null, null),
+        ["totpCode"] = new(200, null, null),
+        ["accessToken"] = new(200, null, null),
         ["oauthCode"] = new(200, null, null),
         // Spec 0012: the redirect flow over HTTP against the fake provider, then the redemption. The .NET SDK has no client
         // helper, so this is the raw operations; linking needs a signed in client, so it is the JS and Dart runners' alone.
@@ -50,13 +53,17 @@ internal static class RunnerDispatch
         ["verifyAccessToken"] = new(200, async (client, input, ct) =>
         {
             var verified = await client.VerifyAccessTokenAsync(
-                input["token"]?.GetValue<string>() ?? "", input["online"]?.GetValue<bool>() == true, ct);
+                input["token"]?.GetValue<string>() ?? "",
+                new VerifyAccessTokenOptions { Online = input["online"]?.GetValue<bool>() == true, RequireMfa = input["requireMfa"]?.GetValue<bool>() == true },
+                ct);
             return new JsonObject
             {
                 ["userId"] = verified.UserId,
                 ["sessionId"] = verified.SessionId,
                 ["emailVerified"] = verified.EmailVerified,
                 ["expiresAt"] = verified.ExpiresAt.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+                ["aal"] = verified.Aal,
+                ["amr"] = new JsonArray([.. verified.Amr.Select(m => (JsonNode?)JsonValue.Create(m))]),
             };
         }, null),
     };

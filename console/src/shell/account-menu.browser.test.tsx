@@ -64,6 +64,7 @@ const account = {
   lastSignInAt: '2026-09-27T00:00:00Z',
   providers: [],
   hasPassword: true,
+  mfaEnabled: false,
 }
 
 /**

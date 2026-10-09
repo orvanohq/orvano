@@ -31,11 +31,19 @@ import type {
   EmailAuthTransport,
   EmailCodeResult,
   LinkResult,
+  MfaFactor,
+  MfaTransport,
   OAuthTransport,
+  PasskeyChallenge,
+  PendingMfaStore,
+  PendingMfaTicket,
   RequestOptions,
   SessionRefresher,
   SessionStore,
+  SignInOutcome,
 } from '@orvano/js'
+
+import { decodeMfaCookie, encodeMfaCookie } from './cookie-codec.js'
 
 export { Client, ErrorCode, Orvano, OrvanoError } from '@orvano/js'
 export type {
@@ -46,8 +54,15 @@ export type {
   EmailCodeResult,
   EmailLinkType,
   LinkResult,
+  MfaAnswer,
+  MfaWireAnswer,
+  PasskeyAuthenticator,
+  PasskeyRegistrationOptions,
+  PasskeySignInOptions,
+  PendingMfa,
   RequestOptions,
   SessionStore,
+  SignInOutcome,
 } from '@orvano/js'
 
 /** The cookie that holds the access token; browser code can read it. Named only here. */
@@ -55,6 +70,15 @@ export const accessCookie = 'orvano_access'
 
 /** The `HttpOnly` cookie that holds the refresh token. Named only here. */
 export const refreshCookie = 'orvano_refresh'
+
+/**
+ * The `HttpOnly` cookie that holds the MFA ticket and `next` while a sign in waits at the MFA step
+ * (spec 0013, AC-37). Named only here.
+ */
+export const mfaCookie = 'orvano_mfa'
+
+/** How long the `orvano_mfa` cookie lives: the ticket's 5 minutes. */
+export const mfaCookieSeconds = 300
 
 /** Where the app mounts {@link createOrvanoRouteHandler} unless told otherwise. */
 export const defaultHandlerPath = '/api/orvano'
@@ -74,6 +98,20 @@ export interface CookieOptions {
   expires: Date
 }
 
+/** Options for the `orvano_mfa` cookie: `HttpOnly`, host only, as long as the ticket lives. */
+export interface MfaCookieOptions {
+  httpOnly: true
+  secure: boolean
+  sameSite: 'lax'
+  path: string
+  maxAge: number
+}
+
+/** The options the `orvano_mfa` cookie is written with. */
+export function mfaCookieOptions(secure: boolean): MfaCookieOptions {
+  return { httpOnly: true, secure, sameSite: 'lax', path: '/', maxAge: mfaCookieSeconds }
+}
+
 /**
  * The part of a Next.js cookie store the session needs: `await cookies()` in server components,
  * route handlers, and server actions, or `request.cookies` and `response.cookies` in middleware.
@@ -82,7 +120,7 @@ export interface CookieStore {
   /** Reads a cookie. */
   get(name: string): { value: string } | undefined
   /** Writes a cookie. Server components can't; the session is then only read. */
-  set?(name: string, value: string, options: CookieOptions): unknown
+  set?(name: string, value: string, options: CookieOptions | MfaCookieOptions): unknown
   /** Deletes a cookie. */
   delete?(name: string): unknown
 }
@@ -199,6 +237,60 @@ export class CookieSessionStore implements SessionStore {
   }
 }
 
+/**
+ * A {@link PendingMfaStore} in the `HttpOnly` `orvano_mfa` cookie (spec 0013, AC-37): a server
+ * side sign in that stops at the MFA step keeps its ticket there, never in what the call returns,
+ * and the route handler's `mfa` action finishes it. Reads from `read`; writes to every store in
+ * `write`.
+ */
+export class CookiePendingMfaStore implements PendingMfaStore {
+  /** The ticket is in an `HttpOnly` cookie, so the client blanks it in the sign in's result. */
+  readonly hidesTicket = true
+  readonly #read: CookieStore
+  readonly #write: readonly CookieStore[]
+  readonly #secure: boolean
+  readonly #next: string
+
+  /** `next` is the app path the `mfa` action answers once the sign in finishes; default `/`. */
+  constructor(
+    read: CookieStore,
+    write: readonly CookieStore[] = [read],
+    options: { secure?: boolean; next?: string } = {},
+  ) {
+    this.#read = read
+    this.#write = write
+    this.#secure = options.secure ?? true
+    this.#next = options.next ?? '/'
+  }
+
+  get(): PendingMfaTicket | null {
+    const cookie = decodeMfaCookie(this.#read.get(mfaCookie)?.value)
+    return cookie === null
+      ? null
+      : {
+          ticket: cookie.ticket,
+          factors: cookie.factors as MfaFactor[],
+          expiresAt: cookie.expiresAt,
+        }
+  }
+
+  set(pending: PendingMfaTicket | null): void {
+    for (const store of this.#write) {
+      try {
+        if (pending === null) store.delete?.(mfaCookie)
+        else
+          store.set?.(
+            mfaCookie,
+            encodeMfaCookie({ ...pending, next: this.#next }),
+            mfaCookieOptions(this.#secure),
+          )
+      } catch {
+        // Server components can't set cookies; sign in from a server action or route handler.
+      }
+    }
+  }
+}
+
 /** Settings for {@link createServerClient}. */
 export interface ServerClientConfig extends Omit<ClientConfig, 'session' | 'refresh'> {
   /** The request's cookies: `await cookies()` from `next/headers`. */
@@ -229,6 +321,7 @@ export function createServerClient(config: ServerClientConfig): Orvano {
         ...(requestHeaders === undefined ? {} : forwardedClientHeaders(requestHeaders)),
       },
       session: new CookieSessionStore(cookies, [cookies], { secure }),
+      mfaStore: new CookiePendingMfaStore(cookies, [cookies], { secure }),
     }),
   )
 }
@@ -372,17 +465,114 @@ export function emailAuthThroughHandler(handlerPath = defaultHandlerPath): Email
   }
   return {
     async redeemLink(link, client, options): Promise<LinkResult> {
-      const result = await post<LinkResult>('redeem', link, options)
-      if (link.type === 'magic_link' || link.type === 'recovery')
+      const result = await post<HandlerAnswer<LinkResult>>('redeem', link, options)
+      if (result.mfaRequired === true) {
+        // Only the `orvano_mfa` cookie was set: the sign in waits at the MFA step.
+        announce(client, result)
+      } else if (link.type === 'magic_link' || link.type === 'recovery')
         await client.reloadSession('signedIn')
       else if ((await client.session.get()) !== null) await client.reloadSession('userUpdated')
-      return { type: result.type, user: result.user, isNewUser: result.isNewUser }
+      return outcome(result, { type: result.type })
     },
     async signInWithEmailCode(email, code, client, options): Promise<EmailCodeResult> {
-      const result = await post<EmailCodeResult>('email-code', { email, code }, options)
-      await client.reloadSession('signedIn')
-      return { user: result.user, isNewUser: result.isNewUser }
+      const result = await post<HandlerAnswer<EmailCodeResult>>(
+        'email-code',
+        { email, code },
+        options,
+      )
+      if (result.mfaRequired === true) announce(client, result)
+      else await client.reloadSession('signedIn')
+      return outcome(result, {})
     },
+  }
+}
+
+/**
+ * A sign in answer as the route handler sends it: `mfaRequired` may be missing (a handler older
+ * than spec 0013), and `expiresAt` comes with a challenge.
+ */
+type HandlerAnswer<T extends SignInOutcome> = Omit<T, 'mfaRequired'> & {
+  mfaRequired?: boolean
+  expiresAt?: string
+}
+
+/** Tells the client's listeners `mfaRequired` for a sign in the handler's cookie holds. */
+function announce(client: Client, result: HandlerAnswer<SignInOutcome>): void {
+  client.announceMfa({
+    factors: Array.isArray(result.factors) ? result.factors : [],
+    expiresAt: typeof result.expiresAt === 'string' ? result.expiresAt : '',
+  })
+}
+
+/**
+ * The browser's {@link MfaTransport} (spec 0013, AC-37): `completeMfa`, `verifyMfa`, and
+ * `confirmTotp` post to the app's route handler (`.../mfa`, `.../mfa-verify`, `.../totp-confirm`),
+ * which reads the `orvano_mfa` cookie or the session cookies, calls Orvano, and sets the cookies
+ * (after `verifyMfa` and `confirmTotp`, only the access cookie: the refresh cookie stays as it
+ * was), so the browser never holds a refresh token or a ticket. Passkeys run in the browser; their
+ * challenges come from `.../mfa-passkey` and `.../passkey-challenge`, and a passkey sign in
+ * finishes at `.../passkey`.
+ */
+export function mfaThroughHandler(handlerPath = defaultHandlerPath): MfaTransport {
+  const post = async (
+    action: string,
+    body: unknown,
+    options?: RequestOptions,
+  ): Promise<Response> => {
+    const init: RequestInit = {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+    if (options?.signal !== undefined) init.signal = options.signal
+    const response = await globalThis.fetch(`${handlerPath}/${action}`, init)
+    if (!response.ok) throw await OrvanoError.fromResponse(response)
+    return response
+  }
+  return {
+    async completeMfa(answer, client, options): Promise<SignInOutcome> {
+      // A passkey's answer goes flat, as `{ challengeId, credential }` (AC-37).
+      await post('mfa', 'passkey' in answer ? answer.passkey : answer, options)
+      await client.reloadSession('signedIn')
+      return { user: null, isNewUser: false, mfaRequired: false, factors: [] }
+    },
+    async verifyMfa(answer, client, options): Promise<void> {
+      await post('mfa-verify', answer, options)
+      await client.reloadSession('tokenRefreshed')
+    },
+    async confirmTotp(code, client, options): Promise<string[]> {
+      const response = await post('totp-confirm', { code }, options)
+      const { recoveryCodes } = (await response.json()) as { recoveryCodes: string[] }
+      await client.reloadSession('tokenRefreshed')
+      return recoveryCodes
+    },
+    async createMfaPasskeyChallenge(_client, options): Promise<PasskeyChallenge> {
+      return (await (await post('mfa-passkey', {}, options)).json()) as PasskeyChallenge
+    },
+    async createPasskeyChallenge(_client, options): Promise<PasskeyChallenge> {
+      return (await (await post('passkey-challenge', {}, options)).json()) as PasskeyChallenge
+    },
+    async signInWithPasskey(answer, client, options): Promise<SignInOutcome> {
+      const response = await post('passkey', answer, options)
+      const { user } = (await response.json()) as { user: SignInOutcome['user'] }
+      await client.reloadSession('signedIn')
+      return { user, isNewUser: false, mfaRequired: false, factors: [] }
+    },
+  }
+}
+
+/** A handler's sign in answer as a `SignInOutcome`, read field by field. */
+function outcome<T extends object>(
+  result: HandlerAnswer<SignInOutcome>,
+  extra: T,
+): SignInOutcome & T {
+  return {
+    ...extra,
+    user: result.user,
+    isNewUser: result.isNewUser,
+    mfaRequired: result.mfaRequired === true,
+    factors: Array.isArray(result.factors) ? result.factors : [],
   }
 }
 
@@ -391,7 +581,8 @@ export const oauthCookie = 'orvano_oauth'
 
 /**
  * The browser client's {@link OAuthTransport} (spec 0012, AC-21): `signInWithOAuth` and
- * `linkIdentity` post `{ provider, next, link }` to the app's route handler (`.../oauth`), which
+ * `linkIdentity` post `{ provider, next, link, password? }` to the app's route handler
+ * (`.../oauth`; `password` is the user's current password, for a link only), which
  * keeps the verifier in an `HttpOnly` cookie and answers the provider's URL, and the browser goes
  * there. The provider comes back to the handler's `.../oauth-callback`, which sets the session
  * cookies and redirects to `next`: the `redirectUrl` option, a path in the app. Both helpers
@@ -408,6 +599,9 @@ export function oauthThroughHandler(handlerPath = defaultHandlerPath): OAuthTran
           provider,
           next: options.redirectUrl,
           link: purpose === 'oauth_link',
+          ...(purpose === 'oauth_link' && options.password !== undefined
+            ? { password: options.password }
+            : {}),
         }),
       }
       if (options.signal !== undefined) init.signal = options.signal
@@ -441,8 +635,8 @@ const browserClients = new Map<string, Orvano>()
  * so calling it on every render is cheap. It sends the `orvano_access` cookie's token and
  * refreshes through the app's route handler (`createOrvanoRouteHandler`, mounted at
  * `app/api/orvano/[...orvano]/route.ts`) when under a minute of it is left. Its
- * `client.redeemLink` and `client.signInWithEmailCode` go through that handler too, so the
- * session lands in the cookies.
+ * `client.redeemLink`, `client.signInWithEmailCode`, `client.completeMfa`, `client.verifyMfa`, and
+ * `client.confirmTotp` go through that handler too, so the session lands in the cookies.
  */
 export function createBrowserClient(config: BrowserClientConfig): Orvano {
   const { handlerPath, ...rest } = config
@@ -459,6 +653,7 @@ export function createBrowserClient(config: BrowserClientConfig): Orvano {
         refresh: refreshThroughHandler(handlerPath),
         emailAuth: emailAuthThroughHandler(handlerPath),
         oauth: oauthThroughHandler(handlerPath),
+        mfa: mfaThroughHandler(handlerPath),
       }),
     )
     browserClients.set(key, orvano)

@@ -13,6 +13,9 @@ export const keys = {
    * is `sessionOptional`, so a 401 means "signed out" and never redirects (spec 0008, AC-21).
    */
   accountOptional: ['console', 'account', 'optional'] as const,
+  /** The signed in account's MFA state and passkeys (spec 0013, AC-42). */
+  accountMfa: ['console', 'account', 'mfa'] as const,
+  accountPasskeys: ['console', 'account', 'passkeys'] as const,
   setup: ['console', 'install', 'setup'] as const,
   installSettings: ['console', 'install', 'settings'] as const,
   installSmtp: ['console', 'install', 'smtp'] as const,
@@ -32,6 +35,11 @@ export const keys = {
     ['console', 'projects', projectId, 'users', userId, 'identities'] as const,
   authProviders: (projectId: string) =>
     ['console', 'projects', projectId, 'auth-providers'] as const,
+  authMethods: (projectId: string) => ['console', 'projects', projectId, 'auth-methods'] as const,
+  userMfa: (projectId: string, userId: string) =>
+    ['console', 'projects', projectId, 'users', userId, 'mfa'] as const,
+  userPasskeys: (projectId: string, userId: string) =>
+    ['console', 'projects', projectId, 'users', userId, 'passkeys'] as const,
   userSessions: (projectId: string, userId: string) =>
     ['console', 'projects', projectId, 'users', userId, 'sessions'] as const,
   signingKeys: (projectId: string) => ['console', 'projects', projectId, 'signing-keys'] as const,
@@ -66,6 +74,22 @@ export function accountQuery() {
   return queryOptions({
     queryKey: keys.account,
     queryFn: ({ signal }) => consoleApi().consoleAccount.get({ signal }),
+  })
+}
+
+/** The signed in account's MFA state: on or off, recovery codes left, passkeys (spec 0013, AC-42). */
+export function accountMfaQuery() {
+  return queryOptions({
+    queryKey: keys.accountMfa,
+    queryFn: ({ signal }) => consoleApi().consoleAccount.getMfa({ signal }),
+  })
+}
+
+/** The signed in account's passkeys, oldest first (spec 0013, AC-42). */
+export function accountPasskeysQuery() {
+  return queryOptions({
+    queryKey: keys.accountPasskeys,
+    queryFn: ({ signal }) => consoleApi().consoleAccount.listPasskeys({ signal }),
   })
 }
 
@@ -197,13 +221,22 @@ export function projectQuery(projectId: string) {
   })
 }
 
-/** A project's users, newest first, paged by cursor; `email` narrows to a prefix (spec 0004, AC-29). */
-export function usersQuery(projectId: string, email: string, emailVerified?: boolean, limit = 25) {
+/**
+ * A project's users, newest first, paged by cursor; `email` narrows to a prefix (spec 0004, AC-29),
+ * and `mfa` to users with MFA `on` or `off` (spec 0013, AC-44).
+ */
+export function usersQuery(
+  projectId: string,
+  email: string,
+  emailVerified?: boolean,
+  limit = 25,
+  mfa?: 'on' | 'off',
+) {
   return infiniteQueryOptions({
-    queryKey: [...keys.users(projectId), { email, emailVerified, limit }] as const,
+    queryKey: [...keys.users(projectId), { email, emailVerified, mfa, limit }] as const,
     queryFn: ({ pageParam, signal }) =>
       projectClient(projectId).consoleUsers.list(
-        { email: email === '' ? undefined : email, emailVerified, cursor: pageParam, limit },
+        { email: email === '' ? undefined : email, emailVerified, mfa, cursor: pageParam, limit },
         { signal },
       ),
     initialPageParam: undefined as string | undefined,
@@ -233,6 +266,30 @@ export function authProvidersQuery(projectId: string) {
   return queryOptions({
     queryKey: keys.authProviders(projectId),
     queryFn: ({ signal }) => projectClient(projectId).consoleAuthProviders.list({ signal }),
+  })
+}
+
+/** A user's MFA state: on or off, when it was turned on, and recovery codes left (spec 0013, AC-27, AC-44). */
+export function userMfaQuery(projectId: string, userId: string) {
+  return queryOptions({
+    queryKey: keys.userMfa(projectId, userId),
+    queryFn: ({ signal }) => projectClient(projectId).consoleUsers.getMfa(userId, { signal }),
+  })
+}
+
+/** A user's passkeys, oldest first, inactive ones included (spec 0013, AC-44). */
+export function userPasskeysQuery(projectId: string, userId: string) {
+  return queryOptions({
+    queryKey: keys.userPasskeys(projectId, userId),
+    queryFn: ({ signal }) => projectClient(projectId).consoleUsers.listPasskeys(userId, { signal }),
+  })
+}
+
+/** The project's MFA and passkey settings, with the active passkey count and accepted origins (spec 0013, AC-43). */
+export function authMethodsQuery(projectId: string) {
+  return queryOptions({
+    queryKey: keys.authMethods(projectId),
+    queryFn: ({ signal }) => projectClient(projectId).consoleAuthMethods.get({ signal }),
   })
 }
 
@@ -314,7 +371,7 @@ export function smtpQuery(projectId: string) {
   })
 }
 
-/** A project's four auth email templates, each marked Default or Custom (spec 0009, AC-8). */
+/** A project's five auth email templates, each marked Default or Custom (spec 0009, AC-8). */
 export function emailTemplatesQuery(projectId: string) {
   return queryOptions({
     // Shares its prefix with the single templates, so one invalidation refreshes the list and the editor.

@@ -86,5 +86,10 @@ public class RecoveryQueueRefusalTests(PostgresFixture postgres)
 
         public Task<EmailQueueResult> QueueAuthEmailAsync(NpgsqlTransaction tx, AuthEmail email, CancellationToken ct) =>
             inner.QueueAuthEmailAsync(tx, email, ct);
+
+        public Task<EmailQueueResult> QueueSecurityAlertAsync(
+            NpgsqlTransaction tx, string projectId, string to, string projectName, SecurityAlertKind alert, DateTimeOffset occurredAt,
+            CancellationToken ct) =>
+            inner.QueueSecurityAlertAsync(tx, projectId, to, projectName, alert, occurredAt, ct);
     }
 }

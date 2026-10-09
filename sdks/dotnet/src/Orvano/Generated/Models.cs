@@ -4,6 +4,47 @@ using System.Text.Json.Serialization;
 
 namespace Orvano;
 
+/// <summary>A second factor.</summary>
+[JsonConverter(typeof(MfaFactorJsonConverter))]
+public enum MfaFactor
+{
+    /// <summary>A value this version does not know yet.</summary>
+    Unknown,
+
+    /// <summary>The wire value <c>totp</c>.</summary>
+    Totp,
+
+    /// <summary>The wire value <c>recovery_code</c>.</summary>
+    RecoveryCode,
+
+    /// <summary>The wire value <c>passkey</c>.</summary>
+    Passkey,
+}
+
+/// <summary>Reads and writes <see cref="MfaFactor"/> by wire value; unknown values read as <see cref="MfaFactor.Unknown"/>.</summary>
+public sealed class MfaFactorJsonConverter : JsonConverter<MfaFactor>
+{
+    /// <inheritdoc/>
+    public override MfaFactor Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() switch
+        {
+            "totp" => MfaFactor.Totp,
+            "recovery_code" => MfaFactor.RecoveryCode,
+            "passkey" => MfaFactor.Passkey,
+            _ => MfaFactor.Unknown,
+        };
+
+    /// <inheritdoc/>
+    public override void Write(Utf8JsonWriter writer, MfaFactor value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            MfaFactor.Totp => "totp",
+            MfaFactor.RecoveryCode => "recovery_code",
+            MfaFactor.Passkey => "passkey",
+            _ => throw new JsonException($"MfaFactor.{value} has no wire value"),
+        });
+}
+
 /// <summary>A sign in provider.</summary>
 [JsonConverter(typeof(OAuthProviderJsonConverter))]
 public enum OAuthProvider
@@ -77,6 +118,9 @@ public enum SessionMethod
 
     /// <summary>The wire value <c>id_token</c>.</summary>
     IdToken,
+
+    /// <summary>The wire value <c>passkey</c>.</summary>
+    Passkey,
 }
 
 /// <summary>Reads and writes <see cref="SessionMethod"/> by wire value; unknown values read as <see cref="SessionMethod.Unknown"/>.</summary>
@@ -93,6 +137,7 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             "recovery" => SessionMethod.Recovery,
             "oauth" => SessionMethod.Oauth,
             "id_token" => SessionMethod.IdToken,
+            "passkey" => SessionMethod.Passkey,
             _ => SessionMethod.Unknown,
         };
 
@@ -107,6 +152,7 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             SessionMethod.Recovery => "recovery",
             SessionMethod.Oauth => "oauth",
             SessionMethod.IdToken => "id_token",
+            SessionMethod.Passkey => "passkey",
             _ => throw new JsonException($"SessionMethod.{value} has no wire value"),
         });
 }
@@ -219,6 +265,21 @@ public sealed record Jwk(
 public sealed record Jwks(
     [property: JsonPropertyName("keys")] IReadOnlyList<Jwk> Keys);
 
+/// <summary>A user's MFA state.</summary>
+/// <param name="MfaEnabled">Whether sign in asks for a second factor: a confirmed authenticator app, while the project allows TOTP.</param>
+/// <param name="TotpConfirmed">Whether an authenticator app is confirmed, even while the project has TOTP turned off.</param>
+/// <param name="TotpConfirmedAt">When the authenticator app was confirmed; null when none is.</param>
+/// <param name="RecoveryCodesRemaining">How many unused recovery codes are left, 0 to 10.</param>
+/// <param name="PasskeyCount">How many of the user's passkeys can sign in now.</param>
+/// <param name="FactorsAvailable">What the project lets users turn on now: <c>totp</c> and <c>passkey</c>.</param>
+public sealed record MfaStatus(
+    [property: JsonPropertyName("mfaEnabled")] bool MfaEnabled,
+    [property: JsonPropertyName("totpConfirmed")] bool TotpConfirmed,
+    [property: JsonPropertyName("totpConfirmedAt")] DateTimeOffset? TotpConfirmedAt,
+    [property: JsonPropertyName("recoveryCodesRemaining")] int RecoveryCodesRemaining,
+    [property: JsonPropertyName("passkeyCount")] int PasskeyCount,
+    [property: JsonPropertyName("factorsAvailable")] IReadOnlyList<MfaFactor> FactorsAvailable);
+
 /// <summary>The discovery document standard JWT libraries configure themselves from. Orvano is not an OpenID provider; this exists so tools that take an issuer URL find the keys. Its names are the standard snake case ones.</summary>
 /// <param name="Issuer">The issuer, the <c>iss</c> of every access token of the project.</param>
 /// <param name="JwksUri">Where the project's JWKS lives.</param>
@@ -232,6 +293,26 @@ public sealed record OpenIdConfiguration(
     [property: JsonPropertyName("subject_types_supported")] IReadOnlyList<string> SubjectTypesSupported,
     [property: JsonPropertyName("response_types_supported")] IReadOnlyList<string> ResponseTypesSupported);
 
+/// <summary>A passkey of a user.</summary>
+/// <param name="Id">The passkey's ID.</param>
+/// <param name="Name">The name the user gave it, else <c>Passkey</c>.</param>
+/// <param name="CreatedAt">When it was added.</param>
+/// <param name="LastUsedAt">When it last signed in or answered a challenge; null when it never has.</param>
+/// <param name="Synced">Whether the passkey is backed up and synced across devices (for example by iCloud Keychain or a password manager).</param>
+/// <param name="Active">Whether it can sign in now: false after the project's RP ID changed away from the one it was made for.</param>
+public sealed record Passkey(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("lastUsedAt")] DateTimeOffset? LastUsedAt,
+    [property: JsonPropertyName("synced")] bool Synced,
+    [property: JsonPropertyName("active")] bool Active);
+
+/// <summary>A user's passkeys, oldest first; at most 10.</summary>
+/// <param name="Items">The passkeys.</param>
+public sealed record PasskeyList(
+    [property: JsonPropertyName("items")] IReadOnlyList<Passkey> Items);
+
 /// <summary>An active session of a user: one signed in device or browser.</summary>
 /// <param name="Id">The session ID.</param>
 /// <param name="CreatedAt">When the user signed in.</param>
@@ -242,6 +323,8 @@ public sealed record OpenIdConfiguration(
 /// <param name="Current">Whether this is the session making the call.</param>
 /// <param name="Method">How the session began.</param>
 /// <param name="Provider">The provider of an <c>oauth</c> or <c>id_token</c> session; null for every other method.</param>
+/// <param name="Aal">How strongly the session signed in: 1 for one factor, 2 once a second factor or a passkey was verified on it. Also the access token's <c>aal</c> claim.</param>
+/// <param name="Amr">The ways the user proved who they are on this session, sorted: <c>pwd</c>, <c>email</c>, <c>fed</c>, <c>otp</c>, <c>rec</c>, <c>hwk</c>, <c>swk</c>, <c>user</c>, and <c>mfa</c> (whenever <c>aal</c> is 2). Also the access token's <c>amr</c> claim.</param>
 public sealed record Session(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
@@ -251,7 +334,9 @@ public sealed record Session(
     [property: JsonPropertyName("ipAddress")] string? IpAddress,
     [property: JsonPropertyName("current")] bool Current,
     [property: JsonPropertyName("method")] SessionMethod Method,
-    [property: JsonPropertyName("provider")] OAuthProvider? Provider);
+    [property: JsonPropertyName("provider")] OAuthProvider? Provider,
+    [property: JsonPropertyName("aal")] int Aal,
+    [property: JsonPropertyName("amr")] IReadOnlyList<string> Amr);
 
 /// <summary>One page of a user's active sessions, newest first.</summary>
 /// <param name="Items">The sessions on this page.</param>
@@ -284,6 +369,7 @@ public sealed record UpdateUserEmailRequest(
 /// <param name="LastSignInAt">When the user last signed in; null if never.</param>
 /// <param name="Providers">The providers linked to the user, sorted by name.</param>
 /// <param name="HasPassword">Whether the user has a password.</param>
+/// <param name="MfaEnabled">Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never turns it on.</param>
 public sealed record User(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("email")] string? Email,
@@ -295,7 +381,8 @@ public sealed record User(
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
     [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt,
     [property: JsonPropertyName("providers")] IReadOnlyList<OAuthProvider> Providers,
-    [property: JsonPropertyName("hasPassword")] bool HasPassword);
+    [property: JsonPropertyName("hasPassword")] bool HasPassword,
+    [property: JsonPropertyName("mfaEnabled")] bool MfaEnabled);
 
 /// <summary>One page of a project's users, newest first.</summary>
 /// <param name="Items">The users on this page.</param>

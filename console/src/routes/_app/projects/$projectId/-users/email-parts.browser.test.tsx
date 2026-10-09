@@ -26,6 +26,7 @@ const unverified: User = {
   lastSignInAt: null,
   providers: [],
   hasPassword: true,
+  mfaEnabled: false,
 }
 const verified: User = {
   ...unverified,

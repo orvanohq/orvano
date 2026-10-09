@@ -58,7 +58,7 @@ afterEach(() => {
 })
 
 describe('the Email Templates tab', () => {
-  it('lists the four templates with a Default or Custom badge and when one was edited', async () => {
+  it('lists the five templates with a Default or Custom badge and when one was edited', async () => {
     seed('viewer')
     api.emailTemplates = {
       recovery: {
@@ -80,10 +80,12 @@ describe('the Email Templates tab', () => {
       'Password reset',
       'Magic link',
       'Email code',
+      'Security alert',
     ])
     expect(rows.map((row) => row.querySelector('[data-slot=badge]')?.textContent)).toEqual([
       'Default',
       'Custom',
+      'Default',
       'Default',
       'Default',
     ])
@@ -317,7 +319,7 @@ describe('the template editor', () => {
     expect(sent('POST', previewPath)).toEqual([])
   })
 
-  it('says so when the template is not one of the four', async () => {
+  it('says so when the template is not one of the five', async () => {
     seed()
     await renderApp(`${base}/console_invitation`)
     await expect.poll(text).toContain('No such template')

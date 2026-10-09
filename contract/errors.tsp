@@ -85,7 +85,7 @@ enum ErrorCode {
   @doc("The password is not 8 to 256 characters after Unicode NFKC normalization (400).")
   invalid_password,
 
-  @doc("The email and password do not match a user, or the password given to confirm an action is wrong (401).")
+  @doc("The email and password do not match a user, or the password given to confirm an action is missing or wrong (401).")
   invalid_credentials,
 
   @doc("The operation needs a signed in user's access token in `Authorization: Bearer` (401).")
@@ -178,7 +178,7 @@ enum ErrorCode {
   @doc("The email code is wrong, expired, or used up; ask for a new one after 5 wrong tries (401).")
   invalid_code,
 
-  @doc("Sign in again within 10 minutes before this action: a user without a password, or anyone linking a provider (403).")
+  @doc("Sign in again within 10 minutes before this action: a user without a password, or an old session removing a passkey (403).")
   reauthentication_required,
 
   @doc("The email is already verified (409).")
@@ -222,6 +222,51 @@ enum ErrorCode {
 
   @doc("The provider did not answer in time, or answered with a server error; try again (503).")
   provider_unavailable,
+
+  @doc("The MFA ticket is unknown, expired, used up by 5 wrong factors, or from another project; sign in again (401).")
+  invalid_mfa_ticket,
+
+  @doc("The authenticator code or recovery code is wrong, or the code was already used (401).")
+  invalid_mfa_code,
+
+  @doc("The passkey's answer failed a check, or the passkey is unknown, inactive, or another user's (401).")
+  invalid_passkey,
+
+  @doc("The passkey challenge is unknown, used, expired, or not this user's; ask for a new one (400).")
+  invalid_passkey_challenge,
+
+  @doc("Pass a second factor (`account.verifyMfa`) within 10 minutes before this action (403).")
+  mfa_verification_required,
+
+  @doc("The access token's `aal` is below 2: this route needs a session that passed MFA (403).")
+  mfa_required,
+
+  @doc("The user already has an authenticator app turned on (409).")
+  mfa_already_enabled,
+
+  @doc("The user has no authenticator app turned on (409).")
+  mfa_not_enabled,
+
+  @doc("Verify the user's email before turning on MFA or adding a passkey (409).")
+  email_not_verified,
+
+  @doc("No authenticator app is waiting for its first code, or it waited more than 15 minutes; start again (409).")
+  totp_not_pending,
+
+  @doc("This factor is turned off for the project, or the user can't use it now (409).")
+  factor_not_enabled,
+
+  @doc("This passkey is already registered in the project (409).")
+  passkey_already_registered,
+
+  @doc("The user already has 10 passkeys (409).")
+  passkey_limit,
+
+  @doc("Passkeys are registered under the current RP ID; confirm the change with `confirmRpIdChange` (409).")
+  passkeys_exist,
+
+  @doc("No such passkey for this user (404).")
+  passkey_not_found,
 }
 
 @doc("Error codes only the test operations send. Generated only into the scenario runners.")

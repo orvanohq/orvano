@@ -6,8 +6,12 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show parseHttpDate;
 
 import 'auth.dart';
+import 'generated/models.dart';
 import 'generated/version.dart';
+import 'generated/services.dart';
+import 'mfa.dart';
 import 'orvano_exception.dart';
+import 'passkeys.dart';
 import 'version.dart';
 
 /// What a successful call does to the client's stored session, from the
@@ -117,12 +121,152 @@ base class Client {
   final SessionRefresher _refresher;
   final _changes = StreamController<AuthStateChange>.broadcast();
   Future<AuthSession?>? _refreshing;
+  MfaChallenge? _mfa;
   bool _versionChecked = false;
 
   /// Every change to the signed in user: [AuthEvent.signedIn],
-  /// [AuthEvent.signedOut], [AuthEvent.tokenRefreshed], and
-  /// [AuthEvent.userUpdated].
+  /// [AuthEvent.signedOut], [AuthEvent.tokenRefreshed],
+  /// [AuthEvent.userUpdated], and [AuthEvent.mfaRequired] when a sign in
+  /// stops at the MFA step.
   Stream<AuthStateChange> get authStateChanges => _changes.stream;
+
+  /// The sign in waiting at the MFA step (spec 0013, AC-38), or null. Its
+  /// ticket stays in this client's memory only, so an app restart starts
+  /// over.
+  PendingMfa? get pendingMfa {
+    final mfa = _mfa;
+    return mfa == null
+        ? null
+        : PendingMfa(factors: mfa.factors, expiresAt: mfa.expiresAt);
+  }
+
+  /// Finishes a sign in that stopped at the MFA step with an authenticator
+  /// app code, a recovery code, or a passkey (`account.createMfaSession`),
+  /// stores the session, emits [AuthEvent.signedIn], and returns the signed
+  /// in user. [MfaAnswer.passkey] runs the ceremony first
+  /// (`account.createMfaPasskeyChallenge`, then [authenticator] or the
+  /// client's default).
+  ///
+  /// Throws [StateError], before any call, when no sign in is waiting for
+  /// MFA, and [OrvanoException] for a wrong code (`invalid_mfa_code`) or
+  /// passkey (`invalid_passkey`; after 5 wrong answers the ticket ends) or an
+  /// ended ticket (`invalid_mfa_ticket`: sign in again).
+  Future<User> completeMfa(
+    MfaAnswer answer, {
+    PasskeyAuthenticator? authenticator,
+    RequestOptions? options,
+  }) async {
+    final pending = _mfa;
+    if (pending == null) {
+      throw StateError('No sign in is waiting for MFA; sign in first.');
+    }
+    try {
+      final resolved = await _resolve(
+        answer,
+        authenticator,
+        () => AccountService(this).createMfaPasskeyChallenge(
+          CreateMfaPasskeyChallengeRequest(ticket: pending.ticket),
+          options: options,
+        ),
+      );
+      final result = await send(
+        'POST',
+        '/v1/account/sessions/mfa',
+        body: {'ticket': pending.ticket, ...resolved.toJson()},
+        session: SessionChange.start,
+        options: options,
+      );
+      return AuthResult.fromJson(result! as Map<String, dynamic>).user!;
+    } on OrvanoException catch (e) {
+      if (e.code == 'invalid_mfa_ticket' && identical(_mfa, pending)) {
+        _mfa = null;
+      }
+      rethrow;
+    }
+  }
+
+  /// Step up (spec 0013, AC-19): proves a second factor on the signed in
+  /// session (`account.verifyMfa`), so security changes work for the next 10
+  /// minutes. [MfaAnswer.passkey] runs the ceremony against
+  /// `account.createStepUpPasskeyChallenge` first. Stores the new access
+  /// token, which carries `aal` 2, keeps the refresh token the store holds
+  /// (Orvano sends none; it is unchanged), and emits
+  /// [AuthEvent.tokenRefreshed].
+  Future<void> verifyMfa(
+    MfaAnswer answer, {
+    PasskeyAuthenticator? authenticator,
+    RequestOptions? options,
+  }) async {
+    final resolved = await _resolve(
+      answer,
+      authenticator,
+      () => AccountService(this).createStepUpPasskeyChallenge(options: options),
+    );
+    final raised = await send(
+      'POST',
+      '/v1/account/mfa/verify',
+      body: resolved.toJson(),
+      options: options,
+    );
+    await _saveRaised(RaisedSession.fromJson(raised! as Map<String, dynamic>));
+  }
+
+  /// Stores the new access token of a session a second factor raised
+  /// (spec 0013), keeping the refresh token the store holds, and emits
+  /// [AuthEvent.tokenRefreshed]. When the store holds no session, or another
+  /// one, it is left as it is.
+  Future<void> _saveRaised(RaisedSession raised) async {
+    final current = await session.read();
+    if (current == null || current.sessionId != raised.sessionId) return;
+    await _save(
+      AuthSession(
+        accessToken: raised.accessToken,
+        accessTokenExpiresAt: raised.accessTokenExpiresAt,
+        refreshToken: current.refreshToken,
+        refreshTokenExpiresAt: current.refreshTokenExpiresAt,
+        sessionId: raised.sessionId,
+      ),
+      AuthEvent.tokenRefreshed,
+    );
+  }
+
+  /// [answer], with a passkey's ceremony run when it has no answer yet.
+  Future<MfaAnswer> _resolve(
+    MfaAnswer answer,
+    PasskeyAuthenticator? authenticator,
+    Future<PasskeyChallenge> Function() challenge,
+  ) async {
+    if (answer is! PasskeyMfaAnswer || answer.answer != null) return answer;
+    final passkeys = passkeyAuthenticatorFor(this, authenticator);
+    final issued = await challenge();
+    final credential = await passkeys.get(issued.options);
+    return MfaAnswer.passkey(
+      PasskeyAnswer(challengeId: issued.challengeId, credential: credential),
+    );
+  }
+
+  /// Turns MFA on with the first code from the authenticator app
+  /// (`account.confirmTotp`), after `account.createTotp` (which takes the
+  /// user's current password). Stores the new access token, keeps the
+  /// refresh token the store holds (Orvano sends none; it is unchanged), and
+  /// emits [AuthEvent.tokenRefreshed]; every other session of the user has
+  /// ended. Returns the 10 recovery codes: show them once.
+  Future<List<String>> confirmTotp(
+    String code, {
+    RequestOptions? options,
+  }) async {
+    final result = await send(
+      'POST',
+      '/v1/account/mfa/totp/confirm',
+      body: {'code': code},
+      options: options,
+    );
+    final confirmation = TotpConfirmation.fromJson(
+      result! as Map<String, dynamic>,
+    );
+    await _saveRaised(confirmation.session);
+    return confirmation.recoveryCodes;
+  }
 
   /// The signed in user's session, refreshed first when under a minute of
   /// its access token is left; null when nobody is signed in. Call it when
@@ -357,6 +501,24 @@ base class Client {
         return;
       case SessionChange.start:
         final body = result is Map<String, dynamic> ? result : null;
+        // Spec 0013, AC-38: a sign in that stopped at the MFA step stores
+        // nothing and keeps the ticket in memory only.
+        final challenge = body?['mfa'];
+        if (body?['session'] == null && challenge is Map<String, dynamic>) {
+          final mfa = MfaChallenge.fromJson(challenge);
+          _mfa = mfa;
+          if (!_changes.isClosed) {
+            _changes.add(
+              AuthStateChange(
+                AuthEvent.mfaRequired,
+                await session.read(),
+                mfa: PendingMfa(factors: mfa.factors, expiresAt: mfa.expiresAt),
+              ),
+            );
+          }
+          return;
+        }
+        _mfa = null;
         await _save(AuthSession.fromJson(body?['session']), AuthEvent.signedIn);
       case SessionChange.refresh:
         await _save(AuthSession.fromJson(result), AuthEvent.tokenRefreshed);

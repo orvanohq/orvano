@@ -1,0 +1,41 @@
+---
+title: Your account's security
+description: "Protect your console account with an authenticator app and passkeys."
+sidebar:
+  order: 7
+---
+
+Your console account holds the keys to every project you can reach, so protect it with a second step at sign in. Open the account menu and select **Security**. The page has two parts: **Authenticator app** and **Passkeys**.
+
+## Turn on an authenticator app
+
+1. Under **Authenticator app**, select **Turn on**.
+2. Scan the QR code with an app such as 1Password, Google Authenticator, or Microsoft Authenticator. If you can't scan it, type the key shown beside it into the app (**Copy key** copies it).
+3. Enter the 6 digit code the app shows and select **Verify**.
+4. Save the 10 recovery codes that appear: **Copy codes** or **Download**, then **I saved them**. They show only this once. Each one signs you in once if you lose your phone.
+
+Turning it on signs you out everywhere else. From now on, signing in with your password asks for a code: see [Sign in with a second step](#sign-in-with-a-second-step).
+
+Once it's on, the section shows when you turned it on and how many recovery codes are left. **Make new codes** replaces them with 10 new ones (the old ones stop working), and **Turn off** removes the app and the codes.
+
+## Add a passkey
+
+A passkey signs you in with your face, fingerprint, or device PIN, with no password, and it counts as both steps. Under **Passkeys**, select **Add a passkey** and follow your browser's prompt. Each passkey is listed with when it was added and last used, and whether it is **Synced** (kept by a password manager or your phone's keychain) or **Device bound** (a security key). **Rename** gives it a name you'll recognize, and **Remove** deletes it.
+
+Console passkeys need Orvano on `https` with a domain name, or on `localhost`. An install reached by an IP address or by plain `http` on another host has no console passkeys; use an authenticator app there.
+
+## Confirm it's you
+
+Changes to your security (turning the app on or off, new recovery codes, adding or removing a passkey) need a recent check. When yours is older than 10 minutes, a **Confirm it's you** dialog asks for a code from your app, a recovery code, or a passkey, and then the change goes through. Without an authenticator app, turning the app on and adding a passkey ask for your password instead, even right after you sign in, so someone who gets hold of your session can't add their own. Removing a passkey without an authenticator app offers your passkey, or **Sign in again**, which brings you back to this page afterwards.
+
+## Sign in with a second step
+
+On the **Sign in** page, an account with an authenticator app first enters its email and password, then sees **Two step verification**: enter the code from your app, or select **Use a passkey** or **Use a recovery code**. The step lasts 5 minutes; after that, or after 5 wrong codes, you start over.
+
+**Sign in with a passkey** skips both steps, and so does picking a passkey from the email field's suggestions.
+
+Each change to your security emails you an alert through the [install's email server](/docs/self-hosting/email-delivery/), when it has one.
+
+## Locked out
+
+Lost your phone and your recovery codes? Another way in is a passkey. Without one, someone with access to the server can reset your second step with [`orvano mfa reset`](/docs/self-hosting/upgrade/#recover-a-locked-out-console-account).

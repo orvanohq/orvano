@@ -4,6 +4,7 @@ import { Client as ServerClient } from '@orvano/js/server'
 import { ClientSurface } from './generated/client.js'
 import { ConsoleSurface } from './generated/console.js'
 import { ServerSurface } from './generated/server.js'
+import { testPasskeys } from './test-passkeys.js'
 import type { Surface } from './interpreter.js'
 
 /** A console account to sign in as. */
@@ -48,8 +49,13 @@ export function createSurface(endpoint: string, options: SurfaceOptions = {}): S
     options.consoleUser === undefined
       ? undefined
       : new ConsoleSurface(new ConsoleClient({ endpoint }))
+  // The client's passkeys come from the server's software authenticator, reached through the
+  // client's own test service.
+  const client: ClientSurface = new ClientSurface(
+    new Client({ endpoint, ...project, passkeys: testPasskeys(() => client.test) }),
+  )
   return {
-    client: new ClientSurface(new Client({ endpoint, ...project })),
+    client,
     server: new ServerSurface(server),
     serverKey,
     console,

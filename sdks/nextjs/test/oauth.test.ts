@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server.js'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { accessCookie, oauthCookie, refreshCookie } from '../src/index.js'
+import { Client, MemorySessionStore } from '@orvano/js'
+import { accessCookie, oauthCookie, oauthThroughHandler, refreshCookie } from '../src/index.js'
 import { createOrvanoRouteHandler, safeNext } from '../src/server.js'
 
 // Spec 0012 AC-21: the route handler's provider flow, `POST .../oauth` behind the Origin rule and
@@ -225,6 +226,35 @@ describe('createOrvanoRouteHandler oauth (spec 0012, AC-21)', () => {
     ).toBe(true)
   })
 
+  it('a link sends the current password to Orvano and keeps it out of the flow cookie (spec 0013)', async () => {
+    const { POST, calls } = handler({
+      '/v1/account/identities/oauth/flows': () =>
+        Response.json({ url: 'https://github.example/auth' }),
+    })
+
+    const response = await POST(
+      post(
+        '/api/orvano/oauth',
+        { provider: 'github', link: true, password: 'correct horse' },
+        { [accessCookie]: accessIn(900) },
+      ),
+    )
+
+    expect(response.status).toBe(200)
+    expect(calls[0]?.path).toBe('/v1/account/identities/oauth/flows')
+    expect(calls[0]?.body).toMatchObject({ provider: 'github', password: 'correct horse' })
+    expect(response.headers.getSetCookie().join('\n')).not.toContain('correct')
+  })
+
+  it('a sign in never forwards a password', async () => {
+    const { POST, calls } = handler(flows)
+
+    await POST(post('/api/orvano/oauth', { provider: 'google', password: 'correct horse' }))
+
+    expect(calls[0]?.path).toBe('/v1/account/oauth/flows')
+    expect(calls[0]?.body).not.toHaveProperty('password')
+  })
+
   it('goes to next with orvano_error for a provider error, a missing cookie, or a refusal', async () => {
     const start = handler(flows)
     const started = await start.POST(post('/api/orvano/oauth', { provider: 'google', next: '/in' }))
@@ -265,5 +295,40 @@ describe('createOrvanoRouteHandler oauth (spec 0012, AC-21)', () => {
       expect(target.origin).toBe(app)
     }
     expect(safeNext('/\t/evil.example')).toBe('/')
+  })
+})
+
+describe('the browser OAuth transport (spec 0012, AC-21; spec 0013)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('linkIdentity posts the current password to the handler; signInWithOAuth posts none', async () => {
+    const fetch = vi.fn((_url: string, _init?: RequestInit) =>
+      Promise.resolve(Response.json({ url: 'https://github.example/auth' })),
+    )
+    vi.stubGlobal('fetch', fetch)
+    const client = new Client({
+      endpoint,
+      session: new MemorySessionStore(),
+      oauth: oauthThroughHandler('/api/orvano'),
+      logger: quiet,
+    })
+    const open = vi.fn()
+
+    await client.linkIdentity('github', {
+      redirectUrl: '/account',
+      password: 'correct horse',
+      open,
+    })
+    await client.signInWithOAuth('github', { redirectUrl: '/account', open })
+
+    const bodies = fetch.mock.calls.map((c) => JSON.parse(c[1]?.body as string) as unknown)
+    expect(fetch.mock.calls.map((c) => c[0])).toEqual(['/api/orvano/oauth', '/api/orvano/oauth'])
+    expect(bodies).toEqual([
+      { provider: 'github', next: '/account', link: true, password: 'correct horse' },
+      { provider: 'github', next: '/account', link: false },
+    ])
+    expect(open).toHaveBeenCalledWith('https://github.example/auth')
   })
 })

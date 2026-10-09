@@ -20,6 +20,22 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>POST /v1/account/passkeys: Finishes adding a passkey with the browser's or the platform's answer to <c>account.createPasskeyRegistration</c>.</summary>
+    public static class CompletePasskeyRegistration
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.completePasskeyRegistration";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/passkeys";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account/recovery/confirm: Sets a new password with the token from a reset link, and signs the user in. Every other session of the user</summary>
     public static class CompleteRecovery
     {
@@ -47,6 +63,22 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/email/confirm";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/mfa/totp/confirm: Turns MFA on with the first code from the authenticator app, within 15 minutes of <c>account.createTotp</c>. Answers 10</summary>
+    public static class ConfirmTotp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.confirmTotp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/totp/confirm";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";
@@ -100,7 +132,7 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
-    /// <summary>POST /v1/account/identities/id-token: Links a provider to the signed in user with its ID token from a native app. The session must be at most 10 minutes old.</summary>
+    /// <summary>POST /v1/account/identities/id-token: Links a provider to the signed in user with its ID token from a native app. Needs the user's current password when</summary>
     public static class CreateIdTokenIdentity
     {
         /// <summary>The operationId, also the endpoint name.</summary>
@@ -164,6 +196,38 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>POST /v1/account/sessions/mfa/passkey-challenge: Starts answering an MFA challenge with a passkey: answers the options for <c>navigator.credentials.get</c>, listing the</summary>
+    public static class CreateMfaPasskeyChallenge
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createMfaPasskeyChallenge";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/mfa/passkey-challenge";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/sessions/mfa: Finishes a sign in that answered an MFA challenge: checks the ticket and one factor, then creates the session.</summary>
+    public static class CreateMfaSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createMfaSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/mfa";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account/oauth/flows: Starts signing in with a provider: answers the provider's sign in page to send the browser to. After the user</summary>
     public static class CreateOAuthFlow
     {
@@ -180,7 +244,7 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
-    /// <summary>POST /v1/account/identities/oauth/flows: Starts linking a provider to the signed in user, like <c>createOAuthFlow</c>. The session must be at most 10 minutes</summary>
+    /// <summary>POST /v1/account/identities/oauth/flows: Starts linking a provider to the signed in user, like <c>createOAuthFlow</c>. Needs the user's current password when</summary>
     public static class CreateOAuthLinkFlow
     {
         /// <summary>The operationId, also the endpoint name.</summary>
@@ -207,6 +271,54 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/sessions/oauth";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/sessions/passkey-challenge: Starts a passkey sign in: answers a challenge with an empty <c>allowCredentials</c>, so the browser or the platform</summary>
+    public static class CreatePasskeyChallenge
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createPasskeyChallenge";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/passkey-challenge";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/passkeys/registration: Starts adding a passkey: answers the options for <c>navigator.credentials.create</c>. Needs passkeys turned on, the</summary>
+    public static class CreatePasskeyRegistration
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createPasskeyRegistration";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/passkeys/registration";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/sessions/passkey: Signs in with a passkey's answer to <c>account.createPasskeyChallenge</c>. A passkey counts as two factors, so this sign</summary>
+    public static class CreatePasskeySession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createPasskeySession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/passkey";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";
@@ -239,6 +351,54 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/recovery";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/mfa/recovery-codes: Replaces the user's recovery codes with 10 new ones; every older code stops working. Needs MFA on and a second</summary>
+    public static class CreateRecoveryCodes
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createRecoveryCodes";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/recovery-codes";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/mfa/passkey-challenge: Starts a step up with a passkey: answers the options for <c>navigator.credentials.get</c>, listing the signed in user's</summary>
+    public static class CreateStepUpPasskeyChallenge
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createStepUpPasskeyChallenge";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/passkey-challenge";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/mfa/totp: Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.</summary>
+    public static class CreateTotp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createTotp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/totp";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";
@@ -324,6 +484,22 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>DELETE /v1/account/passkeys/{passkeyId}: Removes one of the signed in user's passkeys. A user with MFA on needs a second factor on this session within 10</summary>
+    public static class DeletePasskey
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.deletePasskey";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/passkeys/{passkeyId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>DELETE /v1/account/sessions/{sessionId}: Ends one of the signed in user's sessions.</summary>
     public static class DeleteSession
     {
@@ -335,6 +511,22 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/sessions/{sessionId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>DELETE /v1/account/mfa/totp: Turns MFA off: removes the authenticator app and every recovery code. Sessions stay. Needs a second factor on this</summary>
+    public static class DeleteTotp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.deleteTotp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/totp";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";
@@ -356,6 +548,22 @@ public static class AccountOperations
         public const string Audience = "both";
     }
 
+    /// <summary>GET /v1/account/mfa: Gets the signed in user's MFA state.</summary>
+    public static class GetMfa
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.getMfa";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>GET /v1/account/identities: Lists the signed in user's identities, oldest first.</summary>
     public static class ListIdentities
     {
@@ -367,6 +575,22 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/identities";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>GET /v1/account/passkeys: Lists the signed in user's passkeys, oldest first, including inactive ones.</summary>
+    public static class ListPasskeys
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.listPasskeys";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/passkeys";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";
@@ -436,6 +660,22 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>PATCH /v1/account/passkeys/{passkeyId}: Renames one of the signed in user's passkeys.</summary>
+    public static class UpdatePasskey
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.updatePasskey";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PATCH";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/passkeys/{passkeyId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>PUT /v1/account/password: Changes the signed in user's password and ends every other session of theirs.</summary>
     public static class UpdatePassword
     {
@@ -467,11 +707,59 @@ public static class AccountOperations
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";
     }
+
+    /// <summary>POST /v1/account/mfa/verify: Step up: checks a second factor on the signed in session, so security changes work for the next 10 minutes. Raises</summary>
+    public static class VerifyMfa
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.verifyMfa";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/mfa/verify";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
 }
 
 /// <summary>Route constants for the <c>consoleAccount</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class ConsoleAccountOperations
 {
+    /// <summary>POST /v1/console/account/passkeys: Finishes adding a passkey to the console account with the browser's answer to <c>consoleAccount.createPasskeyRegistration</c>.</summary>
+    public static class CompletePasskeyRegistration
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.completePasskeyRegistration";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/passkeys";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/account/mfa/totp/confirm: Turns MFA on for the console account with the first code from the authenticator app. Answers 10 new recovery</summary>
+    public static class ConfirmTotp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.confirmTotp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/mfa/totp/confirm";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>POST /v1/console/account: Creates a console account and signs it in, setting the session cookies. The install's sign up policy decides</summary>
     public static class Create
     {
@@ -488,7 +776,103 @@ public static class ConsoleAccountOperations
         public const string Audience = "console";
     }
 
-    /// <summary>POST /v1/console/account/session: Signs a console account in with its email and password, setting the session cookies.</summary>
+    /// <summary>POST /v1/console/account/session/mfa/passkey-challenge: Starts answering a console MFA challenge with a passkey: answers the options for <c>navigator.credentials.get</c>,</summary>
+    public static class CreateMfaPasskeyChallenge
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.createMfaPasskeyChallenge";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/session/mfa/passkey-challenge";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/account/session/mfa: Finishes a console sign in that answered an MFA challenge: checks the <c>orvano_console_mfa</c> ticket and one factor,</summary>
+    public static class CreateMfaSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.createMfaSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/session/mfa";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/account/session/passkey-challenge: Starts a console passkey sign in: answers a challenge with an empty <c>allowCredentials</c>, so the browser offers every</summary>
+    public static class CreatePasskeyChallenge
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.createPasskeyChallenge";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/session/passkey-challenge";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/account/passkeys/registration: Starts adding a passkey to the console account: answers the options for <c>navigator.credentials.create</c>. Needs</summary>
+    public static class CreatePasskeyRegistration
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.createPasskeyRegistration";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/passkeys/registration";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/account/session/passkey: Signs a console account in with a passkey's answer to <c>consoleAccount.createPasskeyChallenge</c>, setting both</summary>
+    public static class CreatePasskeySession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.createPasskeySession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/session/passkey";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/account/mfa/recovery-codes: Replaces the console account's recovery codes with 10 new ones; every older code stops working. Needs MFA on and a</summary>
+    public static class CreateRecoveryCodes
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.createRecoveryCodes";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/mfa/recovery-codes";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/account/session: Signs a console account in with its email and password. Without MFA it sets the session cookies and answers</summary>
     public static class CreateSession
     {
         /// <summary>The operationId, also the endpoint name.</summary>
@@ -499,6 +883,54 @@ public static class ConsoleAccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/console/account/session";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/account/mfa/passkey-challenge: Starts a console step up with a passkey: answers the options for <c>navigator.credentials.get</c>, listing the account's</summary>
+    public static class CreateStepUpPasskeyChallenge
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.createStepUpPasskeyChallenge";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/mfa/passkey-challenge";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/account/mfa/totp: Starts turning on an authenticator app for the console account: answers a new secret, replacing any that still</summary>
+    public static class CreateTotp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.createTotp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/mfa/totp";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>DELETE /v1/console/account/passkeys/{passkeyId}: Removes one of the console account's passkeys. An account with MFA on needs a second factor on this session within</summary>
+    public static class DeletePasskey
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.deletePasskey";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/passkeys/{passkeyId}";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "console";
@@ -520,6 +952,22 @@ public static class ConsoleAccountOperations
         public const string Audience = "console";
     }
 
+    /// <summary>DELETE /v1/console/account/mfa/totp: Turns MFA off for the console account: removes the authenticator app and every recovery code. Sessions stay. Needs</summary>
+    public static class DeleteTotp
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.deleteTotp";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/mfa/totp";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>GET /v1/console/account: Gets the signed in console account.</summary>
     public static class Get
     {
@@ -536,6 +984,38 @@ public static class ConsoleAccountOperations
         public const string Audience = "console";
     }
 
+    /// <summary>GET /v1/console/account/mfa: Gets the signed in console account's MFA state.</summary>
+    public static class GetMfa
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.getMfa";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/mfa";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/console/account/passkeys: Lists the console account's passkeys, oldest first, including inactive ones.</summary>
+    public static class ListPasskeys
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.listPasskeys";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/passkeys";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>POST /v1/console/account/session/refresh: Trades the refresh cookie for a new pair of session cookies. The console client calls it after <c>token_expired</c>.</summary>
     public static class RefreshSession
     {
@@ -547,6 +1027,38 @@ public static class ConsoleAccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/console/account/session/refresh";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>PATCH /v1/console/account/passkeys/{passkeyId}: Renames one of the console account's passkeys.</summary>
+    public static class UpdatePasskey
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.updatePasskey";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PATCH";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/passkeys/{passkeyId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/account/mfa/verify: Step up for the console account: checks a second factor on this session, so security changes work for the next</summary>
+    public static class VerifyMfa
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAccount.verifyMfa";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/account/mfa/verify";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "console";
@@ -641,6 +1153,42 @@ public static class ConsoleAuthKeysOperations
     }
 }
 
+/// <summary>Route constants for the <c>consoleAuthMethods</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleAuthMethodsOperations
+{
+    /// <summary>GET /v1/console/project/auth/methods: Gets the project's second factor and passkey settings; any member.</summary>
+    public static class Get
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAuthMethods.get";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/auth/methods";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>PATCH /v1/console/project/auth/methods: Changes the project's second factor and passkey settings; owners and developers only.</summary>
+    public static class Update
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleAuthMethods.update";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "PATCH";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/auth/methods";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
 /// <summary>Route constants for the <c>consoleAuthProviders</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class ConsoleAuthProvidersOperations
 {
@@ -712,7 +1260,7 @@ public static class ConsoleEmailTemplatesOperations
         public const string Audience = "console";
     }
 
-    /// <summary>GET /v1/console/project/email/templates: Lists the four auth email templates of the project named by <c>X-Orvano-Project</c>. Any member.</summary>
+    /// <summary>GET /v1/console/project/email/templates: Lists the five auth email templates of the project named by <c>X-Orvano-Project</c>. Any member.</summary>
     public static class GetCatalog
     {
         /// <summary>The operationId, also the endpoint name.</summary>
@@ -1548,6 +2096,22 @@ public static class ConsoleUsersOperations
         public const string Audience = "console";
     }
 
+    /// <summary>DELETE /v1/console/project/users/{userId}/passkeys/{passkeyId}: Removes one of a user's passkeys. Sessions stay. Owners and developers.</summary>
+    public static class DeletePasskey
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.deletePasskey";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/passkeys/{passkeyId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>DELETE /v1/console/project/users/{userId}/sessions/{sessionId}: Ends one session of a user.</summary>
     public static class DeleteSession
     {
@@ -1596,6 +2160,22 @@ public static class ConsoleUsersOperations
         public const string Audience = "console";
     }
 
+    /// <summary>GET /v1/console/project/users/{userId}/mfa: The MFA state of a user of the project named by <c>X-Orvano-Project</c>: whether sign in asks them for a second factor,</summary>
+    public static class GetMfa
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.getMfa";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/mfa";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>GET /v1/console/project/users: Lists the users of the project named by <c>X-Orvano-Project</c>, newest first. Every role.</summary>
     public static class List
     {
@@ -1628,6 +2208,22 @@ public static class ConsoleUsersOperations
         public const string Audience = "console";
     }
 
+    /// <summary>GET /v1/console/project/users/{userId}/passkeys: Lists a user's passkeys, oldest first, including inactive ones. Every role.</summary>
+    public static class ListPasskeys
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.listPasskeys";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/passkeys";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
     /// <summary>GET /v1/console/project/users/{userId}/sessions: Lists a user's active sessions, newest first. <c>current</c> is always false.</summary>
     public static class ListSessions
     {
@@ -1639,6 +2235,22 @@ public static class ConsoleUsersOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/console/project/users/{userId}/sessions";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>POST /v1/console/project/users/{userId}/mfa/reset: Turns MFA off for a user of the project named by <c>X-Orvano-Project</c>: deletes their authenticator app and recovery</summary>
+    public static class ResetMfa
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleUsers.resetMfa";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/users/{userId}/mfa/reset";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "console";
@@ -1800,7 +2412,39 @@ public static class TestOperations
         public const string Audience = "both";
     }
 
-    /// <summary>GET /v1/test/emails/latest: Waits up to 15 seconds for the newest email to <c>to</c> that Mailpit caught after <c>after</c>, and reads it.</summary>
+    /// <summary>POST /v1/test/passkeys/assertions: Signs a challenge with a passkey the software authenticator made.</summary>
+    public static class CreatePasskeyAssertion
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "test.createPasskeyAssertion";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/test/passkeys/assertions";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/test/passkeys/credentials: Makes a passkey with the software authenticator: a new P-256 key, kept in memory for the run.</summary>
+    public static class CreatePasskeyCredential
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "test.createPasskeyCredential";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/test/passkeys/credentials";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>GET /v1/test/emails/latest: Waits up to 15 seconds for the newest email to <c>to</c> that Mailpit caught after <c>after</c> (and whose subject contains</summary>
     public static class GetLatestEmail
     {
         /// <summary>The operationId, also the endpoint name.</summary>
@@ -1966,6 +2610,25 @@ public static class UsersOperations
         public const string Scope = "users.write";
     }
 
+    /// <summary>DELETE /v1/users/{userId}/passkeys/{passkeyId}: Removes one of a user's passkeys. Sessions stay.</summary>
+    public static class DeletePasskey
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.deletePasskey";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "DELETE";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/passkeys/{passkeyId}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
+    }
+
     /// <summary>DELETE /v1/users/{userId}/sessions/{sessionId}: Ends one session of a user.</summary>
     public static class DeleteSession
     {
@@ -2023,6 +2686,25 @@ public static class UsersOperations
         public const string Scope = "users.read";
     }
 
+    /// <summary>GET /v1/users/{userId}/mfa: A user's MFA state: whether sign in asks them for a second factor, their recovery codes left, and their passkeys.</summary>
+    public static class GetMfa
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.getMfa";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/mfa";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.read";
+    }
+
     /// <summary>GET /v1/users: Lists the project's users, newest first.</summary>
     public static class List
     {
@@ -2061,6 +2743,25 @@ public static class UsersOperations
         public const string Scope = "users.read";
     }
 
+    /// <summary>GET /v1/users/{userId}/passkeys: Lists a user's passkeys, oldest first, including inactive ones.</summary>
+    public static class ListPasskeys
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.listPasskeys";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/passkeys";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.read";
+    }
+
     /// <summary>GET /v1/users/{userId}/sessions: Lists a user's active sessions, newest first. <c>current</c> is always false.</summary>
     public static class ListSessions
     {
@@ -2078,6 +2779,25 @@ public static class UsersOperations
 
         /// <summary>The API key scope it needs.</summary>
         public const string Scope = "users.read";
+    }
+
+    /// <summary>POST /v1/users/{userId}/mfa/reset: Turns MFA off for a user who lost every factor: deletes their authenticator app and recovery codes and ends all</summary>
+    public static class ResetMfa
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "users.resetMfa";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/users/{userId}/mfa/reset";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "users.write";
     }
 
     /// <summary>POST /v1/users/{userId}/unblock: Unblocks a user so they can sign in again. Their old sessions stay ended.</summary>

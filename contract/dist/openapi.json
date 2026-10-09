@@ -368,7 +368,7 @@
     "/v1/account/identities/id-token": {
       "post": {
         "operationId": "account.createIdTokenIdentity",
-        "description": "Links a provider to the signed in user with its ID token from a native app. The session must be at most 10 minutes old.",
+        "description": "Links a provider to the signed in user with its ID token from a native app. Needs the user's current password when\nthey have one (or a second factor on this session within 10 minutes); a user without a password needs a session at\nmost 10 minutes old.",
         "parameters": [],
         "responses": {
           "201": {
@@ -400,7 +400,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateIdTokenSessionRequest"
+                "$ref": "#/components/schemas/CreateIdTokenIdentityRequest"
               }
             }
           }
@@ -466,7 +466,7 @@
     "/v1/account/identities/oauth/flows": {
       "post": {
         "operationId": "account.createOAuthLinkFlow",
-        "description": "Starts linking a provider to the signed in user, like `createOAuthFlow`. The session must be at most 10 minutes\nold. The SDKs' `linkIdentity` does all of it.",
+        "description": "Starts linking a provider to the signed in user, like `createOAuthFlow`. Needs the user's current password when\nthey have one (or a second factor on this session within 10 minutes); a user without a password needs a session at\nmost 10 minutes old. The SDKs' `linkIdentity` does all of it.",
         "parameters": [],
         "responses": {
           "200": {
@@ -498,7 +498,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateOAuthFlowRequest"
+                "$ref": "#/components/schemas/CreateOAuthLinkFlowRequest"
               }
             }
           }
@@ -591,6 +591,300 @@
         "x-orvano-audience": "client"
       }
     },
+    "/v1/account/mfa": {
+      "get": {
+        "operationId": "account.getMfa",
+        "description": "Gets the signed in user's MFA state.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/mfa/passkey-challenge": {
+      "post": {
+        "operationId": "account.createStepUpPasskeyChallenge",
+        "description": "Starts a step up with a passkey: answers the options for `navigator.credentials.get`, listing the signed in user's\npasskeys. Send the passkey's answer to `account.verifyMfa`.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyChallenge"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/mfa/recovery-codes": {
+      "post": {
+        "operationId": "account.createRecoveryCodes",
+        "description": "Replaces the user's recovery codes with 10 new ones; every older code stops working. Needs MFA on and a second\nfactor on this session within 10 minutes (`account.verifyMfa`).",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodes"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/mfa/totp": {
+      "post": {
+        "operationId": "account.createTotp",
+        "description": "Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.\nNeeds the user's current password when they have one (or a second factor on this session within 10 minutes; a\nuser without a password needs a session that signed in within 10 minutes) and, when the user has an email, a\nverified one.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpSetup"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTotpRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      },
+      "delete": {
+        "operationId": "account.deleteTotp",
+        "description": "Turns MFA off: removes the authenticator app and every recovery code. Sessions stay. Needs a second factor on this\nsession within 10 minutes (`account.verifyMfa`).",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/mfa/totp/confirm": {
+      "post": {
+        "operationId": "account.confirmTotp",
+        "description": "Turns MFA on with the first code from the authenticator app, within 15 minutes of `account.createTotp`. Answers 10\nnew recovery codes, ends every other session of the user, and raises this one to level 2 with a new access token.\nThe SDKs keep their stored refresh token, whose next refresh carries `aal` 2 too.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpConfirmation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmTotpRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/mfa/verify": {
+      "post": {
+        "operationId": "account.verifyMfa",
+        "description": "Step up: checks a second factor on the signed in session, so security changes work for the next 10 minutes. Raises\nthe session to level 2 and answers a new access token; the refresh token is not sent and stays unchanged. The SDK\nhelpers (`verifyMfa`) store the access token.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RaisedSession"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyMfaRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/account/oauth/flows": {
       "post": {
         "operationId": "account.createOAuthFlow",
@@ -631,6 +925,240 @@
             }
           }
         },
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/passkeys": {
+      "post": {
+        "operationId": "account.completePasskeyRegistration",
+        "description": "Finishes adding a passkey with the browser's or the platform's answer to `account.createPasskeyRegistration`.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Passkey"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletePasskeyRegistrationRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      },
+      "get": {
+        "operationId": "account.listPasskeys",
+        "description": "Lists the signed in user's passkeys, oldest first, including inactive ones.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/passkeys/registration": {
+      "post": {
+        "operationId": "account.createPasskeyRegistration",
+        "description": "Starts adding a passkey: answers the options for `navigator.credentials.create`. Needs passkeys turned on, the\nuser's current password when they have one (or a second factor on this session within 10 minutes; a user without a\npassword needs a session that signed in within 10 minutes), a verified email when the user has one, and fewer than\n10 passkeys.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyRegistration"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePasskeyRegistrationRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/passkeys/{passkeyId}": {
+      "patch": {
+        "operationId": "account.updatePasskey",
+        "description": "Renames one of the signed in user's passkeys.",
+        "parameters": [
+          {
+            "name": "passkeyId",
+            "in": "path",
+            "required": true,
+            "description": "The passkey's ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Passkey"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePasskeyRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      },
+      "delete": {
+        "operationId": "account.deletePasskey",
+        "description": "Removes one of the signed in user's passkeys. A user with MFA on needs a second factor on this session within 10\nminutes (`account.verifyMfa`); a user without it needs a session that signed in within 10 minutes.",
+        "parameters": [
+          {
+            "name": "passkeyId",
+            "in": "path",
+            "required": true,
+            "description": "The passkey's ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "x-orvano-service": "account",
         "x-orvano-audience": "client"
       }
@@ -1018,6 +1546,95 @@
         "x-orvano-audience": "client"
       }
     },
+    "/v1/account/sessions/mfa": {
+      "post": {
+        "operationId": "account.createMfaSession",
+        "description": "Finishes a sign in that answered an MFA challenge: checks the ticket and one factor, then creates the session.\nAfter 5 wrong factors the ticket stops working; sign in again.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMfaSessionRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-session": "start",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/sessions/mfa/passkey-challenge": {
+      "post": {
+        "operationId": "account.createMfaPasskeyChallenge",
+        "description": "Starts answering an MFA challenge with a passkey: answers the options for `navigator.credentials.get`, listing the\nuser's passkeys. Send the passkey's answer to `account.createMfaSession`. Never counts as a wrong attempt.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyChallenge"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMfaPasskeyChallengeRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/account/sessions/oauth": {
       "post": {
         "operationId": "account.createOAuthSession",
@@ -1059,6 +1676,85 @@
           }
         },
         "x-orvano-session": "start",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/sessions/passkey": {
+      "post": {
+        "operationId": "account.createPasskeySession",
+        "description": "Signs in with a passkey's answer to `account.createPasskeyChallenge`. A passkey counts as two factors, so this sign\nin is never asked for MFA and the session starts at level 2.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePasskeySessionRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-session": "start",
+        "x-orvano-service": "account",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/account/sessions/passkey-challenge": {
+      "post": {
+        "operationId": "account.createPasskeyChallenge",
+        "description": "Starts a passkey sign in: answers a challenge with an empty `allowCredentials`, so the browser or the platform\noffers every passkey of the RP ID, including through autofill. Needs passkeys turned on for the project.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyChallenge"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "account"
+        ],
         "x-orvano-service": "account",
         "x-orvano-audience": "client"
       }
@@ -1364,10 +2060,88 @@
         "x-orvano-audience": "console"
       }
     },
-    "/v1/console/account/session": {
+    "/v1/console/account/mfa": {
+      "get": {
+        "operationId": "consoleAccount.getMfa",
+        "description": "Gets the signed in console account's MFA state.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/mfa/passkey-challenge": {
       "post": {
-        "operationId": "consoleAccount.createSession",
-        "description": "Signs a console account in with its email and password, setting the session cookies.",
+        "operationId": "consoleAccount.createStepUpPasskeyChallenge",
+        "description": "Starts a console step up with a passkey: answers the options for `navigator.credentials.get`, listing the account's\npasskeys. Send the passkey's answer to `consoleAccount.verifyMfa`.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyChallenge"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/mfa/recovery-codes": {
+      "post": {
+        "operationId": "consoleAccount.createRecoveryCodes",
+        "description": "Replaces the console account's recovery codes with 10 new ones; every older code stops working. Needs MFA on and a\nsecond factor on this session within 10 minutes (`consoleAccount.verifyMfa`).",
         "parameters": [],
         "responses": {
           "201": {
@@ -1375,7 +2149,450 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConsoleAccount"
+                  "$ref": "#/components/schemas/RecoveryCodes"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/mfa/totp": {
+      "post": {
+        "operationId": "consoleAccount.createTotp",
+        "description": "Starts turning on an authenticator app for the console account: answers a new secret, replacing any that still\nwaits for its first code. Needs the account's current password (or a second factor on this session within 10\nminutes).",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpSetup"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTotpRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      },
+      "delete": {
+        "operationId": "consoleAccount.deleteTotp",
+        "description": "Turns MFA off for the console account: removes the authenticator app and every recovery code. Sessions stay. Needs\na second factor on this session within 10 minutes (`consoleAccount.verifyMfa`).",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/mfa/totp/confirm": {
+      "post": {
+        "operationId": "consoleAccount.confirmTotp",
+        "description": "Turns MFA on for the console account with the first code from the authenticator app. Answers 10 new recovery\ncodes, ends every other session of the account, and sets a new `orvano_console` cookie at level 2.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleTotpConfirmation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmTotpRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/mfa/verify": {
+      "post": {
+        "operationId": "consoleAccount.verifyMfa",
+        "description": "Step up for the console account: checks a second factor on this session, so security changes work for the next\n10 minutes, and sets a new `orvano_console` cookie at the new strength.",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyMfaRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/passkeys": {
+      "post": {
+        "operationId": "consoleAccount.completePasskeyRegistration",
+        "description": "Finishes adding a passkey to the console account with the browser's answer to `consoleAccount.createPasskeyRegistration`.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Passkey"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletePasskeyRegistrationRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      },
+      "get": {
+        "operationId": "consoleAccount.listPasskeys",
+        "description": "Lists the console account's passkeys, oldest first, including inactive ones.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/passkeys/registration": {
+      "post": {
+        "operationId": "consoleAccount.createPasskeyRegistration",
+        "description": "Starts adding a passkey to the console account: answers the options for `navigator.credentials.create`. Needs\nconsole passkeys (https with a host name, or localhost), the account's current password (or a second factor on\nthis session within 10 minutes), and fewer than 10 passkeys.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyRegistration"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePasskeyRegistrationRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/passkeys/{passkeyId}": {
+      "patch": {
+        "operationId": "consoleAccount.updatePasskey",
+        "description": "Renames one of the console account's passkeys.",
+        "parameters": [
+          {
+            "name": "passkeyId",
+            "in": "path",
+            "required": true,
+            "description": "The passkey's ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Passkey"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePasskeyRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      },
+      "delete": {
+        "operationId": "consoleAccount.deletePasskey",
+        "description": "Removes one of the console account's passkeys. An account with MFA on needs a second factor on this session within\n10 minutes (`consoleAccount.verifyMfa`); one without it needs a session that signed in within 10 minutes.",
+        "parameters": [
+          {
+            "name": "passkeyId",
+            "in": "path",
+            "required": true,
+            "description": "The passkey's ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/session": {
+      "post": {
+        "operationId": "consoleAccount.createSession",
+        "description": "Signs a console account in with its email and password. Without MFA it sets the session cookies and answers\n`account`. With MFA it sets no session cookie, sets the `orvano_console_mfa` ticket cookie, and answers `mfa`;\nfinish with `consoleAccount.createMfaSession`.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleAuthResult"
                 }
               }
             }
@@ -1414,6 +2631,162 @@
         "responses": {
           "204": {
             "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/session/mfa": {
+      "post": {
+        "operationId": "consoleAccount.createMfaSession",
+        "description": "Finishes a console sign in that answered an MFA challenge: checks the `orvano_console_mfa` ticket and one factor,\nthen sets both session cookies. Clears the ticket cookie on success, on an expired ticket, and after the fifth\nwrong factor.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleAccount"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConsoleMfaSessionRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/session/mfa/passkey-challenge": {
+      "post": {
+        "operationId": "consoleAccount.createMfaPasskeyChallenge",
+        "description": "Starts answering a console MFA challenge with a passkey: answers the options for `navigator.credentials.get`,\nlisting the account's passkeys. Reads the `orvano_console_mfa` ticket. Never counts as a wrong attempt.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyChallenge"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/session/passkey": {
+      "post": {
+        "operationId": "consoleAccount.createPasskeySession",
+        "description": "Signs a console account in with a passkey's answer to `consoleAccount.createPasskeyChallenge`, setting both\nsession cookies at level 2. Never asked for MFA.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleAccount"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePasskeySessionRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-service": "consoleAccount",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/account/session/passkey-challenge": {
+      "post": {
+        "operationId": "consoleAccount.createPasskeyChallenge",
+        "description": "Starts a console passkey sign in: answers a challenge with an empty `allowCredentials`, so the browser offers every\npasskey for the console, including through autofill. Needs the install on https with a host name, or on localhost.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyChallenge"
+                }
+              }
+            }
           },
           "default": {
             "description": "An unexpected error response.",
@@ -2906,6 +4279,92 @@
         "x-orvano-audience": "console"
       }
     },
+    "/v1/console/project/auth/methods": {
+      "get": {
+        "operationId": "consoleAuthMethods.get",
+        "description": "Gets the project's second factor and passkey settings; any member.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthMethodSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAuthMethods",
+        "x-orvano-audience": "console"
+      },
+      "patch": {
+        "operationId": "consoleAuthMethods.update",
+        "description": "Changes the project's second factor and passkey settings; owners and developers only.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthMethodSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAuthMethodSettingsRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleAuthMethods",
+        "x-orvano-audience": "console"
+      }
+    },
     "/v1/console/project/auth/providers": {
       "get": {
         "operationId": "consoleAuthProviders.list",
@@ -3214,7 +4673,7 @@
     "/v1/console/project/email/templates": {
       "get": {
         "operationId": "consoleEmailTemplates.getCatalog",
-        "description": "Lists the four auth email templates of the project named by `X-Orvano-Project`. Any member.",
+        "description": "Lists the five auth email templates of the project named by `X-Orvano-Project`. Any member.",
         "parameters": [],
         "responses": {
           "200": {
@@ -4109,6 +5568,16 @@
             "explode": false
           },
           {
+            "name": "mfa",
+            "in": "query",
+            "required": false,
+            "description": "Only users with MFA `on` or `off`. With the project's authenticator app switch off, every user counts as `off`.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
             "name": "cursor",
             "in": "query",
             "required": false,
@@ -4538,6 +6007,198 @@
             "in": "path",
             "required": true,
             "description": "The identity to unlink.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/users/{userId}/mfa": {
+      "get": {
+        "operationId": "consoleUsers.getMfa",
+        "description": "The MFA state of a user of the project named by `X-Orvano-Project`: whether sign in asks them for a second factor,\ntheir recovery codes left, and their passkeys. Every role.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/users/{userId}/mfa/reset": {
+      "post": {
+        "operationId": "consoleUsers.resetMfa",
+        "description": "Turns MFA off for a user of the project named by `X-Orvano-Project`: deletes their authenticator app and recovery\ncodes and ends all their sessions. Passkeys stay. Owners and developers.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/users/{userId}/passkeys": {
+      "get": {
+        "operationId": "consoleUsers.listPasskeys",
+        "description": "Lists a user's passkeys, oldest first, including inactive ones. Every role.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleUsers",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/users/{userId}/passkeys/{passkeyId}": {
+      "delete": {
+        "operationId": "consoleUsers.deletePasskey",
+        "description": "Removes one of a user's passkeys. Sessions stay. Owners and developers.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "passkeyId",
+            "in": "path",
+            "required": true,
+            "description": "The passkey's ID.",
             "schema": {
               "type": "string"
             }
@@ -5290,7 +6951,7 @@
     "/v1/test/emails/latest": {
       "get": {
         "operationId": "test.getLatestEmail",
-        "description": "Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after`, and reads it.",
+        "description": "Waits up to 15 seconds for the newest email to `to` that Mailpit caught after `after` (and whose subject contains\n`subject`, when given), and reads it.",
         "parameters": [
           {
             "name": "to",
@@ -5310,6 +6971,16 @@
             "schema": {
               "type": "string",
               "format": "date-time"
+            },
+            "explode": false
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": false,
+            "description": "Only an email whose subject contains this, so a step waits for that email even when the runner's clock is off.",
+            "schema": {
+              "type": "string"
             },
             "explode": false
           }
@@ -5493,6 +7164,96 @@
         "x-orvano-audience": "both"
       }
     },
+    "/v1/test/passkeys/assertions": {
+      "post": {
+        "operationId": "test.createPasskeyAssertion",
+        "description": "Signs a challenge with a passkey the software authenticator made.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyAssertionCredential"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "test"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestCreatePasskeyAssertionRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-test": true,
+        "x-orvano-service": "test",
+        "x-orvano-audience": "client"
+      }
+    },
+    "/v1/test/passkeys/credentials": {
+      "post": {
+        "operationId": "test.createPasskeyCredential",
+        "description": "Makes a passkey with the software authenticator: a new P-256 key, kept in memory for the run.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyRegistrationCredential"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "test"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestCreatePasskeyCredentialRequest"
+              }
+            }
+          }
+        },
+        "x-orvano-test": true,
+        "x-orvano-service": "test",
+        "x-orvano-audience": "client"
+      }
+    },
     "/v1/users": {
       "get": {
         "operationId": "users.list",
@@ -5547,6 +7308,16 @@
             "description": "Only verified users (true) or unverified users (false).",
             "schema": {
               "type": "boolean"
+            },
+            "explode": false
+          },
+          {
+            "name": "mfa",
+            "in": "query",
+            "required": false,
+            "description": "Only users with MFA `on` or `off`. With the project's authenticator app switch off, every user counts as `off`.",
+            "schema": {
+              "type": "string"
             },
             "explode": false
           },
@@ -5988,6 +7759,202 @@
             "in": "path",
             "required": true,
             "description": "The identity to unlink.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/mfa": {
+      "get": {
+        "operationId": "users.getMfa",
+        "description": "A user's MFA state: whether sign in asks them for a second factor, their recovery codes left, and their passkeys.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.read",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/mfa/reset": {
+      "post": {
+        "operationId": "users.resetMfa",
+        "description": "Turns MFA off for a user who lost every factor: deletes their authenticator app and recovery codes and ends all\ntheir sessions. Their passkeys stay. A user without MFA is left as they are.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful."
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-idempotent": true,
+        "x-orvano-scope": "users.write",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/passkeys": {
+      "get": {
+        "operationId": "users.listPasskeys",
+        "description": "Lists a user's passkeys, oldest first, including inactive ones.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "users.read",
+        "x-orvano-service": "users",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/users/{userId}/passkeys/{passkeyId}": {
+      "delete": {
+        "operationId": "users.deletePasskey",
+        "description": "Removes one of a user's passkeys. Sessions stay.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "The user ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "passkeyId",
+            "in": "path",
+            "required": true,
+            "description": "The passkey's ID.",
             "schema": {
               "type": "string"
             }
@@ -6497,26 +8464,143 @@
           "verification",
           "recovery",
           "magic_link",
-          "email_code"
+          "email_code",
+          "security_alert"
         ],
-        "description": "One of the four auth email templates a project can edit."
+        "description": "One of the five auth email templates a project can edit."
+      },
+      "AuthMethodSettings": {
+        "type": "object",
+        "required": [
+          "totpEnabled",
+          "passkeysEnabled",
+          "rpId",
+          "rpName",
+          "androidCertFingerprints",
+          "activePasskeyCount",
+          "acceptedOrigins"
+        ],
+        "properties": {
+          "totpEnabled": {
+            "type": "boolean",
+            "description": "Whether users can turn on an authenticator app. Turned off, nobody is asked for MFA; stored factors stay.",
+            "examples": [
+              true
+            ]
+          },
+          "passkeysEnabled": {
+            "type": "boolean",
+            "description": "Whether users can add passkeys and sign in with them. Needs `rpId`.",
+            "examples": [
+              true
+            ]
+          },
+          "rpId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The passkey domain: a lowercase host name such as `example.com` (no scheme, port, path, or IP address), or `localhost`.",
+            "examples": [
+              "example.com"
+            ]
+          },
+          "rpName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The name authenticators show, 1 to 64 characters; null means the project name.",
+            "examples": [
+              "Acme"
+            ]
+          },
+          "androidCertFingerprints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "SHA-256 fingerprints of the Android app's signing certificates (uppercase hex pairs joined by colons), at most 10.",
+            "examples": [
+              [
+                "14:6D:E9:83:C5:73:06:50:D8:EE:B9:95:2F:34:FC:64:16:A0:83:42:E6:1D:BE:A8:8A:04:96:B2:3F:CF:44:E5"
+              ]
+            ]
+          },
+          "activePasskeyCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many passkeys can sign in now: those made for the current `rpId`.",
+            "examples": [
+              3
+            ]
+          },
+          "acceptedOrigins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The origins a passkey ceremony is accepted from today: the project's web platforms on `rpId` or its subdomains,\n`https://<rpId>` for iOS and macOS apps, and one `android:apk-key-hash:` origin per fingerprint. A wildcard web\nplatform shows as a pattern, such as `https://*.example.com`, which accepts any one subdomain level.",
+            "examples": [
+              [
+                "https://app.example.com",
+                "https://example.com"
+              ]
+            ]
+          }
+        },
+        "description": "A project's second factor and passkey settings, with what the Passkeys card shows beside them. A project that never\nsaved any reads as the defaults: TOTP on, passkeys off."
       },
       "AuthResult": {
         "type": "object",
         "required": [
           "user",
           "session",
+          "mfa",
           "isNewUser",
           "verificationEmail"
         ],
         "properties": {
           "user": {
-            "$ref": "#/components/schemas/User",
-            "description": "The user."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The user; null while `mfa` is set."
           },
           "session": {
-            "$ref": "#/components/schemas/SessionTokens",
-            "description": "The new session's tokens."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionTokens"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The new session's tokens; null while `mfa` is set."
+          },
+          "mfa": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MfaChallenge"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when the user has MFA on: no session exists yet. Finish with `account.createMfaSession` and the ticket before\nit expires. The SDKs' `completeMfa` does it. Null otherwise."
           },
           "isNewUser": {
             "type": "boolean",
@@ -6537,7 +8621,7 @@
             "description": "What happened to the verification email sign up was asked to send; null when none was asked for."
           }
         },
-        "description": "A signed in user and their new session."
+        "description": "A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of\n`session` and `mfa` is set."
       },
       "CompleteOAuthLinkRequest": {
         "type": "object",
@@ -6562,6 +8646,34 @@
           }
         },
         "description": "A link of a provider to the signed in user, with the code a link flow returned."
+      },
+      "CompletePasskeyRegistrationRequest": {
+        "type": "object",
+        "required": [
+          "challengeId",
+          "credential"
+        ],
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "description": "The `challengeId` of the `PasskeyRegistration`.",
+            "examples": [
+              "01928f3e-6c1a-7b2d-9e4f-5a6b7c8d9e0f"
+            ]
+          },
+          "credential": {
+            "$ref": "#/components/schemas/PasskeyRegistrationCredential",
+            "description": "The browser's or the platform's answer."
+          },
+          "name": {
+            "type": "string",
+            "description": "1 to 64 characters. Left out, the passkey is named `Passkey`.",
+            "examples": [
+              "MacBook"
+            ]
+          }
+        },
+        "description": "A finished passkey registration."
       },
       "CompleteRecoveryRequest": {
         "type": "object",
@@ -6603,6 +8715,22 @@
         },
         "description": "An email change confirmation, with the token from the link sent to the new address."
       },
+      "ConfirmTotpRequest": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The 6 digit code the authenticator app shows now.",
+            "examples": [
+              "492039"
+            ]
+          }
+        },
+        "description": "The first code from the authenticator app, which turns MFA on."
+      },
       "ConsoleAccount": {
         "type": "object",
         "required": [
@@ -6617,6 +8745,7 @@
           "lastSignInAt",
           "providers",
           "hasPassword",
+          "mfaEnabled",
           "isInstallAdmin"
         ],
         "properties": {
@@ -6714,6 +8843,13 @@
               true
             ]
           },
+          "mfaEnabled": {
+            "type": "boolean",
+            "description": "Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never\nturns it on.",
+            "examples": [
+              false
+            ]
+          },
           "isInstallAdmin": {
             "type": "boolean",
             "description": "True when the account is an install admin, who may change the install settings.",
@@ -6724,6 +8860,38 @@
         },
         "description": "A console account: a user of the console, and whether it is an install admin."
       },
+      "ConsoleAuthResult": {
+        "type": "object",
+        "required": [
+          "account",
+          "mfa"
+        ],
+        "properties": {
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsoleAccount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The signed in account, with both session cookies set; null while a second step is needed."
+          },
+          "mfa": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MfaChallenge"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The second step to pass with `consoleAccount.createMfaSession`; null when signed in. Its `ticket` is empty: the\nticket travels in the `orvano_console_mfa` cookie."
+          }
+        },
+        "description": "A console sign in's answer: `account` when the account is signed in, or `mfa` when it has MFA on and must pass a\nsecond step first. Exactly one of them is set."
+      },
       "ConsoleSignupMode": {
         "type": "string",
         "enum": [
@@ -6731,6 +8899,28 @@
           "open"
         ],
         "description": "Who may create a console account."
+      },
+      "ConsoleTotpConfirmation": {
+        "type": "object",
+        "required": [
+          "recoveryCodes"
+        ],
+        "properties": {
+          "recoveryCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "10 recovery codes, each `XXXXX-XXXXX`, each working once.",
+            "examples": [
+              [
+                "K7QXM-2RPLD",
+                "A4ZTN-WQ6EB"
+              ]
+            ]
+          }
+        },
+        "description": "MFA is on for the console account. Show the recovery codes once and ask to keep them safe; they can't be read again.\nEvery other session of the account has ended, and the `orvano_console` cookie now carries level 2."
       },
       "ConsoleUserRef": {
         "type": "object",
@@ -6912,6 +9102,30 @@
         },
         "description": "A new console account."
       },
+      "CreateConsoleMfaSessionRequest": {
+        "type": "object",
+        "properties": {
+          "totpCode": {
+            "type": "string",
+            "description": "The 6 digit code the authenticator app shows now.",
+            "examples": [
+              "492039"
+            ]
+          },
+          "recoveryCode": {
+            "type": "string",
+            "description": "A recovery code; case, spaces, and hyphens do not matter. Each works once.",
+            "examples": [
+              "K7QXM-2RPLD"
+            ]
+          },
+          "passkey": {
+            "$ref": "#/components/schemas/PasskeyAnswer",
+            "description": "A passkey's answer to `consoleAccount.createMfaPasskeyChallenge`."
+          }
+        },
+        "description": "The second step of a console sign in: exactly one factor. The ticket comes from the `orvano_console_mfa` cookie."
+      },
       "CreateConsoleSessionRequest": {
         "type": "object",
         "required": [
@@ -6982,6 +9196,63 @@
           }
         },
         "description": "A sign in with an emailed code."
+      },
+      "CreateIdTokenIdentityRequest": {
+        "type": "object",
+        "required": [
+          "provider",
+          "idToken",
+          "nonce"
+        ],
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/IdTokenProvider",
+            "description": "The provider that issued the token."
+          },
+          "idToken": {
+            "type": "string",
+            "description": "The provider's ID token, at most 8 KB.",
+            "examples": [
+              "eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9.e30.c2ln"
+            ]
+          },
+          "nonce": {
+            "type": "string",
+            "description": "The raw nonce, 16 to 128 characters. Give the provider its lowercase hex SHA-256 (the SDKs' `createNonce` makes\nboth), so the token carries that hash.",
+            "examples": [
+              "q2lV7l3o0W9nE5w6Xk0wq1JmYp8tVb3Z"
+            ]
+          },
+          "authorizationCode": {
+            "type": "string",
+            "description": "Apple only, and required for Apple: the authorization code Sign in with Apple returned with the token.",
+            "examples": [
+              "c1f2e3d4..."
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Apple only: the name Sign in with Apple returned on the first authorization, at most 256 characters.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "description": "The user's current password. A user who has one sends it, unless this session passed a second factor within 10\nminutes. A user without one leaves it out, and must have signed in within 10 minutes.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          }
+        },
+        "description": "A link of a provider to the signed in user with its ID token from a native app."
       },
       "CreateIdTokenSessionRequest": {
         "type": "object",
@@ -7101,6 +9372,56 @@
         },
         "description": "A sign in with the token from a magic link."
       },
+      "CreateMfaPasskeyChallengeRequest": {
+        "type": "object",
+        "required": [
+          "ticket"
+        ],
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "description": "The `ticket` of the `MfaChallenge`.",
+            "examples": [
+              "orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          }
+        },
+        "description": "The ticket of a sign in waiting for its second step."
+      },
+      "CreateMfaSessionRequest": {
+        "type": "object",
+        "required": [
+          "ticket"
+        ],
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "description": "The `ticket` of the `MfaChallenge`.",
+            "examples": [
+              "orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          },
+          "totpCode": {
+            "type": "string",
+            "description": "The 6 digit code the authenticator app shows now.",
+            "examples": [
+              "492039"
+            ]
+          },
+          "recoveryCode": {
+            "type": "string",
+            "description": "A recovery code; case, spaces, and hyphens do not matter. Each works once.",
+            "examples": [
+              "K7QXM-2RPLD"
+            ]
+          },
+          "passkey": {
+            "$ref": "#/components/schemas/PasskeyAnswer",
+            "description": "A passkey's answer to `account.createMfaPasskeyChallenge`."
+          }
+        },
+        "description": "The second step of a sign in: the ticket and exactly one factor."
+      },
       "CreateOAuthFlowRequest": {
         "type": "object",
         "required": [
@@ -7129,6 +9450,42 @@
           }
         },
         "description": "A request to start signing in with a provider."
+      },
+      "CreateOAuthLinkFlowRequest": {
+        "type": "object",
+        "required": [
+          "provider",
+          "redirectUrl",
+          "codeChallenge"
+        ],
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/OAuthProvider",
+            "description": "The provider to sign in with."
+          },
+          "redirectUrl": {
+            "type": "string",
+            "description": "Your page or app that receives the result: a host that is one of the project's web platforms (`http` only on\n`localhost` or `127.0.0.1`), or your app's own scheme (its iOS, Android, or macOS identifier). Orvano adds\n`orvano_type` and then `orvano_code` or `orvano_error` to it.",
+            "examples": [
+              "https://app.example.com/auth/callback"
+            ]
+          },
+          "codeChallenge": {
+            "type": "string",
+            "description": "The S256 PKCE challenge: base64url(SHA-256(verifier)), 43 characters. Keep the verifier; only it redeems the\ncode. The SDKs make both.",
+            "examples": [
+              "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "description": "The user's current password. A user who has one sends it, unless this session passed a second factor within 10\nminutes. A user without one leaves it out, and must have signed in within 10 minutes.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          }
+        },
+        "description": "A request to start linking a provider to the signed in user."
       },
       "CreateOAuthSessionRequest": {
         "type": "object",
@@ -7169,6 +9526,40 @@
           }
         },
         "description": "A new org. The caller becomes its owner."
+      },
+      "CreatePasskeyRegistrationRequest": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "The user's current password. A user who has one sends it, unless this session passed a second factor within 10\nminutes. A user without one leaves it out, and must have signed in within 10 minutes.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          }
+        },
+        "description": "A request to start adding a passkey."
+      },
+      "CreatePasskeySessionRequest": {
+        "type": "object",
+        "required": [
+          "challengeId",
+          "credential"
+        ],
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "description": "The `challengeId` of the `PasskeyChallenge`.",
+            "examples": [
+              "01928f3e-6c1a-7b2d-9e4f-5a6b7c8d9e0f"
+            ]
+          },
+          "credential": {
+            "$ref": "#/components/schemas/PasskeyAssertionCredential",
+            "description": "The browser's or the platform's answer."
+          }
+        },
+        "description": "A sign in with a passkey."
       },
       "CreatePasswordSessionRequest": {
         "type": "object",
@@ -7262,6 +9653,19 @@
           }
         },
         "description": "A request to email a password reset link."
+      },
+      "CreateTotpRequest": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "The user's current password. A user who has one sends it, unless this session passed a second factor within 10\nminutes. A user without one leaves it out, and must have signed in within 10 minutes.",
+            "examples": [
+              "correct horse battery staple"
+            ]
+          }
+        },
+        "description": "A request to start turning on an authenticator app."
       },
       "CreateUserRecoveryRequest": {
         "type": "object",
@@ -7685,10 +10089,10 @@
             "items": {
               "$ref": "#/components/schemas/EmailTemplateSummary"
             },
-            "description": "The four templates."
+            "description": "The five templates."
           }
         },
-        "description": "The auth email templates of a project. Always all four, so it is not paged."
+        "description": "The auth email templates of a project. Always all five, so it is not paged."
       },
       "EmailTemplateInput": {
         "type": "object",
@@ -7733,9 +10137,10 @@
           "recovery",
           "magic_link",
           "email_code",
+          "security_alert",
           "console_invitation"
         ],
-        "description": "Which email was sent: one of the four auth templates, or the console's own invite."
+        "description": "Which email was sent: one of the five auth templates, or the console's own invite."
       },
       "EmailTemplateSummary": {
         "type": "object",
@@ -7866,7 +10271,22 @@
           "identity_already_linked",
           "last_sign_in_method",
           "provider_error",
-          "provider_unavailable"
+          "provider_unavailable",
+          "invalid_mfa_ticket",
+          "invalid_mfa_code",
+          "invalid_passkey",
+          "invalid_passkey_challenge",
+          "mfa_verification_required",
+          "mfa_required",
+          "mfa_already_enabled",
+          "mfa_not_enabled",
+          "email_not_verified",
+          "totp_not_pending",
+          "factor_not_enabled",
+          "passkey_already_registered",
+          "passkey_limit",
+          "passkeys_exist",
+          "passkey_not_found"
         ],
         "description": "Every stable error code the server sends in `Problem.code`."
       },
@@ -8391,6 +10811,108 @@
         ],
         "description": "Whether a member's console account may sign in."
       },
+      "MfaChallenge": {
+        "type": "object",
+        "required": [
+          "ticket",
+          "factors",
+          "expiresAt"
+        ],
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "description": "Proves the first step passed; send it to `account.createMfaSession`. Keep it in memory only. Empty when the ticket\ntravels in a cookie instead (the console).",
+            "examples": [
+              "orv_mt_Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmE"
+            ]
+          },
+          "factors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MfaFactor"
+            },
+            "description": "The factors the user can answer with now, in this order: `totp`, `recovery_code`, `passkey`."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the ticket stops working: 5 minutes after the first step. After that, sign in again."
+          }
+        },
+        "description": "The second step a sign in must pass before it gets a session: the user has MFA on. Answer it with\n`account.createMfaSession` before `expiresAt`."
+      },
+      "MfaFactor": {
+        "type": "string",
+        "enum": [
+          "totp",
+          "recovery_code",
+          "passkey"
+        ],
+        "description": "A second factor."
+      },
+      "MfaStatus": {
+        "type": "object",
+        "required": [
+          "mfaEnabled",
+          "totpConfirmed",
+          "totpConfirmedAt",
+          "recoveryCodesRemaining",
+          "passkeyCount",
+          "factorsAvailable"
+        ],
+        "properties": {
+          "mfaEnabled": {
+            "type": "boolean",
+            "description": "Whether sign in asks for a second factor: a confirmed authenticator app, while the project allows TOTP.",
+            "examples": [
+              true
+            ]
+          },
+          "totpConfirmed": {
+            "type": "boolean",
+            "description": "Whether an authenticator app is confirmed, even while the project has TOTP turned off.",
+            "examples": [
+              true
+            ]
+          },
+          "totpConfirmedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the authenticator app was confirmed; null when none is."
+          },
+          "recoveryCodesRemaining": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many unused recovery codes are left, 0 to 10.",
+            "examples": [
+              10
+            ]
+          },
+          "passkeyCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many of the user's passkeys can sign in now.",
+            "examples": [
+              0
+            ]
+          },
+          "factorsAvailable": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MfaFactor"
+            },
+            "description": "What the project lets users turn on now: `totp` and `passkey`."
+          }
+        },
+        "description": "A user's MFA state."
+      },
       "OAuthCallbackForm": {
         "type": "object",
         "properties": {
@@ -8786,6 +11308,573 @@
         ],
         "description": "An org's lifecycle state."
       },
+      "Passkey": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "createdAt",
+          "lastUsedAt",
+          "synced",
+          "active"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The passkey's ID.",
+            "examples": [
+              "01928f3e-6c1a-7b2d-9e4f-5a6b7c8d9e0f"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "The name the user gave it, else `Passkey`.",
+            "examples": [
+              "MacBook"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was added."
+          },
+          "lastUsedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it last signed in or answered a challenge; null when it never has."
+          },
+          "synced": {
+            "type": "boolean",
+            "description": "Whether the passkey is backed up and synced across devices (for example by iCloud Keychain or a password manager).",
+            "examples": [
+              true
+            ]
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether it can sign in now: false after the project's RP ID changed away from the one it was made for.",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "description": "A passkey of a user."
+      },
+      "PasskeyAnswer": {
+        "type": "object",
+        "required": [
+          "challengeId",
+          "credential"
+        ],
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "description": "The `challengeId` of the `PasskeyChallenge`.",
+            "examples": [
+              "01928f3e-6c1a-7b2d-9e4f-5a6b7c8d9e0f"
+            ]
+          },
+          "credential": {
+            "$ref": "#/components/schemas/PasskeyAssertionCredential",
+            "description": "The browser's or the platform's answer."
+          }
+        },
+        "description": "A passkey's answer to a challenge."
+      },
+      "PasskeyAssertionCredential": {
+        "type": "object",
+        "required": [
+          "id",
+          "rawId",
+          "type",
+          "response"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The credential ID, base64url.",
+            "examples": [
+              "pM2Gq8pZ1wqTNO4FqVt9fA"
+            ]
+          },
+          "rawId": {
+            "type": "string",
+            "description": "The credential ID again, base64url; must equal `id`.",
+            "examples": [
+              "pM2Gq8pZ1wqTNO4FqVt9fA"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "description": "Always `public-key`.",
+            "examples": [
+              "public-key"
+            ]
+          },
+          "response": {
+            "$ref": "#/components/schemas/PasskeyAssertionResponse",
+            "description": "The authenticator's answer."
+          },
+          "authenticatorAttachment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`platform` or `cross-platform`; null when the browser does not say.",
+            "examples": [
+              "platform"
+            ]
+          }
+        },
+        "description": "A passkey's answer in WebAuthn's JSON form: what `PublicKeyCredential.toJSON()` gives after `get`."
+      },
+      "PasskeyAssertionResponse": {
+        "type": "object",
+        "required": [
+          "clientDataJSON",
+          "authenticatorData",
+          "signature"
+        ],
+        "properties": {
+          "clientDataJSON": {
+            "type": "string",
+            "description": "The client data, base64url."
+          },
+          "authenticatorData": {
+            "type": "string",
+            "description": "The authenticator data, base64url."
+          },
+          "signature": {
+            "type": "string",
+            "description": "The signature, base64url."
+          },
+          "userHandle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The user handle the passkey stores, base64url; null when the authenticator gives none."
+          }
+        },
+        "description": "The authenticator's answer to `navigator.credentials.get`."
+      },
+      "PasskeyAttestationResponse": {
+        "type": "object",
+        "required": [
+          "clientDataJSON",
+          "attestationObject"
+        ],
+        "properties": {
+          "clientDataJSON": {
+            "type": "string",
+            "description": "The client data, base64url."
+          },
+          "attestationObject": {
+            "type": "string",
+            "description": "The attestation object, base64url."
+          },
+          "transports": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "How the authenticator was reached: `internal`, `hybrid`, `usb`, `nfc`, or `ble`.",
+            "examples": [
+              [
+                "internal"
+              ]
+            ]
+          }
+        },
+        "description": "The authenticator's answer to `navigator.credentials.create`."
+      },
+      "PasskeyAuthenticatorSelection": {
+        "type": "object",
+        "required": [
+          "residentKey",
+          "requireResidentKey",
+          "userVerification"
+        ],
+        "properties": {
+          "residentKey": {
+            "type": "string",
+            "description": "Always `required`: the passkey is discoverable, so it signs in with no email typed.",
+            "examples": [
+              "required"
+            ]
+          },
+          "requireResidentKey": {
+            "type": "boolean",
+            "description": "Always true, for older browsers.",
+            "examples": [
+              true
+            ]
+          },
+          "userVerification": {
+            "type": "string",
+            "description": "Always `required`: face, fingerprint, or PIN.",
+            "examples": [
+              "required"
+            ]
+          }
+        },
+        "description": "What kind of authenticator a new passkey must come from."
+      },
+      "PasskeyChallenge": {
+        "type": "object",
+        "required": [
+          "challengeId",
+          "options"
+        ],
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "description": "Names this challenge; send it back with the answer within 5 minutes.",
+            "examples": [
+              "01928f3e-6c1a-7b2d-9e4f-5a6b7c8d9e0f"
+            ]
+          },
+          "options": {
+            "$ref": "#/components/schemas/PasskeyRequestOptions",
+            "description": "The options for `navigator.credentials.get`."
+          }
+        },
+        "description": "A challenge for a passkey to sign: pass `options` to the browser, then send its answer with `challengeId`."
+      },
+      "PasskeyCreationOptions": {
+        "type": "object",
+        "required": [
+          "rp",
+          "user",
+          "challenge",
+          "pubKeyCredParams",
+          "timeout",
+          "excludeCredentials",
+          "authenticatorSelection",
+          "attestation"
+        ],
+        "properties": {
+          "rp": {
+            "$ref": "#/components/schemas/PasskeyRelyingParty",
+            "description": "The relying party."
+          },
+          "user": {
+            "$ref": "#/components/schemas/PasskeyUserEntity",
+            "description": "The user the passkey is for."
+          },
+          "challenge": {
+            "type": "string",
+            "description": "32 random bytes, base64url, used once.",
+            "examples": [
+              "Q2hhbGxlbmdlQ2hhbGxlbmdlQ2hhbGxlbmdlQ2hhbGw"
+            ]
+          },
+          "pubKeyCredParams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PasskeyCredentialParameters"
+            },
+            "description": "The key types the server accepts, in order of preference."
+          },
+          "timeout": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How long the browser waits, in milliseconds: 300000.",
+            "examples": [
+              300000
+            ]
+          },
+          "excludeCredentials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PasskeyCredentialDescriptor"
+            },
+            "description": "The user's passkeys under this RP ID, so the same authenticator is not registered twice."
+          },
+          "authenticatorSelection": {
+            "$ref": "#/components/schemas/PasskeyAuthenticatorSelection",
+            "description": "The authenticator rules."
+          },
+          "attestation": {
+            "type": "string",
+            "description": "Always `none`: no device certificate is asked for.",
+            "examples": [
+              "none"
+            ]
+          }
+        },
+        "description": "The options for `navigator.credentials.create` in WebAuthn's JSON form. Pass them to\n`PublicKeyCredential.parseCreationOptionsFromJSON`, or let the SDK's `registerPasskey` do it."
+      },
+      "PasskeyCredentialDescriptor": {
+        "type": "object",
+        "required": [
+          "type",
+          "id"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Always `public-key`.",
+            "examples": [
+              "public-key"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "description": "The credential ID, base64url.",
+            "examples": [
+              "pM2Gq8pZ1wqTNO4FqVt9fA"
+            ]
+          },
+          "transports": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "How the authenticator was reached when the passkey was made: `internal`, `hybrid`, `usb`, `nfc`, or `ble`.",
+            "examples": [
+              [
+                "internal",
+                "hybrid"
+              ]
+            ]
+          }
+        },
+        "description": "One passkey, named by its credential ID."
+      },
+      "PasskeyCredentialParameters": {
+        "type": "object",
+        "required": [
+          "type",
+          "alg"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Always `public-key`.",
+            "examples": [
+              "public-key"
+            ]
+          },
+          "alg": {
+            "type": "integer",
+            "format": "int32",
+            "description": "A COSE algorithm: -7 (ES256), -8 (EdDSA), or -257 (RS256).",
+            "examples": [
+              -7
+            ]
+          }
+        },
+        "description": "A key type the server accepts."
+      },
+      "PasskeyList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Passkey"
+            },
+            "description": "The passkeys."
+          }
+        },
+        "description": "A user's passkeys, oldest first; at most 10."
+      },
+      "PasskeyRegistration": {
+        "type": "object",
+        "required": [
+          "challengeId",
+          "options"
+        ],
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "description": "Names this registration; send it back with the new passkey within 5 minutes.",
+            "examples": [
+              "01928f3e-6c1a-7b2d-9e4f-5a6b7c8d9e0f"
+            ]
+          },
+          "options": {
+            "$ref": "#/components/schemas/PasskeyCreationOptions",
+            "description": "The options for `navigator.credentials.create`."
+          }
+        },
+        "description": "A started passkey registration: pass `options` to the browser, then send its answer with `challengeId`."
+      },
+      "PasskeyRegistrationCredential": {
+        "type": "object",
+        "required": [
+          "id",
+          "rawId",
+          "type",
+          "response"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The credential ID, base64url.",
+            "examples": [
+              "pM2Gq8pZ1wqTNO4FqVt9fA"
+            ]
+          },
+          "rawId": {
+            "type": "string",
+            "description": "The credential ID again, base64url; must equal `id`.",
+            "examples": [
+              "pM2Gq8pZ1wqTNO4FqVt9fA"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "description": "Always `public-key`.",
+            "examples": [
+              "public-key"
+            ]
+          },
+          "response": {
+            "$ref": "#/components/schemas/PasskeyAttestationResponse",
+            "description": "The authenticator's answer."
+          },
+          "authenticatorAttachment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`platform` or `cross-platform`; null when the browser does not say.",
+            "examples": [
+              "platform"
+            ]
+          }
+        },
+        "description": "A new passkey in WebAuthn's JSON form: what `PublicKeyCredential.toJSON()` gives after `create`."
+      },
+      "PasskeyRelyingParty": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The RP ID: the domain passkeys are bound to.",
+            "examples": [
+              "example.com"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "The name an authenticator shows: the project's RP name, else the project name.",
+            "examples": [
+              "Acme"
+            ]
+          }
+        },
+        "description": "The relying party of a passkey: the app's passkey domain and the name people see."
+      },
+      "PasskeyRequestOptions": {
+        "type": "object",
+        "required": [
+          "challenge",
+          "rpId",
+          "timeout",
+          "userVerification",
+          "allowCredentials"
+        ],
+        "properties": {
+          "challenge": {
+            "type": "string",
+            "description": "32 random bytes, base64url, used once.",
+            "examples": [
+              "Q2hhbGxlbmdlQ2hhbGxlbmdlQ2hhbGxlbmdlQ2hhbGw"
+            ]
+          },
+          "rpId": {
+            "type": "string",
+            "description": "The RP ID.",
+            "examples": [
+              "example.com"
+            ]
+          },
+          "timeout": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How long the browser waits, in milliseconds: 300000.",
+            "examples": [
+              300000
+            ]
+          },
+          "userVerification": {
+            "type": "string",
+            "description": "Always `required`: face, fingerprint, or PIN.",
+            "examples": [
+              "required"
+            ]
+          },
+          "allowCredentials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PasskeyCredentialDescriptor"
+            },
+            "description": "The passkeys that may answer; empty for sign in, so the browser offers every passkey for the RP ID."
+          }
+        },
+        "description": "The options for `navigator.credentials.get` in WebAuthn's JSON form. Pass them to\n`PublicKeyCredential.parseRequestOptionsFromJSON`, or let the SDK's helpers do it."
+      },
+      "PasskeyUserEntity": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "displayName"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The user handle: the user ID's 16 bytes, base64url.",
+            "examples": [
+              "AZK1JbJ8dXqZ6m8RkF6uQg"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "The user's email, else their user ID.",
+            "examples": [
+              "ada@example.com"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The user's name, else their email, else `User`.",
+            "examples": [
+              "Ada Lovelace"
+            ]
+          }
+        },
+        "description": "The account a new passkey is for, as the authenticator stores it."
+      },
       "Platform": {
         "type": "object",
         "required": [
@@ -9091,6 +12180,58 @@
         ],
         "description": "A project's lifecycle state."
       },
+      "RaisedSession": {
+        "type": "object",
+        "required": [
+          "accessToken",
+          "accessTokenExpiresAt",
+          "sessionId"
+        ],
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "An ES256 JWT, valid for 15 minutes.",
+            "examples": [
+              "eyJhbGciOiJFUzI1NiIsImtpZCI6Ii4uLiJ9.e30.c2ln"
+            ]
+          },
+          "accessTokenExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the access token expires."
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "The session ID, also the `sid` claim of the access token.",
+            "examples": [
+              "01924f5e-9a1b-7c4d-8e21-3d5e6f7a8b9c"
+            ]
+          }
+        },
+        "description": "The signed in session after a second factor: a new access token carrying the new `aal` and `amr` claims. The refresh\ntoken is not sent; keep the one you hold, which is unchanged and whose next refresh carries the new claims too."
+      },
+      "RecoveryCodes": {
+        "type": "object",
+        "required": [
+          "codes"
+        ],
+        "properties": {
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "10 recovery codes, each `XXXXX-XXXXX`, each working once.",
+            "examples": [
+              [
+                "K7QXM-2RPLD",
+                "A4ZTN-WQ6EB"
+              ]
+            ]
+          }
+        },
+        "description": "New recovery codes. Show them once and ask the user to keep them safe; every older code stopped working."
+      },
       "RefreshSessionRequest": {
         "type": "object",
         "required": [
@@ -9144,7 +12285,9 @@
           "ipAddress",
           "current",
           "method",
-          "provider"
+          "provider",
+          "aal",
+          "amr"
         ],
         "properties": {
           "id": {
@@ -9227,6 +12370,28 @@
               }
             ],
             "description": "The provider of an `oauth` or `id_token` session; null for every other method."
+          },
+          "aal": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How strongly the session signed in: 1 for one factor, 2 once a second factor or a passkey was verified on it. Also\nthe access token's `aal` claim.",
+            "examples": [
+              2
+            ]
+          },
+          "amr": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The ways the user proved who they are on this session, sorted: `pwd`, `email`, `fed`, `otp`, `rec`, `hwk`, `swk`,\n`user`, and `mfa` (whenever `aal` is 2). Also the access token's `amr` claim.",
+            "examples": [
+              [
+                "mfa",
+                "otp",
+                "pwd"
+              ]
+            ]
           }
         },
         "description": "An active session of a user: one signed in device or browser."
@@ -9240,7 +12405,8 @@
           "email_code",
           "recovery",
           "oauth",
-          "id_token"
+          "id_token",
+          "passkey"
         ],
         "description": "How a session began."
       },
@@ -9750,6 +12916,115 @@
         "description": "A request for a native ID token from the fake sign in provider (spec 0012).",
         "x-orvano-test": true
       },
+      "TestCreatePasskeyAssertionRequest": {
+        "type": "object",
+        "required": [
+          "options",
+          "origin",
+          "credentialId"
+        ],
+        "properties": {
+          "options": {
+            "$ref": "#/components/schemas/PasskeyRequestOptions",
+            "description": "The `options` of a `PasskeyChallenge`."
+          },
+          "origin": {
+            "type": "string",
+            "description": "The origin the client data names.",
+            "examples": [
+              "http://localhost:3000"
+            ]
+          },
+          "credentialId": {
+            "type": "string",
+            "description": "The `id` of a credential this authenticator made in this run.",
+            "examples": [
+              "pM2Gq8pZ1wqTNO4FqVt9fA"
+            ]
+          },
+          "rpId": {
+            "type": "string",
+            "description": "The RP ID whose hash the authenticator data carries; defaults to `options.rpId`.",
+            "examples": [
+              "localhost"
+            ]
+          },
+          "backedUp": {
+            "type": "boolean",
+            "description": "Whether the passkey is backed up (synced); defaults to the value it was made with.",
+            "examples": [
+              false
+            ]
+          },
+          "signCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The signature counter to report; defaults to 0.",
+            "examples": [
+              0
+            ]
+          },
+          "userVerified": {
+            "type": "boolean",
+            "description": "Whether the user verified flag is set; defaults to true.",
+            "examples": [
+              true
+            ]
+          },
+          "includeUserHandle": {
+            "type": "boolean",
+            "description": "Whether to send the user handle the passkey stores; defaults to true.",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "description": "A request for an assertion from the `Test` only software authenticator (spec 0013, AC-45).",
+        "x-orvano-test": true
+      },
+      "TestCreatePasskeyCredentialRequest": {
+        "type": "object",
+        "required": [
+          "options",
+          "origin"
+        ],
+        "properties": {
+          "options": {
+            "$ref": "#/components/schemas/PasskeyCreationOptions",
+            "description": "The `options` of `account.createPasskeyRegistration`."
+          },
+          "origin": {
+            "type": "string",
+            "description": "The origin the client data names.",
+            "examples": [
+              "http://localhost:3000"
+            ]
+          },
+          "rpId": {
+            "type": "string",
+            "description": "The RP ID whose hash the authenticator data carries; defaults to `options.rp.id`.",
+            "examples": [
+              "localhost"
+            ]
+          },
+          "backedUp": {
+            "type": "boolean",
+            "description": "Whether the passkey is backed up (synced); defaults to false.",
+            "examples": [
+              false
+            ]
+          },
+          "userVerified": {
+            "type": "boolean",
+            "description": "Whether the user verified flag is set; defaults to true.",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "description": "A request for a new passkey from the `Test` only software authenticator (spec 0013, AC-45).",
+        "x-orvano-test": true
+      },
       "TestEmail": {
         "type": "object",
         "required": [
@@ -9931,6 +13206,63 @@
         "x-orvano-event": "test.pinged",
         "x-orvano-test": true
       },
+      "TotpConfirmation": {
+        "type": "object",
+        "required": [
+          "recoveryCodes",
+          "session"
+        ],
+        "properties": {
+          "recoveryCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "10 recovery codes, each `XXXXX-XXXXX`, each working once.",
+            "examples": [
+              [
+                "K7QXM-2RPLD",
+                "A4ZTN-WQ6EB"
+              ]
+            ]
+          },
+          "session": {
+            "$ref": "#/components/schemas/RaisedSession",
+            "description": "A new access token for this session, carrying `aal` 2. Keep the refresh token you hold; it is unchanged."
+          }
+        },
+        "description": "MFA is on. Show the recovery codes once and ask the user to keep them safe; they can't be read again. Every other\nsession of the user has ended, and this one is now at level 2."
+      },
+      "TotpSetup": {
+        "type": "object",
+        "required": [
+          "secret",
+          "uri",
+          "expiresAt"
+        ],
+        "properties": {
+          "secret": {
+            "type": "string",
+            "description": "The secret: 20 random bytes as unpadded base32 (32 characters). Never log it.",
+            "examples": [
+              "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
+            ]
+          },
+          "uri": {
+            "type": "string",
+            "description": "The `otpauth://` URI an authenticator app scans: the project as the issuer, the user's email as the label.",
+            "examples": [
+              "otpauth://totp/Acme:ada%40example.com?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=Acme&algorithm=SHA1&digits=6&period=30"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the secret stops waiting for its first code; ask for a new one after that."
+          }
+        },
+        "description": "A new authenticator app secret, waiting for its first code. Show `uri` as a QR code and `secret` for typing in, then\nconfirm with `account.confirmTotp` within 15 minutes."
+      },
       "UpdateAccountRequest": {
         "type": "object",
         "properties": {
@@ -9955,6 +13287,68 @@
           }
         },
         "description": "Changes to the signed in user. A field left out stays as it is."
+      },
+      "UpdateAuthMethodSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "totpEnabled": {
+            "type": "boolean",
+            "description": "Whether users can turn on an authenticator app.",
+            "examples": [
+              true
+            ]
+          },
+          "passkeysEnabled": {
+            "type": "boolean",
+            "description": "Whether users can add passkeys and sign in with them. Needs an `rpId`.",
+            "examples": [
+              true
+            ]
+          },
+          "rpId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The passkey domain; null clears it (only while passkeys are off).",
+            "examples": [
+              "example.com"
+            ]
+          },
+          "rpName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The name authenticators show, 1 to 64 characters; null means the project name.",
+            "examples": [
+              "Acme"
+            ]
+          },
+          "androidCertFingerprints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "At most 10 SHA-256 fingerprints, uppercase or lowercase hex pairs joined by colons; stored uppercase."
+          },
+          "confirmRpIdChange": {
+            "type": "boolean",
+            "description": "Must be true to change `rpId` while passkeys are registered under the current one: they stop working.",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "description": "Changes to a project's second factor and passkey settings. Fields left out keep their value."
       },
       "UpdateEmailRequest": {
         "type": "object",
@@ -10149,6 +13543,22 @@
         },
         "description": "Changes to an org."
       },
+      "UpdatePasskeyRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "1 to 64 characters.",
+            "examples": [
+              "Work laptop"
+            ]
+          }
+        },
+        "description": "A new name for a passkey."
+      },
       "UpdatePasswordRequest": {
         "type": "object",
         "required": [
@@ -10244,7 +13654,8 @@
           "createdAt",
           "lastSignInAt",
           "providers",
-          "hasPassword"
+          "hasPassword",
+          "mfaEnabled"
         ],
         "properties": {
           "id": {
@@ -10340,6 +13751,13 @@
             "examples": [
               true
             ]
+          },
+          "mfaEnabled": {
+            "type": "boolean",
+            "description": "Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never\nturns it on.",
+            "examples": [
+              false
+            ]
           }
         },
         "description": "A user of a project."
@@ -10404,6 +13822,30 @@
           }
         },
         "description": "An email verification, with the token from the emailed link."
+      },
+      "VerifyMfaRequest": {
+        "type": "object",
+        "properties": {
+          "totpCode": {
+            "type": "string",
+            "description": "The 6 digit code the authenticator app shows now.",
+            "examples": [
+              "492039"
+            ]
+          },
+          "recoveryCode": {
+            "type": "string",
+            "description": "A recovery code; case, spaces, and hyphens do not matter. Each works once.",
+            "examples": [
+              "K7QXM-2RPLD"
+            ]
+          },
+          "passkey": {
+            "$ref": "#/components/schemas/PasskeyAnswer",
+            "description": "A passkey's answer to `account.createStepUpPasskeyChallenge`."
+          }
+        },
+        "description": "A second factor for a step up: exactly one of the fields."
       }
     },
     "securitySchemes": {
@@ -10411,7 +13853,7 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "orvano_console",
-        "description": "A console account's session: the `orvano_console` cookie (`HttpOnly`, `SameSite=Strict`), set by\n`consoleAccount.create` and `consoleAccount.createSession`. Browsers send it themselves."
+        "description": "A console account's session: the `orvano_console` cookie (`HttpOnly`, `SameSite=Strict`), set by\n`consoleAccount.create`, `consoleAccount.createSession` (when the account has no MFA), and the second step and\npasskey sign in that finish it. Browsers send it themselves."
       },
       "bearer": {
         "type": "http",

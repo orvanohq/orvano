@@ -166,6 +166,8 @@ jobs:
         working-directory: sdks/dart/server
       - run: flutter test
         working-directory: sdks/dart/flutter
+      - run: flutter test
+        working-directory: sdks/dart/flutter_passkeys
 
   breaking:
     name: Breaking changes since the last release

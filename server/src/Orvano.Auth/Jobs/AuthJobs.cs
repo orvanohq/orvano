@@ -47,12 +47,15 @@ internal static class AuthJobs
         var db = job.Services.GetRequiredKeyedService<NpgsqlDataSource>(OrvanoDb.App);
         var logger = job.Services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(AuthJobs));
         var total = await RevokeAppleAsync(job.Services, db, projectId, logger, ct);
-        // Tokens, sessions, flows, and identities first so each user batch cascades over few rows; passwords go with
-        // their users. Tokens for emails with no user yet have no user to cascade from.
+        // Tokens, sessions, flows, second factors, and identities first so each user batch cascades over few rows;
+        // passwords go with their users. Tokens for emails with no user yet, and passkey sign in challenges, have no
+        // user to cascade from (spec 0013, AC-35).
         foreach (var (table, key) in new[]
                  {
-                     ("auth_email_tokens", "id"), ("auth_sessions", "id"), ("auth_oauth_flows", "id"), ("auth_id_token_uses", "token_hash"),
-                     ("auth_identities", "id"), ("auth_users", "id"), ("auth_signing_keys", "id"),
+                     ("auth_email_tokens", "id"), ("auth_webauthn_challenges", "id"), ("auth_mfa_tickets", "id"), ("auth_sessions", "id"),
+                     ("auth_oauth_flows", "id"), ("auth_id_token_uses", "token_hash"), ("auth_recovery_codes", "id"),
+                     ("auth_totp_factors", "user_id"), ("auth_passkeys", "id"), ("auth_identities", "id"), ("auth_users", "id"),
+                     ("auth_signing_keys", "id"),
                  })
         {
             int deleted;
@@ -68,11 +71,12 @@ internal static class AuthJobs
             while (deleted == BatchSize);
         }
 
-        // Last: the provider settings, which the Apple revokes above needed.
-        await using (var providers = db.CreateCommand("DELETE FROM orvano.auth_oauth_providers WHERE project_id = @project"))
+        // Last: the provider settings, which the Apple revokes above needed, and the MFA and passkey settings.
+        foreach (var settings in new[] { "auth_oauth_providers", "auth_method_settings" })
         {
-            providers.Parameters.AddWithValue("project", projectId);
-            total += await providers.ExecuteNonQueryAsync(ct);
+            await using var cmd = db.CreateCommand($"DELETE FROM orvano.{settings} WHERE project_id = @project");
+            cmd.Parameters.AddWithValue("project", projectId);
+            total += await cmd.ExecuteNonQueryAsync(ct);
         }
 
         logger.LogInformation("Purged {Rows} auth row(s) of project {ProjectId}", total, projectId);

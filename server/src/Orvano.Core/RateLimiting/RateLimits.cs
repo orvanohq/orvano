@@ -66,6 +66,30 @@ public static class RateLimitPolicies
     /// </summary>
     public static RateLimitPolicy FailedOAuthRedeemPerIp { get; } = new("auth.oauth_failed.ip", 60, TimeSpan.FromMinutes(15));
 
+    /// <summary>
+    /// Wrong second factors in <c>createMfaSession</c>, <c>verifyMfa</c>, <c>confirmTotp</c>, and their console twins,
+    /// keyed by user ID. Checked first, counted only after a wrong factor (spec 0013, rate limits).
+    /// </summary>
+    public static RateLimitPolicy FailedMfaPerUser { get; } = new("auth.mfa_failed.user", 10, TimeSpan.FromMinutes(15));
+
+    /// <summary>
+    /// <c>createMfaSession</c> and <c>createMfaPasskeyChallenge</c> with an unknown or expired ticket, keyed by
+    /// connection IP. Checked first, counted only after an <c>invalid_mfa_ticket</c> (spec 0013, rate limits).
+    /// </summary>
+    public static RateLimitPolicy FailedMfaTicketPerIp { get; } = new("auth.mfa_ticket_failed.ip", 60, TimeSpan.FromMinutes(15));
+
+    /// <summary>The passkey ceremonies' challenges and passkey sign in, keyed by connection IP (spec 0013, rate limits).</summary>
+    public static RateLimitPolicy PasskeyPerIp { get; } = new("auth.passkey.ip", 300, TimeSpan.FromMinutes(15));
+
+    /// <summary>Passkey challenges tied to a user (step two, step up, registration), keyed by user ID (spec 0013, rate limits).</summary>
+    public static RateLimitPolicy PasskeyChallengePerUser { get; } = new("auth.passkey_challenge.user", 30, TimeSpan.FromMinutes(15));
+
+    /// <summary>Failed passkey sign ins, keyed by connection IP (spec 0013, rate limits).</summary>
+    public static RateLimitPolicy FailedPasskeyPerIp { get; } = new("auth.passkey_failed.ip", 60, TimeSpan.FromMinutes(15));
+
+    /// <summary><c>createTotp</c>, <c>createPasskeyRegistration</c>, and <c>createRecoveryCodes</c>, keyed by user ID (spec 0013, rate limits).</summary>
+    public static RateLimitPolicy MfaEnrollPerUser { get; } = new("auth.mfa_enroll.user", 10, TimeSpan.FromMinutes(15));
+
     /// <summary><c>consoleInstall.getSetup</c>, keyed by connection IP (spec 0006, AC-22).</summary>
     public static RateLimitPolicy ConsoleSetupPerIp { get; } = new("console.setup.ip", 60, TimeSpan.FromMinutes(1));
 

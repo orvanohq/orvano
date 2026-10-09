@@ -94,6 +94,19 @@ final class UsersService {
     );
   }
 
+  /// Removes one of a user's passkeys. Sessions stay.
+  Future<void> deletePasskey(
+    String userId,
+    String passkeyId, {
+    RequestOptions? options,
+  }) async {
+    await _client.send(
+      'DELETE',
+      '/v1/users/${Uri.encodeComponent(userId)}/passkeys/${Uri.encodeComponent(passkeyId)}',
+      options: options,
+    );
+  }
+
   /// Ends one session of a user.
   Future<void> deleteSession(
     String userId,
@@ -126,6 +139,16 @@ final class UsersService {
     return User.fromJson(json as Map<String, dynamic>);
   }
 
+  /// A user's MFA state: whether sign in asks them for a second factor, their recovery codes left, and their passkeys.
+  Future<MfaStatus> getMfa(String userId, {RequestOptions? options}) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/users/${Uri.encodeComponent(userId)}/mfa',
+      options: options,
+    );
+    return MfaStatus.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Lists the project's users, newest first.
   Future<UserPage> list({
     String? email,
@@ -133,6 +156,7 @@ final class UsersService {
     DateTime? createdAfter,
     DateTime? createdBefore,
     bool? emailVerified,
+    String? mfa,
     String? cursor,
     int? limit,
     RequestOptions? options,
@@ -146,6 +170,7 @@ final class UsersService {
         'createdAfter': createdAfter?.toUtc().toIso8601String(),
         'createdBefore': createdBefore?.toUtc().toIso8601String(),
         'emailVerified': emailVerified?.toString(),
+        'mfa': mfa,
         'cursor': cursor,
         'limit': limit?.toString(),
       },
@@ -161,6 +186,7 @@ final class UsersService {
     DateTime? createdAfter,
     DateTime? createdBefore,
     bool? emailVerified,
+    String? mfa,
     int? limit,
     RequestOptions? options,
   }) => paginate(
@@ -170,6 +196,7 @@ final class UsersService {
       createdAfter: createdAfter,
       createdBefore: createdBefore,
       emailVerified: emailVerified,
+      mfa: mfa,
       cursor: cursor,
       limit: limit,
       options: options,
@@ -188,6 +215,19 @@ final class UsersService {
       options: options,
     );
     return IdentityList.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Lists a user's passkeys, oldest first, including inactive ones.
+  Future<PasskeyList> listPasskeys(
+    String userId, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/users/${Uri.encodeComponent(userId)}/passkeys',
+      options: options,
+    );
+    return PasskeyList.fromJson(json as Map<String, dynamic>);
   }
 
   /// Lists a user's active sessions, newest first. `current` is always false.
@@ -216,6 +256,17 @@ final class UsersService {
         listSessions(userId, cursor: cursor, limit: limit, options: options),
     (page) => (page.items, page.nextCursor),
   );
+
+  /// Turns MFA off for a user who lost every factor: deletes their authenticator app and recovery codes and ends all
+  /// their sessions. Their passkeys stay. A user without MFA is left as they are.
+  Future<void> resetMfa(String userId, {RequestOptions? options}) async {
+    await _client.send(
+      'POST',
+      '/v1/users/${Uri.encodeComponent(userId)}/mfa/reset',
+      idempotent: true,
+      options: options,
+    );
+  }
 
   /// Unblocks a user so they can sign in again. Their old sessions stay ended.
   Future<User> unblock(String userId, {RequestOptions? options}) async {

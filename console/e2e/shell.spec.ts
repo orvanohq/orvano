@@ -233,11 +233,11 @@ test('signing in lands where you were headed, and signing out ends the session (
   await expect(page).toHaveURL(/\/sign-in\?redirect=/)
   await page.getByLabel('Email').fill('fixture-admin@example.com')
   await page.getByLabel('Password').fill('wrong console password')
-  await page.getByRole('button', { name: 'Sign in' }).click()
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('The email or password is wrong.')
 
   await page.getByLabel('Password').fill('fixture console password')
-  await page.getByRole('button', { name: 'Sign in' }).click()
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`/projects/${scenariosProject}$`))
   const cookies = await page.context().cookies()
   const access = cookies.find((c) => c.name === 'orvano_console')

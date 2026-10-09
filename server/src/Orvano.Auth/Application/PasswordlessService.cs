@@ -19,10 +19,11 @@ internal sealed class PasswordlessService(
     SigningKeys keys,
     AccountService accounts,
     RateLimits limits,
+    MethodPolicies policies,
     ILogger<PasswordlessService> logger)
 {
     /// <summary>What a redemption decided: the user, their new session, whether it created them, and sessions to evict.</summary>
-    private sealed record Redeemed(Guid UserId, SessionGrant Grant, bool IsNewUser, Guid[] Ended);
+    private sealed record Redeemed(Guid UserId, SessionGrant? Grant, bool IsNewUser, Guid[] Ended, MfaChallengeView? Mfa = null);
 
     /// <summary><c>account.createMagicLink</c> (AC-7, AC-8).</summary>
     public async Task<Outcome<Done>> RequestLinkAsync(string projectId, string? email, string? redirectUrl, bool? createUser, string ipKey, CancellationToken ct)
@@ -168,6 +169,15 @@ internal sealed class PasswordlessService(
                 new Dictionary<string, string> { ["userId"] = user.Id.ToString() }, ["emailVerified"], ct: ct);
         }
 
+        // Spec 0013, AC-6: after every check and the claim (which removes factors, AC-29), a user with MFA on gets a
+        // challenge in place of the session. The link or code stays used.
+        if (!created)
+        {
+            var gate = await MfaGate.ChallengeAsync(policies, uow, projectId, user.Id, method, null, client, ct);
+            if (!gate.Succeeded) return gate.Failure!;
+            if (gate.Value is { } challenge) return new Redeemed(user.Id, null, false, ended, challenge);
+        }
+
         var grant = await sessions.CreateAsync(uow, projectId, user.Id, client, actor, method, ct);
         return new Redeemed(user.Id, grant, created, ended);
     }
@@ -177,7 +187,8 @@ internal sealed class PasswordlessService(
         if (!outcome.Succeeded) return outcome.Failure!;
         var redeemed = outcome.Value!;
         foreach (var id in redeemed.Ended) await checks.EvictAsync(id, ct);
+        if (redeemed.Mfa is { } mfa) return SignedIn.Challenged(mfa);
         var row = await store.ReadAsync((db, token) => db.Users.AsNoTracking().SingleAsync(u => u.Id == redeemed.UserId, token), ct);
-        return await accounts.SignedInAsync(projectId, row, redeemed.Grant, ct, redeemed.IsNewUser);
+        return await accounts.SignedInAsync(projectId, row, redeemed.Grant!, ct, redeemed.IsNewUser);
     }
 }

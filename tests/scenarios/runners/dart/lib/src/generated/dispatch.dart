@@ -18,6 +18,17 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.completePasskeyRegistration': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.completePasskeyRegistration(
+        CompletePasskeyRegistrationRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
   'account.completeRecovery': DispatchEntry(
     status: 201,
     client: (o, input) async {
@@ -34,6 +45,15 @@ final Map<String, DispatchEntry> dispatch = {
         ConfirmEmailChangeRequest.fromJson(
           input['body'] as Map<String, dynamic>,
         ),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.confirmTotp': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.confirmTotp(
+        ConfirmTotpRequest.fromJson(input['body'] as Map<String, dynamic>),
       );
       return r.toJson();
     },
@@ -71,7 +91,7 @@ final Map<String, DispatchEntry> dispatch = {
     status: 201,
     client: (o, input) async {
       final r = await o.account.createIdTokenIdentity(
-        CreateIdTokenSessionRequest.fromJson(
+        CreateIdTokenIdentityRequest.fromJson(
           input['body'] as Map<String, dynamic>,
         ),
       );
@@ -109,6 +129,26 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.createMfaPasskeyChallenge': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.createMfaPasskeyChallenge(
+        CreateMfaPasskeyChallengeRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.createMfaSession': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createMfaSession(
+        CreateMfaSessionRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+  ),
   'account.createOAuthFlow': DispatchEntry(
     status: 200,
     client: (o, input) async {
@@ -122,7 +162,9 @@ final Map<String, DispatchEntry> dispatch = {
     status: 200,
     client: (o, input) async {
       final r = await o.account.createOAuthLinkFlow(
-        CreateOAuthFlowRequest.fromJson(input['body'] as Map<String, dynamic>),
+        CreateOAuthLinkFlowRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
       );
       return r.toJson();
     },
@@ -132,6 +174,35 @@ final Map<String, DispatchEntry> dispatch = {
     client: (o, input) async {
       final r = await o.account.createOAuthSession(
         CreateOAuthSessionRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.createPasskeyChallenge': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.createPasskeyChallenge();
+      return r.toJson();
+    },
+  ),
+  'account.createPasskeyRegistration': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.createPasskeyRegistration(
+        CreatePasskeyRegistrationRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.createPasskeySession': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createPasskeySession(
+        CreatePasskeySessionRequest.fromJson(
           input['body'] as Map<String, dynamic>,
         ),
       );
@@ -156,6 +227,29 @@ final Map<String, DispatchEntry> dispatch = {
         CreateRecoveryRequest.fromJson(input['body'] as Map<String, dynamic>),
       );
       return null;
+    },
+  ),
+  'account.createRecoveryCodes': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createRecoveryCodes();
+      return r.toJson();
+    },
+  ),
+  'account.createStepUpPasskeyChallenge': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.createStepUpPasskeyChallenge();
+      return r.toJson();
+    },
+  ),
+  'account.createTotp': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.account.createTotp(
+        CreateTotpRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
     },
   ),
   'account.createVerification': DispatchEntry(
@@ -199,10 +293,24 @@ final Map<String, DispatchEntry> dispatch = {
       return null;
     },
   ),
+  'account.deletePasskey': DispatchEntry(
+    status: 204,
+    client: (o, input) async {
+      await o.account.deletePasskey(input['passkeyId'] as String);
+      return null;
+    },
+  ),
   'account.deleteSession': DispatchEntry(
     status: 204,
     client: (o, input) async {
       await o.account.deleteSession(input['sessionId'] as String);
+      return null;
+    },
+  ),
+  'account.deleteTotp': DispatchEntry(
+    status: 204,
+    client: (o, input) async {
+      await o.account.deleteTotp();
       return null;
     },
   ),
@@ -217,10 +325,24 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'account.getMfa': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.getMfa();
+      return r.toJson();
+    },
+  ),
   'account.listIdentities': DispatchEntry(
     status: 200,
     client: (o, input) async {
       final r = await o.account.listIdentities();
+      return r.toJson();
+    },
+  ),
+  'account.listPasskeys': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.listPasskeys();
       return r.toJson();
     },
   ),
@@ -268,6 +390,16 @@ final Map<String, DispatchEntry> dispatch = {
       return null;
     },
   ),
+  'account.updatePasskey': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.updatePasskey(
+        input['passkeyId'] as String,
+        UpdatePasskeyRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+  ),
   'account.updatePassword': DispatchEntry(
     status: 204,
     client: (o, input) async {
@@ -282,6 +414,15 @@ final Map<String, DispatchEntry> dispatch = {
     client: (o, input) async {
       final r = await o.account.verifyEmail(
         VerifyEmailRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+  ),
+  'account.verifyMfa': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.account.verifyMfa(
+        VerifyMfaRequest.fromJson(input['body'] as Map<String, dynamic>),
       );
       return r.toJson();
     },
@@ -353,6 +494,28 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'test.createPasskeyAssertion': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.test.createPasskeyAssertion(
+        TestCreatePasskeyAssertionRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
+  'test.createPasskeyCredential': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.test.createPasskeyCredential(
+        TestCreatePasskeyCredentialRequest.fromJson(
+          input['body'] as Map<String, dynamic>,
+        ),
+      );
+      return r.toJson();
+    },
+  ),
   'test.getLatestEmail': DispatchEntry(
     status: 200,
     client: (o, input) async {
@@ -361,6 +524,7 @@ final Map<String, DispatchEntry> dispatch = {
         after: input['after'] == null
             ? null
             : DateTime.parse(input['after'] as String),
+        subject: input['subject'] == null ? null : input['subject'] as String,
       );
       return r.toJson();
     },
@@ -370,6 +534,7 @@ final Map<String, DispatchEntry> dispatch = {
         after: input['after'] == null
             ? null
             : DateTime.parse(input['after'] as String),
+        subject: input['subject'] == null ? null : input['subject'] as String,
       );
       return r.toJson();
     },
@@ -487,6 +652,17 @@ final Map<String, DispatchEntry> dispatch = {
     },
     scope: 'users.write',
   ),
+  'users.deletePasskey': DispatchEntry(
+    status: 204,
+    server: (o, input) async {
+      await o.users.deletePasskey(
+        input['userId'] as String,
+        input['passkeyId'] as String,
+      );
+      return null;
+    },
+    scope: 'users.write',
+  ),
   'users.deleteSession': DispatchEntry(
     status: 204,
     server: (o, input) async {
@@ -514,6 +690,14 @@ final Map<String, DispatchEntry> dispatch = {
     },
     scope: 'users.read',
   ),
+  'users.getMfa': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.users.getMfa(input['userId'] as String);
+      return r.toJson();
+    },
+    scope: 'users.read',
+  ),
   'users.list': DispatchEntry(
     status: 200,
     server: (o, input) async {
@@ -529,6 +713,7 @@ final Map<String, DispatchEntry> dispatch = {
         emailVerified: input['emailVerified'] == null
             ? null
             : input['emailVerified'] as bool,
+        mfa: input['mfa'] == null ? null : input['mfa'] as String,
         cursor: input['cursor'] == null ? null : input['cursor'] as String,
         limit: input['limit'] == null ? null : (input['limit'] as num).toInt(),
       );
@@ -547,6 +732,7 @@ final Map<String, DispatchEntry> dispatch = {
           emailVerified: input['emailVerified'] == null
               ? null
               : input['emailVerified'] as bool,
+          mfa: input['mfa'] == null ? null : input['mfa'] as String,
           limit: input['limit'] == null
               ? null
               : (input['limit'] as num).toInt(),
@@ -558,6 +744,14 @@ final Map<String, DispatchEntry> dispatch = {
     status: 200,
     server: (o, input) async {
       final r = await o.users.listIdentities(input['userId'] as String);
+      return r.toJson();
+    },
+    scope: 'users.read',
+  ),
+  'users.listPasskeys': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.users.listPasskeys(input['userId'] as String);
       return r.toJson();
     },
     scope: 'users.read',
@@ -581,6 +775,14 @@ final Map<String, DispatchEntry> dispatch = {
         )
         .map((e) => e.toJson()),
     scope: 'users.read',
+  ),
+  'users.resetMfa': DispatchEntry(
+    status: 204,
+    server: (o, input) async {
+      await o.users.resetMfa(input['userId'] as String);
+      return null;
+    },
+    scope: 'users.write',
   ),
   'users.unblock': DispatchEntry(
     status: 200,

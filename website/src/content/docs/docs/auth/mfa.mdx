@@ -1,0 +1,227 @@
+---
+title: Multi factor authentication
+description: "Ask for a code from an authenticator app after the first sign in step."
+sidebar:
+  order: 16
+---
+
+import { TabItem, Tabs } from '@astrojs/starlight/components'
+
+With MFA, a stolen password, inbox, or provider account isn't enough to sign in. A user turns on an authenticator app (1Password, Google Authenticator, Microsoft Authenticator, and others), and from then on every sign in asks for its 6 digit code after the first step. Ten recovery codes cover a lost phone. A [passkey](/docs/auth/passkeys/) counts as both steps by itself.
+
+MFA is on for a project by default: the **Authenticator app** card on the console's [Sign in methods](/docs/console/sign-in-methods/#mfa-and-passkeys) page turns it off for everyone. A user with an email turns MFA on only once the email is [verified](/docs/auth/email-verification/).
+
+## 1. Turn on an authenticator app
+
+[`account.createTotp`](/docs/api/operations/accountcreatetotp/) answers a new secret: show its `uri` as a QR code (with any QR library) and its `secret` for typing in. The user enters the first code from their app, and [`account.confirmTotp`](/docs/api/operations/accountconfirmtotp/) turns MFA on and answers 10 recovery codes. Show them once and ask the user to keep them; they can't be read again.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+// A user with a password confirms it first (check user.hasPassword).
+const { uri, secret } = await orvano.account.createTotp({ password })
+showQrCode(uri, secret)
+
+// once the user typed the first code:
+const recoveryCodes = await orvano.client.confirmTotp(code)
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+'use server'
+export async function startTotp(password?: string) {
+  return (await orvano()).account.createTotp({ password }) // { uri, secret, expiresAt }
+}
+```
+
+```tsx
+'use client'
+// The route handler sets the new access cookie.
+const recoveryCodes = await orvano.client.confirmTotp(code)
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final setup = await orvano.account.createTotp(CreateTotpRequest(password: password));
+showQrCode(setup.uri, setup.secret);
+
+// once the user typed the first code:
+final recoveryCodes = await orvano.client.confirmTotp(code);
+```
+
+  </TabItem>
+</Tabs>
+
+- A user with a password sends it (`password`), even right after signing in, so a stolen access token can't add an authenticator: a missing or wrong one gets [`invalid_credentials`](/errors/invalid_credentials/). A user without a password must have signed in within the last 10 minutes ([`reauthentication_required`](/errors/reauthentication_required/) otherwise). A user with an unverified email gets [`email_not_verified`](/errors/email_not_verified/).
+- The secret waits 15 minutes for its first code ([`totp_not_pending`](/errors/totp_not_pending/) after that). A wrong code gets [`invalid_mfa_code`](/errors/invalid_mfa_code/).
+- Turning MFA on signs the user out everywhere else, and raises this session to two factors. Use the client's `confirmTotp` (not `orvano.account.confirmTotp`): it keeps the stronger access token. The answer carries no refresh token; the one the client holds stays valid, and its next refresh carries the second factor too.
+
+[`account.getMfa`](/docs/api/operations/accountgetmfa/) answers the user's state for a settings screen: `mfaEnabled`, `totpConfirmedAt`, `recoveryCodesRemaining`, `passkeyCount`, and what the project allows, `factorsAvailable`.
+
+## 2. Pass the second step at sign in
+
+For a user with MFA on, every sign in (password, magic link, email code, a provider, a password reset) stops after its first step: it answers no session, only a challenge with the factors the user can answer with (`totp`, `recovery_code`, `passkey`). The SDKs keep the challenge's ticket and announce it as the `mfaRequired` auth event. Show a code field, then finish with `completeMfa`:
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+orvano.client.onAuthStateChange((event, _session, mfa) => {
+  if (event === 'mfaRequired') showCodeForm(mfa!.factors) // e.g. ['totp', 'recovery_code']
+})
+
+await orvano.account.createPasswordSession({ email, password }) // stops at the second step
+
+await orvano.client.completeMfa({ totpCode: code })
+// or { recoveryCode: code }, or { passkey: true } to use a passkey instead
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+'use server'
+export async function signIn(email: string, password: string) {
+  const result = await (await orvano()).account.createPasswordSession({ email, password })
+  // Challenged: Orvano kept the ticket in the HttpOnly `orvano_mfa` cookie, not in the result.
+  return { mfaRequired: result.mfa !== null, factors: result.mfa?.factors ?? [] }
+}
+```
+
+```tsx
+'use client'
+// app/sign-in/mfa/page.tsx: the route handler reads `orvano_mfa` and sets the session cookies.
+await orvano.client.completeMfa({ totpCode: code })
+router.push('/')
+```
+
+A provider sign in that needs the second step redirects to `mfaPath` (default `/sign-in/mfa`), an option of `createOrvanoRouteHandler`. An emailed link or code answers `{ mfaRequired: true, factors }`.
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+orvano.client.authStateChanges.listen((change) {
+  if (change.event == AuthEvent.mfaRequired) showCodeForm(change.mfa!.factors);
+});
+
+await orvano.account.createPasswordSession(
+  CreatePasswordSessionRequest(email: email, password: password),
+); // stops at the second step
+
+await orvano.client.completeMfa(MfaAnswer.totp(code));
+// or MfaAnswer.recoveryCode(code), or MfaAnswer.passkey()
+```
+
+  </TabItem>
+</Tabs>
+
+- The challenge lasts 5 minutes, and allows 5 wrong answers; after that, or after a page reload (the JavaScript and Flutter SDKs keep the ticket in memory only), the user signs in again. A spent or expired ticket gets [`invalid_mfa_ticket`](/errors/invalid_mfa_ticket/).
+- Each code from the app works once. A recovery code works once too; case, spaces, and hyphens don't matter.
+- `redeemLink`, `handleLink`, and the email code and provider helpers answer `mfaRequired: true` and the `factors` when the second step is needed.
+- Whatever the first step used up stays used: an abandoned challenge after a magic link needs a new link. A password reset for a user with MFA changes the password only once the second step passes.
+
+## Recovery codes
+
+A user who lost their phone signs in with a recovery code instead, and should then make new ones with [`account.createRecoveryCodes`](/docs/api/operations/accountcreaterecoverycodes/): it answers 10 new codes, and every older one stops working.
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const { codes } = await orvano.account.createRecoveryCodes()
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+const { codes } = await (await orvano()).account.createRecoveryCodes()
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+final codes = (await orvano.account.createRecoveryCodes()).codes;
+```
+
+  </TabItem>
+</Tabs>
+
+## Step up before security changes
+
+For a user with MFA on, changing security needs a second factor from the last 10 minutes on this session: making recovery codes, turning MFA off, adding or removing a passkey, linking a provider, changing the password or email, and deleting the account. An older session gets 403 [`mfa_verification_required`](/errors/mfa_verification_required/). Ask for a code, call `verifyMfa`, and try the change again:
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+await orvano.client.verifyMfa({ totpCode: code }) // or { recoveryCode }, or { passkey: true }
+await orvano.account.deleteTotp()
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```tsx
+'use client'
+await orvano.client.verifyMfa({ totpCode: code })
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+await orvano.client.verifyMfa(MfaAnswer.totp(code));
+await orvano.account.deleteTotp();
+```
+
+  </TabItem>
+</Tabs>
+
+`verifyMfa` keeps the session and stores a new access token that says it passed two factors. A passkey works for step up even for a user without MFA.
+
+## Turn MFA off
+
+[`account.deleteTotp`](/docs/api/operations/accountdeletetotp/) removes the authenticator app and every recovery code, after a step up. The user's sessions stay. A user without MFA gets [`mfa_not_enabled`](/errors/mfa_not_enabled/).
+
+Each change (MFA on or off, new codes, a recovery code used, a passkey added or removed) emails the user a **Security alert** when the project can send email. You can reword it on the console's [Email](/docs/console/email/#templates) page.
+
+## On your server
+
+A user who lost both their phone and their recovery codes asks you for help. Once you're sure who is asking, [`users.resetMfa`](/docs/api/operations/usersresetmfa/) removes their authenticator app and recovery codes and ends all their sessions; their passkeys stay. [`users.getMfa`](/docs/api/operations/usersgetmfa/) answers their state first. The console's user page has the same **Reset MFA** button.
+
+<Tabs syncKey="server-sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const mfa = await orvano.users.getMfa(userId) // { mfaEnabled, recoveryCodesRemaining, ... }
+await orvano.users.resetMfa(userId)
+```
+
+  </TabItem>
+  <TabItem label="Dart">
+
+```dart
+final mfa = await orvano.users.getMfa(userId);
+await orvano.users.resetMfa(userId);
+```
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+var mfa = await orvano.Users.GetMfaAsync(userId);
+await orvano.Users.ResetMfaAsync(userId);
+```
+
+  </TabItem>
+</Tabs>
+
+Users have `mfaEnabled`, and [`users.list`](/docs/api/operations/userslist/) filters with `mfa: 'on'` or `'off'`. To let only users who passed MFA reach a route on your own server, check their token with [`requireMfa`](/docs/auth/verify-tokens/#require-mfa).

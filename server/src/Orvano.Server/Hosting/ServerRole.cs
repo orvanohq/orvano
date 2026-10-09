@@ -108,6 +108,8 @@ internal static class ServerRole
             await AuthFixtures.SeedAsync(authStore, accounts, fixtures.Users, logger, stopping);
             if (fixtures.OAuthProviders is { Count: > 0 } providers)
                 await AuthFixtures.SeedOAuthProvidersAsync(app.Services.GetRequiredService<ProviderSettings>(), providers, logger, stopping);
+            if (fixtures.MethodSettings is { Count: > 0 } methods)
+                await AuthFixtures.SeedMethodSettingsAsync(app.Services.GetRequiredService<MethodSettingsService>(), methods, logger, stopping);
             if (fixtures.InstallSmtp is { } installSmtp)
                 await MessagingFixtures.SeedInstallSmtpAsync(app.Services.GetRequiredService<MessagingStore>(), owner.Value, installSmtp, logger, stopping);
         }
@@ -141,7 +143,7 @@ internal static class ServerRole
     /// envelope encryption (<c>ORVANO_MASTER_KEYS</c>, api and worker), the public URL and trusted proxies (api), the
     /// in memory cache, and the rate limits.
     /// </summary>
-    private static void AddKernel(WebApplicationBuilder builder, OrvanoRole role)
+    internal static void AddKernel(WebApplicationBuilder builder, OrvanoRole role)
     {
         var config = builder.Configuration;
         var services = builder.Services;

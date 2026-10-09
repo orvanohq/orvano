@@ -251,7 +251,7 @@ public class AuthDomainTests
         var session = Guid.CreateVersion7();
         var now = new DateTimeOffset(2026, 3, 1, 12, 0, 0, 750, TimeSpan.Zero);
 
-        var claims = AccessTokenClaims.For("https://orvano.example.com", "shop", user, session, emailVerified: true, now);
+        var claims = AccessTokenClaims.For("https://orvano.example.com", "shop", user, session, emailVerified: true, SessionStrength.StepOne(SessionMethod.Password), now);
 
         Assert.Equal("https://orvano.example.com/v1/projects/shop", claims.Issuer);
         Assert.Equal("shop", claims.Audience);

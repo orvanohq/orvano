@@ -1,19 +1,27 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { Skeleton } from '@/components/ui/skeleton'
 import { projectClient } from '@/lib/console-client'
 import { usePageTitle } from '@/lib/page-title'
-import { authProvidersQuery, keys, projectQuery } from '@/lib/queries'
+import {
+  authMethodsQuery,
+  authProvidersQuery,
+  keys,
+  platformsQuery,
+  projectQuery,
+} from '@/lib/queries'
 import { roleReason, useOrgRole } from '@/lib/roles'
-import { notifySuccess } from '@/lib/toast'
+import { notifyError, notifySuccess } from '@/lib/toast'
 import { providerInfo } from '@/auth/providers'
 import { meetsRole } from '@/shell/nav'
 import { PageHeading } from '@/shell/page-heading'
 import { ErrorPanel } from '@/shell/error-panel'
-import type { OAuthProvider } from '@orvano/console-client'
+import type { OAuthProvider, UpdateAuthMethodSettingsRequest } from '@orvano/console-client'
 
+import { PasskeysCard, TotpCard } from './-sign-in/method-cards'
+import { PasskeysDialog } from './-sign-in/passkeys-dialog'
 import { ProviderCard } from './-sign-in/provider-card'
 import { ProviderDialog } from './-sign-in/provider-dialog'
 
@@ -23,8 +31,9 @@ export const Route = createFileRoute('/_app/projects/$projectId/sign-in-methods'
 
 /**
  * The project's sign in providers (spec 0012, AC-25): Google, Apple, GitHub, and Microsoft as
- * cards with their state and readiness, each opening its settings. Owners and developers change
- * them; viewers see everything, disabled.
+ * cards with their state and readiness, each opening its settings; and the Authenticator app and
+ * Passkeys cards (spec 0013, AC-43). Owners and developers change them; viewers see everything,
+ * disabled.
  */
 function SignInMethodsPage() {
   const { projectId } = Route.useParams()
@@ -37,8 +46,18 @@ function SignInMethodsPage() {
   const [opened, setOpened] = useState<OAuthProvider | null>(null)
   const [open, setOpen] = useState(false)
 
+  const methods = useQuery(authMethodsQuery(projectId))
+  const platforms = useInfiniteQuery(platformsQuery(projectId))
+  const [passkeysOpen, setPasskeysOpen] = useState(false)
+
   const items = list.data?.items ?? []
   const current = items.find((item) => item.provider === opened)
+
+  const saveMethods = async (request: UpdateAuthMethodSettingsRequest) => {
+    const saved = await projectClient(projectId).consoleAuthMethods.update(request)
+    queryClient.setQueryData(keys.authMethods(projectId), saved)
+    return saved
+  }
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
@@ -48,6 +67,51 @@ function SignInMethodsPage() {
           Let your users sign in with their Google, Apple, GitHub, or Microsoft account.
         </p>
       </div>
+      <section className="flex flex-col gap-3" aria-labelledby="mfa-passkeys-heading">
+        <h2 id="mfa-passkeys-heading" className="text-lg font-semibold">
+          MFA and passkeys
+        </h2>
+        {methods.isError ? (
+          <ErrorPanel
+            error={methods.error}
+            onRetry={() => {
+              void methods.refetch()
+            }}
+          />
+        ) : methods.isPending ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[0, 1].map((i) => (
+              <Skeleton key={i} className="h-36" />
+            ))}
+          </div>
+        ) : (
+          <ul className="grid gap-4 sm:grid-cols-2" aria-label="MFA and passkeys">
+            <li>
+              <TotpCard
+                settings={methods.data}
+                readOnlyReason={readOnlyReason}
+                onToggle={async (enabled) => {
+                  try {
+                    const saved = await saveMethods({ totpEnabled: enabled })
+                    notifySuccess('Authenticator app saved', saved.totpEnabled ? 'On' : 'Off')
+                  } catch (error) {
+                    notifyError("Couldn't save the authenticator app", error)
+                  }
+                }}
+              />
+            </li>
+            <li>
+              <PasskeysCard
+                settings={methods.data}
+                onOpen={() => {
+                  setPasskeysOpen(true)
+                }}
+              />
+            </li>
+          </ul>
+        )}
+      </section>
+      <h2 className="text-lg font-semibold">Providers</h2>
       {list.isError ? (
         <ErrorPanel
           error={list.error}
@@ -75,6 +139,22 @@ function SignInMethodsPage() {
             </li>
           ))}
         </ul>
+      )}
+      {methods.data === undefined ? null : (
+        <PasskeysDialog
+          // A fresh form once a save changed the settings.
+          key={JSON.stringify(methods.data)}
+          settings={methods.data}
+          projectName={project?.name ?? ''}
+          platforms={platforms.data?.pages.flatMap((page) => page.items) ?? []}
+          open={passkeysOpen}
+          onOpenChange={setPasskeysOpen}
+          readOnlyReason={readOnlyReason}
+          onSave={async (request) => {
+            const saved = await saveMethods(request)
+            notifySuccess('Passkeys saved', saved.passkeysEnabled ? 'On' : 'Off')
+          }}
+        />
       )}
       {current === undefined ? null : (
         <ProviderDialog

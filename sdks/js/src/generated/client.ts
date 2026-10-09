@@ -4,35 +4,55 @@ import { paginate } from '../runtime/pagination.js'
 import type {
   AuthResult,
   CompleteOAuthLinkRequest,
+  CompletePasskeyRegistrationRequest,
   CompleteRecoveryRequest,
   ConfirmEmailChangeRequest,
+  ConfirmTotpRequest,
   CreateAccountRequest,
   CreateEmailCodeRequest,
   CreateEmailCodeSessionRequest,
+  CreateIdTokenIdentityRequest,
   CreateIdTokenSessionRequest,
   CreateMagicLinkRequest,
   CreateMagicLinkSessionRequest,
+  CreateMfaPasskeyChallengeRequest,
+  CreateMfaSessionRequest,
   CreateOAuthFlowRequest,
+  CreateOAuthLinkFlowRequest,
   CreateOAuthSessionRequest,
+  CreatePasskeyRegistrationRequest,
+  CreatePasskeySessionRequest,
   CreatePasswordSessionRequest,
   CreateRecoveryRequest,
+  CreateTotpRequest,
   CreateVerificationRequest,
   DeleteAccountRequest,
   Health,
   Identity,
   IdentityList,
   Jwks,
+  MfaStatus,
   OAuthFlow,
   OpenIdConfiguration,
+  Passkey,
+  PasskeyChallenge,
+  PasskeyList,
+  PasskeyRegistration,
+  RaisedSession,
+  RecoveryCodes,
   RefreshSessionRequest,
   Session,
   SessionPage,
   SessionTokens,
+  TotpConfirmation,
+  TotpSetup,
   UpdateAccountRequest,
   UpdateEmailRequest,
+  UpdatePasskeyRequest,
   UpdatePasswordRequest,
   User,
   VerifyEmailRequest,
+  VerifyMfaRequest,
 } from './models.js'
 
 /** Operations in the `account` service. */
@@ -47,6 +67,17 @@ export class AccountService {
   completeOAuthLink(body: CompleteOAuthLinkRequest, options?: RequestOptions): Promise<Identity> {
     return this.#client.request<Identity>(
       { method: 'POST', path: '/v1/account/identities/oauth', body },
+      options,
+    )
+  }
+
+  /** Finishes adding a passkey with the browser's or the platform's answer to `account.createPasskeyRegistration`. */
+  completePasskeyRegistration(
+    body: CompletePasskeyRegistrationRequest,
+    options?: RequestOptions,
+  ): Promise<Passkey> {
+    return this.#client.request<Passkey>(
+      { method: 'POST', path: '/v1/account/passkeys', body },
       options,
     )
   }
@@ -69,6 +100,18 @@ export class AccountService {
   confirmEmailChange(body: ConfirmEmailChangeRequest, options?: RequestOptions): Promise<User> {
     return this.#client.request<User>(
       { method: 'POST', path: '/v1/account/email/confirm', body, session: 'user' },
+      options,
+    )
+  }
+
+  /**
+   * Turns MFA on with the first code from the authenticator app, within 15 minutes of `account.createTotp`. Answers 10
+   * new recovery codes, ends every other session of the user, and raises this one to level 2 with a new access token.
+   * The SDKs keep their stored refresh token, whose next refresh carries `aal` 2 too.
+   */
+  confirmTotp(body: ConfirmTotpRequest, options?: RequestOptions): Promise<TotpConfirmation> {
+    return this.#client.request<TotpConfirmation>(
+      { method: 'POST', path: '/v1/account/mfa/totp/confirm', body },
       options,
     )
   }
@@ -103,9 +146,13 @@ export class AccountService {
     )
   }
 
-  /** Links a provider to the signed in user with its ID token from a native app. The session must be at most 10 minutes old. */
+  /**
+   * Links a provider to the signed in user with its ID token from a native app. Needs the user's current password when
+   * they have one (or a second factor on this session within 10 minutes); a user without a password needs a session at
+   * most 10 minutes old.
+   */
   createIdTokenIdentity(
-    body: CreateIdTokenSessionRequest,
+    body: CreateIdTokenIdentityRequest,
     options?: RequestOptions,
   ): Promise<Identity> {
     return this.#client.request<Identity>(
@@ -152,6 +199,31 @@ export class AccountService {
   }
 
   /**
+   * Starts answering an MFA challenge with a passkey: answers the options for `navigator.credentials.get`, listing the
+   * user's passkeys. Send the passkey's answer to `account.createMfaSession`. Never counts as a wrong attempt.
+   */
+  createMfaPasskeyChallenge(
+    body: CreateMfaPasskeyChallengeRequest,
+    options?: RequestOptions,
+  ): Promise<PasskeyChallenge> {
+    return this.#client.request<PasskeyChallenge>(
+      { method: 'POST', path: '/v1/account/sessions/mfa/passkey-challenge', body },
+      options,
+    )
+  }
+
+  /**
+   * Finishes a sign in that answered an MFA challenge: checks the ticket and one factor, then creates the session.
+   * After 5 wrong factors the ticket stops working; sign in again.
+   */
+  createMfaSession(body: CreateMfaSessionRequest, options?: RequestOptions): Promise<AuthResult> {
+    return this.#client.request<AuthResult>(
+      { method: 'POST', path: '/v1/account/sessions/mfa', body, session: 'start' },
+      options,
+    )
+  }
+
+  /**
    * Starts signing in with a provider: answers the provider's sign in page to send the browser to. After the user
    * agrees, Orvano sends the browser back to `redirectUrl` with a code that only your verifier redeems. The SDKs'
    * `signInWithOAuth` does all of it.
@@ -164,10 +236,14 @@ export class AccountService {
   }
 
   /**
-   * Starts linking a provider to the signed in user, like `createOAuthFlow`. The session must be at most 10 minutes
-   * old. The SDKs' `linkIdentity` does all of it.
+   * Starts linking a provider to the signed in user, like `createOAuthFlow`. Needs the user's current password when
+   * they have one (or a second factor on this session within 10 minutes); a user without a password needs a session at
+   * most 10 minutes old. The SDKs' `linkIdentity` does all of it.
    */
-  createOAuthLinkFlow(body: CreateOAuthFlowRequest, options?: RequestOptions): Promise<OAuthFlow> {
+  createOAuthLinkFlow(
+    body: CreateOAuthLinkFlowRequest,
+    options?: RequestOptions,
+  ): Promise<OAuthFlow> {
     return this.#client.request<OAuthFlow>(
       { method: 'POST', path: '/v1/account/identities/oauth/flows', body },
       options,
@@ -184,6 +260,47 @@ export class AccountService {
   ): Promise<AuthResult> {
     return this.#client.request<AuthResult>(
       { method: 'POST', path: '/v1/account/sessions/oauth', body, session: 'start' },
+      options,
+    )
+  }
+
+  /**
+   * Starts a passkey sign in: answers a challenge with an empty `allowCredentials`, so the browser or the platform
+   * offers every passkey of the RP ID, including through autofill. Needs passkeys turned on for the project.
+   */
+  createPasskeyChallenge(options?: RequestOptions): Promise<PasskeyChallenge> {
+    return this.#client.request<PasskeyChallenge>(
+      { method: 'POST', path: '/v1/account/sessions/passkey-challenge' },
+      options,
+    )
+  }
+
+  /**
+   * Starts adding a passkey: answers the options for `navigator.credentials.create`. Needs passkeys turned on, the
+   * user's current password when they have one (or a second factor on this session within 10 minutes; a user without a
+   * password needs a session that signed in within 10 minutes), a verified email when the user has one, and fewer than
+   * 10 passkeys.
+   */
+  createPasskeyRegistration(
+    body: CreatePasskeyRegistrationRequest,
+    options?: RequestOptions,
+  ): Promise<PasskeyRegistration> {
+    return this.#client.request<PasskeyRegistration>(
+      { method: 'POST', path: '/v1/account/passkeys/registration', body },
+      options,
+    )
+  }
+
+  /**
+   * Signs in with a passkey's answer to `account.createPasskeyChallenge`. A passkey counts as two factors, so this sign
+   * in is never asked for MFA and the session starts at level 2.
+   */
+  createPasskeySession(
+    body: CreatePasskeySessionRequest,
+    options?: RequestOptions,
+  ): Promise<AuthResult> {
+    return this.#client.request<AuthResult>(
+      { method: 'POST', path: '/v1/account/sessions/passkey', body, session: 'start' },
       options,
     )
   }
@@ -206,6 +323,41 @@ export class AccountService {
   createRecovery(body: CreateRecoveryRequest, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
       { method: 'POST', path: '/v1/account/recovery', body },
+      options,
+    )
+  }
+
+  /**
+   * Replaces the user's recovery codes with 10 new ones; every older code stops working. Needs MFA on and a second
+   * factor on this session within 10 minutes (`account.verifyMfa`).
+   */
+  createRecoveryCodes(options?: RequestOptions): Promise<RecoveryCodes> {
+    return this.#client.request<RecoveryCodes>(
+      { method: 'POST', path: '/v1/account/mfa/recovery-codes' },
+      options,
+    )
+  }
+
+  /**
+   * Starts a step up with a passkey: answers the options for `navigator.credentials.get`, listing the signed in user's
+   * passkeys. Send the passkey's answer to `account.verifyMfa`.
+   */
+  createStepUpPasskeyChallenge(options?: RequestOptions): Promise<PasskeyChallenge> {
+    return this.#client.request<PasskeyChallenge>(
+      { method: 'POST', path: '/v1/account/mfa/passkey-challenge' },
+      options,
+    )
+  }
+
+  /**
+   * Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.
+   * Needs the user's current password when they have one (or a second factor on this session within 10 minutes; a
+   * user without a password needs a session that signed in within 10 minutes) and, when the user has an email, a
+   * verified one.
+   */
+  createTotp(body: CreateTotpRequest, options?: RequestOptions): Promise<TotpSetup> {
+    return this.#client.request<TotpSetup>(
+      { method: 'POST', path: '/v1/account/mfa/totp', body },
       options,
     )
   }
@@ -250,10 +402,32 @@ export class AccountService {
     )
   }
 
+  /**
+   * Removes one of the signed in user's passkeys. A user with MFA on needs a second factor on this session within 10
+   * minutes (`account.verifyMfa`); a user without it needs a session that signed in within 10 minutes.
+   */
+  deletePasskey(passkeyId: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'DELETE', path: `/v1/account/passkeys/${encodeURIComponent(passkeyId)}` },
+      options,
+    )
+  }
+
   /** Ends one of the signed in user's sessions. */
   deleteSession(sessionId: string, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
       { method: 'DELETE', path: `/v1/account/sessions/${encodeURIComponent(sessionId)}` },
+      options,
+    )
+  }
+
+  /**
+   * Turns MFA off: removes the authenticator app and every recovery code. Sessions stay. Needs a second factor on this
+   * session within 10 minutes (`account.verifyMfa`).
+   */
+  deleteTotp(options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      { method: 'DELETE', path: '/v1/account/mfa/totp' },
       options,
     )
   }
@@ -263,10 +437,23 @@ export class AccountService {
     return this.#client.request<User>({ method: 'GET', path: '/v1/account' }, options)
   }
 
+  /** Gets the signed in user's MFA state. */
+  getMfa(options?: RequestOptions): Promise<MfaStatus> {
+    return this.#client.request<MfaStatus>({ method: 'GET', path: '/v1/account/mfa' }, options)
+  }
+
   /** Lists the signed in user's identities, oldest first. */
   listIdentities(options?: RequestOptions): Promise<IdentityList> {
     return this.#client.request<IdentityList>(
       { method: 'GET', path: '/v1/account/identities' },
+      options,
+    )
+  }
+
+  /** Lists the signed in user's passkeys, oldest first, including inactive ones. */
+  listPasskeys(options?: RequestOptions): Promise<PasskeyList> {
+    return this.#client.request<PasskeyList>(
+      { method: 'GET', path: '/v1/account/passkeys' },
       options,
     )
   }
@@ -323,6 +510,18 @@ export class AccountService {
     )
   }
 
+  /** Renames one of the signed in user's passkeys. */
+  updatePasskey(
+    passkeyId: string,
+    body: UpdatePasskeyRequest,
+    options?: RequestOptions,
+  ): Promise<Passkey> {
+    return this.#client.request<Passkey>(
+      { method: 'PATCH', path: `/v1/account/passkeys/${encodeURIComponent(passkeyId)}`, body },
+      options,
+    )
+  }
+
   /** Changes the signed in user's password and ends every other session of theirs. */
   updatePassword(body: UpdatePasswordRequest, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
@@ -338,6 +537,18 @@ export class AccountService {
   verifyEmail(body: VerifyEmailRequest, options?: RequestOptions): Promise<User> {
     return this.#client.request<User>(
       { method: 'POST', path: '/v1/account/verification/confirm', body, session: 'user' },
+      options,
+    )
+  }
+
+  /**
+   * Step up: checks a second factor on the signed in session, so security changes work for the next 10 minutes. Raises
+   * the session to level 2 and answers a new access token; the refresh token is not sent and stays unchanged. The SDK
+   * helpers (`verifyMfa`) store the access token.
+   */
+  verifyMfa(body: VerifyMfaRequest, options?: RequestOptions): Promise<RaisedSession> {
+    return this.#client.request<RaisedSession>(
+      { method: 'POST', path: '/v1/account/mfa/verify', body },
       options,
     )
   }

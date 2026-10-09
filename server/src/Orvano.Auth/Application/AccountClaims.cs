@@ -5,8 +5,9 @@ namespace Orvano.Auth.Application;
 
 /// <summary>
 /// Claiming an unverified account for whoever just proved the email (spec 0010, AC-32, amended by spec 0012, AC-12):
-/// the password and every identity go, Apple ones with a revoke queued, and the user's sessions end with reason
-/// <c>account_claimed</c>. Runs in the caller's transaction, under the user's lock, before the caller signs in.
+/// the password and every identity go, Apple ones with a revoke queued, the second factors and passkeys go (spec 0013,
+/// AC-29), and the user's sessions end with reason <c>account_claimed</c>. Runs in the caller's transaction, under the
+/// user's lock, before the caller signs in.
 /// </summary>
 internal static class AccountClaims
 {
@@ -18,10 +19,16 @@ internal static class AccountClaims
     /// <c>auth.identity.unlinked</c>, reason <c>claimed</c>), and ends the user's sessions when <paramref name="endSessions"/>
     /// says so or anything was removed. <paramref name="removePassword"/> false keeps the password (the email link proves
     /// the inbox, not who chose the password). The caller marks the email verified and writes <c>auth.user.updated</c>.
+    /// Refuses project <c>console</c> (spec 0013, AC-29): console accounts enroll factors with an unverified email, which
+    /// is safe only while nothing claims one. A change that adds a console claim must drop this guard and bring the
+    /// verified email rule back for <c>console</c> in the same pull request.
     /// </summary>
     public static async Task<Claimed> ClaimAsync(
         AuthUnitOfWork uow, Sessions sessions, string projectId, LockedUser user, Actor actor, bool endSessions, CancellationToken ct, bool removePassword = true)
     {
+        if (projectId == ConsoleProject.Id)
+            throw new InvalidOperationException("Console accounts are never claimed (spec 0013, AC-29).");
+
         var removed = false;
         if (removePassword && user.HasPassword)
         {
@@ -40,6 +47,23 @@ internal static class AccountClaims
         {
             await Identities.DeleteAsync(uow, projectId, identity, Identities.UnlinkReason.Claimed, actor, ct);
             removed = true;
+        }
+
+        // Spec 0013, AC-29: a claimed account keeps no second factor and no passkey, with no alert emails. Removing
+        // them alone ends no session.
+        var userKey = user.Id.ToString();
+        var ids = new Dictionary<string, string> { ["userId"] = userKey };
+        if (await MfaFactorStore.DeleteFactorsAsync(uow, user.Id, ct))
+        {
+            await AuthEvents.WriteAsync(uow.Tx, AuthEvents.MfaDisabled, projectId, actor, userKey, ids,
+                fields: new Dictionary<string, string?> { ["reason"] = AuthEvents.RemovedByClaim }, ct: ct);
+        }
+
+        foreach (var passkeyId in await MfaFactorStore.DeletePasskeysAsync(uow, user.Id, ct))
+        {
+            await AuthEvents.WriteAsync(uow.Tx, AuthEvents.PasskeyRemoved, projectId, actor, userKey,
+                new Dictionary<string, string> { ["userId"] = userKey, ["passkeyId"] = passkeyId.ToString() },
+                fields: new Dictionary<string, string?> { ["reason"] = AuthEvents.RemovedByClaim }, ct: ct);
         }
 
         Guid[] ended = endSessions || removed

@@ -1,6 +1,8 @@
 import { createNonce, createPkce } from '@orvano/js'
+import type { MfaAnswer } from '@orvano/js'
 import type { Client as ServerClient } from '@orvano/js/server'
 import type { DispatchTable } from './dispatch-table.js'
+import type { ClientSurface } from './generated/client.js'
 
 /** The fake provider's headers for Apple's form post (spec 0012, AC-27): its target and urlencoded body. */
 const formActionHeader = 'x-orvano-test-form-action'
@@ -63,6 +65,68 @@ function base64Url(text: string): string {
 
 const defaultRedirect = 'http://localhost:3000/auth/callback'
 
+const base32Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+
+/**
+ * The 6 digit code an authenticator app shows for `secret` (unpadded base32) at this 30 second step
+ * plus `offset` (RFC 6238, HMAC SHA-1), as the TOTP scenarios need (spec 0013, AC-45).
+ */
+export async function totpCode(secret: string, offset: number): Promise<string> {
+  const bytes: number[] = []
+  let buffer = 0
+  let bits = 0
+  for (const c of secret) {
+    buffer = (buffer << 5) | base32Alphabet.indexOf(c)
+    bits += 5
+    if (bits >= 8) {
+      bytes.push((buffer >> (bits - 8)) & 0xff)
+      bits -= 8
+    }
+  }
+  const step = Math.floor(Date.now() / 1000 / 30) + offset
+  const counter = new Uint8Array(8)
+  new DataView(counter.buffer).setBigUint64(0, BigInt(step))
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new Uint8Array(bytes),
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign'],
+  )
+  const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, counter))
+  const at = (mac[19] ?? 0) & 0x0f
+  const binary =
+    (((mac[at] ?? 0) & 0x7f) << 24) |
+    ((mac[at + 1] ?? 0) << 16) |
+    ((mac[at + 2] ?? 0) << 8) |
+    (mac[at + 3] ?? 0)
+  return String(binary % 1_000_000).padStart(6, '0')
+}
+
+/** A step's optional `password`, the user's current password (spec 0013), as helper options. */
+function passwordOf(input: Record<string, unknown>): { password?: string } {
+  return typeof input.password === 'string' ? { password: input.password } : {}
+}
+
+/**
+ * Runs a helper that raises the session with a second factor (spec 0013) and says whether the
+ * client still holds the refresh token it held before: Orvano answers only a new access token.
+ */
+async function keepsRefreshToken(o: ClientSurface, raise: () => Promise<void>): Promise<boolean> {
+  const before = (await o.client.session.get())?.refreshToken ?? null
+  await raise()
+  const after = (await o.client.session.get())?.refreshToken ?? null
+  return before !== null && after === before
+}
+
+/** The one factor of an MFA runner step: `totpCode`, `recoveryCode`, or `passkey: true`. */
+function mfaAnswer(input: Record<string, unknown>): MfaAnswer {
+  if (input.passkey === true) return { passkey: true }
+  return typeof input.totpCode === 'string'
+    ? { totpCode: input.totpCode }
+    : { recoveryCode: String(input.recoveryCode) }
+}
+
 /**
  * Runner operations: calls the scenarios make that are not contract operations. `signIn` is a
  * plain sign in call that leaves the SDK's stored session alone, so a runner without client
@@ -70,10 +134,60 @@ const defaultRedirect = 'http://localhost:3000/auth/callback'
  * is the runner's clock, saved before a send and passed to `test.getLatestEmail` as `after`;
  * `redeemLink` is the client SDK's link helper (spec 0010); `oauthSignIn` runs the client SDK's
  * `signInWithOAuth` or `linkIdentity` with an `open` that follows the fake provider over HTTP,
- * `oauthCode` stops at the code so a scenario can redeem it itself, and `createNonce` is the SDK's
- * native nonce (spec 0012). Their names have no dot, so they never collide with an operationId.
+ * `oauthCode` stops at the code so a scenario can redeem it itself, `createNonce` is the SDK's
+ * native nonce (spec 0012), `totpCode` is an authenticator app's current code, `completeMfa`,
+ * `verifyMfa`, and `confirmTotp` are the client SDK's MFA helpers (the last two also say whether the
+ * client kept its refresh token), and `registerPasskey` and `signInWithPasskey` its passkey
+ * helpers, on the server's software authenticator (spec 0013); `registerPasskey` and a linking
+ * `oauthSignIn` send the step's `password`. `accessToken` hands the client's stored access token to
+ * a server step.
+ * Their names have no dot, so they never collide with an operationId.
  */
 export const runnerDispatch: DispatchTable = {
+  totpCode: {
+    status: 200,
+    client: async (_, input) => ({
+      code: await totpCode(
+        String(input.secret),
+        typeof input.offset === 'number' ? input.offset : 0,
+      ),
+    }),
+  },
+  completeMfa: {
+    status: 201,
+    client: async (o, input) => o.client.completeMfa(mfaAnswer(input)),
+  },
+  verifyMfa: {
+    status: 200,
+    client: async (o, input) => {
+      const refreshTokenKept = await keepsRefreshToken(o, () =>
+        o.client.verifyMfa(mfaAnswer(input)),
+      )
+      return { verified: true, refreshTokenKept }
+    },
+  },
+  registerPasskey: {
+    status: 201,
+    client: async (o, input) =>
+      o.client.registerPasskey({
+        ...(typeof input.name === 'string' ? { name: input.name } : {}),
+        ...passwordOf(input),
+      }),
+  },
+  signInWithPasskey: {
+    status: 201,
+    client: async (o) => o.client.signInWithPasskey(),
+  },
+  confirmTotp: {
+    status: 200,
+    client: async (o, input) => {
+      let recoveryCodes: string[] = []
+      const refreshTokenKept = await keepsRefreshToken(o, async () => {
+        recoveryCodes = await o.client.confirmTotp(String(input.code))
+      })
+      return { recoveryCodes, refreshTokenKept }
+    },
+  },
   now: {
     status: 200,
     client: () => Promise.resolve({ now: new Date().toISOString() }),
@@ -101,7 +215,7 @@ export const runnerDispatch: DispatchTable = {
       }
       const provider = String(input.provider) as 'google' | 'apple' | 'github' | 'microsoft'
       return input.link === true
-        ? await o.client.linkIdentity(provider, options)
+        ? await o.client.linkIdentity(provider, { ...options, ...passwordOf(input) })
         : await o.client.signInWithOAuth(provider, options)
     },
   },
@@ -134,17 +248,28 @@ export const runnerDispatch: DispatchTable = {
         body: input.body,
       }),
   },
+  accessToken: {
+    status: 200,
+    client: async (o) => {
+      const session = await o.client.getSession()
+      if (session === null) throw new Error('accessToken needs a signed in client.')
+      return { token: session.accessToken }
+    },
+  },
   verifyAccessToken: {
     status: 200,
     server: async (o, input) => {
       const verified = await (o.client as ServerClient).verifyAccessToken(String(input.token), {
         online: input.online === true,
+        requireMfa: input.requireMfa === true,
       })
       return {
         userId: verified.userId,
         sessionId: verified.sessionId,
         emailVerified: verified.emailVerified,
         expiresAt: verified.expiresAt.toISOString(),
+        aal: verified.aal,
+        amr: verified.amr,
       }
     },
   },

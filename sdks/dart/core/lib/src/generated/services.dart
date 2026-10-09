@@ -24,6 +24,20 @@ final class AccountService {
     return Identity.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Finishes adding a passkey with the browser's or the platform's answer to `account.createPasskeyRegistration`.
+  Future<Passkey> completePasskeyRegistration(
+    CompletePasskeyRegistrationRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/passkeys',
+      body: body.toJson(),
+      options: options,
+    );
+    return Passkey.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Sets a new password with the token from a reset link, and signs the user in. Every other session of the user
   /// ends, and the email counts as verified. The token works once.
   Future<AuthResult> completeRecovery(
@@ -54,6 +68,22 @@ final class AccountService {
       options: options,
     );
     return User.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Turns MFA on with the first code from the authenticator app, within 15 minutes of `account.createTotp`. Answers 10
+  /// new recovery codes, ends every other session of the user, and raises this one to level 2 with a new access token.
+  /// The SDKs keep their stored refresh token, whose next refresh carries `aal` 2 too.
+  Future<TotpConfirmation> confirmTotp(
+    ConfirmTotpRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/mfa/totp/confirm',
+      body: body.toJson(),
+      options: options,
+    );
+    return TotpConfirmation.fromJson(json as Map<String, dynamic>);
   }
 
   /// Signs a new user up with an email and password, and signs them in.
@@ -100,9 +130,11 @@ final class AccountService {
     return AuthResult.fromJson(json as Map<String, dynamic>);
   }
 
-  /// Links a provider to the signed in user with its ID token from a native app. The session must be at most 10 minutes old.
+  /// Links a provider to the signed in user with its ID token from a native app. Needs the user's current password when
+  /// they have one (or a second factor on this session within 10 minutes); a user without a password needs a session at
+  /// most 10 minutes old.
   Future<Identity> createIdTokenIdentity(
-    CreateIdTokenSessionRequest body, {
+    CreateIdTokenIdentityRequest body, {
     RequestOptions? options,
   }) async {
     final json = await _client.send(
@@ -160,6 +192,37 @@ final class AccountService {
     return AuthResult.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Starts answering an MFA challenge with a passkey: answers the options for `navigator.credentials.get`, listing the
+  /// user's passkeys. Send the passkey's answer to `account.createMfaSession`. Never counts as a wrong attempt.
+  Future<PasskeyChallenge> createMfaPasskeyChallenge(
+    CreateMfaPasskeyChallengeRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/sessions/mfa/passkey-challenge',
+      body: body.toJson(),
+      options: options,
+    );
+    return PasskeyChallenge.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Finishes a sign in that answered an MFA challenge: checks the ticket and one factor, then creates the session.
+  /// After 5 wrong factors the ticket stops working; sign in again.
+  Future<AuthResult> createMfaSession(
+    CreateMfaSessionRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/sessions/mfa',
+      body: body.toJson(),
+      session: SessionChange.start,
+      options: options,
+    );
+    return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Starts signing in with a provider: answers the provider's sign in page to send the browser to. After the user
   /// agrees, Orvano sends the browser back to `redirectUrl` with a code that only your verifier redeems. The SDKs'
   /// `signInWithOAuth` does all of it.
@@ -176,10 +239,11 @@ final class AccountService {
     return OAuthFlow.fromJson(json as Map<String, dynamic>);
   }
 
-  /// Starts linking a provider to the signed in user, like `createOAuthFlow`. The session must be at most 10 minutes
-  /// old. The SDKs' `linkIdentity` does all of it.
+  /// Starts linking a provider to the signed in user, like `createOAuthFlow`. Needs the user's current password when
+  /// they have one (or a second factor on this session within 10 minutes); a user without a password needs a session at
+  /// most 10 minutes old. The SDKs' `linkIdentity` does all of it.
   Future<OAuthFlow> createOAuthLinkFlow(
-    CreateOAuthFlowRequest body, {
+    CreateOAuthLinkFlowRequest body, {
     RequestOptions? options,
   }) async {
     final json = await _client.send(
@@ -200,6 +264,52 @@ final class AccountService {
     final json = await _client.send(
       'POST',
       '/v1/account/sessions/oauth',
+      body: body.toJson(),
+      session: SessionChange.start,
+      options: options,
+    );
+    return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Starts a passkey sign in: answers a challenge with an empty `allowCredentials`, so the browser or the platform
+  /// offers every passkey of the RP ID, including through autofill. Needs passkeys turned on for the project.
+  Future<PasskeyChallenge> createPasskeyChallenge({
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/sessions/passkey-challenge',
+      options: options,
+    );
+    return PasskeyChallenge.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Starts adding a passkey: answers the options for `navigator.credentials.create`. Needs passkeys turned on, the
+  /// user's current password when they have one (or a second factor on this session within 10 minutes; a user without a
+  /// password needs a session that signed in within 10 minutes), a verified email when the user has one, and fewer than
+  /// 10 passkeys.
+  Future<PasskeyRegistration> createPasskeyRegistration(
+    CreatePasskeyRegistrationRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/passkeys/registration',
+      body: body.toJson(),
+      options: options,
+    );
+    return PasskeyRegistration.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Signs in with a passkey's answer to `account.createPasskeyChallenge`. A passkey counts as two factors, so this sign
+  /// in is never asked for MFA and the session starts at level 2.
+  Future<AuthResult> createPasskeySession(
+    CreatePasskeySessionRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/sessions/passkey',
       body: body.toJson(),
       session: SessionChange.start,
       options: options,
@@ -234,6 +344,47 @@ final class AccountService {
       body: body.toJson(),
       options: options,
     );
+  }
+
+  /// Replaces the user's recovery codes with 10 new ones; every older code stops working. Needs MFA on and a second
+  /// factor on this session within 10 minutes (`account.verifyMfa`).
+  Future<RecoveryCodes> createRecoveryCodes({RequestOptions? options}) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/mfa/recovery-codes',
+      options: options,
+    );
+    return RecoveryCodes.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Starts a step up with a passkey: answers the options for `navigator.credentials.get`, listing the signed in user's
+  /// passkeys. Send the passkey's answer to `account.verifyMfa`.
+  Future<PasskeyChallenge> createStepUpPasskeyChallenge({
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/mfa/passkey-challenge',
+      options: options,
+    );
+    return PasskeyChallenge.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Starts turning on an authenticator app: answers a new secret, replacing any that still waits for its first code.
+  /// Needs the user's current password when they have one (or a second factor on this session within 10 minutes; a
+  /// user without a password needs a session that signed in within 10 minutes) and, when the user has an email, a
+  /// verified one.
+  Future<TotpSetup> createTotp(
+    CreateTotpRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/mfa/totp',
+      body: body.toJson(),
+      options: options,
+    );
+    return TotpSetup.fromJson(json as Map<String, dynamic>);
   }
 
   /// Emails the signed in user a link that verifies their email.
@@ -290,6 +441,19 @@ final class AccountService {
     await _client.send('DELETE', '/v1/account/sessions', options: options);
   }
 
+  /// Removes one of the signed in user's passkeys. A user with MFA on needs a second factor on this session within 10
+  /// minutes (`account.verifyMfa`); a user without it needs a session that signed in within 10 minutes.
+  Future<void> deletePasskey(
+    String passkeyId, {
+    RequestOptions? options,
+  }) async {
+    await _client.send(
+      'DELETE',
+      '/v1/account/passkeys/${Uri.encodeComponent(passkeyId)}',
+      options: options,
+    );
+  }
+
   /// Ends one of the signed in user's sessions.
   Future<void> deleteSession(
     String sessionId, {
@@ -302,10 +466,22 @@ final class AccountService {
     );
   }
 
+  /// Turns MFA off: removes the authenticator app and every recovery code. Sessions stay. Needs a second factor on this
+  /// session within 10 minutes (`account.verifyMfa`).
+  Future<void> deleteTotp({RequestOptions? options}) async {
+    await _client.send('DELETE', '/v1/account/mfa/totp', options: options);
+  }
+
   /// Gets the signed in user. A server can call it with a user's access token to check that the session is still active.
   Future<User> get({RequestOptions? options}) async {
     final json = await _client.send('GET', '/v1/account', options: options);
     return User.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Gets the signed in user's MFA state.
+  Future<MfaStatus> getMfa({RequestOptions? options}) async {
+    final json = await _client.send('GET', '/v1/account/mfa', options: options);
+    return MfaStatus.fromJson(json as Map<String, dynamic>);
   }
 
   /// Lists the signed in user's identities, oldest first.
@@ -316,6 +492,16 @@ final class AccountService {
       options: options,
     );
     return IdentityList.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Lists the signed in user's passkeys, oldest first, including inactive ones.
+  Future<PasskeyList> listPasskeys({RequestOptions? options}) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/account/passkeys',
+      options: options,
+    );
+    return PasskeyList.fromJson(json as Map<String, dynamic>);
   }
 
   /// Lists the signed in user's active sessions, newest first.
@@ -386,6 +572,21 @@ final class AccountService {
     );
   }
 
+  /// Renames one of the signed in user's passkeys.
+  Future<Passkey> updatePasskey(
+    String passkeyId,
+    UpdatePasskeyRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'PATCH',
+      '/v1/account/passkeys/${Uri.encodeComponent(passkeyId)}',
+      body: body.toJson(),
+      options: options,
+    );
+    return Passkey.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Changes the signed in user's password and ends every other session of theirs.
   Future<void> updatePassword(
     UpdatePasswordRequest body, {
@@ -413,6 +614,22 @@ final class AccountService {
       options: options,
     );
     return User.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Step up: checks a second factor on the signed in session, so security changes work for the next 10 minutes. Raises
+  /// the session to level 2 and answers a new access token; the refresh token is not sent and stays unchanged. The SDK
+  /// helpers (`verifyMfa`) store the access token.
+  Future<RaisedSession> verifyMfa(
+    VerifyMfaRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/account/mfa/verify',
+      body: body.toJson(),
+      options: options,
+    );
+    return RaisedSession.fromJson(json as Map<String, dynamic>);
   }
 }
 

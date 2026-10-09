@@ -32,20 +32,35 @@ const verificationOptions = [
 
 type VerificationChoice = (typeof verificationOptions)[number]['value']
 
+/** The MFA filter's choices; the URL keeps `mfa=on` or `off` (spec 0013, AC-44). */
+const mfaOptions = [
+  { value: 'all', label: 'All' },
+  { value: 'on', label: 'On' },
+  { value: 'off', label: 'Off' },
+] as const
+
+interface UsersSearch {
+  emailVerified?: boolean
+  mfa?: 'on' | 'off'
+}
+
 export const Route = createFileRoute('/_app/projects/$projectId/users/')({
-  validateSearch: (search: Record<string, unknown>): { emailVerified?: boolean } =>
-    typeof search.emailVerified === 'boolean' ? { emailVerified: search.emailVerified } : {},
+  validateSearch: (search: Record<string, unknown>): UsersSearch => ({
+    ...(typeof search.emailVerified === 'boolean' ? { emailVerified: search.emailVerified } : {}),
+    ...(search.mfa === 'on' || search.mfa === 'off' ? { mfa: search.mfa } : {}),
+  }),
   component: UsersPage,
 })
 
 /**
- * The project's users (spec 0004, AC-29): newest first, paged, with a prefix search on email and
- * a verification filter kept in the URL (spec 0010, AC-22). Owners and developers create users;
+ * The project's users (spec 0004, AC-29): newest first, paged, with a prefix search on email, and
+ * verification (spec 0010, AC-22) and MFA (spec 0013, AC-44) filters kept in the URL. Owners and
+ * developers create users;
  * viewers see the button with the reason it is not theirs.
  */
 function UsersPage() {
   const { projectId } = Route.useParams()
-  const { emailVerified } = Route.useSearch()
+  const { emailVerified, mfa } = Route.useSearch()
   const navigate = Route.useNavigate()
   const choice: VerificationChoice =
     emailVerified === undefined ? 'all' : emailVerified ? 'verified' : 'unverified'
@@ -64,7 +79,7 @@ function UsersPage() {
       clearTimeout(timer)
     }
   }, [typed])
-  const users = useInfiniteQuery(usersQuery(projectId, email, emailVerified))
+  const users = useInfiniteQuery(usersQuery(projectId, email, emailVerified, 25, mfa))
   const rows = users.data?.pages.flatMap((page) => page.items) ?? []
 
   return (
@@ -112,7 +127,10 @@ function UsersPage() {
             onValueChange={(next) => {
               if (next === null) return
               void navigate({
-                search: next === 'all' ? {} : { emailVerified: next === 'verified' },
+                search: (prev) => ({
+                  ...(prev.mfa === undefined ? {} : { mfa: prev.mfa }),
+                  ...(next === 'all' ? {} : { emailVerified: next === 'verified' }),
+                }),
                 replace: true,
               })
             }}
@@ -122,6 +140,36 @@ function UsersPage() {
             </SelectTrigger>
             <SelectContent>
               {verificationOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="users-mfa">MFA</Label>
+          <Select
+            items={mfaOptions}
+            value={mfa ?? 'all'}
+            onValueChange={(next) => {
+              if (next === null) return
+              void navigate({
+                search: (prev) => ({
+                  ...(prev.emailVerified === undefined
+                    ? {}
+                    : { emailVerified: prev.emailVerified }),
+                  ...(next === 'on' || next === 'off' ? { mfa: next } : {}),
+                }),
+                replace: true,
+              })
+            }}
+          >
+            <SelectTrigger id="users-mfa" className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {mfaOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
@@ -144,7 +192,9 @@ function UsersPage() {
         onLoadMore={() => {
           void users.fetchNextPage()
         }}
-        empty={<NoUsers searching={email !== '' || emailVerified !== undefined} />}
+        empty={
+          <NoUsers searching={email !== '' || emailVerified !== undefined || mfa !== undefined} />
+        }
       />
     </div>
   )

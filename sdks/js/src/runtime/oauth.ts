@@ -1,7 +1,9 @@
 import { AccountService } from '../generated/client.js'
-import type { IdTokenProvider, Identity, OAuthProvider, User } from '../generated/models.js'
+import type { IdTokenProvider, Identity, OAuthProvider } from '../generated/models.js'
 import type { Client, RequestOptions } from './client.js'
 import { OrvanoError } from './error.js'
+import { signInOutcome } from './mfa.js'
+import type { SignInOutcome } from './mfa.js'
 
 /** What a provider redirect came back for: its `orvano_type` parameter (spec 0012). */
 export type OAuthLinkType = 'oauth' | 'oauth_link'
@@ -33,14 +35,35 @@ export interface OAuthOptions extends RequestOptions {
   open?: OAuthOpener
 }
 
-/** A finished provider sign in: the user, and whether it created them. */
-export interface OAuthSignInResult {
+/**
+ * Options for {@link Client.linkIdentity}: those of a sign in, plus the user's current password.
+ */
+export interface LinkIdentityOptions extends OAuthOptions {
+  /**
+   * The user's current password. A user who has one passes it, unless this session passed a
+   * second factor within 10 minutes; a user without one leaves it out, and must have signed in
+   * within 10 minutes.
+   */
+  password?: string
+}
+
+/** Options for {@link Client.linkIdentityWithIdToken}: the call's options plus the user's current password. */
+export interface IdentityLinkOptions extends RequestOptions {
+  /**
+   * The user's current password. A user who has one passes it, unless this session passed a
+   * second factor within 10 minutes; a user without one leaves it out, and must have signed in
+   * within 10 minutes.
+   */
+  password?: string
+}
+
+/**
+ * A finished provider sign in: the user, and whether it created them, or the MFA step it stopped
+ * at (`mfaRequired`).
+ */
+export interface OAuthSignInResult extends SignInOutcome {
   /** `oauth`. */
   type: 'oauth'
-  /** The signed in user. */
-  user: User
-  /** True when the provider account had no user yet. */
-  isNewUser: boolean
 }
 
 /** A finished link of a provider to the signed in user. */
@@ -51,13 +74,11 @@ export interface IdentityLinkResult {
   identity: Identity
 }
 
-/** What a native sign in did: the user, and whether it created them. */
-export interface IdTokenSignInResult {
-  /** The signed in user. */
-  user: User
-  /** True when the provider account had no user yet. */
-  isNewUser: boolean
-}
+/**
+ * What a native sign in did: the user, and whether it created them, or the MFA step it stopped at
+ * (`mfaRequired`).
+ */
+export type IdTokenSignInResult = SignInOutcome
 
 /** A native sign in or link with a provider's ID token (spec 0012, AC-9). */
 export interface IdTokenCredentials {
@@ -87,11 +108,14 @@ export interface Nonce {
  * posts to the app's route handler, which keeps it in a cookie.
  */
 export interface OAuthTransport {
-  /** Starts a sign in or link flow and opens the provider; null when the page navigated away. */
+  /**
+   * Starts a sign in or link flow and opens the provider; null when the page navigated away. A
+   * link's `options` may carry the user's `password`.
+   */
   start(
     purpose: OAuthLinkType,
     provider: OAuthProvider,
-    options: OAuthOptions,
+    options: LinkIdentityOptions,
     client: Client,
   ): Promise<OAuthSignInResult | IdentityLinkResult | null>
   /** Redeems a provider redirect's code with the stored verifier. */
@@ -113,7 +137,7 @@ const memoryVerifiers = new WeakMap<Client, string>()
 /** The default {@link OAuthTransport}: the `account` operations, called from this runtime. */
 export const directOAuth: OAuthTransport = {
   async start(purpose, provider, options, client) {
-    const { redirectUrl, open, ...request } = options
+    const { redirectUrl, open, password, ...request } = options
     const opener = open ?? defaultOpener()
     if (opener === undefined)
       throw new TypeError('Orvano: pass an open function; this runtime has no location to assign.')
@@ -124,7 +148,10 @@ export const directOAuth: OAuthTransport = {
     const flow =
       purpose === 'oauth'
         ? await account.createOAuthFlow(body, request)
-        : await account.createOAuthLinkFlow(body, request)
+        : await account.createOAuthLinkFlow(
+            password === undefined ? body : { ...body, password },
+            request,
+          )
     saveVerifier(client, verifier)
     const final = await opener(flow.url)
     if (final === undefined) return null
@@ -141,7 +168,7 @@ export const directOAuth: OAuthTransport = {
       if (type === 'oauth') {
         const result = await account.createOAuthSession({ code, codeVerifier }, options)
         takeVerifier(client)
-        return { type, user: result.user, isNewUser: result.isNewUser }
+        return { type, ...signInOutcome(result) }
       }
       const identity = await account.completeOAuthLink({ code, codeVerifier }, options)
       takeVerifier(client)
@@ -219,18 +246,22 @@ export async function signInWithIdToken(
   options?: RequestOptions,
 ): Promise<IdTokenSignInResult> {
   const result = await new AccountService(client).createIdTokenSession(body(credentials), options)
-  return { user: result.user, isNewUser: result.isNewUser }
+  return signInOutcome(result)
 }
 
-/** Links a provider natively (`account.createIdTokenIdentity`) and says `userUpdated`. */
+/**
+ * Links a provider natively (`account.createIdTokenIdentity`), sending the user's `password` when
+ * given, and says `userUpdated`.
+ */
 export async function linkIdentityWithIdToken(
   client: Client,
   credentials: IdTokenCredentials,
-  options?: RequestOptions,
+  options: IdentityLinkOptions = {},
 ): Promise<Identity> {
+  const { password, ...request } = options
   const identity = await new AccountService(client).createIdTokenIdentity(
-    body(credentials),
-    options,
+    password === undefined ? body(credentials) : { ...body(credentials), password },
+    request,
   )
   await client.reloadSession('userUpdated')
   return identity

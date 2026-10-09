@@ -15,6 +15,7 @@ model apiKey is ApiKeyAuth<ApiKeyLocation.header, "X-Orvano-Key">;
 
 @doc("""
   A console account's session: the `orvano_console` cookie (`HttpOnly`, `SameSite=Strict`), set by
-  `consoleAccount.create` and `consoleAccount.createSession`. Browsers send it themselves.
+  `consoleAccount.create`, `consoleAccount.createSession` (when the account has no MFA), and the second step and
+  passkey sign in that finish it. Browsers send it themselves.
   """)
 model consoleSession is ApiKeyAuth<ApiKeyLocation.cookie, "orvano_console">;

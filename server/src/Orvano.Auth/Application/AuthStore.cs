@@ -28,9 +28,9 @@ internal sealed class AuthStore([FromKeyedServices(OrvanoDb.App)] NpgsqlDataSour
     }
 
     /// <summary>
-    /// A unit of work whose use case decides whether to commit: the one place a refusal must still keep its writes,
-    /// the wrong email code whose attempt count stays counted (spec 0010, AC-5). Use <see cref="WriteAsync{T}"/>
-    /// everywhere else.
+    /// A unit of work whose use case decides whether to commit: the two places a refusal must still keep its writes,
+    /// the wrong email code whose attempt count stays counted (spec 0010, AC-5) and the wrong second factor that counts
+    /// against its MFA ticket (spec 0013, AC-8). Use <see cref="WriteAsync{T}"/> everywhere else.
     /// </summary>
     public async Task<Outcome<T>> WriteDecidingAsync<T>(
         Func<AuthUnitOfWork, CancellationToken, Task<(Outcome<T> Outcome, bool Commit)>> work, CancellationToken ct)

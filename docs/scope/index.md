@@ -56,7 +56,7 @@ Every product feature ships in all of these layers in the same version, unless i
 | 10 | Email verification, recovery & passwordless | v0.2 | done |
 | 11 | Docs site & quickstarts | v0.2 | done |
 | 12 | OAuth & ID token sign in | v0.3 | done |
-| 13 | MFA, passkeys & sessions | v0.3 | planned |
+| 13 | MFA, passkeys & sessions | v0.3 | in-progress |
 | 14 | Auth policies & abuse protection | v0.3 | planned |
 | 15 | Console team members & roles | v0.3 | done |
 | 16 | Tables, rows & data API | v0.4 | planned |
@@ -118,7 +118,7 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - **Signed images and installer**: cosign signatures on the images and `install.sh`, checked by the installer · from spec 0006
 - **Short install URL**: `get.orvano.dev` redirecting to the release's `install.sh` · from spec 0006
 - **RHEL family installs**: Rocky, Alma, and Fedora support once SELinux and firewalld are tested · from spec 0006
-- **Console account recovery**: password reset and email verification for console accounts, through the install SMTP · from spec 0010
+- **Console account recovery**: password reset and email verification for console accounts, through the install SMTP · from spec 0010; it must also lift spec 0013's guard on claiming console accounts and apply its verified email rule to them (spec 0013 AC-29)
 - **Security notice emails**: tell the old address when an email changes, and the user when their password is reset (a new template in Messaging) · from spec 0010
 - **Quickstart links in the console**: the project's "Connect your app" card links to the matching quickstart on orvano.dev · from spec 0011
 - **Localized email templates**: a version of each email template per language, picked from the user's locale (the `locale` column is already in the key) · from spec 0009

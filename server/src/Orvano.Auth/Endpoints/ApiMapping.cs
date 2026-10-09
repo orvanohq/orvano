@@ -44,6 +44,10 @@ internal static class ApiMapping
     public static IResult NoContent(HttpContext http, Outcome<Done> outcome) =>
         outcome.Succeeded ? TypedResults.NoContent() : Problem(http, outcome.Failure!);
 
+    /// <summary>204 for a use case whose answer the caller doesn't show, such as a reset's result.</summary>
+    public static IResult NoContent<T>(HttpContext http, Outcome<T> outcome) =>
+        outcome.Succeeded ? TypedResults.NoContent() : Problem(http, outcome.Failure!);
+
     public static IResult Accepted(HttpContext http, Outcome<Done> outcome) =>
         outcome.Succeeded ? TypedResults.StatusCode(StatusCodes.Status202Accepted) : Problem(http, outcome.Failure!);
 
@@ -58,13 +62,14 @@ internal static class ApiMapping
         row.CreatedAt,
         row.LastSignInAt,
         [],
+        false,
         false);
 
     public static Api.ConsoleAccount ConsoleAccount(UserRow row, bool isInstallAdmin)
     {
         var user = User(row);
         return new(user.Id, user.Email, user.EmailVerified, user.EmailVerifiedAt, user.Name, user.Status, user.Metadata, user.CreatedAt, user.LastSignInAt,
-            user.Providers, user.HasPassword, isInstallAdmin);
+            user.Providers, user.HasPassword, user.MfaEnabled, isInstallAdmin);
     }
 
     public static Api.Identity Identity(IdentityRow row) => new(
@@ -117,6 +122,8 @@ internal static class ApiMapping
         view.RefreshTokenExpiresAt,
         view.SessionId.ToString());
 
+    public static Api.RaisedSession RaisedSession(RaisedSessionView view) => new(view.AccessToken, view.AccessTokenExpiresAt, view.SessionId.ToString());
+
     public static Api.Session Session(SessionView view) => new(
         view.Id.ToString(),
         view.CreatedAt,
@@ -126,7 +133,9 @@ internal static class ApiMapping
         view.IpAddress?.ToString(),
         view.Current,
         SessionMethodOf(view.Method),
-        view.Provider is null ? null : ProviderOf(view.Provider));
+        view.Provider is null ? null : ProviderOf(view.Provider),
+        view.Aal,
+        view.Amr);
 
     public static Api.SessionMethod SessionMethodOf(string method) => method switch
     {
@@ -137,6 +146,7 @@ internal static class ApiMapping
         SessionMethod.Recovery => Api.SessionMethod.Recovery,
         SessionMethod.OAuth => Api.SessionMethod.Oauth,
         SessionMethod.IdToken => Api.SessionMethod.IdToken,
+        SessionMethod.Passkey => Api.SessionMethod.Passkey,
         _ => throw new ArgumentOutOfRangeException(nameof(method), method, "Unknown session method."),
     };
 
@@ -167,14 +177,93 @@ internal static class ApiMapping
     public static Api.UserPage UserPage(Page<UserRow> page) => new([.. page.Items.Select(User)], page.NextCursor);
 
     public static Api.AuthResult AuthResult(SignedIn signedIn) =>
-        new(User(signedIn.User), SessionTokens(signedIn.Session), signedIn.IsNewUser, signedIn.VerificationEmail switch
-        {
-            null => null,
-            VerificationEmail.Queued => Api.VerificationEmailStatus.Queued,
-            VerificationEmail.NotConfigured => Api.VerificationEmailStatus.NotConfigured,
-            VerificationEmail.RateLimited => Api.VerificationEmailStatus.RateLimited,
-            _ => throw new ArgumentOutOfRangeException(nameof(signedIn), signedIn.VerificationEmail, "Unknown verification email status."),
-        });
+        new(
+            signedIn.User is null ? null : User(signedIn.User),
+            signedIn.Session is null ? null : SessionTokens(signedIn.Session),
+            signedIn.Mfa is null ? null : MfaChallenge(signedIn.Mfa),
+            signedIn.IsNewUser,
+            signedIn.VerificationEmail switch
+            {
+                null => null,
+                VerificationEmail.Queued => Api.VerificationEmailStatus.Queued,
+                VerificationEmail.NotConfigured => Api.VerificationEmailStatus.NotConfigured,
+                VerificationEmail.RateLimited => Api.VerificationEmailStatus.RateLimited,
+                _ => throw new ArgumentOutOfRangeException(nameof(signedIn), signedIn.VerificationEmail, "Unknown verification email status."),
+            });
+
+    public static Api.MfaChallenge MfaChallenge(MfaChallengeView view) => new(view.Ticket, [.. view.Factors.Select(MfaFactorOf)], view.ExpiresAt);
+
+    public static Api.MfaFactor MfaFactorOf(string factor) => factor switch
+    {
+        MfaFactors.Totp => Api.MfaFactor.Totp,
+        MfaFactors.RecoveryCode => Api.MfaFactor.RecoveryCode,
+        MfaFactors.Passkey => Api.MfaFactor.Passkey,
+        _ => throw new ArgumentOutOfRangeException(nameof(factor), factor, "Unknown MFA factor."),
+    };
+
+    public static Api.MfaStatus MfaStatus(MfaStatusView view) => new(
+        view.MfaEnabled, view.TotpConfirmed, view.TotpConfirmedAt, view.RecoveryCodesRemaining, view.PasskeyCount,
+        [.. view.FactorsAvailable.Select(MfaFactorOf)]);
+
+    public static Api.TotpSetup TotpSetup(TotpSetupView view) => new(view.Secret, view.Uri, view.ExpiresAt);
+
+    public static Api.TotpConfirmation TotpConfirmation(TotpConfirmationView view) => new(view.RecoveryCodes, RaisedSession(view.Session));
+
+    public static Api.Passkey Passkey(PasskeyView view) =>
+        new(view.Id.ToString(), view.Name, view.CreatedAt, view.LastUsedAt, view.Synced, view.Active);
+
+    public static Api.PasskeyList PasskeyList(IEnumerable<PasskeyView> views) => new([.. views.Select(Passkey)]);
+
+    public static Api.PasskeyRegistration PasskeyRegistration(RegistrationView view) => new(
+        view.ChallengeId.ToString(),
+        new Api.PasskeyCreationOptions(
+            new Api.PasskeyRelyingParty(view.Options.RpId, view.Options.RpName),
+            new Api.PasskeyUserEntity(view.Options.UserHandle, view.Options.UserName, view.Options.DisplayName),
+            view.Options.Challenge,
+            [.. PasskeyRules.Algorithms.Select(alg => new Api.PasskeyCredentialParameters(PasskeyRules.CredentialType, alg))],
+            PasskeyRules.TimeoutMs,
+            [.. view.Options.ExcludeCredentials.Select(CredentialDescriptor)],
+            new Api.PasskeyAuthenticatorSelection(PasskeyRules.Required, true, PasskeyRules.Required),
+            PasskeyRules.AttestationNone));
+
+    public static Api.PasskeyChallenge PasskeyChallenge(PasskeyChallengeView view) => new(
+        view.ChallengeId.ToString(),
+        new Api.PasskeyRequestOptions(
+            view.Options.Challenge,
+            view.Options.RpId,
+            PasskeyRules.TimeoutMs,
+            PasskeyRules.Required,
+            [.. view.Options.AllowCredentials.Select(CredentialDescriptor)]));
+
+    private static Api.PasskeyCredentialDescriptor CredentialDescriptor(CredentialRef credential) =>
+        new(PasskeyRules.CredentialType, credential.Id, credential.Transports.Count == 0 ? null : [.. credential.Transports]);
+
+    /// <summary>A passkey's answer as the use cases read it; null when the body left it out.</summary>
+    public static AssertionInput? Assertion(Api.PasskeyAssertionCredential? credential) => credential?.Response is null
+        ? null
+        : new AssertionInput(
+            credential.Id, credential.RawId, credential.Type, credential.Response.ClientDataJSON, credential.Response.AuthenticatorData,
+            credential.Response.Signature, credential.Response.UserHandle);
+
+    /// <summary>A new passkey as the use cases read it; null when the body left it out.</summary>
+    public static AttestationInput? Attestation(Api.PasskeyRegistrationCredential? credential) => credential?.Response is null
+        ? null
+        : new AttestationInput(
+            credential.Id, credential.RawId, credential.Type, credential.Response.ClientDataJSON, credential.Response.AttestationObject,
+            credential.Response.Transports);
+
+    /// <summary>A step two's or step up's passkey part; null when the body left it out.</summary>
+    public static PasskeyAnswerInput? PasskeyAnswer(Api.PasskeyAnswer? answer) =>
+        answer is null ? null : new PasskeyAnswerInput(answer.ChallengeId, Assertion(answer.Credential));
+
+    public static Api.AuthMethodSettings AuthMethodSettings(MethodSettingsView view) => new(
+        view.Settings.TotpEnabled,
+        view.Settings.PasskeysEnabled,
+        view.Settings.RpId,
+        view.Settings.RpName,
+        [.. view.Settings.AndroidCertFingerprints],
+        view.ActivePasskeyCount,
+        [.. view.AcceptedOrigins]);
 
     public static Api.Jwk Jwk(PublicSigningKey key) =>
         JsonSerializer.Deserialize<Api.Jwk>(key.PublicJwk) ?? throw new InvalidOperationException($"Signing key {key.Kid} has no public JWK.");

@@ -9,17 +9,27 @@
 import { Client as BaseClient, MemorySessionStore, OrvanoError } from '@orvano/js'
 import type { ClientConfig, RequestOptions, RequestSpec } from '@orvano/js'
 
-export { OrvanoError } from '@orvano/js'
+export { OrvanoError, browserPasskeys } from '@orvano/js'
 export type { ClientConfig, RequestOptions } from '@orvano/js'
 // Models console operations share with the app SDK, so the console imports every model from here.
 export type {
   CreateUserRequest,
   Identity,
   IdentityList,
+  MfaChallenge,
+  MfaFactor,
+  MfaStatus,
   OAuthProvider,
+  Passkey,
+  PasskeyAssertionCredential,
+  PasskeyChallenge,
+  PasskeyList,
+  PasskeyRegistration,
+  RecoveryCodes,
   Session,
   SessionMethod,
   SessionPage,
+  TotpSetup,
   User,
   UserPage,
   UserStatus,

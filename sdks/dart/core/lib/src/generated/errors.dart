@@ -23,8 +23,14 @@ abstract final class ErrorCode {
   /// `email_not_configured`
   static const emailNotConfigured = 'email_not_configured';
 
+  /// `email_not_verified`
+  static const emailNotVerified = 'email_not_verified';
+
   /// `email_rate_limited`
   static const emailRateLimited = 'email_rate_limited';
+
+  /// `factor_not_enabled`
+  static const factorNotEnabled = 'factor_not_enabled';
 
   /// `forbidden`
   static const forbidden = 'forbidden';
@@ -59,8 +65,20 @@ abstract final class ErrorCode {
   /// `invalid_id_token`
   static const invalidIdToken = 'invalid_id_token';
 
+  /// `invalid_mfa_code`
+  static const invalidMfaCode = 'invalid_mfa_code';
+
+  /// `invalid_mfa_ticket`
+  static const invalidMfaTicket = 'invalid_mfa_ticket';
+
   /// `invalid_oauth_code`
   static const invalidOauthCode = 'invalid_oauth_code';
+
+  /// `invalid_passkey`
+  static const invalidPasskey = 'invalid_passkey';
+
+  /// `invalid_passkey_challenge`
+  static const invalidPasskeyChallenge = 'invalid_passkey_challenge';
 
   /// `invalid_password`
   static const invalidPassword = 'invalid_password';
@@ -92,6 +110,18 @@ abstract final class ErrorCode {
   /// `last_sign_in_method`
   static const lastSignInMethod = 'last_sign_in_method';
 
+  /// `mfa_already_enabled`
+  static const mfaAlreadyEnabled = 'mfa_already_enabled';
+
+  /// `mfa_not_enabled`
+  static const mfaNotEnabled = 'mfa_not_enabled';
+
+  /// `mfa_required`
+  static const mfaRequired = 'mfa_required';
+
+  /// `mfa_verification_required`
+  static const mfaVerificationRequired = 'mfa_verification_required';
+
   /// `not_found`
   static const notFound = 'not_found';
 
@@ -106,6 +136,18 @@ abstract final class ErrorCode {
 
   /// `origin_not_allowed`
   static const originNotAllowed = 'origin_not_allowed';
+
+  /// `passkey_already_registered`
+  static const passkeyAlreadyRegistered = 'passkey_already_registered';
+
+  /// `passkey_limit`
+  static const passkeyLimit = 'passkey_limit';
+
+  /// `passkey_not_found`
+  static const passkeyNotFound = 'passkey_not_found';
+
+  /// `passkeys_exist`
+  static const passkeysExist = 'passkeys_exist';
 
   /// `project_not_found`
   static const projectNotFound = 'project_not_found';
@@ -175,6 +217,9 @@ abstract final class ErrorCode {
 
   /// `token_expired`
   static const tokenExpired = 'token_expired';
+
+  /// `totp_not_pending`
+  static const totpNotPending = 'totp_not_pending';
 
   /// `user_already_exists`
   static const userAlreadyExists = 'user_already_exists';

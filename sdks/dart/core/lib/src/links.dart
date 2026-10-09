@@ -52,18 +52,45 @@ sealed class HandledLink {
 
   /// True only when the call created the user.
   bool get isNewUser;
+
+  /// True when the sign in stopped at the MFA step (spec 0013): the user has
+  /// MFA on, so no session exists yet.
+  bool get mfaRequired => false;
+
+  /// The factors the MFA challenge offers; empty when [mfaRequired] is false.
+  List<MfaFactor> get factors => const [];
 }
 
-/// A finished provider sign in: the user, and whether it created them.
+/// A finished provider sign in: the user, and whether it created them, or
+/// the MFA step it stopped at ([mfaRequired]).
 final class OAuthSignInResult extends HandledLink {
   /// Creates a result.
-  const OAuthSignInResult({required this.user, required this.isNewUser});
+  const OAuthSignInResult({
+    required this.user,
+    required this.isNewUser,
+    this.mfaRequired = false,
+    this.factors = const [],
+  });
 
-  /// The signed in user.
-  final User user;
+  /// The result of a sign in's [AuthResult].
+  factory OAuthSignInResult.of(AuthResult result) => OAuthSignInResult(
+    user: result.user,
+    isNewUser: result.isNewUser,
+    mfaRequired: result.mfa != null,
+    factors: result.mfa?.factors ?? const [],
+  );
+
+  /// The signed in user; null while [mfaRequired] is true.
+  final User? user;
 
   @override
   final bool isNewUser;
+
+  @override
+  final bool mfaRequired;
+
+  @override
+  final List<MfaFactor> factors;
 }
 
 /// A finished link of a provider to the signed in user.
@@ -79,24 +106,42 @@ final class IdentityLinkResult extends HandledLink {
 }
 
 /// What a redeemed link did: its type, the user, and whether the call created
-/// them.
+/// them. A magic link or reset for a user with MFA on stops at the MFA step:
+/// [mfaRequired] is true and [user] null.
 final class LinkResult extends HandledLink {
   /// Creates a result.
   const LinkResult({
     required this.type,
     required this.user,
     required this.isNewUser,
+    this.mfaRequired = false,
+    this.factors = const [],
   });
+
+  /// The result of a link that signs in, from its [AuthResult].
+  factory LinkResult.of(EmailLinkType type, AuthResult result) => LinkResult(
+    type: type,
+    user: result.user,
+    isNewUser: result.isNewUser,
+    mfaRequired: result.mfa != null,
+    factors: result.mfa?.factors ?? const [],
+  );
 
   /// What the link was for.
   final EmailLinkType type;
 
-  /// The user, as it is now.
-  final User user;
+  /// The user, as it is now; null while [mfaRequired] is true.
+  final User? user;
 
   /// True only when a magic link created the user.
   @override
   final bool isNewUser;
+
+  @override
+  final bool mfaRequired;
+
+  @override
+  final List<MfaFactor> factors;
 }
 
 /// Reads an emailed link from [uri]: null when it carries neither
@@ -166,21 +211,13 @@ extension EmailLinks on Client {
           CreateMagicLinkSessionRequest(token: link.token),
           options: options,
         );
-        return LinkResult(
-          type: link.type,
-          user: result.user,
-          isNewUser: result.isNewUser,
-        );
+        return LinkResult.of(link.type, result);
       case EmailLinkType.recovery:
         final result = await account.completeRecovery(
           CompleteRecoveryRequest(token: link.token, password: link.password!),
           options: options,
         );
-        return LinkResult(
-          type: link.type,
-          user: result.user,
-          isNewUser: result.isNewUser,
-        );
+        return LinkResult.of(link.type, result);
       case EmailLinkType.verification:
         final user = await account.verifyEmail(
           VerifyEmailRequest(token: link.token),

@@ -2,7 +2,7 @@ using Npgsql;
 
 namespace Orvano.Messaging.Contracts;
 
-/// <summary>The four auth emails a project can send, each with its own editable template (spec 0009).</summary>
+/// <summary>The five auth emails a project can send, each with its own editable template (spec 0009, spec 0013).</summary>
 public enum AuthEmailKind
 {
     /// <summary>Confirms a user owns their email address.</summary>
@@ -16,6 +16,34 @@ public enum AuthEmailKind
 
     /// <summary>Signs a user in with a one time code.</summary>
     EmailCode,
+
+    /// <summary>
+    /// Tells a user their sign in security changed (spec 0013, AC-31). Queued only through
+    /// <see cref="IEmailQueue.QueueSecurityAlertAsync"/>: it has no link and no code.
+    /// </summary>
+    SecurityAlert,
+}
+
+/// <summary>Which change a security alert tells the user about (spec 0013, AC-31); the template's <c>alert</c>.</summary>
+public enum SecurityAlertKind
+{
+    /// <summary>An authenticator app was turned on.</summary>
+    MfaEnabled,
+
+    /// <summary>MFA was turned off, by the user or by a reset.</summary>
+    MfaDisabled,
+
+    /// <summary>A passkey was added.</summary>
+    PasskeyAdded,
+
+    /// <summary>A passkey was removed.</summary>
+    PasskeyRemoved,
+
+    /// <summary>New recovery codes replaced the old ones.</summary>
+    RecoveryCodesCreated,
+
+    /// <summary>A recovery code was used to sign in or to step up.</summary>
+    RecoveryCodeUsed,
 }
 
 /// <summary>One auth email to queue. Never log <paramref name="To"/>, <paramref name="ActionUrl"/>, or <paramref name="Code"/>.</summary>
@@ -92,4 +120,22 @@ public interface IEmailQueue
     /// <returns>Whether it was queued, and why not when it was not.</returns>
     /// <exception cref="ArgumentException">A value of <paramref name="email"/> breaks its rule, which is a caller bug.</exception>
     Task<EmailQueueResult> QueueAuthEmailAsync(NpgsqlTransaction tx, AuthEmail email, CancellationToken ct);
+
+    /// <summary>
+    /// Queues a security alert (spec 0013, AC-31) in <paramref name="tx"/> the same way as
+    /// <see cref="QueueAuthEmailAsync"/>: the SMTP and the hourly limit, the project's <c>security_alert</c> template
+    /// (or the default), and the sealed row and its job, so the email exists only if the change commits. Never log
+    /// <paramref name="to"/>.
+    /// </summary>
+    /// <param name="tx">The caller's open transaction, the one that makes the change.</param>
+    /// <param name="projectId">The project that sends it.</param>
+    /// <param name="to">The user's email address.</param>
+    /// <param name="projectName">The project's name (<c>Orvano</c> for <c>console</c>), read before the transaction.</param>
+    /// <param name="alert">Which change happened.</param>
+    /// <param name="occurredAt">When it happened: the change's transaction time.</param>
+    /// <param name="ct">Cancels the call.</param>
+    /// <returns>Whether it was queued, and why not when it was not; a caller never stops its change for a refusal.</returns>
+    /// <exception cref="ArgumentException">A value breaks its rule, which is a caller bug.</exception>
+    Task<EmailQueueResult> QueueSecurityAlertAsync(
+        NpgsqlTransaction tx, string projectId, string to, string projectName, SecurityAlertKind alert, DateTimeOffset occurredAt, CancellationToken ct);
 }

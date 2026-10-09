@@ -24,7 +24,7 @@ send the first fixture project as `X-Orvano-Project`, and server steps send that
 fixture API key. A browser can't hold an API key, so there a server step whose operation needs a
 scope skips the scenario.
 
-Four runner operations are not in the contract. Their names have no dot, so they never collide
+These runner operations are not in the contract. Their names have no dot, so they never collide
 with an operationId:
 
 | `op` | `as` | Input | Body |
@@ -32,7 +32,15 @@ with an operationId:
 | `signIn` | `client` | `body: { email, password }` | the sign in answer; the SDK's stored session is left alone, so a runner without client operations (.NET) gets a token too |
 | `redeemLink` | `client` | `url`, optional `password` | `{ type, user, isNewUser }` from the client SDK's link helper (`redeemLink` in JS, `handleLink` in Dart), or null for a URL without Orvano's parameters; .NET skips it |
 | `now` | `client` or `server` | none | `{ now }`, the runner's clock as an ISO 8601 time; save it before a send and pass it to `test.getLatestEmail` as `after` |
-| `verifyAccessToken` | `server` | `token`, optional `online: true` | `{ userId, sessionId, emailVerified, expiresAt }` from the server SDK's own check, or its `token_expired` / `invalid_token` error |
+| `verifyAccessToken` | `server` | `token`, optional `online: true`, optional `requireMfa: true` | `{ userId, sessionId, emailVerified, expiresAt, aal, amr }` from the server SDK's own check, or its `token_expired` / `invalid_token` / `mfa_required` error |
+| `accessToken` | `client` | none | `{ token }`, the access token the client SDK stores now, so a server step can verify a session made by a client helper such as `completeMfa`; .NET skips it |
+| `totpCode` | `client` | `secret`, optional `offset` (steps from now) | `{ code }`, the code an authenticator app shows for that step (spec 0013) |
+| `completeMfa` | `client` | `totpCode`, `recoveryCode`, or `passkey: true` (the runner's test authenticator answers) | `{ user, isNewUser, mfaRequired, factors }` from the client SDK's `completeMfa`, which uses the ticket the last sign in kept (201); .NET skips it |
+| `verifyMfa` | `client` | `totpCode`, `recoveryCode`, or `passkey: true` | `{ verified: true, refreshTokenKept }` after the client SDK's `verifyMfa` stored the new access token; Orvano sends no refresh token, so `refreshTokenKept` is true when the client still holds the one it held before (spec 0013) |
+| `confirmTotp` | `client` | `code` | `{ recoveryCodes, refreshTokenKept }` from the client SDK's `confirmTotp`, which stores the new access token; `refreshTokenKept` as for `verifyMfa` |
+| `registerPasskey` | `client` | optional `name`, optional `password` (the user's current password, spec 0013) | the `Passkey` from the client SDK's `registerPasskey`, whose passkey the server's `Test` only software authenticator makes (201) |
+| `oauthSignIn` | `client` | `provider`, `testUser` (the fake provider's user), optional `redirectUrl`, optional `link: true`, and for a link optional `password` | `{ type, ... }` from the client SDK's `signInWithOAuth`, or `linkIdentity` with `link: true` (sending `password`), following the fake provider over HTTP (spec 0012); .NET runs only the sign in |
+| `signInWithPasskey` | `client` | none | `{ user, isNewUser, mfaRequired, factors }` from the client SDK's `signInWithPasskey`, signed by the newest passkey the software authenticator made (201) |
 
 SdkGen writes a test only dispatch table per language (`operationId` to the generated method), so
 each SDK has one small interpreter instead of one test per scenario. A step whose operation has no

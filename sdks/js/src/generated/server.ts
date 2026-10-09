@@ -8,7 +8,9 @@ import type {
   Health,
   IdentityList,
   Jwks,
+  MfaStatus,
   OpenIdConfiguration,
+  PasskeyList,
   Session,
   SessionPage,
   UpdateEmailVerificationRequest,
@@ -143,6 +145,17 @@ export class UsersService {
     )
   }
 
+  /** Removes one of a user's passkeys. Sessions stay. */
+  deletePasskey(userId: string, passkeyId: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      {
+        method: 'DELETE',
+        path: `/v1/users/${encodeURIComponent(userId)}/passkeys/${encodeURIComponent(passkeyId)}`,
+      },
+      options,
+    )
+  }
+
   /** Ends one session of a user. */
   deleteSession(userId: string, sessionId: string, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
@@ -170,6 +183,14 @@ export class UsersService {
     )
   }
 
+  /** A user's MFA state: whether sign in asks them for a second factor, their recovery codes left, and their passkeys. */
+  getMfa(userId: string, options?: RequestOptions): Promise<MfaStatus> {
+    return this.#client.request<MfaStatus>(
+      { method: 'GET', path: `/v1/users/${encodeURIComponent(userId)}/mfa` },
+      options,
+    )
+  }
+
   /** Lists the project's users, newest first. */
   list(
     query?: {
@@ -178,6 +199,7 @@ export class UsersService {
       createdAfter?: string | undefined
       createdBefore?: string | undefined
       emailVerified?: boolean | undefined
+      mfa?: string | undefined
       cursor?: string | undefined
       limit?: number | undefined
     },
@@ -194,6 +216,7 @@ export class UsersService {
       createdAfter?: string | undefined
       createdBefore?: string | undefined
       emailVerified?: boolean | undefined
+      mfa?: string | undefined
       limit?: number | undefined
     },
     options?: RequestOptions,
@@ -205,6 +228,14 @@ export class UsersService {
   listIdentities(userId: string, options?: RequestOptions): Promise<IdentityList> {
     return this.#client.request<IdentityList>(
       { method: 'GET', path: `/v1/users/${encodeURIComponent(userId)}/identities` },
+      options,
+    )
+  }
+
+  /** Lists a user's passkeys, oldest first, including inactive ones. */
+  listPasskeys(userId: string, options?: RequestOptions): Promise<PasskeyList> {
+    return this.#client.request<PasskeyList>(
+      { method: 'GET', path: `/v1/users/${encodeURIComponent(userId)}/passkeys` },
       options,
     )
   }
@@ -228,6 +259,21 @@ export class UsersService {
     options?: RequestOptions,
   ): AsyncGenerator<Session> {
     return paginate((cursor) => this.listSessions(userId, { ...query, cursor }, options))
+  }
+
+  /**
+   * Turns MFA off for a user who lost every factor: deletes their authenticator app and recovery codes and ends all
+   * their sessions. Their passkeys stay. A user without MFA is left as they are.
+   */
+  resetMfa(userId: string, options?: RequestOptions): Promise<void> {
+    return this.#client.request<undefined>(
+      {
+        method: 'POST',
+        path: `/v1/users/${encodeURIComponent(userId)}/mfa/reset`,
+        idempotent: true,
+      },
+      options,
+    )
   }
 
   /** Unblocks a user so they can sign in again. Their old sessions stay ended. */

@@ -40,10 +40,12 @@ export class Client extends BaseClient {
    * project's keys (fetched from its JWKS and kept for 10 minutes), issued by this endpoint for
    * this project, and not expired (30 seconds leeway). A token whose session ended still passes
    * until it expires (at most 15 minutes); pass `online: true` to also ask Orvano, as the user and
-   * never with the API key, whether the session is still active.
+   * never with the API key, whether the session is still active. The answer carries `aal` and
+   * `amr`, and `requireMfa: true` refuses a session that signed in with one factor.
    *
    * @throws {@link OrvanoError} with status 401 and code `token_expired` or `invalid_token` when the
-   * token does not check out, and `Error` when the client has no project.
+   * token does not check out, 403 `mfa_required` when `requireMfa` is set and `aal` is below 2, and
+   * `Error` when the client has no project.
    */
   verifyAccessToken(
     token: string,

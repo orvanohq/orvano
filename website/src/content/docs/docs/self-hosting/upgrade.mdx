@@ -26,6 +26,25 @@ Each version's installer installs exactly that version ({version} for this one),
 
 Run the installer of the version you already have. It writes `docker-compose.yml` and `initdb/` again, fixes the settings it manages in `.env`, and starts every service. Use it after editing a managed file by mistake, or when a service won't start after a host change.
 
+## Recover a locked out console account
+
+A console account that lost its authenticator app and its recovery codes, and has no passkey, can't sign in. Someone with access to the server can reset its second step. From `/opt/orvano`:
+
+```sh
+docker compose exec api /app/orvano mfa reset --email ada@example.com
+```
+
+It removes the account's authenticator app and recovery codes, ends its sessions, and prints `reset`. The person then signs in with their password alone and can turn on a new app on their [Security page](/docs/console/account-security/). Add `--passkeys` to remove the account's passkeys too, for a lost or stolen device.
+
+| Output | Exit code | Meaning |
+|---|---|---|
+| `reset` | 0 | The second step was removed. |
+| `no factor` | 0 | The account had nothing to reset. |
+| `not found` | 2 | No console account has that email. |
+| the usage line | 64 | An argument is missing or wrong. |
+
+The account gets an alert email when the install has an [email server](/docs/self-hosting/email-delivery/). Check who is asking before you run it: it is the way in for someone who lost every factor, and for anyone who can talk you into it.
+
 ## Downgrades
 
 The installer refuses an older version than the one installed, with exit code 2: a newer version may have changed the database in ways an older one can't read. To go back, restore the backup you took before the upgrade.

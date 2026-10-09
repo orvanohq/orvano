@@ -38,12 +38,14 @@ async function sign(
     sid?: string | null
     exp?: number
     emailVerified?: boolean
+    extra?: Record<string, unknown>
   } = {},
 ): Promise<string> {
   const exp = claims.exp ?? Math.floor(Date.now() / 1000) + 900
   const jwt = new SignJWT({
     ...(claims.sid === null ? {} : { sid: claims.sid ?? 'session-1' }),
     ...(claims.emailVerified === undefined ? {} : { email_verified: claims.emailVerified }),
+    ...claims.extra,
   })
     .setProtectedHeader({ alg: 'ES256', typ: 'JWT', kid: key.kid })
     .setSubject('user-1')
@@ -97,6 +99,8 @@ describe('verifyAccessToken', () => {
       sessionId: 'session-1',
       emailVerified: false,
       expiresAt: new Date(exp * 1000),
+      aal: 1,
+      amr: [],
     })
     // Spec 0010 AC-14: the email_verified claim, false when missing.
     expect(
@@ -176,6 +180,7 @@ describe('verifyAccessToken', () => {
           lastSignInAt: null,
           providers: [],
           hasPassword: false,
+          mfaEnabled: false,
         }),
         { headers: { 'Content-Type': 'application/json' } },
       )
@@ -193,6 +198,33 @@ describe('verifyAccessToken', () => {
     expect(check?.headers.get('X-Orvano-Project')).toBe(project)
     expect(check?.headers.has('X-Orvano-Key')).toBe(false)
     expect(ended).toBe('401 invalid_token')
+  })
+
+  // Spec 0013 AC-39: aal and amr from the token, missing ones read as 1 and empty; requireMfa
+  // refuses a one factor session with mfa_required before any online check.
+  it('reads aal and amr and requireMfa refuses a one factor session', async () => {
+    const key = await newKey('k1')
+    const { fetch, sent } = fakeFetch(jwks(key))
+    const client = server(fetch)
+    const strong = await sign(key, { extra: { aal: 2, amr: ['mfa', 'otp', 'pwd'] } })
+    const weak = await sign(key, { extra: { aal: 1, amr: ['pwd'] } })
+    const old = await sign(key)
+    const junk = await sign(key, { extra: { aal: 'two', amr: 'pwd' } })
+
+    const verified = await client.verifyAccessToken(strong, { requireMfa: true })
+
+    expect(verified.aal).toBe(2)
+    expect(verified.amr).toEqual(['mfa', 'otp', 'pwd'])
+    expect(await client.verifyAccessToken(weak)).toMatchObject({ aal: 1, amr: ['pwd'] })
+    expect(await client.verifyAccessToken(old)).toMatchObject({ aal: 1, amr: [] })
+    expect(await client.verifyAccessToken(junk)).toMatchObject({ aal: 1, amr: [] })
+    expect(await codeOf(client.verifyAccessToken(weak, { requireMfa: true }))).toBe(
+      '403 mfa_required',
+    )
+    expect(await codeOf(client.verifyAccessToken(old, { requireMfa: true, online: true }))).toBe(
+      '403 mfa_required',
+    )
+    expect(sent).toHaveLength(1)
   })
 
   it('needs a project', async () => {

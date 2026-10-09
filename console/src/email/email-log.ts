@@ -6,6 +6,7 @@ export const templateLabels: Record<EmailTemplateName, string> = {
   recovery: 'Password reset',
   magic_link: 'Magic link',
   email_code: 'Email code',
+  security_alert: 'Security alert',
   console_invitation: 'Console invite',
 }
 

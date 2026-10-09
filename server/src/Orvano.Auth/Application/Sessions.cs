@@ -25,8 +25,8 @@ internal sealed record ClientInfo(string? UserAgent, string? Sdk, IPAddress? Ip)
         : char.IsHighSurrogate(value[max - 1]) ? value[..(max - 1)] : value[..max];
 }
 
-/// <summary>A new or rotated session and its refresh token, before the access token is issued.</summary>
-internal sealed record SessionGrant(Guid SessionId, RefreshToken RefreshToken, DateTimeOffset RefreshTokenExpiresAt);
+/// <summary>A new session, its refresh token, and its strength (spec 0013, AC-25), before the access token is issued.</summary>
+internal sealed record SessionGrant(Guid SessionId, RefreshToken RefreshToken, DateTimeOffset RefreshTokenExpiresAt, SessionStrength Strength);
 
 /// <summary>Creates and ends session rows inside the caller's transaction (spec 0004, data model, state transitions, AC-31).</summary>
 internal sealed class Sessions(SecretBox secrets)
@@ -38,11 +38,15 @@ internal sealed class Sessions(SecretBox secrets)
     /// Inserts a session for the user, sets their <c>last_sign_in_at</c>, and writes <c>auth.session.created</c> with
     /// the <paramref name="method"/> (one of <see cref="SessionMethod"/>), plus the <paramref name="provider"/> of an
     /// <c>oauth</c> or <c>id_token</c> session (spec 0012, AC-18). The session ID comes from Postgres' <c>uuidv7()</c>
-    /// first, since the encrypted refresh token is bound to it.
+    /// first, since the encrypted refresh token is bound to it. Its strength (spec 0013, AC-25) is step one's for
+    /// <paramref name="method"/> unless <paramref name="strength"/> says more; a level 2 session also records
+    /// <c>strong_auth_at</c>.
     /// </summary>
     public async Task<SessionGrant> CreateAsync(
-        AuthUnitOfWork uow, string projectId, Guid userId, ClientInfo client, Actor actor, string method, CancellationToken ct, string? provider = null)
+        AuthUnitOfWork uow, string projectId, Guid userId, ClientInfo client, Actor actor, string method, CancellationToken ct, string? provider = null,
+        SessionStrength? strength = null)
     {
+        strength ??= SessionStrength.StepOne(method);
         var conn = uow.Tx.Connection!;
         Guid sessionId;
         await using (var id = new NpgsqlCommand("SELECT uuidv7()", conn, uow.Tx))
@@ -56,10 +60,11 @@ internal sealed class Sessions(SecretBox secrets)
             WITH created AS (
                 INSERT INTO orvano.auth_sessions (
                     id, project_id, user_id, refresh_hash, refresh_ciphertext, user_agent, sdk, ip_created, ip_last,
-                    created_at, last_refreshed_at, idle_expires_at, expires_at, method, provider)
+                    created_at, last_refreshed_at, idle_expires_at, expires_at, method, provider, aal, amr, strong_auth_at)
                 VALUES (
                     @id, @project, @user, @hash, @ciphertext, @agent, @sdk, @ip, @ip,
-                    now(), now(), least(now() + @idle, now() + @absolute), now() + @absolute, @method, @provider)
+                    now(), now(), least(now() + @idle, now() + @absolute), now() + @absolute, @method, @provider, @aal, @amr,
+                    CASE WHEN @aal = 2 THEN now() END)
                 RETURNING idle_expires_at, expires_at),
             signed_in AS (
                 UPDATE orvano.auth_users SET last_sign_in_at = now() WHERE id = @user)
@@ -77,17 +82,30 @@ internal sealed class Sessions(SecretBox secrets)
         insert.Parameters.AddWithValue("absolute", AuthTimings.AbsoluteExpiry);
         insert.Parameters.AddWithValue("method", method);
         insert.Parameters.AddWithValue("provider", NpgsqlDbType.Text, (object?)provider ?? DBNull.Value);
+        insert.Parameters.AddWithValue("aal", NpgsqlDbType.Smallint, strength.Aal);
+        insert.Parameters.AddWithValue("amr", NpgsqlDbType.Array | NpgsqlDbType.Text, strength.Amr.ToArray());
         var endsAt = (DateTime)(await insert.ExecuteScalarAsync(ct))!;
 
         await AuthEvents.WriteAsync(uow.Tx, AuthEvents.SessionCreated, projectId, actor, userId.ToString(),
             new Dictionary<string, string> { ["userId"] = userId.ToString(), ["sessionId"] = sessionId.ToString() },
-            fields: MethodFields(method, provider), ct: ct);
-        return new SessionGrant(sessionId, token, new DateTimeOffset(endsAt, TimeSpan.Zero));
+            fields: CreatedFields(method, provider, strength.Aal), ct: ct);
+        return new SessionGrant(sessionId, token, new DateTimeOffset(endsAt, TimeSpan.Zero), strength);
     }
 
     /// <summary>The <c>method</c> of a created event, and the <c>provider</c> when there is one (spec 0012, AC-18).</summary>
     public static Dictionary<string, string?> MethodFields(string method, string? provider) =>
         provider is null ? new() { ["method"] = method } : new() { ["method"] = method, ["provider"] = provider };
+
+    /// <summary>
+    /// The <c>method</c> of a session's created event, the <c>provider</c> when there is one (spec 0012, AC-18), and the session's
+    /// <c>aal</c> (spec 0013, AC-33).
+    /// </summary>
+    public static Dictionary<string, string?> CreatedFields(string method, string? provider, short aal)
+    {
+        var fields = MethodFields(method, provider);
+        fields["aal"] = aal.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return fields;
+    }
 
     /// <summary>
     /// Ends one session of the user, if it is still open: one conditional <c>UPDATE</c>, so two racing ends write one

@@ -7,9 +7,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { roleInfo } from '@/lib/roles'
 import { ErrorPanel } from '@/shell/error-panel'
-import type { InvitationPreview } from '@orvano/console-client'
+import type { InvitationPreview, MfaFactor } from '@orvano/console-client'
 
 import { authErrorMessage, SignInForm, SignUpForm } from '../-auth/auth-form'
+import { MfaStep } from '../-auth/mfa-step'
 
 /** What a new account from the invite sends. */
 export interface NewAccount {
@@ -39,8 +40,18 @@ export type InviteState =
   | {
       kind: 'signed-out'
       preview: InvitationPreview
+      /** Why sign in starts over, such as an expired second step; opens the Sign in tab. */
+      notice?: string | undefined
       onCreateAccount: (account: NewAccount) => Promise<void>
       onSignIn: (values: { email: string; password: string }) => Promise<void>
+    }
+  | {
+      /** The account signing in has MFA: its second step, in place (spec 0013, AC-41). */
+      kind: 'mfa'
+      preview: InvitationPreview
+      factors: readonly MfaFactor[]
+      onSignedIn: () => Promise<void>
+      onStartOver: (reason?: string) => void
     }
 
 /** "<inviter> invited you to join <org> as <role>", or without the inviter once they are gone. */
@@ -96,6 +107,17 @@ export function InviteView({ state }: { state: InviteState }) {
       return <MismatchPanel {...state} />
     case 'signed-out':
       return <SignedOutPanel {...state} />
+    case 'mfa':
+      return (
+        <div className="flex flex-col gap-4">
+          <InviteLine preview={state.preview} />
+          <MfaStep
+            factors={state.factors}
+            onSignedIn={state.onSignedIn}
+            onStartOver={state.onStartOver}
+          />
+        </div>
+      )
   }
 }
 
@@ -169,17 +191,24 @@ function MismatchPanel({
 
 function SignedOutPanel({
   preview,
+  notice,
   onCreateAccount,
   onSignIn,
 }: {
   preview: InvitationPreview
+  notice?: string | undefined
   onCreateAccount: (account: NewAccount) => Promise<void>
   onSignIn: (values: { email: string; password: string }) => Promise<void>
 }) {
-  const [tab, setTab] = useState<'create' | 'sign-in'>('create')
+  const [tab, setTab] = useState<'create' | 'sign-in'>(notice === undefined ? 'create' : 'sign-in')
   return (
     <div className="flex flex-col gap-4">
       <InviteLine preview={preview} />
+      {notice === undefined ? null : (
+        <FormAlert variant="warning" title="Sign in again">
+          {notice}
+        </FormAlert>
+      )}
       <Tabs
         value={tab}
         onValueChange={(next) => {

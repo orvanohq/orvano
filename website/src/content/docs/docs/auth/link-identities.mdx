@@ -11,13 +11,16 @@ Each provider a user signs in with is an identity on their account: at most one 
 
 ## Link a provider
 
-Linking needs a session at most 10 minutes old; otherwise the user signs in again first ([`reauthentication_required`](/errors/reauthentication_required/)).
+Linking asks a user with a password for it (`password`), even right after signing in, so a stolen access token can't link someone else's account ([`invalid_credentials`](/errors/invalid_credentials/) when missing or wrong). A user without a password needs a session at most 10 minutes old; otherwise they sign in again first ([`reauthentication_required`](/errors/reauthentication_required/)). A user with MFA on needs a [step up](/docs/auth/mfa/#step-up-before-security-changes) from the last 10 minutes instead.
 
 <Tabs syncKey="sdk">
   <TabItem label="JavaScript">
 
 ```ts
-await orvano.client.linkIdentity('github', { redirectUrl: `${location.origin}/auth/callback.html` })
+await orvano.client.linkIdentity('github', {
+  redirectUrl: `${location.origin}/auth/callback.html`,
+  password, // the user's current password, when user.hasPassword
+})
 // On the callback page, redeemLink finishes it:
 const result = await orvano.client.redeemLink() // { type: 'oauth_link', identity }
 ```
@@ -27,7 +30,7 @@ const result = await orvano.client.redeemLink() // { type: 'oauth_link', identit
 
 ```tsx
 'use client'
-await orvano.client.linkIdentity('github', { redirectUrl: '/account' })
+await orvano.client.linkIdentity('github', { redirectUrl: '/account', password })
 ```
 
   </TabItem>
@@ -37,6 +40,7 @@ await orvano.client.linkIdentity('github', { redirectUrl: '/account' })
 final linked = await orvano.client.linkIdentity(
   OAuthProvider.github,
   redirectUrl: Uri.parse('com.acme.shop://auth'),
+  password: password, // the user's current password, when user.hasPassword
 );
 // Natively, with a Google or Apple ID token:
 await orvano.client.linkIdentityWithIdToken(
@@ -44,6 +48,7 @@ await orvano.client.linkIdentityWithIdToken(
   idToken: idToken,
   nonce: nonce.raw,
   authorizationCode: authorizationCode,
+  password: password,
 );
 ```
 

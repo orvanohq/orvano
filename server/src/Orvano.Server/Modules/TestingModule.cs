@@ -26,6 +26,7 @@ internal sealed class TestingModule : IOrvanoModule
     {
         services.AddSingleton<TestEmails>();
         services.AddSingleton<FakeOAuthProvider>();
+        services.AddSingleton<SoftwareAuthenticator>();
     }
 
     public void MapApi(RouteGroupBuilder v1)
@@ -37,10 +38,10 @@ internal sealed class TestingModule : IOrvanoModule
         v1.MapGet(TestOperations.List.Route, List).WithName(TestOperations.List.Id);
 
         v1.MapGet(TestOperations.GetLatestEmail.Route, async Task<Results<Ok<TestEmail>, ProblemHttpResult>> (
-                string? to, DateTimeOffset? after, TestEmails emails, CancellationToken ct) =>
+                string? to, DateTimeOffset? after, string? subject, TestEmails emails, CancellationToken ct) =>
             string.IsNullOrWhiteSpace(to)
                 ? Problems.Result(StatusCodes.Status400BadRequest, ErrorCode.InvalidRequest, "Send the recipient as to.")
-                : await emails.FindLatestAsync(to, after, ct) is { } email
+                : await emails.FindLatestAsync(to, after, subject, ct) is { } email
                     ? TypedResults.Ok(email)
                     : Problems.Result(StatusCodes.Status404NotFound, ErrorCode.NotFound, "No email to that address arrived within 15 seconds."))
             .WithName(TestOperations.GetLatestEmail.Id);
@@ -60,6 +61,17 @@ internal sealed class TestingModule : IOrvanoModule
             return TypedResults.Ok(new TestIdToken(idToken, code));
         })
             .WithName(TestOperations.CreateIdToken.Id);
+
+        v1.MapPost(TestOperations.CreatePasskeyCredential.Route, (TestCreatePasskeyCredentialRequest request, SoftwareAuthenticator authenticator) =>
+            TypedResults.Ok(authenticator.Create(request)))
+            .WithName(TestOperations.CreatePasskeyCredential.Id);
+
+        v1.MapPost(TestOperations.CreatePasskeyAssertion.Route, Results<Ok<PasskeyAssertionCredential>, ProblemHttpResult> (
+                TestCreatePasskeyAssertionRequest request, SoftwareAuthenticator authenticator) =>
+            authenticator.Assert(request) is { } assertion
+                ? TypedResults.Ok(assertion)
+                : Problems.Result(StatusCodes.Status404NotFound, ErrorCode.NotFound, "This authenticator made no passkey with that ID in this run."))
+            .WithName(TestOperations.CreatePasskeyAssertion.Id);
 
         v1.MapGet(TestOperations.ListAppleRevocations.Route, (DateTimeOffset? after) =>
             TypedResults.Ok(new TestAppleRevocationList([.. fake.Revocations

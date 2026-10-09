@@ -1,0 +1,78 @@
+# Spec 0013, AC-7, AC-8, AC-11, AC-25, AC-36 to AC-38: a user with an authenticator app adds a passkey, so a password
+# sign in offers it at the MFA step, and the SDK's completeMfa with a passkey finishes the sign in at level 2.
+name: a passkey answers the MFA step of a password sign in
+requires: []
+steps:
+  - op: now
+    as: client
+    input: {}
+    expect: { status: 200 }
+    save:
+      beforeSignUp: $.now
+  - op: account.create
+    as: client
+    input:
+      body:
+        email: 'mfa-passkey-${unique}@example.com'
+        password: correct horse battery staple
+        verificationRedirectUrl: 'http://localhost:3000/auth/callback'
+    expect: { status: 201 }
+  - op: test.getLatestEmail
+    as: client
+    input: { to: 'mfa-passkey-${unique}@example.com', after: '${beforeSignUp}' }
+    expect: { status: 200 }
+    save:
+      link: $.url
+  - op: redeemLink
+    as: client
+    input: { url: '${link}' }
+    expect: { status: 200 }
+  - op: account.createTotp
+    as: client
+    input:
+      body: { password: correct horse battery staple }
+    expect: { status: 201 }
+    save:
+      secret: $.secret
+  - op: totpCode
+    as: client
+    input: { secret: '${secret}', offset: 0 }
+    expect: { status: 200 }
+    save:
+      firstCode: $.code
+  - op: confirmTotp
+    as: client
+    input: { code: '${firstCode}' }
+    expect:
+      status: 200
+      body: { refreshTokenKept: true }
+  - op: registerPasskey
+    as: client
+    input: { password: correct horse battery staple }
+    expect:
+      status: 201
+      body: { name: Passkey }
+  - op: account.deleteCurrentSession
+    as: client
+    input: {}
+    expect: { status: 204 }
+  - op: account.createPasswordSession
+    as: client
+    input:
+      body: { email: 'mfa-passkey-${unique}@example.com', password: correct horse battery staple }
+    expect:
+      status: 201
+      body: { user: null, session: null, mfa: { factors: [totp, recovery_code, passkey] } }
+  - op: completeMfa
+    as: client
+    input: { passkey: true }
+    expect:
+      status: 201
+      body: { user: { email: 'mfa-passkey-${unique}@example.com' }, mfaRequired: false }
+  - op: account.listSessions
+    as: client
+    input: {}
+    expect:
+      status: 200
+      body:
+        items: [{ current: true, method: password, aal: 2, amr: [hwk, mfa, pwd, user] }]

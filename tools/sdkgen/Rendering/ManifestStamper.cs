@@ -52,6 +52,7 @@ internal static partial class ManifestStamper
     [
         "sdks/dart/core/pubspec.yaml",
         "sdks/dart/flutter/pubspec.yaml",
+        "sdks/dart/flutter_passkeys/pubspec.yaml",
         "sdks/dart/server/pubspec.yaml",
     ];
 

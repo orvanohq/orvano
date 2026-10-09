@@ -14,7 +14,12 @@ import 'web_auth_launcher.dart';
 /// access token is left. Nothing refreshes on a timer. Provider sign in
 /// (`signInWithOAuth`, `linkIdentity`) opens the system's auth session
 /// through [webAuthLauncher] unless [oauthLauncher] says otherwise
-/// (spec 0012). Call it after
+/// (spec 0012). Passkeys (`signInWithPasskey`, `registerPasskey`, and
+/// `MfaAnswer.passkey`) use [passkeys] (spec 0013): this package has no
+/// passkey dependency, so pass `PlatformPasskeys()` from the opt in
+/// `orvano_flutter_passkeys` package for native passkeys; with none, those
+/// helpers throw an [ArgumentError] unless a call passes its own
+/// authenticator. Call it after
 /// `WidgetsFlutterBinding.ensureInitialized()`; the resume check lasts as long
 /// as the app.
 ///
@@ -34,6 +39,7 @@ Client createClient({
   http.Client? httpClient,
   void Function(String message)? onWarning,
   OAuthLauncher? oauthLauncher,
+  PasskeyAuthenticator? passkeys,
 }) {
   final client = Client(
     endpoint: endpoint,
@@ -46,6 +52,7 @@ Client createClient({
     onWarning: onWarning,
   );
   setDefaultOAuthLauncher(client, oauthLauncher ?? webAuthLauncher);
+  if (passkeys != null) setDefaultPasskeyAuthenticator(client, passkeys);
   watchResume(client);
   return client;
 }

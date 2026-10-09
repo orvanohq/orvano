@@ -93,7 +93,13 @@ describe('redeeming a link (AC-24)', () => {
       `https://app.example.com/cb?orvano_type=magic_link&orvano_token=${token}`,
     )
 
-    expect(result).toEqual({ type: 'magic_link', user: user('u2', true), isNewUser: true })
+    expect(result).toEqual({
+      type: 'magic_link',
+      user: user('u2', true),
+      isNewUser: true,
+      mfaRequired: false,
+      factors: [],
+    })
     expect((await c.session.get())?.sessionId).toBe('s2')
     expect(seen).toEqual(['signedIn'])
     expect(new URL(sent[0]?.url ?? '').pathname).toBe('/v1/account/sessions/magic-link')
@@ -133,7 +139,13 @@ describe('redeeming a link (AC-24)', () => {
       `https://app.example.com/cb?orvano_type=verification&orvano_token=${token}`,
     )
 
-    expect(result).toEqual({ type: 'verification', user: user('u1', true), isNewUser: false })
+    expect(result).toEqual({
+      type: 'verification',
+      user: user('u1', true),
+      isNewUser: false,
+      mfaRequired: false,
+      factors: [],
+    })
     expect(sent.map((s) => new URL(s.url).pathname)).toEqual([
       '/v1/account/verification/confirm',
       '/v1/account/sessions/refresh',
@@ -231,7 +243,12 @@ describe('email code sign in', () => {
 
     const result = await c.signInWithEmailCode('ada@example.com', '042137')
 
-    expect(result).toEqual({ user: user('u1', true), isNewUser: true })
+    expect(result).toEqual({
+      user: user('u1', true),
+      isNewUser: true,
+      mfaRequired: false,
+      factors: [],
+    })
     expect(new URL(sent[0]?.url ?? '').pathname).toBe('/v1/account/sessions/email-code')
     expect(JSON.parse(sent[0]?.body ?? '{}')).toEqual({ email: 'ada@example.com', code: '042137' })
     expect(seen).toEqual(['signedIn'])

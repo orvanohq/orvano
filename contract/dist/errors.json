@@ -72,7 +72,7 @@
   {
     "code": "invalid_credentials",
     "status": 401,
-    "description": "The email and password do not match a user, or the password given to confirm an action is wrong."
+    "description": "The email and password do not match a user, or the password given to confirm an action is missing or wrong."
   },
   {
     "code": "session_required",
@@ -227,7 +227,7 @@
   {
     "code": "reauthentication_required",
     "status": 403,
-    "description": "Sign in again within 10 minutes before this action: a user without a password, or anyone linking a provider."
+    "description": "Sign in again within 10 minutes before this action: a user without a password, or an old session removing a passkey."
   },
   {
     "code": "email_already_verified",
@@ -298,5 +298,80 @@
     "code": "provider_unavailable",
     "status": 503,
     "description": "The provider did not answer in time, or answered with a server error; try again."
+  },
+  {
+    "code": "invalid_mfa_ticket",
+    "status": 401,
+    "description": "The MFA ticket is unknown, expired, used up by 5 wrong factors, or from another project; sign in again."
+  },
+  {
+    "code": "invalid_mfa_code",
+    "status": 401,
+    "description": "The authenticator code or recovery code is wrong, or the code was already used."
+  },
+  {
+    "code": "invalid_passkey",
+    "status": 401,
+    "description": "The passkey's answer failed a check, or the passkey is unknown, inactive, or another user's."
+  },
+  {
+    "code": "invalid_passkey_challenge",
+    "status": 400,
+    "description": "The passkey challenge is unknown, used, expired, or not this user's; ask for a new one."
+  },
+  {
+    "code": "mfa_verification_required",
+    "status": 403,
+    "description": "Pass a second factor (`account.verifyMfa`) within 10 minutes before this action."
+  },
+  {
+    "code": "mfa_required",
+    "status": 403,
+    "description": "The access token's `aal` is below 2: this route needs a session that passed MFA."
+  },
+  {
+    "code": "mfa_already_enabled",
+    "status": 409,
+    "description": "The user already has an authenticator app turned on."
+  },
+  {
+    "code": "mfa_not_enabled",
+    "status": 409,
+    "description": "The user has no authenticator app turned on."
+  },
+  {
+    "code": "email_not_verified",
+    "status": 409,
+    "description": "Verify the user's email before turning on MFA or adding a passkey."
+  },
+  {
+    "code": "totp_not_pending",
+    "status": 409,
+    "description": "No authenticator app is waiting for its first code, or it waited more than 15 minutes; start again."
+  },
+  {
+    "code": "factor_not_enabled",
+    "status": 409,
+    "description": "This factor is turned off for the project, or the user can't use it now."
+  },
+  {
+    "code": "passkey_already_registered",
+    "status": 409,
+    "description": "This passkey is already registered in the project."
+  },
+  {
+    "code": "passkey_limit",
+    "status": 409,
+    "description": "The user already has 10 passkeys."
+  },
+  {
+    "code": "passkeys_exist",
+    "status": 409,
+    "description": "Passkeys are registered under the current RP ID; confirm the change with `confirmRpIdChange`."
+  },
+  {
+    "code": "passkey_not_found",
+    "status": 404,
+    "description": "No such passkey for this user."
   }
 ]

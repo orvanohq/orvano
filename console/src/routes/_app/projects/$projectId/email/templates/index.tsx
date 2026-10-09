@@ -14,7 +14,7 @@ export const Route = createFileRoute('/_app/projects/$projectId/email/templates/
 })
 
 /**
- * The Email Templates tab (spec 0009, AC-8): the four auth emails, each with what it is for, whether
+ * The Email Templates tab (spec 0009, AC-8; spec 0013, AC-31): the five auth emails, each with what it is for, whether
  * the project edited it, and when. Each row opens its editor.
  */
 function EmailTemplatesPage() {

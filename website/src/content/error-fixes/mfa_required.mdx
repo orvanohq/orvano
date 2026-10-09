@@ -1,0 +1,7 @@
+## Why it happens
+
+Your server asked for `requireMfa`, and the access token's `aal` claim is below 2: the session never passed a second factor.
+
+## How to fix
+
+Send the person through MFA: turn it on for their account, or step up with `account.verifyMfa`, then call your route with the new access token. See [Verify tokens](/docs/auth/verify-tokens/).

@@ -47,7 +47,16 @@ export function UserStatusBadge({ status }: { status: UserStatus }) {
   )
 }
 
-/** The Users table: email (the link to the user), name, status, and dates. */
+/** Whether a user has MFA on, as a word (spec 0013, AC-44): never only an icon. */
+export function MfaBadge({ enabled }: { enabled: boolean }) {
+  return (
+    <Badge variant="status" tone={enabled ? 'success' : 'neutral'}>
+      {enabled ? 'On' : 'Off'}
+    </Badge>
+  )
+}
+
+/** The Users table: email (the link to the user), name, sign in methods, MFA, status, and dates. */
 export function userColumns(projectId: string): ColumnDef<User>[] {
   return [
     {
@@ -73,6 +82,11 @@ export function userColumns(projectId: string): ColumnDef<User>[] {
       id: 'signIn',
       header: 'Sign in',
       cell: ({ row }) => <SignInMethods user={row.original} />,
+    },
+    {
+      accessorKey: 'mfaEnabled',
+      header: 'MFA',
+      cell: ({ row }) => <MfaBadge enabled={row.original.mfaEnabled} />,
     },
     {
       accessorKey: 'status',
@@ -132,8 +146,33 @@ export function NoUsers({ searching }: { searching: boolean }) {
   )
 }
 
+/** A session's level (spec 0013, AC-26): one factor, or two after a second step or with a passkey. */
+export function sessionLevelLabel(aal: number): string {
+  return aal >= 2 ? 'Two factors' : 'One factor'
+}
+
+/** The words for a session's `amr` values (spec 0013, AC-25); `mfa` and `user` add nothing the level doesn't say. */
+const factorWords: Record<string, string> = {
+  pwd: 'Password',
+  email: 'Email',
+  fed: 'Provider',
+  otp: 'Authenticator app',
+  rec: 'Recovery code',
+  hwk: 'Passkey (device bound)',
+  swk: 'Passkey (synced)',
+}
+
+/** How a session signed in, as words in the order the server sorted `amr` (spec 0013, AC-44). */
+export function sessionFactorsLabel(amr: readonly string[]): string {
+  const words = amr
+    .filter((value) => value !== 'mfa' && value !== 'user')
+    .map((value) => factorWords[value] ?? value)
+  return words.length === 0 ? 'Unknown' : words.join(', ')
+}
+
 /**
- * A user's active sessions: when they signed in and were last active, the device, and where from.
+ * A user's active sessions: when they signed in and were last active, how strongly and with what
+ * (spec 0013, AC-44), the device, and where from.
  * `endReason` is set when you may not end sessions (a viewer); the End buttons then explain why.
  */
 export function SessionsTable({
@@ -173,6 +212,16 @@ export function SessionsTable({
         row.original.provider === null
           ? sessionMethodLabel(row.original.method)
           : `${sessionMethodLabel(row.original.method)}, ${providerInfo(row.original.provider).label}`,
+    },
+    {
+      accessorKey: 'aal',
+      header: 'Level',
+      cell: ({ row }) => sessionLevelLabel(row.original.aal),
+    },
+    {
+      accessorKey: 'amr',
+      header: 'Factors',
+      cell: ({ row }) => sessionFactorsLabel(row.original.amr),
     },
     {
       accessorKey: 'userAgent',

@@ -100,6 +100,10 @@ Sign users in from a server action rather than the browser: a session started in
 
 The page an emailed link lands on is a client component with a **Continue** button that calls `orvano.client.redeemLink()`. A password reset link needs the new password: `redeemLink(undefined, { password })`. An emailed code signs in with `orvano.client.signInWithEmailCode(email, code)`. Send the emails themselves from a server action with `createServerClient`. Each [auth guide](/docs/auth/email-verification/) has the Next.js version of its flow.
 
+### MFA and passkeys
+
+A sign in that needs the [second step](/docs/auth/mfa/) keeps its ticket in the `orvano_mfa` cookie (`HttpOnly`, 5 minutes), never in a response: a server action gets `result.mfa` with an empty `ticket` and the `factors`, and a provider sign in redirects to `mfaPath` (default `/sign-in/mfa`), an option of `createOrvanoRouteHandler`. On that page, `orvano.client.completeMfa({ totpCode })` posts the factor to the route handler, which sets the session cookies. `confirmTotp`, `verifyMfa`, `signInWithPasskey`, and a passkey answer go through the handler too, so the refresh token never reaches the browser. [Passkeys](/docs/auth/passkeys/) has the rest.
+
 ## Errors
 
 Refused calls throw `OrvanoError`, re-exported from this package with `ErrorCode`. See [Errors](/docs/concepts/errors/).

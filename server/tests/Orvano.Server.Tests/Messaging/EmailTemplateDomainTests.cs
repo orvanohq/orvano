@@ -15,6 +15,63 @@ public class EmailTemplateDomainTests
 
     public static TheoryData<AuthEmailKind> Kinds => [AuthEmailKind.Verification, AuthEmailKind.Recovery, AuthEmailKind.MagicLink, AuthEmailKind.EmailCode];
 
+    public static TheoryData<SecurityAlertKind, string> Alerts => new()
+    {
+        { SecurityAlertKind.MfaEnabled, "Two step verification is on" },
+        { SecurityAlertKind.MfaDisabled, "Two step verification is off" },
+        { SecurityAlertKind.PasskeyAdded, "A passkey was added" },
+        { SecurityAlertKind.PasskeyRemoved, "A passkey was removed" },
+        { SecurityAlertKind.RecoveryCodesCreated, "New recovery codes were made" },
+        { SecurityAlertKind.RecoveryCodeUsed, "A recovery code was used" },
+    };
+
+    // Spec 0013 AC-31: the security alert's default, worded per alert through one Liquid case, with AC-13's rules
+    // apart from the button.
+    [Theory]
+    [MemberData(nameof(Alerts))]
+    public async Task The_security_alert_default_names_each_change_and_when_with_no_button(SecurityAlertKind alert, string heading)
+    {
+        var info = EmailTemplateCatalog.Get(AuthEmailKind.SecurityAlert);
+        var source = DefaultTemplates.Get(AuthEmailKind.SecurityAlert);
+        Assert.True(EmailTemplates.TryNormalize(source.Subject, source.Html, source.Text, out var stored, out var error), error);
+        Assert.Equal(source, stored);
+        var values = AuthEmailRule.CheckAlert("p1", "grace@example.com", "Acme Shop", alert, new DateTimeOffset(2026, 6, 1, 12, 30, 0, TimeSpan.FromHours(2)));
+
+        var (email, problem) = await EmailTemplates.CheckAsync(info, source, values);
+
+        Assert.True(problem is null, problem?.Detail);
+        var html = email!.Html;
+        Assert.Equal("Security alert for Acme Shop", email.Subject);
+        Assert.StartsWith("<!doctype html>\n<html lang=\"en\" dir=\"ltr\">", html, StringComparison.Ordinal);
+        Assert.Contains($"<title>{email.Subject}</title>", html, StringComparison.Ordinal);
+        Assert.Matches($"""<div style="display:none[^"]*">{heading} \(2026-06-01 10:30 UTC\)\.</div>""", html);
+        Assert.Single(Regex.Matches(html, "<h1[ >]"));
+        Assert.Contains($">{heading}</h1>", html, StringComparison.Ordinal);
+        Assert.Contains("When: 2026-06-01 10:30 UTC", html, StringComparison.Ordinal);
+        Assert.Contains("Acme Shop account", html + email.Text, StringComparison.Ordinal);
+        Assert.Equal(Regex.Matches(html, "<table ").Count, Regex.Matches(html, """<table role="presentation" """).Count);
+        Assert.DoesNotMatch(@"font-size:(\d|1[0-5])px", html);
+        Assert.DoesNotContain("href", html, StringComparison.Ordinal);
+        Assert.StartsWith($"{heading}\n\n", email.Text, StringComparison.Ordinal);
+        Assert.Contains("When: 2026-06-01 10:30 UTC", email.Text, StringComparison.Ordinal);
+        Assert.Contains("If it wasn't, sign in to Acme Shop now", email.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("{{", html + email.Text + email.Subject, StringComparison.Ordinal);
+        Assert.DoesNotContain("{%", html + email.Text + email.Subject, StringComparison.Ordinal);
+        Assert.DoesNotContain('<', email.Text);
+    }
+
+    [Fact]
+    public void A_security_alert_goes_only_through_its_own_method_and_needs_one_address()
+    {
+        var asAuthEmail = new AuthEmail("p1", "Acme", AuthEmailKind.SecurityAlert, "grace@example.com", null, null, null, 10);
+
+        Assert.Throws<ArgumentException>(() => AuthEmailRule.Check(asAuthEmail));
+        Assert.Throws<ArgumentException>(() => AuthEmailRule.CheckAlert("p1", "not an email", "Acme", SecurityAlertKind.MfaEnabled, DateTimeOffset.UtcNow));
+        Assert.Throws<ArgumentException>(() => AuthEmailRule.CheckAlert("p1", "grace@example.com\r\nBcc: x@y.z", "Acme", SecurityAlertKind.MfaEnabled, DateTimeOffset.UtcNow));
+        Assert.Throws<ArgumentException>(() => AuthEmailRule.CheckAlert("", "grace@example.com", "Acme", SecurityAlertKind.MfaEnabled, DateTimeOffset.UtcNow));
+        Assert.Throws<ArgumentException>(() => AuthEmailRule.CheckAlert("p1", "grace@example.com", "Acme", (SecurityAlertKind)99, DateTimeOffset.UtcNow));
+    }
+
     // AC-13, rule by rule, on what a recipient actually gets.
     [Theory]
     [MemberData(nameof(Kinds))]
@@ -306,10 +363,11 @@ public class EmailTemplateDomainTests
     }
 
     [Fact]
-    public void The_catalog_names_the_four_templates_and_their_variables()
+    public void The_catalog_names_the_five_templates_and_their_variables()
     {
-        Assert.Equal(["verification", "recovery", "magic_link", "email_code"], EmailTemplateCatalog.All.Select(t => t.Wire));
-        Assert.Equal(["Email verification", "Password reset", "Magic link", "Email code"], EmailTemplateCatalog.All.Select(t => t.Name));
+        Assert.Equal(["verification", "recovery", "magic_link", "email_code", "security_alert"], EmailTemplateCatalog.All.Select(t => t.Wire));
+        Assert.Equal(["Email verification", "Password reset", "Magic link", "Email code", "Security alert"], EmailTemplateCatalog.All.Select(t => t.Name));
+        Assert.Equal(["project.name", "alert", "occurred_at"], EmailTemplateCatalog.Get(AuthEmailKind.SecurityAlert).Variables.Select(v => v.Name));
         Assert.Equal(
             ["project.name", "user.email", "user.name", "action_url", "expires_in_minutes"],
             EmailTemplateCatalog.Get(AuthEmailKind.MagicLink).Variables.Select(v => v.Name));

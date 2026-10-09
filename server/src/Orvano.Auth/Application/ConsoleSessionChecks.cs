@@ -1,11 +1,12 @@
 using Orvano.Auth.Contracts;
+using Orvano.Auth.Domain;
 
 namespace Orvano.Auth.Application;
 
 /// <summary>The console accounts' project, whose users are console accounts (spec 0003, AC-6).</summary>
 internal static class ConsoleProject
 {
-    public const string Id = "console";
+    public const string Id = VerifiedEmailRule.ExemptProject;
 }
 
 /// <summary>Checks console session cookies with the same rules as bearer tokens (AC-7, AC-27).</summary>
@@ -23,7 +24,7 @@ internal sealed class ConsoleSessionChecks(AccessTokens tokens, SessionChecks se
         }
 
         return await sessions.IsActiveAsync(identity.SessionId, identity.UserId, ConsoleProject.Id, ct)
-            ? new ConsoleSessionCheck(ConsoleSessionStatus.Valid, identity.UserId)
+            ? new ConsoleSessionCheck(ConsoleSessionStatus.Valid, identity.UserId, identity.SessionId)
             : new ConsoleSessionCheck(ConsoleSessionStatus.Invalid, Guid.Empty);
     }
 }

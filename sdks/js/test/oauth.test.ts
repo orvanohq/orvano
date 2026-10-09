@@ -136,11 +136,19 @@ describe('provider sign in (AC-20)', () => {
 
     const result = await c.linkIdentity('github', {
       redirectUrl,
+      password: 'correct horse',
       open: () => `${redirectUrl}?orvano_type=oauth_link&orvano_code=${code}`,
     })
 
     expect(new URL(sent[0]?.url ?? '').pathname).toBe('/v1/account/identities/oauth/flows')
+    // Spec 0013: the link flow carries the user's current password; the redemption does not.
+    expect(JSON.parse(sent[0]?.body ?? '{}')).toMatchObject({
+      provider: 'github',
+      redirectUrl,
+      password: 'correct horse',
+    })
     expect(new URL(sent[1]?.url ?? '').pathname).toBe('/v1/account/identities/oauth')
+    expect(JSON.parse(sent[1]?.body ?? '{}')).not.toHaveProperty('password')
     expect(result).toEqual({ type: 'oauth_link', identity: { id: 'i1', provider: 'github' } })
     expect(seen).toEqual(['userUpdated'])
   })
@@ -276,7 +284,12 @@ describe('native ID tokens (AC-20)', () => {
       authorizationCode: 'apple-code',
       name: 'Grace Hopper',
     })
-    expect(result).toEqual({ user: { id: 'u1', providers: ['google'] }, isNewUser: true })
+    expect(result).toEqual({
+      user: { id: 'u1', providers: ['google'] },
+      isNewUser: true,
+      mfaRequired: false,
+      factors: [],
+    })
     expect((await c.session.get())?.sessionId).toBe('s1')
     expect(seen).toEqual(['signedIn'])
   })
@@ -308,8 +321,28 @@ describe('native ID tokens (AC-20)', () => {
     })
 
     expect(new URL(sent[0]?.url ?? '').pathname).toBe('/v1/account/identities/id-token')
+    expect(JSON.parse(sent[0]?.body ?? '{}')).not.toHaveProperty('password')
     expect(identity).toEqual({ id: 'i2', provider: 'google' })
     expect(seen).toEqual(['userUpdated'])
+  })
+
+  it('linkIdentityWithIdToken sends the current password with the token', async () => {
+    const { fetch, sent } = fakeFetch(
+      Response.json({ id: 'i2', provider: 'google' }, { status: 201 }),
+    )
+    const c = client(fetch)
+
+    await c.linkIdentityWithIdToken(
+      { provider: 'google', idToken: 't', nonce: 'n' },
+      { password: 'correct horse' },
+    )
+
+    expect(JSON.parse(sent[0]?.body ?? '{}')).toEqual({
+      provider: 'google',
+      idToken: 't',
+      nonce: 'n',
+      password: 'correct horse',
+    })
   })
 
   it('a refused token throws invalid_id_token and stores nothing', async () => {

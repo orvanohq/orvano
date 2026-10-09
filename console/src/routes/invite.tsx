@@ -9,7 +9,7 @@ import { invalidateOrgLists, keys, optionalAccountQuery } from '@/lib/queries'
 import { notifySuccess } from '@/lib/toast'
 import { LogoMark } from '@/shell/logo'
 import { PageHeading } from '@/shell/page-heading'
-import type { InvitationPreview } from '@orvano/console-client'
+import type { InvitationPreview, MfaChallenge } from '@orvano/console-client'
 
 import { InviteView, type InviteState } from './-invite/invite-view'
 
@@ -44,8 +44,9 @@ export const Route = createFileRoute('/invite')({
 
 /**
  * Previews the invitation, then lets you join with the account you are signed in to (AC-21), or
- * create an account or sign in when you are signed out (AC-22). A 401 on the account query means
- * "signed out" here and never redirects to sign in.
+ * create an account or sign in when you are signed out (AC-22); an account with MFA passes its
+ * second step in place first (spec 0013, AC-41). A 401 on the account query means "signed out"
+ * here and never redirects to sign in.
  */
 function InvitePage() {
   const { inviteToken, inviteGeneration } = Route.useRouteContext()
@@ -53,6 +54,9 @@ function InvitePage() {
   const queryClient = useQueryClient()
   // Bumped after the cache is cleared in place (sign in, sign out), so the queries load again.
   const [, setEpoch] = useState(0)
+  // A sign in waiting for its second step (spec 0013, AC-41), and why one started over.
+  const [mfa, setMfa] = useState<MfaChallenge | null>(null)
+  const [notice, setNotice] = useState<string | undefined>(undefined)
 
   const preview = useQuery({
     queryKey: [...keys.invitationPreview, inviteGeneration],
@@ -100,10 +104,27 @@ function InvitePage() {
     if (preview.isPending || account.isPending) return { kind: 'loading' }
     const invitation: InvitationPreview = preview.data
     const me = account.data
+    if ((me === null || me === undefined) && mfa !== null) {
+      return {
+        kind: 'mfa',
+        preview: invitation,
+        factors: mfa.factors,
+        onSignedIn: () => {
+          setMfa(null)
+          clearInPlace()
+          return Promise.resolve()
+        },
+        onStartOver: (reason) => {
+          setNotice(reason)
+          setMfa(null)
+        },
+      }
+    }
     if (me === null || me === undefined) {
       return {
         kind: 'signed-out',
         preview: invitation,
+        notice,
         onCreateAccount: async ({ name, email, password }) => {
           await consoleApi().consoleAccount.create({
             email,
@@ -115,7 +136,12 @@ function InvitePage() {
           await joined(invitation.orgId, `You joined ${invitation.orgName}`)
         },
         onSignIn: async (values) => {
-          await consoleApi().consoleAccount.createSession(values)
+          const result = await consoleApi().consoleAccount.createSession(values)
+          setNotice(undefined)
+          if (result.mfa !== null) {
+            setMfa(result.mfa)
+            return
+          }
           clearInPlace()
         },
       }

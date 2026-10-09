@@ -41,6 +41,25 @@ final result = await orvano.client.signInWithOAuth(
 
 The system's sign in sheet opens through `flutter_web_auth_2` and closes when the provider is done. For Google and Apple, prefer native sign in: add `google_sign_in` or `sign_in_with_apple`, make a nonce with `OrvanoNonce.create()`, and call `signInWithIdToken`. Guide: https://orvano.dev/docs/auth/native-sign-in/
 
+## Passkeys
+
+This package has no passkey dependency, so apps that don't use passkeys (on the web too) start without any extra script or native code. For native passkeys on iOS, macOS, Android, and the web, add the opt in [`orvano_flutter_passkeys`](https://pub.dev/packages/orvano_flutter_passkeys) package and pass its authenticator to `createClient`:
+
+```dart
+import 'package:orvano_flutter_passkeys/orvano_flutter_passkeys.dart';
+
+final orvano = Orvano(
+  createClient(
+    endpoint: 'https://orvano.example.com',
+    project: 'my-project',
+    passkeys: PlatformPasskeys(),
+  ),
+);
+await orvano.client.signInWithPasskey();
+```
+
+Without an authenticator, `signInWithPasskey`, `registerPasskey`, and `MfaAnswer.passkey()` throw an `ArgumentError` that names `orvano_flutter_passkeys`. Its README covers Associated Domains, `assetlinks.json`, and the script a web build needs. Guide: https://orvano.dev/docs/auth/passkeys/
+
 ## About
 
 Orvano is the open source backend you host yourself: auth, Postgres databases, storage, functions, realtime, messaging, webhooks, jobs, and backups, run from one console.

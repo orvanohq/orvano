@@ -23,7 +23,9 @@ internal sealed class IdentityService(
     Sessions sessions,
     SigningKeys keys,
     OAuthService oauth,
-    OAuthRedemptions redemptions)
+    OAuthRedemptions redemptions,
+    StepUp stepUp,
+    MethodPolicies policies)
 {
     public const int MaxIdTokenBytes = 8 * 1024;
     public const int MaxAuthorizationCode = 2048;
@@ -48,20 +50,23 @@ internal sealed class IdentityService(
             var name = native.Provider == OAuthProvider.Apple ? request.Name : null;
             var resolved = await resolution.ResolveAsync(uow, projectId, native.Provider, native.Result, name, SessionMethod.IdToken, ipKey, token);
             if (!resolved.Succeeded) return resolved.Failure!;
-            var grant = await sessions.CreateAsync(uow, projectId, resolved.Value!.UserId, client, Actor.User(resolved.Value.UserId),
-                SessionMethod.IdToken, token, OAuthProviders.Wire(native.Provider));
-            return new OAuthRedeemed(resolved.Value, grant);
+            return await redemptions.SignInAsync(uow, sessions, projectId, resolved.Value!, client, SessionMethod.IdToken,
+                OAuthProviders.Wire(native.Provider), token);
         }, ct);
         return await redemptions.FinishAsync(projectId, outcome, ct);
     }
 
-    /// <summary><c>account.createOAuthLinkFlow</c> (AC-13): a fresh session and no identity of the provider yet, then AC-4's start.</summary>
+    /// <summary>
+    /// <c>account.createOAuthLinkFlow</c> (AC-13): the enrollment check (spec 0013, AC-17, with the user's current
+    /// <paramref name="password"/>) and no identity of the provider yet, then AC-4's start.
+    /// </summary>
     public async Task<Outcome<string>> StartLinkAsync(
-        string projectId, Guid userId, Guid sessionId, OAuthProvider? provider, string? redirectUrl, string? codeChallenge, string ipKey, CancellationToken ct)
+        string projectId, Guid userId, Guid sessionId, OAuthProvider? provider, string? redirectUrl, string? codeChallenge, string? password,
+        string ipKey, CancellationToken ct)
     {
         // AC-4's start limit comes before the two reads below.
         if (oauth.TakeStartLimit(ipKey) is { } limited) return limited;
-        if (!await IsFreshAsync(userId, sessionId, ct)) return Failure.ReauthenticationRequired;
+        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, password, ct) is { } stale) return stale;
         if (provider is { } chosen && await HasProviderAsync(userId, chosen, ct)) return Failure.ProviderAlreadyLinked;
         return await oauth.StartAsync(projectId, provider, redirectUrl, codeChallenge, ipKey, ct, linkUserId: userId, limitTaken: true);
     }
@@ -81,10 +86,14 @@ internal sealed class IdentityService(
                 : Failure.InvalidOAuthCode, ct);
     }
 
-    /// <summary><c>account.createIdTokenIdentity</c> (AC-13): AC-9's checks on a fresh session, then the link.</summary>
-    public async Task<Outcome<IdentityRow>> LinkNativeAsync(string projectId, Guid userId, Guid sessionId, NativeRequest request, CancellationToken ct)
+    /// <summary>
+    /// <c>account.createIdTokenIdentity</c> (AC-13): the enrollment check (spec 0013, AC-17, with the user's current
+    /// <paramref name="password"/>), AC-9's checks, then the link.
+    /// </summary>
+    public async Task<Outcome<IdentityRow>> LinkNativeAsync(
+        string projectId, Guid userId, Guid sessionId, NativeRequest request, string? password, CancellationToken ct)
     {
-        if (!await IsFreshAsync(userId, sessionId, ct)) return Failure.ReauthenticationRequired;
+        if (await stepUp.EnrollmentAsync(projectId, userId, sessionId, password, ct) is { } stale) return stale;
         var check = await CheckAsync(projectId, request, ct);
         if (!check.Succeeded) return check.Failure!;
         var native = check.Value!;
@@ -110,8 +119,8 @@ internal sealed class IdentityService(
 
     /// <summary>
     /// Unlinks one identity (AC-14), under the user's lock: another user's or an unknown identity is 404, and the
-    /// last way in is 409 <c>last_sign_in_method</c>. Another way in is another identity, a verified email, or an
-    /// email with a password. Sessions stay; an Apple identity gets its revoke queued.
+    /// last way in is 409 <c>last_sign_in_method</c>. Another way in is another identity, a verified email, an
+    /// email with a password, or an active passkey. Sessions stay; an Apple identity gets its revoke queued.
     /// </summary>
     public async Task<Outcome<Done>> DeleteAsync(string projectId, string userId, string identityId, string reason, Actor actor, CancellationToken ct)
     {
@@ -124,9 +133,12 @@ internal sealed class IdentityService(
             var all = await Identities.OfUserAsync(uow, uid, token);
             if (all.FirstOrDefault(i => i.Id == iid) is not { } target) return Failure.IdentityNotFound;
 
+            // An active passkey is a way in too (spec 0013), while the project's passkeys are on.
+            var passkeysState = await MfaFactorState.ReadAsync(policies, uow.Tx.Connection!, uow.Tx, projectId, uid, token);
             var anotherWayIn = all.Count > 1
                 || (user.Email is not null && user.EmailVerifiedAt is not null)
-                || (user.Email is not null && user.HasPassword);
+                || (user.Email is not null && user.HasPassword)
+                || (passkeysState.Policy.PasskeysEnabled && passkeysState.ActivePasskeys > 0);
             if (!anotherWayIn) return Failure.LastSignInMethod;
 
             await Identities.DeleteAsync(uow, projectId, target, reason, actor, token);
@@ -207,9 +219,6 @@ internal sealed class IdentityService(
         insert.Parameters.AddWithValue("expires", native.ExpiresAt + AuthTimings.ClockLeeway);
         return await insert.ExecuteNonQueryAsync(ct) == 1;
     }
-
-    private Task<bool> IsFreshAsync(Guid userId, Guid sessionId, CancellationToken ct) =>
-        store.ReadAsync((db, token) => UserRecords.IsSessionFreshAsync((NpgsqlConnection)db.Database.GetDbConnection(), null, userId, sessionId, token), ct);
 
     private Task<bool> HasProviderAsync(Guid userId, OAuthProvider provider, CancellationToken ct)
     {

@@ -46,6 +46,7 @@ Map<String, Object?> user(String id) => {
   'lastSignInAt': null,
   'providers': <String>['google'],
   'hasPassword': false,
+  'mfaEnabled': false,
 };
 
 Map<String, Object?> identity(String provider) => {
@@ -183,7 +184,7 @@ void main() {
         expect(verifier, hasLength(43));
         expect(s256(verifier), challenge);
         expect(result.isNewUser, isTrue);
-        expect(result.user.id, 'u2');
+        expect(result.user?.id, 'u2');
         expect((await client.session.read())?.sessionId, 's2');
         expect(seen, [AuthEvent.signedIn]);
       });
@@ -343,6 +344,24 @@ void main() {
         expect(result.isNewUser, isFalse);
         expect((await client.session.read())?.sessionId, 's1');
         expect(seen, [AuthEvent.userUpdated]);
+        expect(server.jsonBody(0).containsKey('password'), isFalse);
+      });
+
+      test('sends the current password to start the link flow only', () async {
+        await serve([
+          flow(),
+          json(identity('github'), code: 201),
+        ], signedIn: session('u1'));
+
+        await client.linkIdentity(
+          OAuthProvider.github,
+          redirectUrl: redirect,
+          password: 'correct horse',
+          launcher: RecordingLauncher(back('oauth_link')).call,
+        );
+
+        expect(server.jsonBody(0)['password'], 'correct horse');
+        expect(server.jsonBody(1).containsKey('password'), isFalse);
       });
     });
 
@@ -452,9 +471,25 @@ void main() {
 
         expect(server.paths, ['/v1/account/identities/id-token']);
         expect(server.jsonBody(0)['provider'], 'google');
+        expect(server.jsonBody(0).containsKey('password'), isFalse);
         expect(linked.provider, OAuthProvider.google);
         expect((await client.session.read())?.sessionId, 's1');
         expect(seen, [AuthEvent.userUpdated]);
+      });
+
+      test('linkIdentityWithIdToken sends the current password', () async {
+        await serve([
+          json(identity('google'), code: 201),
+        ], signedIn: session('u1'));
+
+        await client.linkIdentityWithIdToken(
+          provider: IdTokenProvider.google,
+          idToken: 'id.token.value',
+          nonce: OrvanoNonce.create().raw,
+          password: 'correct horse',
+        );
+
+        expect(server.jsonBody(0)['password'], 'correct horse');
       });
 
       test(

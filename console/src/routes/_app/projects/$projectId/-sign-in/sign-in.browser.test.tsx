@@ -247,6 +247,8 @@ describe('SessionsTable with provider sign in (AC-26)', () => {
       sdk: null,
       ipAddress: null,
       current: false,
+      aal: 1,
+      amr: ['fed'],
     }
     const screen = await render(
       <main>

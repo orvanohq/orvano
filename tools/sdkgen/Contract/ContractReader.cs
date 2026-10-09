@@ -390,9 +390,14 @@ internal static partial class ContractReader
             }
         }
 
-        /// <summary>A model that carries every field a client runtime stores, each required.</summary>
+        /// <summary>
+        /// A model that carries every field a client runtime stores, each required. A nullable model (<c>T | null</c>)
+        /// counts too: a sign in that ends at an MFA challenge answers no session (spec 0013, AC-36).
+        /// </summary>
         private bool IsSessionModel(IOpenApiSchema schema)
         {
+            var variants = (schema.AnyOf ?? []).Concat(schema.OneOf ?? []).Where(v => v.Type is not JsonSchemaType.Null).ToList();
+            if (variants.Count == 1) schema = variants[0];
             var target = schema is OpenApiSchemaReference reference && _schemas.TryGetValue(reference.Reference.Id ?? "", out var t) ? t : schema;
             return target.Properties is { } properties && target.Required is { } required
                 && SessionFields.All(f => properties.ContainsKey(f) && required.Contains(f));

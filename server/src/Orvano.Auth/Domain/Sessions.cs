@@ -88,6 +88,12 @@ internal static class SessionEndReason
 
     /// <summary>The inbox owner signed in by link or code to an unverified account (spec 0010, AC-32).</summary>
     public const string AccountClaimed = "account_claimed";
+
+    /// <summary>Turning MFA on ends every other session of the user (spec 0013, AC-13).</summary>
+    public const string MfaEnabled = "mfa_enabled";
+
+    /// <summary>A server, console, or CLI reset of a user's MFA ends every session (spec 0013, AC-27).</summary>
+    public const string MfaReset = "mfa_reset";
 }
 
 /// <summary>How a session began (spec 0010, the <c>method</c> column, AC-20).</summary>
@@ -104,6 +110,9 @@ internal static class SessionMethod
 
     /// <summary>A provider's ID token from a native app (spec 0012, AC-9); the session also records the provider.</summary>
     public const string IdToken = "id_token";
+
+    /// <summary>A passkey sign in (spec 0013, AC-24); never challenged.</summary>
+    public const string Passkey = "passkey";
 }
 
 /// <summary>What a refresh does (spec 0004, refresh decision).</summary>

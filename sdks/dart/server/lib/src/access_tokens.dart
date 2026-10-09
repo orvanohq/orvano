@@ -13,6 +13,8 @@ final class VerifiedAccessToken {
     required this.sessionId,
     required this.emailVerified,
     required this.expiresAt,
+    this.aal = 1,
+    this.amr = const [],
   });
 
   /// The user ID (the `sub` claim).
@@ -28,6 +30,16 @@ final class VerifiedAccessToken {
 
   /// When the token expires (the `exp` claim), in UTC.
   final DateTime expiresAt;
+
+  /// How strongly the session signed in (the `aal` claim): 1 for one factor,
+  /// 2 after a second factor or with a passkey. 1 for a token issued before
+  /// Orvano had the claim.
+  final int aal;
+
+  /// How the session signed in (the `amr` claim), such as
+  /// `['mfa', 'otp', 'pwd']`; empty for a token issued before Orvano had the
+  /// claim.
+  final List<String> amr;
 }
 
 /// How long the project's signing keys are kept before they are fetched
@@ -57,6 +69,7 @@ final class AccessTokenVerifier {
   Future<VerifiedAccessToken> verify(
     String token, {
     bool online = false,
+    bool requireMfa = false,
   }) async {
     final project = _client.project;
     if (project == null) {
@@ -112,12 +125,35 @@ final class AccessTokenVerifier {
         );
       }
 
+      // Tokens from before spec 0013 carry neither claim: one factor.
+      final aal = switch (payload['aal']) {
+        final int level when level >= 1 => level,
+        _ => 1,
+      };
+      final amr = switch (payload['amr']) {
+        final List<Object?> methods => List<String>.unmodifiable(
+          methods.whereType<String>(),
+        ),
+        _ => const <String>[],
+      };
+      if (requireMfa && aal < 2) {
+        throw core.OrvanoException(
+          status: 403,
+          code: 'mfa_required',
+          message:
+              'This needs a session that passed a second factor or signed '
+              'in with a passkey.',
+        );
+      }
+
       if (online) await _client.send('GET', '/v1/account', bearer: token);
       return VerifiedAccessToken(
         userId: userId,
         sessionId: sessionId,
         emailVerified: payload['email_verified'] == true,
         expiresAt: expiresAt,
+        aal: aal,
+        amr: amr,
       );
     }
 

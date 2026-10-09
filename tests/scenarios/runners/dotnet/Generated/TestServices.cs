@@ -23,12 +23,13 @@ public sealed class TestService
     public Task<TestIdToken> CreateIdTokenAsync(TestCreateIdTokenRequest body, CancellationToken cancellationToken = default) =>
         _client.SendAsync(new OrvanoRequest("POST", "/v1/test/oauth/id-tokens", null, OrvanoRequest.Json(body, TestJsonContext.Default.TestCreateIdTokenRequest), false), TestJsonContext.Default.TestIdToken, cancellationToken);
 
-    /// <summary>Waits up to 15 seconds for the newest email to <c>to</c> that Mailpit caught after <c>after</c>, and reads it.</summary>
+    /// <summary>Waits up to 15 seconds for the newest email to <c>to</c> that Mailpit caught after <c>after</c> (and whose subject contains <c>subject</c>, when given), and reads it.</summary>
     /// <param name="to">The recipient.</param>
     /// <param name="after">Only an email received after this time.</param>
+    /// <param name="subject">Only an email whose subject contains this, so a step waits for that email even when the runner's clock is off.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
-    public Task<TestEmail> GetLatestEmailAsync(string to, DateTimeOffset? after = null, CancellationToken cancellationToken = default) =>
-        _client.SendAsync(new OrvanoRequest("GET", "/v1/test/emails/latest", [new("to", to), new("after", after is null ? null : after.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture))], null, false), TestJsonContext.Default.TestEmail, cancellationToken);
+    public Task<TestEmail> GetLatestEmailAsync(string to, DateTimeOffset? after = null, string? subject = null, CancellationToken cancellationToken = default) =>
+        _client.SendAsync(new OrvanoRequest("GET", "/v1/test/emails/latest", [new("to", to), new("after", after is null ? null : after.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)), new("subject", subject)], null, false), TestJsonContext.Default.TestEmail, cancellationToken);
 
     /// <summary>Pages through five fixed items.</summary>
     /// <param name="cursor">The <c>nextCursor</c> of the previous page.</param>

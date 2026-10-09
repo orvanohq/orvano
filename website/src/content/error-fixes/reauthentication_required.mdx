@@ -1,7 +1,7 @@
 ## Why it happens
 
-A user without a password must have signed in, by link or code, within the last 10 minutes before a sensitive action like changing their email.
+A user without a password must have signed in, by link, code, or provider, within the last 10 minutes before a sensitive action: changing their email, adding an authenticator app or a passkey, or linking a provider. Removing a passkey also needs a session from the last 10 minutes, for any user without MFA. A user with a password sends it instead, and never gets this error for those actions.
 
 ## How to fix
 
-Send them a [magic link](/docs/auth/magic-links/) or an [email code](/docs/auth/email-codes/) to sign in again, then retry the action.
+Send them a [magic link](/docs/auth/magic-links/) or an [email code](/docs/auth/email-codes/) to sign in again, then retry the action. A user with a passkey can instead pass a [step up](/docs/auth/mfa/#step-up-before-security-changes) with it.

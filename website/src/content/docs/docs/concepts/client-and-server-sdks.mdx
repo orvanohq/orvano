@@ -12,7 +12,7 @@ Orvano has two kinds of SDK, and every operation in the API is meant for one or 
 | Runs | where your users are: browsers, phones, desktops | on your own servers |
 | Credential | the signed in user's session | an [API key](/docs/concepts/api-keys/) |
 | Can call | the user's own account: sign up, sign in, profile, sessions, email flows | any user of the project, through `users` |
-| Packages | [`@orvano/js`](/docs/sdks/js/), [`@orvano/nextjs`](/docs/sdks/nextjs/), [`orvano_flutter`](/docs/sdks/flutter/) | [`@orvano/js/server`](/docs/sdks/js/#on-your-server), [`orvano_dart`](/docs/sdks/dart/), [`Orvano`](/docs/sdks/dotnet/) for .NET |
+| Packages | [`@orvano/js`](/docs/sdks/js/), [`@orvano/nextjs`](/docs/sdks/nextjs/), [`orvano_flutter`](/docs/sdks/flutter/) (with the opt in [`orvano_flutter_passkeys`](/docs/sdks/flutter/#passkeys)) | [`@orvano/js/server`](/docs/sdks/js/#on-your-server), [`orvano_dart`](/docs/sdks/dart/), [`Orvano`](/docs/sdks/dotnet/) for .NET |
 
 Each SDK carries only the operations meant for it, so you can't call `users.block` from a browser by mistake: the method isn't there. A few operations work in both, such as reading the signed in user and fetching the project's public signing keys.
 

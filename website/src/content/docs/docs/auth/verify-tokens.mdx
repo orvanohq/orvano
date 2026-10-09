@@ -47,7 +47,7 @@ const client = new Client({ endpoint: process.env.ORVANO_ENDPOINT!, project: pro
 
 try {
   const token = await client.verifyAccessToken(accessToken)
-  // token.userId, token.sessionId, token.emailVerified, token.expiresAt
+  // token.userId, token.sessionId, token.emailVerified, token.expiresAt, token.aal, token.amr
 } catch (error) {
   if (error instanceof OrvanoError && error.status === 401) return new Response(null, { status: 401 })
   throw error
@@ -60,7 +60,7 @@ try {
 ```dart
 try {
   final token = await client.verifyAccessToken(accessToken);
-  // token.userId, token.sessionId, token.emailVerified, token.expiresAt
+  // token.userId, token.sessionId, token.emailVerified, token.expiresAt, token.aal, token.amr
 } on OrvanoException catch (error) {
   if (error.status != 401) rethrow;
   return Response.unauthorized('Send a valid access token.');
@@ -74,7 +74,7 @@ try {
 try
 {
     var token = await orvano.VerifyAccessTokenAsync(accessToken);
-    // token.UserId, token.SessionId, token.EmailVerified, token.ExpiresAt
+    // token.UserId, token.SessionId, token.EmailVerified, token.ExpiresAt, token.Aal, token.Amr
 }
 catch (OrvanoException error) when (error.Status == 401)
 {
@@ -121,8 +121,38 @@ var token = await orvano.VerifyAccessTokenAsync(accessToken, online: true);
   </TabItem>
 </Tabs>
 
+## Require MFA
+
+`aal` and `amr` say how strongly the session signed in ([Manage sessions](/docs/auth/manage-sessions/#how-strongly-a-session-signed-in)): `aal` is 2 once the user passed [MFA](/docs/auth/mfa/) or used a [passkey](/docs/auth/passkeys/). To guard a sensitive route, pass `requireMfa`: a token at one factor then throws 403 [`mfa_required`](/errors/mfa_required/). Answer it by asking the user to step up with `verifyMfa`, which gives the session a two factor token, then try again.
+
+<Tabs syncKey="server-sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const token = await client.verifyAccessToken(accessToken, { requireMfa: true, online: true })
+```
+
+  </TabItem>
+  <TabItem label="Dart">
+
+```dart
+final token = await client.verifyAccessToken(accessToken, requireMfa: true, online: true);
+```
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+var token = await orvano.VerifyAccessTokenAsync(accessToken, new VerifyAccessTokenOptions { RequireMfa = true, Online = true });
+```
+
+  </TabItem>
+</Tabs>
+
+The check reads the token's own claims, so pair it with `online` when a later [MFA reset](/docs/auth/mfa/#on-your-server) must count at once: a reset ends every session. Tokens issued before Orvano had MFA read as `aal` 1 with an empty `amr`.
+
 ## In other languages
 
-Any JWT library can check the tokens. Point it at the project's keys, `<your Orvano URL>/v1/projects/<projectId>/.well-known/jwks.json`, or at the discovery document from [`keys.getOpenIdConfiguration`](/docs/api/operations/keysgetopenidconfiguration/). Accept only `ES256`, and check `iss`, `aud`, and `exp` as above. The claims are `sub` (the user ID), `sid` (the session ID), and `email_verified`.
+Any JWT library can check the tokens. Point it at the project's keys, `<your Orvano URL>/v1/projects/<projectId>/.well-known/jwks.json`, or at the discovery document from [`keys.getOpenIdConfiguration`](/docs/api/operations/keysgetopenidconfiguration/). Accept only `ES256`, and check `iss`, `aud`, and `exp` as above. The claims are `sub` (the user ID), `sid` (the session ID), `email_verified`, `aal` (1 or 2), and `amr` (an array, such as `["mfa", "otp", "pwd"]`).
 
 Orvano rotates a project's signing key when an owner asks; the old key stays in the key set for 24 hours, so tokens signed with it keep working until they expire. When you see an unknown key ID, fetch the key set again.

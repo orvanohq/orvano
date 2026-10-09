@@ -180,14 +180,19 @@ function AuthForm({
   )
 }
 
-/** The sign in form: email and password, the email optionally filled in (spec 0008, AC-22). */
+/**
+ * The sign in form: email and password, the email optionally filled in (spec 0008, AC-22). With
+ * `passkeyAutofill`, the email field also offers the browser's passkeys (spec 0013, AC-41).
+ */
 export function SignInForm({
   id = 'sign-in',
   email: emailPrefill,
+  passkeyAutofill = false,
   onSubmit,
 }: {
   id?: string
   email?: string | undefined
+  passkeyAutofill?: boolean
   onSubmit: (values: { email: string; password: string }) => Promise<void>
 }) {
   return (
@@ -195,7 +200,12 @@ export function SignInForm({
       id={id}
       defaults={emailPrefill === undefined ? {} : { email: emailPrefill }}
       fields={[
-        { name: 'email', label: 'Email', type: 'email', autoComplete: 'username' },
+        {
+          name: 'email',
+          label: 'Email',
+          type: 'email',
+          autoComplete: passkeyAutofill ? 'username webauthn' : 'username',
+        },
         { name: 'password', label: 'Password', type: 'password', autoComplete: 'current-password' },
       ]}
       schema={signInSchema}

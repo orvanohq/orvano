@@ -21,6 +21,30 @@ enum IdTokenProvider {
       values.firstWhere((e) => e.value == value, orElse: () => unknown);
 }
 
+/// A second factor.
+enum MfaFactor {
+  /// The wire value `totp`.
+  totp('totp'),
+
+  /// The wire value `recovery_code`.
+  recoveryCode('recovery_code'),
+
+  /// The wire value `passkey`.
+  passkey('passkey'),
+
+  /// A value this SDK version does not know yet.
+  unknown('');
+
+  const MfaFactor(this.value);
+
+  /// The value on the wire.
+  final String value;
+
+  /// Decodes a wire value; values this SDK does not know map to [unknown].
+  static MfaFactor fromJson(String value) =>
+      values.firstWhere((e) => e.value == value, orElse: () => unknown);
+}
+
 /// A sign in provider.
 enum OAuthProvider {
   /// The wire value `google`.
@@ -70,6 +94,9 @@ enum SessionMethod {
 
   /// The wire value `id_token`.
   idToken('id_token'),
+
+  /// The wire value `passkey`.
+  passkey('passkey'),
 
   /// A value this SDK version does not know yet.
   unknown('');
@@ -129,31 +156,44 @@ enum VerificationEmailStatus {
       values.firstWhere((e) => e.value == value, orElse: () => unknown);
 }
 
-/// A signed in user and their new session.
+/// A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of
+/// `session` and `mfa` is set.
 final class AuthResult {
   /// Creates a [AuthResult].
   const AuthResult({
-    required this.user,
-    required this.session,
+    this.user,
+    this.session,
+    this.mfa,
     required this.isNewUser,
     this.verificationEmail,
   });
 
   /// Decodes a [AuthResult] from JSON.
   factory AuthResult.fromJson(Map<String, dynamic> json) => AuthResult(
-    user: User.fromJson(json['user'] as Map<String, dynamic>),
-    session: SessionTokens.fromJson(json['session'] as Map<String, dynamic>),
+    user: json['user'] == null
+        ? null
+        : User.fromJson(json['user'] as Map<String, dynamic>),
+    session: json['session'] == null
+        ? null
+        : SessionTokens.fromJson(json['session'] as Map<String, dynamic>),
+    mfa: json['mfa'] == null
+        ? null
+        : MfaChallenge.fromJson(json['mfa'] as Map<String, dynamic>),
     isNewUser: json['isNewUser'] as bool,
     verificationEmail: json['verificationEmail'] == null
         ? null
         : VerificationEmailStatus.fromJson(json['verificationEmail'] as String),
   );
 
-  /// The user.
-  final User user;
+  /// The user; null while `mfa` is set.
+  final User? user;
 
-  /// The new session's tokens.
-  final SessionTokens session;
+  /// The new session's tokens; null while `mfa` is set.
+  final SessionTokens? session;
+
+  /// Set when the user has MFA on: no session exists yet. Finish with `account.createMfaSession` and the ticket before
+  /// it expires. The SDKs' `completeMfa` does it. Null otherwise.
+  final MfaChallenge? mfa;
 
   /// Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user.
   final bool isNewUser;
@@ -163,8 +203,18 @@ final class AuthResult {
 
   /// Encodes this [AuthResult] as JSON.
   Map<String, dynamic> toJson() => {
-    'user': user.toJson(),
-    'session': session.toJson(),
+    'user': switch (user) {
+      final v? => v.toJson(),
+      null => null,
+    },
+    'session': switch (session) {
+      final v? => v.toJson(),
+      null => null,
+    },
+    'mfa': switch (mfa) {
+      final v? => v.toJson(),
+      null => null,
+    },
     'isNewUser': isNewUser,
     'verificationEmail': switch (verificationEmail) {
       final v? => v.value,
@@ -196,6 +246,43 @@ final class CompleteOAuthLinkRequest {
 
   /// Encodes this [CompleteOAuthLinkRequest] as JSON.
   Map<String, dynamic> toJson() => {'code': code, 'codeVerifier': codeVerifier};
+}
+
+/// A finished passkey registration.
+final class CompletePasskeyRegistrationRequest {
+  /// Creates a [CompletePasskeyRegistrationRequest].
+  const CompletePasskeyRegistrationRequest({
+    required this.challengeId,
+    required this.credential,
+    this.name,
+  });
+
+  /// Decodes a [CompletePasskeyRegistrationRequest] from JSON.
+  factory CompletePasskeyRegistrationRequest.fromJson(
+    Map<String, dynamic> json,
+  ) => CompletePasskeyRegistrationRequest(
+    challengeId: json['challengeId'] as String,
+    credential: PasskeyRegistrationCredential.fromJson(
+      json['credential'] as Map<String, dynamic>,
+    ),
+    name: json['name'] == null ? null : json['name'] as String,
+  );
+
+  /// The `challengeId` of the `PasskeyRegistration`.
+  final String challengeId;
+
+  /// The browser's or the platform's answer.
+  final PasskeyRegistrationCredential credential;
+
+  /// 1 to 64 characters. Left out, the passkey is named `Passkey`.
+  final String? name;
+
+  /// Encodes this [CompletePasskeyRegistrationRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'challengeId': challengeId,
+    'credential': credential.toJson(),
+    'name': ?name,
+  };
 }
 
 /// A password reset, with the token from the emailed link.
@@ -234,6 +321,22 @@ final class ConfirmEmailChangeRequest {
 
   /// Encodes this [ConfirmEmailChangeRequest] as JSON.
   Map<String, dynamic> toJson() => {'token': token};
+}
+
+/// The first code from the authenticator app, which turns MFA on.
+final class ConfirmTotpRequest {
+  /// Creates a [ConfirmTotpRequest].
+  const ConfirmTotpRequest({required this.code});
+
+  /// Decodes a [ConfirmTotpRequest] from JSON.
+  factory ConfirmTotpRequest.fromJson(Map<String, dynamic> json) =>
+      ConfirmTotpRequest(code: json['code'] as String);
+
+  /// The 6 digit code the authenticator app shows now.
+  final String code;
+
+  /// Encodes this [ConfirmTotpRequest] as JSON.
+  Map<String, dynamic> toJson() => {'code': code};
 }
 
 /// A new user with an email and password.
@@ -326,6 +429,62 @@ final class CreateEmailCodeSessionRequest {
 
   /// Encodes this [CreateEmailCodeSessionRequest] as JSON.
   Map<String, dynamic> toJson() => {'email': email, 'code': code};
+}
+
+/// A link of a provider to the signed in user with its ID token from a native app.
+final class CreateIdTokenIdentityRequest {
+  /// Creates a [CreateIdTokenIdentityRequest].
+  const CreateIdTokenIdentityRequest({
+    required this.provider,
+    required this.idToken,
+    required this.nonce,
+    this.authorizationCode,
+    this.name,
+    this.password,
+  });
+
+  /// Decodes a [CreateIdTokenIdentityRequest] from JSON.
+  factory CreateIdTokenIdentityRequest.fromJson(Map<String, dynamic> json) =>
+      CreateIdTokenIdentityRequest(
+        provider: IdTokenProvider.fromJson(json['provider'] as String),
+        idToken: json['idToken'] as String,
+        nonce: json['nonce'] as String,
+        authorizationCode: json['authorizationCode'] == null
+            ? null
+            : json['authorizationCode'] as String,
+        name: json['name'] == null ? null : json['name'] as String,
+        password: json['password'] == null ? null : json['password'] as String,
+      );
+
+  /// The provider that issued the token.
+  final IdTokenProvider provider;
+
+  /// The provider's ID token, at most 8 KB.
+  final String idToken;
+
+  /// The raw nonce, 16 to 128 characters. Give the provider its lowercase hex SHA-256 (the SDKs' `createNonce` makes
+  /// both), so the token carries that hash.
+  final String nonce;
+
+  /// Apple only, and required for Apple: the authorization code Sign in with Apple returned with the token.
+  final String? authorizationCode;
+
+  /// Apple only: the name Sign in with Apple returned on the first authorization, at most 256 characters.
+  final String? name;
+
+  /// The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+  /// minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+  final String? password;
+
+  /// Encodes this [CreateIdTokenIdentityRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'provider': provider.value,
+    'idToken': idToken,
+    'nonce': nonce,
+    'authorizationCode': ?authorizationCode,
+    'name': ?name,
+    'password': ?password,
+  };
 }
 
 /// A sign in with a provider's ID token from a native app.
@@ -430,6 +589,67 @@ final class CreateMagicLinkSessionRequest {
   Map<String, dynamic> toJson() => {'token': token};
 }
 
+/// The ticket of a sign in waiting for its second step.
+final class CreateMfaPasskeyChallengeRequest {
+  /// Creates a [CreateMfaPasskeyChallengeRequest].
+  const CreateMfaPasskeyChallengeRequest({required this.ticket});
+
+  /// Decodes a [CreateMfaPasskeyChallengeRequest] from JSON.
+  factory CreateMfaPasskeyChallengeRequest.fromJson(
+    Map<String, dynamic> json,
+  ) => CreateMfaPasskeyChallengeRequest(ticket: json['ticket'] as String);
+
+  /// The `ticket` of the `MfaChallenge`.
+  final String ticket;
+
+  /// Encodes this [CreateMfaPasskeyChallengeRequest] as JSON.
+  Map<String, dynamic> toJson() => {'ticket': ticket};
+}
+
+/// The second step of a sign in: the ticket and exactly one factor.
+final class CreateMfaSessionRequest {
+  /// Creates a [CreateMfaSessionRequest].
+  const CreateMfaSessionRequest({
+    required this.ticket,
+    this.totpCode,
+    this.recoveryCode,
+    this.passkey,
+  });
+
+  /// Decodes a [CreateMfaSessionRequest] from JSON.
+  factory CreateMfaSessionRequest.fromJson(Map<String, dynamic> json) =>
+      CreateMfaSessionRequest(
+        ticket: json['ticket'] as String,
+        totpCode: json['totpCode'] == null ? null : json['totpCode'] as String,
+        recoveryCode: json['recoveryCode'] == null
+            ? null
+            : json['recoveryCode'] as String,
+        passkey: json['passkey'] == null
+            ? null
+            : PasskeyAnswer.fromJson(json['passkey'] as Map<String, dynamic>),
+      );
+
+  /// The `ticket` of the `MfaChallenge`.
+  final String ticket;
+
+  /// The 6 digit code the authenticator app shows now.
+  final String? totpCode;
+
+  /// A recovery code; case, spaces, and hyphens do not matter. Each works once.
+  final String? recoveryCode;
+
+  /// A passkey's answer to `account.createMfaPasskeyChallenge`.
+  final PasskeyAnswer? passkey;
+
+  /// Encodes this [CreateMfaSessionRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'ticket': ticket,
+    'totpCode': ?totpCode,
+    'recoveryCode': ?recoveryCode,
+    if (passkey case final v?) 'passkey': v.toJson(),
+  };
+}
+
 /// A request to start signing in with a provider.
 final class CreateOAuthFlowRequest {
   /// Creates a [CreateOAuthFlowRequest].
@@ -467,6 +687,50 @@ final class CreateOAuthFlowRequest {
   };
 }
 
+/// A request to start linking a provider to the signed in user.
+final class CreateOAuthLinkFlowRequest {
+  /// Creates a [CreateOAuthLinkFlowRequest].
+  const CreateOAuthLinkFlowRequest({
+    required this.provider,
+    required this.redirectUrl,
+    required this.codeChallenge,
+    this.password,
+  });
+
+  /// Decodes a [CreateOAuthLinkFlowRequest] from JSON.
+  factory CreateOAuthLinkFlowRequest.fromJson(Map<String, dynamic> json) =>
+      CreateOAuthLinkFlowRequest(
+        provider: OAuthProvider.fromJson(json['provider'] as String),
+        redirectUrl: json['redirectUrl'] as String,
+        codeChallenge: json['codeChallenge'] as String,
+        password: json['password'] == null ? null : json['password'] as String,
+      );
+
+  /// The provider to sign in with.
+  final OAuthProvider provider;
+
+  /// Your page or app that receives the result: a host that is one of the project's web platforms (`http` only on
+  /// `localhost` or `127.0.0.1`), or your app's own scheme (its iOS, Android, or macOS identifier). Orvano adds
+  /// `orvano_type` and then `orvano_code` or `orvano_error` to it.
+  final String redirectUrl;
+
+  /// The S256 PKCE challenge: base64url(SHA-256(verifier)), 43 characters. Keep the verifier; only it redeems the
+  /// code. The SDKs make both.
+  final String codeChallenge;
+
+  /// The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+  /// minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+  final String? password;
+
+  /// Encodes this [CreateOAuthLinkFlowRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'provider': provider.value,
+    'redirectUrl': redirectUrl,
+    'codeChallenge': codeChallenge,
+    'password': ?password,
+  };
+}
+
 /// A sign in with the code a provider flow returned.
 final class CreateOAuthSessionRequest {
   /// Creates a [CreateOAuthSessionRequest].
@@ -490,6 +754,56 @@ final class CreateOAuthSessionRequest {
 
   /// Encodes this [CreateOAuthSessionRequest] as JSON.
   Map<String, dynamic> toJson() => {'code': code, 'codeVerifier': codeVerifier};
+}
+
+/// A request to start adding a passkey.
+final class CreatePasskeyRegistrationRequest {
+  /// Creates a [CreatePasskeyRegistrationRequest].
+  const CreatePasskeyRegistrationRequest({this.password});
+
+  /// Decodes a [CreatePasskeyRegistrationRequest] from JSON.
+  factory CreatePasskeyRegistrationRequest.fromJson(
+    Map<String, dynamic> json,
+  ) => CreatePasskeyRegistrationRequest(
+    password: json['password'] == null ? null : json['password'] as String,
+  );
+
+  /// The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+  /// minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+  final String? password;
+
+  /// Encodes this [CreatePasskeyRegistrationRequest] as JSON.
+  Map<String, dynamic> toJson() => {'password': ?password};
+}
+
+/// A sign in with a passkey.
+final class CreatePasskeySessionRequest {
+  /// Creates a [CreatePasskeySessionRequest].
+  const CreatePasskeySessionRequest({
+    required this.challengeId,
+    required this.credential,
+  });
+
+  /// Decodes a [CreatePasskeySessionRequest] from JSON.
+  factory CreatePasskeySessionRequest.fromJson(Map<String, dynamic> json) =>
+      CreatePasskeySessionRequest(
+        challengeId: json['challengeId'] as String,
+        credential: PasskeyAssertionCredential.fromJson(
+          json['credential'] as Map<String, dynamic>,
+        ),
+      );
+
+  /// The `challengeId` of the `PasskeyChallenge`.
+  final String challengeId;
+
+  /// The browser's or the platform's answer.
+  final PasskeyAssertionCredential credential;
+
+  /// Encodes this [CreatePasskeySessionRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'challengeId': challengeId,
+    'credential': credential.toJson(),
+  };
 }
 
 /// A sign in with an email and password.
@@ -538,6 +852,25 @@ final class CreateRecoveryRequest {
 
   /// Encodes this [CreateRecoveryRequest] as JSON.
   Map<String, dynamic> toJson() => {'email': email, 'redirectUrl': redirectUrl};
+}
+
+/// A request to start turning on an authenticator app.
+final class CreateTotpRequest {
+  /// Creates a [CreateTotpRequest].
+  const CreateTotpRequest({this.password});
+
+  /// Decodes a [CreateTotpRequest] from JSON.
+  factory CreateTotpRequest.fromJson(Map<String, dynamic> json) =>
+      CreateTotpRequest(
+        password: json['password'] == null ? null : json['password'] as String,
+      );
+
+  /// The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+  /// minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+  final String? password;
+
+  /// Encodes this [CreateTotpRequest] as JSON.
+  Map<String, dynamic> toJson() => {'password': ?password};
 }
 
 /// A request to email a user a password reset link.
@@ -834,6 +1167,101 @@ final class Jwks {
   };
 }
 
+/// The second step a sign in must pass before it gets a session: the user has MFA on. Answer it with
+/// `account.createMfaSession` before `expiresAt`.
+final class MfaChallenge {
+  /// Creates a [MfaChallenge].
+  const MfaChallenge({
+    required this.ticket,
+    required this.factors,
+    required this.expiresAt,
+  });
+
+  /// Decodes a [MfaChallenge] from JSON.
+  factory MfaChallenge.fromJson(Map<String, dynamic> json) => MfaChallenge(
+    ticket: json['ticket'] as String,
+    factors: (json['factors'] as List<dynamic>)
+        .map((e) => MfaFactor.fromJson(e as String))
+        .toList(),
+    expiresAt: DateTime.parse(json['expiresAt'] as String),
+  );
+
+  /// Proves the first step passed; send it to `account.createMfaSession`. Keep it in memory only. Empty when the ticket
+  /// travels in a cookie instead (the console).
+  final String ticket;
+
+  /// The factors the user can answer with now, in this order: `totp`, `recovery_code`, `passkey`.
+  final List<MfaFactor> factors;
+
+  /// When the ticket stops working: 5 minutes after the first step. After that, sign in again.
+  final DateTime expiresAt;
+
+  /// Encodes this [MfaChallenge] as JSON.
+  Map<String, dynamic> toJson() => {
+    'ticket': ticket,
+    'factors': factors.map((e) => e.value).toList(),
+    'expiresAt': expiresAt.toUtc().toIso8601String(),
+  };
+}
+
+/// A user's MFA state.
+final class MfaStatus {
+  /// Creates a [MfaStatus].
+  const MfaStatus({
+    required this.mfaEnabled,
+    required this.totpConfirmed,
+    this.totpConfirmedAt,
+    required this.recoveryCodesRemaining,
+    required this.passkeyCount,
+    required this.factorsAvailable,
+  });
+
+  /// Decodes a [MfaStatus] from JSON.
+  factory MfaStatus.fromJson(Map<String, dynamic> json) => MfaStatus(
+    mfaEnabled: json['mfaEnabled'] as bool,
+    totpConfirmed: json['totpConfirmed'] as bool,
+    totpConfirmedAt: json['totpConfirmedAt'] == null
+        ? null
+        : DateTime.parse(json['totpConfirmedAt'] as String),
+    recoveryCodesRemaining: (json['recoveryCodesRemaining'] as num).toInt(),
+    passkeyCount: (json['passkeyCount'] as num).toInt(),
+    factorsAvailable: (json['factorsAvailable'] as List<dynamic>)
+        .map((e) => MfaFactor.fromJson(e as String))
+        .toList(),
+  );
+
+  /// Whether sign in asks for a second factor: a confirmed authenticator app, while the project allows TOTP.
+  final bool mfaEnabled;
+
+  /// Whether an authenticator app is confirmed, even while the project has TOTP turned off.
+  final bool totpConfirmed;
+
+  /// When the authenticator app was confirmed; null when none is.
+  final DateTime? totpConfirmedAt;
+
+  /// How many unused recovery codes are left, 0 to 10.
+  final int recoveryCodesRemaining;
+
+  /// How many of the user's passkeys can sign in now.
+  final int passkeyCount;
+
+  /// What the project lets users turn on now: `totp` and `passkey`.
+  final List<MfaFactor> factorsAvailable;
+
+  /// Encodes this [MfaStatus] as JSON.
+  Map<String, dynamic> toJson() => {
+    'mfaEnabled': mfaEnabled,
+    'totpConfirmed': totpConfirmed,
+    'totpConfirmedAt': switch (totpConfirmedAt) {
+      final v? => v.toUtc().toIso8601String(),
+      null => null,
+    },
+    'recoveryCodesRemaining': recoveryCodesRemaining,
+    'passkeyCount': passkeyCount,
+    'factorsAvailable': factorsAvailable.map((e) => e.value).toList(),
+  };
+}
+
 /// A started provider flow.
 final class OAuthFlow {
   /// Creates a [OAuthFlow].
@@ -905,6 +1333,677 @@ final class OpenIdConfiguration {
   };
 }
 
+/// A passkey of a user.
+final class Passkey {
+  /// Creates a [Passkey].
+  const Passkey({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+    this.lastUsedAt,
+    required this.synced,
+    required this.active,
+  });
+
+  /// Decodes a [Passkey] from JSON.
+  factory Passkey.fromJson(Map<String, dynamic> json) => Passkey(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    createdAt: DateTime.parse(json['createdAt'] as String),
+    lastUsedAt: json['lastUsedAt'] == null
+        ? null
+        : DateTime.parse(json['lastUsedAt'] as String),
+    synced: json['synced'] as bool,
+    active: json['active'] as bool,
+  );
+
+  /// The passkey's ID.
+  final String id;
+
+  /// The name the user gave it, else `Passkey`.
+  final String name;
+
+  /// When it was added.
+  final DateTime createdAt;
+
+  /// When it last signed in or answered a challenge; null when it never has.
+  final DateTime? lastUsedAt;
+
+  /// Whether the passkey is backed up and synced across devices (for example by iCloud Keychain or a password manager).
+  final bool synced;
+
+  /// Whether it can sign in now: false after the project's RP ID changed away from the one it was made for.
+  final bool active;
+
+  /// Encodes this [Passkey] as JSON.
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'createdAt': createdAt.toUtc().toIso8601String(),
+    'lastUsedAt': switch (lastUsedAt) {
+      final v? => v.toUtc().toIso8601String(),
+      null => null,
+    },
+    'synced': synced,
+    'active': active,
+  };
+}
+
+/// A passkey's answer to a challenge.
+final class PasskeyAnswer {
+  /// Creates a [PasskeyAnswer].
+  const PasskeyAnswer({required this.challengeId, required this.credential});
+
+  /// Decodes a [PasskeyAnswer] from JSON.
+  factory PasskeyAnswer.fromJson(Map<String, dynamic> json) => PasskeyAnswer(
+    challengeId: json['challengeId'] as String,
+    credential: PasskeyAssertionCredential.fromJson(
+      json['credential'] as Map<String, dynamic>,
+    ),
+  );
+
+  /// The `challengeId` of the `PasskeyChallenge`.
+  final String challengeId;
+
+  /// The browser's or the platform's answer.
+  final PasskeyAssertionCredential credential;
+
+  /// Encodes this [PasskeyAnswer] as JSON.
+  Map<String, dynamic> toJson() => {
+    'challengeId': challengeId,
+    'credential': credential.toJson(),
+  };
+}
+
+/// A passkey's answer in WebAuthn's JSON form: what `PublicKeyCredential.toJSON()` gives after `get`.
+final class PasskeyAssertionCredential {
+  /// Creates a [PasskeyAssertionCredential].
+  const PasskeyAssertionCredential({
+    required this.id,
+    required this.rawId,
+    required this.type,
+    required this.response,
+    this.authenticatorAttachment,
+  });
+
+  /// Decodes a [PasskeyAssertionCredential] from JSON.
+  factory PasskeyAssertionCredential.fromJson(Map<String, dynamic> json) =>
+      PasskeyAssertionCredential(
+        id: json['id'] as String,
+        rawId: json['rawId'] as String,
+        type: json['type'] as String,
+        response: PasskeyAssertionResponse.fromJson(
+          json['response'] as Map<String, dynamic>,
+        ),
+        authenticatorAttachment: json['authenticatorAttachment'] == null
+            ? null
+            : json['authenticatorAttachment'] as String,
+      );
+
+  /// The credential ID, base64url.
+  final String id;
+
+  /// The credential ID again, base64url; must equal `id`.
+  final String rawId;
+
+  /// Always `public-key`.
+  final String type;
+
+  /// The authenticator's answer.
+  final PasskeyAssertionResponse response;
+
+  /// `platform` or `cross-platform`; null when the browser does not say.
+  final String? authenticatorAttachment;
+
+  /// Encodes this [PasskeyAssertionCredential] as JSON.
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'rawId': rawId,
+    'type': type,
+    'response': response.toJson(),
+    'authenticatorAttachment': ?authenticatorAttachment,
+  };
+}
+
+/// The authenticator's answer to `navigator.credentials.get`.
+final class PasskeyAssertionResponse {
+  /// Creates a [PasskeyAssertionResponse].
+  const PasskeyAssertionResponse({
+    required this.clientDataJSON,
+    required this.authenticatorData,
+    required this.signature,
+    this.userHandle,
+  });
+
+  /// Decodes a [PasskeyAssertionResponse] from JSON.
+  factory PasskeyAssertionResponse.fromJson(Map<String, dynamic> json) =>
+      PasskeyAssertionResponse(
+        clientDataJSON: json['clientDataJSON'] as String,
+        authenticatorData: json['authenticatorData'] as String,
+        signature: json['signature'] as String,
+        userHandle: json['userHandle'] == null
+            ? null
+            : json['userHandle'] as String,
+      );
+
+  /// The client data, base64url.
+  final String clientDataJSON;
+
+  /// The authenticator data, base64url.
+  final String authenticatorData;
+
+  /// The signature, base64url.
+  final String signature;
+
+  /// The user handle the passkey stores, base64url; null when the authenticator gives none.
+  final String? userHandle;
+
+  /// Encodes this [PasskeyAssertionResponse] as JSON.
+  Map<String, dynamic> toJson() => {
+    'clientDataJSON': clientDataJSON,
+    'authenticatorData': authenticatorData,
+    'signature': signature,
+    'userHandle': ?userHandle,
+  };
+}
+
+/// The authenticator's answer to `navigator.credentials.create`.
+final class PasskeyAttestationResponse {
+  /// Creates a [PasskeyAttestationResponse].
+  const PasskeyAttestationResponse({
+    required this.clientDataJSON,
+    required this.attestationObject,
+    this.transports,
+  });
+
+  /// Decodes a [PasskeyAttestationResponse] from JSON.
+  factory PasskeyAttestationResponse.fromJson(Map<String, dynamic> json) =>
+      PasskeyAttestationResponse(
+        clientDataJSON: json['clientDataJSON'] as String,
+        attestationObject: json['attestationObject'] as String,
+        transports: json['transports'] == null
+            ? null
+            : (json['transports'] as List<dynamic>)
+                  .map((e) => e as String)
+                  .toList(),
+      );
+
+  /// The client data, base64url.
+  final String clientDataJSON;
+
+  /// The attestation object, base64url.
+  final String attestationObject;
+
+  /// How the authenticator was reached: `internal`, `hybrid`, `usb`, `nfc`, or `ble`.
+  final List<String>? transports;
+
+  /// Encodes this [PasskeyAttestationResponse] as JSON.
+  Map<String, dynamic> toJson() => {
+    'clientDataJSON': clientDataJSON,
+    'attestationObject': attestationObject,
+    'transports': ?transports,
+  };
+}
+
+/// What kind of authenticator a new passkey must come from.
+final class PasskeyAuthenticatorSelection {
+  /// Creates a [PasskeyAuthenticatorSelection].
+  const PasskeyAuthenticatorSelection({
+    required this.residentKey,
+    required this.requireResidentKey,
+    required this.userVerification,
+  });
+
+  /// Decodes a [PasskeyAuthenticatorSelection] from JSON.
+  factory PasskeyAuthenticatorSelection.fromJson(Map<String, dynamic> json) =>
+      PasskeyAuthenticatorSelection(
+        residentKey: json['residentKey'] as String,
+        requireResidentKey: json['requireResidentKey'] as bool,
+        userVerification: json['userVerification'] as String,
+      );
+
+  /// Always `required`: the passkey is discoverable, so it signs in with no email typed.
+  final String residentKey;
+
+  /// Always true, for older browsers.
+  final bool requireResidentKey;
+
+  /// Always `required`: face, fingerprint, or PIN.
+  final String userVerification;
+
+  /// Encodes this [PasskeyAuthenticatorSelection] as JSON.
+  Map<String, dynamic> toJson() => {
+    'residentKey': residentKey,
+    'requireResidentKey': requireResidentKey,
+    'userVerification': userVerification,
+  };
+}
+
+/// A challenge for a passkey to sign: pass `options` to the browser, then send its answer with `challengeId`.
+final class PasskeyChallenge {
+  /// Creates a [PasskeyChallenge].
+  const PasskeyChallenge({required this.challengeId, required this.options});
+
+  /// Decodes a [PasskeyChallenge] from JSON.
+  factory PasskeyChallenge.fromJson(Map<String, dynamic> json) =>
+      PasskeyChallenge(
+        challengeId: json['challengeId'] as String,
+        options: PasskeyRequestOptions.fromJson(
+          json['options'] as Map<String, dynamic>,
+        ),
+      );
+
+  /// Names this challenge; send it back with the answer within 5 minutes.
+  final String challengeId;
+
+  /// The options for `navigator.credentials.get`.
+  final PasskeyRequestOptions options;
+
+  /// Encodes this [PasskeyChallenge] as JSON.
+  Map<String, dynamic> toJson() => {
+    'challengeId': challengeId,
+    'options': options.toJson(),
+  };
+}
+
+/// The options for `navigator.credentials.create` in WebAuthn's JSON form. Pass them to
+/// `PublicKeyCredential.parseCreationOptionsFromJSON`, or let the SDK's `registerPasskey` do it.
+final class PasskeyCreationOptions {
+  /// Creates a [PasskeyCreationOptions].
+  const PasskeyCreationOptions({
+    required this.rp,
+    required this.user,
+    required this.challenge,
+    required this.pubKeyCredParams,
+    required this.timeout,
+    required this.excludeCredentials,
+    required this.authenticatorSelection,
+    required this.attestation,
+  });
+
+  /// Decodes a [PasskeyCreationOptions] from JSON.
+  factory PasskeyCreationOptions.fromJson(
+    Map<String, dynamic> json,
+  ) => PasskeyCreationOptions(
+    rp: PasskeyRelyingParty.fromJson(json['rp'] as Map<String, dynamic>),
+    user: PasskeyUserEntity.fromJson(json['user'] as Map<String, dynamic>),
+    challenge: json['challenge'] as String,
+    pubKeyCredParams: (json['pubKeyCredParams'] as List<dynamic>)
+        .map(
+          (e) =>
+              PasskeyCredentialParameters.fromJson(e as Map<String, dynamic>),
+        )
+        .toList(),
+    timeout: (json['timeout'] as num).toInt(),
+    excludeCredentials: (json['excludeCredentials'] as List<dynamic>)
+        .map(
+          (e) =>
+              PasskeyCredentialDescriptor.fromJson(e as Map<String, dynamic>),
+        )
+        .toList(),
+    authenticatorSelection: PasskeyAuthenticatorSelection.fromJson(
+      json['authenticatorSelection'] as Map<String, dynamic>,
+    ),
+    attestation: json['attestation'] as String,
+  );
+
+  /// The relying party.
+  final PasskeyRelyingParty rp;
+
+  /// The user the passkey is for.
+  final PasskeyUserEntity user;
+
+  /// 32 random bytes, base64url, used once.
+  final String challenge;
+
+  /// The key types the server accepts, in order of preference.
+  final List<PasskeyCredentialParameters> pubKeyCredParams;
+
+  /// How long the browser waits, in milliseconds: 300000.
+  final int timeout;
+
+  /// The user's passkeys under this RP ID, so the same authenticator is not registered twice.
+  final List<PasskeyCredentialDescriptor> excludeCredentials;
+
+  /// The authenticator rules.
+  final PasskeyAuthenticatorSelection authenticatorSelection;
+
+  /// Always `none`: no device certificate is asked for.
+  final String attestation;
+
+  /// Encodes this [PasskeyCreationOptions] as JSON.
+  Map<String, dynamic> toJson() => {
+    'rp': rp.toJson(),
+    'user': user.toJson(),
+    'challenge': challenge,
+    'pubKeyCredParams': pubKeyCredParams.map((e) => e.toJson()).toList(),
+    'timeout': timeout,
+    'excludeCredentials': excludeCredentials.map((e) => e.toJson()).toList(),
+    'authenticatorSelection': authenticatorSelection.toJson(),
+    'attestation': attestation,
+  };
+}
+
+/// One passkey, named by its credential ID.
+final class PasskeyCredentialDescriptor {
+  /// Creates a [PasskeyCredentialDescriptor].
+  const PasskeyCredentialDescriptor({
+    required this.type,
+    required this.id,
+    this.transports,
+  });
+
+  /// Decodes a [PasskeyCredentialDescriptor] from JSON.
+  factory PasskeyCredentialDescriptor.fromJson(Map<String, dynamic> json) =>
+      PasskeyCredentialDescriptor(
+        type: json['type'] as String,
+        id: json['id'] as String,
+        transports: json['transports'] == null
+            ? null
+            : (json['transports'] as List<dynamic>)
+                  .map((e) => e as String)
+                  .toList(),
+      );
+
+  /// Always `public-key`.
+  final String type;
+
+  /// The credential ID, base64url.
+  final String id;
+
+  /// How the authenticator was reached when the passkey was made: `internal`, `hybrid`, `usb`, `nfc`, or `ble`.
+  final List<String>? transports;
+
+  /// Encodes this [PasskeyCredentialDescriptor] as JSON.
+  Map<String, dynamic> toJson() => {
+    'type': type,
+    'id': id,
+    'transports': ?transports,
+  };
+}
+
+/// A key type the server accepts.
+final class PasskeyCredentialParameters {
+  /// Creates a [PasskeyCredentialParameters].
+  const PasskeyCredentialParameters({required this.type, required this.alg});
+
+  /// Decodes a [PasskeyCredentialParameters] from JSON.
+  factory PasskeyCredentialParameters.fromJson(Map<String, dynamic> json) =>
+      PasskeyCredentialParameters(
+        type: json['type'] as String,
+        alg: (json['alg'] as num).toInt(),
+      );
+
+  /// Always `public-key`.
+  final String type;
+
+  /// A COSE algorithm: -7 (ES256), -8 (EdDSA), or -257 (RS256).
+  final int alg;
+
+  /// Encodes this [PasskeyCredentialParameters] as JSON.
+  Map<String, dynamic> toJson() => {'type': type, 'alg': alg};
+}
+
+/// A user's passkeys, oldest first; at most 10.
+final class PasskeyList {
+  /// Creates a [PasskeyList].
+  const PasskeyList({required this.items});
+
+  /// Decodes a [PasskeyList] from JSON.
+  factory PasskeyList.fromJson(Map<String, dynamic> json) => PasskeyList(
+    items: (json['items'] as List<dynamic>)
+        .map((e) => Passkey.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
+
+  /// The passkeys.
+  final List<Passkey> items;
+
+  /// Encodes this [PasskeyList] as JSON.
+  Map<String, dynamic> toJson() => {
+    'items': items.map((e) => e.toJson()).toList(),
+  };
+}
+
+/// A started passkey registration: pass `options` to the browser, then send its answer with `challengeId`.
+final class PasskeyRegistration {
+  /// Creates a [PasskeyRegistration].
+  const PasskeyRegistration({required this.challengeId, required this.options});
+
+  /// Decodes a [PasskeyRegistration] from JSON.
+  factory PasskeyRegistration.fromJson(Map<String, dynamic> json) =>
+      PasskeyRegistration(
+        challengeId: json['challengeId'] as String,
+        options: PasskeyCreationOptions.fromJson(
+          json['options'] as Map<String, dynamic>,
+        ),
+      );
+
+  /// Names this registration; send it back with the new passkey within 5 minutes.
+  final String challengeId;
+
+  /// The options for `navigator.credentials.create`.
+  final PasskeyCreationOptions options;
+
+  /// Encodes this [PasskeyRegistration] as JSON.
+  Map<String, dynamic> toJson() => {
+    'challengeId': challengeId,
+    'options': options.toJson(),
+  };
+}
+
+/// A new passkey in WebAuthn's JSON form: what `PublicKeyCredential.toJSON()` gives after `create`.
+final class PasskeyRegistrationCredential {
+  /// Creates a [PasskeyRegistrationCredential].
+  const PasskeyRegistrationCredential({
+    required this.id,
+    required this.rawId,
+    required this.type,
+    required this.response,
+    this.authenticatorAttachment,
+  });
+
+  /// Decodes a [PasskeyRegistrationCredential] from JSON.
+  factory PasskeyRegistrationCredential.fromJson(Map<String, dynamic> json) =>
+      PasskeyRegistrationCredential(
+        id: json['id'] as String,
+        rawId: json['rawId'] as String,
+        type: json['type'] as String,
+        response: PasskeyAttestationResponse.fromJson(
+          json['response'] as Map<String, dynamic>,
+        ),
+        authenticatorAttachment: json['authenticatorAttachment'] == null
+            ? null
+            : json['authenticatorAttachment'] as String,
+      );
+
+  /// The credential ID, base64url.
+  final String id;
+
+  /// The credential ID again, base64url; must equal `id`.
+  final String rawId;
+
+  /// Always `public-key`.
+  final String type;
+
+  /// The authenticator's answer.
+  final PasskeyAttestationResponse response;
+
+  /// `platform` or `cross-platform`; null when the browser does not say.
+  final String? authenticatorAttachment;
+
+  /// Encodes this [PasskeyRegistrationCredential] as JSON.
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'rawId': rawId,
+    'type': type,
+    'response': response.toJson(),
+    'authenticatorAttachment': ?authenticatorAttachment,
+  };
+}
+
+/// The relying party of a passkey: the app's passkey domain and the name people see.
+final class PasskeyRelyingParty {
+  /// Creates a [PasskeyRelyingParty].
+  const PasskeyRelyingParty({required this.id, required this.name});
+
+  /// Decodes a [PasskeyRelyingParty] from JSON.
+  factory PasskeyRelyingParty.fromJson(Map<String, dynamic> json) =>
+      PasskeyRelyingParty(
+        id: json['id'] as String,
+        name: json['name'] as String,
+      );
+
+  /// The RP ID: the domain passkeys are bound to.
+  final String id;
+
+  /// The name an authenticator shows: the project's RP name, else the project name.
+  final String name;
+
+  /// Encodes this [PasskeyRelyingParty] as JSON.
+  Map<String, dynamic> toJson() => {'id': id, 'name': name};
+}
+
+/// The options for `navigator.credentials.get` in WebAuthn's JSON form. Pass them to
+/// `PublicKeyCredential.parseRequestOptionsFromJSON`, or let the SDK's helpers do it.
+final class PasskeyRequestOptions {
+  /// Creates a [PasskeyRequestOptions].
+  const PasskeyRequestOptions({
+    required this.challenge,
+    required this.rpId,
+    required this.timeout,
+    required this.userVerification,
+    required this.allowCredentials,
+  });
+
+  /// Decodes a [PasskeyRequestOptions] from JSON.
+  factory PasskeyRequestOptions.fromJson(Map<String, dynamic> json) =>
+      PasskeyRequestOptions(
+        challenge: json['challenge'] as String,
+        rpId: json['rpId'] as String,
+        timeout: (json['timeout'] as num).toInt(),
+        userVerification: json['userVerification'] as String,
+        allowCredentials: (json['allowCredentials'] as List<dynamic>)
+            .map(
+              (e) => PasskeyCredentialDescriptor.fromJson(
+                e as Map<String, dynamic>,
+              ),
+            )
+            .toList(),
+      );
+
+  /// 32 random bytes, base64url, used once.
+  final String challenge;
+
+  /// The RP ID.
+  final String rpId;
+
+  /// How long the browser waits, in milliseconds: 300000.
+  final int timeout;
+
+  /// Always `required`: face, fingerprint, or PIN.
+  final String userVerification;
+
+  /// The passkeys that may answer; empty for sign in, so the browser offers every passkey for the RP ID.
+  final List<PasskeyCredentialDescriptor> allowCredentials;
+
+  /// Encodes this [PasskeyRequestOptions] as JSON.
+  Map<String, dynamic> toJson() => {
+    'challenge': challenge,
+    'rpId': rpId,
+    'timeout': timeout,
+    'userVerification': userVerification,
+    'allowCredentials': allowCredentials.map((e) => e.toJson()).toList(),
+  };
+}
+
+/// The account a new passkey is for, as the authenticator stores it.
+final class PasskeyUserEntity {
+  /// Creates a [PasskeyUserEntity].
+  const PasskeyUserEntity({
+    required this.id,
+    required this.name,
+    required this.displayName,
+  });
+
+  /// Decodes a [PasskeyUserEntity] from JSON.
+  factory PasskeyUserEntity.fromJson(Map<String, dynamic> json) =>
+      PasskeyUserEntity(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        displayName: json['displayName'] as String,
+      );
+
+  /// The user handle: the user ID's 16 bytes, base64url.
+  final String id;
+
+  /// The user's email, else their user ID.
+  final String name;
+
+  /// The user's name, else their email, else `User`.
+  final String displayName;
+
+  /// Encodes this [PasskeyUserEntity] as JSON.
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'displayName': displayName,
+  };
+}
+
+/// The signed in session after a second factor: a new access token carrying the new `aal` and `amr` claims. The refresh
+/// token is not sent; keep the one you hold, which is unchanged and whose next refresh carries the new claims too.
+final class RaisedSession {
+  /// Creates a [RaisedSession].
+  const RaisedSession({
+    required this.accessToken,
+    required this.accessTokenExpiresAt,
+    required this.sessionId,
+  });
+
+  /// Decodes a [RaisedSession] from JSON.
+  factory RaisedSession.fromJson(Map<String, dynamic> json) => RaisedSession(
+    accessToken: json['accessToken'] as String,
+    accessTokenExpiresAt: DateTime.parse(
+      json['accessTokenExpiresAt'] as String,
+    ),
+    sessionId: json['sessionId'] as String,
+  );
+
+  /// An ES256 JWT, valid for 15 minutes.
+  final String accessToken;
+
+  /// When the access token expires.
+  final DateTime accessTokenExpiresAt;
+
+  /// The session ID, also the `sid` claim of the access token.
+  final String sessionId;
+
+  /// Encodes this [RaisedSession] as JSON.
+  Map<String, dynamic> toJson() => {
+    'accessToken': accessToken,
+    'accessTokenExpiresAt': accessTokenExpiresAt.toUtc().toIso8601String(),
+    'sessionId': sessionId,
+  };
+}
+
+/// New recovery codes. Show them once and ask the user to keep them safe; every older code stopped working.
+final class RecoveryCodes {
+  /// Creates a [RecoveryCodes].
+  const RecoveryCodes({required this.codes});
+
+  /// Decodes a [RecoveryCodes] from JSON.
+  factory RecoveryCodes.fromJson(Map<String, dynamic> json) => RecoveryCodes(
+    codes: (json['codes'] as List<dynamic>).map((e) => e as String).toList(),
+  );
+
+  /// 10 recovery codes, each `XXXXX-XXXXX`, each working once.
+  final List<String> codes;
+
+  /// Encodes this [RecoveryCodes] as JSON.
+  Map<String, dynamic> toJson() => {'codes': codes};
+}
+
 /// A trade of a refresh token for a new pair.
 final class RefreshSessionRequest {
   /// Creates a [RefreshSessionRequest].
@@ -934,6 +2033,8 @@ final class Session {
     required this.current,
     required this.method,
     this.provider,
+    required this.aal,
+    required this.amr,
   });
 
   /// Decodes a [Session] from JSON.
@@ -949,6 +2050,8 @@ final class Session {
     provider: json['provider'] == null
         ? null
         : OAuthProvider.fromJson(json['provider'] as String),
+    aal: (json['aal'] as num).toInt(),
+    amr: (json['amr'] as List<dynamic>).map((e) => e as String).toList(),
   );
 
   /// The session ID.
@@ -978,6 +2081,14 @@ final class Session {
   /// The provider of an `oauth` or `id_token` session; null for every other method.
   final OAuthProvider? provider;
 
+  /// How strongly the session signed in: 1 for one factor, 2 once a second factor or a passkey was verified on it. Also
+  /// the access token's `aal` claim.
+  final int aal;
+
+  /// The ways the user proved who they are on this session, sorted: `pwd`, `email`, `fed`, `otp`, `rec`, `hwk`, `swk`,
+  /// `user`, and `mfa` (whenever `aal` is 2). Also the access token's `amr` claim.
+  final List<String> amr;
+
   /// Encodes this [Session] as JSON.
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -992,6 +2103,8 @@ final class Session {
       final v? => v.value,
       null => null,
     },
+    'aal': aal,
+    'amr': amr,
   };
 }
 
@@ -1073,6 +2186,70 @@ final class SessionTokens {
   };
 }
 
+/// MFA is on. Show the recovery codes once and ask the user to keep them safe; they can't be read again. Every other
+/// session of the user has ended, and this one is now at level 2.
+final class TotpConfirmation {
+  /// Creates a [TotpConfirmation].
+  const TotpConfirmation({required this.recoveryCodes, required this.session});
+
+  /// Decodes a [TotpConfirmation] from JSON.
+  factory TotpConfirmation.fromJson(Map<String, dynamic> json) =>
+      TotpConfirmation(
+        recoveryCodes: (json['recoveryCodes'] as List<dynamic>)
+            .map((e) => e as String)
+            .toList(),
+        session: RaisedSession.fromJson(
+          json['session'] as Map<String, dynamic>,
+        ),
+      );
+
+  /// 10 recovery codes, each `XXXXX-XXXXX`, each working once.
+  final List<String> recoveryCodes;
+
+  /// A new access token for this session, carrying `aal` 2. Keep the refresh token you hold; it is unchanged.
+  final RaisedSession session;
+
+  /// Encodes this [TotpConfirmation] as JSON.
+  Map<String, dynamic> toJson() => {
+    'recoveryCodes': recoveryCodes,
+    'session': session.toJson(),
+  };
+}
+
+/// A new authenticator app secret, waiting for its first code. Show `uri` as a QR code and `secret` for typing in, then
+/// confirm with `account.confirmTotp` within 15 minutes.
+final class TotpSetup {
+  /// Creates a [TotpSetup].
+  const TotpSetup({
+    required this.secret,
+    required this.uri,
+    required this.expiresAt,
+  });
+
+  /// Decodes a [TotpSetup] from JSON.
+  factory TotpSetup.fromJson(Map<String, dynamic> json) => TotpSetup(
+    secret: json['secret'] as String,
+    uri: json['uri'] as String,
+    expiresAt: DateTime.parse(json['expiresAt'] as String),
+  );
+
+  /// The secret: 20 random bytes as unpadded base32 (32 characters). Never log it.
+  final String secret;
+
+  /// The `otpauth://` URI an authenticator app scans: the project as the issuer, the user's email as the label.
+  final String uri;
+
+  /// When the secret stops waiting for its first code; ask for a new one after that.
+  final DateTime expiresAt;
+
+  /// Encodes this [TotpSetup] as JSON.
+  Map<String, dynamic> toJson() => {
+    'secret': secret,
+    'uri': uri,
+    'expiresAt': expiresAt.toUtc().toIso8601String(),
+  };
+}
+
 /// Changes to the signed in user. A field left out stays as it is.
 final class UpdateAccountRequest {
   /// Creates a [UpdateAccountRequest].
@@ -1150,6 +2327,22 @@ final class UpdateEmailVerificationRequest {
   Map<String, dynamic> toJson() => {'verified': verified};
 }
 
+/// A new name for a passkey.
+final class UpdatePasskeyRequest {
+  /// Creates a [UpdatePasskeyRequest].
+  const UpdatePasskeyRequest({required this.name});
+
+  /// Decodes a [UpdatePasskeyRequest] from JSON.
+  factory UpdatePasskeyRequest.fromJson(Map<String, dynamic> json) =>
+      UpdatePasskeyRequest(name: json['name'] as String);
+
+  /// 1 to 64 characters.
+  final String name;
+
+  /// Encodes this [UpdatePasskeyRequest] as JSON.
+  Map<String, dynamic> toJson() => {'name': name};
+}
+
 /// A password change.
 final class UpdatePasswordRequest {
   /// Creates a [UpdatePasswordRequest].
@@ -1222,6 +2415,7 @@ final class User {
     this.lastSignInAt,
     required this.providers,
     required this.hasPassword,
+    required this.mfaEnabled,
   });
 
   /// Decodes a [User] from JSON.
@@ -1245,6 +2439,7 @@ final class User {
         .map((e) => OAuthProvider.fromJson(e as String))
         .toList(),
     hasPassword: json['hasPassword'] as bool,
+    mfaEnabled: json['mfaEnabled'] as bool,
   );
 
   /// The user ID.
@@ -1280,6 +2475,10 @@ final class User {
   /// Whether the user has a password.
   final bool hasPassword;
 
+  /// Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never
+  /// turns it on.
+  final bool mfaEnabled;
+
   /// Encodes this [User] as JSON.
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -1299,6 +2498,7 @@ final class User {
     },
     'providers': providers.map((e) => e.value).toList(),
     'hasPassword': hasPassword,
+    'mfaEnabled': mfaEnabled,
   };
 }
 
@@ -1344,4 +2544,38 @@ final class VerifyEmailRequest {
 
   /// Encodes this [VerifyEmailRequest] as JSON.
   Map<String, dynamic> toJson() => {'token': token};
+}
+
+/// A second factor for a step up: exactly one of the fields.
+final class VerifyMfaRequest {
+  /// Creates a [VerifyMfaRequest].
+  const VerifyMfaRequest({this.totpCode, this.recoveryCode, this.passkey});
+
+  /// Decodes a [VerifyMfaRequest] from JSON.
+  factory VerifyMfaRequest.fromJson(Map<String, dynamic> json) =>
+      VerifyMfaRequest(
+        totpCode: json['totpCode'] == null ? null : json['totpCode'] as String,
+        recoveryCode: json['recoveryCode'] == null
+            ? null
+            : json['recoveryCode'] as String,
+        passkey: json['passkey'] == null
+            ? null
+            : PasskeyAnswer.fromJson(json['passkey'] as Map<String, dynamic>),
+      );
+
+  /// The 6 digit code the authenticator app shows now.
+  final String? totpCode;
+
+  /// A recovery code; case, spaces, and hyphens do not matter. Each works once.
+  final String? recoveryCode;
+
+  /// A passkey's answer to `account.createStepUpPasskeyChallenge`.
+  final PasskeyAnswer? passkey;
+
+  /// Encodes this [VerifyMfaRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'totpCode': ?totpCode,
+    'recoveryCode': ?recoveryCode,
+    if (passkey case final v?) 'passkey': v.toJson(),
+  };
 }

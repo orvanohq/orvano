@@ -3,7 +3,7 @@ using Orvano.Messaging.Contracts;
 namespace Orvano.Messaging.Domain;
 
 /// <summary>
-/// The rules an <see cref="AuthEmail"/> must meet before it is queued (spec 0009, AC-14). A value that breaks one
+/// The rules an <see cref="AuthEmail"/> or a security alert must meet before it is queued (spec 0009, AC-14; spec 0013, AC-31). A value that breaks one
 /// is a bug in the calling module, so each failure is an <see cref="ArgumentException"/> that never names the value.
 /// </summary>
 internal static class AuthEmailRule
@@ -29,6 +29,7 @@ internal static class AuthEmailRule
         if (string.IsNullOrWhiteSpace(email.ProjectId)) throw Broken(nameof(email.ProjectId), "is empty");
         if (email.ProjectName is null) throw Broken(nameof(email.ProjectName), "is null");
         if (!Enum.IsDefined(email.Kind)) throw Broken(nameof(email.Kind), "is not a known kind");
+        if (email.Kind == AuthEmailKind.SecurityAlert) throw Broken(nameof(email.Kind), "is a security alert, which QueueSecurityAlertAsync sends");
         if (!EmailAddress.TryNormalize(email.To, out var to) || to != email.To || to.AsSpan().ContainsAny('\r', '\n'))
             throw Broken(nameof(email.To), $"must be one email address of at most {EmailAddress.MaxLength} characters with no line break");
         if (email.ExpiresInMinutes is < 1 or > MaxExpiresInMinutes)
@@ -53,6 +54,24 @@ internal static class AuthEmailRule
 
         return new TemplateValues(email.ProjectName, to, email.UserName ?? "", email.ActionUrl, email.Code, email.ExpiresInMinutes);
     }
+
+    /// <summary>
+    /// Checks a security alert (spec 0013, AC-31) and returns the values its template is rendered with: no link, no
+    /// code, and no expiry.
+    /// </summary>
+    /// <exception cref="ArgumentException">A value breaks its rule.</exception>
+    public static TemplateValues CheckAlert(string projectId, string to, string projectName, SecurityAlertKind alert, DateTimeOffset occurredAt)
+    {
+        if (string.IsNullOrWhiteSpace(projectId)) throw Alert("projectId", "is empty");
+        ArgumentNullException.ThrowIfNull(projectName);
+        if (!Enum.IsDefined(alert)) throw Alert("alert", "is not a known alert");
+        if (!EmailAddress.TryNormalize(to, out var normalized) || normalized != to || normalized.AsSpan().ContainsAny('\r', '\n'))
+            throw Alert("to", $"must be one email address of at most {EmailAddress.MaxLength} characters with no line break");
+        return new TemplateValues(projectName, normalized, "", null, null, 0,
+            EmailTemplateCatalog.AlertWire(alert), EmailTemplateCatalog.AlertTime(occurredAt));
+    }
+
+    private static ArgumentException Alert(string member, string rule) => new($"The security alert's {member} {rule}.", member);
 
     private static ArgumentException Broken(string member, string rule) => new($"{nameof(AuthEmail)}.{member} {rule}.", "email");
 }

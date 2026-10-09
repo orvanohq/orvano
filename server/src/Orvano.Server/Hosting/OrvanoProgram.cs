@@ -15,6 +15,9 @@ internal static class OrvanoProgram
         if (args is ["setup-status", ..]) return await SetupStatusCommand.RunAsync();
         if (args is ["install", .. var installArgs]) return await InstallCommand.RunAsync(installArgs, InstallHost.Container());
 
+        // Run inside the api container by someone with shell access, when a console account lost every factor (spec 0013).
+        if (args is ["mfa", .. var mfaArgs]) return await MfaResetCommand.RunAsync(mfaArgs);
+
         var selection = RoleSelector.Resolve(args, Environment.GetEnvironmentVariable("ORVANO_ROLE"), out var error);
         if (error is not null)
         {

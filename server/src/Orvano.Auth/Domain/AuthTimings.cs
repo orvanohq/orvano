@@ -74,4 +74,22 @@ internal static class AuthTimings
 
     /// <summary>The open email requests answer no sooner than this after they start, whether or not the account exists (AC-8).</summary>
     public static readonly TimeSpan OpenSendFloor = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>How long an MFA ticket waits for the second step (spec 0013, AC-7).</summary>
+    public static readonly TimeSpan MfaTicket = TimeSpan.FromMinutes(5);
+
+    /// <summary>How long a WebAuthn challenge works (spec 0013, AC-20, AC-23).</summary>
+    public static readonly TimeSpan WebAuthnChallenge = TimeSpan.FromMinutes(5);
+
+    /// <summary>How long a TOTP factor waits for its first code before it is swept (spec 0013, AC-12, AC-13).</summary>
+    public static readonly TimeSpan PendingTotp = TimeSpan.FromMinutes(15);
+
+    /// <summary>How recent a session's strong check must be for enrollment and step up (spec 0013, AC-17, AC-18).</summary>
+    public static readonly TimeSpan StrongAuthWindow = TimeSpan.FromMinutes(10);
+
+    /// <summary>Wrong factors one ticket allows; the last one deletes it (spec 0013, AC-8).</summary>
+    public const int MfaTicketAttempts = 5;
+
+    /// <summary>Live tickets one user may hold; a new one past this deletes the oldest (spec 0013, AC-7).</summary>
+    public const int MfaTicketsPerUser = 5;
 }

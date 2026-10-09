@@ -23,12 +23,16 @@ import "./platform/members.tsp";
 import "./platform/invitations.tsp";
 import "./auth/security.tsp";
 import "./auth/account.tsp";
+import "./auth/mfa.tsp";
+import "./auth/passkeys.tsp";
 import "./auth/keys.tsp";
 import "./auth/users.tsp";
 import "./auth/console-account.tsp";
+import "./auth/console-account-mfa.tsp";
 import "./auth/console-users.tsp";
 import "./auth/oauth.tsp";
 import "./auth/identities.tsp";
+import "./auth/users-mfa.tsp";
 import "./messaging/email.tsp";
 import "./test/test.tsp";
 

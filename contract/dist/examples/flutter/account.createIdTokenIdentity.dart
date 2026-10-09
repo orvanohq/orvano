@@ -4,7 +4,7 @@ import 'package:orvano_flutter/orvano_flutter.dart';
 Future<void> main() async {
   final orvano = Orvano(Client(endpoint: 'https://orvano.example.com'));
   final identity = await orvano.account.createIdTokenIdentity(
-    CreateIdTokenSessionRequest(
+    CreateIdTokenIdentityRequest(
       provider: IdTokenProvider.google,
       idToken: 'eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9.e30.c2ln',
       nonce: 'q2lV7l3o0W9nE5w6Xk0wq1JmYp8tVb3Z',

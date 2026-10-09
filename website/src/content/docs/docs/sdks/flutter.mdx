@@ -41,6 +41,7 @@ Make one client for the whole app, after `WidgetsFlutterBinding.ensureInitialize
 | `session` | Your own `SessionStore` instead of secure storage. |
 | `timeout`, `maxRetries` | 30 seconds and 3 retries (of reads after a 429 or 503) by default. |
 | `httpClient`, `headers`, `onWarning` | Your own `http.Client`, extra headers, and where warnings go. |
+| `passkeys` | The authenticator for [passkeys](#passkeys), `PlatformPasskeys()` from `orvano_flutter_passkeys`. None by default. |
 
 Register your app as a [platform](/docs/concepts/platforms/) of the project: its hostname for web, its bundle ID for iOS, its package name for Android.
 
@@ -52,7 +53,7 @@ Signing in stores the session in secure storage (Keychain on iOS, Keystore on An
 final session = await orvano.client.getSession(); // null when signed out
 
 orvano.client.authStateChanges.listen((change) {
-  // change.event is signedIn, signedOut, tokenRefreshed, or userUpdated
+  // change.event is signedIn, signedOut, tokenRefreshed, userUpdated, or mfaRequired
 });
 ```
 
@@ -62,7 +63,7 @@ A session the server has ended (a password change elsewhere, or blocking the use
 
 | Service | Methods |
 |---|---|
-| `account` | `create`, `createPasswordSession`, `get`, `update`, `updatePassword`, `delete`, `deleteCurrentSession` (sign out), `listSessions`, `listSessionsAll`, `deleteSession`, `deleteOtherSessions`, `refreshSession`, and the email flows: `createVerification`, `verifyEmail`, `createRecovery`, `completeRecovery`, `createMagicLink`, `createMagicLinkSession`, `createEmailCode`, `createEmailCodeSession`, `updateEmail`, `confirmEmailChange` |
+| `account` | `create`, `createPasswordSession`, `get`, `update`, `updatePassword`, `delete`, `deleteCurrentSession` (sign out), `listSessions`, `listSessionsAll`, `deleteSession`, `deleteOtherSessions`, `refreshSession`, and the email flows: `createVerification`, `verifyEmail`, `createRecovery`, `completeRecovery`, `createMagicLink`, `createMagicLinkSession`, `createEmailCode`, `createEmailCodeSession`, `updateEmail`, `confirmEmailChange`, MFA: `getMfa`, `createTotp`, `confirmTotp`, `deleteTotp`, `createRecoveryCodes`, `verifyMfa`, `createMfaSession`, and passkeys: `listPasskeys`, `updatePasskey`, `deletePasskey`, and the ceremony operations the helpers below call |
 | `health` | `get` |
 | `keys` | `getJwks`, `getOpenIdConfiguration` |
 
@@ -73,6 +74,24 @@ Requests take a model, for example `orvano.account.createPasswordSession(CreateP
 When your app opens from an emailed link, pass the link to `orvano.client.handleLink(uri)`. It reads the link's type and finishes it: it verifies the email, confirms an email change, or signs the user in from a magic link. A password reset link needs the new password: `handleLink(uri, password: newPassword)`. It answers `null` for a link that isn't from Orvano.
 
 The SDK doesn't open links for you. Use a package such as `app_links` to receive them. Magic links and password reset links must be https links, so they need Android App Links and iOS Universal Links on a real domain; [Email verification](/docs/auth/email-verification/#flutter-deep-links) explains the setup. During development, sign in with an [emailed code](/docs/auth/email-codes/) instead: it needs no links.
+
+## MFA
+
+A sign in for a user with [MFA](/docs/auth/mfa/) on emits `mfaRequired` on `authStateChanges`, with `change.mfa!.factors`, and stores no session. Finish it with `orvano.client.completeMfa(MfaAnswer.totp(code))` (or `MfaAnswer.recoveryCode(code)`, or `MfaAnswer.passkey()`). The second step is kept in memory only, so restarting the app starts the sign in over. `confirmTotp` and `verifyMfa` on the client keep the stronger access token they get.
+
+## Passkeys
+
+`orvano_flutter` has no passkey code of its own, so apps that don't use passkeys start on the web with no extra script. To use them, add `orvano_flutter_passkeys` and pass `PlatformPasskeys()` as `createClient`'s `passkeys`:
+
+<Code code={`flutter pub add orvano_flutter_passkeys:${version}`} lang="sh" />
+
+```dart
+final orvano = Orvano(
+  createClient(endpoint: 'https://orvano.example.com', project: 'your-project-id', passkeys: PlatformPasskeys()),
+);
+```
+
+It uses Apple's AuthenticationServices on iOS and macOS, Credential Manager on Android, and Corbado's script on the web, which you serve from your app's `web/` folder. Without it, `signInWithPasskey`, `registerPasskey`, and a passkey answer throw an `ArgumentError` that names the package. [Passkeys](/docs/auth/passkeys/#flutter) walks through Associated Domains, `assetlinks.json`, and the web script.
 
 ## Errors
 

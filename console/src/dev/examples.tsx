@@ -901,6 +901,16 @@ const inviteStates: readonly { title: string; state: InviteState }[] = [
       onSignIn: () => Promise.resolve(),
     },
   },
+  {
+    title: 'Signing in, second step',
+    state: {
+      kind: 'mfa',
+      preview: examplePreview,
+      factors: ['totp', 'recovery_code', 'passkey'],
+      onSignedIn: () => Promise.resolve(),
+      onStartOver: () => undefined,
+    },
+  },
 ]
 
 // Every state of the invite page (spec 0008, AC-20 to AC-22), with nothing sent anywhere.

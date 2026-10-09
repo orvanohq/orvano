@@ -11,6 +11,8 @@ import {
   keys,
   platformsQuery,
   userIdentitiesQuery,
+  userMfaQuery,
+  userPasskeysQuery,
   userQuery,
   userSessionsQuery,
 } from '@/lib/queries'
@@ -25,6 +27,7 @@ import type { User } from '@orvano/console-client'
 import { EmailCard } from '../-users/email-parts'
 import { IdentitiesTable } from '../-users/identities'
 import { SessionsTable, UserStatusBadge } from '../-users/parts'
+import { UserSecurity } from '../-users/security'
 
 export const Route = createFileRoute('/_app/projects/$projectId/users/$userId')({
   loader: async ({ context, params }) => {
@@ -44,8 +47,9 @@ export const Route = createFileRoute('/_app/projects/$projectId/users/$userId')(
 
 /**
  * One user (spec 0004, AC-29): their details, email and verification (spec 0010, AC-22, AC-23),
- * linked identities (spec 0012, AC-26), and active sessions. Owners and developers block, unblock, delete, end sessions, and run the email
- * actions; viewers see the same buttons with the reason.
+ * linked identities (spec 0012, AC-26), MFA and passkeys (spec 0013, AC-44), and active sessions.
+ * Owners and developers block, unblock, delete, end sessions, reset MFA, remove passkeys, and run
+ * the email actions; viewers see the same buttons with the reason.
  */
 function UserPage() {
   const { projectId, userId } = Route.useParams()
@@ -57,6 +61,8 @@ function UserPage() {
   const navigate = useNavigate()
   const sessions = useInfiniteQuery(userSessionsQuery(projectId, userId))
   const identities = useQuery(userIdentitiesQuery(projectId, userId))
+  const passkeys = useQuery(userPasskeysQuery(projectId, userId))
+  const mfa = useQuery(userMfaQuery(projectId, userId))
   const platforms = useInfiniteQuery(platformsQuery(projectId))
   const webHosts = (platforms.data?.pages.flatMap((page) => page.items) ?? [])
     .filter((platform) => platform.type === 'web')
@@ -158,6 +164,37 @@ function UserPage() {
           const changed = await client.consoleUsers.updateEmail(userId, { email, emailVerified })
           await refresh()
           notifySuccess('Email changed', changed.email ?? email)
+        }}
+      />
+      <UserSecurity
+        user={user}
+        mfa={mfa.data}
+        passkeys={passkeys.data?.items ?? []}
+        loading={passkeys.isPending}
+        error={passkeys.isError ? passkeys.error : undefined}
+        onRetry={() => {
+          void passkeys.refetch()
+        }}
+        actionReason={reason}
+        onReset={async () => {
+          try {
+            await client.consoleUsers.resetMfa(userId)
+          } catch (error) {
+            notifyError("Couldn't reset MFA", error)
+            return
+          }
+          await refresh()
+          notifySuccess('MFA reset', label)
+        }}
+        onRemove={async (passkey) => {
+          try {
+            await client.consoleUsers.deletePasskey(userId, passkey.id)
+          } catch (error) {
+            notifyError("Couldn't remove the passkey", error)
+            return
+          }
+          await refresh()
+          notifySuccess('Passkey removed', passkey.name)
         }}
       />
       <section aria-labelledby="identities-heading" className="flex flex-col gap-3">

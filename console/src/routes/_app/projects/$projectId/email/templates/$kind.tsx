@@ -20,7 +20,7 @@ export const Route = createFileRoute('/_app/projects/$projectId/email/templates/
 
 /**
  * One email template (spec 0009, AC-9): its editor for owners and developers, the same page read
- * only for a viewer. A kind that is not one of the four says so, inside the Email area.
+ * only for a viewer. A kind that is not one of the five says so, inside the Email area.
  */
 function EmailTemplatePage() {
   const { projectId, kind } = Route.useParams()
@@ -61,7 +61,8 @@ function EmailTemplatePage() {
               </EmptyMedia>
               <EmptyTitle>No such template</EmptyTitle>
               <EmptyDescription>
-                There are four: email verification, password reset, magic link, and email code.
+                There are five: email verification, password reset, magic link, email code, and
+                security alert.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

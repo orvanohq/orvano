@@ -66,6 +66,7 @@ internal static class ApiMapping
             "recovery" => Api.EmailTemplateName.Recovery,
             "magic_link" => Api.EmailTemplateName.MagicLink,
             "email_code" => Api.EmailTemplateName.EmailCode,
+            "security_alert" => Api.EmailTemplateName.SecurityAlert,
             EmailTemplateNames.ConsoleInvitation => Api.EmailTemplateName.ConsoleInvitation,
             _ => throw new ArgumentOutOfRangeException(nameof(row), row.Template, null),
         },
@@ -123,6 +124,7 @@ internal static class ApiMapping
         AuthEmailKind.Recovery => Api.AuthEmailKind.Recovery,
         AuthEmailKind.MagicLink => Api.AuthEmailKind.MagicLink,
         AuthEmailKind.EmailCode => Api.AuthEmailKind.EmailCode,
+        AuthEmailKind.SecurityAlert => Api.AuthEmailKind.SecurityAlert,
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 

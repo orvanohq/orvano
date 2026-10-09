@@ -3,12 +3,22 @@
 /** A provider a native app can sign in with by its ID token. */
 export type IdTokenProvider = 'google' | 'apple'
 
+/** A second factor. */
+export type MfaFactor = 'totp' | 'recovery_code' | 'passkey'
+
 /** A sign in provider. */
 export type OAuthProvider = 'google' | 'apple' | 'github' | 'microsoft'
 
 /** How a session began. */
 export type SessionMethod =
-  'password' | 'sign_up' | 'magic_link' | 'email_code' | 'recovery' | 'oauth' | 'id_token'
+  | 'password'
+  | 'sign_up'
+  | 'magic_link'
+  | 'email_code'
+  | 'recovery'
+  | 'oauth'
+  | 'id_token'
+  | 'passkey'
 
 /** Whether a user may sign in. */
 export type UserStatus = 'active' | 'blocked'
@@ -16,12 +26,20 @@ export type UserStatus = 'active' | 'blocked'
 /** What happened to the verification email of a sign up. The user and session are created whatever it says. */
 export type VerificationEmailStatus = 'queued' | 'not_configured' | 'rate_limited'
 
-/** A signed in user and their new session. */
+/**
+ * A signed in user and their new session, or, for a user with MFA on, the challenge to answer first. Exactly one of
+ * `session` and `mfa` is set.
+ */
 export interface AuthResult {
-  /** The user. */
-  user: User
-  /** The new session's tokens. */
-  session: SessionTokens
+  /** The user; null while `mfa` is set. */
+  user: User | null
+  /** The new session's tokens; null while `mfa` is set. */
+  session: SessionTokens | null
+  /**
+   * Set when the user has MFA on: no session exists yet. Finish with `account.createMfaSession` and the ticket before
+   * it expires. The SDKs' `completeMfa` does it. Null otherwise.
+   */
+  mfa: MfaChallenge | null
   /** Whether this call created the user: true from sign up, from a magic link or email code for a new email, and from a provider sign in that created the user. */
   isNewUser: boolean
   /** What happened to the verification email sign up was asked to send; null when none was asked for. */
@@ -36,6 +54,16 @@ export interface CompleteOAuthLinkRequest {
   codeVerifier: string
 }
 
+/** A finished passkey registration. */
+export interface CompletePasskeyRegistrationRequest {
+  /** The `challengeId` of the `PasskeyRegistration`. */
+  challengeId: string
+  /** The browser's or the platform's answer. */
+  credential: PasskeyRegistrationCredential
+  /** 1 to 64 characters. Left out, the passkey is named `Passkey`. */
+  name?: string
+}
+
 /** A password reset, with the token from the emailed link. */
 export interface CompleteRecoveryRequest {
   /** The `orvano_token` parameter of the emailed link. */
@@ -48,6 +76,12 @@ export interface CompleteRecoveryRequest {
 export interface ConfirmEmailChangeRequest {
   /** The `orvano_token` parameter of the emailed link. */
   token: string
+}
+
+/** The first code from the authenticator app, which turns MFA on. */
+export interface ConfirmTotpRequest {
+  /** The 6 digit code the authenticator app shows now. */
+  code: string
 }
 
 /** A new user with an email and password. */
@@ -79,6 +113,28 @@ export interface CreateEmailCodeSessionRequest {
   email: string
   /** The 6 digit code from the email. */
   code: string
+}
+
+/** A link of a provider to the signed in user with its ID token from a native app. */
+export interface CreateIdTokenIdentityRequest {
+  /** The provider that issued the token. */
+  provider: IdTokenProvider
+  /** The provider's ID token, at most 8 KB. */
+  idToken: string
+  /**
+   * The raw nonce, 16 to 128 characters. Give the provider its lowercase hex SHA-256 (the SDKs' `createNonce` makes
+   * both), so the token carries that hash.
+   */
+  nonce: string
+  /** Apple only, and required for Apple: the authorization code Sign in with Apple returned with the token. */
+  authorizationCode?: string
+  /** Apple only: the name Sign in with Apple returned on the first authorization, at most 256 characters. */
+  name?: string | null
+  /**
+   * The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+   * minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+   */
+  password?: string
 }
 
 /** A sign in with a provider's ID token from a native app. */
@@ -117,6 +173,24 @@ export interface CreateMagicLinkSessionRequest {
   token: string
 }
 
+/** The ticket of a sign in waiting for its second step. */
+export interface CreateMfaPasskeyChallengeRequest {
+  /** The `ticket` of the `MfaChallenge`. */
+  ticket: string
+}
+
+/** The second step of a sign in: the ticket and exactly one factor. */
+export interface CreateMfaSessionRequest {
+  /** The `ticket` of the `MfaChallenge`. */
+  ticket: string
+  /** The 6 digit code the authenticator app shows now. */
+  totpCode?: string
+  /** A recovery code; case, spaces, and hyphens do not matter. Each works once. */
+  recoveryCode?: string
+  /** A passkey's answer to `account.createMfaPasskeyChallenge`. */
+  passkey?: PasskeyAnswer
+}
+
 /** A request to start signing in with a provider. */
 export interface CreateOAuthFlowRequest {
   /** The provider to sign in with. */
@@ -134,12 +208,51 @@ export interface CreateOAuthFlowRequest {
   codeChallenge: string
 }
 
+/** A request to start linking a provider to the signed in user. */
+export interface CreateOAuthLinkFlowRequest {
+  /** The provider to sign in with. */
+  provider: OAuthProvider
+  /**
+   * Your page or app that receives the result: a host that is one of the project's web platforms (`http` only on
+   * `localhost` or `127.0.0.1`), or your app's own scheme (its iOS, Android, or macOS identifier). Orvano adds
+   * `orvano_type` and then `orvano_code` or `orvano_error` to it.
+   */
+  redirectUrl: string
+  /**
+   * The S256 PKCE challenge: base64url(SHA-256(verifier)), 43 characters. Keep the verifier; only it redeems the
+   * code. The SDKs make both.
+   */
+  codeChallenge: string
+  /**
+   * The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+   * minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+   */
+  password?: string
+}
+
 /** A sign in with the code a provider flow returned. */
 export interface CreateOAuthSessionRequest {
   /** The `orvano_code` parameter Orvano added to your redirect URL. It works once, for 2 minutes. */
   code: string
   /** The PKCE verifier whose challenge started the flow: 43 to 128 characters of `[A-Za-z0-9-._~]`. */
   codeVerifier: string
+}
+
+/** A request to start adding a passkey. */
+export interface CreatePasskeyRegistrationRequest {
+  /**
+   * The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+   * minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+   */
+  password?: string
+}
+
+/** A sign in with a passkey. */
+export interface CreatePasskeySessionRequest {
+  /** The `challengeId` of the `PasskeyChallenge`. */
+  challengeId: string
+  /** The browser's or the platform's answer. */
+  credential: PasskeyAssertionCredential
 }
 
 /** A sign in with an email and password. */
@@ -159,6 +272,15 @@ export interface CreateRecoveryRequest {
    * `localhost` or `127.0.0.1`). The link adds `orvano_type=recovery` and `orvano_token` to it.
    */
   redirectUrl: string
+}
+
+/** A request to start turning on an authenticator app. */
+export interface CreateTotpRequest {
+  /**
+   * The user's current password. A user who has one sends it, unless this session passed a second factor within 10
+   * minutes. A user without one leaves it out, and must have signed in within 10 minutes.
+   */
+  password?: string
 }
 
 /** A request to email a user a password reset link. */
@@ -263,6 +385,38 @@ export interface Jwks {
   keys: Jwk[]
 }
 
+/**
+ * The second step a sign in must pass before it gets a session: the user has MFA on. Answer it with
+ * `account.createMfaSession` before `expiresAt`.
+ */
+export interface MfaChallenge {
+  /**
+   * Proves the first step passed; send it to `account.createMfaSession`. Keep it in memory only. Empty when the ticket
+   * travels in a cookie instead (the console).
+   */
+  ticket: string
+  /** The factors the user can answer with now, in this order: `totp`, `recovery_code`, `passkey`. */
+  factors: MfaFactor[]
+  /** When the ticket stops working: 5 minutes after the first step. After that, sign in again. */
+  expiresAt: string
+}
+
+/** A user's MFA state. */
+export interface MfaStatus {
+  /** Whether sign in asks for a second factor: a confirmed authenticator app, while the project allows TOTP. */
+  mfaEnabled: boolean
+  /** Whether an authenticator app is confirmed, even while the project has TOTP turned off. */
+  totpConfirmed: boolean
+  /** When the authenticator app was confirmed; null when none is. */
+  totpConfirmedAt: string | null
+  /** How many unused recovery codes are left, 0 to 10. */
+  recoveryCodesRemaining: number
+  /** How many of the user's passkeys can sign in now. */
+  passkeyCount: number
+  /** What the project lets users turn on now: `totp` and `passkey`. */
+  factorsAvailable: MfaFactor[]
+}
+
 /** A started provider flow. */
 export interface OAuthFlow {
   /** Send the browser here: the provider's sign in page. */
@@ -284,6 +438,207 @@ export interface OpenIdConfiguration {
   subject_types_supported: string[]
   /** Always `["token"]`. */
   response_types_supported: string[]
+}
+
+/** A passkey of a user. */
+export interface Passkey {
+  /** The passkey's ID. */
+  id: string
+  /** The name the user gave it, else `Passkey`. */
+  name: string
+  /** When it was added. */
+  createdAt: string
+  /** When it last signed in or answered a challenge; null when it never has. */
+  lastUsedAt: string | null
+  /** Whether the passkey is backed up and synced across devices (for example by iCloud Keychain or a password manager). */
+  synced: boolean
+  /** Whether it can sign in now: false after the project's RP ID changed away from the one it was made for. */
+  active: boolean
+}
+
+/** A passkey's answer to a challenge. */
+export interface PasskeyAnswer {
+  /** The `challengeId` of the `PasskeyChallenge`. */
+  challengeId: string
+  /** The browser's or the platform's answer. */
+  credential: PasskeyAssertionCredential
+}
+
+/** A passkey's answer in WebAuthn's JSON form: what `PublicKeyCredential.toJSON()` gives after `get`. */
+export interface PasskeyAssertionCredential {
+  /** The credential ID, base64url. */
+  id: string
+  /** The credential ID again, base64url; must equal `id`. */
+  rawId: string
+  /** Always `public-key`. */
+  type: string
+  /** The authenticator's answer. */
+  response: PasskeyAssertionResponse
+  /** `platform` or `cross-platform`; null when the browser does not say. */
+  authenticatorAttachment?: string | null
+}
+
+/** The authenticator's answer to `navigator.credentials.get`. */
+export interface PasskeyAssertionResponse {
+  /** The client data, base64url. */
+  clientDataJSON: string
+  /** The authenticator data, base64url. */
+  authenticatorData: string
+  /** The signature, base64url. */
+  signature: string
+  /** The user handle the passkey stores, base64url; null when the authenticator gives none. */
+  userHandle?: string | null
+}
+
+/** The authenticator's answer to `navigator.credentials.create`. */
+export interface PasskeyAttestationResponse {
+  /** The client data, base64url. */
+  clientDataJSON: string
+  /** The attestation object, base64url. */
+  attestationObject: string
+  /** How the authenticator was reached: `internal`, `hybrid`, `usb`, `nfc`, or `ble`. */
+  transports?: string[]
+}
+
+/** What kind of authenticator a new passkey must come from. */
+export interface PasskeyAuthenticatorSelection {
+  /** Always `required`: the passkey is discoverable, so it signs in with no email typed. */
+  residentKey: string
+  /** Always true, for older browsers. */
+  requireResidentKey: boolean
+  /** Always `required`: face, fingerprint, or PIN. */
+  userVerification: string
+}
+
+/** A challenge for a passkey to sign: pass `options` to the browser, then send its answer with `challengeId`. */
+export interface PasskeyChallenge {
+  /** Names this challenge; send it back with the answer within 5 minutes. */
+  challengeId: string
+  /** The options for `navigator.credentials.get`. */
+  options: PasskeyRequestOptions
+}
+
+/**
+ * The options for `navigator.credentials.create` in WebAuthn's JSON form. Pass them to
+ * `PublicKeyCredential.parseCreationOptionsFromJSON`, or let the SDK's `registerPasskey` do it.
+ */
+export interface PasskeyCreationOptions {
+  /** The relying party. */
+  rp: PasskeyRelyingParty
+  /** The user the passkey is for. */
+  user: PasskeyUserEntity
+  /** 32 random bytes, base64url, used once. */
+  challenge: string
+  /** The key types the server accepts, in order of preference. */
+  pubKeyCredParams: PasskeyCredentialParameters[]
+  /** How long the browser waits, in milliseconds: 300000. */
+  timeout: number
+  /** The user's passkeys under this RP ID, so the same authenticator is not registered twice. */
+  excludeCredentials: PasskeyCredentialDescriptor[]
+  /** The authenticator rules. */
+  authenticatorSelection: PasskeyAuthenticatorSelection
+  /** Always `none`: no device certificate is asked for. */
+  attestation: string
+}
+
+/** One passkey, named by its credential ID. */
+export interface PasskeyCredentialDescriptor {
+  /** Always `public-key`. */
+  type: string
+  /** The credential ID, base64url. */
+  id: string
+  /** How the authenticator was reached when the passkey was made: `internal`, `hybrid`, `usb`, `nfc`, or `ble`. */
+  transports?: string[]
+}
+
+/** A key type the server accepts. */
+export interface PasskeyCredentialParameters {
+  /** Always `public-key`. */
+  type: string
+  /** A COSE algorithm: -7 (ES256), -8 (EdDSA), or -257 (RS256). */
+  alg: number
+}
+
+/** A user's passkeys, oldest first; at most 10. */
+export interface PasskeyList {
+  /** The passkeys. */
+  items: Passkey[]
+}
+
+/** A started passkey registration: pass `options` to the browser, then send its answer with `challengeId`. */
+export interface PasskeyRegistration {
+  /** Names this registration; send it back with the new passkey within 5 minutes. */
+  challengeId: string
+  /** The options for `navigator.credentials.create`. */
+  options: PasskeyCreationOptions
+}
+
+/** A new passkey in WebAuthn's JSON form: what `PublicKeyCredential.toJSON()` gives after `create`. */
+export interface PasskeyRegistrationCredential {
+  /** The credential ID, base64url. */
+  id: string
+  /** The credential ID again, base64url; must equal `id`. */
+  rawId: string
+  /** Always `public-key`. */
+  type: string
+  /** The authenticator's answer. */
+  response: PasskeyAttestationResponse
+  /** `platform` or `cross-platform`; null when the browser does not say. */
+  authenticatorAttachment?: string | null
+}
+
+/** The relying party of a passkey: the app's passkey domain and the name people see. */
+export interface PasskeyRelyingParty {
+  /** The RP ID: the domain passkeys are bound to. */
+  id: string
+  /** The name an authenticator shows: the project's RP name, else the project name. */
+  name: string
+}
+
+/**
+ * The options for `navigator.credentials.get` in WebAuthn's JSON form. Pass them to
+ * `PublicKeyCredential.parseRequestOptionsFromJSON`, or let the SDK's helpers do it.
+ */
+export interface PasskeyRequestOptions {
+  /** 32 random bytes, base64url, used once. */
+  challenge: string
+  /** The RP ID. */
+  rpId: string
+  /** How long the browser waits, in milliseconds: 300000. */
+  timeout: number
+  /** Always `required`: face, fingerprint, or PIN. */
+  userVerification: string
+  /** The passkeys that may answer; empty for sign in, so the browser offers every passkey for the RP ID. */
+  allowCredentials: PasskeyCredentialDescriptor[]
+}
+
+/** The account a new passkey is for, as the authenticator stores it. */
+export interface PasskeyUserEntity {
+  /** The user handle: the user ID's 16 bytes, base64url. */
+  id: string
+  /** The user's email, else their user ID. */
+  name: string
+  /** The user's name, else their email, else `User`. */
+  displayName: string
+}
+
+/**
+ * The signed in session after a second factor: a new access token carrying the new `aal` and `amr` claims. The refresh
+ * token is not sent; keep the one you hold, which is unchanged and whose next refresh carries the new claims too.
+ */
+export interface RaisedSession {
+  /** An ES256 JWT, valid for 15 minutes. */
+  accessToken: string
+  /** When the access token expires. */
+  accessTokenExpiresAt: string
+  /** The session ID, also the `sid` claim of the access token. */
+  sessionId: string
+}
+
+/** New recovery codes. Show them once and ask the user to keep them safe; every older code stopped working. */
+export interface RecoveryCodes {
+  /** 10 recovery codes, each `XXXXX-XXXXX`, each working once. */
+  codes: string[]
 }
 
 /** A trade of a refresh token for a new pair. */
@@ -312,6 +667,16 @@ export interface Session {
   method: SessionMethod
   /** The provider of an `oauth` or `id_token` session; null for every other method. */
   provider: OAuthProvider | null
+  /**
+   * How strongly the session signed in: 1 for one factor, 2 once a second factor or a passkey was verified on it. Also
+   * the access token's `aal` claim.
+   */
+  aal: number
+  /**
+   * The ways the user proved who they are on this session, sorted: `pwd`, `email`, `fed`, `otp`, `rec`, `hwk`, `swk`,
+   * `user`, and `mfa` (whenever `aal` is 2). Also the access token's `amr` claim.
+   */
+  amr: string[]
 }
 
 /** One page of a user's active sessions, newest first. */
@@ -339,6 +704,30 @@ export interface SessionTokens {
   sessionId: string
 }
 
+/**
+ * MFA is on. Show the recovery codes once and ask the user to keep them safe; they can't be read again. Every other
+ * session of the user has ended, and this one is now at level 2.
+ */
+export interface TotpConfirmation {
+  /** 10 recovery codes, each `XXXXX-XXXXX`, each working once. */
+  recoveryCodes: string[]
+  /** A new access token for this session, carrying `aal` 2. Keep the refresh token you hold; it is unchanged. */
+  session: RaisedSession
+}
+
+/**
+ * A new authenticator app secret, waiting for its first code. Show `uri` as a QR code and `secret` for typing in, then
+ * confirm with `account.confirmTotp` within 15 minutes.
+ */
+export interface TotpSetup {
+  /** The secret: 20 random bytes as unpadded base32 (32 characters). Never log it. */
+  secret: string
+  /** The `otpauth://` URI an authenticator app scans: the project as the issuer, the user's email as the label. */
+  uri: string
+  /** When the secret stops waiting for its first code; ask for a new one after that. */
+  expiresAt: string
+}
+
 /** Changes to the signed in user. A field left out stays as it is. */
 export interface UpdateAccountRequest {
   /** A new display name of at most 256 characters, or null to remove it. */
@@ -364,6 +753,12 @@ export interface UpdateEmailRequest {
 export interface UpdateEmailVerificationRequest {
   /** True marks it verified (keeping an earlier date); false marks it unverified. */
   verified: boolean
+}
+
+/** A new name for a passkey. */
+export interface UpdatePasskeyRequest {
+  /** 1 to 64 characters. */
+  name: string
 }
 
 /** A password change. */
@@ -406,6 +801,11 @@ export interface User {
   providers: OAuthProvider[]
   /** Whether the user has a password. */
   hasPassword: boolean
+  /**
+   * Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never
+   * turns it on.
+   */
+  mfaEnabled: boolean
 }
 
 /** One page of a project's users, newest first. */
@@ -420,4 +820,14 @@ export interface UserPage {
 export interface VerifyEmailRequest {
   /** The `orvano_token` parameter of the emailed link. */
   token: string
+}
+
+/** A second factor for a step up: exactly one of the fields. */
+export interface VerifyMfaRequest {
+  /** The 6 digit code the authenticator app shows now. */
+  totpCode?: string
+  /** A recovery code; case, spaces, and hyphens do not matter. Each works once. */
+  recoveryCode?: string
+  /** A passkey's answer to `account.createStepUpPasskeyChallenge`. */
+  passkey?: PasskeyAnswer
 }
