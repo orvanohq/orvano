@@ -31,7 +31,7 @@ _Steps derived from the acceptance criteria and the Value sourcing table. `/chec
 - [x] Step two copies the ticket's `method`, user agent, SDK, and IP: sign in with `User-Agent: probe-ua`, finish step two with another user agent, and the session lists `probe-ua` → Value sourcing row 4
 - [x] TOTP step from the server clock: a code for the step after next (offset 2) is refused, offsets 1 and 0 (unused) pass → Value sourcing row "TOTP check"
 - [x] `issuer` is the project name, `label` the email: a project renamed in the console gives the new name in the next `uri` → Value sourcing rows "createTotp"
-- [ ] Recovery codes survive a master key rotation: add a new active key to `ORVANO_MASTER_KEYS`, restart, and an old code still answers → Value sourcing row "Recovery codes"
+- [x] Recovery codes survive a master key rotation: add a new active key to `ORVANO_MASTER_KEYS`, restart, and an old code still answers → Value sourcing row "Recovery codes"
 
 ### Data handling
 
@@ -122,7 +122,7 @@ _Steps derived from the acceptance criteria and the Value sourcing table. `/chec
 
 ### Console project (AC-3)
 
-- [ ] With `ORVANO_PUBLIC_URL=https://orvano.example.com`, the console's policy has passkeys on with RP ID `orvano.example.com` and accepts only that origin; with `http://localhost:8080` on with RP ID `localhost`; with `https://10.0.0.5` or `http://orvano.example.com` off → AC-3 (the console screens that use it arrive in task 5)
+- [x] With `ORVANO_PUBLIC_URL=https://orvano.example.com`, the console's policy has passkeys on with RP ID `orvano.example.com` and accepts only that origin; with `http://localhost:8080` on with RP ID `localhost`; with `https://10.0.0.5` or `http://orvano.example.com` off → AC-3 (the console screens that use it arrive in task 5)
 
 ### SDKs
 
@@ -234,7 +234,7 @@ _Steps derived from the 2026-10-08 update (AC-12, AC-20, AC-27, AC-29, AC-41, AC
 - [x] A console account with an unverified email: `POST /v1/console/account/mfa/totp` → 201, and passkey registration through the `consoleAccount.*` twins → 200 then 201; an app user with an unverified email still gets 409 `email_not_verified` → AC-12, AC-20
 - [x] `GET /v1/users/{id}/mfa` with a `users.read` key → 200 `MfaStatus` with `totpConfirmedAt` and `recoveryCodesRemaining` 10, then 9 after a code is used at step two; an unknown user, or one in another project → 404 `user_not_found`; a key without `users.read` → 403 → AC-27, AC-39
 - [x] `GET /v1/console/project/users/{id}/mfa` as a viewer → 200, the same body; with the project's TOTP switch off → `mfaEnabled: false`, `totpConfirmed: true` → AC-27, AC-44
-- [ ] `POST /v1/console/account/session` for an account without MFA → 201 with `account` set, `mfa` null, and both session cookies; for one with MFA → 201 with `account` null, `mfa.ticket` empty, `mfa.factors` set, `orvano_console_mfa` set (no `Secure` on `http://localhost`, `Secure` on https), and no session cookie set or changed → AC-41
+- [x] `POST /v1/console/account/session` for an account without MFA → 201 with `account` set, `mfa` null, and both session cookies; for one with MFA → 201 with `account` null, `mfa.ticket` empty, `mfa.factors` set, `orvano_console_mfa` set (no `Secure` on `http://localhost`, `Secure` on https), and no session cookie set or changed → AC-41
 - [x] `POST /v1/console/account/session/mfa` with a right code → 201 `ConsoleAccount`, both session cookies, `orvano_console_mfa` cleared; with the fifth wrong code, or after the ticket expired → 401 and the cookie cleared → AC-41
 
 ### UI
