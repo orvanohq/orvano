@@ -57,7 +57,7 @@ Every product feature ships in all of these layers in the same version, unless i
 | 11 | Docs site & quickstarts | v0.2 | done |
 | 12 | OAuth & ID token sign in | v0.3 | done |
 | 13 | MFA, passkeys & sessions | v0.3 | in-progress |
-| 14 | Auth policies & abuse protection | v0.3 | planned |
+| 14 | Auth policies & abuse protection | v0.3 | in-progress |
 | 15 | Console team members & roles | v0.3 | done |
 | 16 | Tables, rows & data API | v0.4 | planned |
 | 17 | Row level permissions & app teams | v0.4 | planned |
@@ -106,6 +106,9 @@ Every product feature ships in all of these layers in the same version, unless i
 Out of scope for the current build pass, kept so the plan stays honest.
 - **Managed cloud & billing**: hosted Orvano with plans and usage billing · needs a decision · GA
 - **Cluster install**: multi node and Kubernetes deployment · needs a decision
+- **CAPTCHA on sign up and sign in**: Turnstile or hCaptcha as a per project option · from spec 0014
+- **Known device tokens**: a signed token the SDKs keep after a good sign in, so a per account password ceiling can't lock out the owner, if distributed guessing shows up · from spec 0014
+- **Install level console policies**: require MFA and password rules for console accounts, edited by install admins (needs row 41) · from spec 0014
 - **More runtimes**: Python, Go, Bun, and others for functions · needs a decision
 - **More SDKs**: React Native, Swift, Kotlin, Python, Go · needs a decision
 - **Vectors & AI**: vector columns, embeddings, similarity search · needs a decision
