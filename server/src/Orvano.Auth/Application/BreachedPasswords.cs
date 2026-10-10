@@ -73,7 +73,11 @@ internal sealed class BreachedPasswords(IHttpClientFactory http, Uri baseUrl)
     }
 }
 
-/// <summary>The <c>hibp</c> HTTP client: a 2 second timeout, no redirects, and at most 2 MB read (spec 0014, AC-6).</summary>
+/// <summary>
+/// The <c>hibp</c> HTTP client: a 2 second timeout, no redirects, and at most 2 MB read (spec 0014, AC-6). The default
+/// HTTP client loggers are removed: they log each request's URL at Information, and this URL ends with the password's
+/// hash prefix (AC-39).
+/// </summary>
 internal static class BreachedPasswordsHttp
 {
     public static IServiceCollection AddBreachedPasswords(this IServiceCollection services, Uri? testUrl)
@@ -84,7 +88,8 @@ internal static class BreachedPasswordsHttp
                 client.MaxResponseContentBufferSize = BreachedPasswords.MaxResponseBytes;
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("Orvano");
             })
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, AutomaticDecompression = DecompressionMethods.All });
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, AutomaticDecompression = DecompressionMethods.All })
+            .RemoveAllLoggers();
 
         // A base URL ends with a slash, so range/{prefix} lands under it rather than beside it.
         var baseUrl = testUrl ?? BreachedPasswords.DefaultUrl;
