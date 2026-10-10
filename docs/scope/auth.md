@@ -91,7 +91,7 @@ Password rules, sign up email policies (block disposable domains), anonymous gue
    - [x] Anonymous users: guest sign in, upgrade, retention, and the Users page filter, in every SDK (AC-2, 28 to 32, 35, 36)
    - [x] Hardening and docs: events, metrics, the leak scan, errors and fix pages, guides, notices, and the checks in verify.md (AC-38 to 40)
    - [x] Review amendments: a second hidden sign up claims the unverified account, required MFA challenges passkey only users, Next.js rotated cookies on every answer, and the rightmost `x-forwarded-for` default (AC-12, 27, 36)
-- [ ] Verify it: `/check verify auth policies & abuse protection`
+- [x] Verify it: `/check verify auth policies & abuse protection`
 - [x] Test it: `/test auth policies & abuse protection`
 - [x] Review it (fresh model): `/check review auth policies & abuse protection`
 - [ ] Document it: `/document auth policies & abuse protection`
