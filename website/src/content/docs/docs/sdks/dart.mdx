@@ -64,7 +64,7 @@ await for (final user in orvano.users.listAll(emailVerified: false)) {
 
 ```dart
 final token = await client.verifyAccessToken(accessToken);
-print(token.userId); // also sessionId, emailVerified, expiresAt
+print(token.userId); // also sessionId, emailVerified, expiresAt, aal, amr, isAnonymous
 ```
 
 It checks the token against the project's public keys without a call to Orvano once the keys are cached. Pass `online: true` to also catch a session that ended in the last 15 minutes. [Verify tokens on your server](/docs/auth/verify-tokens/) explains both.

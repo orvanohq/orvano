@@ -44,7 +44,7 @@ print(result.user?.isAnonymous); // true
   </TabItem>
 </Tabs>
 
-A guest session proves nothing about who the user is: its `aal` is 1 and its `amr` is empty, and its access token carries `is_anonymous: true`. Each address may start 30 guests an hour by default (the **Rate limits** card of the project's **Security** page in the console changes it), and a project at most 1,000 an hour. Closed sign ups refuse guest sign in too.
+A guest session proves nothing about who the user is: its `aal` is 1 and its `amr` is empty, and its access token carries `is_anonymous: true`. Each address may start 30 guests an hour by default (the **Rate limits** card of the project's [Security](/docs/console/security/#rate-limits) page changes it), and a project at most 1,000 an hour. Closed sign ups refuse guest sign in too.
 
 ## 2. What a guest can and can't do
 
@@ -54,7 +54,7 @@ A guest can't set a password, change or verify an email, or add an authenticator
 
 ## 3. Upgrade the guest
 
-[`account.upgradeAnonymous`](/docs/api/operations/accountupgradeanonymous/) gives the signed in guest an email and password. The user ID stays the same, so their data stays theirs, and the password is held to the project's password rules (the **Passwords** card of the **Security** page). The session in hand keeps working: the SDK refreshes it, and the new access token says `is_anonymous: false`.
+[`account.upgradeAnonymous`](/docs/api/operations/accountupgradeanonymous/) gives the signed in guest an email and password. The user ID stays the same, so their data stays theirs, and the password is held to the project's [password rules](/docs/auth/security-policies/#passwords). The session in hand keeps working: the SDK refreshes it, and the new access token says `is_anonymous: false`.
 
 <Tabs syncKey="sdk">
   <TabItem label="JavaScript">
@@ -111,7 +111,7 @@ With **Require MFA** on, the moment the guest becomes permanent ends their sessi
 
 ## 4. Or link a provider
 
-A guest can link Google, Apple, GitHub, or Microsoft with [`linkIdentity`](/docs/auth/link-identities/), with no password or recent sign in asked. Linking makes them permanent, and takes the provider's verified email when no other user has it. When the project's email domain rules (the **Email domains** card of the **Security** page) refuse that email, the link answers 403 [`email_domain_not_allowed`](/errors/email_domain_not_allowed/) and nothing changes.
+A guest can link Google, Apple, GitHub, or Microsoft with [`linkIdentity`](/docs/auth/link-identities/), with no password or recent sign in asked. Linking makes them permanent, and takes the provider's verified email when no other user has it. When the project's [email domain rules](/docs/auth/security-policies/#email-domains) refuse that email, the link answers 403 [`email_domain_not_allowed`](/errors/email_domain_not_allowed/) and nothing changes.
 
 ## 5. Idle guests are deleted
 

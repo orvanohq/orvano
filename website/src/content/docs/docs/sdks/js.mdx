@@ -69,13 +69,15 @@ const stop = orvano.client.onAuthStateChange((event, session) => {
 
 | Service | Methods |
 |---|---|
-| `account` | `create`, `createPasswordSession`, `get`, `update`, `updatePassword`, `delete`, `deleteCurrentSession` (sign out), `listSessions`, `listSessionsAll`, `deleteSession`, `deleteOtherSessions`, `refreshSession`, and the email flows: `createVerification`, `verifyEmail`, `createRecovery`, `completeRecovery`, `createMagicLink`, `createMagicLinkSession`, `createEmailCode`, `createEmailCodeSession`, `updateEmail`, `confirmEmailChange`, MFA: `getMfa`, `createTotp`, `confirmTotp`, `deleteTotp`, `createRecoveryCodes`, `verifyMfa`, `createMfaSession`, and passkeys: `listPasskeys`, `updatePasskey`, `deletePasskey`, and the ceremony operations the helpers below call |
+| `account` | `create`, `createPasswordSession`, `get`, `update`, `updatePassword`, `delete`, `deleteCurrentSession` (sign out), `listSessions`, `listSessionsAll`, `deleteSession`, `deleteOtherSessions`, `refreshSession`, and the email flows: `createVerification`, `verifyEmail`, `createRecovery`, `completeRecovery`, `createMagicLink`, `createMagicLinkSession`, `createEmailCode`, `createEmailCodeSession`, `updateEmail`, `confirmEmailChange`, `rejectEmailVerification`, guests: `createAnonymousSession`, `upgradeAnonymous`, MFA: `getMfa`, `createTotp`, `confirmTotp`, `deleteTotp`, `createRecoveryCodes`, `verifyMfa`, `createMfaSession`, the required MFA enrollment: `createMfaEnrollmentTotp`, `completeMfaEnrollmentTotp`, `createMfaEnrollmentPasskey`, `completeMfaEnrollmentPasskey`, and passkeys: `listPasskeys`, `updatePasskey`, `deletePasskey`, and the ceremony operations the helpers below call |
 | `health` | `get` |
 | `keys` | `getJwks`, `getOpenIdConfiguration` |
 
 The client also has two helpers for email sign in: `orvano.client.redeemLink()` finishes any emailed link on the page it lands on, and `orvano.client.signInWithEmailCode(email, code)` signs in with an emailed code. The [auth guides](/docs/auth/email-and-password/) show each flow.
 
-For [MFA](/docs/auth/mfa/) and [passkeys](/docs/auth/passkeys/), the client adds `confirmTotp`, `completeMfa`, `verifyMfa`, `signInWithPasskey`, `registerPasskey`, and `isPasskeySupported`, and `orvano.client.pendingMfa` holds the second step a sign in is waiting for (in memory only).
+For [MFA](/docs/auth/mfa/) and [passkeys](/docs/auth/passkeys/), the client adds `confirmTotp`, `completeMfa`, `verifyMfa`, `signInWithPasskey`, `registerPasskey`, and `isPasskeySupported`, and `orvano.client.pendingMfa` holds the second step a sign in is waiting for (in memory only). When the project [requires MFA](/docs/auth/mfa/#require-mfa-for-every-user), `enrollmentRequired(result)` says a sign in must enroll a first factor, and `startTotpEnrollment`, `completeTotpEnrollment(code)`, and `enrollPasskey` do it with the ticket the client holds, storing the session at the end.
+
+A sign up or a [guest's upgrade](/docs/auth/anonymous-users/) in a project that requires verified emails answers `verificationRequired: true` and stores nothing. `upgradeAnonymous` refreshes the session once the guest is permanent, so the access token's `is_anonymous` claim is current. `redeemLink` also finishes the "this wasn't me" link of a verification email (`verification_reject`).
 
 ## On your server
 
@@ -102,7 +104,7 @@ The server client sends your [API key](/docs/concepts/api-keys/) with every call
 | `account` | `get` (for a user's own token) |
 | `health`, `keys` | as above |
 
-`client.verifyAccessToken(token)` checks a user's access token on your server. See [Verify tokens on your server](/docs/auth/verify-tokens/).
+`client.verifyAccessToken(token)` checks a user's access token on your server; its answer includes `isAnonymous` for a [guest](/docs/auth/anonymous-users/). See [Verify tokens on your server](/docs/auth/verify-tokens/). `users.list` filters by `anonymous` as well as `email`, `status`, `emailVerified`, `mfa`, and the creation time.
 
 ## Errors
 

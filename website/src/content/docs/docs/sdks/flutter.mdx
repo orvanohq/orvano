@@ -63,7 +63,7 @@ A session the server has ended (a password change elsewhere, or blocking the use
 
 | Service | Methods |
 |---|---|
-| `account` | `create`, `createPasswordSession`, `get`, `update`, `updatePassword`, `delete`, `deleteCurrentSession` (sign out), `listSessions`, `listSessionsAll`, `deleteSession`, `deleteOtherSessions`, `refreshSession`, and the email flows: `createVerification`, `verifyEmail`, `createRecovery`, `completeRecovery`, `createMagicLink`, `createMagicLinkSession`, `createEmailCode`, `createEmailCodeSession`, `updateEmail`, `confirmEmailChange`, MFA: `getMfa`, `createTotp`, `confirmTotp`, `deleteTotp`, `createRecoveryCodes`, `verifyMfa`, `createMfaSession`, and passkeys: `listPasskeys`, `updatePasskey`, `deletePasskey`, and the ceremony operations the helpers below call |
+| `account` | `create`, `createPasswordSession`, `get`, `update`, `updatePassword`, `delete`, `deleteCurrentSession` (sign out), `listSessions`, `listSessionsAll`, `deleteSession`, `deleteOtherSessions`, `refreshSession`, and the email flows: `createVerification`, `verifyEmail`, `createRecovery`, `completeRecovery`, `createMagicLink`, `createMagicLinkSession`, `createEmailCode`, `createEmailCodeSession`, `updateEmail`, `confirmEmailChange`, `rejectEmailVerification`, guests: `createAnonymousSession`, `upgradeAnonymous`, MFA: `getMfa`, `createTotp`, `confirmTotp`, `deleteTotp`, `createRecoveryCodes`, `verifyMfa`, `createMfaSession`, the required MFA enrollment: `createMfaEnrollmentTotp`, `completeMfaEnrollmentTotp`, `createMfaEnrollmentPasskey`, `completeMfaEnrollmentPasskey`, and passkeys: `listPasskeys`, `updatePasskey`, `deletePasskey`, and the ceremony operations the helpers below call |
 | `health` | `get` |
 | `keys` | `getJwks`, `getOpenIdConfiguration` |
 
@@ -71,13 +71,19 @@ Requests take a model, for example `orvano.account.createPasswordSession(CreateP
 
 ## Emailed links
 
-When your app opens from an emailed link, pass the link to `orvano.client.handleLink(uri)`. It reads the link's type and finishes it: it verifies the email, confirms an email change, or signs the user in from a magic link. A password reset link needs the new password: `handleLink(uri, password: newPassword)`. It answers `null` for a link that isn't from Orvano.
+When your app opens from an emailed link, pass the link to `orvano.client.handleLink(uri)`. It reads the link's type and finishes it: it verifies the email, confirms an email change, signs the user in from a magic link, or takes back an account someone else signed up with (`verification_reject`). A password reset link needs the new password: `handleLink(uri, password: newPassword)`. It answers `null` for a link that isn't from Orvano.
 
 The SDK doesn't open links for you. Use a package such as `app_links` to receive them. Magic links and password reset links must be https links, so they need Android App Links and iOS Universal Links on a real domain; [Email verification](/docs/auth/email-verification/#flutter-deep-links) explains the setup. During development, sign in with an [emailed code](/docs/auth/email-codes/) instead: it needs no links.
 
 ## MFA
 
 A sign in for a user with [MFA](/docs/auth/mfa/) on emits `mfaRequired` on `authStateChanges`, with `change.mfa!.factors`, and stores no session. Finish it with `orvano.client.completeMfa(MfaAnswer.totp(code))` (or `MfaAnswer.recoveryCode(code)`, or `MfaAnswer.passkey()`). The second step is kept in memory only, so restarting the app starts the sign in over. `confirmTotp` and `verifyMfa` on the client keep the stronger access token they get.
+
+When the project [requires MFA](/docs/auth/mfa/#require-mfa-for-every-user), `enrollmentRequired(result)` says a sign in must enroll a first factor; `orvano.client.startTotpEnrollment()`, `completeTotpEnrollment(code)`, and `enrollPasskey()` do it with the ticket the client holds, and store the session at the end.
+
+## Guests
+
+`orvano.account.createAnonymousSession()` signs a [guest](/docs/auth/anonymous-users/) in and stores the session. `orvano.account.upgradeAnonymous(...)` gives them an email and password and refreshes the session once they are permanent; while the project requires verified emails it answers `verificationRequired: true` and stores nothing.
 
 ## Passkeys
 
