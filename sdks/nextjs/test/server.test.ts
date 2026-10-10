@@ -192,6 +192,26 @@ describe('createOrvanoRouteHandler (AC-23)', () => {
     expect(setCookies(foreign)).toEqual([])
   })
 
+  it('takes the app origin from the Host behind a proxy, where nextUrl is the listening address', async () => {
+    // Self hosted `next start` builds request.nextUrl from its own address (https://localhost:3000
+    // behind a TLS proxy); the browser's host arrives as X-Forwarded-Host or Host.
+    const { POST } = handler(() => Response.json(fresh))
+    const behindProxy = (origin: string, headers: Record<string, string>) =>
+      request(
+        'https://localhost:3000/api/orvano/refresh',
+        { [refreshCookie]: 'orv_rt_old.secret' },
+        { origin, 'x-forwarded-proto': 'https', ...headers },
+      )
+
+    const forwarded = await POST(behindProxy(app, { 'x-forwarded-host': 'app.example.com' }))
+    const hostOnly = await POST(behindProxy(app, { host: 'app.example.com' }))
+    const foreign = await POST(
+      behindProxy('https://evil.test', { 'x-forwarded-host': 'app.example.com' }),
+    )
+
+    expect([forwarded.status, hostOnly.status, foreign.status]).toEqual([200, 200, 403])
+  })
+
   it('refreshes: sets both cookies and answers only the access token', async () => {
     const { POST } = handler(() => Response.json(fresh))
 

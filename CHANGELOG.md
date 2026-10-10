@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An email code now survives 10 wrong guesses instead of 5, and one inbox can receive up to 20 emails of a kind an hour (was 5).
 - `@orvano/nextjs` now sends Orvano the rightmost `x-forwarded-for` value (the one your nearest proxy added) when `x-real-ip` is missing, never the first, which the visitor can set. Device lists may show a different address than before. Pass `clientIp` to read the header your host sets (see the Rate limits reference).
 
+### Fixed
+- `@orvano/nextjs`: a self hosted Next.js app behind a proxy (Caddy, nginx, a tunnel) no longer has every route handler POST refused with `origin_not_allowed`, and provider sign in no longer sends the browser to `localhost`. The handler now takes the app's origin from `X-Forwarded-Host` (else `Host`) and the request's scheme, because `next start` reports its own listening address as `request.nextUrl.origin`. Your proxy must pass the original `Host` or set `X-Forwarded-Host`, and set `X-Forwarded-Proto` when it ends TLS.
+
 ## [0.2.0] - 2026-10-04
 
 The first published release: the server images, `install.sh`, the five SDKs on npm, pub.dev, and NuGet, and the docs at orvano.dev.
