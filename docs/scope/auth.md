@@ -79,7 +79,7 @@ Authenticator app codes, recovery codes, passkeys, and letting users see and rev
 - [ ] Document it: `/document MFA, passkeys & sessions`
 Spec [0013](../specs/0013-mfa-passkeys-sessions/index.md) · code in `server/src/Orvano.Auth/`, `server/src/Orvano.Messaging/`, `contract/auth/`, `sdks/`, `console/`, `tests/scenarios/`, `website/`
 
-### 14. Auth policies & abuse protection · in-progress · GA
+### 14. Auth policies & abuse protection · done · GA
 Password rules, sign up email policies (block disposable domains), anonymous guest users, session limits, and rate limits on auth endpoints.
 **Done when:** each policy is set per project in the console and enforced by the API; repeated failed sign ins are throttled.
 - [x] Design it (spec): `/architect auth policies & abuse protection`
@@ -91,8 +91,8 @@ Password rules, sign up email policies (block disposable domains), anonymous gue
    - [x] Anonymous users: guest sign in, upgrade, retention, and the Users page filter, in every SDK (AC-2, 28 to 32, 35, 36)
    - [x] Hardening and docs: events, metrics, the leak scan, errors and fix pages, guides, notices, and the checks in verify.md (AC-38 to 40)
    - [x] Review amendments: a second hidden sign up claims the unverified account, required MFA challenges passkey only users, Next.js rotated cookies on every answer, and the rightmost `x-forwarded-for` default (AC-12, 27, 36)
-- [ ] Verify it: `/check verify auth policies & abuse protection`
+- [x] Verify it: `/check verify auth policies & abuse protection`
 - [x] Test it: `/test auth policies & abuse protection`
 - [x] Review it (fresh model): `/check review auth policies & abuse protection`
-- [ ] Document it: `/document auth policies & abuse protection`
+- [x] Document it: `/document auth policies & abuse protection`
 Spec [0014](../specs/0014-auth-policies-abuse-protection/index.md) · code in `server/src/Orvano.Auth/`, `server/src/Orvano.Core/RateLimiting/`, `server/src/Orvano.Platform/`, `server/src/Orvano.Messaging/`, `contract/auth/`, `sdks/`, `console/`, `tests/scenarios/`, `website/`

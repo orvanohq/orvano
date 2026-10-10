@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-09
 **Updated**: 2026-10-10 (AC-36 names the guest sign in operation `createAnonymousSession`, as the contract, every SDK, and the docs do); 2026-10-10 again, amended from the review of 2026-10-09 (AC-12, AC-27, AC-36; see rationale.md)
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
