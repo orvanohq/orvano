@@ -150,6 +150,37 @@ describe('createOrvanoRouteHandler oauth (spec 0012, AC-21)', () => {
     expect(new URL(response.headers.get('location') ?? '').origin).toBe(app)
   })
 
+  it('builds the callback and the redirect after it on the app host behind a proxy', async () => {
+    // Self hosted `next start` reads its own address as https://localhost:3000; the app's host is
+    // X-Forwarded-Host.
+    const proxied = { 'x-forwarded-host': 'app.example.com', 'x-forwarded-proto': 'https' }
+    const start = handler(flows)
+    const started = await start.POST(
+      new NextRequest('https://localhost:3000/api/orvano/oauth', {
+        method: 'POST',
+        headers: { origin: app, 'content-type': 'application/json', ...proxied },
+        body: JSON.stringify({ provider: 'google', next: '/welcome' }),
+      }),
+    )
+    expect(started.status).toBe(200)
+    expect(start.calls[0]?.body.redirectUrl).toBe(`${app}/api/orvano/oauth-callback`)
+
+    const { GET } = handler({
+      '/v1/account/sessions/oauth': () =>
+        Response.json(
+          { user, session, isNewUser: false, verificationEmail: null },
+          { status: 201 },
+        ),
+    })
+    const response = await GET(
+      new NextRequest(
+        'https://localhost:3000/api/orvano/oauth-callback?orvano_type=oauth&orvano_code=orv_oc_x',
+        { headers: { cookie: `${oauthCookie}=${oauthValue(started)}`, ...proxied } },
+      ),
+    )
+    expect(response.headers.get('location')).toBe(`${app}/welcome`)
+  })
+
   it('refuses an unknown provider', async () => {
     const { POST } = handler(flows)
     const response = await POST(post('/api/orvano/oauth', { provider: 'yahoo' }))

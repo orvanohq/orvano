@@ -92,7 +92,7 @@ const orvano = createBrowserClient({
 })
 ```
 
-The handler answers `POST` requests only from your app's own origin. Its one `GET` action, `.../oauth-callback`, is where a provider sends the browser back after [provider sign in](/docs/auth/sign-in-with-google/); a cookie only that browser holds binds it, so nobody else can finish the sign in. No action finishes an emailed link on `GET`, so a mail scanner that opens a link can't use it up.
+The handler answers `POST` requests only from your app's own origin: the request's `X-Forwarded-Host` (else its `Host`) and scheme. Behind your own proxy (Caddy, nginx, a tunnel), pass the browser's host through, either as `Host` or as `X-Forwarded-Host`, and set `X-Forwarded-Proto` when the proxy ends TLS; Caddy and Vercel do both by default. The same origin builds the provider callback URL. Its one `GET` action, `.../oauth-callback`, is where a provider sends the browser back after [provider sign in](/docs/auth/sign-in-with-google/); a cookie only that browser holds binds it, so nobody else can finish the sign in. No action finishes an emailed link on `GET`, so a mail scanner that opens a link can't use it up.
 
 Sign users in from a server action rather than the browser: a session started in the browser keeps only the access token, so it lasts 15 minutes.
 

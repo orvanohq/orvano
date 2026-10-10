@@ -204,7 +204,7 @@ export async function updateSession(
     return NextResponse.next({ request })
   }
 
-  const secure = secureCookies(request.nextUrl.origin)
+  const secure = secureCookies(appOrigin(request))
   writeRequest(request, session)
   const response = NextResponse.next({ request })
   writeResponse(response, session, secure)
@@ -413,6 +413,21 @@ function decodeCookie(value: string | undefined): OAuthCookie | null {
     : null
 }
 
+/**
+ * The app's own origin as the browser sees it (spec 0004): the request's `Host` (the first
+ * `X-Forwarded-Host` value when a proxy sent one) and scheme. Never `request.nextUrl.origin`
+ * alone: self hosted `next start` builds that from its listening address, so behind a proxy it
+ * reads `https://localhost:3000`; only the scheme follows `X-Forwarded-Proto` there.
+ */
+function appOrigin(request: NextRequest): string {
+  const first = (name: string): string | undefined => {
+    const value = request.headers.get(name)?.split(',')[0]?.trim()
+    return value === '' ? undefined : value
+  }
+  const host = first('x-forwarded-host') ?? first('host') ?? request.nextUrl.host
+  return `${request.nextUrl.protocol}//${host}`
+}
+
 /** The handler's own base path: the request path without its last segment (the action). */
 function handlerBase(request: NextRequest): string {
   return request.nextUrl.pathname.replace(/\/[^/]*\/?$/, '')
@@ -460,7 +475,7 @@ async function oauthStart(
   const link = body.link === true
   const password = link && typeof body.password === 'string' ? body.password : undefined
   const { verifier, challenge } = await createPkce()
-  const redirectUrl = `${request.nextUrl.origin}${handlerBase(request)}/oauth-callback`
+  const redirectUrl = `${appOrigin(request)}${handlerBase(request)}/oauth-callback`
 
   let session: { access: string; fresh: AuthSession | null } | null = null
   let url: string
@@ -520,7 +535,7 @@ async function oauthCallback(
   const state = decodeCookie(request.cookies.get(oauthCookie)?.value)
   const next = safeNext(state?.n)
   const target = (error?: string): URL => {
-    const url = new URL(next, request.nextUrl.origin)
+    const url = new URL(next, appOrigin(request))
     if (error !== undefined) url.searchParams.set('orvano_error', error)
     return url
   }
@@ -550,7 +565,7 @@ async function oauthCallback(
       if (mfaStore.get() !== null) {
         // Spec 0013, AC-37: the MFA page finishes it; `next` waits in the cookie with the ticket.
         const response = done(
-          new URL(safeNext(config.mfaPath ?? defaultMfaPath), request.nextUrl.origin),
+          new URL(safeNext(config.mfaPath ?? defaultMfaPath), appOrigin(request)),
         )
         writeMfaCookie(response, mfaStore, next, secure)
         return response
@@ -1060,18 +1075,18 @@ export function createOrvanoRouteHandler(config: OrvanoRouteHandlerConfig): {
         .filter((part: string) => part !== '')
         .at(-1)
       if (action !== 'oauth-callback') return problem(404, 'not_found', 'Unknown Orvano action.')
-      return oauthCallback(request, config, secureCookies(request.nextUrl.origin))
+      return oauthCallback(request, config, secureCookies(appOrigin(request)))
     },
 
     async POST(request: NextRequest): Promise<NextResponse> {
-      if (request.headers.get('origin') !== request.nextUrl.origin)
+      if (request.headers.get('origin') !== appOrigin(request))
         return problem(403, 'origin_not_allowed', 'This handler only answers the app itself.')
 
       const action = request.nextUrl.pathname
         .split('/')
         .filter((part: string) => part !== '')
         .at(-1)
-      const secure = secureCookies(request.nextUrl.origin)
+      const secure = secureCookies(appOrigin(request))
       const client = clientFor(config, request)
 
       if (action === 'refresh') {
