@@ -1,7 +1,7 @@
 # 0009. Transactional email: SMTP per project, editable templates, and a send queue
 
 **Date**: 2026-09-29
-**Updated**: 2026-10-08 (spec 0013: the `security_alert` template kind and `IEmailQueue.QueueSecurityAlertAsync`, with no `ActionUrl` or `Code`); 2026-10-02 (the `ActionUrl` rule becomes a scheme deny list and `IEmailQueue` gains `CheckAvailabilityAsync`, spec 0010)
+**Updated**: 2026-10-10 (spec 0014: the verification email's `reject_url`, the `sign_up_attempt` alert, and a per recipient limit on console invitation emails); 2026-10-08 (spec 0013: the `security_alert` template kind and `IEmailQueue.QueueSecurityAlertAsync`, with no `ActionUrl` or `Code`); 2026-10-02 (the `ActionUrl` rule becomes a scheme deny list and `IEmailQueue` gains `CheckAvailabilityAsync`, spec 0010)
 **Status**: Accepted
 
 ## Summary
@@ -185,6 +185,7 @@ The catalog lives in `Domain/EmailTemplateCatalog`. Variables are snake_case, as
 | `user.email` | all four | The address this email is sent to. | `AuthEmail.To` | the caller's console email |
 | `user.name` | all four | The user's name. Empty when they haven't set one. | `AuthEmail.UserName` (empty when null) | the caller's console name, else empty |
 | `action_url` | `verification`, `recovery`, `magic_link` | The link the user opens to finish. | `AuthEmail.ActionUrl` | `https://example.com/auth/confirm?token=sample` |
+| `reject_url` | `verification` ([spec 0014](../0014-auth-policies-abuse-protection/index.md), AC-15) | The link the inbox owner opens if they didn't sign up: the same token with `orvano_type=verification_reject`. Not set in an email change email. | `AuthEmail.RejectUrl` | `https://example.com/auth/confirm?type=verification_reject&token=sample` |
 | `code` | `email_code` | The code the user types in. | `AuthEmail.Code` | `428613` |
 | `expires_in_minutes` | all four | How many minutes the link or code works. | `AuthEmail.ExpiresInMinutes` | 60 for links, 10 for `email_code` |
 
@@ -422,7 +423,7 @@ Tracer Bullet: the first slice pushes one test email from the project's Settings
 ## Follow-up
 
 - [x] Row 10 (email verification, recovery, and passwordless): done in [spec 0010](../0010-email-verification-recovery-passwordless/index.md), which also amended AC-14 and *Module seams* here. Read the project name before its transaction and call `IEmailQueue.QueueAuthEmailAsync`, choose each flow's expiry, map `NotConfigured` and `RateLimited` to its answers (`email_not_configured`, `email_rate_limited`), and add per recipient limits for resend.
-- [ ] Row 14 (auth policies and abuse protection): consider a per recipient limit on console invite emails, which needs a hash of the recipient that this row doesn't store.
+- [x] Row 14 (auth policies and abuse protection): consider a per recipient limit on console invite emails, which needs a hash of the recipient that this row doesn't store. Done in [spec 0014](../0014-auth-policies-abuse-protection/index.md) (AC-23): `console.invite_email.recipient`, 5 per hour, keyed by the lowercased recipient in memory only, so nothing new is stored. Its AC-12 also adds the `sign_up_attempt` value to spec 0013's `security_alert` template.
 - [ ] Spec 0008: when this row is built, mark its row 9 follow up done.
 - [ ] Row 24 (messaging providers): generalize the SMTP row into providers (HTTP APIs such as SES or Postmark), add bounce and complaint webhooks and a suppression list, and a server SDK send operation.
 - [ ] Per locale templates once app users carry a locale (the `locale` column is already in the key).
