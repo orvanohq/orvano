@@ -174,3 +174,32 @@ _Steps derived from spec 0014's AC-2 (guests), AC-28 to AC-32, AC-35 (Anonymous 
 ## Acceptance criteria coverage (build task 7: anonymous users)
 
 - AC-2 (anonymousEnabled, anonymousIdleDays): card steps and `AnonymousUserTests.The_settings_rules_the_list_filter_and_the_guest_limit` · AC-28: guest sign in steps, the guest limit, and `auth-anonymous` · AC-29: refusal and delete steps · AC-30: both upgrade modes, the link upgrade, the MFA ending, and `auth-anonymous` · AC-31: retention steps and `AnonymousUserTests.Retention_deletes_guests_idle_past_their_project_days_and_keeps_active_ones` · AC-32: Users page steps, `auth-anonymous-server`, and the console tests · AC-35 (Anonymous card): card steps · AC-36: SDK steps, the Next.js actions, and both scenarios
+
+# Verify: auth policies and abuse protection (build task 8: hardening and docs) · spec 0014 · updated 2026-10-09
+_Steps derived from spec 0014's AC-38 to AC-40, plus the whole of this file run once on the test server. `/check verify` runs these; `/test` locks the durable ones. Server tests: `AuthPolicyLeakTests`, `KernelSettingsTests.A_refusal_counts_on_the_metric_by_policy_name_only`, `BreachedPasswordsTests`._
+
+## UI / manual
+
+- [ ] On the test server, with the build of this release: run every block above (build tasks 1 to 7) against a real project, real SMTP, and a Next.js app behind the host's proxy, ticking each step → AC-1 to AC-37
+- [ ] With the breached check on and the server at log level Information, sign up with a password Have I Been Pwned knows: the API answers `password_breached`, and `docker compose logs api` has no line with `pwnedpasswords.com/range/` or any 5 hex character prefix of that password's SHA-1 → AC-6, AC-39
+- [ ] After a session of sign ups, refused domains, lockouts, guest upgrades, and policy saves, search the api logs and the `orvano.events` and `orvano.jobs` payloads for the emails, domains, IPs, CIDRs, and passwords used: none appear; `auth.policies.updated` lists field names only → AC-39
+- [ ] Hit a limit (11 wrong passwords for one email): the OpenTelemetry export (the Aspire dashboard in dev, the collector on the test server) shows `orvano.auth.limit_refused` with only a `policy` tag → AC-39
+- [ ] orvano.dev preview of this branch: the Security policies guide, the Anonymous users guide, the Rate limits reference, the console's Security page, and the Require MFA section of the MFA guide each open, every link works, and the SDK pages list the new helpers (guests, enrollment, `clientIp`, `isAnonymous`) → AC-38
+- [ ] Each of the seven new codes (`password_too_common`, `password_breached`, `email_domain_not_allowed`, `sign_up_disabled`, `email_verification_required`, `anonymous_disabled`, `anonymous_not_allowed`) has its `/errors/<code>/` page with "Why it happens" and "How to fix" → AC-38
+- [ ] The CHANGELOG's Unreleased section states the common list on new passwords, the per email and IP keys, the email code's 10 tries, and the Next.js forwarded address change → AC-40
+- [ ] Upgrade a copy of a 0.2 database on the test server: the migration applies, and an existing project keeps its old behavior apart from AC-40's list (sign up, sign in, sessions, and MFA as before) → AC-40
+
+## Commands
+
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "*AuthPolicyLeakTests" --filter-class "*KernelSettingsTests" --filter-class "*BreachedPasswordsTests"` → all pass → AC-39
+- [ ] `pnpm --filter @orvano/contract build && ORVANO_SITE_ENV=preview pnpm --filter @orvano/website build && ORVANO_SITE_ENV=preview pnpm --filter @orvano/website check:site` → the site builds with every error code's fix page and every link valid, and axe and the CSP pass → AC-38
+- [ ] `dotnet test --solution Orvano.slnx` and every scenario runner on CI (`sdks.yml`) → green → AC-36 to AC-40
+
+## Value sourcing
+
+- [ ] The hash prefix of the breached check exists only in the outgoing request: neither the `hibp` client's logs (removed) nor any event, job, or problem carries it → AC-6, AC-39
+- [ ] The metric's only tag is the limit's name, never the key it counted → AC-39
+
+## Acceptance criteria coverage (build task 8: hardening and docs)
+
+- AC-38: the docs and error page steps, and the site build · AC-39: the log, event, and metric steps, `AuthPolicyLeakTests`, and the metric test · AC-40: the changelog and migration steps · AC-1 to AC-37: the full run of the blocks above on the test server
