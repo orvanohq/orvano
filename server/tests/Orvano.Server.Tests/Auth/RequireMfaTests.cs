@@ -229,6 +229,50 @@ public class RequireMfaTests(PostgresFixture postgres)
             Assert.False(bobStatus.Body.GetProperty("mfaEnabled").GetBoolean());
     }
 
+    [Fact]
+    public async Task An_expired_enrollment_ticket_is_refused_by_every_enrollment_step()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
+        await PasskeyTests.EnablePasskeysAsync(api);
+        using (var signUp = await api.SignUpAsync("ada@x.com")) await VerifyEmailAsync(api, AuthApi.UserId(signUp));
+        await RequireAsync(api);
+        using var stepOne = await api.SignInAsync("ada@x.com");
+        AssertEnrollment(stepOne, ["totp", "passkey"]);
+        var ticket = Ticket(stepOne);
+        using var setup = await api.SendAsync(HttpMethod.Post, "/v1/account/mfa/enrollment/totp", new { ticket });
+        AssertCreated(setup);
+        var secret = setup.Body.GetProperty("secret").GetString()!;
+
+        // AC-27: past its 15 minutes (the expiry moved into the past), even the right code is refused, and so is every other step.
+        await TestDatabase.ExecuteAsync(api.Database.Superuser, "UPDATE orvano.auth_mfa_tickets SET expires_at = now() - interval '1 second'");
+        using (var confirm = await CompleteTotpAsync(api, ticket, CodeAt(secret, 0)))
+            Assert.Equal((HttpStatusCode.Unauthorized, "invalid_mfa_ticket"), (confirm.Status, confirm.Code));
+        foreach (var path in new[] { "/v1/account/mfa/enrollment/totp", "/v1/account/mfa/enrollment/passkey" })
+        {
+            using var refused = await api.SendAsync(HttpMethod.Post, path, new { ticket });
+            Assert.Equal((HttpStatusCode.Unauthorized, "invalid_mfa_ticket"), (refused.Status, refused.Code));
+        }
+
+        Assert.Equal(0L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, "SELECT count(*) FROM orvano.auth_totp_factors WHERE confirmed_at IS NOT NULL"));
+    }
+
+    [Fact]
+    public async Task Turning_passkeys_off_counts_a_passkey_only_user_with_a_live_session_as_without_mfa()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
+        await PasskeyTests.EnablePasskeysAsync(api);
+        await PasskeyTests.RegisterAsync(api, await PasskeyTests.VerifiedUserAsync(api, "ada@x.com"));
+        Assert.Equal(0, await WithoutMfaAsync(api));
+
+        // AC-27, AC-35: a passkey counts as a factor only while passkeys are on.
+        using (var off = await api.AsConsoleAsync(HttpMethod.Patch, MethodsUrl, new { passkeysEnabled = false }))
+            Assert.Equal(HttpStatusCode.OK, off.Status);
+        Assert.Equal(1, await WithoutMfaAsync(api));
+        using (var on = await api.AsConsoleAsync(HttpMethod.Patch, MethodsUrl, new { passkeysEnabled = true }))
+            Assert.Equal(HttpStatusCode.OK, on.Status);
+        Assert.Equal(0, await WithoutMfaAsync(api));
+    }
+
     private static void AssertCreated(Reply reply) => Assert.True(reply.Status == HttpStatusCode.Created, $"{reply.Status}: {reply.Body}");
 
     private static async Task RequireAsync(AuthApi api)
