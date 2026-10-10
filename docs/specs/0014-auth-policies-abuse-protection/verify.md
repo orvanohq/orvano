@@ -62,7 +62,7 @@ _Steps derived from spec 0014's acceptance criteria for what has landed: passwor
 
 - [x] Policy values come from `PolicySettings`: change a value through the console, and the same `api` instance applies it on the next request; the `console` project always uses the defaults (a console sign up with `password123` → `password_too_common`, and no `auth_policies` row for `console`) → AC-3, AC-37
 - [x] Limit IP: only a request from a listed CIDR may name the visitor; IPv6 addresses in one `/64` share a bucket; `::ffff:198.51.100.20` counts as `198.51.100.20` → AC-16
-- [ ] `@orvano/nextjs` sends the rightmost `x-forwarded-for` value by default, never the first and never `x-real-ip` (only a custom `clientIp` reads that) → AC-36 (amended 2026-10-10)
+- [x] `@orvano/nextjs` sends the rightmost `x-forwarded-for` value by default, never the first and never `x-real-ip` (only a custom `clientIp` reads that) → AC-36 (amended 2026-10-10)
 - [x] Session `expires_at` is creation plus `sessionAbsoluteSeconds`, and `idle_expires_at` after a refresh is the earlier of now plus `sessionIdleSeconds` and `expires_at` → AC-25
 
 ## Acceptance criteria coverage (landed so far)
