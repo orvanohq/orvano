@@ -209,6 +209,50 @@ public class SignUpPolicyTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task The_reject_link_carries_the_verification_token_on_the_same_redirect_and_an_email_change_has_none()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
+        using var signUp = await api.SignUpAsync("ada@x.com", extra: new { email = "ada@x.com", password = Password, verificationRedirectUrl = Redirect });
+        Assert.Equal(HttpStatusCode.Created, signUp.Status);
+
+        // AC-15: both links hold the same token on the same redirect URL; only orvano_type tells them apart.
+        var links = Links((await api.LatestEmailAsync("ada@x.com"))!.Text);
+        Assert.Equal(["verification", "verification_reject"], links.Select(l => l.Type).Order());
+        Assert.Single(links.Select(l => l.Token).Distinct());
+        Assert.All(links, l => Assert.Equal(Redirect, l.Target));
+
+        // An email change email carries only its own link, never a reject link.
+        using (var verified = await api.SendAsync(HttpMethod.Post, "/v1/account/verification/confirm", new { token = links[0].Token }))
+            Assert.Equal(HttpStatusCode.OK, verified.Status);
+        using var signedIn = await api.SignInAsync("ada@x.com");
+        using var change = await api.SendAsync(HttpMethod.Put, "/v1/account/email",
+            new { email = "ada.new@x.com", redirectUrl = Redirect, password = Password }, bearer: AuthApi.AccessToken(signedIn));
+        Assert.True(change.Status == HttpStatusCode.Accepted, $"{change.Status}: {change.Code}");
+        var changeEmail = (await api.LatestEmailAsync("ada.new@x.com"))!;
+        Assert.Equal(["email_change"], Links(changeEmail.Text).Select(l => l.Type));
+        Assert.DoesNotContain("verification_reject", changeEmail.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_sign_up_attempt_alert_is_the_security_alert_template_and_keeps_a_projects_own_words()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
+        using (var owner = await api.SignUpAsync("owner@x.com")) await MfaTests.VerifyEmailAsync(api, AuthApi.UserId(owner));
+        using (var edited = await api.AsConsoleAsync(HttpMethod.Put, "/v1/console/project/email/templates/security_alert",
+            new { subject = "Heads up from {{ project.name }}", html = "<p>Our words: {{ alert }}</p>", text = "Our words: {{ alert }}" }))
+            Assert.True(edited.Status == HttpStatusCode.OK, edited.Document?.RootElement.ToString());
+        await SetAsync(api, new { requireVerifiedEmail = true });
+
+        using (var hidden = await PendingSignUpAsync(api, "owner@x.com")) { }
+
+        // AC-12: the alert renders the project's edited security_alert, with alert sign_up_attempt.
+        var alert = (await api.LatestEmailAsync("owner@x.com"))!;
+        Assert.Equal("security_alert", alert.Template);
+        Assert.Equal("Heads up from Auth project", alert.Subject);
+        Assert.Equal("Our words: sign_up_attempt", alert.Text.Trim());
+    }
+
+    [Fact]
     public async Task A_second_hidden_sign_up_claims_the_unverified_account_so_no_earlier_password_survives()
     {
         const string Other = "other horse battery";
@@ -315,6 +359,13 @@ public class SignUpPolicyTests(PostgresFixture postgres)
     }
 
     private static Dictionary<string, string> From(string ip) => new() { ["X-Orvano-Client-IP"] = ip };
+
+    /// <summary>Every distinct emailed link in a text body: its URL before the query, its <c>orvano_type</c>, and its token.</summary>
+    private static List<(string Target, string Type, string Token)> Links(string text) =>
+        System.Text.RegularExpressions.Regex.Matches(text, @"(?<target>https?://[^\s?""<>()]+)\?orvano_type=(?<type>[a-z_]+)&orvano_token=(?<token>[A-Za-z0-9_\-]+)")
+            .Select(m => (m.Groups["target"].Value, m.Groups["type"].Value, m.Groups["token"].Value))
+            .Distinct()
+            .ToList();
 
     private static async Task<Reply> PendingSignUpAsync(AuthApi api, string email, string? name = null, string? from = null, string password = Password)
     {

@@ -181,6 +181,53 @@ public class AnonymousUserTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task A_refused_later_upgrade_leaves_the_pending_link_and_its_email_as_they_were()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
+        await EnableAsync(api);
+        await SetPoliciesAsync(api, new { requireVerifiedEmail = true, blockedEmailDomains = new[] { "blocked.com" } });
+        using var guest = await GuestAsync(api);
+        var bearer = AuthApi.AccessToken(guest);
+        using (var pending = await UpgradeAsync(api, bearer, "ada@x.com", redirect: Redirect))
+            Assert.True(pending.Body.GetProperty("verificationRequired").GetBoolean());
+
+        // AC-30: later calls the rules refuse lose outright, so no new link goes out and the first one is not voided.
+        var queued = await api.QueuedEmailCountAsync();
+        using (var common = await UpgradeAsync(api, bearer, "bob@x.com", password: "password1234", redirect: Redirect))
+            Assert.Equal((HttpStatusCode.BadRequest, "password_too_common"), (common.Status, common.Code));
+        using (var blocked = await UpgradeAsync(api, bearer, "eve@blocked.com", redirect: Redirect))
+            Assert.Equal((HttpStatusCode.Forbidden, "email_domain_not_allowed"), (blocked.Status, blocked.Code));
+        Assert.Equal(queued, await api.QueuedEmailCountAsync());
+
+        // The first link sets the email from its own token row, verified, and the first call's password stands.
+        using var confirmed = await api.SendAsync(HttpMethod.Post, "/v1/account/email/confirm", new { token = (await api.LatestEmailAsync("ada@x.com"))!.Token });
+        Assert.Equal(HttpStatusCode.OK, confirmed.Status);
+        Assert.Equal("ada@x.com", confirmed.Body.GetProperty("email").GetString());
+        Assert.True(confirmed.Body.GetProperty("emailVerified").GetBoolean());
+        Assert.False(confirmed.Body.GetProperty("isAnonymous").GetBoolean());
+        using var signIn = await api.SignInAsync("ada@x.com");
+        Assert.Equal(AuthApi.UserId(guest), AuthApi.UserId(signIn));
+    }
+
+    [Fact]
+    public async Task A_project_with_no_settings_row_keeps_idle_guests_30_days_and_never_counts_guests_as_without_mfa()
+    {
+        await using var api = await AuthApi.StartAsync(postgres);
+
+        // AC-31: with no auth_method_settings row, the idle days read as 30.
+        Assert.Equal(0L, await CountAsync(api, "SELECT count(*) FROM orvano.auth_method_settings WHERE project_id = @p", ("p", AuthApi.Project)));
+        using (var read = await api.AsConsoleAsync(HttpMethod.Get, MethodsUrl))
+            Assert.Equal(30, read.Body.GetProperty("anonymousIdleDays").GetInt32());
+
+        // AC-27, AC-35: a guest's live session is not counted; a permanent user's is.
+        await EnableAsync(api);
+        using (var guest = await GuestAsync(api)) Assert.Equal(HttpStatusCode.Created, guest.Status);
+        Assert.Equal(0, await WithoutMfaAsync(api));
+        using (var ada = await api.SignUpAsync("ada@x.com")) Assert.Equal(HttpStatusCode.Created, ada.Status);
+        Assert.Equal(1, await WithoutMfaAsync(api));
+    }
+
+    [Fact]
     public async Task Under_required_mfa_the_upgrade_ends_the_guest_sessions_and_the_next_sign_in_enrolls()
     {
         await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
@@ -218,6 +265,7 @@ public class AnonymousUserTests(PostgresFixture postgres)
             Assert.Equal((HttpStatusCode.Forbidden, "email_domain_not_allowed"), (refused.Status, refused.Code));
         Assert.True(await TestDatabase.ScalarAsync<bool>(api.Database.Superuser,
             "SELECT is_anonymous FROM orvano.auth_users WHERE id = @id", ("id", Guid.Parse(AuthApi.UserId(refusedGuest)))));
+        Assert.Equal(0L, await CountAsync(api, "SELECT count(*) FROM orvano.auth_identities WHERE user_id = @id", ("id", Guid.Parse(AuthApi.UserId(refusedGuest)))));
 
         // No password or recent session asked: the guest's session is their only credential.
         using var guest = await GuestAsync(api);
@@ -302,6 +350,12 @@ public class AnonymousUserTests(PostgresFixture postgres)
     }
 
     private static Task<Reply> GuestAsync(AuthApi api) => api.SendAsync(HttpMethod.Post, "/v1/account/sessions/anonymous");
+
+    private static async Task<int> WithoutMfaAsync(AuthApi api)
+    {
+        using var read = await api.AsConsoleAsync(HttpMethod.Get, MethodsUrl);
+        return read.Body.GetProperty("activeUsersWithoutMfa").GetInt32();
+    }
 
     private static Task<Reply> UpgradeAsync(
         AuthApi api, string bearer, string email, string password = Password, string? name = null, string? redirect = null, string? ip = null)
