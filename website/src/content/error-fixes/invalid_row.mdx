@@ -1,0 +1,7 @@
+## Why it happens
+
+A value in the row doesn't fit its column: a required column is missing or null, a column doesn't exist or is read only (`created_at`, `updated_at`), or a value has the wrong form for its type. `errors` lists every bad field, and `detail` starts with the first.
+
+## How to fix
+
+Fix each field `errors` names. Send `bigint` and `decimal` values as strings, timestamps as ISO 8601 with an offset (`2026-10-10T08:30:00Z`), and dates as `YYYY-MM-DD`. [Databases and tables](/docs/databases/databases-and-tables/#column-types) lists every type's form.

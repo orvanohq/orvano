@@ -500,6 +500,32 @@ final Map<String, DispatchEntry> dispatch = {
       return r.toJson();
     },
   ),
+  'databases.get': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.databases.get(input['database'] as String);
+      return r.toJson();
+    },
+    scope: 'tables.read',
+  ),
+  'databases.list': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.databases.list(
+        cursor: input['cursor'] == null ? null : input['cursor'] as String,
+        limit: input['limit'] == null ? null : (input['limit'] as num).toInt(),
+      );
+      return r.toJson();
+    },
+    serverAll: (o, input) => o.databases
+        .listAll(
+          limit: input['limit'] == null
+              ? null
+              : (input['limit'] as num).toInt(),
+        )
+        .map((e) => e.toJson()),
+    scope: 'tables.read',
+  ),
   'health.get': DispatchEntry(
     status: 200,
     client: (o, input) async {
@@ -536,6 +562,108 @@ final Map<String, DispatchEntry> dispatch = {
       );
       return r.toJson();
     },
+  ),
+  'rows.create': DispatchEntry(
+    status: 201,
+    client: (o, input) async {
+      final r = await o.rows.create(
+        input['database'] as String,
+        input['table'] as String,
+        Map<String, Object?>.from(input['body'] as Map<String, dynamic>),
+      );
+      return r;
+    },
+    server: (o, input) async {
+      final r = await o.rows.create(
+        input['database'] as String,
+        input['table'] as String,
+        Map<String, Object?>.from(input['body'] as Map<String, dynamic>),
+      );
+      return r;
+    },
+    scope: 'rows.write',
+  ),
+  'rows.list': DispatchEntry(
+    status: 200,
+    client: (o, input) async {
+      final r = await o.rows.list(
+        input['database'] as String,
+        input['table'] as String,
+        cursor: input['cursor'] == null ? null : input['cursor'] as String,
+        limit: input['limit'] == null ? null : (input['limit'] as num).toInt(),
+      );
+      return r.toJson();
+    },
+    server: (o, input) async {
+      final r = await o.rows.list(
+        input['database'] as String,
+        input['table'] as String,
+        cursor: input['cursor'] == null ? null : input['cursor'] as String,
+        limit: input['limit'] == null ? null : (input['limit'] as num).toInt(),
+      );
+      return r.toJson();
+    },
+    clientAll: (o, input) => o.rows
+        .listAll(
+          input['database'] as String,
+          input['table'] as String,
+          limit: input['limit'] == null
+              ? null
+              : (input['limit'] as num).toInt(),
+        )
+        .map((e) => e),
+    serverAll: (o, input) => o.rows
+        .listAll(
+          input['database'] as String,
+          input['table'] as String,
+          limit: input['limit'] == null
+              ? null
+              : (input['limit'] as num).toInt(),
+        )
+        .map((e) => e),
+    scope: 'rows.read',
+  ),
+  'tables.create': DispatchEntry(
+    status: 201,
+    server: (o, input) async {
+      final r = await o.tables.create(
+        input['database'] as String,
+        CreateTableRequest.fromJson(input['body'] as Map<String, dynamic>),
+      );
+      return r.toJson();
+    },
+    scope: 'tables.write',
+  ),
+  'tables.get': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.tables.get(
+        input['database'] as String,
+        input['table'] as String,
+      );
+      return r.toJson();
+    },
+    scope: 'tables.read',
+  ),
+  'tables.list': DispatchEntry(
+    status: 200,
+    server: (o, input) async {
+      final r = await o.tables.list(
+        input['database'] as String,
+        cursor: input['cursor'] == null ? null : input['cursor'] as String,
+        limit: input['limit'] == null ? null : (input['limit'] as num).toInt(),
+      );
+      return r.toJson();
+    },
+    serverAll: (o, input) => o.tables
+        .listAll(
+          input['database'] as String,
+          limit: input['limit'] == null
+              ? null
+              : (input['limit'] as num).toInt(),
+        )
+        .map((e) => e.toJson()),
+    scope: 'tables.read',
   ),
   'test.conflict': DispatchEntry(
     status: 204,

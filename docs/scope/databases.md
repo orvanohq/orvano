@@ -7,7 +7,7 @@ Create a table in the console, then create, read, update, delete, filter, sort, 
 **Done when:** a table made in the console is instantly usable from all SDKs with filters and pagination, and new columns appear without a restart.
 - [x] Design it (spec): `/architect tables, rows & data API`
 - [ ] Build it: `/develop tables, rows & data API`
-   - [ ] Thin thread, a console table to rows from the .NET SDK: the module, migration `0011`, `ProjectScope` schema and `afterAsApp`, the structure cache, `main`, `tables.create`, `rows.create` and `list`, the contract and SdkGen changes, the first console pages, and a .NET scenario (AC-1, 5, 6, 11, 16, 25, 28)
+   - [x] Thin thread, a console table to rows from the .NET SDK: the module, migration `0011`, `ProjectScope` schema and `afterAsApp`, the structure cache, `main`, `tables.create`, `rows.create` and `list`, the contract and SdkGen changes, the first console pages, and a .NET scenario (AC-1, 5, 6, 11, 16, 25, 28)
    - [ ] Rows and queries: the full row API with wire forms, error mapping, timeouts, and row events, then the filter grammar, sort, select, keyset cursors, the pagination property test, and the fuzz test (AC-11 to 20, 25, 26)
    - [ ] Schema changes, named databases, and callers: column and table changes with advisory locks, NOTIFY and self heal, odd tables, the provision job and purge change, `IAppCallerResolver`, `IRowAccess`, the `Test` opener, and the console mirror operations (AC-2 to 4, 7 to 10, 21 to 24, 27)
    - [ ] Every SDK and the full console: query builders in JS, Dart, and .NET with shared test vectors, scenarios on every surface, and the Databases, tables, Rows, and Columns screens with axe and Playwright (AC-29 to 35)

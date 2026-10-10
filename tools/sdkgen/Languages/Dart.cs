@@ -169,7 +169,7 @@ internal static class Dart
         Enums = slice.Enums.Select(e => new EnumDef(
             Doc(e.Doc, ""),
             e.Name,
-            [.. e.Values.Select(v => new EnumMember($"  /// The wire value `{v}`.\n", Naming.MemberFromWire(v), Naming.QuotedString(v)))])).ToList(),
+            [.. e.Values.Select(v => new EnumMember($"  /// The wire value `{v}`.\n", Naming.DartEnumMember(Naming.MemberFromWire(v)), Naming.QuotedString(v)))])).ToList(),
         Models = slice.Models.Select(ToModel).ToList(),
     };
 
@@ -195,6 +195,7 @@ internal static class Dart
     {
         var fields = m.Properties.Select(p =>
         {
+            var name = Naming.DartMember(p.Name);
             var nullable = p.Optional || p.Nullable;
             // Any JSON value is already `Object?`.
             var type = Type(p.Type) + (nullable && p.Type is not JsonValueType ? "?" : "");
@@ -204,16 +205,16 @@ internal static class Dart
             // `--fatal-infos` rejects the `if (x case final v?)` form for it (use_null_aware_elements).
             var toJson = p.Optional
                 ? ToJson(p.Type, "v") == "v"
-                    ? $"'{p.Wire}': ?{p.Name}"
-                    : $"if ({p.Name} case final v?) '{p.Wire}': {ToJson(p.Type, "v")}"
+                    ? $"'{p.Wire}': ?{name}"
+                    : $"if ({name} case final v?) '{p.Wire}': {ToJson(p.Type, "v")}"
                 : p.Nullable && ToJson(p.Type, "v") != "v"
-                    ? $"'{p.Wire}': switch ({p.Name}) {{ final v? => {ToJson(p.Type, "v")}, null => null }}"
-                    : $"'{p.Wire}': {ToJson(p.Type, p.Name)}";
+                    ? $"'{p.Wire}': switch ({name}) {{ final v? => {ToJson(p.Type, "v")}, null => null }}"
+                    : $"'{p.Wire}': {ToJson(p.Type, name)}";
             return new Field(
                 Doc(p.Doc, "  "),
-                $"final {type} {p.Name};",
-                nullable ? $"this.{p.Name}" : $"required this.{p.Name}",
-                $"{p.Name}: {fromJson}",
+                $"final {type} {name};",
+                nullable ? $"this.{name}" : $"required this.{name}",
+                $"{name}: {fromJson}",
                 toJson);
         }).ToList();
         return new Model(Doc(m.Doc, ""), m.Name, fields);
@@ -232,7 +233,7 @@ internal static class Dart
         var query = op.Params.Where(p => p.In == ParamLocation.Query).ToList();
         if (query.Count > 0)
             call.Add("query: {" + string.Join(", ", query.Select(q => $"'{q.Name}': {QueryValue(q)}")) + "}");
-        if (op.Body is not null) call.Add("body: body.toJson()");
+        if (op.Body is not null) call.Add($"body: {ToJson(op.Body, "body")}");
         if (op.Idempotent) call.Add("idempotent: true");
         if (op.Session != SessionEffect.None) call.Add($"session: SessionChange.{op.Session.ToString().ToLowerInvariant()}");
         call.Add("options: options");
@@ -257,7 +258,7 @@ internal static class Dart
     {
         var positional = new List<string>();
         foreach (var p in op.Params.Where(p => p.In == ParamLocation.Path)) positional.Add($"{Type(p.Type)} {p.Name}");
-        if (op.Body is not null) positional.Add($"{op.Body.Name} body");
+        if (op.Body is not null) positional.Add($"{Type(op.Body)} body");
         var named = op.Params.Where(p => p.In == ParamLocation.Query && (withCursor || p.Name != "cursor"))
             .Select(q => q.Required ? $"required {Type(q.Type)} {q.Name}" : $"{Type(q.Type)}? {q.Name}")
             .Append("RequestOptions? options");
@@ -295,7 +296,7 @@ internal static class Dart
     {
         var args = new List<string>();
         foreach (var p in op.Params.Where(p => p.In == ParamLocation.Path)) args.Add(FromJson(p.Type, $"input['{p.Name}']"));
-        if (op.Body is not null) args.Add($"{op.Body.Name}.fromJson(input['body'] as Map<String, dynamic>)");
+        if (op.Body is not null) args.Add(FromJson(op.Body, "input['body']"));
         foreach (var q in op.Params.Where(p => p.In == ParamLocation.Query && (withCursor || p.Name != "cursor")))
         {
             var source = $"input['{q.Name}']";
@@ -317,6 +318,7 @@ internal static class Dart
         ModelType m => m.Name,
         EnumType e => e.Name,
         JsonValueType => "Object?",
+        DynamicType => "Map<String, Object?>",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 
@@ -334,6 +336,7 @@ internal static class Dart
         ModelType m => $"{m.Name}.fromJson({source} as Map<String, dynamic>)",
         EnumType e => $"{e.Name}.fromJson({source} as String)",
         JsonValueType => source,
+        DynamicType => $"Map<String, Object?>.from({source} as Map<String, dynamic>)",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 
@@ -347,6 +350,7 @@ internal static class Dart
         ModelType => $"{value}.toJson()",
         EnumType => $"{value}.value",
         JsonValueType => value,
+        DynamicType => value,
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 

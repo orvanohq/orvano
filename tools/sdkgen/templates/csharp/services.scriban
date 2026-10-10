@@ -2,6 +2,9 @@
 {{~ if uses_globalization ~}}
 using System.Globalization;
 {{~ end ~}}
+{{~ if uses_nodes ~}}
+using System.Text.Json.Nodes;
+{{~ end ~}}
 
 namespace {{ namespace }};
 {{~ for s in services ~}}

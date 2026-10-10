@@ -26,6 +26,7 @@ import type {
   ConfirmTotpRequest,
   CreatePasskeyRegistrationRequest,
   CreatePasskeySessionRequest,
+  CreateTableRequest,
   CreateTotpRequest,
   CreateUserRecoveryRequest,
   CreateUserRequest,
@@ -189,6 +190,20 @@ export const consoleDispatch: DispatchTable = {
         input.provider as string,
         input.body as UpdateOAuthProviderRequest,
       ),
+  },
+  'consoleDatabases.get': {
+    status: 200,
+    console: (o, input) => o.consoleDatabases.get(input.database as string),
+  },
+  'consoleDatabases.list': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleDatabases.list({
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    consoleAll: (o, input) =>
+      o.consoleDatabases.listAll({ limit: input.limit as number | undefined }),
   },
   'consoleEmailTemplates.get': {
     status: 200,
@@ -412,6 +427,18 @@ export const consoleDispatch: DispatchTable = {
     status: 200,
     console: (o, input) => o.consoleProjects.update(input.body as UpdateProjectRequest),
   },
+  'consoleRows.list': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleRows.list(input.database as string, input.table as string, {
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    consoleAll: (o, input) =>
+      o.consoleRows.listAll(input.database as string, input.table as string, {
+        limit: input.limit as number | undefined,
+      }),
+  },
   'consoleSmtp.delete': {
     status: 204,
     console: (o, _input) => o.consoleSmtp.delete(),
@@ -427,6 +454,27 @@ export const consoleDispatch: DispatchTable = {
   'consoleSmtp.update': {
     status: 200,
     console: (o, input) => o.consoleSmtp.update(input.body as SmtpSettingsInput),
+  },
+  'consoleTables.create': {
+    status: 201,
+    console: (o, input) =>
+      o.consoleTables.create(input.database as string, input.body as CreateTableRequest),
+  },
+  'consoleTables.get': {
+    status: 200,
+    console: (o, input) => o.consoleTables.get(input.database as string, input.table as string),
+  },
+  'consoleTables.list': {
+    status: 200,
+    console: (o, input) =>
+      o.consoleTables.list(input.database as string, {
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    consoleAll: (o, input) =>
+      o.consoleTables.listAll(input.database as string, {
+        limit: input.limit as number | undefined,
+      }),
   },
   'consoleUsers.block': {
     status: 200,

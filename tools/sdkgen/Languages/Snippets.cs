@@ -82,6 +82,7 @@ internal static class Snippets
         MapType m => $"{{ key: {TsValue(m.Value, null, name, contract)} }}",
         ModelType m => "{ " + string.Join(", ", Required(m, contract).Select(p => $"{p.Wire}: {TsValue(p.Type, p.Example, p.Name, contract)}")) + " }",
         JsonValueType => "'value'",
+        DynamicType => "{ title: 'value' }",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 
@@ -102,11 +103,12 @@ internal static class Snippets
         PrimitiveType { Kind: PrimitiveKind.Boolean } => Bool(example) ? "true" : "false",
         PrimitiveType { Kind: PrimitiveKind.Float64 } => Number(example, fraction: true),
         PrimitiveType => Number(example),
-        EnumType e => $"{e.Name}.{Naming.MemberFromWire(EnumValue(e, example, contract))}",
+        EnumType e => $"{e.Name}.{Naming.DartEnumMember(Naming.MemberFromWire(EnumValue(e, example, contract)))}",
         ArrayType a => $"[{DartValue(a.Item, (example as JsonArray)?.FirstOrDefault(), name, contract)}]",
         MapType m => $"{{'key': {DartValue(m.Value, null, name, contract)}}}",
         JsonValueType => "'value'",
-        ModelType m => $"{m.Name}(" + string.Join(", ", Required(m, contract).Select(p => $"{p.Name}: {DartValue(p.Type, p.Example, p.Name, contract)}")) + ")",
+        DynamicType => "{'title': 'value'}",
+        ModelType m => $"{m.Name}(" + string.Join(", ", Required(m, contract).Select(p => $"{Naming.DartMember(p.Name)}: {DartValue(p.Type, p.Example, p.Name, contract)}")) + ")",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 
@@ -121,10 +123,14 @@ internal static class Snippets
     {
         var args = PathParams(op).Concat(RequiredQuery(op)).Select(p => CsValue(p.Type, p.Example, p.Name, contract)).ToList();
         // dotnet format does not wrap lines, so the body gets one property per line here.
-        if (op.Body is not null)
+        if (op.Body is ModelType body)
         {
-            args.Add($"new {op.Body.Name}(\n" + string.Join(",\n", Required(op.Body, contract)
+            args.Add($"new {body.Name}(\n" + string.Join(",\n", Required(body, contract)
                 .Select(p => $"    {Naming.Pascal(p.Name)}: {CsValue(p.Type, p.Example, p.Name, contract)}")) + ")");
+        }
+        else if (op.Body is not null)
+        {
+            args.Add(CsValue(op.Body, null, "body", contract));
         }
 
         return $"orvano.{Naming.Pascal(op.Service)}.{Naming.Pascal(op.Name)}Async({string.Join(", ", args)})";
@@ -142,6 +148,7 @@ internal static class Snippets
         ArrayType a => $"[{CsValue(a.Item, (example as JsonArray)?.FirstOrDefault(), name, contract)}]",
         MapType m => $"new Dictionary<string, {CSharp.Type(m.Value)}> {{ [\"key\"] = {CsValue(m.Value, null, name, contract)} }}",
         JsonValueType => "JsonSerializer.SerializeToElement(\"value\")",
+        DynamicType => "new JsonObject { [\"title\"] = \"value\" }",
         ModelType m => $"new {m.Name}(" + string.Join(", ", Required(m, contract).Select(p => $"{Naming.Pascal(p.Name)}: {CsValue(p.Type, p.Example, p.Name, contract)}")) + ")",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };

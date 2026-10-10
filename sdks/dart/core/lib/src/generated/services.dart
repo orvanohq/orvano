@@ -787,13 +787,69 @@ final class KeysService {
   }
 }
 
+/// Operations in the `rows` service.
+final class RowsService {
+  /// Creates the service over [client].
+  RowsService(this._client);
+
+  final Client _client;
+
+  /// Creates a row and answers it as stored. `id` may be sent (a uuid); `created_at` and `updated_at` never. An API key
+  /// needs `rows.write`; other callers are refused until the table has permission rules.
+  Future<Map<String, Object?>> create(
+    String database,
+    String table,
+    Map<String, Object?> body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/databases/${Uri.encodeComponent(database)}/tables/${Uri.encodeComponent(table)}/rows',
+      body: body,
+      options: options,
+    );
+    return Map<String, Object?>.from(json as Map<String, dynamic>);
+  }
+
+  /// Lists rows, by `created_at` then `id` ascending. An API key needs `rows.read`; other callers are refused until
+  /// the table has permission rules.
+  Future<RowPage> list(
+    String database,
+    String table, {
+    String? cursor,
+    int? limit,
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/databases/${Uri.encodeComponent(database)}/tables/${Uri.encodeComponent(table)}/rows',
+      query: {'cursor': cursor, 'limit': limit?.toString()},
+      options: options,
+    );
+    return RowPage.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Every item of [list], walking all pages: `await for (final item in ...)`.
+  Stream<Map<String, Object?>> listAll(
+    String database,
+    String table, {
+    int? limit,
+    RequestOptions? options,
+  }) => paginate(
+    (cursor) =>
+        list(database, table, cursor: cursor, limit: limit, options: options),
+    (page) => (page.items, page.nextCursor),
+  );
+}
+
 /// Every service in this package, on one object: `orvano.health.get()`.
 base class Orvano {
   /// Creates the services over [client].
   Orvano(this.client)
     : account = AccountService(client),
       health = HealthService(client),
-      keys = KeysService(client);
+      keys = KeysService(client),
+      rows = RowsService(client);
 
   /// The client every service sends through.
   final Client client;
@@ -806,4 +862,7 @@ base class Orvano {
 
   /// Operations in the `keys` service.
   final KeysService keys;
+
+  /// Operations in the `rows` service.
+  final RowsService rows;
 }

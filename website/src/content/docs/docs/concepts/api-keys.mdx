@@ -21,6 +21,10 @@ A key can do only what its scopes allow. Pick the fewest scopes your server need
 |---|---|
 | `users.read` | Read a project's users and their sessions: [`users.list`](/docs/api/operations/userslist/), [`users.get`](/docs/api/operations/usersget/), [`users.listSessions`](/docs/api/operations/userslistsessions/). |
 | `users.write` | Create, change, and delete users, end their sessions, and send them verification or reset emails: [`users.create`](/docs/api/operations/userscreate/), [`users.block`](/docs/api/operations/usersblock/), [`users.delete`](/docs/api/operations/usersdelete/), and the rest of `users`. |
+| `tables.read` | Read a project's databases and tables with their columns: [`databases.get`](/docs/api/operations/databasesget/), [`tables.get`](/docs/api/operations/tablesget/), and their lists. |
+| `tables.write` | Create tables: [`tables.create`](/docs/api/operations/tablescreate/). |
+| `rows.read` | Read the rows of any table in the project: [`rows.list`](/docs/api/operations/rowslist/). |
+| `rows.write` | Create rows in any table in the project: [`rows.create`](/docs/api/operations/rowscreate/). |
 
 A write scope doesn't include read: a server that creates users and then reads them needs both. Each operation's page in the [API reference](/docs/api/operations/usersget/) names the scope it needs.
 

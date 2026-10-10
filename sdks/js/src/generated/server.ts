@@ -2,17 +2,23 @@
 import type { Client, RequestOptions } from '../runtime/client.js'
 import { paginate } from '../runtime/pagination.js'
 import type {
+  CreateTableRequest,
   CreateUserRecoveryRequest,
   CreateUserRequest,
   CreateUserVerificationRequest,
+  Database,
+  DatabasePage,
   Health,
   IdentityList,
   Jwks,
   MfaStatus,
   OpenIdConfiguration,
   PasskeyList,
+  RowPage,
   Session,
   SessionPage,
+  Table,
+  TablePage,
   UpdateEmailVerificationRequest,
   UpdateUserEmailRequest,
   User,
@@ -30,6 +36,42 @@ export class AccountService {
   /** Gets the signed in user. A server can call it with a user's access token to check that the session is still active. */
   get(options?: RequestOptions): Promise<User> {
     return this.#client.request<User>({ method: 'GET', path: '/v1/account' }, options)
+  }
+}
+
+/** Operations in the `databases` service. */
+export class DatabasesService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /** Gets a database by slug. */
+  get(database: string, options?: RequestOptions): Promise<Database> {
+    return this.#client.request<Database>(
+      { method: 'GET', path: `/v1/databases/${encodeURIComponent(database)}` },
+      options,
+    )
+  }
+
+  /** Lists the project's databases: `main` first, then the rest by slug. */
+  list(
+    query?: { cursor?: string | undefined; limit?: number | undefined },
+    options?: RequestOptions,
+  ): Promise<DatabasePage> {
+    return this.#client.request<DatabasePage>(
+      { method: 'GET', path: '/v1/databases', query },
+      options,
+    )
+  }
+
+  /** Every item of `list`, walking all pages: `for await (const item of ...)`. */
+  listAll(
+    query?: { limit?: number | undefined },
+    options?: RequestOptions,
+  ): AsyncGenerator<Database> {
+    return paginate((cursor) => this.list({ ...query, cursor }, options))
   }
 }
 
@@ -78,6 +120,117 @@ export class KeysService {
       },
       options,
     )
+  }
+}
+
+/** Operations in the `rows` service. */
+export class RowsService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /**
+   * Creates a row and answers it as stored. `id` may be sent (a uuid); `created_at` and `updated_at` never. An API key
+   * needs `rows.write`; other callers are refused until the table has permission rules.
+   */
+  create(
+    database: string,
+    table: string,
+    body: Record<string, unknown>,
+    options?: RequestOptions,
+  ): Promise<Record<string, unknown>> {
+    return this.#client.request<Record<string, unknown>>(
+      {
+        method: 'POST',
+        path: `/v1/databases/${encodeURIComponent(database)}/tables/${encodeURIComponent(table)}/rows`,
+        body,
+      },
+      options,
+    )
+  }
+
+  /**
+   * Lists rows, by `created_at` then `id` ascending. An API key needs `rows.read`; other callers are refused until
+   * the table has permission rules.
+   */
+  list(
+    database: string,
+    table: string,
+    query?: { cursor?: string | undefined; limit?: number | undefined },
+    options?: RequestOptions,
+  ): Promise<RowPage> {
+    return this.#client.request<RowPage>(
+      {
+        method: 'GET',
+        path: `/v1/databases/${encodeURIComponent(database)}/tables/${encodeURIComponent(table)}/rows`,
+        query,
+      },
+      options,
+    )
+  }
+
+  /** Every item of `list`, walking all pages: `for await (const item of ...)`. */
+  listAll(
+    database: string,
+    table: string,
+    query?: { limit?: number | undefined },
+    options?: RequestOptions,
+  ): AsyncGenerator<Record<string, unknown>> {
+    return paginate((cursor) => this.list(database, table, { ...query, cursor }, options))
+  }
+}
+
+/** Operations in the `tables` service. */
+export class TablesService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /**
+   * Creates a table with `id uuid` (the primary key, `uuidv7()` by default), `created_at`, `updated_at`, then your
+   * columns in order.
+   */
+  create(database: string, body: CreateTableRequest, options?: RequestOptions): Promise<Table> {
+    return this.#client.request<Table>(
+      { method: 'POST', path: `/v1/databases/${encodeURIComponent(database)}/tables`, body },
+      options,
+    )
+  }
+
+  /** Gets a table with its columns, read live from Postgres. */
+  get(database: string, table: string, options?: RequestOptions): Promise<Table> {
+    return this.#client.request<Table>(
+      {
+        method: 'GET',
+        path: `/v1/databases/${encodeURIComponent(database)}/tables/${encodeURIComponent(table)}`,
+      },
+      options,
+    )
+  }
+
+  /** Lists a database's tables by name, with their columns, read live from Postgres. */
+  list(
+    database: string,
+    query?: { cursor?: string | undefined; limit?: number | undefined },
+    options?: RequestOptions,
+  ): Promise<TablePage> {
+    return this.#client.request<TablePage>(
+      { method: 'GET', path: `/v1/databases/${encodeURIComponent(database)}/tables`, query },
+      options,
+    )
+  }
+
+  /** Every item of `list`, walking all pages: `for await (const item of ...)`. */
+  listAll(
+    database: string,
+    query?: { limit?: number | undefined },
+    options?: RequestOptions,
+  ): AsyncGenerator<Table> {
+    return paginate((cursor) => this.list(database, { ...query, cursor }, options))
   }
 }
 
@@ -330,18 +483,27 @@ export class Orvano {
   readonly client: Client
   /** Operations in the `account` service. */
   readonly account: AccountService
+  /** Operations in the `databases` service. */
+  readonly databases: DatabasesService
   /** Operations in the `health` service. */
   readonly health: HealthService
   /** Operations in the `keys` service. */
   readonly keys: KeysService
+  /** Operations in the `rows` service. */
+  readonly rows: RowsService
+  /** Operations in the `tables` service. */
+  readonly tables: TablesService
   /** Operations in the `users` service. */
   readonly users: UsersService
 
   constructor(client: Client) {
     this.client = client
     this.account = new AccountService(client)
+    this.databases = new DatabasesService(client)
     this.health = new HealthService(client)
     this.keys = new KeysService(client)
+    this.rows = new RowsService(client)
+    this.tables = new TablesService(client)
     this.users = new UsersService(client)
   }
 }

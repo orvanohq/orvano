@@ -1,0 +1,7 @@
+## Why it happens
+
+The API changes rows only in tables whose primary key is the standard `id uuid`. A table with another primary key is read only through the API, and a table with no primary key can't be used at all. The table may also belong to another Postgres role than the project's.
+
+## How to fix
+
+Create tables through the console or `tables.create`, which always add the standard `id`. For a table you made in SQL, add a primary key to read it, or change rows in SQL.

@@ -1,0 +1,70 @@
+name: a server creates a table in main, then creates and pages through its rows
+requires: []
+steps:
+  # Every project has `main` (spec 0015, AC-1).
+  - op: databases.get
+    as: server
+    input: { database: main }
+    expect:
+      status: 200
+      body: { id: main, slug: main, name: Main, status: active, main: true, createdAt: null }
+  - op: tables.create
+    as: server
+    input:
+      database: main
+      body:
+        name: 'tasks_${unique}'
+        columns:
+          - { name: title, type: text, required: true }
+          - { name: views, type: bigint, default: { kind: value, value: '0' } }
+          - { name: due_at, type: timestamp }
+    expect:
+      status: 201
+      body: { name: 'tasks_${unique}', database: main, readable: true, writable: true }
+  # The table is usable on the very next call; bigint travels as a string, timestamps in UTC with microseconds (AC-16).
+  - op: rows.create
+    as: server
+    input:
+      database: main
+      table: 'tasks_${unique}'
+      body: { title: first, views: '9007199254740993', due_at: '2026-10-10T10:30:00.5+02:00' }
+    expect:
+      status: 201
+      body: { title: first, views: '9007199254740993', due_at: '2026-10-10T08:30:00.500000Z' }
+    save:
+      firstId: $.id
+  - op: rows.create
+    as: server
+    input:
+      database: main
+      table: 'tasks_${unique}'
+      body: { title: second }
+    expect:
+      status: 201
+      body: { title: second, views: '0', due_at: null }
+    save:
+      secondId: $.id
+  - op: rows.create
+    as: server
+    input:
+      database: main
+      table: 'tasks_${unique}'
+      body: { title: null, nope: 1 }
+    expect: { status: 400, code: invalid_row }
+  # Rows come back in created order, one page of one row at a time (AC-18).
+  - op: rows.list
+    as: server
+    input: { database: main, table: 'tasks_${unique}', limit: 1 }
+    paginate: true
+    expect:
+      status: 200
+      body:
+        items: [{ id: '${firstId}', title: first }, { id: '${secondId}', title: second }]
+  - op: tables.get
+    as: server
+    input: { database: main, table: 'nothing_${unique}' }
+    expect: { status: 404, code: table_not_found }
+  - op: databases.get
+    as: server
+    input: { database: 'nothing${unique}' }
+    expect: { status: 404, code: database_not_found }

@@ -1,0 +1,144 @@
+---
+title: Databases and tables
+description: "Real Postgres tables you create in the console or from server code, and how rows travel as JSON."
+sidebar:
+  order: 1
+---
+
+import { TabItem, Tabs } from '@astrojs/starlight/components'
+
+Every project gets real Postgres tables. You create a table in the console or from your server, and every SDK can use it at once through one data API. Tables live in a database: every project has `main`, and SDK calls use it when you name none.
+
+:::note[Apps come later]
+Until tables have permission rules, only your server (with an API key) and the console can read and write rows. Calls from apps, signed in or not, get [`table_access_denied`](/errors/table_access_denied/) for every table.
+:::
+
+## Databases
+
+A database is a Postgres schema of your project. [`databases.get`](/docs/api/operations/databasesget/) and `databases.list` read them with an API key that has `tables.read`. `main` is always there, always active, and can't be renamed or deleted.
+
+## Create a table
+
+Create tables in the console under **Databases**, or from your server with [`tables.create`](/docs/api/operations/tablescreate/) and a key that has `tables.write`. Every table starts with three system columns: `id` (a uuid, the primary key, a time ordered `uuidv7()` by default), `created_at`, and `updated_at`, which moves forward on every change. Your columns follow, in order.
+
+<Tabs syncKey="server-sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const table = await orvano.tables.create('main', {
+  name: 'tasks',
+  columns: [
+    { name: 'title', type: 'text', required: true },
+    { name: 'due_at', type: 'timestamp' },
+    { name: 'views', type: 'bigint', default: { kind: 'value', value: '0' } },
+  ],
+})
+```
+
+  </TabItem>
+  <TabItem label="Dart">
+
+```dart
+final table = await orvano.tables.create(
+  'main',
+  CreateTableRequest(
+    name: 'tasks',
+    columns: [
+      ColumnInput(name: 'title', type: ColumnType.text, required: true),
+      ColumnInput(name: 'due_at', type: ColumnType.timestamp),
+      ColumnInput(
+        name: 'views',
+        type: ColumnType.bigint,
+        defaultValue: ColumnDefault(kind: DefaultKind.valueValue, value: '0'),
+      ),
+    ],
+  ),
+);
+```
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+var table = await orvano.Tables.CreateAsync("main", new CreateTableRequest("tasks",
+[
+    new ColumnInput("title", ColumnType.Text, Required: true),
+    new ColumnInput("due_at", ColumnType.Timestamp),
+    new ColumnInput("views", ColumnType.Bigint, Default: new ColumnDefault(DefaultKind.Value, "0")),
+]));
+```
+
+  </TabItem>
+</Tabs>
+
+Names use lowercase letters, digits, and `_`, start with a letter, and can't be a reserved Postgres word (such as `select` or `user`) or start with `pg_` or `orvano`. A column can be `required` (NOT NULL) or `unique`, and take a default: a fixed `value`, `now` for times and dates, or `uuidv7` and `random_uuid` for uuids. A fixed value is checked against the column's type when you create the table.
+
+[`tables.get`](/docs/api/operations/tablesget/) and `tables.list` read the structure live from Postgres, so tables and columns you make in SQL show up too. A table whose primary key isn't the standard `id uuid` is read only through the API, and one without a primary key can't be used ([`table_not_writable`](/errors/table_not_writable/)).
+
+## Column types
+
+Rows travel as JSON objects keyed by column name. Each type has one form:
+
+| Type | Postgres | JSON form |
+|---|---|---|
+| `text` | `text` | string |
+| `integer` | `int4` | number, a whole one in range (`1.0` and `1e3` are refused) |
+| `bigint` | `int8` | string on output; a string or a whole number on input |
+| `float` | `float8` | number; stored `NaN` and infinities come back as the strings `"NaN"`, `"Infinity"`, `"-Infinity"` |
+| `decimal` | `numeric` | string on output, every digit kept; a string or a number on input |
+| `boolean` | `boolean` | `true` or `false` |
+| `timestamp` | `timestamptz` | ISO 8601 in UTC with microseconds on output (`2026-10-10T08:30:00.123456Z`); any ISO 8601 with an offset on input |
+| `date` | `date` | `YYYY-MM-DD` |
+| `uuid` | `uuid` | string, lowercase on output |
+| `json` | `jsonb` | any JSON value (a JSON `null` is stored as SQL NULL) |
+| `text[]`, `integer[]`, `uuid[]` | arrays | JSON arrays of the element's form, `null` elements allowed |
+| `other` | anything else | its Postgres text form, read only |
+
+`null` is `null` for every type.
+
+## Create and list rows
+
+[`rows.create`](/docs/api/operations/rowscreate/) takes the row's values and answers the row as stored, with its `id`, `created_at`, and `updated_at`. Send `id` (a uuid) to choose it yourself; `created_at` and `updated_at` are never accepted. A bad value answers [`invalid_row`](/errors/invalid_row/), with `errors` naming every bad field, and a duplicate unique value answers [`row_conflict`](/errors/row_conflict/).
+
+[`rows.list`](/docs/api/operations/rowslist/) pages through rows in created order, 25 at a time by default (up to 100). `listAll` walks every page. Writing rows needs `rows.write`; reading needs `rows.read`.
+
+<Tabs syncKey="server-sdk">
+  <TabItem label="JavaScript">
+
+```ts
+const row = await orvano.rows.create('main', 'tasks', { title: 'Write the spec' })
+
+for await (const task of orvano.rows.listAll('main', 'tasks')) {
+  console.log(task.id, task.title)
+}
+```
+
+  </TabItem>
+  <TabItem label="Dart">
+
+```dart
+final row = await orvano.rows.create('main', 'tasks', {'title': 'Write the spec'});
+
+await for (final task in orvano.rows.listAll('main', 'tasks')) {
+  print('${task['id']} ${task['title']}');
+}
+```
+
+  </TabItem>
+  <TabItem label=".NET">
+
+```csharp
+var row = await orvano.Rows.CreateAsync("main", "tasks", new JsonObject { ["title"] = "Write the spec" });
+
+await foreach (var task in orvano.Rows.ListAllAsync("main", "tasks"))
+{
+    Console.WriteLine($"{task["id"]} {task["title"]}");
+}
+```
+
+  </TabItem>
+</Tabs>
+
+## Events
+
+Creating a table writes `databases.table.created`, and creating a row writes `databases.row.created` with the row's ID and the names of its columns, never their values. Rows you change in SQL write no event.

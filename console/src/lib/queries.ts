@@ -57,6 +57,15 @@ export const keys = {
   /** Whether the project has any platform (spec 0007, AC-21). */
   anyPlatform: (projectId: string) =>
     ['console', 'projects', projectId, 'platforms', 'any'] as const,
+  /** The project's databases, `main` first (spec 0015, AC-31). */
+  databases: (projectId: string) => ['console', 'projects', projectId, 'databases'] as const,
+  /** One database's tables, and each table's structure and rows (spec 0015, AC-32, AC-33). */
+  tables: (projectId: string, database: string) =>
+    ['console', 'projects', projectId, 'databases', database, 'tables'] as const,
+  table: (projectId: string, database: string, table: string) =>
+    ['console', 'projects', projectId, 'databases', database, 'tables', table] as const,
+  rows: (projectId: string, database: string, table: string) =>
+    ['console', 'projects', projectId, 'databases', database, 'tables', table, 'rows'] as const,
 }
 
 /**
@@ -411,6 +420,57 @@ export function emailsQuery(projectId: string) {
     queryKey: keys.emails(projectId),
     queryFn: ({ pageParam, signal }) =>
       projectClient(projectId).consoleEmails.list({ cursor: pageParam, limit: 25 }, { signal }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+}
+
+/** A project's databases, `main` first, then by slug (spec 0015, AC-31). */
+export function databasesQuery(projectId: string) {
+  return infiniteQueryOptions({
+    queryKey: keys.databases(projectId),
+    queryFn: ({ pageParam, signal }) =>
+      projectClient(projectId).consoleDatabases.list({ cursor: pageParam, limit: 25 }, { signal }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+}
+
+/** A database's tables by name, 25 per page, read live from Postgres (spec 0015, AC-32). */
+export function tablesQuery(projectId: string, database: string) {
+  return infiniteQueryOptions({
+    queryKey: keys.tables(projectId, database),
+    queryFn: ({ pageParam, signal }) =>
+      projectClient(projectId).consoleTables.list(
+        database,
+        { cursor: pageParam, limit: 25 },
+        { signal },
+      ),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+}
+
+/** One table with its columns (spec 0015, AC-6). */
+export function tableQuery(projectId: string, database: string, table: string) {
+  return queryOptions({
+    queryKey: keys.table(projectId, database, table),
+    queryFn: ({ signal }) =>
+      projectClient(projectId).consoleTables.get(database, table, { signal }),
+  })
+}
+
+/** A table's rows in created order, 25 per page (spec 0015, AC-33). */
+export function rowsQuery(projectId: string, database: string, table: string) {
+  return infiniteQueryOptions({
+    queryKey: keys.rows(projectId, database, table),
+    queryFn: ({ pageParam, signal }) =>
+      projectClient(projectId).consoleRows.list(
+        database,
+        table,
+        { cursor: pageParam, limit: 25 },
+        { signal },
+      ),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   })

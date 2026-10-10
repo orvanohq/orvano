@@ -13,7 +13,16 @@ export { OrvanoError, browserPasskeys } from '@orvano/js'
 export type { ClientConfig, RequestOptions } from '@orvano/js'
 // Models console operations share with the app SDK, so the console imports every model from here.
 export type {
+  Column,
+  ColumnDefault,
+  ColumnInput,
+  ColumnType,
+  CreateTableRequest,
   CreateUserRequest,
+  Database,
+  DatabasePage,
+  DatabaseStatus,
+  DefaultKind,
   Identity,
   IdentityList,
   MfaChallenge,
@@ -28,7 +37,10 @@ export type {
   RecoveryCodes,
   Session,
   SessionMethod,
+  RowPage,
   SessionPage,
+  Table,
+  TablePage,
   TotpSetup,
   User,
   UserPage,

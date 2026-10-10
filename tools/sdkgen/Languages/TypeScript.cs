@@ -246,7 +246,7 @@ internal static class TypeScript
     {
         var parameters = new List<string>();
         foreach (var p in op.Params.Where(p => p.In == ParamLocation.Path)) parameters.Add($"{p.Name}: {Type(p.Type)}");
-        if (op.Body is not null) parameters.Add($"body: {op.Body.Name}");
+        if (op.Body is not null) parameters.Add($"body: {Type(op.Body)}");
         var query = op.Params.Where(p => p.In == ParamLocation.Query && (withCursor || p.Name != "cursor")).ToList();
         if (query.Count > 0)
         {
@@ -283,7 +283,7 @@ internal static class TypeScript
     {
         var args = new List<string>();
         foreach (var p in op.Params.Where(p => p.In == ParamLocation.Path)) args.Add($"input.{p.Name} as {Type(p.Type)}");
-        if (op.Body is not null) args.Add($"input.body as {op.Body.Name}");
+        if (op.Body is not null) args.Add($"input.body as {Type(op.Body)}");
         var query = op.Params.Where(p => p.In == ParamLocation.Query && (withCursor || p.Name != "cursor")).ToList();
         if (query.Count > 0)
             args.Add("{ " + string.Join(", ", query.Select(q => $"{q.Name}: input.{q.Name} as {Type(q.Type)}{(q.Required ? "" : " | undefined")}")) + " }");
@@ -295,7 +295,7 @@ internal static class TypeScript
         Name = name,
         Doc = doc,
         Entries = entries,
-        Imports = Imports(operations.Where(o => o.Body is not null).Select(o => o.Body!.Name), module),
+        Imports = Imports(operations.SelectMany(o => Mentioned(o.Body)), module),
     };
 
     public static string Type(TypeRef type) => type switch
@@ -308,6 +308,7 @@ internal static class TypeScript
         ModelType m => m.Name,
         EnumType e => e.Name,
         JsonValueType => "unknown",
+        DynamicType => "Record<string, unknown>",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 

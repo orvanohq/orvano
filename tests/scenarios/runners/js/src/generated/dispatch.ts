@@ -31,6 +31,7 @@ import type {
   CreatePasskeySessionRequest,
   CreatePasswordSessionRequest,
   CreateRecoveryRequest,
+  CreateTableRequest,
   CreateTotpRequest,
   CreateUserRecoveryRequest,
   CreateUserRequest,
@@ -280,6 +281,21 @@ export const dispatch: DispatchTable = {
     status: 200,
     client: (o, input) => o.account.verifyMfa(input.body as VerifyMfaRequest),
   },
+  'databases.get': {
+    status: 200,
+    server: (o, input) => o.databases.get(input.database as string),
+    scope: 'tables.read',
+  },
+  'databases.list': {
+    status: 200,
+    server: (o, input) =>
+      o.databases.list({
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    serverAll: (o, input) => o.databases.listAll({ limit: input.limit as number | undefined }),
+    scope: 'tables.read',
+  },
   'health.get': {
     status: 200,
     client: (o, _input) => o.health.get(),
@@ -294,6 +310,66 @@ export const dispatch: DispatchTable = {
     status: 200,
     client: (o, input) => o.keys.getOpenIdConfiguration(input.projectId as string),
     server: (o, input) => o.keys.getOpenIdConfiguration(input.projectId as string),
+  },
+  'rows.create': {
+    status: 201,
+    client: (o, input) =>
+      o.rows.create(
+        input.database as string,
+        input.table as string,
+        input.body as Record<string, unknown>,
+      ),
+    server: (o, input) =>
+      o.rows.create(
+        input.database as string,
+        input.table as string,
+        input.body as Record<string, unknown>,
+      ),
+    scope: 'rows.write',
+  },
+  'rows.list': {
+    status: 200,
+    client: (o, input) =>
+      o.rows.list(input.database as string, input.table as string, {
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    server: (o, input) =>
+      o.rows.list(input.database as string, input.table as string, {
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    clientAll: (o, input) =>
+      o.rows.listAll(input.database as string, input.table as string, {
+        limit: input.limit as number | undefined,
+      }),
+    serverAll: (o, input) =>
+      o.rows.listAll(input.database as string, input.table as string, {
+        limit: input.limit as number | undefined,
+      }),
+    scope: 'rows.read',
+  },
+  'tables.create': {
+    status: 201,
+    server: (o, input) =>
+      o.tables.create(input.database as string, input.body as CreateTableRequest),
+    scope: 'tables.write',
+  },
+  'tables.get': {
+    status: 200,
+    server: (o, input) => o.tables.get(input.database as string, input.table as string),
+    scope: 'tables.read',
+  },
+  'tables.list': {
+    status: 200,
+    server: (o, input) =>
+      o.tables.list(input.database as string, {
+        cursor: input.cursor as string | undefined,
+        limit: input.limit as number | undefined,
+      }),
+    serverAll: (o, input) =>
+      o.tables.listAll(input.database as string, { limit: input.limit as number | undefined }),
+    scope: 'tables.read',
   },
   'test.conflict': {
     status: 204,

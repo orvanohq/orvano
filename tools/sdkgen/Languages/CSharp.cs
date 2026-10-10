@@ -53,6 +53,7 @@ internal static partial class CSharp
                 ConstructorVisibility = "internal",
                 PartialClient = true,
                 UsesGlobalization = UsesGlobalization(services),
+                UsesNodes = OperationsMentionDynamic(sdkSlice.Operations),
             })),
             new("sdks/dotnet/src/Orvano/Generated/OrvanoJsonContext.cs", renderer.Render("csharp", "json_context", new
             {
@@ -60,6 +61,7 @@ internal static partial class CSharp
                 Name = SdkContext,
                 Summary = "Source generated JSON metadata for every contract type, used on every target framework.",
                 Types = SerializableTypes(sdkSlice).Append("OrvanoProblem").ToList(),
+                UsesNodes = SerializableTypes(sdkSlice).Contains("JsonObject"),
             })),
             new("sdks/dotnet/src/Orvano/Generated/ErrorCodes.cs", renderer.Render("csharp", "error_codes", new
             {
@@ -123,6 +125,7 @@ internal static partial class CSharp
                 ConstructorVisibility = "public",
                 PartialClient = false,
                 UsesGlobalization = UsesGlobalization(testServices),
+                UsesNodes = OperationsMentionDynamic(testSlice.Operations),
             })),
             new("tests/scenarios/runners/dotnet/Generated/TestJsonContext.cs", renderer.Render("csharp", "json_context", new
             {
@@ -130,6 +133,7 @@ internal static partial class CSharp
                 Name = TestContext,
                 Summary = "Source generated JSON metadata for the test types the runner sends and decodes.",
                 Types = SerializableTypes(testSlice),
+                UsesNodes = SerializableTypes(testSlice).Contains("JsonObject"),
             })),
             new("tests/scenarios/runners/dotnet/Generated/TestErrorCodes.cs", renderer.Render("csharp", "error_codes", new
             {
@@ -142,7 +146,11 @@ internal static partial class CSharp
                 Declaration = "public static class TestEvents",
                 Events = Events(testTypes, TestContext),
             })),
-            new("tests/scenarios/runners/dotnet/Generated/Dispatch.cs", renderer.Render("csharp", "dispatch", new { Entries = dispatch })),
+            new("tests/scenarios/runners/dotnet/Generated/Dispatch.cs", renderer.Render("csharp", "dispatch", new
+            {
+                Entries = dispatch,
+                UsesNodes = OperationsMentionDynamic(contract.Operations.Where(o => o.Audience != Audience.Console && o.IsServer).Select(o => o with { Result = null, PageItem = null })),
+            })),
         ]);
     }
 
@@ -165,6 +173,7 @@ internal static partial class CSharp
         Visibility = visibility,
         // JsonElement (any JSON value) and the enum converters need System.Text.Json itself.
         UsesJson = slice.Enums.Count > 0 || slice.Models.Any(m => m.Properties.Any(p => MentionsJsonValue(p.Type))),
+        UsesNodes = slice.Models.Any(m => m.Properties.Any(p => MentionsDynamic(p.Type))),
         Enums = slice.Enums.Select(e => new EnumDef(
             Xml(Summary(e.Doc, e.Name)),
             e.Name,
@@ -184,6 +193,18 @@ internal static partial class CSharp
             })])).ToList(),
     };
 
+    /// <summary>True when a type is or holds an open object, whose <c>JsonObject</c> needs <c>System.Text.Json.Nodes</c>.</summary>
+    private static bool MentionsDynamic(TypeRef? type) => type switch
+    {
+        DynamicType => true,
+        ArrayType a => MentionsDynamic(a.Item),
+        MapType m => MentionsDynamic(m.Value),
+        _ => false,
+    };
+
+    private static bool OperationsMentionDynamic(IEnumerable<ContractOperation> operations) =>
+        operations.Any(o => MentionsDynamic(o.Body) || MentionsDynamic(o.Result) || MentionsDynamic(o.PageItem));
+
     private static bool MentionsJsonValue(TypeRef type) => type switch
     {
         JsonValueType => true,
@@ -198,7 +219,11 @@ internal static partial class CSharp
         foreach (var m in slice.Models) types.Add(m.Name);
         foreach (var e in slice.Enums) types.Add(e.Name);
         foreach (var op in slice.Operations)
-            if (op.Result is ArrayType or MapType) types.Add(Type(op.Result));
+        {
+            if (op.Result is ArrayType or MapType or DynamicType) types.Add(Type(op.Result));
+            if (op.Body is DynamicType) types.Add(Type(op.Body));
+        }
+
         return [.. types];
     }
 
@@ -223,7 +248,7 @@ internal static partial class CSharp
 
         if (op.Body is not null)
         {
-            parameters.Add($"{op.Body.Name} body");
+            parameters.Add($"{Type(op.Body)} body");
             docs.Add("<param name=\"body\">The request body.</param>");
         }
 
@@ -255,7 +280,7 @@ internal static partial class CSharp
         request.Add(query.Count == 0
             ? "null"
             : "[" + string.Join(", ", query.Select(q => $"new({Naming.CsString(q.Name)}, {(q.Required || q.Type.Kind == PrimitiveKind.String ? QueryText(q) : $"{q.Name} is null ? null : {QueryText(q, ".Value")}")})")) + "]");
-        request.Add(op.Body is null ? "null" : $"OrvanoRequest.Json(body, {context}.Default.{op.Body.Name})");
+        request.Add(op.Body is null ? "null" : $"OrvanoRequest.Json(body, {context}.Default.{JsonInfoName(op.Body)})");
         request.Add(op.Idempotent ? "true" : "false");
 
         var name = Naming.Pascal(op.Name);
@@ -298,7 +323,7 @@ internal static partial class CSharp
         var args = new List<string>();
         foreach (var p in op.Params.Where(p => p.In == ParamLocation.Path).Concat(op.Params.Where(p => p.In == ParamLocation.Query && p.Required)))
             args.Add($"Args.Required<{Type(p.Type)}>(input, {Naming.CsString(p.Name)})");
-        if (op.Body is not null) args.Add($"Args.Required<{op.Body.Name}>(input, \"body\")");
+        if (op.Body is not null) args.Add($"Args.Required<{Type(op.Body)}>(input, \"body\")");
         foreach (var p in op.Params.Where(p => p.In == ParamLocation.Query && !p.Required && (withCursor || p.Name != "cursor")))
             args.Add($"{p.Name}: Args.Optional<{Type(p.Type)}?>(input, {Naming.CsString(p.Name)})");
         args.Add("cancellationToken: ct");
@@ -330,6 +355,7 @@ internal static partial class CSharp
         ModelType m => m.Name,
         EnumType e => e.Name,
         JsonValueType => "JsonElement",
+        DynamicType => "JsonObject",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 
@@ -344,6 +370,7 @@ internal static partial class CSharp
         ModelType m => m.Name,
         EnumType e => e.Name,
         JsonValueType => "JsonElement",
+        DynamicType => "JsonObject",
         _ => throw new InvalidOperationException($"unmapped type {type}"),
     };
 

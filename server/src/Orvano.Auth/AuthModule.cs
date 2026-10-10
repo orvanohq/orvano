@@ -68,6 +68,7 @@ internal sealed class AuthModule : IOrvanoModule
         services.AddSingleton<PasswordlessService>();
         services.AddSingleton<EmailChangeService>();
         services.AddSingleton<IConsoleSessions, ConsoleSessionChecks>();
+        services.AddSingleton<IAppCallerResolver, AppCallerResolver>();
         services.AddSingleton<OAuthCallbacks>();
         services.AddSingleton<ProviderSettings>();
         services.AddSingleton<IdTokens>();

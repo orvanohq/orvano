@@ -19,6 +19,7 @@ public class TypeMappingTests
         "enum Kind" => new EnumType("Kind"),
         "unknown" => JsonValueType.Instance,
         "Record<unknown>" => new MapType(JsonValueType.Instance),
+        "x-orvano-dynamic" => DynamicType.Instance,
         _ => throw new ArgumentOutOfRangeException(nameof(name), name, null),
     };
 
@@ -33,11 +34,51 @@ public class TypeMappingTests
     [InlineData("enum Kind", "Kind", "Kind", "Kind")]
     [InlineData("unknown", "unknown", "Object?", "JsonElement")]
     [InlineData("Record<unknown>", "Record<string, unknown>", "Map<String, Object?>", "IReadOnlyDictionary<string, JsonElement>")]
+    [InlineData("x-orvano-dynamic", "Record<string, unknown>", "Map<String, Object?>", "JsonObject")] // spec 0015, AC-28
     public void Maps_each_contract_shape_to_every_language(string shape, string ts, string dart, string cs)
     {
         var type = Shape(shape);
 
         Assert.Equal((ts, dart, cs), (TypeScript.Type(type), Dart.Type(type), CSharp.Type(type)));
+    }
+
+    [Theory] // spec 0015: an array type's wire name never collides with its element's, and Dart's reserved words get a suffix
+    [InlineData("text[]", "textArray")]
+    [InlineData("random_uuid", "randomUuid")]
+    [InlineData("users.read", "usersRead")]
+    public void Names_enum_members_from_wire_values(string wire, string member)
+    {
+        Assert.Equal(member, Naming.MemberFromWire(wire));
+    }
+
+    [Theory]
+    [InlineData("default", "defaultValue")]
+    [InlineData("title", "title")]
+    public void Escapes_dart_reserved_words_in_members(string name, string member)
+    {
+        Assert.Equal(member, Naming.DartMember(name));
+        Assert.Equal("valueValue", Naming.DartEnumMember("value"));
+        Assert.Equal("now", Naming.DartEnumMember("now"));
+    }
+
+    [Fact]
+    public void Sends_and_answers_an_open_object_in_every_language() // spec 0015, AC-28
+    {
+        var contract = new ApiContract("0.0.0",
+            [new("rows.create", "rows", "create", "POST", "/v1/rows", Audience.Both, null, [], DynamicType.Instance, 201, DynamicType.Instance, false, false, null)],
+            [], [], []);
+        var renderer = Repo.Renderer;
+
+        var ts = File(TypeScript.Generate(contract, renderer), "sdks/js/src/generated/server.ts");
+        var dart = File(Dart.Generate(contract, renderer), "sdks/dart/core/lib/src/generated/services.dart");
+        var cs = File(CSharp.Generate(contract, renderer), "sdks/dotnet/src/Orvano/Generated/Services.cs");
+
+        Assert.Contains("create(body: Record<string, unknown>, options?: RequestOptions): Promise<Record<string, unknown>>", ts, StringComparison.Ordinal);
+        Assert.Contains("Future<Map<String, Object?>> create(Map<String, Object?> body, {RequestOptions? options})", dart, StringComparison.Ordinal);
+        Assert.Contains("body: body,", dart, StringComparison.Ordinal);
+        Assert.Contains("Task<JsonObject> CreateAsync(JsonObject body", cs, StringComparison.Ordinal);
+        Assert.Contains("using System.Text.Json.Nodes;", cs, StringComparison.Ordinal);
+        Assert.Contains("OrvanoJsonContext.Default.JsonObject", cs, StringComparison.Ordinal);
     }
 
     private static readonly ContractModel Part = new("Part", null, [new("name", new PrimitiveType(PrimitiveKind.String), false, false, null)], false, null);

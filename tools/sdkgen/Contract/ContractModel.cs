@@ -49,6 +49,15 @@ internal sealed record JsonValueType : TypeRef
     public static JsonValueType Instance { get; } = new();
 }
 
+/// <summary>
+/// An open JSON object whose keys are only known at run time, such as a table row: a model marked
+/// <c>x-orvano-dynamic</c> (a <c>Record&lt;unknown&gt;</c>). Languages map it to their open map type, never a class.
+/// </summary>
+internal sealed record DynamicType : TypeRef
+{
+    public static DynamicType Instance { get; } = new();
+}
+
 /// <summary>What a successful call does to the client's stored session, from <c>x-orvano-session</c>.</summary>
 internal enum SessionEffect
 {
@@ -89,6 +98,7 @@ internal sealed record ContractErrorCode(string Code, bool Test);
 internal sealed record ContractParam(string Name, ParamLocation In, PrimitiveType Type, bool Required, string? Doc, JsonNode? Example = null);
 
 // Id: the operationId, always `service.method`. Name: the method name, the part after the dot.
+// Body: the request body, a named model or an open object (DynamicType); null when there is none.
 // Result: the success response body, or null when the operation returns no content.
 // PageItem: for a cursor list operation (AC-7), the type of one item in `items`; otherwise null.
 internal sealed record ContractOperation(
@@ -100,7 +110,7 @@ internal sealed record ContractOperation(
     Audience Audience,
     string? Doc,
     IReadOnlyList<ContractParam> Params,
-    ModelType? Body,
+    TypeRef? Body,
     int SuccessStatus,
     TypeRef? Result,
     bool Idempotent,

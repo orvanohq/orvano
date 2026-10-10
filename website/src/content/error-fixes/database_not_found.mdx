@@ -1,0 +1,7 @@
+## Why it happens
+
+No database with this slug exists in the project. Every project has `main`; other slugs exist only after you create them, and a renamed database answers only to its new slug.
+
+## How to fix
+
+Check the slug and that the request goes to the right project (`X-Orvano-Project`). Leave the database out of an SDK call to use `main`. The console lists your databases under **Databases**.

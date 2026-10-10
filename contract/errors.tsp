@@ -36,6 +36,20 @@ model Problem {
   @doc("The request ID to quote when reporting a problem; also sent as `X-Request-Id`.")
   @example("4bf92f3577b34da6a3ce929d0e0e4736")
   requestId: string;
+
+  @doc("Every bad field of the request, when the error names fields (`invalid_row`). Never holds a value.")
+  errors?: ProblemField[];
+}
+
+@doc("One bad field of a request.")
+model ProblemField {
+  @doc("The field's path, such as `title` or `rows[3].title`.")
+  @example("title")
+  field: string;
+
+  @doc("What is wrong with it, in a few words.")
+  @example("required")
+  message: string;
 }
 
 @doc("Every stable error code the server sends in `Problem.code`.")
@@ -288,6 +302,39 @@ enum ErrorCode {
 
   @doc("No such passkey for this user (404).")
   passkey_not_found,
+
+  @doc("No database with this slug in the project (404).")
+  database_not_found,
+
+  @doc("No table with this name in the database (404).")
+  table_not_found,
+
+  @doc("The database is still being created, or creating it failed (409).")
+  database_not_ready,
+
+  @doc("Another table, column, or database already uses this name (409).")
+  name_taken,
+
+  @doc("The database, table, or project already has as many tables, columns, or databases as the API allows (409).")
+  schema_limit_reached,
+
+  @doc("The table is locked by another change; retry after `Retry-After` (409).")
+  table_busy,
+
+  @doc("The table has no primary key, or one other than `id uuid`, so the API can't change its rows (409).")
+  table_not_writable,
+
+  @doc("A value in the row is missing, unknown, read only, or does not fit its column; `errors` lists each one (400).")
+  invalid_row,
+
+  @doc("A row breaks a unique or foreign key constraint; `detail` names the column or constraint (409).")
+  row_conflict,
+
+  @doc("The query ran past its time limit; narrow it, then try again (422).")
+  query_timeout,
+
+  @doc("Only API keys can use this table until it has permission rules (403).")
+  table_access_denied,
 }
 
 @doc("Error codes only the test operations send. Generated only into the scenario runners.")

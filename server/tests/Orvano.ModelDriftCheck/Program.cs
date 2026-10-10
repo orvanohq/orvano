@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Orvano.Auth.Data;
 using Orvano.Core.Data;
 using Orvano.Core.Migrations;
+using Orvano.Databases.Data;
 using Orvano.Messaging.Data;
 using Orvano.Platform.Data;
 using Orvano.Server.Hosting;
@@ -46,7 +47,8 @@ await using var kernel = new OrvanoDbContext(new DbContextOptionsBuilder<OrvanoD
 await using var platform = PlatformDbContext.On(conn);
 await using var auth = AuthDbContext.On(conn);
 await using var messaging = MessagingDbContext.On(conn);
-DbContext[] contexts = [kernel, platform, auth, messaging];
+await using var databases = DatabasesDbContext.On(conn);
+DbContext[] contexts = [kernel, platform, auth, messaging, databases];
 
 var problems = new List<string>();
 var tables = 0;

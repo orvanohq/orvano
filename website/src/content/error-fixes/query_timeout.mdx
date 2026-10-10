@@ -1,0 +1,7 @@
+## Why it happens
+
+The query ran longer than its limit: 5 seconds for SDK calls, 15 seconds in the console. Big tables without the right index, or a page far into a large table, can take that long.
+
+## How to fix
+
+Ask for less: a smaller `limit`, or a narrower request. Add an index in SQL for what you read often. SDKs never retry this error, since the same query would run just as long.

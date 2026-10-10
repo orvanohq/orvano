@@ -15,6 +15,109 @@ final class AccountService {
   }
 }
 
+/// Operations in the `databases` service.
+final class DatabasesService {
+  /// Creates the service over [client].
+  DatabasesService(this._client);
+
+  final Client _client;
+
+  /// Gets a database by slug.
+  Future<Database> get(String database, {RequestOptions? options}) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/databases/${Uri.encodeComponent(database)}',
+      options: options,
+    );
+    return Database.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Lists the project's databases: `main` first, then the rest by slug.
+  Future<DatabasePage> list({
+    String? cursor,
+    int? limit,
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/databases',
+      query: {'cursor': cursor, 'limit': limit?.toString()},
+      options: options,
+    );
+    return DatabasePage.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Every item of [list], walking all pages: `await for (final item in ...)`.
+  Stream<Database> listAll({int? limit, RequestOptions? options}) => paginate(
+    (cursor) => list(cursor: cursor, limit: limit, options: options),
+    (page) => (page.items, page.nextCursor),
+  );
+}
+
+/// Operations in the `tables` service.
+final class TablesService {
+  /// Creates the service over [client].
+  TablesService(this._client);
+
+  final Client _client;
+
+  /// Creates a table with `id uuid` (the primary key, `uuidv7()` by default), `created_at`, `updated_at`, then your
+  /// columns in order.
+  Future<Table> create(
+    String database,
+    CreateTableRequest body, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'POST',
+      '/v1/databases/${Uri.encodeComponent(database)}/tables',
+      body: body.toJson(),
+      options: options,
+    );
+    return Table.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Gets a table with its columns, read live from Postgres.
+  Future<Table> get(
+    String database,
+    String table, {
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/databases/${Uri.encodeComponent(database)}/tables/${Uri.encodeComponent(table)}',
+      options: options,
+    );
+    return Table.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Lists a database's tables by name, with their columns, read live from Postgres.
+  Future<TablePage> list(
+    String database, {
+    String? cursor,
+    int? limit,
+    RequestOptions? options,
+  }) async {
+    final json = await _client.send(
+      'GET',
+      '/v1/databases/${Uri.encodeComponent(database)}/tables',
+      query: {'cursor': cursor, 'limit': limit?.toString()},
+      options: options,
+    );
+    return TablePage.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Every item of [list], walking all pages: `await for (final item in ...)`.
+  Stream<Table> listAll(
+    String database, {
+    int? limit,
+    RequestOptions? options,
+  }) => paginate(
+    (cursor) => list(database, cursor: cursor, limit: limit, options: options),
+    (page) => (page.items, page.nextCursor),
+  );
+}
+
 /// Operations in the `users` service.
 final class UsersService {
   /// Creates the service over [client].
@@ -322,8 +425,11 @@ base class Orvano {
   /// Creates the services over [client].
   Orvano(this.client)
     : account = AccountService(client),
+      databases = DatabasesService(client),
       health = HealthService(client),
       keys = KeysService(client),
+      rows = RowsService(client),
+      tables = TablesService(client),
       users = UsersService(client);
 
   /// The client every service sends through.
@@ -332,11 +438,20 @@ base class Orvano {
   /// Operations in the `account` service.
   final AccountService account;
 
+  /// Operations in the `databases` service.
+  final DatabasesService databases;
+
   /// Operations in the `health` service.
   final HealthService health;
 
   /// Operations in the `keys` service.
   final KeysService keys;
+
+  /// Operations in the `rows` service.
+  final RowsService rows;
+
+  /// Operations in the `tables` service.
+  final TablesService tables;
 
   /// Operations in the `users` service.
   final UsersService users;

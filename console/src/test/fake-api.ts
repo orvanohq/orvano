@@ -4,6 +4,8 @@ import type {
   AuthEmailKind,
   ConsoleAccount,
   ConsoleSignupMode,
+  CreateTableRequest,
+  Database,
   EmailLogEntry,
   EmailTemplate,
   EmailTemplateInput,
@@ -20,6 +22,7 @@ import type {
   Project,
   SmtpSettings,
   SmtpSettingsInput,
+  Table,
 } from '@orvano/console-client'
 
 /*
@@ -83,6 +86,12 @@ export interface FakeApi {
   projects: Project[]
   apiKeys: ApiKey[]
   platforms: Platform[]
+  /** The project's databases besides `main`, which every project has (spec 0015, AC-1). */
+  databases: Database[]
+  /** Tables by database slug; a new one is added by `consoleTables.create`. */
+  tables: Record<string, Table[]>
+  /** Rows by `<database>/<table>`, in created order. */
+  rows: Record<string, Record<string, unknown>[]>
   requests: SentRequest[]
   /** Whether the install still waits for its first admin, as `consoleInstall.getSetup` answers. */
   setupRequired: boolean
@@ -244,6 +253,52 @@ export function makePlatform(
   }
 }
 
+/** Every project's `main` database (spec 0015, AC-1). */
+export const mainDatabase: Database = {
+  id: 'main',
+  slug: 'main',
+  name: 'Main',
+  status: 'active',
+  main: true,
+  createdAt: null,
+}
+
+/** A table as `consoleTables.create` would make it: the system columns, then the request's columns. */
+export function makeTable(database: string, request: CreateTableRequest): Table {
+  const system = (name: string, type: 'uuid' | 'timestamp', pgType: string) => ({
+    name,
+    type,
+    pgType,
+    required: true,
+    unique: name === 'id',
+    default: { kind: name === 'id' ? ('uuidv7' as const) : ('now' as const), value: null },
+    system: true,
+    writable: false,
+  })
+  return {
+    name: request.name,
+    database,
+    columns: [
+      system('id', 'uuid', 'uuid'),
+      system('created_at', 'timestamp', 'timestamptz'),
+      system('updated_at', 'timestamp', 'timestamptz'),
+      ...request.columns.map((column) => ({
+        name: column.name,
+        type: column.type,
+        pgType: column.type,
+        required: column.required ?? false,
+        unique: column.unique ?? false,
+        default: column.default ?? null,
+        system: false,
+        writable: true,
+      })),
+    ],
+    readable: true,
+    writable: true,
+    estimatedRows: null,
+  }
+}
+
 function problem(status: number, code: string, detail: string): Response {
   return Response.json(
     { type: `https://orvano.dev/errors/${code}`, title: detail, status, code, detail },
@@ -292,6 +347,9 @@ export function installFakeApi(): FakeApi {
     projects: [],
     apiKeys: [],
     platforms: [],
+    databases: [],
+    tables: {},
+    rows: {},
     requests: [],
     setupRequired: false,
     consoleMfa: null,
@@ -747,6 +805,39 @@ export function installFakeApi(): FakeApi {
         if (index === -1) return problem(404, 'not_found', 'No such key.')
         api.apiKeys.splice(index, 1)
         return new Response(null, { status: 204 })
+      }
+      if (path === '/v1/console/project/databases') return page([mainDatabase, ...api.databases])
+      match =
+        /^\/v1\/console\/project\/databases\/([^/]+)(?:\/tables(?:\/([^/]+)(\/rows)?)?)?$/.exec(
+          path,
+        )
+      if (match !== null) {
+        const slug = match.at(1) ?? ''
+        const table = match.at(2)
+        const rows = match.at(3)
+        const database = slug === 'main' ? mainDatabase : api.databases.find((d) => d.slug === slug)
+        if (database === undefined) return problem(404, 'database_not_found', 'No such database.')
+        const tables = (api.tables[slug] ??= [])
+        if (!path.includes('/tables')) return Response.json(database)
+        if (table === undefined && method === 'POST') {
+          const request = input as unknown as CreateTableRequest
+          if (tables.some((t) => t.name === request.name)) {
+            return problem(
+              409,
+              'name_taken',
+              `name: a table named '${request.name}' already exists in this database.`,
+            )
+          }
+          const created = makeTable(slug, request)
+          tables.push(created)
+          return Response.json(created, { status: 201 })
+        }
+        if (table === undefined) return page(tables)
+        const found = tables.find((t) => t.name === table)
+        if (found === undefined)
+          return problem(404, 'table_not_found', 'No such table in the database.')
+        if (rows === undefined) return Response.json(found)
+        return page(api.rows[`${slug}/${table}`] ?? [])
       }
       if (path === '/v1/console/project/platforms' && method === 'GET') {
         return page(

@@ -1,0 +1,7 @@
+## Why it happens
+
+Another change held a lock on the table for more than 3 seconds, so this call stopped waiting. A long running transaction or a schema change on a big table can cause it.
+
+## How to fix
+
+Retry after the `Retry-After` header's seconds. If it keeps happening, look for long transactions on the table in your own SQL.

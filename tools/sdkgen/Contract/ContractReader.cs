@@ -20,6 +20,7 @@ internal static partial class ContractReader
     private const string SessionExtension = "x-orvano-session";
     private const string StandardNamesExtension = "x-orvano-standard-names";
     private const string ScopeExtension = "x-orvano-scope";
+    private const string DynamicExtension = "x-orvano-dynamic";
     private const string ScopeCatalog = "ApiKeyScope";
     private const string ApiKeyScheme = "apiKey";
 
@@ -99,6 +100,9 @@ internal static partial class ContractReader
                     enums.Add(ReadEnum(name, schema, values));
                     continue;
                 }
+
+                // An open object (a table row) is no model: every reference to it becomes a DynamicType.
+                if (IsDynamic(name, schema)) continue;
 
                 if (schema.Type is JsonSchemaType.Object && schema.Properties is { Count: > 0 })
                 {
@@ -553,7 +557,7 @@ internal static partial class ContractReader
             ];
         }
 
-        private ModelType? ReadBody(OpenApiOperation op, string where)
+        private TypeRef? ReadBody(OpenApiOperation op, string where)
         {
             if (op.RequestBody is null) return null;
             var content = op.RequestBody.Content;
@@ -563,10 +567,25 @@ internal static partial class ContractReader
                 return null;
             }
 
-            if (media.Schema is OpenApiSchemaReference { Reference.Id: { } modelId } && _schemas.ContainsKey(modelId))
-                return new ModelType(modelId);
+            if (media.Schema is OpenApiSchemaReference { Reference.Id: { } modelId } && _schemas.TryGetValue(modelId, out var target))
+                return IsDynamic(modelId, target) ? DynamicType.Instance : (TypeRef)new ModelType(modelId);
             errors.Add($"{where}: a request body must be a named model");
             return null;
+        }
+
+        /// <summary>
+        /// A model marked <c>x-orvano-dynamic</c>: it must be exactly a <c>Record&lt;unknown&gt;</c>, an object with no
+        /// properties whose values are any JSON.
+        /// </summary>
+        private bool IsDynamic(string name, IOpenApiSchema schema)
+        {
+            var target = schema is OpenApiSchemaReference r ? r.Target ?? schema : schema;
+            if (ReadBool(target.Extensions, DynamicExtension, $"schema '{name}'") is not true) return false;
+            var values = MapValues(target);
+            var anyValue = values is not null && values.Type is null or 0 && values.Properties is not { Count: > 0 } && values.Items is null && values.Enum is not { Count: > 0 };
+            if (target.Type is not JsonSchemaType.Object || target.Properties is { Count: > 0 } || !anyValue)
+                errors.Add($"schema '{name}': {DynamicExtension} is only for an object of any JSON values (Record<unknown>)");
+            return true;
         }
 
         private (int Status, TypeRef? Result) ReadSuccess(OpenApiOperation op, string where)
@@ -618,6 +637,7 @@ internal static partial class ContractReader
                     return (null, false);
                 }
 
+                if (IsDynamic(id, target)) return (DynamicType.Instance, false);
                 return (target.Enum is { Count: > 0 } ? new EnumType(id) : new ModelType(id), false);
             }
 

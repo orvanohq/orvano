@@ -19,10 +19,13 @@ public sealed class PlatformHarness : IAsyncDisposable
     private readonly ServiceProvider _services;
     private readonly WorkRegistry _work = new();
 
-    private PlatformHarness(TestDatabase database, ServiceProvider services)
+    private readonly bool _ownsDatabase;
+
+    private PlatformHarness(TestDatabase database, ServiceProvider services, bool ownsDatabase = true)
     {
         Database = database;
         _services = services;
+        _ownsDatabase = ownsDatabase;
         new PlatformModule().RegisterWork(_work);
     }
 
@@ -34,7 +37,17 @@ public sealed class PlatformHarness : IAsyncDisposable
     {
         var database = await postgres.NewDatabaseAsync();
         await database.MigrateAsync();
+        return Build(database, graceDays, setupToken, ownsDatabase: true);
+    }
 
+    /// <summary>
+    /// The module over a database someone else owns and migrated, such as the api a test started, to run its queued
+    /// jobs (the fixture projects' provisioning) the way the worker would. Disposing it leaves the database alone.
+    /// </summary>
+    public static PlatformHarness Over(TestDatabase database) => Build(database, graceDays: 7, setupToken: null, ownsDatabase: false);
+
+    private static PlatformHarness Build(TestDatabase database, int graceDays, string? setupToken, bool ownsDatabase)
+    {
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -47,7 +60,7 @@ public sealed class PlatformHarness : IAsyncDisposable
         services.AddKeyedSingleton(OrvanoDb.App, (_, _) => database.Track(NpgsqlDataSource.Create(database.AppUrl)));
         services.AddKeyedSingleton(OrvanoDb.Admin, (_, _) => database.Track(NpgsqlDataSource.Create(database.AdminUrl)));
         new PlatformModule().ConfigureServices(services, config);
-        return new PlatformHarness(database, services.BuildServiceProvider());
+        return new PlatformHarness(database, services.BuildServiceProvider(), ownsDatabase);
     }
 
     public T Get<T>() where T : notnull => _services.GetRequiredService<T>();
@@ -139,7 +152,7 @@ public sealed class PlatformHarness : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await _services.DisposeAsync();
-        await Database.DisposeAsync();
+        if (_ownsDatabase) await Database.DisposeAsync();
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

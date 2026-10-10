@@ -1,5 +1,6 @@
 import type { LinkProps } from '@tanstack/react-router'
 import {
+  Database,
   FolderKanban,
   KeyRound,
   LayoutDashboard,
@@ -62,6 +63,7 @@ export const projectNav: readonly NavEntry[] = [
     to: '/projects/$projectId/sign-in-methods',
   },
   { id: 'security', label: 'Security', icon: ShieldCheck, to: '/projects/$projectId/security' },
+  { id: 'databases', label: 'Databases', icon: Database, to: '/projects/$projectId/databases' },
   { id: 'email', label: 'Email', icon: Mail, to: '/projects/$projectId/email' },
   { id: 'keys', label: 'API keys', icon: KeyRound, to: '/projects/$projectId/keys' },
   {

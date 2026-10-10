@@ -20,6 +20,12 @@ abstract final class ErrorCode {
   /// `csrf_rejected`
   static const csrfRejected = 'csrf_rejected';
 
+  /// `database_not_found`
+  static const databaseNotFound = 'database_not_found';
+
+  /// `database_not_ready`
+  static const databaseNotReady = 'database_not_ready';
+
   /// `email_already_in_use`
   static const emailAlreadyInUse = 'email_already_in_use';
 
@@ -101,6 +107,9 @@ abstract final class ErrorCode {
   /// `invalid_request`
   static const invalidRequest = 'invalid_request';
 
+  /// `invalid_row`
+  static const invalidRow = 'invalid_row';
+
   /// `invalid_token`
   static const invalidToken = 'invalid_token';
 
@@ -133,6 +142,9 @@ abstract final class ErrorCode {
 
   /// `mfa_verification_required`
   static const mfaVerificationRequired = 'mfa_verification_required';
+
+  /// `name_taken`
+  static const nameTaken = 'name_taken';
 
   /// `not_found`
   static const notFound = 'not_found';
@@ -188,6 +200,9 @@ abstract final class ErrorCode {
   /// `provider_unavailable`
   static const providerUnavailable = 'provider_unavailable';
 
+  /// `query_timeout`
+  static const queryTimeout = 'query_timeout';
+
   /// `rate_limited`
   static const rateLimited = 'rate_limited';
 
@@ -196,6 +211,12 @@ abstract final class ErrorCode {
 
   /// `redirect_url_not_allowed`
   static const redirectUrlNotAllowed = 'redirect_url_not_allowed';
+
+  /// `row_conflict`
+  static const rowConflict = 'row_conflict';
+
+  /// `schema_limit_reached`
+  static const schemaLimitReached = 'schema_limit_reached';
 
   /// `server_busy`
   static const serverBusy = 'server_busy';
@@ -232,6 +253,18 @@ abstract final class ErrorCode {
 
   /// `smtp_unreachable`
   static const smtpUnreachable = 'smtp_unreachable';
+
+  /// `table_access_denied`
+  static const tableAccessDenied = 'table_access_denied';
+
+  /// `table_busy`
+  static const tableBusy = 'table_busy';
+
+  /// `table_not_found`
+  static const tableNotFound = 'table_not_found';
+
+  /// `table_not_writable`
+  static const tableNotWritable = 'table_not_writable';
 
   /// `template_invalid`
   static const templateInvalid = 'template_invalid';

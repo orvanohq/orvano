@@ -27,12 +27,14 @@ describe('nav registry (AC-15)', () => {
     expect(orgNav.find((entry) => entry.id === 'members')?.minRole).toBeUndefined()
     // API keys and Platforms sit between Users and Settings (spec 0007, AC-11); Email sits below
     // Users (spec 0009, Screens); Sign in methods sits right below Users (spec 0012, AC-25), and
-    // Security beside it (spec 0014, AC-34).
+    // Security beside it (spec 0014, AC-34). Databases follows Users and its auth entries (spec 0015,
+    // AC-31).
     expect(projectNav.map((entry) => entry.label)).toEqual([
       'Overview',
       'Users',
       'Sign in methods',
       'Security',
+      'Databases',
       'Email',
       'API keys',
       'Platforms',

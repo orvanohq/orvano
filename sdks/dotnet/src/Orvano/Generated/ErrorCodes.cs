@@ -22,6 +22,12 @@ public static class ErrorCode
     /// <summary>The <c>csrf_rejected</c> error code.</summary>
     public const string CsrfRejected = "csrf_rejected";
 
+    /// <summary>The <c>database_not_found</c> error code.</summary>
+    public const string DatabaseNotFound = "database_not_found";
+
+    /// <summary>The <c>database_not_ready</c> error code.</summary>
+    public const string DatabaseNotReady = "database_not_ready";
+
     /// <summary>The <c>email_already_in_use</c> error code.</summary>
     public const string EmailAlreadyInUse = "email_already_in_use";
 
@@ -103,6 +109,9 @@ public static class ErrorCode
     /// <summary>The <c>invalid_request</c> error code.</summary>
     public const string InvalidRequest = "invalid_request";
 
+    /// <summary>The <c>invalid_row</c> error code.</summary>
+    public const string InvalidRow = "invalid_row";
+
     /// <summary>The <c>invalid_token</c> error code.</summary>
     public const string InvalidToken = "invalid_token";
 
@@ -135,6 +144,9 @@ public static class ErrorCode
 
     /// <summary>The <c>mfa_verification_required</c> error code.</summary>
     public const string MfaVerificationRequired = "mfa_verification_required";
+
+    /// <summary>The <c>name_taken</c> error code.</summary>
+    public const string NameTaken = "name_taken";
 
     /// <summary>The <c>not_found</c> error code.</summary>
     public const string NotFound = "not_found";
@@ -190,6 +202,9 @@ public static class ErrorCode
     /// <summary>The <c>provider_unavailable</c> error code.</summary>
     public const string ProviderUnavailable = "provider_unavailable";
 
+    /// <summary>The <c>query_timeout</c> error code.</summary>
+    public const string QueryTimeout = "query_timeout";
+
     /// <summary>The <c>rate_limited</c> error code.</summary>
     public const string RateLimited = "rate_limited";
 
@@ -198,6 +213,12 @@ public static class ErrorCode
 
     /// <summary>The <c>redirect_url_not_allowed</c> error code.</summary>
     public const string RedirectUrlNotAllowed = "redirect_url_not_allowed";
+
+    /// <summary>The <c>row_conflict</c> error code.</summary>
+    public const string RowConflict = "row_conflict";
+
+    /// <summary>The <c>schema_limit_reached</c> error code.</summary>
+    public const string SchemaLimitReached = "schema_limit_reached";
 
     /// <summary>The <c>server_busy</c> error code.</summary>
     public const string ServerBusy = "server_busy";
@@ -234,6 +255,18 @@ public static class ErrorCode
 
     /// <summary>The <c>smtp_unreachable</c> error code.</summary>
     public const string SmtpUnreachable = "smtp_unreachable";
+
+    /// <summary>The <c>table_access_denied</c> error code.</summary>
+    public const string TableAccessDenied = "table_access_denied";
+
+    /// <summary>The <c>table_busy</c> error code.</summary>
+    public const string TableBusy = "table_busy";
+
+    /// <summary>The <c>table_not_found</c> error code.</summary>
+    public const string TableNotFound = "table_not_found";
+
+    /// <summary>The <c>table_not_writable</c> error code.</summary>
+    public const string TableNotWritable = "table_not_writable";
 
     /// <summary>The <c>template_invalid</c> error code.</summary>
     public const string TemplateInvalid = "template_invalid";

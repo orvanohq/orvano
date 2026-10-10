@@ -1,4 +1,7 @@
 // {{ header }}
+{{~ if uses_nodes ~}}
+using System.Text.Json.Nodes;
+{{~ end ~}}
 using System.Text.Json.Serialization;
 
 namespace {{ namespace }};

@@ -11,6 +11,7 @@ COPY server/src/Orvano.Auth/Orvano.Auth.csproj server/src/Orvano.Auth/
 COPY server/src/Orvano.Contract/Orvano.Contract.csproj server/src/Orvano.Contract/
 COPY server/src/Orvano.Core/Orvano.Core.csproj server/src/Orvano.Core/
 COPY server/src/Orvano.Messaging/Orvano.Messaging.csproj server/src/Orvano.Messaging/
+COPY server/src/Orvano.Databases/Orvano.Databases.csproj server/src/Orvano.Databases/
 COPY server/src/Orvano.Platform/Orvano.Platform.csproj server/src/Orvano.Platform/
 COPY server/src/Orvano.Server/Orvano.Server.csproj server/src/Orvano.Server/
 RUN dotnet restore server/src/Orvano.Server/Orvano.Server.csproj -a $TARGETARCH

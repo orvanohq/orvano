@@ -31,13 +31,16 @@ import { Route as AppProjectsProjectIdPlatformsRouteImport } from './routes/_app
 import { Route as AppProjectsProjectIdSecurityRouteImport } from './routes/_app/projects/$projectId/security'
 import { Route as AppProjectsProjectIdSettingsRouteImport } from './routes/_app/projects/$projectId/settings'
 import { Route as AppProjectsProjectIdSignInMethodsRouteImport } from './routes/_app/projects/$projectId/sign-in-methods'
+import { Route as AppProjectsProjectIdDatabasesIndexRouteImport } from './routes/_app/projects/$projectId/databases/index'
 import { Route as AppProjectsProjectIdEmailIndexRouteImport } from './routes/_app/projects/$projectId/email/index'
 import { Route as AppProjectsProjectIdEmailLogRouteImport } from './routes/_app/projects/$projectId/email/log'
 import { Route as AppProjectsProjectIdEmailSettingsRouteImport } from './routes/_app/projects/$projectId/email/settings'
 import { Route as AppProjectsProjectIdUsersIndexRouteImport } from './routes/_app/projects/$projectId/users/index'
 import { Route as AppProjectsProjectIdUsersUserIdRouteImport } from './routes/_app/projects/$projectId/users/$userId'
+import { Route as AppProjectsProjectIdDatabasesDatabaseIndexRouteImport } from './routes/_app/projects/$projectId/databases/$database/index'
 import { Route as AppProjectsProjectIdEmailTemplatesIndexRouteImport } from './routes/_app/projects/$projectId/email/templates/index'
 import { Route as AppProjectsProjectIdEmailTemplatesKindRouteImport } from './routes/_app/projects/$projectId/email/templates/$kind'
+import { Route as AppProjectsProjectIdDatabasesDatabaseTablesTableRouteImport } from './routes/_app/projects/$projectId/databases/$database/tables/$table'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -156,6 +159,12 @@ const AppProjectsProjectIdSignInMethodsRoute =
     path: '/sign-in-methods',
     getParentRoute: () => AppProjectsProjectIdRouteRoute,
   } as any)
+const AppProjectsProjectIdDatabasesIndexRoute =
+  AppProjectsProjectIdDatabasesIndexRouteImport.update({
+    id: '/databases/',
+    path: '/databases/',
+    getParentRoute: () => AppProjectsProjectIdRouteRoute,
+  } as any)
 const AppProjectsProjectIdEmailIndexRoute =
   AppProjectsProjectIdEmailIndexRouteImport.update({
     id: '/',
@@ -186,6 +195,12 @@ const AppProjectsProjectIdUsersUserIdRoute =
     path: '/users/$userId',
     getParentRoute: () => AppProjectsProjectIdRouteRoute,
   } as any)
+const AppProjectsProjectIdDatabasesDatabaseIndexRoute =
+  AppProjectsProjectIdDatabasesDatabaseIndexRouteImport.update({
+    id: '/databases/$database/',
+    path: '/databases/$database/',
+    getParentRoute: () => AppProjectsProjectIdRouteRoute,
+  } as any)
 const AppProjectsProjectIdEmailTemplatesIndexRoute =
   AppProjectsProjectIdEmailTemplatesIndexRouteImport.update({
     id: '/templates/',
@@ -197,6 +212,12 @@ const AppProjectsProjectIdEmailTemplatesKindRoute =
     id: '/templates/$kind',
     path: '/templates/$kind',
     getParentRoute: () => AppProjectsProjectIdEmailRouteRoute,
+  } as any)
+const AppProjectsProjectIdDatabasesDatabaseTablesTableRoute =
+  AppProjectsProjectIdDatabasesDatabaseTablesTableRouteImport.update({
+    id: '/databases/$database/tables/$table',
+    path: '/databases/$database/tables/$table',
+    getParentRoute: () => AppProjectsProjectIdRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -224,10 +245,13 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/email/log': typeof AppProjectsProjectIdEmailLogRoute
   '/projects/$projectId/email/settings': typeof AppProjectsProjectIdEmailSettingsRoute
   '/projects/$projectId/users/$userId': typeof AppProjectsProjectIdUsersUserIdRoute
+  '/projects/$projectId/databases/': typeof AppProjectsProjectIdDatabasesIndexRoute
   '/projects/$projectId/email/': typeof AppProjectsProjectIdEmailIndexRoute
   '/projects/$projectId/users/': typeof AppProjectsProjectIdUsersIndexRoute
   '/projects/$projectId/email/templates/$kind': typeof AppProjectsProjectIdEmailTemplatesKindRoute
+  '/projects/$projectId/databases/$database/': typeof AppProjectsProjectIdDatabasesDatabaseIndexRoute
   '/projects/$projectId/email/templates/': typeof AppProjectsProjectIdEmailTemplatesIndexRoute
+  '/projects/$projectId/databases/$database/tables/$table': typeof AppProjectsProjectIdDatabasesDatabaseTablesTableRoute
 }
 export interface FileRoutesByTo {
   '/invite': typeof InviteRoute
@@ -251,10 +275,13 @@ export interface FileRoutesByTo {
   '/projects/$projectId/email/log': typeof AppProjectsProjectIdEmailLogRoute
   '/projects/$projectId/email/settings': typeof AppProjectsProjectIdEmailSettingsRoute
   '/projects/$projectId/users/$userId': typeof AppProjectsProjectIdUsersUserIdRoute
+  '/projects/$projectId/databases': typeof AppProjectsProjectIdDatabasesIndexRoute
   '/projects/$projectId/email': typeof AppProjectsProjectIdEmailIndexRoute
   '/projects/$projectId/users': typeof AppProjectsProjectIdUsersIndexRoute
   '/projects/$projectId/email/templates/$kind': typeof AppProjectsProjectIdEmailTemplatesKindRoute
+  '/projects/$projectId/databases/$database': typeof AppProjectsProjectIdDatabasesDatabaseIndexRoute
   '/projects/$projectId/email/templates': typeof AppProjectsProjectIdEmailTemplatesIndexRoute
+  '/projects/$projectId/databases/$database/tables/$table': typeof AppProjectsProjectIdDatabasesDatabaseTablesTableRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -283,10 +310,13 @@ export interface FileRoutesById {
   '/_app/projects/$projectId/email/log': typeof AppProjectsProjectIdEmailLogRoute
   '/_app/projects/$projectId/email/settings': typeof AppProjectsProjectIdEmailSettingsRoute
   '/_app/projects/$projectId/users/$userId': typeof AppProjectsProjectIdUsersUserIdRoute
+  '/_app/projects/$projectId/databases/': typeof AppProjectsProjectIdDatabasesIndexRoute
   '/_app/projects/$projectId/email/': typeof AppProjectsProjectIdEmailIndexRoute
   '/_app/projects/$projectId/users/': typeof AppProjectsProjectIdUsersIndexRoute
   '/_app/projects/$projectId/email/templates/$kind': typeof AppProjectsProjectIdEmailTemplatesKindRoute
+  '/_app/projects/$projectId/databases/$database/': typeof AppProjectsProjectIdDatabasesDatabaseIndexRoute
   '/_app/projects/$projectId/email/templates/': typeof AppProjectsProjectIdEmailTemplatesIndexRoute
+  '/_app/projects/$projectId/databases/$database/tables/$table': typeof AppProjectsProjectIdDatabasesDatabaseTablesTableRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -315,10 +345,13 @@ export interface FileRouteTypes {
     | '/projects/$projectId/email/log'
     | '/projects/$projectId/email/settings'
     | '/projects/$projectId/users/$userId'
+    | '/projects/$projectId/databases/'
     | '/projects/$projectId/email/'
     | '/projects/$projectId/users/'
     | '/projects/$projectId/email/templates/$kind'
+    | '/projects/$projectId/databases/$database/'
     | '/projects/$projectId/email/templates/'
+    | '/projects/$projectId/databases/$database/tables/$table'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/invite'
@@ -342,10 +375,13 @@ export interface FileRouteTypes {
     | '/projects/$projectId/email/log'
     | '/projects/$projectId/email/settings'
     | '/projects/$projectId/users/$userId'
+    | '/projects/$projectId/databases'
     | '/projects/$projectId/email'
     | '/projects/$projectId/users'
     | '/projects/$projectId/email/templates/$kind'
+    | '/projects/$projectId/databases/$database'
     | '/projects/$projectId/email/templates'
+    | '/projects/$projectId/databases/$database/tables/$table'
   id:
     | '__root__'
     | '/_app'
@@ -373,10 +409,13 @@ export interface FileRouteTypes {
     | '/_app/projects/$projectId/email/log'
     | '/_app/projects/$projectId/email/settings'
     | '/_app/projects/$projectId/users/$userId'
+    | '/_app/projects/$projectId/databases/'
     | '/_app/projects/$projectId/email/'
     | '/_app/projects/$projectId/users/'
     | '/_app/projects/$projectId/email/templates/$kind'
+    | '/_app/projects/$projectId/databases/$database/'
     | '/_app/projects/$projectId/email/templates/'
+    | '/_app/projects/$projectId/databases/$database/tables/$table'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -544,6 +583,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectsProjectIdSignInMethodsRouteImport
       parentRoute: typeof AppProjectsProjectIdRouteRoute
     }
+    '/_app/projects/$projectId/databases/': {
+      id: '/_app/projects/$projectId/databases/'
+      path: '/databases'
+      fullPath: '/projects/$projectId/databases/'
+      preLoaderRoute: typeof AppProjectsProjectIdDatabasesIndexRouteImport
+      parentRoute: typeof AppProjectsProjectIdRouteRoute
+    }
     '/_app/projects/$projectId/email/': {
       id: '/_app/projects/$projectId/email/'
       path: '/'
@@ -579,6 +625,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectsProjectIdUsersUserIdRouteImport
       parentRoute: typeof AppProjectsProjectIdRouteRoute
     }
+    '/_app/projects/$projectId/databases/$database/': {
+      id: '/_app/projects/$projectId/databases/$database/'
+      path: '/databases/$database'
+      fullPath: '/projects/$projectId/databases/$database/'
+      preLoaderRoute: typeof AppProjectsProjectIdDatabasesDatabaseIndexRouteImport
+      parentRoute: typeof AppProjectsProjectIdRouteRoute
+    }
     '/_app/projects/$projectId/email/templates/': {
       id: '/_app/projects/$projectId/email/templates/'
       path: '/templates'
@@ -592,6 +645,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/projects/$projectId/email/templates/$kind'
       preLoaderRoute: typeof AppProjectsProjectIdEmailTemplatesKindRouteImport
       parentRoute: typeof AppProjectsProjectIdEmailRouteRoute
+    }
+    '/_app/projects/$projectId/databases/$database/tables/$table': {
+      id: '/_app/projects/$projectId/databases/$database/tables/$table'
+      path: '/databases/$database/tables/$table'
+      fullPath: '/projects/$projectId/databases/$database/tables/$table'
+      preLoaderRoute: typeof AppProjectsProjectIdDatabasesDatabaseTablesTableRouteImport
+      parentRoute: typeof AppProjectsProjectIdRouteRoute
     }
   }
 }
@@ -645,7 +705,10 @@ interface AppProjectsProjectIdRouteRouteChildren {
   AppProjectsProjectIdSignInMethodsRoute: typeof AppProjectsProjectIdSignInMethodsRoute
   AppProjectsProjectIdIndexRoute: typeof AppProjectsProjectIdIndexRoute
   AppProjectsProjectIdUsersUserIdRoute: typeof AppProjectsProjectIdUsersUserIdRoute
+  AppProjectsProjectIdDatabasesIndexRoute: typeof AppProjectsProjectIdDatabasesIndexRoute
   AppProjectsProjectIdUsersIndexRoute: typeof AppProjectsProjectIdUsersIndexRoute
+  AppProjectsProjectIdDatabasesDatabaseIndexRoute: typeof AppProjectsProjectIdDatabasesDatabaseIndexRoute
+  AppProjectsProjectIdDatabasesDatabaseTablesTableRoute: typeof AppProjectsProjectIdDatabasesDatabaseTablesTableRoute
 }
 
 const AppProjectsProjectIdRouteRouteChildren: AppProjectsProjectIdRouteRouteChildren =
@@ -660,7 +723,13 @@ const AppProjectsProjectIdRouteRouteChildren: AppProjectsProjectIdRouteRouteChil
       AppProjectsProjectIdSignInMethodsRoute,
     AppProjectsProjectIdIndexRoute: AppProjectsProjectIdIndexRoute,
     AppProjectsProjectIdUsersUserIdRoute: AppProjectsProjectIdUsersUserIdRoute,
+    AppProjectsProjectIdDatabasesIndexRoute:
+      AppProjectsProjectIdDatabasesIndexRoute,
     AppProjectsProjectIdUsersIndexRoute: AppProjectsProjectIdUsersIndexRoute,
+    AppProjectsProjectIdDatabasesDatabaseIndexRoute:
+      AppProjectsProjectIdDatabasesDatabaseIndexRoute,
+    AppProjectsProjectIdDatabasesDatabaseTablesTableRoute:
+      AppProjectsProjectIdDatabasesDatabaseTablesTableRoute,
   }
 
 const AppProjectsProjectIdRouteRouteWithChildren =

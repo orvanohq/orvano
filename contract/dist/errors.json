@@ -408,5 +408,60 @@
     "code": "passkey_not_found",
     "status": 404,
     "description": "No such passkey for this user."
+  },
+  {
+    "code": "database_not_found",
+    "status": 404,
+    "description": "No database with this slug in the project."
+  },
+  {
+    "code": "table_not_found",
+    "status": 404,
+    "description": "No table with this name in the database."
+  },
+  {
+    "code": "database_not_ready",
+    "status": 409,
+    "description": "The database is still being created, or creating it failed."
+  },
+  {
+    "code": "name_taken",
+    "status": 409,
+    "description": "Another table, column, or database already uses this name."
+  },
+  {
+    "code": "schema_limit_reached",
+    "status": 409,
+    "description": "The database, table, or project already has as many tables, columns, or databases as the API allows."
+  },
+  {
+    "code": "table_busy",
+    "status": 409,
+    "description": "The table is locked by another change; retry after `Retry-After`."
+  },
+  {
+    "code": "table_not_writable",
+    "status": 409,
+    "description": "The table has no primary key, or one other than `id uuid`, so the API can't change its rows."
+  },
+  {
+    "code": "invalid_row",
+    "status": 400,
+    "description": "A value in the row is missing, unknown, read only, or does not fit its column; `errors` lists each one."
+  },
+  {
+    "code": "row_conflict",
+    "status": 409,
+    "description": "A row breaks a unique or foreign key constraint; `detail` names the column or constraint."
+  },
+  {
+    "code": "query_timeout",
+    "status": 422,
+    "description": "The query ran past its time limit; narrow it, then try again."
+  },
+  {
+    "code": "table_access_denied",
+    "status": 403,
+    "description": "Only API keys can use this table until it has permission rules."
   }
 ]

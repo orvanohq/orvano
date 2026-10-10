@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-10
 **Updated**: 2026-10-10 (cross check: self heal on unknown names, quoted defaults, reserved words, advisory locks, value free problems, lock timeouts on row calls, grammar and cursor details)
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 

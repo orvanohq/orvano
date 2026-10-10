@@ -1,0 +1,7 @@
+## Why it happens
+
+The row breaks a unique constraint (another row has the same value, or the same `id`) or a foreign key you made in SQL. `detail` names the column or constraint, never the value.
+
+## How to fix
+
+Change the value, or update the existing row instead of creating a new one. Leave `id` out to let Orvano make one.

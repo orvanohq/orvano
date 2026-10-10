@@ -42,7 +42,7 @@ projects:
 apiKeys:
   - project: scenarios0000000000a
     secret: orv_sk_scenarioScenarioScenarioScenarioScenario000
-    scopes: [users.read, users.write]
+    scopes: [users.read, users.write, tables.read, tables.write, rows.read, rows.write]
 platforms:
   - project: scenarios0000000000a
     type: web

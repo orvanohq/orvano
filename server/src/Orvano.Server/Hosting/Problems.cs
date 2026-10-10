@@ -14,6 +14,7 @@ namespace Orvano.Server.Hosting;
 internal static class Problems
 {
     private const string CodeKey = ApiProblem.CodeKey;
+    private const string ErrorsKey = ApiProblem.ErrorsKey;
     private const string RequestIdKey = "requestId";
     private static readonly object RequestIdItem = new();
 
@@ -33,9 +34,15 @@ internal static class Problems
             problem.Instance = null;
             // Never an exception message, stack trace, or anything else a handler did not write.
             if (context.Exception is not null || status >= 500 && code == ErrorCode.InternalError) problem.Detail = null;
+            // Field errors only when a handler wrote them as ApiProblem.FieldError, the one shape that never holds a value.
+            var errors = context.Exception is null && problem.Extensions.TryGetValue(ErrorsKey, out var listed)
+                && listed is IReadOnlyList<ApiProblem.FieldError> { Count: > 0 } fields
+                ? fields
+                : null;
             problem.Extensions.Clear();
             problem.Extensions[CodeKey] = code;
             problem.Extensions[RequestIdKey] = RequestIdOf(context.HttpContext);
+            if (errors is not null) problem.Extensions[ErrorsKey] = errors;
         });
 
     /// <summary>Gives every response an <c>X-Request-Id</c>: the current trace ID, never the client's.</summary>

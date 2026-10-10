@@ -20,6 +20,18 @@ enum ApiKeyScope {
 
   @doc("Create, change, and delete a project's users.")
   usersWrite: "users.write",
+
+  @doc("Read a project's databases and tables, with their columns.")
+  tablesRead: "tables.read",
+
+  @doc("Create, change, and delete a project's databases, tables, and columns.")
+  tablesWrite: "tables.write",
+
+  @doc("Read, list, and count the rows of any table in the project.")
+  rowsRead: "rows.read",
+
+  @doc("Create, change, and delete the rows of any table in the project.")
+  rowsWrite: "rows.write",
 }
 
 @doc("An API key for server code. Its secret is never shown again after creation.")

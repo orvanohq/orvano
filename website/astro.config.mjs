@@ -78,6 +78,7 @@ export default defineConfig({
         },
         { label: 'Concepts', items: [{ autogenerate: { directory: 'docs/concepts' } }] },
         { label: 'Auth guides', items: [{ autogenerate: { directory: 'docs/auth' } }] },
+        { label: 'Databases', items: [{ autogenerate: { directory: 'docs/databases' } }] },
         { label: 'SDKs', items: [{ autogenerate: { directory: 'docs/sdks' } }] },
         { label: 'Console', items: [{ autogenerate: { directory: 'docs/console' } }] },
         { label: 'Self hosting', items: [{ autogenerate: { directory: 'docs/self-hosting' } }] },

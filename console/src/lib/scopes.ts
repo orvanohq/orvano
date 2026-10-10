@@ -20,6 +20,26 @@ export const scopes: Record<ApiKeyScope, ScopeInfo> = {
     access: 'write',
     description: "Create, change, and delete a project's users.",
   },
+  'tables.read': {
+    resource: 'Tables',
+    access: 'read',
+    description: "Read a project's databases and tables, with their columns.",
+  },
+  'tables.write': {
+    resource: 'Tables',
+    access: 'write',
+    description: "Create, change, and delete a project's databases, tables, and columns.",
+  },
+  'rows.read': {
+    resource: 'Rows',
+    access: 'read',
+    description: 'Read, list, and count the rows of any table in the project.',
+  },
+  'rows.write': {
+    resource: 'Rows',
+    access: 'write',
+    description: 'Create, change, and delete the rows of any table in the project.',
+  },
 }
 
 /** One row of the scope grid: a resource with its read and write scopes, when it has them. */

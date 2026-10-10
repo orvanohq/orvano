@@ -22,6 +22,24 @@ public class ContractReaderTests
     }
 
     [Fact]
+    public async Task Reads_a_dynamic_model_as_an_open_object_and_refuses_one_with_properties() // covers: spec 0015 AC-28
+    {
+        var (contract, errors) = await Repo.ReadAsync(Repo.OpenApi());
+        Assert.Empty(errors);
+        var create = Assert.Single(contract!.Operations, o => o.Id == "rows.create");
+        Assert.IsType<DynamicType>(create.Body);
+        Assert.IsType<DynamicType>(create.Result);
+        Assert.DoesNotContain(contract.Models, m => m.Name == "Row");
+
+        var doc = Repo.OpenApi();
+        var row = doc["components"]!["schemas"]!["Row"]!.AsObject();
+        row["properties"] = new JsonObject { ["id"] = new JsonObject { ["type"] = "string" } };
+        var (refused, rowErrors) = await Repo.ReadAsync(doc);
+        Assert.Null(refused);
+        Assert.Contains(rowErrors, e => e.Contains("schema 'Row'", StringComparison.Ordinal) && e.Contains("x-orvano-dynamic", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Refuses_an_operation_without_an_audience_and_names_it() // covers: AC-2
     {
         var doc = Repo.OpenApi();

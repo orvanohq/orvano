@@ -1,0 +1,7 @@
+## Why it happens
+
+Until tables have permission rules, only server code with an API key and the console can use rows. Calls from apps, signed in or not, are refused for every table, whether it exists or not.
+
+## How to fix
+
+Call the data API from your server with an API key that has `rows.read` or `rows.write`, for example in a server route your app calls. Client access comes with permission rules.

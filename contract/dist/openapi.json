@@ -25,6 +25,15 @@
       "name": "oauth"
     },
     {
+      "name": "databases"
+    },
+    {
+      "name": "tables"
+    },
+    {
+      "name": "rows"
+    },
+    {
       "name": "test"
     }
   ],
@@ -4887,6 +4896,380 @@
         "x-orvano-audience": "console"
       }
     },
+    "/v1/console/project/databases": {
+      "get": {
+        "operationId": "consoleDatabases.list",
+        "description": "Lists the databases of the project named by `X-Orvano-Project`: `main` first, then by slug. Any member.",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Databases per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabasePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleDatabases",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/databases/{database}": {
+      "get": {
+        "operationId": "consoleDatabases.get",
+        "description": "Gets a database of the project named by `X-Orvano-Project`. Any member.",
+        "parameters": [
+          {
+            "name": "database",
+            "in": "path",
+            "required": true,
+            "description": "The database slug, such as `main`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Database"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleDatabases",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/databases/{database}/tables": {
+      "get": {
+        "operationId": "consoleTables.list",
+        "description": "Lists a database's tables by name. Any member.",
+        "parameters": [
+          {
+            "name": "database",
+            "in": "path",
+            "required": true,
+            "description": "The database slug, such as `main`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Tables per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TablePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleTables",
+        "x-orvano-audience": "console"
+      },
+      "post": {
+        "operationId": "consoleTables.create",
+        "description": "Creates a table, as `tables.create` does. Owners and developers.",
+        "parameters": [
+          {
+            "name": "database",
+            "in": "path",
+            "required": true,
+            "description": "The database slug, such as `main`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Table"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTableRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleTables",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/databases/{database}/tables/{table}": {
+      "get": {
+        "operationId": "consoleTables.get",
+        "description": "Gets a table with its columns. Any member.",
+        "parameters": [
+          {
+            "name": "database",
+            "in": "path",
+            "required": true,
+            "description": "The database slug, such as `main`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "table",
+            "in": "path",
+            "required": true,
+            "description": "The table name.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Table"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleTables",
+        "x-orvano-audience": "console"
+      }
+    },
+    "/v1/console/project/databases/{database}/tables/{table}/rows": {
+      "get": {
+        "operationId": "consoleRows.list",
+        "description": "Lists a table's rows, as `rows.list` does. Any member; the console needs no permission rules.",
+        "parameters": [
+          {
+            "name": "database",
+            "in": "path",
+            "required": true,
+            "description": "The database slug, such as `main`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "table",
+            "in": "path",
+            "required": true,
+            "description": "The table name.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Rows per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RowPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "console"
+        ],
+        "security": [
+          {
+            "consoleSession": []
+          }
+        ],
+        "x-orvano-service": "consoleRows",
+        "x-orvano-audience": "console"
+      }
+    },
     "/v1/console/project/email/smtp": {
       "get": {
         "operationId": "consoleSmtp.get",
@@ -6980,6 +7363,461 @@
         "x-orvano-audience": "console"
       }
     },
+    "/v1/databases": {
+      "get": {
+        "operationId": "databases.list",
+        "description": "Lists the project's databases: `main` first, then the rest by slug.",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Databases per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabasePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "databases"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "tables.read",
+        "x-orvano-service": "databases",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/databases/{database}": {
+      "get": {
+        "operationId": "databases.get",
+        "description": "Gets a database by slug.",
+        "parameters": [
+          {
+            "name": "database",
+            "in": "path",
+            "required": true,
+            "description": "The database slug, such as `main`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Database"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "databases"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "tables.read",
+        "x-orvano-service": "databases",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/databases/{database}/tables": {
+      "get": {
+        "operationId": "tables.list",
+        "description": "Lists a database's tables by name, with their columns, read live from Postgres.",
+        "parameters": [
+          {
+            "name": "database",
+            "in": "path",
+            "required": true,
+            "description": "The database slug, such as `main`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Tables per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TablePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "tables"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "tables.read",
+        "x-orvano-service": "tables",
+        "x-orvano-audience": "server"
+      },
+      "post": {
+        "operationId": "tables.create",
+        "description": "Creates a table with `id uuid` (the primary key, `uuidv7()` by default), `created_at`, `updated_at`, then your\ncolumns in order.",
+        "parameters": [
+          {
+            "name": "database",
+            "in": "path",
+            "required": true,
+            "description": "The database slug, such as `main`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Table"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "tables"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTableRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "tables.write",
+        "x-orvano-service": "tables",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/databases/{database}/tables/{table}": {
+      "get": {
+        "operationId": "tables.get",
+        "description": "Gets a table with its columns, read live from Postgres.",
+        "parameters": [
+          {
+            "name": "database",
+            "in": "path",
+            "required": true,
+            "description": "The database slug, such as `main`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "table",
+            "in": "path",
+            "required": true,
+            "description": "The table name.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Table"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "tables"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "tables.read",
+        "x-orvano-service": "tables",
+        "x-orvano-audience": "server"
+      }
+    },
+    "/v1/databases/{database}/tables/{table}/rows": {
+      "get": {
+        "operationId": "rows.list",
+        "description": "Lists rows, by `created_at` then `id` ascending. An API key needs `rows.read`; other callers are refused until\nthe table has permission rules.",
+        "parameters": [
+          {
+            "name": "database",
+            "in": "path",
+            "required": true,
+            "description": "The database slug, such as `main`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "table",
+            "in": "path",
+            "required": true,
+            "description": "The table name.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page. It works only with the same database and table.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Rows per page, 1 to 100. Defaults to 25.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RowPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "rows"
+        ],
+        "security": [
+          {},
+          {
+            "bearer": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "rows.read",
+        "x-orvano-service": "rows",
+        "x-orvano-audience": "both"
+      },
+      "post": {
+        "operationId": "rows.create",
+        "description": "Creates a row and answers it as stored. `id` may be sent (a uuid); `created_at` and `updated_at` never. An API key\nneeds `rows.write`; other callers are refused until the table has permission rules.",
+        "parameters": [
+          {
+            "name": "database",
+            "in": "path",
+            "required": true,
+            "description": "The database slug, such as `main`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "table",
+            "in": "path",
+            "required": true,
+            "description": "The table name.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Row"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "rows"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Row"
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-orvano-scope": "rows.write",
+        "x-orvano-service": "rows",
+        "x-orvano-audience": "both"
+      }
+    },
     "/v1/health": {
       "get": {
         "operationId": "health.get",
@@ -8898,7 +9736,11 @@
         "type": "string",
         "enum": [
           "users.read",
-          "users.write"
+          "users.write",
+          "tables.read",
+          "tables.write",
+          "rows.read",
+          "rows.write"
         ],
         "description": "What an API key may do: `<resource>.<read|write>`. A `write` scope does not imply `read`. Each product\nadds its own scopes."
       },
@@ -9497,6 +10339,173 @@
           }
         },
         "description": "A signed in user and their new session; for a user with MFA on, the challenge to answer first; or, for a sign up in\na project that requires verified emails, a pending answer that says to check the inbox. Exactly one of `session`,\n`mfa`, or `verificationRequired` true is set."
+      },
+      "Column": {
+        "type": "object",
+        "required": [
+          "name",
+          "type",
+          "pgType",
+          "required",
+          "unique",
+          "default",
+          "system",
+          "writable"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The column name.",
+            "examples": [
+              "title"
+            ]
+          },
+          "type": {
+            "$ref": "#/components/schemas/ColumnType",
+            "description": "The column's type in the API."
+          },
+          "pgType": {
+            "type": "string",
+            "description": "The Postgres type name, such as `int4` or `_text`.",
+            "examples": [
+              "text"
+            ]
+          },
+          "required": {
+            "type": "boolean",
+            "description": "True when the column is NOT NULL.",
+            "examples": [
+              false
+            ]
+          },
+          "unique": {
+            "type": "boolean",
+            "description": "True when a single column unique constraint or unique index covers exactly this column.",
+            "examples": [
+              false
+            ]
+          },
+          "default": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ColumnDefault"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The default, or null when there is none."
+          },
+          "system": {
+            "type": "boolean",
+            "description": "True for `id`, `created_at`, and `updated_at` on a standard table.",
+            "examples": [
+              false
+            ]
+          },
+          "writable": {
+            "type": "boolean",
+            "description": "False for system columns, `other` types, generated columns, and names the API can't address.",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "description": "A column, read live from Postgres."
+      },
+      "ColumnDefault": {
+        "type": "object",
+        "required": [
+          "kind",
+          "value"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/DefaultKind",
+            "description": "How the default is made."
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For `value`, the value as text (arrays in Postgres array syntax such as `{a,b}`, json as JSON text); for\n`expression`, the SQL text; null otherwise.",
+            "examples": [
+              "open"
+            ]
+          }
+        },
+        "description": "A column's default value."
+      },
+      "ColumnInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "`^[a-z][a-z0-9_]{0,62}$`, not a reserved Postgres keyword, not starting with `pg_` or `orvano`, and not `id`,\n`created_at`, or `updated_at`.",
+            "examples": [
+              "title"
+            ]
+          },
+          "type": {
+            "$ref": "#/components/schemas/ColumnType",
+            "description": "The column's type; `other` is refused."
+          },
+          "required": {
+            "type": "boolean",
+            "description": "True makes it NOT NULL. Defaults to false.",
+            "examples": [
+              false
+            ]
+          },
+          "unique": {
+            "type": "boolean",
+            "description": "True adds a single column unique constraint. Defaults to false.",
+            "examples": [
+              false
+            ]
+          },
+          "default": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ColumnDefault"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The default, if any. Kind `expression` is refused."
+          }
+        },
+        "description": "A column to create."
+      },
+      "ColumnType": {
+        "type": "string",
+        "enum": [
+          "text",
+          "integer",
+          "bigint",
+          "float",
+          "decimal",
+          "boolean",
+          "timestamp",
+          "date",
+          "uuid",
+          "json",
+          "text[]",
+          "integer[]",
+          "uuid[]",
+          "other"
+        ],
+        "description": "A column's type in the API. Each maps to one Postgres type; `other` is any type Orvano does not map, such as a\ncolumn made in SQL."
       },
       "CompleteMfaEnrollmentPasskeyRequest": {
         "type": "object",
@@ -10665,6 +11674,30 @@
         },
         "description": "A request to email a password reset link."
       },
+      "CreateTableRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "columns"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "`^[a-z][a-z0-9_]{0,62}$`, not a reserved Postgres keyword, and not starting with `pg_` or `orvano`.",
+            "examples": [
+              "tasks"
+            ]
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnInput"
+            },
+            "description": "0 to 200 columns, in order."
+          }
+        },
+        "description": "A new table. It always gets `id`, `created_at`, and `updated_at` first."
+      },
       "CreateTotpRequest": {
         "type": "object",
         "properties": {
@@ -10820,6 +11853,112 @@
           }
         },
         "description": "A new invitation and its link. The link is shown only here, once."
+      },
+      "Database": {
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "status",
+          "main",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The database ID: `main` for the main database, else 20 characters of `[a-z0-9]`.",
+            "examples": [
+              "main"
+            ]
+          },
+          "slug": {
+            "type": "string",
+            "description": "The name used in paths and SDK calls: `main`, or `^[a-z][a-z0-9_]{0,39}$`.",
+            "examples": [
+              "main"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "A display name, 1 to 100 characters.",
+            "examples": [
+              "Main"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/DatabaseStatus",
+            "description": "Whether the database can be used yet."
+          },
+          "main": {
+            "type": "boolean",
+            "description": "True for `main`.",
+            "examples": [
+              true
+            ]
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the database was created; null for `main`, which exists as long as its project."
+          }
+        },
+        "description": "A named group of tables, backed by its own Postgres schema. Every project has `main`, which can't be renamed or\ndeleted."
+      },
+      "DatabasePage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Database"
+            },
+            "description": "The databases on this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass it as `cursor` to get the next page; null on the last page."
+          }
+        },
+        "description": "One page of a project's databases: `main` first, then by slug."
+      },
+      "DatabaseStatus": {
+        "type": "string",
+        "enum": [
+          "provisioning",
+          "active",
+          "failed"
+        ],
+        "description": "Whether a database can be used yet."
+      },
+      "DefaultKind": {
+        "type": "string",
+        "enum": [
+          "value",
+          "now",
+          "uuidv7",
+          "random_uuid",
+          "expression"
+        ],
+        "description": "How a column's default is made."
       },
       "DeleteAccountRequest": {
         "type": "object",
@@ -11305,7 +12444,18 @@
           "passkey_already_registered",
           "passkey_limit",
           "passkeys_exist",
-          "passkey_not_found"
+          "passkey_not_found",
+          "database_not_found",
+          "table_not_found",
+          "database_not_ready",
+          "name_taken",
+          "schema_limit_reached",
+          "table_busy",
+          "table_not_writable",
+          "invalid_row",
+          "row_conflict",
+          "query_timeout",
+          "table_access_denied"
         ],
         "description": "Every stable error code the server sends in `Problem.code`."
       },
@@ -13074,9 +14224,40 @@
             "examples": [
               "4bf92f3577b34da6a3ce929d0e0e4736"
             ]
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProblemField"
+            },
+            "description": "Every bad field of the request, when the error names fields (`invalid_row`). Never holds a value."
           }
         },
         "description": "An RFC 9457 problem details body. Every operation declares it as its `default` response, sent\nas `application/problem+json`."
+      },
+      "ProblemField": {
+        "type": "object",
+        "required": [
+          "field",
+          "message"
+        ],
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "The field's path, such as `title` or `rows[3].title`.",
+            "examples": [
+              "title"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong with it, in a few words.",
+            "examples": [
+              "required"
+            ]
+          }
+        },
+        "description": "One bad field of a request."
       },
       "Project": {
         "type": "object",
@@ -13350,6 +14531,40 @@
           }
         },
         "description": "A template rendered with the sample values."
+      },
+      "Row": {
+        "type": "object",
+        "unevaluatedProperties": {},
+        "description": "A row: a JSON object keyed by column name. Values travel as their column type says: strings for text, uuid,\nbigint, and decimal; numbers for integer and float; ISO 8601 for timestamps; `YYYY-MM-DD` for dates; any JSON for\njson; arrays for array types.",
+        "x-orvano-dynamic": true
+      },
+      "RowPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Row"
+            },
+            "description": "The rows on this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass it as `cursor` to get the next page; null on the last page."
+          }
+        },
+        "description": "One page of rows."
       },
       "Session": {
         "type": "object",
@@ -13859,6 +15074,98 @@
           "none"
         ],
         "description": "Whose SMTP settings a project sends through."
+      },
+      "Table": {
+        "type": "object",
+        "required": [
+          "name",
+          "database",
+          "columns",
+          "readable",
+          "writable",
+          "estimatedRows"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The table name.",
+            "examples": [
+              "tasks"
+            ]
+          },
+          "database": {
+            "type": "string",
+            "description": "The slug of the database it is in.",
+            "examples": [
+              "main"
+            ]
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Column"
+            },
+            "description": "Every column, in order."
+          },
+          "readable": {
+            "type": "boolean",
+            "description": "False when the table has no primary key, so its rows can't be listed through the API.",
+            "examples": [
+              true
+            ]
+          },
+          "writable": {
+            "type": "boolean",
+            "description": "True only for a table whose primary key is the standard `id uuid`; others are read only through the API.",
+            "examples": [
+              true
+            ]
+          },
+          "estimatedRows": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Postgres' estimate of the row count; null when the table was never analyzed.",
+            "examples": [
+              1200
+            ]
+          }
+        },
+        "description": "A table, read live from Postgres."
+      },
+      "TablePage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Table"
+            },
+            "description": "The tables on this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass it as `cursor` to get the next page; null on the last page."
+          }
+        },
+        "description": "One page of a database's tables, by name."
       },
       "TemplateVariable": {
         "type": "object",

@@ -1389,6 +1389,42 @@ public static class ConsoleAuthProvidersOperations
     }
 }
 
+/// <summary>Route constants for the <c>consoleDatabases</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleDatabasesOperations
+{
+    /// <summary>GET /v1/console/project/databases/{database}: Gets a database of the project named by <c>X-Orvano-Project</c>. Any member.</summary>
+    public static class Get
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleDatabases.get";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/databases/{database}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/console/project/databases: Lists the databases of the project named by <c>X-Orvano-Project</c>: <c>main</c> first, then by slug. Any member.</summary>
+    public static class List
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleDatabases.list";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/databases";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
 /// <summary>Route constants for the <c>consoleEmailTemplates</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class ConsoleEmailTemplatesOperations
 {
@@ -2077,6 +2113,26 @@ public static class ConsoleProjectsOperations
     }
 }
 
+/// <summary>Route constants for the <c>consoleRows</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleRowsOperations
+{
+    /// <summary>GET /v1/console/project/databases/{database}/tables/{table}/rows: Lists a table's rows, as <c>rows.list</c> does. Any member; the console needs no permission rules.</summary>
+    public static class List
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleRows.list";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/databases/{database}/tables/{table}/rows";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
 /// <summary>Route constants for the <c>consoleSmtp</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class ConsoleSmtpOperations
 {
@@ -2139,6 +2195,58 @@ public static class ConsoleSmtpOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/console/project/email/smtp";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+}
+
+/// <summary>Route constants for the <c>consoleTables</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class ConsoleTablesOperations
+{
+    /// <summary>POST /v1/console/project/databases/{database}/tables: Creates a table, as <c>tables.create</c> does. Owners and developers.</summary>
+    public static class Create
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleTables.create";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/databases/{database}/tables";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/console/project/databases/{database}/tables/{table}: Gets a table with its columns. Any member.</summary>
+    public static class Get
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleTables.get";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/databases/{database}/tables/{table}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "console";
+    }
+
+    /// <summary>GET /v1/console/project/databases/{database}/tables: Lists a database's tables by name. Any member.</summary>
+    public static class List
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "consoleTables.list";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/console/project/databases/{database}/tables";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "console";
@@ -2453,6 +2561,48 @@ public static class ConsoleUsersOperations
     }
 }
 
+/// <summary>Route constants for the <c>databases</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class DatabasesOperations
+{
+    /// <summary>GET /v1/databases/{database}: Gets a database by slug.</summary>
+    public static class Get
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "databases.get";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/databases/{database}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "tables.read";
+    }
+
+    /// <summary>GET /v1/databases: Lists the project's databases: <c>main</c> first, then the rest by slug.</summary>
+    public static class List
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "databases.list";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/databases";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "tables.read";
+    }
+}
+
 /// <summary>Route constants for the <c>health</c> service. Routes are relative to the <c>/v1</c> group.</summary>
 public static class HealthOperations
 {
@@ -2506,6 +2656,109 @@ public static class KeysOperations
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "both";
+    }
+}
+
+/// <summary>Route constants for the <c>rows</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class RowsOperations
+{
+    /// <summary>POST /v1/databases/{database}/tables/{table}/rows: Creates a row and answers it as stored. <c>id</c> may be sent (a uuid); <c>created_at</c> and <c>updated_at</c> never. An API key</summary>
+    public static class Create
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "rows.create";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/databases/{database}/tables/{table}/rows";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "both";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "rows.write";
+    }
+
+    /// <summary>GET /v1/databases/{database}/tables/{table}/rows: Lists rows, by <c>created_at</c> then <c>id</c> ascending. An API key needs <c>rows.read</c>; other callers are refused until</summary>
+    public static class List
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "rows.list";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/databases/{database}/tables/{table}/rows";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "both";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "rows.read";
+    }
+}
+
+/// <summary>Route constants for the <c>tables</c> service. Routes are relative to the <c>/v1</c> group.</summary>
+public static class TablesOperations
+{
+    /// <summary>POST /v1/databases/{database}/tables: Creates a table with <c>id uuid</c> (the primary key, <c>uuidv7()</c> by default), <c>created_at</c>, <c>updated_at</c>, then your</summary>
+    public static class Create
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "tables.create";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/databases/{database}/tables";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "tables.write";
+    }
+
+    /// <summary>GET /v1/databases/{database}/tables/{table}: Gets a table with its columns, read live from Postgres.</summary>
+    public static class Get
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "tables.get";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/databases/{database}/tables/{table}";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "tables.read";
+    }
+
+    /// <summary>GET /v1/databases/{database}/tables: Lists a database's tables by name, with their columns, read live from Postgres.</summary>
+    public static class List
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "tables.list";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "GET";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/databases/{database}/tables";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "server";
+
+        /// <summary>The API key scope it needs.</summary>
+        public const string Scope = "tables.read";
     }
 }
 

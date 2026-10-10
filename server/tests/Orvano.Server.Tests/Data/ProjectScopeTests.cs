@@ -141,6 +141,80 @@ public class ProjectScopeTests(PostgresFixture postgres)
             ProjectScope.RunAsync(unreachable, "Bad-ID", (_, _, _) => Task.FromResult(0), TestContext.Current.CancellationToken));
     }
 
+    [Fact]
+    public async Task Runs_in_another_schema_of_the_project_then_the_platform_step_as_orvano_app_in_the_same_transaction()
+    {
+        await using var database = await postgres.NewDatabaseAsync();
+        var projectId = await ProvisionProjectAsync(database);
+        var schema = "d_" + projectId;
+        await TestDatabase.ExecuteAsync(database.Superuser, $"CREATE SCHEMA {schema} AUTHORIZATION p_{projectId}");
+        (string User, long Tx)? after = null;
+
+        var inside = await ProjectScope.RunAsync(database.App, projectId, schema, async (conn, tx, ct) =>
+        {
+            await using var cmd = new NpgsqlCommand("SELECT current_setting('search_path'), txid_current()", conn, tx);
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            await reader.ReadAsync(ct);
+            return (SearchPath: reader.GetString(0), Tx: reader.GetInt64(1));
+        }, async (conn, tx, result, ct) =>
+        {
+            await using var cmd = new NpgsqlCommand("SELECT current_user::text, txid_current()", conn, tx);
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            await reader.ReadAsync(ct);
+            after = (reader.GetString(0), reader.GetInt64(1));
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(schema, inside.SearchPath.Trim('"'));
+        Assert.Equal(("orvano_app", inside.Tx), after);
+    }
+
+    [Fact]
+    public async Task A_throwing_platform_step_rolls_back_the_project_work_too()
+    {
+        await using var database = await postgres.NewDatabaseAsync();
+        var projectId = await ProvisionProjectAsync(database);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ProjectScope.RunAsync<int>(database.App, projectId, $"p_{projectId}", async (conn, tx, ct) =>
+        {
+            await using var cmd = new NpgsqlCommand("INSERT INTO items (name) VALUES ('lost')", conn, tx);
+            return await cmd.ExecuteNonQueryAsync(ct);
+        }, (_, _, _, _) => throw new InvalidOperationException("boom"), TestContext.Current.CancellationToken));
+
+        Assert.Equal(1L, await TestDatabase.ScalarAsync<long>(database.Superuser, $"SELECT count(*) FROM p_{projectId}.items"));
+    }
+
+    [Theory]
+    [InlineData("public")]
+    [InlineData("orvano")]
+    [InlineData("p_")]
+    [InlineData("x_abc")]
+    [InlineData("d_abc\"; DROP TABLE x; --")]
+    public async Task Refuses_a_schema_that_is_not_a_project_schema(string schema)
+    {
+        await using var unreachable = NpgsqlDataSource.Create("Host=127.0.0.1;Port=1;Username=x;Password=x;Timeout=1");
+
+        var error = await Assert.ThrowsAsync<ArgumentException>(() =>
+            ProjectScope.RunAsync(unreachable, "abc", schema, (_, _, _) => Task.FromResult(0), afterAsApp: null, TestContext.Current.CancellationToken));
+
+        Assert.Equal("schema", error.ParamName);
+    }
+
+    [Fact]
+    public async Task The_project_role_cannot_reach_a_schema_it_does_not_own()
+    {
+        await using var database = await postgres.NewDatabaseAsync();
+        var projectId = await ProvisionProjectAsync(database);
+        var otherProject = await ProvisionProjectAsync(database);
+
+        var error = await Assert.ThrowsAsync<PostgresException>(() => ProjectScope.RunAsync(database.App, projectId, $"p_{otherProject}", async (conn, tx, ct) =>
+        {
+            await using var cmd = new NpgsqlCommand("SELECT count(*) FROM items", conn, tx);
+            return (long)(await cmd.ExecuteScalarAsync(ct))!;
+        }, afterAsApp: null, TestContext.Current.CancellationToken));
+
+        Assert.Equal(PostgresErrorCodes.UndefinedTable, error.SqlState);
+    }
+
     /// <summary>
     /// What project provisioning will do (rows 3 and 7): a NOLOGIN role owning its schema, granted to
     /// orvano_app without inheritance so the app must SET ROLE to use it. Roles are cluster wide, so

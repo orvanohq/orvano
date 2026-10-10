@@ -48,6 +48,7 @@ import type {
   RecoveryCodes,
   RefreshSessionRequest,
   RejectEmailVerificationRequest,
+  RowPage,
   Session,
   SessionPage,
   SessionTokens,
@@ -713,6 +714,65 @@ export class KeysService {
   }
 }
 
+/** Operations in the `rows` service. */
+export class RowsService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /**
+   * Creates a row and answers it as stored. `id` may be sent (a uuid); `created_at` and `updated_at` never. An API key
+   * needs `rows.write`; other callers are refused until the table has permission rules.
+   */
+  create(
+    database: string,
+    table: string,
+    body: Record<string, unknown>,
+    options?: RequestOptions,
+  ): Promise<Record<string, unknown>> {
+    return this.#client.request<Record<string, unknown>>(
+      {
+        method: 'POST',
+        path: `/v1/databases/${encodeURIComponent(database)}/tables/${encodeURIComponent(table)}/rows`,
+        body,
+      },
+      options,
+    )
+  }
+
+  /**
+   * Lists rows, by `created_at` then `id` ascending. An API key needs `rows.read`; other callers are refused until
+   * the table has permission rules.
+   */
+  list(
+    database: string,
+    table: string,
+    query?: { cursor?: string | undefined; limit?: number | undefined },
+    options?: RequestOptions,
+  ): Promise<RowPage> {
+    return this.#client.request<RowPage>(
+      {
+        method: 'GET',
+        path: `/v1/databases/${encodeURIComponent(database)}/tables/${encodeURIComponent(table)}/rows`,
+        query,
+      },
+      options,
+    )
+  }
+
+  /** Every item of `list`, walking all pages: `for await (const item of ...)`. */
+  listAll(
+    database: string,
+    table: string,
+    query?: { limit?: number | undefined },
+    options?: RequestOptions,
+  ): AsyncGenerator<Record<string, unknown>> {
+    return paginate((cursor) => this.list(database, table, { ...query, cursor }, options))
+  }
+}
+
 /** Every service in this entry, on one object: `orvano.health.get()`. */
 export class Orvano {
   /** The client every service sends through. */
@@ -723,11 +783,14 @@ export class Orvano {
   readonly health: HealthService
   /** Operations in the `keys` service. */
   readonly keys: KeysService
+  /** Operations in the `rows` service. */
+  readonly rows: RowsService
 
   constructor(client: Client) {
     this.client = client
     this.account = new AccountService(client)
     this.health = new HealthService(client)
     this.keys = new KeysService(client)
+    this.rows = new RowsService(client)
   }
 }

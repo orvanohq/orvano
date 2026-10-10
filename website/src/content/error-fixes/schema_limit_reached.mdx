@@ -1,0 +1,7 @@
+## Why it happens
+
+The API creates at most 500 tables per database, 200 columns per table (besides `id`, `created_at`, and `updated_at`), and 10 databases per project besides `main`.
+
+## How to fix
+
+Remove what you no longer need, or split your data across another database. Tables made in SQL don't count toward these limits.

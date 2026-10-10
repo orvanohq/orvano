@@ -14,6 +14,10 @@ export const ErrorCode = {
   contractViolation: 'contract_violation',
   /** `csrf_rejected` */
   csrfRejected: 'csrf_rejected',
+  /** `database_not_found` */
+  databaseNotFound: 'database_not_found',
+  /** `database_not_ready` */
+  databaseNotReady: 'database_not_ready',
   /** `email_already_in_use` */
   emailAlreadyInUse: 'email_already_in_use',
   /** `email_already_verified` */
@@ -68,6 +72,8 @@ export const ErrorCode = {
   invalidRefreshToken: 'invalid_refresh_token',
   /** `invalid_request` */
   invalidRequest: 'invalid_request',
+  /** `invalid_row` */
+  invalidRow: 'invalid_row',
   /** `invalid_token` */
   invalidToken: 'invalid_token',
   /** `invitation_email_mismatch` */
@@ -90,6 +96,8 @@ export const ErrorCode = {
   mfaRequired: 'mfa_required',
   /** `mfa_verification_required` */
   mfaVerificationRequired: 'mfa_verification_required',
+  /** `name_taken` */
+  nameTaken: 'name_taken',
   /** `not_found` */
   notFound: 'not_found',
   /** `oauth_access_denied` */
@@ -126,12 +134,18 @@ export const ErrorCode = {
   providerNotEnabled: 'provider_not_enabled',
   /** `provider_unavailable` */
   providerUnavailable: 'provider_unavailable',
+  /** `query_timeout` */
+  queryTimeout: 'query_timeout',
   /** `rate_limited` */
   rateLimited: 'rate_limited',
   /** `reauthentication_required` */
   reauthenticationRequired: 'reauthentication_required',
   /** `redirect_url_not_allowed` */
   redirectUrlNotAllowed: 'redirect_url_not_allowed',
+  /** `row_conflict` */
+  rowConflict: 'row_conflict',
+  /** `schema_limit_reached` */
+  schemaLimitReached: 'schema_limit_reached',
   /** `server_busy` */
   serverBusy: 'server_busy',
   /** `session_not_found` */
@@ -156,6 +170,14 @@ export const ErrorCode = {
   smtpTlsFailed: 'smtp_tls_failed',
   /** `smtp_unreachable` */
   smtpUnreachable: 'smtp_unreachable',
+  /** `table_access_denied` */
+  tableAccessDenied: 'table_access_denied',
+  /** `table_busy` */
+  tableBusy: 'table_busy',
+  /** `table_not_found` */
+  tableNotFound: 'table_not_found',
+  /** `table_not_writable` */
+  tableNotWritable: 'table_not_writable',
   /** `template_invalid` */
   templateInvalid: 'template_invalid',
   /** `token_expired` */

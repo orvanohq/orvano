@@ -5,7 +5,8 @@ import type { MfaChallenge, OAuthProvider, PasskeyAnswer, UserStatus } from '@or
  * What an API key may do: `<resource>.<read|write>`. A `write` scope does not imply `read`. Each product
  * adds its own scopes.
  */
-export type ApiKeyScope = 'users.read' | 'users.write'
+export type ApiKeyScope =
+  'users.read' | 'users.write' | 'tables.read' | 'tables.write' | 'rows.read' | 'rows.write'
 
 /** One of the five auth email templates a project can edit. */
 export type AuthEmailKind =

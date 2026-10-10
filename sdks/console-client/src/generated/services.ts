@@ -61,10 +61,13 @@ import type {
   ConfirmTotpRequest,
   CreatePasskeyRegistrationRequest,
   CreatePasskeySessionRequest,
+  CreateTableRequest,
   CreateTotpRequest,
   CreateUserRecoveryRequest,
   CreateUserRequest,
   CreateUserVerificationRequest,
+  Database,
+  DatabasePage,
   IdentityList,
   MfaStatus,
   Passkey,
@@ -73,8 +76,11 @@ import type {
   PasskeyRegistration,
   RecoveryCodes,
   RequestOptions,
+  RowPage,
   Session,
   SessionPage,
+  Table,
+  TablePage,
   TotpSetup,
   UpdateEmailVerificationRequest,
   UpdatePasskeyRequest,
@@ -507,6 +513,42 @@ export class ConsoleAuthProvidersService {
       },
       options,
     )
+  }
+}
+
+/** Operations in the `consoleDatabases` service. */
+export class ConsoleDatabasesService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /** Gets a database of the project named by `X-Orvano-Project`. Any member. */
+  get(database: string, options?: RequestOptions): Promise<Database> {
+    return this.#client.request<Database>(
+      { method: 'GET', path: `/v1/console/project/databases/${encodeURIComponent(database)}` },
+      options,
+    )
+  }
+
+  /** Lists the databases of the project named by `X-Orvano-Project`: `main` first, then by slug. Any member. */
+  list(
+    query?: { cursor?: string | undefined; limit?: number | undefined },
+    options?: RequestOptions,
+  ): Promise<DatabasePage> {
+    return this.#client.request<DatabasePage>(
+      { method: 'GET', path: '/v1/console/project/databases', query },
+      options,
+    )
+  }
+
+  /** Every item of `list`, walking all pages: `for await (const item of ...)`. */
+  listAll(
+    query?: { limit?: number | undefined },
+    options?: RequestOptions,
+  ): AsyncGenerator<Database> {
+    return paginate((cursor) => this.list({ ...query, cursor }, options))
   }
 }
 
@@ -1091,6 +1133,42 @@ export class ConsoleProjectsService {
   }
 }
 
+/** Operations in the `consoleRows` service. */
+export class ConsoleRowsService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /** Lists a table's rows, as `rows.list` does. Any member; the console needs no permission rules. */
+  list(
+    database: string,
+    table: string,
+    query?: { cursor?: string | undefined; limit?: number | undefined },
+    options?: RequestOptions,
+  ): Promise<RowPage> {
+    return this.#client.request<RowPage>(
+      {
+        method: 'GET',
+        path: `/v1/console/project/databases/${encodeURIComponent(database)}/tables/${encodeURIComponent(table)}/rows`,
+        query,
+      },
+      options,
+    )
+  }
+
+  /** Every item of `list`, walking all pages: `for await (const item of ...)`. */
+  listAll(
+    database: string,
+    table: string,
+    query?: { limit?: number | undefined },
+    options?: RequestOptions,
+  ): AsyncGenerator<Record<string, unknown>> {
+    return paginate((cursor) => this.list(database, table, { ...query, cursor }, options))
+  }
+}
+
 /** Operations in the `consoleSmtp` service. */
 export class ConsoleSmtpService {
   readonly #client: Client
@@ -1139,6 +1217,63 @@ export class ConsoleSmtpService {
       { method: 'PUT', path: '/v1/console/project/email/smtp', body, idempotent: true },
       options,
     )
+  }
+}
+
+/** Operations in the `consoleTables` service. */
+export class ConsoleTablesService {
+  readonly #client: Client
+
+  constructor(client: Client) {
+    this.#client = client
+  }
+
+  /** Creates a table, as `tables.create` does. Owners and developers. */
+  create(database: string, body: CreateTableRequest, options?: RequestOptions): Promise<Table> {
+    return this.#client.request<Table>(
+      {
+        method: 'POST',
+        path: `/v1/console/project/databases/${encodeURIComponent(database)}/tables`,
+        body,
+      },
+      options,
+    )
+  }
+
+  /** Gets a table with its columns. Any member. */
+  get(database: string, table: string, options?: RequestOptions): Promise<Table> {
+    return this.#client.request<Table>(
+      {
+        method: 'GET',
+        path: `/v1/console/project/databases/${encodeURIComponent(database)}/tables/${encodeURIComponent(table)}`,
+      },
+      options,
+    )
+  }
+
+  /** Lists a database's tables by name. Any member. */
+  list(
+    database: string,
+    query?: { cursor?: string | undefined; limit?: number | undefined },
+    options?: RequestOptions,
+  ): Promise<TablePage> {
+    return this.#client.request<TablePage>(
+      {
+        method: 'GET',
+        path: `/v1/console/project/databases/${encodeURIComponent(database)}/tables`,
+        query,
+      },
+      options,
+    )
+  }
+
+  /** Every item of `list`, walking all pages: `for await (const item of ...)`. */
+  listAll(
+    database: string,
+    query?: { limit?: number | undefined },
+    options?: RequestOptions,
+  ): AsyncGenerator<Table> {
+    return paginate((cursor) => this.list(database, { ...query, cursor }, options))
   }
 }
 
@@ -1430,6 +1565,8 @@ export class Orvano {
   readonly consoleAuthPolicies: ConsoleAuthPoliciesService
   /** Operations in the `consoleAuthProviders` service. */
   readonly consoleAuthProviders: ConsoleAuthProvidersService
+  /** Operations in the `consoleDatabases` service. */
+  readonly consoleDatabases: ConsoleDatabasesService
   /** Operations in the `consoleEmailTemplates` service. */
   readonly consoleEmailTemplates: ConsoleEmailTemplatesService
   /** Operations in the `consoleEmails` service. */
@@ -1446,8 +1583,12 @@ export class Orvano {
   readonly consolePlatforms: ConsolePlatformsService
   /** Operations in the `consoleProjects` service. */
   readonly consoleProjects: ConsoleProjectsService
+  /** Operations in the `consoleRows` service. */
+  readonly consoleRows: ConsoleRowsService
   /** Operations in the `consoleSmtp` service. */
   readonly consoleSmtp: ConsoleSmtpService
+  /** Operations in the `consoleTables` service. */
+  readonly consoleTables: ConsoleTablesService
   /** Operations in the `consoleUsers` service. */
   readonly consoleUsers: ConsoleUsersService
 
@@ -1459,6 +1600,7 @@ export class Orvano {
     this.consoleAuthMethods = new ConsoleAuthMethodsService(client)
     this.consoleAuthPolicies = new ConsoleAuthPoliciesService(client)
     this.consoleAuthProviders = new ConsoleAuthProvidersService(client)
+    this.consoleDatabases = new ConsoleDatabasesService(client)
     this.consoleEmailTemplates = new ConsoleEmailTemplatesService(client)
     this.consoleEmails = new ConsoleEmailsService(client)
     this.consoleInstall = new ConsoleInstallService(client)
@@ -1467,7 +1609,9 @@ export class Orvano {
     this.consoleOrgs = new ConsoleOrgsService(client)
     this.consolePlatforms = new ConsolePlatformsService(client)
     this.consoleProjects = new ConsoleProjectsService(client)
+    this.consoleRows = new ConsoleRowsService(client)
     this.consoleSmtp = new ConsoleSmtpService(client)
+    this.consoleTables = new ConsoleTablesService(client)
     this.consoleUsers = new ConsoleUsersService(client)
   }
 }

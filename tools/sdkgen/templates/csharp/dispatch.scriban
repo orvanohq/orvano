@@ -1,5 +1,9 @@
 // {{ header }}
 // Test only: maps each operationId to its SDK call for the scenario interpreter. Never published.
+{{~ if uses_nodes ~}}
+using System.Text.Json.Nodes;
+
+{{~ end ~}}
 namespace Orvano.Scenarios.Generated;
 
 internal static class Dispatch
