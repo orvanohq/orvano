@@ -1,7 +1,7 @@
 # 0004. App user sign up, sign in, and sessions
 
 **Date**: 2026-09-26
-**Updated**: 2026-10-10 (the Next.js route handler's allowed origin is the first `X-Forwarded-Host` value, else `Host`, plus the scheme, not `request.nextUrl.origin`, which self hosted `next start` builds from its listening address; #124); 2026-10-08 (spec 0013: the `aal` and `amr` claims and `Session` fields, the step up check before the password checks of AC-14 and AC-15, the `passkey` session method, the `mfa_enabled` and `mfa_reset` end reasons, and `AuthResult` with nullable `user` and `session` plus `mfa`); 2026-10-07 (the `oauth` and `id_token` session methods with `Session.provider`, `User.providers` and `hasPassword`, and the Next.js `oauth` and `oauth-callback` actions, spec 0012); 2026-10-02 (the `email_verified` claim, the session `method`, and the `password_reset` and `account_claimed` end reasons, spec 0010); 2026-09-27 (`setupToken` on console sign up, `consoleInstall.getSetup` works without a session and has its own limit, spec 0006)
+**Updated**: 2026-10-10 (spec 0014: `AuthResult` gains `verificationRequired`, the password rules, token lifetimes, and limits become per project settings, and failed sign ins count per email plus limit IP); 2026-10-10 (the Next.js route handler's allowed origin is the first `X-Forwarded-Host` value, else `Host`, plus the scheme, not `request.nextUrl.origin`, which self hosted `next start` builds from its listening address; #124); 2026-10-08 (spec 0013: the `aal` and `amr` claims and `Session` fields, the step up check before the password checks of AC-14 and AC-15, the `passkey` session method, the `mfa_enabled` and `mfa_reset` end reasons, and `AuthResult` with nullable `user` and `session` plus `mfa`); 2026-10-07 (the `oauth` and `id_token` session methods with `Session.provider`, `User.providers` and `hasPassword`, and the Next.js `oauth` and `oauth-callback` actions, spec 0012); 2026-10-02 (the `email_verified` claim, the session `method`, and the `password_reset` and `account_claimed` end reasons, spec 0010); 2026-09-27 (`setupToken` on console sign up, `consoleInstall.getSetup` works without a session and has its own limit, spec 0006)
 **Status**: Accepted
 
 ## Summary
@@ -21,7 +21,7 @@ This spec gives every Orvano project email and password sign up and sign in, and
 
 Sign up and sign in
 - **AC-1**: `account.create` with `email`, `password`, and an optional `name` creates the user, their password row, and a session in one transaction, and answers 201 with the user and the session (access token, refresh token, and both expiry times). The email is trimmed, at most 320 characters, and must match `^[^\s@]+@[^\s@]+$`, otherwise 400 `invalid_request`.
-- **AC-2**: A password is normalised to Unicode NFKC, then must be 8 to 256 code points long, otherwise 400 `invalid_password`. Nothing else is checked in v0.1 (row 14 adds per project rules and a breached password check).
+- **AC-2**: A password is normalised to Unicode NFKC, then must be 8 to 256 code points long, otherwise 400 `invalid_password`. Nothing else is checked in v0.1 ([spec 0014](../0014-auth-policies-abuse-protection/index.md) adds a per project minimum of 8 to 64, the common password list, on by default, and an optional breached password check, its AC-4 to AC-6).
 - **AC-3**: A sign up whose email already exists in the project, ignoring case, gets 409 `user_already_exists`. Two racing sign ups with the same email give exactly one user: the insert relies on spec 0003's unique index on (`project_id`, `lower(email)`), and a unique violation (`23505`) on that index maps to 409 `user_already_exists`, never a 500. The same email in another project is a separate user.
 - **AC-4**: `account.createPasswordSession` with the right email and password answers 201 with the user and a new session, and sets `auth_users.last_sign_in_at`. A wrong password and an unknown email both get 401 `invalid_credentials` with the same body, and both run exactly one Argon2id verification (an unknown email is checked against a fixed dummy hash).
 - **AC-5**: A blocked user with the right password gets 403 `user_blocked`. With a wrong password they get 401 `invalid_credentials`, so block status never shows to someone without the password.
@@ -191,7 +191,7 @@ Hash comparisons use `CryptographicOperations.FixedTimeEquals`.
 
 The session ID inside the refresh token lets the server find the row directly, without a lookup by hash. The session ID is not a secret (it is also the `sid` claim), so only the secret part proves anything, and only a match with the previous secret counts as reuse.
 
-Constants live in one domain class, `AuthTimings`: access 900 s, idle 30 days, absolute 365 days, refresh grace 10 s, session cache 30 s, key overlap 24 h, retention 30 days, clock leeway 30 s, client refresh margin 60 s. Row 14 turns the first three into per project settings.
+Constants live in one domain class, `AuthTimings`: access 900 s, idle 30 days, absolute 365 days, refresh grace 10 s, session cache 30 s, key overlap 24 h, retention 30 days, clock leeway 30 s, client refresh margin 60 s. Spec 0014 turns the first three into per project settings (`accessTokenSeconds`, `sessionIdleSeconds`, `sessionAbsoluteSeconds`, its AC-25), with these constants as their defaults.
 
 ### Password hashing
 
@@ -209,7 +209,7 @@ All paths are under `/v1`. Project scoped operations need `X-Orvano-Project` and
 
 | Operation | Method and path | Key inputs | Output | Auth | Key errors |
 |---|---|---|---|---|---|
-| `account.create` | POST `/account` | `email`, `password`, `name?` | 201 `AuthResult` (`user`, `session`) | none | 400 `invalid_request`, 400 `invalid_password`, 409 `user_already_exists`, 429 |
+| `account.create` | POST `/account` | `email`, `password`, `name?` | 201 `AuthResult` (`user`, `session`; under spec 0014's verified email rule, the pending answer with `verificationRequired` true and both null) | none | 400 `invalid_request`, 400 `invalid_password`, 409 `user_already_exists`, 429 |
 | `account.createPasswordSession` | POST `/account/sessions/password` | `email`, `password` | 201 `AuthResult` | none | 401 `invalid_credentials`, 403 `user_blocked`, 429 |
 | `account.refreshSession` | POST `/account/sessions/refresh` (marked `x-orvano-idempotent`) | `refreshToken` | 200 `SessionTokens` | none | 401 `invalid_refresh_token`, 429 |
 | `account.get` | GET `/account` | | 200 `User` | bearer | 401 `session_required`, `invalid_token`, `token_expired` |
@@ -265,7 +265,7 @@ The discovery document exists only so standard JWT libraries (ASP.NET JwtBearer 
 
 The first four console account operations, plus spec 0006's `consoleInstall.getSetup` (GET `/console/install/setup`, answers only `setupRequired`), are the only console routes that work without a console session. Console account self service (password change, sessions, deletion through `IConsoleAccountGuard`) is left for a later row.
 
-**Models**: `User` (AC-12, plus `providers` and `hasPassword` from spec 0012), `Session` (AC-16, plus `method` from spec 0010, `provider` from spec 0012, and `aal` and `amr` from spec 0013), `SessionTokens` (`accessToken`, `accessTokenExpiresAt`, `refreshToken`, `refreshTokenExpiresAt` = the session's `least(idle_expires_at, expires_at)`, `sessionId`), `AuthResult` (`user`, `session: SessionTokens`, plus `isNewUser` and `verificationEmail` from spec 0010; spec 0013 makes `user` and `session` nullable and adds `mfa: MfaChallenge | null`, set with both null when a sign in stops at the MFA step), `UserList`, `SessionList`, `Jwk`, `Jwks`, `OpenIdConfiguration`, and `enum UserStatus { active, blocked }`.
+**Models**: `User` (AC-12, plus `providers` and `hasPassword` from spec 0012), `Session` (AC-16, plus `method` from spec 0010, `provider` from spec 0012, and `aal` and `amr` from spec 0013), `SessionTokens` (`accessToken`, `accessTokenExpiresAt`, `refreshToken`, `refreshTokenExpiresAt` = the session's `least(idle_expires_at, expires_at)`, `sessionId`), `AuthResult` (`user`, `session: SessionTokens`, plus `isNewUser` and `verificationEmail` from spec 0010; spec 0013 makes `user` and `session` nullable and adds `mfa: MfaChallenge | null`, set with both null when a sign in stops at the MFA step; spec 0014 adds `verificationRequired: boolean`, true only on its pending sign up answer), `UserList`, `SessionList`, `Jwk`, `Jwks`, `OpenIdConfiguration`, and `enum UserStatus { active, blocked }`.
 
 **New error codes** in `contract/errors.tsp`: `invalid_password` (400), `invalid_credentials` (401), `session_required` (401), `invalid_token` (401), `token_expired` (401), `invalid_refresh_token` (401), `user_blocked` (403), `csrf_rejected` (403), `user_not_found` (404), `session_not_found` (404), `user_already_exists` (409), `rate_limited` (429), `server_busy` (503). Spec 0003's `invalid_api_key`, `insufficient_scope`, and `origin_not_allowed` land here too. `console_session_required` stays for console routes. `consoleAccount.create` can also return spec 0006's `setup_token_invalid` (403), which that spec adds.
 
@@ -290,7 +290,7 @@ Cookie `Secure` is on by default. `@orvano/nextjs` turns it off only when the ap
 
 ### Rate limits
 
-In memory, fixed window, per `api` process (spec 0002's middleware). The connection IP is the peer address, or the forwarded client address when the peer is a trusted proxy (see *Configuration*). `X-Orvano-Client-IP` never counts.
+In memory, fixed window, per `api` process (spec 0002's middleware). The connection IP is the peer address, or the forwarded client address when the peer is a trusted proxy (see *Configuration*). `X-Orvano-Client-IP` never counts (spec 0014's AC-16 trusts it from a project's listed app servers).
 
 | Operations | Key | Limit |
 |---|---|---|
@@ -304,7 +304,7 @@ In memory, fixed window, per `api` process (spec 0002's middleware). The connect
 
 The failed refresh limit per IP stops someone from spraying made up session IDs from one address, while a busy Next.js server's successful refreshes never count against it.
 
-A sign in within the limit counts whether it succeeds or not. Row 14 makes these per project settings and adds failed attempt lockouts.
+A sign in within the limit counts whether it succeeds or not. Spec 0014 replaces the per email row: failed sign ins count per project, email, and limit IP (`auth.sign_in_failed.email_ip`) and per limit IP (`auth.sign_in_failed.ip`), and those two and the sign up limit become per project settings (its *Rate limits*, AC-17 and AC-21).
 
 ### Value sourcing
 
@@ -383,7 +383,7 @@ A sign in within the limit counts whether it succeeds or not. Row 14 makes these
 - `ORVANO_MASTER_KEYS` (spec 0002): now required and validated at startup by `api` and `worker` (each entry `id:base64` of exactly 32 bytes, unique IDs). This row is the first user of envelope encryption.
 - `ORVANO_PUBLIC_URL` (spec 0002): now required and validated at startup by `api` (an absolute `http` or `https` URL with no path, query, or fragment), since it forms the token issuer. The API checks `iss` against the current value only, so after a change every existing access token gets 401 `invalid_token`, and client SDKs refresh into new ones (AC-26). Outside verifiers must reload discovery from the new URL.
 - `ORVANO_TRUSTED_PROXIES` (new): which peers may set `X-Forwarded-For` and `X-Forwarded-Proto`. A comma separated list of CIDR ranges, or `private` (loopback plus 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fc00::/7), or `none`. Default `private`, which is right for the compose shape where only Caddy reaches the API. Validated at startup by `api`.
-- No other new setting. The token lifetimes and limits are constants until row 14.
+- No other new setting. The token lifetimes and limits are constants until row 14 (spec 0014 makes them per project settings).
 
 ### Critical test scenarios
 
@@ -440,7 +440,7 @@ Tracer Bullet: task 3 is the thin thread (sign up, sign in, get the current user
 - Tokens are bound to `ORVANO_PUBLIC_URL`. Changing it breaks outside verifiers until they reload discovery.
 - The Next.js integration needs one route file mounted by the developer, one more setup step than a cookie only design.
 - `X-Orvano-Client-IP` is spoofable. It only feeds the device list, but a user can see a wrong IP there.
-- The per email sign in limit lets anyone lock a known email out of sign in for 15 minutes. Row 14 should add smarter lockouts.
+- The per email sign in limit lets anyone lock a known email out of sign in for 15 minutes. Row 14 should add smarter lockouts. Spec 0014 does: failures count per email plus limit IP (its AC-17), so a stranger's guesses lock out only their own address.
 - v0.1 had no password recovery: a user who forgot their password needed the developer to delete and recreate them. Row 10 shipped reset in [spec 0010](../0010-email-verification-recovery-passwordless/index.md) (AC-7 to AC-10).
 - A stolen refresh token that is two or more rotations old is refused but not treated as theft. That is safe (it cannot be used), and it is the price of never letting a made up token end a session.
 - A NativeAOT or trimmed build of `Orvano.Auth` is not a goal; `Microsoft.IdentityModel` uses reflection in places.
@@ -454,8 +454,8 @@ Tracer Bullet: task 3 is the thin thread (sign up, sign in, get the current user
 ## Follow-up
 
 - [x] Row 13 (MFA, passkeys & sessions): session listing and revoking moved into this spec; trim row 13 to MFA, recovery codes, and passkeys. Done in [spec 0013](../0013-mfa-passkeys-sessions/index.md), which adds session strength (`aal`, `amr`), MFA, and passkeys on top of this spec's session listing.
-- [ ] Row 14 (auth policies): make the token lifetimes, password rules, and limits per project settings; add failed attempt lockouts that resist lockout abuse, and a breached password check.
-- [x] Row 10: add the per project "require verified email" switch (off by default) and email change with verification. Email change shipped in [spec 0010](../0010-email-verification-recovery-passwordless/index.md) (AC-17, AC-18). The switch was decided against for now: verification is data apps read (`emailVerified` and the claim), and row 14 may add an enforced switch.
+- [x] Row 14 (auth policies): make the token lifetimes, password rules, and limits per project settings; add failed attempt lockouts that resist lockout abuse, and a breached password check. Done in [spec 0014](../0014-auth-policies-abuse-protection/index.md).
+- [x] Row 10: add the per project "require verified email" switch (off by default) and email change with verification. Email change shipped in [spec 0010](../0010-email-verification-recovery-passwordless/index.md) (AC-17, AC-18). The switch was decided against for now: verification is data apps read (`emailVerified` and the claim), and row 14 may add an enforced switch. Spec 0014 added it: `requireVerifiedEmail` (its AC-11 to AC-14).
 - [x] Row 10 (password reset): done in [spec 0010](../0010-email-verification-recovery-passwordless/index.md) (AC-7 to AC-10). Before it, v0.1 had no password recovery because it sent no email, so the only remedy for a forgotten password was to delete and recreate the user (server or console), which loses that user's ID, and the v0.1 docs and release notes had to say so.
 - [x] Spec 0003: amend its `x-orvano-scope` sentence to the rule in *Scope rule amendment* (scope required exactly on `apiKey` operations). Done in [spec 0003](../0003-platform-data-model/index.md) (*Scopes*).
 - [x] Row 12: `account.delete` for users without a password needs a recent sign in check. Done in [spec 0010](../0010-email-verification-recovery-passwordless/index.md) (AC-19), since passwordless users arrived there.

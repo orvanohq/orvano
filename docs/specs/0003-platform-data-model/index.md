@@ -1,7 +1,7 @@
 # 0003. Platform data model: orgs, projects, keys, platforms, and app users
 
 **Date**: 2026-09-26
-**Updated**: 2026-10-07 (the Auth purge also clears spec 0010's email tokens and spec 0012's OAuth tables, revoking Apple tokens first); 2026-09-29 (keys and platforms of a deleting project can be deleted but not added or changed, and project, key, and platform changes read the caller's role only after the org lock, from PR #76; retry purge stays allowed in a deleting org); 2026-09-27 (the first account also needs the installer's setup token when one is set, spec 0006; the `x-orvano-scope` rule, `last_sign_in_at`, and the purge job's extra tables from spec 0004)
+**Updated**: 2026-10-10 (spec 0014 sets the API key failure limit); 2026-10-07 (the Auth purge also clears spec 0010's email tokens and spec 0012's OAuth tables, revoking Apple tokens first); 2026-09-29 (keys and platforms of a deleting project can be deleted but not added or changed, and project, key, and platform changes read the caller's role only after the org lock, from PR #76; retry purge stays allowed in a deleting org); 2026-09-27 (the first account also needs the installer's setup token when one is set, spec 0006; the `x-orvano-scope` rule, `last_sign_in_at`, and the purge job's extra tables from spec 0004)
 **Status**: Accepted
 
 ## Summary
@@ -338,7 +338,7 @@ Checked at create and update, with 400 `invalid_request` on a mismatch. Stored a
 - The public API refuses the `console` project everywhere (AC-4, AC-6). No API key or platform can be created for it.
 - API keys are SHA-256 hashed. The secret has 256 bits of randomness, so a slow password hash adds nothing, and a fast hash keeps lookup cheap. Hash lookup uses the unique index, so no key is compared in a loop.
 - Every console action is logged at `Information` with the actor ID, org ID, project ID, and action name. It is never logged with a secret, token, or email body.
-- API key verification failures are counted by the rate limiter (row 14 sets the policy) and never say which check failed beyond `invalid_api_key`.
+- API key verification failures are counted by the rate limiter (row 14 sets the policy) and never say which check failed beyond `invalid_api_key`. [spec 0014](../0014-auth-policies-abuse-protection/index.md)'s AC-22 sets it: `auth.api_key_failed.ip`, 60 failures per 15 minutes per connection IP, after which a failing key gets 429 while a valid key always passes.
 - Personal data: `auth_users.email`, `phone`, `name`, and `metadata` are personal data of the developer's end users. Deletion is real: the purge job removes them for good. Row 8 (GA) owns the rest of the auth data handling.
 
 ### Configuration required
@@ -415,7 +415,7 @@ Row 3 is design only. The build lands with the rows that first use each part, so
 - [ ] Row 35 (backups): per project backup and restore must include the project's rows in `auth_users`, `platform_api_keys`, and `platform_platforms`, not only its schema.
 - [ ] Row 36 (environments): confirm the child project shape; the console shows a project family with an environment switcher.
 - [ ] Row 38 (audit log): consume the AC-19 events into a durable audit table before events are pruned (7 days).
-- [ ] Row 14 (abuse protection): set rate limits on API key failures and console sign up.
+- [x] Row 14 (abuse protection): set rate limits on API key failures and console sign up. Done in [spec 0014](../0014-auth-policies-abuse-protection/index.md): API key failures (AC-22); console sign up keeps spec 0004's `auth.sign_up.ip` and gets the fixed console defaults (AC-37).
 - [ ] Row 12 (native sign in): match the ID token audience against `android`, `ios`, and `macos` platform identifiers.
 
 ## Rationale
