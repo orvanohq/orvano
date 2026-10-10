@@ -6,7 +6,8 @@ using static Orvano.Server.Tests.Auth.MfaTests;
 namespace Orvano.Server.Tests.Auth;
 
 // Spec 0014 build task 6 over HTTP against the real binary: the require MFA switch and its rules, the enrollment
-// challenge at step one, and the four enrollment operations with the ticket. AC-2, AC-27.
+// challenge at step one, the four enrollment operations with the ticket, and the step two challenge of a user with a
+// factor but not MFA on (amended 2026-10-10). AC-2, AC-27.
 public class RequireMfaTests(PostgresFixture postgres)
 {
     private const string MethodsUrl = "/v1/console/project/auth/methods";
@@ -174,6 +175,60 @@ public class RequireMfaTests(PostgresFixture postgres)
         Assert.False(newPassword.Body.GetProperty("mfa").GetProperty("enrollmentRequired").GetBoolean());
     }
 
+    [Fact]
+    public async Task A_user_with_a_factor_but_not_mfa_on_is_challenged_for_the_passkey_except_at_passkey_sign_in()
+    {
+        await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
+        await PasskeyTests.EnablePasskeysAsync(api);
+
+        // Ada's only factor is a passkey; Bob has a confirmed TOTP factor and a passkey, and TOTP is turned off below.
+        var ada = await PasskeyTests.RegisterAsync(api, await PasskeyTests.VerifiedUserAsync(api, "ada@x.com"));
+        var bob = await EnrollAsync(api, "bob@x.com");
+        await PasskeyTests.RegisterAsync(api, await PasskeyTests.StrongBearerAsync(api, "bob@x.com", bob.Secret));
+
+        // With the switch off, Ada's password still opens a session at level 1, as before.
+        using (var before = await api.SignInAsync("ada@x.com"))
+        {
+            AssertCreated(before);
+            Assert.Equal(JsonValueKind.Null, before.Body.GetProperty("mfa").ValueKind);
+            Assert.Equal(1, Claims(AuthApi.AccessToken(before)).GetProperty("aal").GetInt32());
+        }
+
+        await RequireAsync(api);
+
+        // Password and magic link both stop at a step two challenge for the passkey: no session, no enrollment.
+        using var password = await api.SignInAsync("ada@x.com");
+        AssertChallenge(password, ["passkey"]);
+        var token = await PasswordlessTests.MagicLinkAsync(api, "ada@x.com", Redirect);
+        using (var magic = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/magic-link", new { token }))
+            AssertChallenge(magic, ["passkey"]);
+
+        // The passkey answers step two at level 2.
+        var ticket = Ticket(password);
+        using var challenge = await PasskeyTests.MfaChallengeAsync(api, ticket);
+        using var stepTwo = await PasskeyTests.StepTwoWithPasskeyAsync(api, ticket, challenge, ada.CredentialId);
+        AssertCreated(stepTwo);
+        var bearer = AuthApi.AccessToken(stepTwo);
+        Assert.Equal(2, Claims(bearer).GetProperty("aal").GetInt32());
+
+        // Passkey sign in is never challenged, and MFA status stays TOTP defined: Ada reads as MFA off.
+        using (var passkey = await PasskeyTests.PasskeySignInAsync(api, ada.CredentialId))
+        {
+            AssertCreated(passkey);
+            Assert.Equal(JsonValueKind.Null, passkey.Body.GetProperty("mfa").ValueKind);
+        }
+
+        using (var status = await api.SendAsync(HttpMethod.Get, "/v1/account/mfa", bearer: bearer))
+            Assert.False(status.Body.GetProperty("mfaEnabled").GetBoolean());
+
+        // Bob, with TOTP off, has MFA off but still a factor, so he is challenged for the passkey alone.
+        using (var off = await api.AsConsoleAsync(HttpMethod.Patch, MethodsUrl, new { totpEnabled = false }))
+            Assert.Equal(HttpStatusCode.OK, off.Status);
+        using (var bobStepOne = await api.SignInAsync("bob@x.com")) AssertChallenge(bobStepOne, ["passkey"]);
+        using (var bobStatus = await api.AsServerAsync(HttpMethod.Get, $"/v1/users/{bob.UserId}/mfa"))
+            Assert.False(bobStatus.Body.GetProperty("mfaEnabled").GetBoolean());
+    }
+
     private static void AssertCreated(Reply reply) => Assert.True(reply.Status == HttpStatusCode.Created, $"{reply.Status}: {reply.Body}");
 
     private static async Task RequireAsync(AuthApi api)
@@ -200,6 +255,16 @@ public class RequireMfaTests(PostgresFixture postgres)
         Assert.False(stepOne.Body.GetProperty("verificationRequired").GetBoolean());
         var mfa = stepOne.Body.GetProperty("mfa");
         Assert.True(mfa.GetProperty("enrollmentRequired").GetBoolean());
+        Assert.Equal(factors, mfa.GetProperty("factors").EnumerateArray().Select(f => f.GetString()!));
+    }
+
+    /// <summary>A step one that ended in a step two challenge: no user, no session, and the factors to answer with.</summary>
+    private static void AssertChallenge(Reply stepOne, string[] factors)
+    {
+        Assert.True(stepOne.Status == HttpStatusCode.Created, $"{stepOne.Status}: {stepOne.Body}");
+        Assert.Equal(JsonValueKind.Null, stepOne.Body.GetProperty("session").ValueKind);
+        var mfa = stepOne.Body.GetProperty("mfa");
+        Assert.False(mfa.GetProperty("enrollmentRequired").GetBoolean());
         Assert.Equal(factors, mfa.GetProperty("factors").EnumerateArray().Select(f => f.GetString()!));
     }
 }

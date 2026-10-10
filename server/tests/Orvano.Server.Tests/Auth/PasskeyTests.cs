@@ -546,14 +546,14 @@ public class PasskeyTests(PostgresFixture postgres)
             new { challengeId = challenge.Body.GetProperty("challengeId").GetString(), credential = assertion });
     }
 
-    private static async Task<Reply> MfaChallengeAsync(AuthApi api, string ticket)
+    internal static async Task<Reply> MfaChallengeAsync(AuthApi api, string ticket)
     {
         var challenge = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/mfa/passkey-challenge", new { ticket });
         Assert.Equal(HttpStatusCode.OK, challenge.Status);
         return challenge;
     }
 
-    private static async Task<Reply> StepTwoWithPasskeyAsync(AuthApi api, string ticket, Reply challenge, string credentialId)
+    internal static async Task<Reply> StepTwoWithPasskeyAsync(AuthApi api, string ticket, Reply challenge, string credentialId)
     {
         var assertion = await AssertAsync(api, challenge.Body.GetProperty("options"), credentialId);
         return await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/mfa",

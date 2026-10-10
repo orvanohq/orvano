@@ -7,7 +7,7 @@ namespace Orvano.Server.Tests.Auth;
 
 // Spec 0014 build task 4 over HTTP against the real binary: closed sign ups, the email domain rule, require verified
 // email with the hidden sign up and the sign in refusal, the reject link, provider sign ups under the switches, and the
-// tightened last sign in method rule. AC-8 to AC-15, AC-33.
+// tightened last sign in method rule, and the claim a second hidden sign up makes (amended 2026-10-10). AC-8 to AC-15, AC-33.
 public class SignUpPolicyTests(PostgresFixture postgres)
 {
     private const string Redirect = "https://app.example.com/auth/callback";
@@ -209,6 +209,69 @@ public class SignUpPolicyTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task A_second_hidden_sign_up_claims_the_unverified_account_so_no_earlier_password_survives()
+    {
+        const string Other = "other horse battery";
+        await using var api = await AuthApi.StartAsync(postgres, email: true, smtp: true);
+
+        // The impostor signs up with Ada's email and password P before the switch, holds a session, and links GitHub.
+        using var impostor = await api.SignUpAsync("ada@x.com");
+        Assert.Equal(HttpStatusCode.Created, impostor.Status);
+        var userId = AuthApi.UserId(impostor);
+        await TestDatabase.ExecuteAsync(api.Database.Superuser,
+            $"INSERT INTO orvano.auth_identities (project_id, user_id, provider, subject, email_verified) VALUES ('{AuthApi.Project}', '{userId}', 'github', '666', false)");
+        await SetAsync(api, new { requireVerifiedEmail = true, trustedServerCidrs = new[] { "127.0.0.1/32", "::1/128" } });
+
+        // Ada signs up with password Q: the same answer, in the same time, as a sign up for a free email.
+        var clock = Stopwatch.StartNew();
+        using var ada = await PendingSignUpAsync(api, "ada@x.com", from: "198.51.100.7", password: Other);
+        Assert.True(clock.ElapsedMilliseconds >= 450, $"took {clock.ElapsedMilliseconds} ms");
+        using var free = await PendingSignUpAsync(api, "free@x.com", from: "198.51.100.8");
+        Assert.Equal(free.Document!.RootElement.GetRawText(), ada.Document!.RootElement.GetRawText());
+        Assert.False(ada.Headers.Contains("Set-Cookie"));
+
+        // The account is claimed at once: no password, identity, or session, with the claim's events.
+        Assert.Equal(0L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, "SELECT count(*) FROM orvano.auth_passwords WHERE user_id = @u::uuid", ("u", userId)));
+        Assert.Equal(0L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, "SELECT count(*) FROM orvano.auth_identities WHERE user_id = @u::uuid", ("u", userId)));
+        Assert.Equal(1L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser,
+            "SELECT count(*) FROM orvano.auth_sessions WHERE user_id = @u::uuid AND end_reason = 'account_claimed'", ("u", userId)));
+        Assert.Equal(1L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, "SELECT count(*) FROM orvano.events WHERE type = 'auth.password.removed'"));
+        Assert.Equal(1L, await TestDatabase.ScalarAsync<long>(api.Database.Superuser, "SELECT count(*) FROM orvano.events WHERE type = 'auth.identity.unlinked'"));
+        using (var stale = await api.SendAsync(HttpMethod.Get, "/v1/account", bearer: AuthApi.AccessToken(impostor)))
+            Assert.Equal(HttpStatusCode.Unauthorized, stale.Status);
+
+        // P now gets 401 at once, not the 403 that would resend a link to the impostor.
+        var before = await api.QueuedEmailCountAsync();
+        using (var p = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/password",
+            new { email = "ada@x.com", password = Password, verificationRedirectUrl = Redirect }, headers: From("198.51.100.9")))
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, p.Status);
+            Assert.Equal("invalid_credentials", p.Code);
+        }
+
+        Assert.Equal(before, await api.QueuedEmailCountAsync());
+
+        // Ada's fresh link verifies the same user, and Q was never kept either.
+        var link = await api.LatestEmailAsync("ada@x.com");
+        Assert.Equal("verification", link!.Type);
+        using (var verified = await api.SendAsync(HttpMethod.Post, "/v1/account/verification/confirm", new { token = link.Token }))
+            Assert.Equal(HttpStatusCode.OK, verified.Status);
+        using (var q = await api.SignInAsync("ada@x.com", Other)) Assert.Equal("invalid_credentials", q.Code);
+
+        var token = await PasswordlessTests.MagicLinkAsync(api, "ada@x.com");
+        using var signedIn = await api.SendAsync(HttpMethod.Post, "/v1/account/sessions/magic-link", new { token });
+        Assert.Equal(HttpStatusCode.Created, signedIn.Status);
+        Assert.Equal(userId, AuthApi.UserId(signedIn));
+
+        // A first sign up whose link is verified with no later sign up keeps its password.
+        var own = await api.LatestEmailAsync("free@x.com");
+        using (var verified = await api.SendAsync(HttpMethod.Post, "/v1/account/verification/confirm", new { token = own!.Token }))
+            Assert.Equal(HttpStatusCode.OK, verified.Status);
+        using var kept = await api.SignInAsync("free@x.com");
+        Assert.Equal(HttpStatusCode.Created, kept.Status);
+    }
+
+    [Fact]
     public async Task Provider_sign_ups_follow_closed_sign_ups_the_domain_rule_and_require_verified_email()
     {
         await using var api = await AuthApi.StartAsync(postgres, oauth: true, smtp: true);
@@ -253,9 +316,9 @@ public class SignUpPolicyTests(PostgresFixture postgres)
 
     private static Dictionary<string, string> From(string ip) => new() { ["X-Orvano-Client-IP"] = ip };
 
-    private static async Task<Reply> PendingSignUpAsync(AuthApi api, string email, string? name = null, string? from = null)
+    private static async Task<Reply> PendingSignUpAsync(AuthApi api, string email, string? name = null, string? from = null, string password = Password)
     {
-        var reply = await api.SendAsync(HttpMethod.Post, "/v1/account", new { email, password = Password, name, verificationRedirectUrl = Redirect },
+        var reply = await api.SendAsync(HttpMethod.Post, "/v1/account", new { email, password, name, verificationRedirectUrl = Redirect },
             headers: from is null ? null : From(from));
         Assert.True(reply.Status == HttpStatusCode.Created, reply.Document?.RootElement.ToString());
         return reply;

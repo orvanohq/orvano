@@ -89,6 +89,12 @@ internal sealed record MfaFactorState(DateTimeOffset? TotpConfirmedAt, int Recov
     /// <summary>Spec 0014, AC-27: the project requires MFA and the user has no factor, so step one ends in enrollment.</summary>
     public bool MustEnroll => Policy.MfaRequired && !HasFactor;
 
+    /// <summary>
+    /// Step one ends in a step two challenge: MFA is on (spec 0013, AC-6), or the project requires MFA and the user has a
+    /// factor without MFA on, such as a passkey only user (spec 0014, AC-27). MFA status and step up stay TOTP defined.
+    /// </summary>
+    public bool MustChallenge => MfaEnabled || (Policy.MfaRequired && HasFactor);
+
     /// <summary>AC-7's list, in its order, each present only when usable now.</summary>
     public IReadOnlyList<string> Factors
     {
@@ -123,14 +129,15 @@ internal sealed record MfaFactorState(DateTimeOffset? TotpConfirmedAt, int Recov
 
 /// <summary>
 /// The step one gate (spec 0013, AC-6, AC-7): for a user with MFA on, a sign in creates a ticket in place of a
-/// session. Spec 0014, AC-27: in a project that requires MFA, a user with no factor gets an enrollment ticket in its
-/// place instead. Runs inside the sign in's transaction, after its own checks, and locks the user before the ticket rows.
+/// session. Spec 0014, AC-27: in a project that requires MFA, a user with a factor but not MFA on is challenged the
+/// same way, and a user with no factor gets an enrollment ticket in its place instead. Runs inside the sign in's transaction, after its own checks, and locks the user before the ticket rows.
 /// </summary>
 internal static class MfaGate
 {
     /// <summary>
     /// The challenge to answer instead of a session, or a null value when the sign in goes on. A user with MFA on gets
-    /// a step two ticket; under required MFA, a user with no factor gets an <c>enroll</c> ticket (15 minutes), except a
+    /// a step two ticket, and under required MFA so does a user with any factor (a passkey only user answers with the
+    /// passkey); under required MFA, a user with no factor gets an <c>enroll</c> ticket (15 minutes), except a
     /// guest, who is never challenged, and a user whose email is not verified, who gets 403
     /// <c>email_verification_required</c>. Keeps the user's live tickets at 5 by deleting the oldest, and drops their
     /// expired ones. Refuses with <see cref="Failure.UserNotFound"/> when the user is gone by the time it takes the lock,
@@ -142,12 +149,12 @@ internal static class MfaGate
     {
         var conn = uow.Tx.Connection!;
         var first = await MfaFactorState.ReadAsync(policies, conn, uow.Tx, projectId, userId, ct);
-        if (!first.MfaEnabled && !first.MustEnroll) return (MfaChallengeView?)null;
+        if (!first.MustChallenge && !first.MustEnroll) return (MfaChallengeView?)null;
 
         if (await UserLocks.ByIdAsync(uow, projectId, userId, ct) is not { } user) return Failure.UserNotFound;
         var state = await MfaFactorState.ReadAsync(policies, conn, uow.Tx, projectId, userId, ct);
         string purpose;
-        if (state.MfaEnabled) purpose = MfaTicketPurposes.Challenge;
+        if (state.MustChallenge) purpose = MfaTicketPurposes.Challenge;
         else if (state.MustEnroll && !user.IsAnonymous)
         {
             // Spec 0013 enrolls only verified emails, so an unverified one can't reach a factor from here.

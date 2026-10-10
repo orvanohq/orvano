@@ -26,7 +26,9 @@ List your app servers (one address or range per line, at most 20, no wider than 
 
 ## From Next.js
 
-`@orvano/nextjs` sends `X-Orvano-Client-IP` for you on every server side call. By default it uses the `x-real-ip` header, else the last (rightmost) value of `x-forwarded-for`, the one the proxy nearest your server appended. It never uses the first value, which the visitor can set to anything.
+`@orvano/nextjs` sends `X-Orvano-Client-IP` for you on every server side call. By default it uses the last (rightmost) value of `x-forwarded-for`, the one the proxy nearest your server appended, which a visitor can't place to its right. It never uses the first value, which the visitor can set to anything, and it never reads `x-real-ip` on its own: that header is safe only behind a proxy that overwrites it, and many (Caddy and Traefik among them) pass a visitor's own value straight through.
+
+The default assumes exactly one proxy in front of your app that appends `x-forwarded-for`. Behind a CDN plus a proxy, the rightmost value is the CDN's address, so every visitor shares one bucket until you read the CDN's header. With no proxy at all, the visitor writes the whole header, so leave that server off the **App servers** card.
 
 When your host puts the visitor's address somewhere else, pass `clientIp` to `createServerClient`, `createMiddlewareClient`, `updateSession`, and `createOrvanoRouteHandler`:
 
@@ -47,11 +49,13 @@ Read the header your host sets and a visitor can't:
 
 | Your app runs on | Read |
 |---|---|
-| Vercel | `x-real-ip` (the default) |
-| Netlify | `x-nf-client-connection-ip` |
+| Vercel | the default (Vercel sets `x-forwarded-for` to the visitor's address) |
+| Your own server behind Caddy | the default (`reverse_proxy` adds the visitor's address to `x-forwarded-for`) |
+| Your own server behind Traefik | the default |
+| Your own server behind nginx | the default, with `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`, or `x-real-ip` through your own `clientIp`, with `proxy_set_header X-Real-IP $remote_addr;` |
 | Cloudflare in front | `cf-connecting-ip` |
+| Netlify | `x-nf-client-connection-ip` |
 | Fly.io | `fly-client-ip` |
-| Your own server behind nginx | `x-real-ip`, with `proxy_set_header X-Real-IP $remote_addr;` in nginx |
 | Behind several proxies you run | `x-forwarded-for` at the position your nearest trusted proxy writes |
 
 Trusting an app server means trusting the address it forwards. A server that passed on a header the visitor sets would let one visitor spread guesses across made up addresses, so list only servers whose `clientIp` reads a header your host controls.

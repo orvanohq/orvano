@@ -4,7 +4,8 @@ using Orvano.Auth.Domain;
 namespace Orvano.Auth.Application;
 
 /// <summary>
-/// Claiming an unverified account for whoever just proved the email (spec 0010, AC-32, amended by spec 0012, AC-12):
+/// Claiming an unverified account for whoever just proved the email (spec 0010, AC-32, amended by spec 0012, AC-12), or
+/// for a second hidden sign up naming it (spec 0014, AC-12):
 /// the password and every identity go, Apple ones with a revoke queued, the second factors and passkeys go (spec 0013,
 /// AC-29), and the user's sessions end with reason <c>account_claimed</c>. Runs in the caller's transaction, under the
 /// user's lock, before the caller signs in.

@@ -200,10 +200,11 @@ internal sealed class AccountService(
     /// project or the install must have SMTP (409 <c>email_not_configured</c>); then every branch answers
     /// <see cref="SignedIn.Pending"/> and sets no session. A new email gets an unverified user with the password and a
     /// verification email. An email whose account is verified changes nothing and gets the <c>sign_up_attempt</c>
-    /// alert; one whose account is still unverified (maybe someone else's pre registration) changes nothing and gets a
-    /// fresh verification email, whose reject link lets the owner claim it (AC-15). Both existing branches check the
-    /// password against the dummy hash, so each branch costs one Argon2id run. A sign up that loses the race on the
-    /// email index takes the existing branch. The endpoint holds the answer to the 500 ms floor.
+    /// alert. One whose account is still unverified (maybe someone else's pre registration) is claimed at once, as the
+    /// reject link claims it (AC-15): two people have now named the address and no link can tell which owns the inbox,
+    /// so neither password survives, and the new one is kept nowhere. It then gets a fresh verification email. Both
+    /// existing branches check the password against the dummy hash, so each branch costs one Argon2id run. A sign up that
+    /// loses the race on the email index takes the existing branch. The endpoint holds the answer to the 500 ms floor.
     /// </summary>
     private async Task<Outcome<SignedIn>> SignUpPendingAsync(
         string projectId, ProjectPolicies project, string email, string? password, string? name, string? redirectUrl, string limitKey, CancellationToken ct)
@@ -229,6 +230,7 @@ internal sealed class AccountService(
             return Failure.Busy;
         }
 
+        Guid[] ended = [];
         var outcome = await store.WriteAsync<Done>(async (uow, token) =>
         {
             if (hash is not null && await UserRecords.TryInsertAsync(uow, projectId, email, name, verified: false, token) is { } userId)
@@ -251,12 +253,15 @@ internal sealed class AccountService(
             }
             else
             {
+                ended = (await AccountClaims.ClaimAsync(uow, sessions, projectId, user, Actor.UnknownUser, endSessions: true, token)).EndedSessions;
                 await SendSignUpVerificationAsync(uow, projectId, projectName, user.Id, to, user.Name, redirect, Actor.UnknownUser, limitKey, token);
             }
 
             return default(Done);
         }, ct);
-        return outcome.Succeeded ? SignedIn.Pending : outcome.Failure!;
+        if (!outcome.Succeeded) return outcome.Failure!;
+        foreach (var id in ended) await checks.EvictAsync(id, ct);
+        return SignedIn.Pending;
     }
 
     /// <summary>

@@ -1,7 +1,13 @@
 import { NextRequest } from 'next/server.js'
 import { describe, expect, it } from 'vitest'
 
-import { accessCookie, forwardedClientHeaders, refreshCookie, secureCookies } from '../src/index.js'
+import {
+  accessCookie,
+  defaultClientIp,
+  forwardedClientHeaders,
+  refreshCookie,
+  secureCookies,
+} from '../src/index.js'
 import { createOrvanoRouteHandler, updateSession } from '../src/server.js'
 
 // Spec 0004 AC-23 and AC-31: the middleware helper, the route handler the browser client uses,
@@ -272,7 +278,7 @@ describe('createOrvanoRouteHandler (AC-23)', () => {
 describe('forwardedClientHeaders (spec 0004 AC-31, spec 0014 AC-36)', () => {
   const headers = (values: Record<string, string>) => new Headers(values)
 
-  it('takes x-real-ip, else the rightmost x-forwarded-for value, and the user agent', () => {
+  it('takes only the rightmost x-forwarded-for value, never x-real-ip, and the user agent', () => {
     // The first value is whatever the visitor sent; the last is what the nearest proxy appended.
     expect(
       forwardedClientHeaders(
@@ -282,11 +288,11 @@ describe('forwardedClientHeaders (spec 0004 AC-31, spec 0014 AC-36)', () => {
       'X-Orvano-Client-IP': '198.51.100.1',
       'X-Orvano-Client-UA': 'UA',
     })
-    expect(
-      forwardedClientHeaders(
-        headers({ 'x-real-ip': '198.51.100.2', 'x-forwarded-for': '6.6.6.6, 10.0.0.9' }),
-      ),
-    ).toEqual({ 'X-Orvano-Client-IP': '198.51.100.2' })
+    // A proxy that passes the visitor's own x-real-ip through would let them pick any address.
+    const both = headers({ 'x-real-ip': '6.6.6.6', 'x-forwarded-for': '7.7.7.7, 198.51.100.2' })
+    expect(forwardedClientHeaders(both)).toEqual({ 'X-Orvano-Client-IP': '198.51.100.2' })
+    expect(defaultClientIp({ headers: both })).toBe('198.51.100.2')
+    expect(defaultClientIp({ headers: headers({ 'x-real-ip': '6.6.6.6' }) })).toBeNull()
     expect(forwardedClientHeaders(headers({}))).toEqual({})
   })
 
