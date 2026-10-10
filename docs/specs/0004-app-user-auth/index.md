@@ -1,7 +1,7 @@
 # 0004. App user sign up, sign in, and sessions
 
 **Date**: 2026-09-26
-**Updated**: 2026-10-08 (spec 0013: the `aal` and `amr` claims and `Session` fields, the step up check before the password checks of AC-14 and AC-15, the `passkey` session method, the `mfa_enabled` and `mfa_reset` end reasons, and `AuthResult` with nullable `user` and `session` plus `mfa`); 2026-10-07 (the `oauth` and `id_token` session methods with `Session.provider`, `User.providers` and `hasPassword`, and the Next.js `oauth` and `oauth-callback` actions, spec 0012); 2026-10-02 (the `email_verified` claim, the session `method`, and the `password_reset` and `account_claimed` end reasons, spec 0010); 2026-09-27 (`setupToken` on console sign up, `consoleInstall.getSetup` works without a session and has its own limit, spec 0006)
+**Updated**: 2026-10-10 (the Next.js route handler's allowed origin is the first `X-Forwarded-Host` value, else `Host`, plus the scheme, not `request.nextUrl.origin`, which self hosted `next start` builds from its listening address; #124); 2026-10-08 (spec 0013: the `aal` and `amr` claims and `Session` fields, the step up check before the password checks of AC-14 and AC-15, the `passkey` session method, the `mfa_enabled` and `mfa_reset` end reasons, and `AuthResult` with nullable `user` and `session` plus `mfa`); 2026-10-07 (the `oauth` and `id_token` session methods with `Session.provider`, `User.providers` and `hasPassword`, and the Next.js `oauth` and `oauth-callback` actions, spec 0012); 2026-10-02 (the `email_verified` claim, the session `method`, and the `password_reset` and `account_claimed` end reasons, spec 0010); 2026-09-27 (`setupToken` on console sign up, `consoleInstall.getSetup` works without a session and has its own limit, spec 0006)
 **Status**: Accepted
 
 ## Summary
@@ -286,7 +286,7 @@ The first four console account operations, plus spec 0006's `consoleInstall.getS
 | `orvano_dart`, .NET SDK, `@orvano/js/server` | none (servers do not hold user sessions) | n/a | `X-Orvano-Key`; `verifyAccessToken(token, { online })` per AC-19 |
 | `@orvano/console-client` | the browser keeps both cookies | on 401 `token_expired`, call `consoleAccount.refreshSession` once and retry the call once | the cookie |
 
-Cookie `Secure` is on by default. `@orvano/nextjs` turns it off only when the app's own URL is `http://localhost` (some browsers drop secure cookies on plain http localhost). Scenario runners keep the memory store (spec 0001).
+Cookie `Secure` is on by default. `@orvano/nextjs` turns it off only when the app's own URL (its allowed origin, *Value sourcing*) is `http://localhost` (some browsers drop secure cookies on plain http localhost). Scenario runners keep the memory store (spec 0001).
 
 ### Rate limits
 
@@ -332,7 +332,7 @@ A sign in within the limit counts whether it succeeds or not. Row 14 makes these
 | JWKS | keys listed | `public_jwk` of `active` and `retiring` rows |
 | Server SDK verify | keys | `keys.getJwks` for the configured project, cached 10 minutes |
 | Server SDK verify | expected `iss` and `aud` | the SDK's configured endpoint and project ID |
-| Next.js route handler | allowed origin | the request's own `Host` and scheme (`request.nextUrl.origin`) |
+| Next.js route handler | allowed origin (the app's origin for every handler use: the `Origin` check, the `Secure` rule, the provider callback URL, and its redirects) | the request's own `Host` and scheme: the host is the first `X-Forwarded-Host` value, else `Host`, else the host Next.js reports (an empty header counts as absent); the scheme is the one Next.js reports, which it takes from `X-Forwarded-Proto` or the TLS connection, so a proxy that ends TLS must send `X-Forwarded-Proto` or every `POST` is refused. Never `request.nextUrl.origin` alone, which self hosted `next start` builds from its listening address |
 | Console CSRF check | allowed origin | origin of `ORVANO_PUBLIC_URL` |
 | Rate limits | IP | connection IP after trusted forwarded headers |
 | Events | `actor` | `{ type: "user", id }` for the signed in user or console user, `{ type: "apiKey", id: <key ID> }` for server calls, `{ type: "system", id: null }` for schedules |
