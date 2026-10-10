@@ -27,7 +27,9 @@ final class PlatformPasskeys implements PasskeyAuthenticator {
     PasskeyCreationOptions options,
   ) async {
     final made = await _authenticator.register(
-      RegisterRequestType.fromJson(options.toJson()),
+      RegisterRequestType.fromJson(
+        _withTransports(options.toJson(), 'excludeCredentials'),
+      ),
     );
     return PasskeyRegistrationCredential(
       id: made.id,
@@ -48,7 +50,7 @@ final class PlatformPasskeys implements PasskeyAuthenticator {
   }) async {
     final used = await _authenticator.authenticate(
       AuthenticateRequestType.fromJson(
-        options.toJson(),
+        _withTransports(options.toJson(), 'allowCredentials'),
         mediation: autofill
             ? MediationType.Conditional
             : MediationType.Optional,
@@ -66,4 +68,23 @@ final class PlatformPasskeys implements PasskeyAuthenticator {
       ),
     );
   }
+}
+
+/// The options' JSON with `transports` on every credential descriptor in
+/// [key]. Orvano leaves the field out when the server stored none for a
+/// passkey (it is optional in the contract), and the `passkeys` package's
+/// parser needs a list, so a missing one becomes empty.
+Map<String, dynamic> _withTransports(Map<String, dynamic> json, String key) {
+  final credentials = json[key];
+  if (credentials is! List<dynamic>) return json;
+  return {
+    ...json,
+    key: [
+      for (final credential in credentials)
+        if (credential is Map<String, dynamic>)
+          {...credential, 'transports': credential['transports'] ?? <String>[]}
+        else
+          credential,
+    ],
+  };
 }

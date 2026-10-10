@@ -155,4 +155,51 @@ void main() {
 
     expect(used.response.userHandle, isNull);
   });
+
+  // A passkey the server stored no transports for comes without the field
+  // (it is optional in the contract), as an MFA step two or step up names it.
+  test(
+    'a credential without transports reaches the platform with none',
+    () async {
+      final stepTwo = PasskeyRequestOptions.fromJson({
+        'challenge': 'Y2hhbGxlbmdlXzM',
+        'rpId': 'example.com',
+        'timeout': 300000,
+        'userVerification': 'required',
+        'allowCredentials': [
+          {'type': 'public-key', 'id': 'Y3JlZF8x'},
+          {
+            'type': 'public-key',
+            'id': 'Y3JlZF8y',
+            'transports': ['usb'],
+          },
+        ],
+      });
+
+      await PlatformPasskeys().get(stepTwo);
+
+      final allowed = platform.authenticated!.allowCredentials!;
+      expect(allowed.map((c) => c.id), ['Y3JlZF8x', 'Y3JlZF8y']);
+      expect(allowed.first.transports, isEmpty);
+      expect(allowed.last.transports, ['usb']);
+    },
+  );
+
+  test(
+    'an excluded credential without transports reaches the platform with none',
+    () async {
+      final json = _creation.toJson();
+      json['excludeCredentials'] = [
+        {'type': 'public-key', 'id': 'b2xkX2NyZWQ'},
+      ];
+
+      await PlatformPasskeys().create(PasskeyCreationOptions.fromJson(json));
+
+      expect(platform.registered!.excludeCredentials.single.id, 'b2xkX2NyZWQ');
+      expect(
+        platform.registered!.excludeCredentials.single.transports,
+        isEmpty,
+      );
+    },
+  );
 }
