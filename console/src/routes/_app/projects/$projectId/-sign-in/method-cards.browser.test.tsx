@@ -5,7 +5,7 @@ import { render } from 'vitest-browser-react'
 
 import { settleStyles } from '@/test/settle'
 
-import { PasskeysCard, TotpCard } from './method-cards'
+import { AnonymousCard, PasskeysCard, TotpCard } from './method-cards'
 import { PasskeysDialog } from './passkeys-dialog'
 
 // Spec 0013 AC-43 (and AC-2): the Authenticator app and Passkeys cards on the Sign in methods page,
@@ -21,6 +21,8 @@ const settings: AuthMethodSettings = {
   acceptedOrigins: ['https://example.com', 'https://app.example.com', 'https://*.example.com'],
   mfaRequired: false,
   activeUsersWithoutMfa: 2,
+  anonymousEnabled: false,
+  anonymousIdleDays: 30,
 }
 
 const at = '2026-10-08T00:00:00Z'
@@ -253,6 +255,56 @@ describe('PasskeysDialog', () => {
     await expect
       .element(dialog.getByRole('button', { name: 'Save' }))
       .toHaveAttribute('aria-disabled', 'true')
+    await noAxeViolations()
+  })
+})
+
+// Spec 0014 AC-35: the Anonymous users card, its switch and idle days saved together, with the idle
+// days checked before a save, and disabled for a viewer.
+describe('AnonymousCard', () => {
+  it('saves the switch and the idle days together', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    const screen = await render(
+      <main>
+        <AnonymousCard settings={settings} readOnlyReason={undefined} onSave={onSave} />
+      </main>,
+    )
+
+    await expect.element(screen.getByText('Off', { exact: true })).toBeVisible()
+    await noAxeViolations()
+    await screen.getByRole('switch', { name: 'Allow guest sign in' }).click()
+    const days = screen.getByRole('textbox', { name: 'Delete idle guests after' })
+    await days.fill('0')
+    await screen.getByRole('button', { name: 'Save' }).click()
+    await expect
+      .element(screen.getByText('Enter a whole number of days from 1 to 365.'))
+      .toBeVisible()
+    expect(onSave).not.toHaveBeenCalled()
+    await noAxeViolations()
+
+    await days.fill('14')
+    await screen.getByRole('button', { name: 'Save' }).click()
+    await expect.poll(() => onSave.mock.calls.length).toBe(1)
+    expect(onSave).toHaveBeenCalledWith({ anonymousEnabled: true, anonymousIdleDays: 14 })
+  })
+
+  it('keeps a viewer from changing it and says why', async () => {
+    const screen = await render(
+      <main>
+        <AnonymousCard
+          settings={{ ...settings, anonymousEnabled: true }}
+          readOnlyReason="Needs the developer role"
+          onSave={vi.fn()}
+        />
+      </main>,
+    )
+
+    await expect.element(screen.getByText('On', { exact: true })).toBeVisible()
+    await expect.element(screen.getByRole('switch', { name: 'Allow guest sign in' })).toBeDisabled()
+    await expect
+      .element(screen.getByRole('textbox', { name: 'Delete idle guests after' }))
+      .toBeDisabled()
+    await expect.element(screen.getByText('Needs the developer role').first()).toBeVisible()
     await noAxeViolations()
   })
 })

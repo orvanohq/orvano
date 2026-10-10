@@ -105,8 +105,8 @@ export interface ApiKeyPage {
 }
 
 /**
- * A project's second factor and passkey settings, with what the Passkeys card shows beside them. A project that never
- * saved any reads as the defaults: TOTP on, passkeys off.
+ * A project's second factor, passkey, and guest settings, with what the Passkeys card shows beside them. A project
+ * that never saved any reads as the defaults: TOTP on, passkeys off, guests off.
  */
 export interface AuthMethodSettings {
   /** Whether users can turn on an authenticator app. Turned off, nobody is asked for MFA; stored factors stay. */
@@ -138,6 +138,10 @@ export interface AuthMethodSettings {
    * `mfaRequired` is on. Counted by `consoleAuthMethods.get` only; null in the answer of an update.
    */
   activeUsersWithoutMfa: number | null
+  /** Whether guests can sign in with `account.createAnonymousSession`. Off by default. */
+  anonymousEnabled: boolean
+  /** How many days a guest may stay idle (no sign in or refresh) before it is deleted, 1 to 365. Defaults to 30. */
+  anonymousIdleDays: number
 }
 
 /** A project's auth rules with what the Security page shows beside them. */
@@ -261,6 +265,11 @@ export interface ConsoleAccount {
    * turns it on.
    */
   mfaEnabled: boolean
+  /**
+   * Whether the user is a guest from `account.createAnonymousSession`: no email, name, or password until they upgrade
+   * with `account.upgradeAnonymous` or link a provider. Also the access token's `is_anonymous` claim.
+   */
+  isAnonymous: boolean
   /** True when the account is an install admin, who may change the install settings. */
   isInstallAdmin: boolean
 }
@@ -807,7 +816,7 @@ export interface TemplateVariable {
   sample: string
 }
 
-/** Changes to a project's second factor and passkey settings. Fields left out keep their value. */
+/** Changes to a project's second factor, passkey, and guest settings. Fields left out keep their value. */
 export interface UpdateAuthMethodSettingsRequest {
   /** Whether users can turn on an authenticator app. */
   totpEnabled?: boolean
@@ -824,6 +833,10 @@ export interface UpdateAuthMethodSettingsRequest {
    * and turning it on needs an email server.
    */
   mfaRequired?: boolean
+  /** Whether guests can sign in with `account.createAnonymousSession`. */
+  anonymousEnabled?: boolean
+  /** How many days a guest may stay idle before it is deleted, 1 to 365. */
+  anonymousIdleDays?: number
   /** Must be true to change `rpId` while passkeys are registered under the current one: they stop working. */
   confirmRpIdChange?: boolean
 }

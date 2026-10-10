@@ -146,7 +146,7 @@ internal sealed record TestFixtures(
             var update = new MethodSettingsUpdate(
                 m.TotpEnabled, m.PasskeysEnabled, m.RpId is null ? FieldChange.Keep : FieldChange.To(m.RpId),
                 m.RpName is null ? FieldChange.Keep : FieldChange.To(m.RpName), m.AndroidCertFingerprints, ConfirmRpIdChange: true,
-                MfaRequired: m.MfaRequired);
+                MfaRequired: m.MfaRequired, AnonymousEnabled: m.AnonymousEnabled, AnonymousIdleDays: m.AnonymousIdleDays);
             if (MethodSettingsRules.Apply(Auth.Domain.MethodSettings.Defaults, update) is (null, var problem))
                 return Fail($"{Setting}: methodSettings of '{m.Project}': {problem}");
             methods.Add(new FixtureMethodSettings(m.Project!, update));
@@ -287,6 +287,12 @@ internal sealed record TestFixtures(
 
         [YamlMember(Alias = "mfaRequired")]
         public bool? MfaRequired { get; set; }
+
+        [YamlMember(Alias = "anonymousEnabled")]
+        public bool? AnonymousEnabled { get; set; }
+
+        [YamlMember(Alias = "anonymousIdleDays")]
+        public int? AnonymousIdleDays { get; set; }
     }
 
     private sealed class OAuthProviderEntry

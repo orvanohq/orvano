@@ -3,13 +3,13 @@ namespace Orvano.Auth.Domain;
 /// <summary>
 /// The claims of an access token (AC-6): issuer, audience (the project ID), subject (the user), session, whether the
 /// user's email is verified (spec 0010, AC-14), the session's strength (<c>aal</c> and <c>amr</c>, spec 0013, AC-26),
-/// and the issue and expiry times, <c>exp = iat + </c> the project's <c>accessTokenSeconds</c> (900 by default,
+/// whether the user is a guest (<c>is_anonymous</c>, spec 0014, AC-28), and the issue and expiry times, <c>exp = iat + </c> the project's <c>accessTokenSeconds</c> (900 by default,
 /// spec 0014, AC-25). No email, name, or other personal data, since tokens end
 /// up in other people's logs.
 /// </summary>
 internal sealed record AccessTokenClaims(
     string Issuer, string Audience, Guid Subject, Guid SessionId, bool EmailVerified, SessionStrength Strength, DateTimeOffset IssuedAt,
-    DateTimeOffset ExpiresAt)
+    DateTimeOffset ExpiresAt, bool IsAnonymous = false)
 {
     /// <summary>The only signing algorithm; every verifier pins it.</summary>
     public const string Algorithm = "ES256";
@@ -26,6 +26,9 @@ internal sealed record AccessTokenClaims(
     /// <summary>The array claim with the session's sorted authentication methods (RFC 8176 values and Orvano's own).</summary>
     public const string AmrClaim = "amr";
 
+    /// <summary>The boolean claim that says whether the user was a guest when the token was issued (spec 0014, AC-28).</summary>
+    public const string IsAnonymousClaim = "is_anonymous";
+
     /// <summary><c>&lt;ORVANO_PUBLIC_URL&gt;/v1/projects/&lt;projectId&gt;</c>.</summary>
     public static string IssuerFor(string publicOrigin, string projectId) => $"{publicOrigin}/v1/projects/{projectId}";
 
@@ -35,10 +38,11 @@ internal sealed record AccessTokenClaims(
     /// </summary>
     public static AccessTokenClaims For(
         string publicOrigin, string projectId, Guid userId, Guid sessionId, bool emailVerified, SessionStrength strength, DateTimeOffset now,
-        TimeSpan? lifetime = null)
+        TimeSpan? lifetime = null, bool isAnonymous = false)
     {
         var issuedAt = DateTimeOffset.FromUnixTimeSeconds(now.ToUnixTimeSeconds());
         return new AccessTokenClaims(
-            IssuerFor(publicOrigin, projectId), projectId, userId, sessionId, emailVerified, strength, issuedAt, issuedAt + (lifetime ?? AuthTimings.AccessToken));
+            IssuerFor(publicOrigin, projectId), projectId, userId, sessionId, emailVerified, strength, issuedAt, issuedAt + (lifetime ?? AuthTimings.AccessToken),
+            isAnonymous);
     }
 }

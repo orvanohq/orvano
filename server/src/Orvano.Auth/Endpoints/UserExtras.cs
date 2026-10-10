@@ -11,7 +11,8 @@ namespace Orvano.Auth.Endpoints;
 /// <summary>
 /// <c>User.providers</c>, <c>User.hasPassword</c> (spec 0012, AC-16), and <c>User.mfaEnabled</c> (spec 0013, AC-39) on every user the Auth module answers with,
 /// read in one grouped query per response: an endpoint filter on the module's routes fills them into a <c>User</c>,
-/// <c>ConsoleAccount</c>, <c>AuthResult</c>, or <c>UserPage</c> body, so no use case has to remember them.
+/// <c>ConsoleAccount</c>, <c>AuthResult</c>, <c>AnonymousUpgradeResult</c>, or <c>UserPage</c> body, so no use case has
+/// to remember them.
 /// </summary>
 internal static class UserExtras
 {
@@ -29,6 +30,7 @@ internal static class UserExtras
                 Api.User user => [user.Id],
                 Api.ConsoleAccount account => [account.Id],
                 Api.AuthResult { User: { } signedIn } => [signedIn.Id],
+                Api.AnonymousUpgradeResult { User: { } upgraded } => [upgraded.Id],
                 Api.UserPage page => page.Items.Select(u => u.Id).ToArray(),
                 _ => (string[]?)null,
             };
@@ -40,6 +42,7 @@ internal static class UserExtras
                 Api.User user => (object)Fill(user, extras),
                 Api.ConsoleAccount account => extras.TryGetValue(account.Id, out var e) ? account with { Providers = e.Providers, HasPassword = e.HasPassword, MfaEnabled = e.MfaEnabled } : account,
                 Api.AuthResult { User: { } user } signedIn => signedIn with { User = Fill(user, extras) },
+                Api.AnonymousUpgradeResult { User: { } user } upgrade => upgrade with { User = Fill(user, extras) },
                 Api.UserPage page => page with { Items = [.. page.Items.Select(u => Fill(u, extras))] },
                 _ => value,
             };

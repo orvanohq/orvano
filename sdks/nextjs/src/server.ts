@@ -33,6 +33,8 @@ import {
   refreshWithToken,
 } from '@orvano/js'
 import type {
+  AnonymousUpgradeResult,
+  AuthResult,
   AuthSession,
   ClientConfig,
   EmailLink,
@@ -891,6 +893,128 @@ async function verifyMfa(
   }
 }
 
+/** The optional string fields of a sign up or an upgrade body, copied only when they are strings. */
+function optionalFields(body: Record<string, unknown>, names: string[]): Record<string, string> {
+  const fields: Record<string, string> = {}
+  for (const name of names) {
+    const value = body[name]
+    if (typeof value === 'string') fields[name] = value
+  }
+  return fields
+}
+
+/**
+ * `POST .../sign-up` (spec 0014, AC-36): the `account.create` body (`{ email, password, name?,
+ * verificationRedirectUrl? }`). Sets both cookies and answers `{ user, isNewUser,
+ * verificationEmail }`; a pending answer (the project requires verified emails or MFA) sets no
+ * cookie and answers `{ verificationRequired: true }`, the same whether or not the email had an
+ * account.
+ */
+async function signUp(
+  request: NextRequest,
+  client: Client,
+  secure: boolean,
+): Promise<NextResponse> {
+  const body = await jsonBody(request)
+  if (body === null || typeof body.email !== 'string' || typeof body.password !== 'string')
+    return problem(400, 'invalid_request', 'Send { email, password } and, optionally, name.')
+  let result: AuthResult
+  try {
+    result = await client.request<AuthResult>({
+      method: 'POST',
+      path: '/v1/account',
+      body: {
+        email: body.email,
+        password: body.password,
+        ...optionalFields(body, ['name', 'verificationRedirectUrl']),
+      },
+      session: 'start',
+    })
+  } catch (error) {
+    if (error instanceof OrvanoError) return passThrough(error)
+    throw error
+  }
+  if (result.verificationRequired) return NextResponse.json({ verificationRequired: true })
+  const response = NextResponse.json({
+    user: result.user,
+    isNewUser: result.isNewUser,
+    verificationEmail: result.verificationEmail,
+  })
+  writeResponse(response, await client.session.get(), secure)
+  return response
+}
+
+/**
+ * `POST .../anonymous` (spec 0014, AC-36): signs a guest in (`account.createAnonymousSession`),
+ * sets both cookies, and answers `{ user, isNewUser }`.
+ */
+async function signInAnonymously(client: Client, secure: boolean): Promise<NextResponse> {
+  let result: AuthResult
+  try {
+    result = await client.request<AuthResult>({
+      method: 'POST',
+      path: '/v1/account/sessions/anonymous',
+      session: 'start',
+    })
+  } catch (error) {
+    if (error instanceof OrvanoError) return passThrough(error)
+    throw error
+  }
+  const response = NextResponse.json({ user: result.user, isNewUser: result.isNewUser })
+  writeResponse(response, await client.session.get(), secure)
+  return response
+}
+
+/**
+ * `POST .../anonymous-upgrade` (spec 0014, AC-36): the `account.upgradeAnonymous` body (`{ email,
+ * password, name?, verificationRedirectUrl? }`), as the signed in guest. Once the guest is
+ * permanent it refreshes, so the cookies carry `is_anonymous: false` (or clears them when the
+ * project's required MFA ended the session), and answers `{ user, verificationRequired: false,
+ * verificationEmail }`. A pending upgrade (it waits for the emailed link) changes no cookie and
+ * answers `{ verificationRequired: true }`.
+ */
+async function upgradeAnonymous(
+  request: NextRequest,
+  client: Client,
+  secure: boolean,
+): Promise<NextResponse> {
+  const body = await jsonBody(request)
+  if (body === null || typeof body.email !== 'string' || typeof body.password !== 'string')
+    return problem(400, 'invalid_request', 'Send { email, password } and, optionally, name.')
+  try {
+    const session = await linkSession(request, client)
+    if (session === null) return problem(401, 'session_required', 'Sign in first.')
+    const result = await client.request<AnonymousUpgradeResult>({
+      method: 'POST',
+      path: '/v1/account/anonymous/upgrade',
+      body: {
+        email: body.email,
+        password: body.password,
+        ...optionalFields(body, ['name', 'verificationRedirectUrl']),
+      },
+      bearer: session.access,
+    })
+    if (result.verificationRequired) return NextResponse.json({ verificationRequired: true })
+    const response = NextResponse.json({
+      user: result.user,
+      verificationRequired: false,
+      verificationEmail: result.verificationEmail,
+    })
+    const refreshToken = session.fresh?.refreshToken ?? request.cookies.get(refreshCookie)?.value
+    if (refreshToken !== undefined && refreshToken !== '') {
+      try {
+        writeResponse(response, await refreshWith(client, refreshToken), secure)
+      } catch {
+        // Orvano is unreachable: the cookies stay, and the claim updates at the next refresh.
+      }
+    }
+    return response
+  } catch (error) {
+    if (error instanceof OrvanoError) return passThrough(error)
+    throw error
+  }
+}
+
 /**
  * The route handler the browser client refreshes, signs out, and redeems emailed links and codes
  * through. Mount it once, at `app/api/orvano/[...orvano]/route.ts`: `POST .../refresh` trades the
@@ -918,6 +1042,12 @@ async function verifyMfa(
  * authenticator app's secret and `POST .../mfa-enroll-totp-confirm` (`{ code }`) finishes it;
  * `POST .../mfa-enroll-passkey` answers the passkey options and `POST .../mfa-enroll-passkey-confirm`
  * finishes it. Both finishes set the session cookies and answer `{ user, recoveryCodes, next }`.
+ *
+ * Sign up and guests (spec 0014, AC-36): `POST .../sign-up` signs up and sets the cookies, or, while
+ * the project requires verified emails or MFA, sets none and answers `{ verificationRequired: true }`.
+ * `POST .../anonymous` signs a guest in and sets the cookies, and `POST .../anonymous-upgrade` makes
+ * the signed in guest permanent and refreshes the cookies, or answers `{ verificationRequired: true }`
+ * while the upgrade waits for its emailed link.
  */
 export function createOrvanoRouteHandler(config: OrvanoRouteHandlerConfig): {
   GET: (request: NextRequest) => Promise<NextResponse>
@@ -990,6 +1120,9 @@ export function createOrvanoRouteHandler(config: OrvanoRouteHandlerConfig): {
         return response
       }
 
+      if (action === 'sign-up') return signUp(request, client, secure)
+      if (action === 'anonymous') return signInAnonymously(client, secure)
+      if (action === 'anonymous-upgrade') return upgradeAnonymous(request, client, secure)
       if (action === 'redeem') return redeem(request, config, secure)
       if (action === 'email-code') return emailCode(request, config, secure)
       if (action === 'oauth') return oauthStart(request, client, secure)

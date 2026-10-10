@@ -36,8 +36,8 @@ internal static class ConsoleUsersEndpoints
     {
         v1.MapGet(Ops.List.Route, async (
                 HttpContext http, string? email, string? status, DateTimeOffset? createdAfter, DateTimeOffset? createdBefore, bool? emailVerified, string? mfa,
-                string? cursor, int? limit, UsersService users, CancellationToken ct) =>
-            Ok(http, await users.ListAsync(Project(http), new UserFilter(email, status, createdAfter, createdBefore, emailVerified, mfa), cursor, limit, ct), UserPage))
+                bool? anonymous, string? cursor, int? limit, UsersService users, CancellationToken ct) =>
+            Ok(http, await users.ListAsync(Project(http), new UserFilter(email, status, createdAfter, createdBefore, emailVerified, mfa, anonymous), cursor, limit, ct), UserPage))
             .WithName(Ops.List.Id)
             .RequireRole(Need.Read);
 
@@ -269,7 +269,9 @@ internal static class ConsoleUsersEndpoints
             body.TryGetProperty("rpName", out _) ? Domain.FieldChange.To(request.RpName) : Domain.FieldChange.Keep,
             request.AndroidCertFingerprints,
             request.ConfirmRpIdChange ?? false,
-            request.MfaRequired);
+            request.MfaRequired,
+            request.AnonymousEnabled,
+            request.AnonymousIdleDays);
         return true;
     }
 

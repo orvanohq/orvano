@@ -20,9 +20,9 @@ internal static class UsersEndpoints
     {
         v1.MapGet(Ops.List.Route, async (
                 HttpContext http, string? email, string? status, DateTimeOffset? createdAfter, DateTimeOffset? createdBefore, bool? emailVerified, string? mfa,
-                string? cursor, int? limit, UsersService users, CancellationToken ct) =>
+                bool? anonymous, string? cursor, int? limit, UsersService users, CancellationToken ct) =>
             Ok(http, await users.ListAsync(
-                PublicRequests.Project(http), new UserFilter(email, status, createdAfter, createdBefore, emailVerified, mfa), cursor, limit, ct), UserPage))
+                PublicRequests.Project(http), new UserFilter(email, status, createdAfter, createdBefore, emailVerified, mfa, anonymous), cursor, limit, ct), UserPage))
             .WithName(Ops.List.Id)
             .RequireProject()
             .RequireApiKey(Ops.List.Scope);

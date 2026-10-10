@@ -15,6 +15,7 @@ final class VerifiedAccessToken {
     required this.expiresAt,
     this.aal = 1,
     this.amr = const [],
+    this.isAnonymous = false,
   });
 
   /// The user ID (the `sub` claim).
@@ -40,6 +41,11 @@ final class VerifiedAccessToken {
   /// `['mfa', 'otp', 'pwd']`; empty for a token issued before Orvano had the
   /// claim.
   final List<String> amr;
+
+  /// Whether the user was a guest (`account.createAnonymousSession`) when the
+  /// token was issued (the `is_anonymous` claim, spec 0014); false when the
+  /// claim is missing. Up to 15 minutes old.
+  final bool isAnonymous;
 }
 
 /// How long the project's signing keys are kept before they are fetched
@@ -154,6 +160,7 @@ final class AccessTokenVerifier {
         expiresAt: expiresAt,
         aal: aal,
         amr: amr,
+        isAnonymous: payload['is_anonymous'] == true,
       );
     }
 

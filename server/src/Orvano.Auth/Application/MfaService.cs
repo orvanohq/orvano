@@ -176,6 +176,7 @@ internal sealed class MfaService(
         if (!outcome.Succeeded) return outcome.Failure!;
         var done = outcome.Value;
         foreach (var id in done.Ended) await checks.EvictAsync(id, ct);
+        // A guest never holds a factor (spec 0014, AC-29), so a raised session is never a guest's.
         var access = await tokens.IssueAsync(projectId, userId, sessionId, done.EmailVerified, done.Strength, ct);
         return new TotpConfirmationView(done.Codes, new RaisedSessionView(access.Token, access.ExpiresAt, done.EndsAt, sessionId));
     }
@@ -355,6 +356,7 @@ internal sealed class MfaService(
         if (wrong) failures.Fail();
         if (!outcome.Succeeded) return outcome.Failure!;
         var done = outcome.Value;
+        // A guest never holds a factor (spec 0014, AC-29), so a raised session is never a guest's.
         var access = await tokens.IssueAsync(projectId, userId, sessionId, done.EmailVerified, done.Strength, ct);
         return new RaisedSessionView(access.Token, access.ExpiresAt, done.EndsAt, sessionId);
     }

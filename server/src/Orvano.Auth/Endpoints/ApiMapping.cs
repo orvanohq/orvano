@@ -63,13 +63,14 @@ internal static class ApiMapping
         row.LastSignInAt,
         [],
         false,
-        false);
+        false,
+        row.IsAnonymous);
 
     public static Api.ConsoleAccount ConsoleAccount(UserRow row, bool isInstallAdmin)
     {
         var user = User(row);
         return new(user.Id, user.Email, user.EmailVerified, user.EmailVerifiedAt, user.Name, user.Status, user.Metadata, user.CreatedAt, user.LastSignInAt,
-            user.Providers, user.HasPassword, user.MfaEnabled, isInstallAdmin);
+            user.Providers, user.HasPassword, user.MfaEnabled, user.IsAnonymous, isInstallAdmin);
     }
 
     public static Api.Identity Identity(IdentityRow row) => new(
@@ -147,6 +148,7 @@ internal static class ApiMapping
         SessionMethod.OAuth => Api.SessionMethod.Oauth,
         SessionMethod.IdToken => Api.SessionMethod.IdToken,
         SessionMethod.Passkey => Api.SessionMethod.Passkey,
+        SessionMethod.Anonymous => Api.SessionMethod.Anonymous,
         _ => throw new ArgumentOutOfRangeException(nameof(method), method, "Unknown session method."),
     };
 
@@ -182,15 +184,20 @@ internal static class ApiMapping
             signedIn.Session is null ? null : SessionTokens(signedIn.Session),
             signedIn.Mfa is null ? null : MfaChallenge(signedIn.Mfa),
             signedIn.IsNewUser,
-            signedIn.VerificationEmail switch
-            {
-                null => null,
-                VerificationEmail.Queued => Api.VerificationEmailStatus.Queued,
-                VerificationEmail.NotConfigured => Api.VerificationEmailStatus.NotConfigured,
-                VerificationEmail.RateLimited => Api.VerificationEmailStatus.RateLimited,
-                _ => throw new ArgumentOutOfRangeException(nameof(signedIn), signedIn.VerificationEmail, "Unknown verification email status."),
-            },
+            VerificationEmailStatus(signedIn.VerificationEmail),
             signedIn.VerificationRequired);
+
+    private static Api.VerificationEmailStatus? VerificationEmailStatus(VerificationEmail? sent) => sent switch
+    {
+        null => null,
+        VerificationEmail.Queued => Api.VerificationEmailStatus.Queued,
+        VerificationEmail.NotConfigured => Api.VerificationEmailStatus.NotConfigured,
+        VerificationEmail.RateLimited => Api.VerificationEmailStatus.RateLimited,
+        _ => throw new ArgumentOutOfRangeException(nameof(sent), sent, "Unknown verification email status."),
+    };
+
+    public static Api.AnonymousUpgradeResult AnonymousUpgradeResult(AnonymousUpgradeView view) =>
+        new(view.User is null ? null : User(view.User), view.VerificationRequired, VerificationEmailStatus(view.VerificationEmail));
 
     public static Api.MfaChallenge MfaChallenge(MfaChallengeView view) =>
         new(view.Ticket, [.. view.Factors.Select(MfaFactorOf)], view.ExpiresAt, view.EnrollmentRequired);
@@ -270,7 +277,9 @@ internal static class ApiMapping
         view.ActivePasskeyCount,
         [.. view.AcceptedOrigins],
         view.Settings.MfaRequired,
-        view.ActiveUsersWithoutMfa);
+        view.ActiveUsersWithoutMfa,
+        view.Settings.AnonymousEnabled,
+        view.Settings.AnonymousIdleDays);
 
     public static Api.AuthPolicies AuthPolicies(AuthPoliciesView view)
     {

@@ -1,0 +1,37 @@
+# Spec 0014, AC-32, AC-36, for every server SDK (the .NET runner too, which has no client operations): a permanent
+# user's token reads isAnonymous false, and the users filter finds them among permanent users, never among guests.
+name: a server reads isAnonymous and filters users by it
+requires: []
+steps:
+  - op: users.create
+    as: server
+    input:
+      body: { email: 'perm-${unique}@example.com', password: correct horse battery staple }
+    expect:
+      status: 201
+      body: { isAnonymous: false }
+  - op: signIn
+    as: client
+    input:
+      body: { email: 'perm-${unique}@example.com', password: correct horse battery staple }
+    expect: { status: 201 }
+    save:
+      token: $.session.accessToken
+  - op: verifyAccessToken
+    as: server
+    input: { token: '${token}' }
+    expect:
+      status: 200
+      body: { isAnonymous: false }
+  - op: users.list
+    as: server
+    input: { email: 'perm-${unique}@example.com', anonymous: false }
+    expect:
+      status: 200
+      body: { items: [{ email: 'perm-${unique}@example.com', isAnonymous: false }] }
+  - op: users.list
+    as: server
+    input: { email: 'perm-${unique}@example.com', anonymous: true }
+    expect:
+      status: 200
+      body: { items: [] }

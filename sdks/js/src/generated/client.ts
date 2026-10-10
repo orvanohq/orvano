@@ -2,6 +2,7 @@
 import type { Client, RequestOptions } from '../runtime/client.js'
 import { paginate } from '../runtime/pagination.js'
 import type {
+  AnonymousUpgradeResult,
   AuthResult,
   CompleteMfaEnrollmentPasskeyRequest,
   CompleteMfaEnrollmentTotpRequest,
@@ -11,6 +12,7 @@ import type {
   ConfirmEmailChangeRequest,
   ConfirmTotpRequest,
   CreateAccountRequest,
+  CreateAnonymousUpgradeRequest,
   CreateEmailCodeRequest,
   CreateEmailCodeSessionRequest,
   CreateIdTokenIdentityRequest,
@@ -157,6 +159,18 @@ export class AccountService {
   create(body: CreateAccountRequest, options?: RequestOptions): Promise<AuthResult> {
     return this.#client.request<AuthResult>(
       { method: 'POST', path: '/v1/account', body, session: 'start' },
+      options,
+    )
+  }
+
+  /**
+   * Signs a new guest in: creates an anonymous user with no email, name, or password, and their session. Needs the
+   * project's anonymous users switch. The guest keeps their user ID when they later upgrade or link a provider; a guest
+   * idle longer than the project's idle days is deleted.
+   */
+  createAnonymousSession(options?: RequestOptions): Promise<AuthResult> {
+    return this.#client.request<AuthResult>(
+      { method: 'POST', path: '/v1/account/sessions/anonymous', session: 'start' },
       options,
     )
   }
@@ -608,6 +622,21 @@ export class AccountService {
   updatePassword(body: UpdatePasswordRequest, options?: RequestOptions): Promise<void> {
     return this.#client.request<undefined>(
       { method: 'PUT', path: '/v1/account/password', body },
+      options,
+    )
+  }
+
+  /**
+   * Turns the signed in guest into a permanent user with an email and password, keeping their user ID and data. While
+   * the project requires verified emails or MFA, the guest stays a guest until they open the link emailed to the new
+   * address, and the answer never says whether that email already had an account.
+   */
+  upgradeAnonymous(
+    body: CreateAnonymousUpgradeRequest,
+    options?: RequestOptions,
+  ): Promise<AnonymousUpgradeResult> {
+    return this.#client.request<AnonymousUpgradeResult>(
+      { method: 'POST', path: '/v1/account/anonymous/upgrade', body, session: 'user' },
       options,
     )
   }

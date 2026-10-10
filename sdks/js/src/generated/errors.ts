@@ -4,6 +4,10 @@
 export const ErrorCode = {
   /** `already_member` */
   alreadyMember: 'already_member',
+  /** `anonymous_disabled` */
+  anonymousDisabled: 'anonymous_disabled',
+  /** `anonymous_not_allowed` */
+  anonymousNotAllowed: 'anonymous_not_allowed',
   /** `console_session_required` */
   consoleSessionRequired: 'console_session_required',
   /** `contract_violation` */

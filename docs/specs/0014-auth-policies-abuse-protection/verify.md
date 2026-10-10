@@ -136,3 +136,41 @@ _Steps derived from spec 0014's AC-2 (MFA), AC-25 to AC-27, AC-35 (MFA card), an
 ## Acceptance criteria coverage (build tasks 5 and 6: sessions and require MFA)
 
 - AC-2 (mfaRequired): switch steps and `RequireMfaTests.The_switch_needs_a_factor_users_can_enroll_and_an_email_server` · AC-25, AC-26: the session steps in the first block, `SessionPolicyTests`, and `auth-session-limit` · AC-27: enrollment steps and `RequireMfaTests` · AC-35 (MFA card): card steps · AC-36 (enrollment helpers): SDK steps and the three scenarios
+
+# Verify: auth policies and abuse protection (build task 7: anonymous users) · spec 0014 · updated 2026-10-09
+_Steps derived from spec 0014's AC-2 (guests), AC-28 to AC-32, AC-35 (Anonymous users card), and AC-36 (guest sign in, upgrade, `isAnonymous`). `/check verify` runs these; `/test` locks the durable ones. Server HTTP tests: `AnonymousUserTests`; shared scenarios: `auth-anonymous` (client runners) and `auth-anonymous-server` (every server SDK, .NET too); console: `method-cards.browser.test.tsx`, `parts.browser.test.tsx`, and `e2e/anonymous.spec.ts`._
+
+## UI / manual
+
+- [ ] Console, Sign in methods, as an owner: the **Guests** section shows the **Anonymous users** card, **Off** by default with 30 idle days → AC-2, AC-35
+- [ ] Type `0` in **Delete idle guests after** and save → "Enter a whole number of days from 1 to 365." and nothing is sent; turn **Allow guest sign in** on, type `14`, save → toast "Anonymous users saved", the badge says **On** → AC-2, AC-35
+- [ ] As a viewer, the switch and the days field are disabled, Save says why, and axe finds nothing on the page → AC-35
+- [ ] A web app on the JS SDK, guests on: `orvano.account.createAnonymousSession()` → signed in, `user.isAnonymous` true, the access token has `is_anonymous: true`, `aal` 1, and an empty `amr`; the session list shows method `anonymous` → AC-28
+- [ ] As that guest: `account.updatePassword`, `account.updateEmail`, `account.createVerification`, `account.createTotp`, and `account.createPasskeyRegistration` each answer 403 `anonymous_not_allowed`; `account.get` works; `account.delete` works with no password, even an hour after sign in → AC-29
+- [ ] `orvano.account.upgradeAnonymous({ email, password })` → 200, same user ID, `isAnonymous` false, `hasPassword` true; the SDK refreshes once and says `userUpdated`, and the new token has `is_anonymous: false`; signing in with that email and password finds the same user → AC-30, AC-36
+- [ ] Upgrading to an email another user has → 409 `user_already_exists`; calling upgrade as a permanent user → 403 `forbidden` → AC-30
+- [ ] Turn on **Require a verified email** (SMTP set): an upgrade without `verificationRedirectUrl` gets 400; with it, a free email and a taken one both answer the same 200 `{ user: null, verificationRequired: true }` in at least 500 ms; the free address gets an email change link, the taken one's owner a "sign up attempt" alert; the guest stays a guest (named, if a name was sent) until the link is opened, then `account.confirmEmailChange` makes them permanent with a verified email → AC-30
+- [ ] A second upgrade call voids the first link: the earlier link answers 401 `invalid_email_token` → AC-30
+- [ ] Turn on **Require MFA**: a guest signs in with no MFA challenge; after their upgrade link is opened, their session refresh fails (`end_reason` `mfa_required`) and their next password sign in asks them to enroll a factor → AC-27, AC-30
+- [ ] A guest links GitHub by `linkIdentity` with no password and an hour old session → linked, now permanent with GitHub's verified email; with that email's domain on the blocked list, the link answers 403 `email_domain_not_allowed` and the user stays a guest → AC-29, AC-30
+- [ ] The Next.js app on a real deployment: `POST /api/orvano/anonymous` sets both cookies; `POST /api/orvano/anonymous-upgrade` refreshes them (the access cookie's token now says `is_anonymous: false`), and under the verified email rule answers `{ verificationRequired: true }` with no cookie change; `POST /api/orvano/sign-up` under that rule also sets no cookie → AC-36
+- [ ] Flutter: `orvano.account.createAnonymousSession()` stores the session in secure storage, and `upgradeAnonymous` refreshes it → AC-36
+- [ ] Console, Users: a guest shows the **Guest** badge beside their ID and **None** under Sign in; the **Kind** filter's **Guests** shows only guests and **Permanent** only the others; a guest's page has the Guest badge and says they are a guest → AC-32
+
+## Commands
+
+- [ ] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "*AnonymousUserTests"` → all 8 pass → AC-2, AC-28 to AC-32
+- [ ] `pnpm --filter @orvano/js --filter @orvano/nextjs test`, `(cd sdks/dart/core && dart test)`, `(cd sdks/dart/server && dart test)`, `dotnet test --project sdks/dotnet/tests/Orvano.Tests` → the guest and `isAnonymous` tests pass → AC-36
+- [ ] `pnpm --filter @orvano/console test` and, against the gateway, `pnpm --filter @orvano/console test:e2e` → the Anonymous users card, the Guest badge, and `anonymous.spec.ts` pass → AC-32, AC-35
+- [ ] Against `tests/scenarios/compose.yml`, one fresh server per runner: every JS runner, Next.js, Dart, and Flutter pass `auth-anonymous`; every runner, .NET too, passes `auth-anonymous-server` (the browser skips it, having no API key) → AC-32, AC-36
+
+## Value sourcing
+
+- [ ] `is_anonymous` is read from `auth_users.is_anonymous` at issue and at every refresh: a guest upgraded through the email change link gets `false` on the next refresh of the session they already hold → AC-28, AC-30
+- [ ] Retention's latest activity is the newest `greatest(created_at, last_refreshed_at)` of the guest's sessions, else the user's `created_at`: with 30 idle days, a guest last refreshed 31 days ago is deleted (`auth.user.deleted`, reason `anonymous_idle`), one refreshed yesterday is kept, and a project set to 7 days deletes a guest idle 8 days → AC-31
+- [ ] The idle days come from `anonymous_idle_days`, 30 for a project with no settings row → AC-31
+- [ ] Under the verified email rule, the pending upgrade's email is the `email_change` token row's: opening the link sets that address, verified, never one sent in a later call that lost → AC-30
+
+## Acceptance criteria coverage (build task 7: anonymous users)
+
+- AC-2 (anonymousEnabled, anonymousIdleDays): card steps and `AnonymousUserTests.The_settings_rules_the_list_filter_and_the_guest_limit` · AC-28: guest sign in steps, the guest limit, and `auth-anonymous` · AC-29: refusal and delete steps · AC-30: both upgrade modes, the link upgrade, the MFA ending, and `auth-anonymous` · AC-31: retention steps and `AnonymousUserTests.Retention_deletes_guests_idle_past_their_project_days_and_keeps_active_ones` · AC-32: Users page steps, `auth-anonymous-server`, and the console tests · AC-35 (Anonymous card): card steps · AC-36: SDK steps, the Next.js actions, and both scenarios

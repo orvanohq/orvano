@@ -47,7 +47,7 @@ const client = new Client({ endpoint: process.env.ORVANO_ENDPOINT!, project: pro
 
 try {
   const token = await client.verifyAccessToken(accessToken)
-  // token.userId, token.sessionId, token.emailVerified, token.expiresAt, token.aal, token.amr
+  // token.userId, token.sessionId, token.emailVerified, token.expiresAt, token.aal, token.amr, token.isAnonymous
 } catch (error) {
   if (error instanceof OrvanoError && error.status === 401) return new Response(null, { status: 401 })
   throw error
@@ -60,7 +60,7 @@ try {
 ```dart
 try {
   final token = await client.verifyAccessToken(accessToken);
-  // token.userId, token.sessionId, token.emailVerified, token.expiresAt, token.aal, token.amr
+  // token.userId, token.sessionId, token.emailVerified, token.expiresAt, token.aal, token.amr, token.isAnonymous
 } on OrvanoException catch (error) {
   if (error.status != 401) rethrow;
   return Response.unauthorized('Send a valid access token.');
@@ -74,7 +74,7 @@ try {
 try
 {
     var token = await orvano.VerifyAccessTokenAsync(accessToken);
-    // token.UserId, token.SessionId, token.EmailVerified, token.ExpiresAt, token.Aal, token.Amr
+    // token.UserId, token.SessionId, token.EmailVerified, token.ExpiresAt, token.Aal, token.Amr, token.IsAnonymous
 }
 catch (OrvanoException error) when (error.Status == 401)
 {
@@ -153,6 +153,6 @@ The check reads the token's own claims, so pair it with `online` when a later [M
 
 ## In other languages
 
-Any JWT library can check the tokens. Point it at the project's keys, `<your Orvano URL>/v1/projects/<projectId>/.well-known/jwks.json`, or at the discovery document from [`keys.getOpenIdConfiguration`](/docs/api/operations/keysgetopenidconfiguration/). Accept only `ES256`, and check `iss`, `aud`, and `exp` as above. The claims are `sub` (the user ID), `sid` (the session ID), `email_verified`, `aal` (1 or 2), and `amr` (an array, such as `["mfa", "otp", "pwd"]`).
+Any JWT library can check the tokens. Point it at the project's keys, `<your Orvano URL>/v1/projects/<projectId>/.well-known/jwks.json`, or at the discovery document from [`keys.getOpenIdConfiguration`](/docs/api/operations/keysgetopenidconfiguration/). Accept only `ES256`, and check `iss`, `aud`, and `exp` as above. The claims are `sub` (the user ID), `sid` (the session ID), `email_verified`, `aal` (1 or 2), `amr` (an array, such as `["mfa", "otp", "pwd"]`), and `is_anonymous` (true for a [guest](/docs/auth/anonymous-users/)).
 
 Orvano rotates a project's signing key when an owner asks; the old key stays in the key set for 24 hours, so tokens signed with it keep working until they expire. When you see an unknown key ID, fetch the key set again.

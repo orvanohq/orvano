@@ -910,19 +910,25 @@ export class Client {
 
   /**
    * A call changed a user (spec 0010, AC-14). When this client holds that user's session it says
-   * `userUpdated`, refreshing first when the token's `email_verified` claim no longer matches, so
-   * the next call carries the new claim. A session for another user, or none, hears nothing.
+   * `userUpdated`, refreshing first when the token's `email_verified` or `is_anonymous` claim no
+   * longer matches, so the next call carries the new claim. A session for another user, or none,
+   * hears nothing. A guest's upgrade (spec 0014, AC-30) answers the user inside `user`, and nothing
+   * at all while it waits for its emailed link (`verificationRequired`): then nothing changed yet.
    */
   async #userChanged(result: unknown): Promise<void> {
+    const body = typeof result === 'object' && result !== null ? result : undefined
+    if (body !== undefined && 'verificationRequired' in body && body.verificationRequired === true)
+      return
     const session = await this.session.get()
     if (session === null) return
     const claims = readAccessClaims(session.accessToken)
-    const user = result as { id?: unknown; emailVerified?: unknown } | undefined
+    const user = (body !== undefined && 'user' in body ? body.user : result) as
+      { id?: unknown; emailVerified?: unknown; isAnonymous?: unknown } | null | undefined
     if (claims !== null && typeof user?.id === 'string' && claims.sub !== user.id) return
     if (
       claims !== null &&
-      typeof user?.emailVerified === 'boolean' &&
-      user.emailVerified !== claims.emailVerified
+      ((typeof user?.emailVerified === 'boolean' && user.emailVerified !== claims.emailVerified) ||
+        (typeof user?.isAnonymous === 'boolean' && user.isAnonymous !== claims.isAnonymous))
     ) {
       try {
         if ((await this.#refresh(session)) === null) return

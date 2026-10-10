@@ -302,6 +302,7 @@ export const runnerDispatch: DispatchTable = {
         expiresAt: verified.expiresAt.toISOString(),
         aal: verified.aal,
         amr: verified.amr,
+        isAnonymous: verified.isAnonymous,
       }
     },
   },

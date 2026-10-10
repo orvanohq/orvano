@@ -19,12 +19,32 @@ export type SessionMethod =
   | 'oauth'
   | 'id_token'
   | 'passkey'
+  | 'anonymous'
 
 /** Whether a user may sign in. */
 export type UserStatus = 'active' | 'blocked'
 
 /** What happened to the verification email of a sign up. The user and session are created whatever it says. */
 export type VerificationEmailStatus = 'queued' | 'not_configured' | 'rate_limited'
+
+/**
+ * The result of upgrading a guest. Either the user is permanent now (`user` set), or the project requires verified
+ * emails or MFA and the upgrade waits for the emailed link (`verificationRequired` true, `user` null).
+ */
+export interface AnonymousUpgradeResult {
+  /** The upgraded, permanent user; null while `verificationRequired` is true. */
+  user: User | null
+  /**
+   * True while the project requires verified emails or MFA: the guest stays a guest until the link sent to the new
+   * address is opened. The answer is the same whether or not that email already had an account. False otherwise.
+   */
+  verificationRequired: boolean
+  /**
+   * What happened to the verification email the upgrade was asked to send; null when none was asked for, and null
+   * while `verificationRequired` is true.
+   */
+  verificationEmail: VerificationEmailStatus | null
+}
 
 /**
  * A signed in user and their new session; for a user with MFA on, the challenge to answer first; or, for a sign up in
@@ -129,6 +149,23 @@ export interface CreateAccountRequest {
    * When set, also emails a verification link that opens here: a host that is one of the project's web platforms, or
    * your app's own scheme. `AuthResult.verificationEmail` says whether it was sent. Required while the project
    * requires verified emails or MFA: the answer is then pending and never says whether the email was sent.
+   */
+  verificationRedirectUrl?: string
+}
+
+/** An upgrade of the signed in guest to a permanent account with an email and password. The user ID stays. */
+export interface CreateAnonymousUpgradeRequest {
+  /** The email, trimmed, at most 320 characters. Unique in the project, ignoring case. */
+  email: string
+  /** The password, held to the project's password rules. */
+  password: string
+  /** A display name, at most 256 characters. Set at once in every case. */
+  name?: string | null
+  /**
+   * Where the emailed link opens: a host that is one of the project's web platforms, or your app's own scheme. Without
+   * a verified email rule, setting it also sends a verification link (`verificationEmail` says what happened). Required
+   * while the project requires verified emails or MFA: the link then confirms the email and completes the upgrade
+   * (`orvano_type=email_change`).
    */
   verificationRedirectUrl?: string
 }
@@ -882,6 +919,11 @@ export interface User {
    * turns it on.
    */
   mfaEnabled: boolean
+  /**
+   * Whether the user is a guest from `account.createAnonymousSession`: no email, name, or password until they upgrade
+   * with `account.upgradeAnonymous` or link a provider. Also the access token's `is_anonymous` claim.
+   */
+  isAnonymous: boolean
 }
 
 /** One page of a project's users, newest first. */

@@ -1,0 +1,7 @@
+## Why it happens
+
+The signed in user is a guest (`isAnonymous` is true): they signed in with [`account.createAnonymousSession`](/docs/api/operations/accountcreateanonymoussession/) and have no email or password yet. A guest can't set a password, change or verify an email, or add an authenticator app or a passkey.
+
+## How to fix
+
+Upgrade the guest first with [`account.upgradeAnonymous`](/docs/api/operations/accountupgradeanonymous/) (an email and password), or let them link a provider. Once `isAnonymous` is false, the call works. Check `user.isAnonymous` before you show these settings, so a guest never sees them. [Anonymous users](/docs/auth/anonymous-users/) has the whole flow.

@@ -95,6 +95,16 @@
     "description": "The project requires a verified email before sign in, and this user's email is not verified yet."
   },
   {
+    "code": "anonymous_disabled",
+    "status": 403,
+    "description": "The project has not turned on anonymous users, so guests can't sign in."
+  },
+  {
+    "code": "anonymous_not_allowed",
+    "status": 403,
+    "description": "An anonymous user (a guest) can't do this; upgrade them to a permanent account first."
+  },
+  {
     "code": "invalid_credentials",
     "status": 401,
     "description": "The email and password do not match a user, or the password given to confirm an action is missing or wrong."

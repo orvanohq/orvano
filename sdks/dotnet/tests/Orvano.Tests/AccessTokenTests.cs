@@ -184,6 +184,19 @@ public class AccessTokenTests
         Assert.Single(server.Requests);
     }
 
+    // Spec 0014 AC-36: the is_anonymous claim, false when missing or not a boolean.
+    [Fact]
+    public async Task Reads_is_anonymous()
+    {
+        var key = NewKey("k1");
+        var server = new FakeServer().Then(() => Jwks(key));
+        using var client = server.Client(o => o.Project = Project);
+
+        Assert.True((await client.VerifyAccessTokenAsync(Sign(key, extra: new Dictionary<string, object> { ["is_anonymous"] = true }), cancellationToken: Ct)).IsAnonymous);
+        Assert.False((await client.VerifyAccessTokenAsync(Sign(key), cancellationToken: Ct)).IsAnonymous);
+        Assert.False((await client.VerifyAccessTokenAsync(Sign(key, extra: new Dictionary<string, object> { ["is_anonymous"] = "yes" }), cancellationToken: Ct)).IsAnonymous);
+    }
+
     private static string Sign(
         ECDsaSecurityKey key, string audience = Project, string issuer = Issuer, string? sid = "session-1", DateTime? expires = null, bool? emailVerified = null,
         IDictionary<string, object>? extra = null)

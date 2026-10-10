@@ -132,6 +132,22 @@ public static class AccountOperations
         public const string Audience = "client";
     }
 
+    /// <summary>POST /v1/account/sessions/anonymous: Signs a new guest in: creates an anonymous user with no email, name, or password, and their session. Needs the</summary>
+    public static class CreateAnonymousSession
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.createAnonymousSession";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/sessions/anonymous";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
     /// <summary>POST /v1/account/email-code: Emails a 6 digit sign in code that works for 10 minutes. An email without a user gets one that creates the user,</summary>
     public static class CreateEmailCode
     {
@@ -767,6 +783,22 @@ public static class AccountOperations
 
         /// <summary>The route pattern under <c>/v1</c>.</summary>
         public const string Route = "/account/password";
+
+        /// <summary>Who may call it: client, server, both, or console.</summary>
+        public const string Audience = "client";
+    }
+
+    /// <summary>POST /v1/account/anonymous/upgrade: Turns the signed in guest into a permanent user with an email and password, keeping their user ID and data. While</summary>
+    public static class UpgradeAnonymous
+    {
+        /// <summary>The operationId, also the endpoint name.</summary>
+        public const string Id = "account.upgradeAnonymous";
+
+        /// <summary>The HTTP method.</summary>
+        public const string Method = "POST";
+
+        /// <summary>The route pattern under <c>/v1</c>.</summary>
+        public const string Route = "/account/anonymous/upgrade";
 
         /// <summary>Who may call it: client, server, both, or console.</summary>
         public const string Audience = "client";

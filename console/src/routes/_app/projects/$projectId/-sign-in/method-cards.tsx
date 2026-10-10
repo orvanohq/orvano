@@ -12,11 +12,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { FormAlert } from '@/components/ui/form-alert'
+import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { describeError } from '@/lib/errors'
 import { OrvanoError } from '@orvano/console-client'
-import type { AuthMethodSettings } from '@orvano/console-client'
+import type { AuthMethodSettings, UpdateAuthMethodSettingsRequest } from '@orvano/console-client'
 
 /**
  * The Authenticator app card on the Sign in methods page (spec 0013, AC-43): whether users may turn
@@ -208,6 +210,130 @@ export function PasskeysCard({
         >
           {settings.rpId === null ? 'Set up' : 'Edit'}
         </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * The Anonymous users card on the Sign in methods page (spec 0014, AC-35): whether guests may sign
+ * in with `account.createAnonymousSession`, and how many idle days a guest is kept before it is
+ * deleted (1 to 365). Both save together. With `readOnlyReason` (a viewer) the controls are disabled
+ * and Save says why.
+ */
+export function AnonymousCard({
+  settings,
+  readOnlyReason,
+  onSave,
+}: {
+  settings: AuthMethodSettings
+  readOnlyReason: string | undefined
+  /** Saves and resolves once the page holds the new settings; throws to show the error. */
+  onSave: (request: UpdateAuthMethodSettingsRequest) => Promise<void>
+}) {
+  const readOnly = readOnlyReason !== undefined
+  const [enabled, setEnabled] = useState(settings.anonymousEnabled)
+  const [days, setDays] = useState(String(settings.anonymousIdleDays))
+  const [daysError, setDaysError] = useState<string | null>(null)
+  const [alert, setAlert] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const submit = async () => {
+    setDaysError(null)
+    setAlert(null)
+    const trimmed = days.trim()
+    const idleDays = /^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN
+    if (!(idleDays >= 1 && idleDays <= 365)) {
+      setDaysError('Enter a whole number of days from 1 to 365.')
+      return
+    }
+    setSaving(true)
+    try {
+      await onSave({ anonymousEnabled: enabled, anonymousIdleDays: idleDays })
+    } catch (error) {
+      setAlert(describeError(error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Anonymous users</CardTitle>
+        <CardDescription>
+          Guests use your app before they sign up, and keep their data when they upgrade to an email
+          and password or link a provider.
+        </CardDescription>
+        <CardAction>
+          <Badge variant="status" tone={settings.anonymousEnabled ? 'success' : 'neutral'}>
+            {settings.anonymousEnabled ? 'On' : 'Off'}
+          </Badge>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <form
+          className="flex flex-col gap-4"
+          aria-label="Anonymous users"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault()
+            void submit()
+          }}
+        >
+          {alert === null ? null : <FormAlert title="Couldn't save">{alert}</FormAlert>}
+          <Field>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="anonymous-enabled"
+                checked={enabled}
+                disabled={readOnly}
+                aria-describedby="anonymous-enabled-hint"
+                onCheckedChange={setEnabled}
+              />
+              <FieldLabel htmlFor="anonymous-enabled">Allow guest sign in</FieldLabel>
+            </div>
+            <FieldDescription id="anonymous-enabled-hint">
+              {readOnlyReason ??
+                'Turned off, no new guest can sign in. Guests who exist keep their sessions and can still upgrade.'}
+            </FieldDescription>
+          </Field>
+          <Field data-invalid={daysError === null ? undefined : true}>
+            <FieldLabel htmlFor="anonymous-idle-days">Delete idle guests after</FieldLabel>
+            <div className="flex items-center gap-2">
+              <Input
+                id="anonymous-idle-days"
+                className="w-24"
+                inputMode="numeric"
+                autoComplete="off"
+                disabled={readOnly}
+                value={days}
+                aria-invalid={daysError === null ? undefined : true}
+                aria-describedby={
+                  daysError === null
+                    ? 'anonymous-idle-days-hint'
+                    : 'anonymous-idle-days-hint anonymous-idle-days-error'
+                }
+                onChange={(event) => {
+                  setDays(event.target.value)
+                }}
+              />
+              <span className="text-sm">days</span>
+            </div>
+            <FieldDescription id="anonymous-idle-days-hint">
+              A guest who hasn&apos;t signed in or refreshed for this long is deleted with their
+              sessions, from 1 to 365 days. Default: 30.
+            </FieldDescription>
+            {daysError === null ? null : (
+              <FieldError id="anonymous-idle-days-error" errors={[{ message: daysError }]} />
+            )}
+          </Field>
+          <div className="flex justify-end">
+            <Button type="submit" disabledReason={readOnlyReason} loading={saving}>
+              Save
+            </Button>
+          </div>
+        </form>
       </CardContent>
     </Card>
   )

@@ -101,6 +101,7 @@ describe('verifyAccessToken', () => {
       expiresAt: new Date(exp * 1000),
       aal: 1,
       amr: [],
+      isAnonymous: false,
     })
     // Spec 0010 AC-14: the email_verified claim, false when missing.
     expect(
@@ -225,6 +226,23 @@ describe('verifyAccessToken', () => {
       '403 mfa_required',
     )
     expect(sent).toHaveLength(1)
+  })
+
+  // Spec 0014 AC-36: the is_anonymous claim, false when missing or not a boolean.
+  it('reads is_anonymous', async () => {
+    const key = await newKey('k1')
+    const { fetch } = fakeFetch(jwks(key))
+    const client = server(fetch)
+
+    expect(
+      (await client.verifyAccessToken(await sign(key, { extra: { is_anonymous: true } })))
+        .isAnonymous,
+    ).toBe(true)
+    expect((await client.verifyAccessToken(await sign(key))).isAnonymous).toBe(false)
+    expect(
+      (await client.verifyAccessToken(await sign(key, { extra: { is_anonymous: 'yes' } })))
+        .isAnonymous,
+    ).toBe(false)
   })
 
   it('needs a project', async () => {

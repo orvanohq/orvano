@@ -57,9 +57,9 @@ internal static class UserRecords
     /// Deletes the user with their password, sessions, and identities and writes <c>auth.user.deleted</c> (AC-15,
     /// AC-17). Identities cascade from the user, so their Apple refresh tokens get revoke jobs first, under the user's
     /// lock (spec 0012, AC-15). Returns the deleted session IDs to evict after the commit, or null when the project has
-    /// no such user.
+    /// no such user. <paramref name="reason"/> goes on the event, such as <c>anonymous_idle</c> (spec 0014, AC-31).
     /// </summary>
-    public static async Task<Guid[]?> DeleteAsync(AuthUnitOfWork uow, string projectId, Guid userId, Actor actor, CancellationToken ct)
+    public static async Task<Guid[]?> DeleteAsync(AuthUnitOfWork uow, string projectId, Guid userId, Actor actor, CancellationToken ct, string? reason = null)
     {
         if (await UserLocks.ByIdAsync(uow, projectId, userId, ct) is null) return null;
         foreach (var identity in await Identities.OfUserAsync(uow, userId, ct))
@@ -84,7 +84,7 @@ internal static class UserRecords
         }
 
         await AuthEvents.WriteAsync(uow.Tx, AuthEvents.UserDeleted, projectId, actor, userId.ToString(),
-            new Dictionary<string, string> { ["userId"] = userId.ToString() }, ct: ct);
+            new Dictionary<string, string> { ["userId"] = userId.ToString() }, reason: reason, ct: ct);
         return [.. ended];
     }
 }

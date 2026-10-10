@@ -263,7 +263,7 @@ internal sealed class AccountService(
     /// The verification email of a sign up (spec 0010, AC-11), inside its transaction: the recipient limits, the
     /// token, and the email, behind a savepoint, so a refusal leaves no token and never fails the sign up.
     /// </summary>
-    private async Task<VerificationEmail> SendSignUpVerificationAsync(
+    internal async Task<VerificationEmail> SendSignUpVerificationAsync(
         AuthUnitOfWork uow, string projectId, string projectName, Guid userId, string email, string? name, RedirectUrl redirect, Actor actor,
         string limitKey, CancellationToken ct)
     {
@@ -420,6 +420,8 @@ internal sealed class AccountService(
     /// </summary>
     public async Task<Outcome<Done>> UpdatePasswordAsync(string projectId, Guid userId, Guid sessionId, string? currentPassword, string? newPassword, CancellationToken ct)
     {
+        // Spec 0014, AC-29: a guest sets a password only by upgrading.
+        if (await stepUp.RefuseAnonymousAsync(projectId, userId, ct) is { } guest) return guest;
         var rules = await passwordRules.CheckNewAsync(projectId, newPassword, ct);
         if (!rules.Succeeded) return rules.Failure!;
         var normalized = rules.Value!;
@@ -465,12 +467,16 @@ internal sealed class AccountService(
 
     /// <summary>
     /// Deletes the user (AC-15) after checking their password: the user, their password, and all their sessions in one
-    /// transaction, with <c>auth.user.deleted</c>. Every token of the user then fails at the api.
+    /// transaction, with <c>auth.user.deleted</c>. Every token of the user then fails at the api. A guest is asked for
+    /// nothing (spec 0014, AC-29): their session is their only credential.
     /// </summary>
     public async Task<Outcome<Done>> DeleteAsync(string projectId, Guid userId, Guid sessionId, string? password, CancellationToken ct)
     {
-        var check = await CheckCredentialAsync(projectId, userId, sessionId, password, ct);
-        if (check.Failure is not null) return check.Failure;
+        if (!await stepUp.IsAnonymousAsync(projectId, userId, ct))
+        {
+            var check = await CheckCredentialAsync(projectId, userId, sessionId, password, ct);
+            if (check.Failure is not null) return check.Failure;
+        }
 
         var outcome = await store.WriteAsync<Guid[]>(async (uow, token) =>
             await UserRecords.DeleteAsync(uow, projectId, userId, Actor.User(userId), token) is { } ended ? ended : Failure.UserNotFound, ct);
@@ -512,7 +518,7 @@ internal sealed class AccountService(
     /// <summary>Issues the new session's access token and returns the <c>AuthResult</c> value.</summary>
     public async Task<SignedIn> SignedInAsync(string projectId, UserRow user, SessionGrant grant, CancellationToken ct, bool isNewUser = false)
     {
-        var access = await tokens.IssueAsync(projectId, user.Id, grant.SessionId, user.EmailVerifiedAt is not null, grant.Strength, ct);
+        var access = await tokens.IssueAsync(projectId, user.Id, grant.SessionId, user.EmailVerifiedAt is not null, grant.Strength, ct, user.IsAnonymous);
         return new SignedIn(user, new SessionTokensView(access.Token, access.ExpiresAt, grant.RefreshToken.Value, grant.RefreshTokenExpiresAt, grant.SessionId), isNewUser);
     }
 

@@ -791,6 +791,9 @@ public enum SessionMethod
 
     /// <summary>The wire value <c>passkey</c>.</summary>
     Passkey,
+
+    /// <summary>The wire value <c>anonymous</c>.</summary>
+    Anonymous,
 }
 
 /// <summary>Reads and writes <see cref="SessionMethod"/> by wire value; unknown values read as <see cref="SessionMethod.Unknown"/>.</summary>
@@ -808,6 +811,7 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             "oauth" => SessionMethod.Oauth,
             "id_token" => SessionMethod.IdToken,
             "passkey" => SessionMethod.Passkey,
+            "anonymous" => SessionMethod.Anonymous,
             _ => SessionMethod.Unknown,
         };
 
@@ -823,6 +827,7 @@ public sealed class SessionMethodJsonConverter : JsonConverter<SessionMethod>
             SessionMethod.Oauth => "oauth",
             SessionMethod.IdToken => "id_token",
             SessionMethod.Passkey => "passkey",
+            SessionMethod.Anonymous => "anonymous",
             _ => throw new JsonException($"SessionMethod.{value} has no wire value"),
         });
 }
@@ -1029,6 +1034,15 @@ public sealed record AcceptedInvitation(
     [property: JsonPropertyName("org")] Org Org,
     [property: JsonPropertyName("alreadyMember")] bool AlreadyMember);
 
+/// <summary>The result of upgrading a guest. Either the user is permanent now (<c>user</c> set), or the project requires verified emails or MFA and the upgrade waits for the emailed link (<c>verificationRequired</c> true, <c>user</c> null).</summary>
+/// <param name="User">The upgraded, permanent user; null while <c>verificationRequired</c> is true.</param>
+/// <param name="VerificationRequired">True while the project requires verified emails or MFA: the guest stays a guest until the link sent to the new address is opened. The answer is the same whether or not that email already had an account. False otherwise.</param>
+/// <param name="VerificationEmail">What happened to the verification email the upgrade was asked to send; null when none was asked for, and null while <c>verificationRequired</c> is true.</param>
+public sealed record AnonymousUpgradeResult(
+    [property: JsonPropertyName("user")] User? User,
+    [property: JsonPropertyName("verificationRequired")] bool VerificationRequired,
+    [property: JsonPropertyName("verificationEmail")] VerificationEmailStatus? VerificationEmail);
+
 /// <summary>An API key for server code. Its secret is never shown again after creation.</summary>
 /// <param name="Id">The key ID.</param>
 /// <param name="Name">A name to recognize the key by, 1 to 100 characters.</param>
@@ -1057,7 +1071,7 @@ public sealed record ApiKeyPage(
     [property: JsonPropertyName("items")] IReadOnlyList<ApiKey> Items,
     [property: JsonPropertyName("nextCursor")] string? NextCursor);
 
-/// <summary>A project's second factor and passkey settings, with what the Passkeys card shows beside them. A project that never saved any reads as the defaults: TOTP on, passkeys off.</summary>
+/// <summary>A project's second factor, passkey, and guest settings, with what the Passkeys card shows beside them. A project that never saved any reads as the defaults: TOTP on, passkeys off, guests off.</summary>
 /// <param name="TotpEnabled">Whether users can turn on an authenticator app. Turned off, nobody is asked for MFA; stored factors stay.</param>
 /// <param name="PasskeysEnabled">Whether users can add passkeys and sign in with them. Needs <c>rpId</c>.</param>
 /// <param name="RpId">The passkey domain: a lowercase host name such as <c>example.com</c> (no scheme, port, path, or IP address), or <c>localhost</c>.</param>
@@ -1067,6 +1081,8 @@ public sealed record ApiKeyPage(
 /// <param name="AcceptedOrigins">The origins a passkey ceremony is accepted from today: the project's web platforms on <c>rpId</c> or its subdomains, <c>https://&lt;rpId&gt;</c> for iOS and macOS apps, and one <c>android:apk-key-hash:</c> origin per fingerprint. A wildcard web platform shows as a pattern, such as <c>https://*.example.com</c>, which accepts any one subdomain level.</param>
 /// <param name="MfaRequired">Whether every user must have a second factor (an authenticator app or a passkey) before they get a session. Sign up and password sign in then need a verified email, and a user with no factor enrolls one at their next sign in. Needs TOTP or passkeys on, and an email server.</param>
 /// <param name="ActiveUsersWithoutMfa">How many users hold a live session and have no second factor, so would enroll one at their next sign in while <c>mfaRequired</c> is on. Counted by <c>consoleAuthMethods.get</c> only; null in the answer of an update.</param>
+/// <param name="AnonymousEnabled">Whether guests can sign in with <c>account.createAnonymousSession</c>. Off by default.</param>
+/// <param name="AnonymousIdleDays">How many days a guest may stay idle (no sign in or refresh) before it is deleted, 1 to 365. Defaults to 30.</param>
 public sealed record AuthMethodSettings(
     [property: JsonPropertyName("totpEnabled")] bool TotpEnabled,
     [property: JsonPropertyName("passkeysEnabled")] bool PasskeysEnabled,
@@ -1076,7 +1092,9 @@ public sealed record AuthMethodSettings(
     [property: JsonPropertyName("activePasskeyCount")] int ActivePasskeyCount,
     [property: JsonPropertyName("acceptedOrigins")] IReadOnlyList<string> AcceptedOrigins,
     [property: JsonPropertyName("mfaRequired")] bool MfaRequired,
-    [property: JsonPropertyName("activeUsersWithoutMfa")] int? ActiveUsersWithoutMfa);
+    [property: JsonPropertyName("activeUsersWithoutMfa")] int? ActiveUsersWithoutMfa,
+    [property: JsonPropertyName("anonymousEnabled")] bool AnonymousEnabled,
+    [property: JsonPropertyName("anonymousIdleDays")] int AnonymousIdleDays);
 
 /// <summary>A project's auth rules with what the Security page shows beside them.</summary>
 /// <param name="SignUpsEnabled">Whether new users can sign up from an app. Servers and the console can always create users.</param>
@@ -1241,6 +1259,7 @@ public sealed record ConfirmTotpRequest(
 /// <param name="Providers">The providers linked to the user, sorted by name.</param>
 /// <param name="HasPassword">Whether the user has a password.</param>
 /// <param name="MfaEnabled">Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never turns it on.</param>
+/// <param name="IsAnonymous">Whether the user is a guest from <c>account.createAnonymousSession</c>: no email, name, or password until they upgrade with <c>account.upgradeAnonymous</c> or link a provider. Also the access token's <c>is_anonymous</c> claim.</param>
 /// <param name="IsInstallAdmin">True when the account is an install admin, who may change the install settings.</param>
 public sealed record ConsoleAccount(
     [property: JsonPropertyName("id")] string Id,
@@ -1255,6 +1274,7 @@ public sealed record ConsoleAccount(
     [property: JsonPropertyName("providers")] IReadOnlyList<OAuthProvider> Providers,
     [property: JsonPropertyName("hasPassword")] bool HasPassword,
     [property: JsonPropertyName("mfaEnabled")] bool MfaEnabled,
+    [property: JsonPropertyName("isAnonymous")] bool IsAnonymous,
     [property: JsonPropertyName("isInstallAdmin")] bool IsInstallAdmin);
 
 /// <summary>A console sign in's answer: <c>account</c> when the account is signed in, or <c>mfa</c> when it has MFA on and must pass a second step first. Exactly one of them is set.</summary>
@@ -1284,6 +1304,17 @@ public sealed record ConsoleUserRef(
 /// <param name="Name">A display name, at most 256 characters.</param>
 /// <param name="VerificationRedirectUrl">When set, also emails a verification link that opens here: a host that is one of the project's web platforms, or your app's own scheme. <c>AuthResult.verificationEmail</c> says whether it was sent. Required while the project requires verified emails or MFA: the answer is then pending and never says whether the email was sent.</param>
 public sealed record CreateAccountRequest(
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null,
+    [property: JsonPropertyName("verificationRedirectUrl"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? VerificationRedirectUrl = null);
+
+/// <summary>An upgrade of the signed in guest to a permanent account with an email and password. The user ID stays.</summary>
+/// <param name="Email">The email, trimmed, at most 320 characters. Unique in the project, ignoring case.</param>
+/// <param name="Password">The password, held to the project's password rules.</param>
+/// <param name="Name">A display name, at most 256 characters. Set at once in every case.</param>
+/// <param name="VerificationRedirectUrl">Where the emailed link opens: a host that is one of the project's web platforms, or your app's own scheme. Without a verified email rule, setting it also sends a verification link (<c>verificationEmail</c> says what happened). Required while the project requires verified emails or MFA: the link then confirms the email and completes the upgrade (<c>orvano_type=email_change</c>).</param>
+public sealed record CreateAnonymousUpgradeRequest(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("password")] string Password,
     [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null,
@@ -2397,13 +2428,15 @@ public sealed record UpdateAccountRequest(
     [property: JsonPropertyName("name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Name = null,
     [property: JsonPropertyName("metadata"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<string, JsonElement>? Metadata = null);
 
-/// <summary>Changes to a project's second factor and passkey settings. Fields left out keep their value.</summary>
+/// <summary>Changes to a project's second factor, passkey, and guest settings. Fields left out keep their value.</summary>
 /// <param name="TotpEnabled">Whether users can turn on an authenticator app.</param>
 /// <param name="PasskeysEnabled">Whether users can add passkeys and sign in with them. Needs an <c>rpId</c>.</param>
 /// <param name="RpId">The passkey domain; null clears it (only while passkeys are off).</param>
 /// <param name="RpName">The name authenticators show, 1 to 64 characters; null means the project name.</param>
 /// <param name="AndroidCertFingerprints">At most 10 SHA-256 fingerprints, uppercase or lowercase hex pairs joined by colons; stored uppercase.</param>
 /// <param name="MfaRequired">Whether every user must have a second factor before they get a session. Needs <c>totpEnabled</c> or <c>passkeysEnabled</c>, and turning it on needs an email server.</param>
+/// <param name="AnonymousEnabled">Whether guests can sign in with <c>account.createAnonymousSession</c>.</param>
+/// <param name="AnonymousIdleDays">How many days a guest may stay idle before it is deleted, 1 to 365.</param>
 /// <param name="ConfirmRpIdChange">Must be true to change <c>rpId</c> while passkeys are registered under the current one: they stop working.</param>
 public sealed record UpdateAuthMethodSettingsRequest(
     [property: JsonPropertyName("totpEnabled"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? TotpEnabled = null,
@@ -2412,6 +2445,8 @@ public sealed record UpdateAuthMethodSettingsRequest(
     [property: JsonPropertyName("rpName"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RpName = null,
     [property: JsonPropertyName("androidCertFingerprints"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? AndroidCertFingerprints = null,
     [property: JsonPropertyName("mfaRequired"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? MfaRequired = null,
+    [property: JsonPropertyName("anonymousEnabled"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? AnonymousEnabled = null,
+    [property: JsonPropertyName("anonymousIdleDays"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? AnonymousIdleDays = null,
     [property: JsonPropertyName("confirmRpIdChange"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? ConfirmRpIdChange = null);
 
 /// <summary>Changes to a project's auth rules. Fields left out keep their value; the result must meet every bound.</summary>
@@ -2552,6 +2587,7 @@ public sealed record UpdateUserEmailRequest(
 /// <param name="Providers">The providers linked to the user, sorted by name.</param>
 /// <param name="HasPassword">Whether the user has a password.</param>
 /// <param name="MfaEnabled">Whether MFA is on: the user has confirmed an authenticator app and the project allows it. A passkey alone never turns it on.</param>
+/// <param name="IsAnonymous">Whether the user is a guest from <c>account.createAnonymousSession</c>: no email, name, or password until they upgrade with <c>account.upgradeAnonymous</c> or link a provider. Also the access token's <c>is_anonymous</c> claim.</param>
 public sealed record User(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("email")] string? Email,
@@ -2564,7 +2600,8 @@ public sealed record User(
     [property: JsonPropertyName("lastSignInAt")] DateTimeOffset? LastSignInAt,
     [property: JsonPropertyName("providers")] IReadOnlyList<OAuthProvider> Providers,
     [property: JsonPropertyName("hasPassword")] bool HasPassword,
-    [property: JsonPropertyName("mfaEnabled")] bool MfaEnabled);
+    [property: JsonPropertyName("mfaEnabled")] bool MfaEnabled,
+    [property: JsonPropertyName("isAnonymous")] bool IsAnonymous);
 
 /// <summary>One page of a project's users, newest first.</summary>
 /// <param name="Items">The users on this page.</param>

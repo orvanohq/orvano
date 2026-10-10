@@ -122,6 +122,9 @@ internal static class SessionMethod
 
     /// <summary>A passkey sign in (spec 0013, AC-24); never challenged.</summary>
     public const string Passkey = "passkey";
+
+    /// <summary>A guest sign in (spec 0014, AC-28): level 1 with no <c>amr</c>, never challenged.</summary>
+    public const string Anonymous = "anonymous";
 }
 
 /// <summary>What a refresh does (spec 0004, refresh decision).</summary>

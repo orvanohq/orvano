@@ -30,7 +30,7 @@ internal readonly record struct TokenCheck(TokenIdentity? Identity, TokenRejecti
 /// <summary>
 /// Issues and checks access tokens (AC-6, AC-7): ES256 JWTs signed with the project's key, carrying only
 /// <c>iss</c>, <c>aud</c>, <c>sub</c>, <c>sid</c>, <c>email_verified</c> (spec 0010, AC-14), <c>aal</c> and <c>amr</c>
-/// (spec 0013, AC-26), <c>iat</c>, and <c>exp</c>. A check pins <c>alg</c> to ES256, needs
+/// (spec 0013, AC-26), <c>is_anonymous</c> (spec 0014, AC-28), <c>iat</c>, and <c>exp</c>. A check pins <c>alg</c> to ES256, needs
 /// the signature to verify against the header project's keys, <c>iss</c> and <c>aud</c> to name that project, and
 /// <c>exp</c> not to have passed (30 seconds of leeway). The session check is the caller's.
 /// </summary>
@@ -39,15 +39,16 @@ internal sealed class AccessTokens(SigningKeys keys, PublicUrl publicUrl, TimePr
     private static readonly JsonWebTokenHandler Handler = new() { SetDefaultTimesOnTokenCreation = false, MapInboundClaims = false };
 
     /// <summary>
-    /// Signs a token for the session; <paramref name="emailVerified"/> and <paramref name="strength"/> are read from the
-    /// user and session rows by the caller.
+    /// Signs a token for the session; <paramref name="emailVerified"/>, <paramref name="strength"/>, and
+    /// <paramref name="isAnonymous"/> are read from the user and session rows by the caller.
     /// </summary>
-    public async Task<IssuedToken> IssueAsync(string projectId, Guid userId, Guid sessionId, bool emailVerified, SessionStrength strength, CancellationToken ct)
+    public async Task<IssuedToken> IssueAsync(
+        string projectId, Guid userId, Guid sessionId, bool emailVerified, SessionStrength strength, CancellationToken ct, bool isAnonymous = false)
     {
         var key = await keys.GetActiveAsync(projectId, ct);
         // Spec 0014, AC-25: the project's access token lifetime, for this token and every refresh.
         var lifetime = TimeSpan.FromSeconds((await policies.GetAsync(projectId, ct)).Auth.AccessTokenSeconds);
-        var claims = AccessTokenClaims.For(publicUrl.Origin, projectId, userId, sessionId, emailVerified, strength, clock.GetUtcNow(), lifetime);
+        var claims = AccessTokenClaims.For(publicUrl.Origin, projectId, userId, sessionId, emailVerified, strength, clock.GetUtcNow(), lifetime, isAnonymous);
         var token = Handler.CreateToken(new SecurityTokenDescriptor
         {
             Issuer = claims.Issuer,
@@ -61,6 +62,7 @@ internal sealed class AccessTokens(SigningKeys keys, PublicUrl publicUrl, TimePr
                 [AccessTokenClaims.EmailVerifiedClaim] = claims.EmailVerified,
                 [AccessTokenClaims.AalClaim] = (int)claims.Strength.Aal,
                 [AccessTokenClaims.AmrClaim] = claims.Strength.Amr.ToArray(),
+                [AccessTokenClaims.IsAnonymousClaim] = claims.IsAnonymous,
             },
             SigningCredentials = new SigningCredentials(new ECDsaSecurityKey(key.PrivateKey) { KeyId = key.Kid }, SecurityAlgorithms.EcdsaSha256),
         });

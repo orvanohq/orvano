@@ -47,6 +47,7 @@ Map<String, Object?> user(String id) => {
   'providers': <String>['google'],
   'hasPassword': false,
   'mfaEnabled': false,
+  'isAnonymous': false,
 };
 
 Map<String, Object?> identity(String provider) => {

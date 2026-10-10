@@ -7,6 +7,12 @@ public static class ErrorCode
     /// <summary>The <c>already_member</c> error code.</summary>
     public const string AlreadyMember = "already_member";
 
+    /// <summary>The <c>anonymous_disabled</c> error code.</summary>
+    public const string AnonymousDisabled = "anonymous_disabled";
+
+    /// <summary>The <c>anonymous_not_allowed</c> error code.</summary>
+    public const string AnonymousNotAllowed = "anonymous_not_allowed";
+
     /// <summary>The <c>console_session_required</c> error code.</summary>
     public const string ConsoleSessionRequired = "console_session_required";
 

@@ -98,6 +98,9 @@ enum SessionMethod {
   /// The wire value `passkey`.
   passkey('passkey'),
 
+  /// The wire value `anonymous`.
+  anonymous('anonymous'),
+
   /// A value this SDK version does not know yet.
   unknown('');
 
@@ -154,6 +157,55 @@ enum VerificationEmailStatus {
   /// Decodes a wire value; values this SDK does not know map to [unknown].
   static VerificationEmailStatus fromJson(String value) =>
       values.firstWhere((e) => e.value == value, orElse: () => unknown);
+}
+
+/// The result of upgrading a guest. Either the user is permanent now (`user` set), or the project requires verified
+/// emails or MFA and the upgrade waits for the emailed link (`verificationRequired` true, `user` null).
+final class AnonymousUpgradeResult {
+  /// Creates a [AnonymousUpgradeResult].
+  const AnonymousUpgradeResult({
+    this.user,
+    required this.verificationRequired,
+    this.verificationEmail,
+  });
+
+  /// Decodes a [AnonymousUpgradeResult] from JSON.
+  factory AnonymousUpgradeResult.fromJson(Map<String, dynamic> json) =>
+      AnonymousUpgradeResult(
+        user: json['user'] == null
+            ? null
+            : User.fromJson(json['user'] as Map<String, dynamic>),
+        verificationRequired: json['verificationRequired'] as bool,
+        verificationEmail: json['verificationEmail'] == null
+            ? null
+            : VerificationEmailStatus.fromJson(
+                json['verificationEmail'] as String,
+              ),
+      );
+
+  /// The upgraded, permanent user; null while `verificationRequired` is true.
+  final User? user;
+
+  /// True while the project requires verified emails or MFA: the guest stays a guest until the link sent to the new
+  /// address is opened. The answer is the same whether or not that email already had an account. False otherwise.
+  final bool verificationRequired;
+
+  /// What happened to the verification email the upgrade was asked to send; null when none was asked for, and null
+  /// while `verificationRequired` is true.
+  final VerificationEmailStatus? verificationEmail;
+
+  /// Encodes this [AnonymousUpgradeResult] as JSON.
+  Map<String, dynamic> toJson() => {
+    'user': switch (user) {
+      final v? => v.toJson(),
+      null => null,
+    },
+    'verificationRequired': verificationRequired,
+    'verificationEmail': switch (verificationEmail) {
+      final v? => v.value,
+      null => null,
+    },
+  };
 }
 
 /// A signed in user and their new session; for a user with MFA on, the challenge to answer first; or, for a sign up in
@@ -455,6 +507,51 @@ final class CreateAccountRequest {
   final String? verificationRedirectUrl;
 
   /// Encodes this [CreateAccountRequest] as JSON.
+  Map<String, dynamic> toJson() => {
+    'email': email,
+    'password': password,
+    'name': ?name,
+    'verificationRedirectUrl': ?verificationRedirectUrl,
+  };
+}
+
+/// An upgrade of the signed in guest to a permanent account with an email and password. The user ID stays.
+final class CreateAnonymousUpgradeRequest {
+  /// Creates a [CreateAnonymousUpgradeRequest].
+  const CreateAnonymousUpgradeRequest({
+    required this.email,
+    required this.password,
+    this.name,
+    this.verificationRedirectUrl,
+  });
+
+  /// Decodes a [CreateAnonymousUpgradeRequest] from JSON.
+  factory CreateAnonymousUpgradeRequest.fromJson(Map<String, dynamic> json) =>
+      CreateAnonymousUpgradeRequest(
+        email: json['email'] as String,
+        password: json['password'] as String,
+        name: json['name'] == null ? null : json['name'] as String,
+        verificationRedirectUrl: json['verificationRedirectUrl'] == null
+            ? null
+            : json['verificationRedirectUrl'] as String,
+      );
+
+  /// The email, trimmed, at most 320 characters. Unique in the project, ignoring case.
+  final String email;
+
+  /// The password, held to the project's password rules.
+  final String password;
+
+  /// A display name, at most 256 characters. Set at once in every case.
+  final String? name;
+
+  /// Where the emailed link opens: a host that is one of the project's web platforms, or your app's own scheme. Without
+  /// a verified email rule, setting it also sends a verification link (`verificationEmail` says what happened). Required
+  /// while the project requires verified emails or MFA: the link then confirms the email and completes the upgrade
+  /// (`orvano_type=email_change`).
+  final String? verificationRedirectUrl;
+
+  /// Encodes this [CreateAnonymousUpgradeRequest] as JSON.
   Map<String, dynamic> toJson() => {
     'email': email,
     'password': password,
@@ -2583,6 +2680,7 @@ final class User {
     required this.providers,
     required this.hasPassword,
     required this.mfaEnabled,
+    required this.isAnonymous,
   });
 
   /// Decodes a [User] from JSON.
@@ -2607,6 +2705,7 @@ final class User {
         .toList(),
     hasPassword: json['hasPassword'] as bool,
     mfaEnabled: json['mfaEnabled'] as bool,
+    isAnonymous: json['isAnonymous'] as bool,
   );
 
   /// The user ID.
@@ -2646,6 +2745,10 @@ final class User {
   /// turns it on.
   final bool mfaEnabled;
 
+  /// Whether the user is a guest from `account.createAnonymousSession`: no email, name, or password until they upgrade
+  /// with `account.upgradeAnonymous` or link a provider. Also the access token's `is_anonymous` claim.
+  final bool isAnonymous;
+
   /// Encodes this [User] as JSON.
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -2666,6 +2769,7 @@ final class User {
     'providers': providers.map((e) => e.value).toList(),
     'hasPassword': hasPassword,
     'mfaEnabled': mfaEnabled,
+    'isAnonymous': isAnonymous,
   };
 }
 

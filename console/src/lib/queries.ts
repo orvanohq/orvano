@@ -232,12 +232,20 @@ export function usersQuery(
   emailVerified?: boolean,
   limit = 25,
   mfa?: 'on' | 'off',
+  anonymous?: boolean,
 ) {
   return infiniteQueryOptions({
-    queryKey: [...keys.users(projectId), { email, emailVerified, mfa, limit }] as const,
+    queryKey: [...keys.users(projectId), { email, emailVerified, mfa, anonymous, limit }] as const,
     queryFn: ({ pageParam, signal }) =>
       projectClient(projectId).consoleUsers.list(
-        { email: email === '' ? undefined : email, emailVerified, mfa, cursor: pageParam, limit },
+        {
+          email: email === '' ? undefined : email,
+          emailVerified,
+          mfa,
+          anonymous,
+          cursor: pageParam,
+          limit,
+        },
         { signal },
       ),
     initialPageParam: undefined as string | undefined,

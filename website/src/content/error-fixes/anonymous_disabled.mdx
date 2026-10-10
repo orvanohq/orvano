@@ -1,0 +1,7 @@
+## Why it happens
+
+Your app called [`account.createAnonymousSession`](/docs/api/operations/accountcreateanonymoussession/) to sign a guest in, but the project hasn't turned on guests. The **Allow guest sign in** switch on the **Anonymous users** card of the console's **Sign in methods** page is off, which is the default.
+
+## How to fix
+
+Turn on **Allow guest sign in** on the [Anonymous users](/docs/console/sign-in-methods/#guests) card, or don't offer guest sign in in your app. Guests who already exist keep their sessions and can still upgrade while it is off.

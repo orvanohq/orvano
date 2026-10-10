@@ -256,6 +256,9 @@ internal sealed record MethodSettings(
 {
     public const int DefaultAnonymousIdleDays = 30;
 
+    /// <summary>The bounds of <see cref="AnonymousIdleDays"/> (spec 0014, AC-2).</summary>
+    public const int MinAnonymousIdleDays = 1, MaxAnonymousIdleDays = 365;
+
     public static MethodSettings Defaults { get; } = new(true, false, null, null, []);
 }
 
@@ -275,12 +278,17 @@ internal sealed record MethodSettingsUpdate(
     FieldChange RpName,
     IReadOnlyList<string>? AndroidCertFingerprints,
     bool ConfirmRpIdChange,
-    bool? MfaRequired = null);
+    bool? MfaRequired = null,
+    bool? AnonymousEnabled = null,
+    int? AnonymousIdleDays = null);
 
 /// <summary>The checked result of an update: the new settings, the changed field names, and whether the RP ID moved.</summary>
 internal sealed record MethodSettingsChange(MethodSettings Next, IReadOnlyList<string> Changed, bool RpIdChanged);
 
-/// <summary>AC-1's field rules, and spec 0014's AC-2 rule for <c>mfaRequired</c>, checked on the settings as they would be after the update.</summary>
+/// <summary>
+/// AC-1's field rules, and spec 0014's AC-2 rules for <c>mfaRequired</c> and <c>anonymousIdleDays</c>, checked on the
+/// settings as they would be after the update.
+/// </summary>
 internal static class MethodSettingsRules
 {
     public const int MaxRpName = 64;
@@ -314,6 +322,9 @@ internal static class MethodSettingsRules
             fingerprints = normalized;
         }
 
+        if (update.AnonymousIdleDays is < MethodSettings.MinAnonymousIdleDays or > MethodSettings.MaxAnonymousIdleDays)
+            return (null, "anonymousIdleDays must be 1 to 365.");
+
         var next = current with
         {
             TotpEnabled = update.TotpEnabled ?? current.TotpEnabled,
@@ -322,6 +333,8 @@ internal static class MethodSettingsRules
             RpName = rpName,
             AndroidCertFingerprints = fingerprints,
             MfaRequired = update.MfaRequired ?? current.MfaRequired,
+            AnonymousEnabled = update.AnonymousEnabled ?? current.AnonymousEnabled,
+            AnonymousIdleDays = update.AnonymousIdleDays ?? current.AnonymousIdleDays,
         };
         if (next.PasskeysEnabled && next.RpId is null) return (null, "Set rpId to turn passkeys on.");
         // Spec 0014, AC-2: required MFA needs a factor users can enroll.
@@ -335,6 +348,8 @@ internal static class MethodSettingsRules
         if (next.RpName != current.RpName) changed.Add("rpName");
         if (!next.AndroidCertFingerprints.SequenceEqual(current.AndroidCertFingerprints, StringComparer.Ordinal)) changed.Add("androidCertFingerprints");
         if (next.MfaRequired != current.MfaRequired) changed.Add("mfaRequired");
+        if (next.AnonymousEnabled != current.AnonymousEnabled) changed.Add("anonymousEnabled");
+        if (next.AnonymousIdleDays != current.AnonymousIdleDays) changed.Add("anonymousIdleDays");
         return (new MethodSettingsChange(next, changed, next.RpId != current.RpId), null);
     }
 }

@@ -26,6 +26,11 @@ export interface VerifiedAccessToken {
    * token issued before Orvano had the claim.
    */
   amr: string[]
+  /**
+   * Whether the user was a guest (`account.createAnonymousSession`) when the token was issued (the
+   * `is_anonymous` claim, spec 0014); false when the claim is missing. Up to 15 minutes old.
+   */
+  isAnonymous: boolean
 }
 
 /** Options for {@link AccessTokenVerifier.verify}. */
@@ -108,13 +113,14 @@ export class AccessTokenVerifier {
       throw invalid('The access token is not valid for this project.')
     }
 
-    const { sub, sid, exp, email_verified, aal, amr } = payload as {
+    const { sub, sid, exp, email_verified, aal, amr, is_anonymous } = payload as {
       sub?: unknown
       sid?: unknown
       exp?: unknown
       email_verified?: unknown
       aal?: unknown
       amr?: unknown
+      is_anonymous?: unknown
     }
     if (
       typeof sub !== 'string' ||
@@ -151,6 +157,7 @@ export class AccessTokenVerifier {
       expiresAt: new Date(exp * 1000),
       aal: level,
       amr: methods,
+      isAnonymous: is_anonymous === true,
     }
   }
 

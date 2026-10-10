@@ -46,6 +46,7 @@ Map<String, Object?> user(String id, bool verified) => {
   'providers': <String>[],
   'hasPassword': true,
   'mfaEnabled': false,
+  'isAnonymous': false,
 };
 
 Answer json(Object body, {int code = 200}) => (response) async {
