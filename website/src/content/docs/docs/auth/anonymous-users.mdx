@@ -54,7 +54,7 @@ A guest can't set a password, change or verify an email, or add an authenticator
 
 ## 3. Upgrade the guest
 
-[`account.upgradeAnonymous`](/docs/api/operations/accountupgradeanonymous/) gives the signed in guest an email and password. The user ID stays the same, so their data stays theirs, and the password is held to the project's [password rules](/docs/auth/security-policies/#passwords). The session in hand keeps working: the SDK refreshes it, and the new access token says `is_anonymous: false`.
+[`account.upgradeAnonymous`](/docs/api/operations/accountupgradeanonymous/) gives the signed in guest an email and password. The user ID stays the same, so their data stays theirs, and the password is held to the project's [password rules](/docs/auth/security-policies/#passwords). The session in hand keeps working: the SDK refreshes it, and the new access token says `is_anonymous: false`. An upgrade counts against the project's sign up limit for the caller's address, and one guest gets 10 tries every 15 minutes; past either, it answers 429 [`rate_limited`](/errors/rate_limited/).
 
 <Tabs syncKey="sdk">
   <TabItem label="JavaScript">

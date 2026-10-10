@@ -210,6 +210,50 @@ public class AnonymousUserTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task An_upgrade_takes_the_sign_up_limit_per_address_and_counts_every_attempt_per_guest()
+    {
+        await using var api = await AuthApi.StartAsync(postgres);
+        await EnableAsync(api);
+        // Listing the test client as an app server lets each call name its own limit IP.
+        await SetPoliciesAsync(api, new { signUpPerIp = 2, trustedServerCidrs = new[] { "127.0.0.1/32", "::1/128" } });
+
+        // Per address (AC-30): the project's sign up limit, so the third upgrade from one address gets 429 before any work.
+        using var first = await GuestAsync(api);
+        var bearer = AuthApi.AccessToken(first);
+        for (var i = 0; i < 2; i++)
+        {
+            using var refused = await UpgradeAsync(api, bearer, "ada@x.com", password: "password1234", ip: "198.51.100.1");
+            Assert.Equal("password_too_common", refused.Code);
+        }
+
+        using (var limited = await UpgradeAsync(api, bearer, "ada@x.com", ip: "198.51.100.1"))
+        {
+            Assert.Equal((HttpStatusCode.TooManyRequests, "rate_limited"), (limited.Status, limited.Code));
+            Assert.True(limited.Headers.Contains("Retry-After"));
+        }
+
+        Assert.True(await TestDatabase.ScalarAsync<bool>(api.Database.Superuser, "SELECT is_anonymous FROM orvano.auth_users WHERE id = @id", ("id", Guid.Parse(AuthApi.UserId(first)))));
+
+        // Per guest: every attempt counts, whatever the address, so one guest's 11th try gets 429.
+        await SetPoliciesAsync(api, new { signUpPerIp = 100 });
+        using var second = await GuestAsync(api);
+        var other = AuthApi.AccessToken(second);
+        for (var i = 0; i < 10; i++)
+        {
+            using var refused = await UpgradeAsync(api, other, $"bob{i}@x.com", password: "password1234", ip: $"203.0.113.{i + 1}");
+            Assert.Equal("password_too_common", refused.Code);
+        }
+
+        using (var limited = await UpgradeAsync(api, other, "bob@x.com", ip: "203.0.113.99"))
+            Assert.Equal((HttpStatusCode.TooManyRequests, "rate_limited"), (limited.Status, limited.Code));
+
+        // A guest with attempts left, from a fresh address, still upgrades.
+        using var third = await GuestAsync(api);
+        using var upgraded = await UpgradeAsync(api, AuthApi.AccessToken(third), "eve@x.com", ip: "192.0.2.7");
+        Assert.Equal(HttpStatusCode.OK, upgraded.Status);
+    }
+
+    [Fact]
     public async Task A_project_with_no_settings_row_keeps_idle_guests_30_days_and_never_counts_guests_as_without_mfa()
     {
         await using var api = await AuthApi.StartAsync(postgres);

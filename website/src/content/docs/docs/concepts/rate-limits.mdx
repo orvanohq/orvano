@@ -69,7 +69,7 @@ You can change the five marked **yes** on the **Rate limits** card of the projec
 | `auth.sign_in.ip` | every password sign in, app and console | project and limit IP | 300 per 15 minutes | no |
 | `auth.sign_in_failed.email_ip` | password sign ins answered `invalid_credentials` | project, email, and limit IP | 10 per 15 minutes | yes, the count and the window |
 | `auth.sign_in_failed.ip` | the same | project and limit IP | 100 per 15 minutes | yes |
-| `auth.sign_up.ip` | sign up, and magic link, email code, and provider sign ins that create a user, and `users.create` | project and limit IP | 60 per hour | yes |
+| `auth.sign_up.ip` | sign up, magic link, email code, and provider sign ins that create a user, guest upgrades, and `users.create` | project and limit IP | 60 per hour | yes |
 | `auth.anonymous.ip` | [guest](/docs/auth/anonymous-users/) sign ins | project and limit IP | 30 per hour | yes |
 | `auth.anonymous.project` | guest sign ins | project | 1,000 per hour | no |
 | `auth.email_send.ip` | the open email requests: recovery, magic link, email code | project and limit IP | 300 per hour | yes |
