@@ -28,6 +28,7 @@ The shared scenarios use a fake range endpoint for the breached check and a scen
 |---|---|---|---|
 | 2026-10-10 | 0.2.0 (`main` at `c6ee5d5`) | Claude, with Ateyib for the inbox and authenticator steps | Outbound HTTPS was blocked for one extra api instance (`api.pwnedpasswords.com` mapped to an unroutable address), not the host firewall. The Next.js route handler refuses browser POSTs behind a proxy (`request.nextUrl.origin` is `https://localhost:3000` under `next start`), so its enrollment and guest actions were checked with `Origin: https://localhost:3000`. Not run: the phone on mobile data, a platform passkey, the JS SDK web app, Flutter. |
 | 2026-10-10 | 0.2.0 (`main` at `4594a4c`, after #124) | Claude, with Ateyib for the passkey step | Reran the Next.js real deployment steps in real Chromium through an ngrok tunnel to the test server, with no `Origin` workaround: guests, the verified email rule, and TOTP enrollment all pass. A platform passkey (Touch ID) enrolled at `aal` 2 with no recovery codes and then signed in by itself, from a scratch page on `@orvano/nextjs`'s browser client. Still not run: the phone on mobile data, the JS SDK web app with an authenticator app, Flutter. |
+| 2026-10-10 | 0.2.0 (`main` at `f9e629b`, after #128) | Claude | Local scenario stack (`tests/scenarios/compose.yml` with the console gateway), not the test server. Every runner step ticked from CI on #128 (`sdks.yml` run 38035337693 and `ci.yml` run 38035337601, at `6345abe`, the merged code): the browser runner skips `auth-email-domains` and `auth-anonymous-server` (no API key), and .NET skips the client scenarios, as designed. The App servers step answers "Lines 1 and 3: ...", since `ok.example` is not an address range either; the server refused the save (400) and nothing was stored. Time was moved in the database for two steps: the enrollment ticket's `expires_at` set into the past, and a guest's session made an hour old. The guest GitHub link and the alert template steps used the fake provider and Mailpit. Still not run: the phone on mobile data, the JS SDK web app with an authenticator app, the Next.js guest steps on a real deployment, Flutter's secure storage, the disposable list's license, and the full pass on the test server. |
 
 # Verify: auth policies and abuse protection (milestones 1 to 3 of the build) · spec 0014 · updated 2026-10-09
 _Steps derived from spec 0014's acceptance criteria for what has landed: password rules, failed attempts and limits, and sessions. `/check verify` runs these; `/test` locks the durable ones. Sign ups, verified email, required MFA, and anonymous users get their steps when they are built._
@@ -36,7 +37,7 @@ _Steps derived from spec 0014's acceptance criteria for what has landed: passwor
 
 - [x] As an owner, open a project's **Security** page: Passwords, Sessions, App servers, and Rate limits cards show the defaults (8 characters, common list on, breached check off, 15 minutes, 720 hours, 365 days, no session cap, no servers, 10 per 15 minutes, 100, 60, 30, 300) → AC-1, AC-34
 - [x] Set the minimum length to 12 and save: only the Passwords card resets, and a toast confirms → AC-1, AC-34
-- [ ] Type `ok.example` on line 1 and `8.0.0.0/8` on line 3 of App servers, save: the field says "Line 3: ..." and nothing is saved → AC-1, AC-34
+- [x] Type `ok.example` on line 1 and `8.0.0.0/8` on line 3 of App servers, save: the field says "Line 3: ..." and nothing is saved → AC-1, AC-34
 - [x] Reset "Sign ups per address" to its default with its Reset button, save: the value is 60 again → AC-21, AC-34
 - [x] As a viewer, open the page: every value shows, every control is disabled, Save explains why → AC-1, AC-34
 - [x] Run axe on the page in light and dark themes: no violations → AC-34
@@ -84,22 +85,22 @@ _Steps derived from spec 0014's AC-7 to AC-15, AC-33, and AC-34 (Sign ups, Email
 
 - [x] With sign ups off: `POST /v1/account` → 403 `sign_up_disabled` (also for a taken email); a magic link for a new email → 403 at redemption and the same link works once sign ups are back on; an existing user signs in; `POST /v1/users` with a key → 201 → AC-10
 - [x] With `example.com` blocked: sign up as `a@mail.example.com`, `users.create`, `users.updateEmail`, `account.updateEmail` to an `example.com` address, and a magic link redemption that would create a user → 403 `email_domain_not_allowed`; an existing `@example.com` user still signs in → AC-8, AC-9
-- [ ] With the allowed list `xn--bcher-kva.example`: `a@bücher.example` signs up, `c@x.com` → 403; a GitHub sign in without an email → 403 → AC-8
+- [x] With the allowed list `xn--bcher-kva.example`: `a@bücher.example` signs up, `c@x.com` → 403; a GitHub sign in without an email → 403 → AC-8
 - [x] With disposable blocking on: `someone@mailinator.com` → 403 → AC-7, AC-8
 - [x] With verified emails required: a sign up without `verificationRedirectUrl` → 400 `invalid_request`; a new email and a verified account's email both answer the same 201 body (`verificationRequired: true`, everything else null or false) in at least 500 ms, with no session; the new inbox gets a verification email with a `verification_reject` link, the owner gets the sign up attempt alert, and the owner's row is unchanged → AC-12
 - [x] The new user's right password → 403 `email_verification_required`, a wrong one → 401; with `verificationRedirectUrl` a fresh link is queued; after the link, sign in works → AC-13
-- [ ] A GitHub sign in whose email is not verified, for a new user → 403 `email_verification_required`; an already linked user signs in → AC-14
-- [ ] An impostor signs up with Ada's address; Ada's reject link → 204, the password and sessions are gone (`account_claimed`), the user ID stays; the same token → 401 `invalid_email_token`, and verifying with it too; Ada then signs in by magic link as the same user → AC-15
+- [x] A GitHub sign in whose email is not verified, for a new user → 403 `email_verification_required`; an already linked user signs in → AC-14
+- [x] An impostor signs up with Ada's address; Ada's reject link → 204, the password and sessions are gone (`account_claimed`), the user ID stays; the same token → 401 `invalid_email_token`, and verifying with it too; Ada then signs in by magic link as the same user → AC-15
 - [x] With no email server, unlinking the only identity of a verified user without a password → 409 `last_sign_in_method`; with one → 204 → AC-33
 - [x] `dotnet test --project server/tests/Orvano.Server.Tests --filter-class "*SignUpPolicyTests"` → all pass → AC-8 to AC-15, AC-33
-- [ ] The shared scenarios in every runner → `auth-email-domains` and `auth-reject-link` pass (the .NET runner skips both) → AC-8, AC-9, AC-15, AC-36
+- [x] The shared scenarios in every runner → `auth-email-domains` and `auth-reject-link` pass (the .NET runner skips both) → AC-8, AC-9, AC-15, AC-36
 
 ## Value sourcing
 
 - [x] The domain comes from the request's email, or the provider's email at redemption, by AC-8's form: an uppercase or IDN address matches its lowercase ASCII entry → AC-8
 - [x] `smtpAvailable` and the AC-11 refusal follow Messaging's check, project then install: a project with its own SMTP and no install SMTP can turn the switch on → AC-11
-- [ ] The alert to an existing owner is the `security_alert` template with `alert` `sign_up_attempt`, and a project that edited that template keeps its own words → AC-12
-- [ ] `reject_url` is the verification link's own token with `orvano_type=verification_reject` on the same redirect URL; an email change email has none → AC-15
+- [x] The alert to an existing owner is the `security_alert` template with `alert` `sign_up_attempt`, and a project that edited that template keeps its own words → AC-12
+- [x] `reject_url` is the verification link's own token with `orvano_type=verification_reject` on the same redirect URL; an email change email has none → AC-15
 
 ## Acceptance criteria coverage (milestone 4)
 
@@ -125,15 +126,15 @@ _Steps derived from spec 0014's AC-2 (MFA), AC-25 to AC-27, AC-35 (MFA card), an
 - [x] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "*RequireMfaTests" --filter-class "*SessionPolicyTests"` → all pass → AC-2, AC-25 to AC-27
 - [x] `pnpm --filter @orvano/js --filter @orvano/nextjs test`, `(cd sdks/dart/core && dart test)` → the enrollment tests pass → AC-36
 - [x] `pnpm --filter @orvano/console exec vitest run --project browser src/routes/_app/projects` → the Require MFA card tests pass with axe → AC-35
-- [ ] Against `tests/scenarios/compose.yml`, one fresh server per runner: `pnpm --filter @orvano/scenarios-js scenarios <node|bun|deno|browser|workerd|nextjs>` and `dart run bin/run.dart` → `auth-require-mfa`, `auth-require-mfa-passkey`, and `auth-session-limit` pass; .NET skips them → AC-26, AC-27, AC-36
-- [ ] Flutter on Chrome and Android (`sdks.yml`) → the same three scenarios pass → AC-36
+- [x] Against `tests/scenarios/compose.yml`, one fresh server per runner: `pnpm --filter @orvano/scenarios-js scenarios <node|bun|deno|browser|workerd|nextjs>` and `dart run bin/run.dart` → `auth-require-mfa`, `auth-require-mfa-passkey`, and `auth-session-limit` pass; .NET skips them → AC-26, AC-27, AC-36
+- [x] Flutter on Chrome and Android (`sdks.yml`) → the same three scenarios pass → AC-36
 
 ## Value sourcing
 
 - [x] `factors` of an enrollment challenge follows `totp_enabled` and `passkeys_enabled`: passkeys off gives `[totp]` only → AC-27
-- [ ] The ticket's lifetime is `AuthTimings.MfaEnrollmentTicket`: `expiresAt` is 15 minutes after the first step, and the ticket fails after it → AC-27
-- [ ] The enrolled session's `amr` is the step one method's plus the factor's: a magic link user enrolling a passkey gets `[email, hwk or swk, mfa, user]`, a password user enrolling TOTP `[mfa, otp, pwd]` → AC-27
-- [ ] `activeUsersWithoutMfa` counts users with a live session and no factor that counts now: turning passkeys off raises it for users whose only factor is a passkey; guests are not counted → AC-27, AC-35
+- [x] The ticket's lifetime is `AuthTimings.MfaEnrollmentTicket`: `expiresAt` is 15 minutes after the first step, and the ticket fails after it → AC-27
+- [x] The enrolled session's `amr` is the step one method's plus the factor's: a magic link user enrolling a passkey gets `[email, hwk or swk, mfa, user]`, a password user enrolling TOTP `[mfa, otp, pwd]` → AC-27
+- [x] `activeUsersWithoutMfa` counts users with a live session and no factor that counts now: turning passkeys off raises it for users whose only factor is a passkey; guests are not counted → AC-27, AC-35
 
 ## Acceptance criteria coverage (build tasks 5 and 6: sessions and require MFA)
 
@@ -154,7 +155,7 @@ _Steps derived from spec 0014's AC-2 (guests), AC-28 to AC-32, AC-35 (Anonymous 
 - [x] Turn on **Require a verified email** (SMTP set): an upgrade without `verificationRedirectUrl` gets 400; with it, a free email and a taken one both answer the same 200 `{ user: null, verificationRequired: true }` in at least 500 ms; the free address gets an email change link, the taken one's owner a "sign up attempt" alert; the guest stays a guest (named, if a name was sent) until the link is opened, then `account.confirmEmailChange` makes them permanent with a verified email → AC-30
 - [x] A second upgrade call voids the first link: the earlier link answers 401 `invalid_email_token` → AC-30
 - [x] Turn on **Require MFA**: a guest signs in with no MFA challenge; after their upgrade link is opened, their session refresh fails (`end_reason` `mfa_required`) and their next password sign in asks them to enroll a factor → AC-27, AC-30
-- [ ] A guest links GitHub by `linkIdentity` with no password and an hour old session → linked, now permanent with GitHub's verified email; with that email's domain on the blocked list, the link answers 403 `email_domain_not_allowed` and the user stays a guest → AC-29, AC-30
+- [x] A guest links GitHub by `linkIdentity` with no password and an hour old session → linked, now permanent with GitHub's verified email; with that email's domain on the blocked list, the link answers 403 `email_domain_not_allowed` and the user stays a guest → AC-29, AC-30
 - [ ] The Next.js app on a real deployment: `POST /api/orvano/anonymous` sets both cookies; `POST /api/orvano/anonymous-upgrade` refreshes them (the access cookie's token now says `is_anonymous: false`), and under the verified email rule answers `{ verificationRequired: true }` with no new session, but with an expired access cookie it (and a refused upgrade, such as `password_too_common`) still sets the rotated cookies, and the guest's next call works after 10 seconds (amended 2026-10-10); `POST /api/orvano/sign-up` under that rule also sets no new session → AC-36
 - [ ] Flutter: `orvano.account.createAnonymousSession()` stores the session in secure storage, and `upgradeAnonymous` refreshes it → AC-36
 - [x] Console, Users: a guest shows the **Guest** badge beside their ID and **None** under Sign in; the **Kind** filter's **Guests** shows only guests and **Permanent** only the others; a guest's page has the Guest badge and says they are a guest → AC-32
@@ -164,14 +165,14 @@ _Steps derived from spec 0014's AC-2 (guests), AC-28 to AC-32, AC-35 (Anonymous 
 - [x] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "*AnonymousUserTests"` → all 8 pass → AC-2, AC-28 to AC-32
 - [x] `pnpm --filter @orvano/js --filter @orvano/nextjs test`, `(cd sdks/dart/core && dart test)`, `(cd sdks/dart/server && dart test)`, `dotnet test --project sdks/dotnet/tests/Orvano.Tests` → the guest and `isAnonymous` tests pass → AC-36
 - [x] `pnpm --filter @orvano/console test` and, against the gateway, `pnpm --filter @orvano/console test:e2e` → the Anonymous users card, the Guest badge, and `anonymous.spec.ts` pass → AC-32, AC-35
-- [ ] Against `tests/scenarios/compose.yml`, one fresh server per runner: every JS runner, Next.js, Dart, and Flutter pass `auth-anonymous`; every runner, .NET too, passes `auth-anonymous-server` (the browser skips it, having no API key) → AC-32, AC-36
+- [x] Against `tests/scenarios/compose.yml`, one fresh server per runner: every JS runner, Next.js, Dart, and Flutter pass `auth-anonymous`; every runner, .NET too, passes `auth-anonymous-server` (the browser skips it, having no API key) → AC-32, AC-36
 
 ## Value sourcing
 
-- [ ] `is_anonymous` is read from `auth_users.is_anonymous` at issue and at every refresh: a guest upgraded through the email change link gets `false` on the next refresh of the session they already hold → AC-28, AC-30
+- [x] `is_anonymous` is read from `auth_users.is_anonymous` at issue and at every refresh: a guest upgraded through the email change link gets `false` on the next refresh of the session they already hold → AC-28, AC-30
 - [x] Retention's latest activity is the newest `greatest(created_at, last_refreshed_at)` of the guest's sessions, else the user's `created_at`: with 30 idle days, a guest last refreshed 31 days ago is deleted (`auth.user.deleted`, reason `anonymous_idle`), one refreshed yesterday is kept, and a project set to 7 days deletes a guest idle 8 days → AC-31
-- [ ] The idle days come from `anonymous_idle_days`, 30 for a project with no settings row → AC-31
-- [ ] Under the verified email rule, the pending upgrade's email is the `email_change` token row's: opening the link sets that address, verified, never one sent in a later call that lost → AC-30
+- [x] The idle days come from `anonymous_idle_days`, 30 for a project with no settings row → AC-31
+- [x] Under the verified email rule, the pending upgrade's email is the `email_change` token row's: opening the link sets that address, verified, never one sent in a later call that lost → AC-30
 
 ## Acceptance criteria coverage (build task 7: anonymous users)
 
@@ -195,7 +196,7 @@ _Steps derived from spec 0014's AC-38 to AC-40, plus the whole of this file run 
 
 - [x] `dotnet test --project server/tests/Orvano.Server.Tests -- --filter-class "*AuthPolicyLeakTests" --filter-class "*KernelSettingsTests" --filter-class "*BreachedPasswordsTests"` → all pass → AC-39
 - [x] `pnpm --filter @orvano/contract build && ORVANO_SITE_ENV=preview pnpm --filter @orvano/website build && ORVANO_SITE_ENV=preview pnpm --filter @orvano/website check:site` → the site builds with every error code's fix page and every link valid, and axe and the CSP pass → AC-38
-- [ ] `dotnet test --solution Orvano.slnx` and every scenario runner on CI (`sdks.yml`) → green → AC-36 to AC-40
+- [x] `dotnet test --solution Orvano.slnx` and every scenario runner on CI (`sdks.yml`) → green → AC-36 to AC-40
 
 ## Value sourcing
 
