@@ -62,7 +62,7 @@ _Steps derived from spec 0014's acceptance criteria for what has landed: passwor
 
 - [x] Policy values come from `PolicySettings`: change a value through the console, and the same `api` instance applies it on the next request; the `console` project always uses the defaults (a console sign up with `password123` → `password_too_common`, and no `auth_policies` row for `console`) → AC-3, AC-37
 - [x] Limit IP: only a request from a listed CIDR may name the visitor; IPv6 addresses in one `/64` share a bucket; `::ffff:198.51.100.20` counts as `198.51.100.20` → AC-16
-- [x] `@orvano/nextjs` sends `x-real-ip`, else the rightmost `x-forwarded-for` value, never the first → AC-36
+- [ ] `@orvano/nextjs` sends the rightmost `x-forwarded-for` value by default, never the first and never `x-real-ip` (only a custom `clientIp` reads that) → AC-36 (amended 2026-10-10)
 - [x] Session `expires_at` is creation plus `sessionAbsoluteSeconds`, and `idle_expires_at` after a refresh is the earlier of now plus `sessionIdleSeconds` and `expires_at` → AC-25
 
 ## Acceptance criteria coverage (landed so far)
@@ -155,7 +155,7 @@ _Steps derived from spec 0014's AC-2 (guests), AC-28 to AC-32, AC-35 (Anonymous 
 - [x] A second upgrade call voids the first link: the earlier link answers 401 `invalid_email_token` → AC-30
 - [x] Turn on **Require MFA**: a guest signs in with no MFA challenge; after their upgrade link is opened, their session refresh fails (`end_reason` `mfa_required`) and their next password sign in asks them to enroll a factor → AC-27, AC-30
 - [ ] A guest links GitHub by `linkIdentity` with no password and an hour old session → linked, now permanent with GitHub's verified email; with that email's domain on the blocked list, the link answers 403 `email_domain_not_allowed` and the user stays a guest → AC-29, AC-30
-- [x] The Next.js app on a real deployment: `POST /api/orvano/anonymous` sets both cookies; `POST /api/orvano/anonymous-upgrade` refreshes them (the access cookie's token now says `is_anonymous: false`), and under the verified email rule answers `{ verificationRequired: true }` with no cookie change; `POST /api/orvano/sign-up` under that rule also sets no cookie → AC-36
+- [ ] The Next.js app on a real deployment: `POST /api/orvano/anonymous` sets both cookies; `POST /api/orvano/anonymous-upgrade` refreshes them (the access cookie's token now says `is_anonymous: false`), and under the verified email rule answers `{ verificationRequired: true }` with no new session, but with an expired access cookie it (and a refused upgrade, such as `password_too_common`) still sets the rotated cookies, and the guest's next call works after 10 seconds (amended 2026-10-10); `POST /api/orvano/sign-up` under that rule also sets no new session → AC-36
 - [ ] Flutter: `orvano.account.createAnonymousSession()` stores the session in secure storage, and `upgradeAnonymous` refreshes it → AC-36
 - [x] Console, Users: a guest shows the **Guest** badge beside their ID and **None** under Sign in; the **Kind** filter's **Guests** shows only guests and **Permanent** only the others; a guest's page has the Guest badge and says they are a guest → AC-32
 

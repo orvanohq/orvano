@@ -83,15 +83,16 @@ Spec [0013](../specs/0013-mfa-passkeys-sessions/index.md) · code in `server/src
 Password rules, sign up email policies (block disposable domains), anonymous guest users, session limits, and rate limits on auth endpoints.
 **Done when:** each policy is set per project in the console and enforced by the API; repeated failed sign ins are throttled.
 - [x] Design it (spec): `/architect auth policies & abuse protection`
-- [x] Build it: `/develop auth policies & abuse protection`
+- [ ] Build it: `/develop auth policies & abuse protection`
    - [x] Thin thread and password rules: the migration, `PolicySettings`, the Security page, minimum length, the common list, and the breached check (AC-1, 3 to 7, 37, 40)
    - [x] Failed attempts and limits: `FailureCounter`, the limit IP with trusted servers and Next.js `clientIp`, the rekeyed and editable limits, API key and invite limits, and the spec 0013 review fixes (AC-16 to 24, 36)
    - [x] Sign up policies and verified email: closed sign ups, email domain rules, require verified email with hidden sign up, the reject link, and the last method rule (AC-8 to 15, 33)
    - [x] Sessions and require MFA: per project lifetimes, the session cap, and enrollment before a session (AC-2, 25 to 27, 35)
    - [x] Anonymous users: guest sign in, upgrade, retention, and the Users page filter, in every SDK (AC-2, 28 to 32, 35, 36)
    - [x] Hardening and docs: events, metrics, the leak scan, errors and fix pages, guides, notices, and the checks in verify.md (AC-38 to 40)
+   - [ ] Review amendments: a second hidden sign up claims the unverified account, required MFA challenges passkey only users, Next.js rotated cookies on every answer, and the rightmost `x-forwarded-for` default (AC-12, 27, 36)
 - [ ] Verify it: `/check verify auth policies & abuse protection`
 - [ ] Test it: `/test auth policies & abuse protection`
-- [ ] Review it (fresh model): `/check review auth policies & abuse protection`
+- [x] Review it (fresh model): `/check review auth policies & abuse protection`
 - [ ] Document it: `/document auth policies & abuse protection`
 Spec [0014](../specs/0014-auth-policies-abuse-protection/index.md) · code in `server/src/Orvano.Auth/`, `server/src/Orvano.Core/RateLimiting/`, `server/src/Orvano.Platform/`, `server/src/Orvano.Messaging/`, `contract/auth/`, `sdks/`, `console/`, `tests/scenarios/`, `website/`
