@@ -66,17 +66,17 @@ Spec [0012](../specs/0012-oauth-id-token-sign-in/index.md) · code in `server/sr
 Authenticator app codes, recovery codes, passkeys, and letting users see and revoke their sessions and devices.
 **Done when:** a user can enroll a second factor or a passkey, must pass it at sign in, and can revoke any other session from the app.
 - [x] Design it (spec): `/architect MFA, passkeys & sessions`
-- [ ] Build it: `/develop MFA, passkeys & sessions`
+- [x] Build it: `/develop MFA, passkeys & sessions`
    - [x] Thin thread, TOTP at password sign in: the migration, the TOTP and session strength domain types, `AuthResult` with the MFA challenge, enroll and confirm, step two with a code, the `aal` and `amr` claims, and a JS scenario (AC-5 to 9, 12, 13, 16, 25, 26, 40)
    - [x] MFA everywhere: the challenge in every step one, recovery codes, turning MFA off, the enrollment and step up checks, the verified email rule, recovery deferred to step two, claiming, the TOTP switch, limits, and the Next.js, Dart, and Flutter helpers (AC-6, 8, 10, 14, 15, 17 to 19, 29, 30, 32, 36 to 38)
    - [x] Passkeys: method settings and the RP ID and origin rules, registration, sign in with autofill, step two and step up, rename and delete, the counter rule, the Test only authenticator, and every client helper (AC-1 to 4, 11, 19 to 24, 30, 36 to 38, 45)
    - [x] Flutter passkeys as an opt in package: move `PlatformPasskeys` into `orvano_flutter_passkeys` so plain Flutter web apps start without Corbado's script, and wire it into SdkGen stamping, `sdks.yml`, and `release.yml` (AC-38, 46)
    - [x] Servers and console: `users.resetMfa` and passkey operations, `aal` and `requireMfa` in the server SDKs, `orvano mfa reset`, the console MFA step and passkey sign in, the account Security page, the Sign in methods cards, and the Users pages (AC-27, 28, 39, 41 to 45)
-   - [ ] Alerts, hardening, and docs: the `security_alert` email, events, retention and purge, the leak scan, docs and fix pages, and the real device checks in verify.md (AC-31, 33 to 35, 46, 47)
+   - [x] Alerts, hardening, and docs: the `security_alert` email, events, retention and purge, the leak scan, docs and fix pages, and the real device checks in verify.md (AC-31, 33 to 35, 46, 47)
 - [ ] Verify it: `/check verify MFA, passkeys & sessions`
 - [x] Test it: `/test MFA, passkeys & sessions`
 - [x] Review it (fresh model): `/check review MFA, passkeys & sessions`
-- [ ] Document it: `/document MFA, passkeys & sessions`
+- [x] Document it: `/document MFA, passkeys & sessions`
 Spec [0013](../specs/0013-mfa-passkeys-sessions/index.md) · code in `server/src/Orvano.Auth/`, `server/src/Orvano.Messaging/`, `contract/auth/`, `sdks/`, `console/`, `tests/scenarios/`, `website/`
 
 ### 14. Auth policies & abuse protection · done · GA
