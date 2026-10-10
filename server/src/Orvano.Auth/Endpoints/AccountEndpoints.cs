@@ -64,9 +64,16 @@ internal static class AccountEndpoints
             .WithName(Api.AccountOperations.CreateAnonymousSession.Id)
             .RequireProject();
 
-        v1.MapPost(Api.AccountOperations.UpgradeAnonymous.Route, async (HttpContext http, Api.CreateAnonymousUpgradeRequest request, AnonymousService anonymous, CancellationToken ct) =>
+        v1.MapPost(Api.AccountOperations.UpgradeAnonymous.Route, async (HttpContext http, Api.CreateAnonymousUpgradeRequest request, AnonymousService anonymous, RateLimits limits, CancellationToken ct) =>
         {
             var started = Stopwatch.StartNew();
+            // Spec 0014, AC-30: an upgrade makes a permanent account, so it takes sign up's limit per address, and every
+            // attempt counts per guest, like the other password checks, before any hashing or email.
+            var perIp = limits.Acquire(ProjectLimits.SignUpPerIp(PublicRequests.Policies(http).Auth), PublicRequests.LimitKey(http));
+            if (!perIp.Allowed) return ApiProblem.RateLimited(http, perIp, Api.ErrorCode.RateLimited);
+            var perUser = limits.Acquire(RateLimitPolicies.PasswordCheckPerUser, PublicRequests.User(http).UserId.ToString());
+            if (!perUser.Allowed) return ApiProblem.RateLimited(http, perUser, Api.ErrorCode.RateLimited);
+
             var outcome = await anonymous.UpgradeAsync(
                 PublicRequests.Project(http), PublicRequests.User(http).UserId, request.Email, request.Password, request.Name, request.VerificationRedirectUrl,
                 PublicRequests.LimitKey(http), ct);
