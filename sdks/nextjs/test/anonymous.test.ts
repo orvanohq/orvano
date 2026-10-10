@@ -85,6 +85,20 @@ function post(action: string, body: unknown, cookies: Record<string, string> = {
 const sets = (response: Response, name: string): boolean =>
   response.headers.getSetCookie().some((c) => c.startsWith(`${name}=`))
 
+/** The value a response set a cookie to ('' when it cleared it), or undefined. */
+const valueOf = (response: Response, name: string): string | undefined =>
+  response.headers
+    .getSetCookie()
+    .find((c) => c.startsWith(`${name}=`))
+    ?.split(';')[0]
+    ?.slice(name.length + 1)
+
+const refused = (status: number, code: string) => (): Response =>
+  Response.json(
+    { type: `https://orvano.dev/errors/${code}`, title: 'Error', status, code, detail: code },
+    { status, headers: { 'Content-Type': 'application/problem+json' } },
+  )
+
 describe('sign up and guests (AC-36)', () => {
   it('sign-up sets both cookies, or none on a pending answer', async () => {
     const signedUp = handler(() =>
@@ -202,5 +216,57 @@ describe('sign up and guests (AC-36)', () => {
       post('anonymous-upgrade', { email: 'ada@example.com', password: 'x' }),
     )
     expect(signedOut.status).toBe(401)
+  })
+
+  it('anonymous-upgrade writes the cookies a refresh on the way rotated on every answer', async () => {
+    // An expired access cookie: the action refreshes first, which spends the old refresh token.
+    const expired = {
+      [accessCookie]: jwt({ sub: 'u1', sid: 's1', exp: Math.floor(Date.now() / 1000) - 60 }),
+      [refreshCookie]: 'orv_rt_old.secret',
+    }
+    const body = {
+      email: 'ada@example.com',
+      password: 'password1',
+      verificationRedirectUrl: `${app}/cb`,
+    }
+
+    const tooCommon = handler(
+      () => Response.json(session(true)),
+      refused(400, 'password_too_common'),
+    )
+    const refusedUpgrade = await tooCommon.POST(post('anonymous-upgrade', body, expired))
+    expect(refusedUpgrade.status).toBe(400)
+    expect(((await refusedUpgrade.json()) as { code: string }).code).toBe('password_too_common')
+    expect(valueOf(refusedUpgrade, refreshCookie)).toBe('orv_rt_new.secret')
+    expect(valueOf(refusedUpgrade, accessCookie)).toBe(session(true).accessToken)
+
+    const waiting = handler(
+      () => Response.json(session(true)),
+      () => Response.json({ user: null, verificationRequired: true, verificationEmail: null }),
+    )
+    const pendingAnswer = await waiting.POST(post('anonymous-upgrade', body, expired))
+    expect(await pendingAnswer.json()).toEqual({ verificationRequired: true })
+    expect(valueOf(pendingAnswer, refreshCookie)).toBe('orv_rt_new.secret')
+  })
+
+  it('anonymous-upgrade answers 401 and clears both cookies when the refresh is refused, and 503 when Orvano is unreachable', async () => {
+    const expired = { [refreshCookie]: 'orv_rt_old.secret' }
+    const body = { email: 'ada@example.com', password: 'correct horse battery' }
+
+    const ended = handler(refused(401, 'invalid_refresh_token'))
+    const over = await ended.POST(post('anonymous-upgrade', body, expired))
+    expect(over.status).toBe(401)
+    expect(((await over.json()) as { code: string }).code).toBe('session_required')
+    expect(valueOf(over, accessCookie)).toBe('')
+    expect(valueOf(over, refreshCookie)).toBe('')
+    expect(ended.calls).toHaveLength(1)
+
+    const down = handler(() => {
+      throw new TypeError('fetch failed')
+    })
+    const busy = await down.POST(post('anonymous-upgrade', body, expired))
+    expect(busy.status).toBe(503)
+    expect(((await busy.json()) as { code: string }).code).toBe('server_busy')
+    expect(busy.headers.getSetCookie()).toEqual([])
   })
 })

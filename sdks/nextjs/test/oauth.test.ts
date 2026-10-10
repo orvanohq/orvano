@@ -257,6 +257,48 @@ describe('createOrvanoRouteHandler oauth (spec 0012, AC-21)', () => {
     ).toBe(true)
   })
 
+  it('a link callback writes the refreshed cookies on a refused link, and clears them on a refused refresh (spec 0014, AC-36)', async () => {
+    const started = await handler({
+      '/v1/account/identities/oauth/flows': () =>
+        Response.json({ url: 'https://github.example/auth' }),
+    }).POST(
+      post(
+        '/api/orvano/oauth',
+        { provider: 'github', link: true },
+        { [accessCookie]: accessIn(900) },
+      ),
+    )
+    const cookies = { [oauthCookie]: oauthValue(started), [refreshCookie]: 'orv_rt_old.secret' }
+    const refusal = (status: number, code: string) => (): Response =>
+      Response.json(
+        { type: 'about:blank', title: 'Error', status, code, detail: code },
+        { status, headers: { 'Content-Type': 'application/problem+json' } },
+      )
+
+    const taken = handler({
+      '/v1/account/sessions/refresh': () => Response.json(session),
+      '/v1/account/identities/oauth': refusal(409, 'identity_already_linked'),
+    })
+    const linkRefused = await taken.GET(
+      get('/api/orvano/oauth-callback?orvano_type=oauth_link&orvano_code=orv_oc_y', cookies),
+    )
+    expect(linkRefused.status).toBe(303)
+    expect(linkRefused.headers.get('location')).toContain('orvano_error=identity_already_linked')
+    expect(
+      linkRefused.headers
+        .getSetCookie()
+        .some((c) => c.startsWith(`${refreshCookie}=orv_rt_new.secret`)),
+    ).toBe(true)
+
+    const ended = handler({ '/v1/account/sessions/refresh': refusal(401, 'invalid_refresh_token') })
+    const over = await ended.GET(
+      get('/api/orvano/oauth-callback?orvano_type=oauth_link&orvano_code=orv_oc_y', cookies),
+    )
+    expect(over.headers.get('location')).toContain('orvano_error=session_required')
+    expect(over.headers.getSetCookie().some((c) => c.startsWith(`${refreshCookie}=;`))).toBe(true)
+    expect(ended.calls).toHaveLength(1)
+  })
+
   it('a link sends the current password to Orvano and keeps it out of the flow cookie (spec 0013)', async () => {
     const { POST, calls } = handler({
       '/v1/account/identities/oauth/flows': () =>

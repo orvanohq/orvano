@@ -334,6 +334,32 @@ describe('the route handler MFA actions (AC-37)', () => {
     expect(setCookie(response, refreshCookie)).toBe(session.refreshToken)
   })
 
+  it('mfa-verify with an expired access cookie sets the refreshed cookies on a refusal too (spec 0014, AC-36)', async () => {
+    const { POST } = handler({
+      '/v1/account/sessions/refresh': () => Response.json(session),
+      '/v1/account/mfa/verify': () =>
+        Response.json(
+          {
+            type: 'about:blank',
+            title: 'Unauthorized',
+            status: 401,
+            code: 'invalid_mfa_code',
+            detail: 'x',
+          },
+          { status: 401, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+    })
+
+    const response = await POST(
+      post('mfa-verify', { totpCode: '123456' }, { [refreshCookie]: 'orv_rt_old.secret' }),
+    )
+
+    expect(response.status).toBe(401)
+    expect(((await response.json()) as { code: string }).code).toBe('invalid_mfa_code')
+    expect(setCookie(response, accessCookie)).toBe(session.accessToken)
+    expect(setCookie(response, refreshCookie)).toBe(session.refreshToken)
+  })
+
   it('mfa-verify with nobody signed in is 401 before calling Orvano', async () => {
     const { POST, calls } = handler({})
     expect((await POST(post('mfa-verify', { totpCode: '123456' }))).status).toBe(401)

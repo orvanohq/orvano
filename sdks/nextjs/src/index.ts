@@ -160,14 +160,15 @@ export function secureCookies(appUrl: string | URL): boolean {
 export type ClientIpResolver = (request: { headers: HeadersLike }) => string | null | undefined
 
 /**
- * The default {@link ClientIpResolver}: `x-real-ip`, else the last (rightmost) `x-forwarded-for`
- * value, the one the proxy nearest your server appended. Never the first value, which the visitor
- * can set to anything. Behind several proxies or a CDN, pass your own `clientIp` that reads the
- * header your host guarantees (the docs list one per host).
+ * The default {@link ClientIpResolver}: the last (rightmost) `x-forwarded-for` value, the one the
+ * proxy nearest your server appended, which a visitor can't place to its right; else `null`. Never
+ * the first value, which the visitor can set to anything, and never `x-real-ip`, which is safe
+ * only behind a proxy that overwrites it (many pass a visitor's own through). It assumes exactly
+ * one proxy in front of your server. Behind a CDN plus a proxy, or to read `x-real-ip` behind
+ * nginx or `cf-connecting-ip` behind Cloudflare, pass your own `clientIp` (the docs list one per
+ * host).
  */
 export function defaultClientIp(request: { headers: HeadersLike }): string | null {
-  const realIp = request.headers.get('x-real-ip')?.trim()
-  if (realIp !== undefined && realIp !== '') return realIp
   const last = request.headers.get('x-forwarded-for')?.split(',').at(-1)?.trim()
   return last === undefined || last === '' ? null : last
 }

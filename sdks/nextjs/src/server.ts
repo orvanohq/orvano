@@ -72,7 +72,7 @@ import {
 export type OrvanoNextConfig = Omit<ClientConfig, 'session' | 'refresh' | 'mfaStore' | 'mfa'> & {
   /**
    * Finds the visitor's IP in the request (spec 0014, AC-36), sent as `X-Orvano-Client-IP`;
-   * defaults to `x-real-ip`, else the rightmost `x-forwarded-for` value.
+   * defaults to the rightmost `x-forwarded-for` value (see `defaultClientIp`).
    */
   clientIp?: ClientIpResolver
 }
@@ -265,9 +265,11 @@ function isLinkType(value: unknown): value is EmailLinkType {
 /**
  * `POST .../redeem` (spec 0010, AC-25): redeems a link with Orvano as the browser. A magic link or
  * reset sets both cookies; a verification or email change refreshes them when they exist, so the
- * access token carries the new claim; a `verification_reject` link (spec 0014) touches no cookie. Answers `{ type, user, isNewUser, mfaRequired, factors }`,
- * never a token or an MFA ticket; a sign in that stopped at the MFA step sets only the `HttpOnly`
- * `orvano_mfa` cookie (spec 0013, AC-37), with `next` from the body.
+ * access token carries the new claim (a refused refresh clears them, an unreachable Orvano leaves
+ * them); a `verification_reject` link (spec 0014) touches no cookie. Answers `{ type, user,
+ * isNewUser, mfaRequired, enrollmentRequired, factors }`, never a token or an MFA ticket; a sign
+ * in that stopped at the MFA step sets only the `HttpOnly` `orvano_mfa` cookie (spec 0013, AC-37),
+ * with `next` from the body.
  */
 async function redeem(
   request: NextRequest,
@@ -434,22 +436,56 @@ function handlerBase(request: NextRequest): string {
 }
 
 /**
- * The signed in user's access token for a link (AC-21): the access cookie, or a fresh session from
- * the refresh cookie when it is missing or under a minute from expiring, since a link flow can
- * outlast the 15 minute access token. Null when nobody is signed in.
+ * The signed in user's session for an action that acts as them (spec 0012, AC-21): the access
+ * cookie, or a fresh session from the refresh cookie when it is missing or under a minute from
+ * expiring, since a link flow can outlast the 15 minute access token. `fresh` is that new session,
+ * whose refresh token replaced the cookie's, so every answer of the action writes it (spec 0014,
+ * AC-36). `session_required` when nobody is signed in or Orvano refused the refresh, and
+ * `server_busy` when Orvano could not be reached.
  */
 async function linkSession(
   request: NextRequest,
   client: Client,
-): Promise<{ access: string; fresh: AuthSession | null } | null> {
+): Promise<{ access: string; fresh: AuthSession | null } | 'session_required' | 'server_busy'> {
   const access = request.cookies.get(accessCookie)?.value
   const claims = access === undefined ? null : accessClaims(access)
   if (access !== undefined && claims !== null && claims.exp * 1000 - Date.now() > refreshMarginMs)
     return { access, fresh: null }
   const refreshToken = request.cookies.get(refreshCookie)?.value
-  if (refreshToken === undefined || refreshToken === '') return null
-  const fresh = await refreshWith(client, refreshToken)
-  return fresh === null ? null : { access: fresh.accessToken, fresh }
+  if (refreshToken === undefined || refreshToken === '') return 'session_required'
+  let fresh: AuthSession | null
+  try {
+    fresh = await refreshWith(client, refreshToken)
+  } catch {
+    return 'server_busy'
+  }
+  return fresh === null ? 'session_required' : { access: fresh.accessToken, fresh }
+}
+
+/**
+ * The answer when {@link linkSession} found no session: 401 `session_required`, clearing both
+ * cookies (as `.../refresh` does), or 503 `server_busy`, leaving them as they are.
+ */
+function noSession(reason: 'session_required' | 'server_busy', secure: boolean): NextResponse {
+  if (reason === 'server_busy')
+    return problem(503, 'server_busy', 'Orvano could not be reached. Try again.')
+  const refused = problem(401, 'session_required', 'Sign in first.')
+  writeResponse(refused, null, secure)
+  return refused
+}
+
+/**
+ * Writes the session a refresh on the way rotated to onto any answer (spec 0014, AC-36): success,
+ * pending, a passed through refusal, or a redirect, so the browser never keeps a spent refresh
+ * token that spec 0004's reuse detection would end.
+ */
+function withFresh(
+  response: NextResponse,
+  fresh: AuthSession | null,
+  secure: boolean,
+): NextResponse {
+  if (fresh !== null) writeResponse(response, fresh, secure)
+  return response
 }
 
 /**
@@ -478,12 +514,14 @@ async function oauthStart(
   const redirectUrl = `${appOrigin(request)}${handlerBase(request)}/oauth-callback`
 
   let session: { access: string; fresh: AuthSession | null } | null = null
+  if (link) {
+    const found = await linkSession(request, client)
+    if (typeof found === 'string') return noSession(found, secure)
+    session = found
+  }
+  const fresh = session?.fresh ?? null
   let url: string
   try {
-    if (link) {
-      session = await linkSession(request, client)
-      if (session === null) return problem(401, 'session_required', 'Sign in first.')
-    }
     const flow = await client.request<{ url: string }>({
       method: 'POST',
       path: link ? '/v1/account/identities/oauth/flows' : '/v1/account/oauth/flows',
@@ -497,12 +535,11 @@ async function oauthStart(
     })
     url = flow.url
   } catch (error) {
-    if (error instanceof OrvanoError) return passThrough(error)
+    if (error instanceof OrvanoError) return withFresh(passThrough(error), fresh, secure)
     throw error
   }
 
-  const response = NextResponse.json({ url })
-  if (session?.fresh != null) writeResponse(response, session.fresh, secure)
+  const response = withFresh(NextResponse.json({ url }), fresh, secure)
   response.cookies.set(
     oauthCookie,
     encodeCookie({ v: verifier, n: safeNext(body.next), t: link ? 'oauth_link' : 'oauth' }),
@@ -539,11 +576,12 @@ async function oauthCallback(
     if (error !== undefined) url.searchParams.set('orvano_error', error)
     return url
   }
+  // `session` sets both cookies; null clears them (a refused refresh); left out, they stay.
   const done = (url: URL, session?: AuthSession | null): NextResponse => {
     const response = NextResponse.redirect(url, 303)
     response.headers.set('Cache-Control', 'no-store')
     response.headers.set('Referrer-Policy', 'no-referrer')
-    if (session !== undefined && session !== null) writeResponse(response, session, secure)
+    if (session !== undefined) writeResponse(response, session, secure)
     response.cookies.delete(oauthCookie)
     return response
   }
@@ -554,38 +592,43 @@ async function oauthCallback(
   const code = params.get('orvano_code')
   if (state === null || code === null || code === '') return done(target('invalid_oauth_code'))
 
-  try {
-    if (state.t === 'oauth') {
+  if (state.t === 'oauth') {
+    try {
       await client.request({
         method: 'POST',
         path: '/v1/account/sessions/oauth',
         body: { code, codeVerifier: state.v },
         session: 'start',
       })
-      if (mfaStore.get() !== null) {
-        // Spec 0013, AC-37: the MFA page finishes it; `next` waits in the cookie with the ticket.
-        const response = done(
-          new URL(safeNext(config.mfaPath ?? defaultMfaPath), appOrigin(request)),
-        )
-        writeMfaCookie(response, mfaStore, next, secure)
-        return response
-      }
-      return done(target(), await client.session.get())
+    } catch (error) {
+      if (error instanceof OrvanoError) return done(target(error.code))
+      throw error
     }
+    if (mfaStore.get() !== null) {
+      // Spec 0013, AC-37: the MFA page finishes it; `next` waits in the cookie with the ticket.
+      const response = done(new URL(safeNext(config.mfaPath ?? defaultMfaPath), appOrigin(request)))
+      writeMfaCookie(response, mfaStore, next, secure)
+      return response
+    }
+    return done(target(), await client.session.get())
+  }
 
-    const session = await linkSession(request, client)
-    if (session === null) return done(target('session_required'))
+  // A link: the session's refresh on the way, if any, is written on every redirect (spec 0014, AC-36).
+  const session = await linkSession(request, client)
+  if (session === 'session_required') return done(target(session), null)
+  if (session === 'server_busy') return done(target(session))
+  try {
     await client.request({
       method: 'POST',
       path: '/v1/account/identities/oauth',
       body: { code, codeVerifier: state.v },
       bearer: session.access,
     })
-    return done(target(), session.fresh)
   } catch (error) {
-    if (error instanceof OrvanoError) return done(target(error.code))
+    if (error instanceof OrvanoError) return done(target(error.code), session.fresh)
     throw error
   }
+  return done(target(), session.fresh)
 }
 
 /** Whether a value has the shape of a passkey's answer: a `challengeId` and a `credential` object. */
@@ -860,9 +903,9 @@ async function confirmTotp(
   const body = await jsonBody(request)
   if (body === null || typeof body.code !== 'string')
     return problem(400, 'invalid_request', 'Send { code }.')
+  const session = await linkSession(request, client)
+  if (typeof session === 'string') return noSession(session, secure)
   try {
-    const session = await linkSession(request, client)
-    if (session === null) return problem(401, 'session_required', 'Sign in first.')
     const confirmation = await client.request<TotpConfirmation>({
       method: 'POST',
       path: '/v1/account/mfa/totp/confirm',
@@ -873,7 +916,7 @@ async function confirmTotp(
     writeResponse(response, raised(confirmation.session, session.fresh), secure)
     return response
   } catch (error) {
-    if (error instanceof OrvanoError) return passThrough(error)
+    if (error instanceof OrvanoError) return withFresh(passThrough(error), session.fresh, secure)
     throw error
   }
 }
@@ -890,9 +933,9 @@ async function verifyMfa(
 ): Promise<NextResponse> {
   const answer = mfaAnswer(await jsonBody(request))
   if (answer === null) return problem(400, 'invalid_request', answerHint)
+  const session = await linkSession(request, client)
+  if (typeof session === 'string') return noSession(session, secure)
   try {
-    const session = await linkSession(request, client)
-    if (session === null) return problem(401, 'session_required', 'Sign in first.')
     const answered = await client.request<RaisedSession>({
       method: 'POST',
       path: '/v1/account/mfa/verify',
@@ -903,7 +946,7 @@ async function verifyMfa(
     writeResponse(response, raised(answered, session.fresh), secure)
     return response
   } catch (error) {
-    if (error instanceof OrvanoError) return passThrough(error)
+    if (error instanceof OrvanoError) return withFresh(passThrough(error), session.fresh, secure)
     throw error
   }
 }
@@ -985,8 +1028,9 @@ async function signInAnonymously(client: Client, secure: boolean): Promise<NextR
  * password, name?, verificationRedirectUrl? }`), as the signed in guest. Once the guest is
  * permanent it refreshes, so the cookies carry `is_anonymous: false` (or clears them when the
  * project's required MFA ended the session), and answers `{ user, verificationRequired: false,
- * verificationEmail }`. A pending upgrade (it waits for the emailed link) changes no cookie and
- * answers `{ verificationRequired: true }`.
+ * verificationEmail }`. A pending upgrade (it waits for the emailed link) sets no new session and
+ * answers `{ verificationRequired: true }`. Like every action that acts as the signed in user, it
+ * writes the session a refresh on the way made onto every answer, a refusal included.
  */
 async function upgradeAnonymous(
   request: NextRequest,
@@ -996,10 +1040,11 @@ async function upgradeAnonymous(
   const body = await jsonBody(request)
   if (body === null || typeof body.email !== 'string' || typeof body.password !== 'string')
     return problem(400, 'invalid_request', 'Send { email, password } and, optionally, name.')
+  const session = await linkSession(request, client)
+  if (typeof session === 'string') return noSession(session, secure)
+  let result: AnonymousUpgradeResult
   try {
-    const session = await linkSession(request, client)
-    if (session === null) return problem(401, 'session_required', 'Sign in first.')
-    const result = await client.request<AnonymousUpgradeResult>({
+    result = await client.request<AnonymousUpgradeResult>({
       method: 'POST',
       path: '/v1/account/anonymous/upgrade',
       body: {
@@ -1009,25 +1054,28 @@ async function upgradeAnonymous(
       },
       bearer: session.access,
     })
-    if (result.verificationRequired) return NextResponse.json({ verificationRequired: true })
-    const response = NextResponse.json({
-      user: result.user,
-      verificationRequired: false,
-      verificationEmail: result.verificationEmail,
-    })
-    const refreshToken = session.fresh?.refreshToken ?? request.cookies.get(refreshCookie)?.value
-    if (refreshToken !== undefined && refreshToken !== '') {
-      try {
-        writeResponse(response, await refreshWith(client, refreshToken), secure)
-      } catch {
-        // Orvano is unreachable: the cookies stay, and the claim updates at the next refresh.
-      }
-    }
-    return response
   } catch (error) {
-    if (error instanceof OrvanoError) return passThrough(error)
+    if (error instanceof OrvanoError) return withFresh(passThrough(error), session.fresh, secure)
     throw error
   }
+  if (result.verificationRequired)
+    return withFresh(NextResponse.json({ verificationRequired: true }), session.fresh, secure)
+  const response = NextResponse.json({
+    user: result.user,
+    verificationRequired: false,
+    verificationEmail: result.verificationEmail,
+  })
+  const refreshToken = session.fresh?.refreshToken ?? request.cookies.get(refreshCookie)?.value
+  if (refreshToken !== undefined && refreshToken !== '') {
+    try {
+      writeResponse(response, await refreshWith(client, refreshToken), secure)
+    } catch {
+      // Orvano is unreachable: the cookies keep the session the refresh on the way made, if any,
+      // and the claim updates at the next refresh.
+      withFresh(response, session.fresh, secure)
+    }
+  }
+  return response
 }
 
 /**
@@ -1063,6 +1111,12 @@ async function upgradeAnonymous(
  * `POST .../anonymous` signs a guest in and sets the cookies, and `POST .../anonymous-upgrade` makes
  * the signed in guest permanent and refreshes the cookies, or answers `{ verificationRequired: true }`
  * while the upgrade waits for its emailed link.
+ *
+ * The actions that act as the signed in user (`oauth` with `link`, its callback, `totp-confirm`,
+ * `mfa-verify`, `anonymous-upgrade`) refresh first when the access cookie is missing or nearly
+ * expired, and then write the rotated cookies on every answer, a refusal or redirect included
+ * (spec 0014, AC-36). A refused refresh answers 401 `session_required` and clears both cookies;
+ * an unreachable Orvano answers 503 `server_busy` and leaves them.
  */
 export function createOrvanoRouteHandler(config: OrvanoRouteHandlerConfig): {
   GET: (request: NextRequest) => Promise<NextResponse>

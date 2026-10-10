@@ -110,7 +110,7 @@ The handler's `POST` actions, under its path (`/api/orvano` by default):
 
 ## The visitor's address
 
-Every call from your Next.js server tells Orvano which visitor it is for, in the `X-Orvano-Client-IP` header, so sessions show the user's address and rate limits count each user rather than your server. By default the address comes from `x-real-ip`, else the rightmost `x-forwarded-for` value. When your host sets another header, pass `clientIp` to `createServerClient`, `createMiddlewareClient`, `updateSession`, and `createOrvanoRouteHandler`, and list your server on the **App servers** card of the project's [Security](/docs/console/security/) page. [Rate limits](/docs/concepts/rate-limits/#from-nextjs) has the header for each host.
+Every call from your Next.js server tells Orvano which visitor it is for, in the `X-Orvano-Client-IP` header, so sessions show the user's address and rate limits count each user rather than your server. By default the address is the rightmost `x-forwarded-for` value, which assumes one proxy in front of your app; `x-real-ip` is read only through your own `clientIp`. When your host sets another header, pass `clientIp` to `createServerClient`, `createMiddlewareClient`, `updateSession`, and `createOrvanoRouteHandler`, and list your server on the **App servers** card of the project's [Security](/docs/console/security/) page. [Rate limits](/docs/concepts/rate-limits/#from-nextjs) has the header for each host.
 
 ## Emailed links and codes
 
