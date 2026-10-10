@@ -1,0 +1,124 @@
+---
+title: Security policies
+description: "Choose who can sign up, which emails and passwords they may use, how long sessions last, and how hard guessing is."
+sidebar:
+  order: 19
+---
+
+import { TabItem, Tabs } from '@astrojs/starlight/components'
+
+Each project sets its own auth rules on the console's [Security](/docs/console/security/) page, and the API enforces them for every SDK and every server. You change behavior there, not in code; your app only needs to handle the answers below. A new project starts with open sign ups, an 8 character minimum, the common password list on, and the default lifetimes and limits.
+
+## Sign ups
+
+**Allow sign ups** off closes your app to new users: sign up, [guest](/docs/auth/anonymous-users/) sign in, and a magic link, email code, or provider sign in for an email with no account all get 403 [`sign_up_disabled`](/errors/sign_up_disabled/). Existing users sign in as before, and your server can still create users with [`users.create`](/docs/api/operations/userscreate/), which makes an invite only app.
+
+**Require a verified email** makes every new user prove their inbox before a password sign in works, and makes providers vouch for the email. Sign up then signs no one in and answers the same whether or not the email has an account, so nobody can use it to learn who uses your app. If someone signs up with an address that isn't theirs, the owner's email has a second link that removes the stranger's password and sessions from the account. [Email verification](/docs/auth/email-verification/#require-a-verified-email) shows the sign up and sign in code, and [When it wasn't them](/docs/auth/email-verification/#when-it-wasnt-them) the second link.
+
+Requiring [MFA](/docs/auth/mfa/#require-mfa-for-every-user) turns on the same verified email flow, since only a verified email can enroll a second factor.
+
+## Email domains
+
+An email set on a user (at sign up, by `users.create`, on an email change, and when a guest upgrades or a provider creates a user) must pass the domain rules, or the call gets 403 [`email_domain_not_allowed`](/errors/email_domain_not_allowed/):
+
+- With **Allowed domains**, only those domains and their subdomains pass, and a provider user with no email is refused.
+- Otherwise **Blocked domains** (and their subdomains) fail, and with **Block disposable addresses** on, so do throwaway inboxes.
+
+The rules read the domain after the last `@`, lowercased, with international names in their ASCII form, so `ada@Bücher.example` matches an entry `xn--bcher-kva.example`. Users who already have an address keep it. The open email requests (a magic link, a code, a reset) answer the same 202 for a refused domain, and refuse only when the link or code is redeemed, so they never reveal which emails have accounts.
+
+## Passwords
+
+Every new password (sign up, `users.create`, a change, a reset, a guest's upgrade) must be at least the **Minimum length** in characters after Unicode normalization, and is checked against the common password list unless you turned it off, and against Have I Been Pwned if you turned that on. Each refusal has its own code, so you can say why:
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+import { OrvanoError } from '@orvano/js'
+
+try {
+  await orvano.account.create({ email, password })
+} catch (error) {
+  if (!(error instanceof OrvanoError)) throw error
+  if (error.code === 'invalid_password') showError(error.message) // names the minimum
+  else if (error.code === 'password_too_common') showError('Choose a password that is harder to guess.')
+  else if (error.code === 'password_breached') showError('That password appeared in a data breach. Choose another one.')
+  else throw error
+}
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+'use server'
+import { OrvanoError } from '@orvano/nextjs'
+
+try {
+  await (await orvano()).account.create({ email, password })
+} catch (error) {
+  if (error instanceof OrvanoError && error.status === 400) return { error: error.message }
+  throw error
+}
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+try {
+  await orvano.account.create(CreateAccountRequest(email: email, password: password));
+} on OrvanoException catch (error) {
+  switch (error.code) {
+    case 'invalid_password' || 'password_too_common' || 'password_breached':
+      showError(error.message);
+    default:
+      rethrow;
+  }
+}
+```
+
+  </TabItem>
+</Tabs>
+
+The breached check sends `api.pwnedpasswords.com` only the first 5 characters of the password's SHA-1 hash and compares the answer on your server; a self hosted server needs outbound HTTPS to that host. If the service doesn't answer within 2 seconds, the password is accepted. Signing in, deleting the account, and confirming a step up never apply these rules, so tightening them never locks anyone out of a password they already have.
+
+## Sessions
+
+The three lifetimes set how long an access token lasts before the SDK refreshes it, how long a session may go without a refresh, and how long it may last at most. **Sessions per user** caps how many devices a user is signed in on: a new sign in past the cap ends their least recently used session, whose next call gets [`invalid_token`](/errors/invalid_token/) or [`invalid_refresh_token`](/errors/invalid_refresh_token/), as for any ended session. Changes apply to tokens and sessions issued after them, and lowering the cap ends nothing until each user's next sign in. [Manage sessions](/docs/auth/manage-sessions/) shows the user's side.
+
+## Failed attempts and rate limits
+
+A failed password sign in counts per email and address: 10 in 15 minutes from one address, and the next attempt from there gets 429 [`rate_limited`](/errors/rate_limited/), even with the right password. The owner signing in from another network isn't affected. Show the wait from `retryAfter`:
+
+<Tabs syncKey="sdk">
+  <TabItem label="JavaScript">
+
+```ts
+if (error instanceof OrvanoError && error.code === 'rate_limited') {
+  showError(`Too many tries. Try again in ${String(error.retryAfter ?? 60)} seconds.`)
+}
+```
+
+  </TabItem>
+  <TabItem label="Next.js">
+
+```ts
+if (error instanceof OrvanoError && error.code === 'rate_limited') {
+  return { error: `Too many tries. Try again in ${String(error.retryAfter ?? 60)} seconds.` }
+}
+```
+
+  </TabItem>
+  <TabItem label="Flutter">
+
+```dart
+if (error.code == 'rate_limited') {
+  showError('Too many tries. Try again in ${error.retryAfter?.inSeconds ?? 60} seconds.');
+}
+```
+
+  </TabItem>
+</Tabs>
+
+If your users reach Orvano through your own server (a Next.js app, or an API of yours), list that server on the **App servers** card, or every user behind it shares one address. [Rate limits](/docs/concepts/rate-limits/) has every limit, the five you can change on the **Rate limits** card, and the header to read on each host.

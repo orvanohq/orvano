@@ -214,7 +214,7 @@ A used, expired, or replaced link gets [`invalid_email_token`](/errors/invalid_e
 
 ## Require a verified email
 
-By default Orvano lets unverified users sign in and leaves the gate to you. To make verification a rule instead, turn on **Require a verified email** on the Sign ups card of the project's **Security** page in the console (it needs an email server). Then:
+By default Orvano lets unverified users sign in and leaves the gate to you. To make verification a rule instead, turn on **Require a verified email** on the Sign ups card of the project's [Security](/docs/console/security/#sign-ups) page in the console (it needs an email server). Then:
 
 - [`account.create`](/docs/api/operations/accountcreate/) needs `verificationRedirectUrl` and signs no one in. It answers `verificationRequired: true` with no user and no session, and the answer is the same, in content and in time, whether or not the email already has an account, so sign up never tells anyone who uses your app. Show "check your inbox" for every such answer. The SDKs store nothing for it.
 - Password sign in for a user who hasn't verified yet answers [`email_verification_required`](/errors/email_verification_required/), only after the password is right. Pass `verificationRedirectUrl` with the sign in to send them a fresh link.

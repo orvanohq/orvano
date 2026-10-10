@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- New passwords are checked against a list of the 100,000 most common passwords, in every project, including projects that existed before the upgrade. A common password gets 400 `password_too_common` at sign up, on a change, and on a reset; passwords people already have keep working. Turn the check off on the Passwords card of the project's Security page (see spec 0014).
+- Failed sign ins now count per email plus IP address instead of per email, so a stranger guessing from their own network can no longer lock the owner out on theirs. Wrong authenticator app codes, wrong email codes, and auth email sends are counted the same way, with a ceiling per account on the 6 digit codes and one per inbox on emails. The old limits `auth.sign_in.email`, `auth.mfa_failed.user`, and `auth.email_code.recipient` are gone (see spec 0014).
+- An email code now survives 10 wrong guesses instead of 5, and one inbox can receive up to 20 emails of a kind an hour (was 5).
+- `@orvano/nextjs` now sends Orvano the rightmost `x-forwarded-for` value (the one your nearest proxy added) when `x-real-ip` is missing, never the first, which the visitor can set. Device lists may show a different address than before. Pass `clientIp` to read the header your host sets (see the Rate limits reference).
+
 ## [0.2.0] - 2026-10-04
 
 The first published release: the server images, `install.sh`, the five SDKs on npm, pub.dev, and NuGet, and the docs at orvano.dev.

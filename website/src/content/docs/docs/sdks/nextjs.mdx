@@ -96,6 +96,22 @@ The handler answers `POST` requests only from your app's own origin. Its one `GE
 
 Sign users in from a server action rather than the browser: a session started in the browser keeps only the access token, so it lasts 15 minutes.
 
+The handler's `POST` actions, under its path (`/api/orvano` by default):
+
+| Action | What it does |
+|---|---|
+| `refresh`, `signout` | Trades the refresh cookie for a new pair; ends the session and clears both cookies |
+| `redeem`, `email-code` | Finishes an emailed link, or signs in with an emailed code, and sets the cookies |
+| `oauth` (and `GET oauth-callback`) | Starts and finishes a provider sign in or link |
+| `sign-up` | Signs up and sets the cookies; while the project requires verified emails or MFA it sets none and answers `{ verificationRequired: true }` |
+| `anonymous`, `anonymous-upgrade` | Signs a [guest](/docs/auth/anonymous-users/) in; makes the signed in guest permanent and refreshes the cookies, or answers `{ verificationRequired: true }` while the upgrade waits for its emailed link |
+| `mfa`, `totp-confirm`, `mfa-verify`, `mfa-passkey`, `passkey-challenge`, `passkey` | The second step, turning MFA on, step up, and passkey sign in |
+| `mfa-enroll-totp`, `mfa-enroll-totp-confirm`, `mfa-enroll-passkey`, `mfa-enroll-passkey-confirm` | The first factor a project that [requires MFA](/docs/auth/mfa/#require-mfa-for-every-user) asks for, with the ticket in the `orvano_mfa` cookie |
+
+## The visitor's address
+
+Every call from your Next.js server tells Orvano which visitor it is for, in the `X-Orvano-Client-IP` header, so sessions show the user's address and rate limits count each user rather than your server. By default the address comes from `x-real-ip`, else the rightmost `x-forwarded-for` value. When your host sets another header, pass `clientIp` to `createServerClient`, `createMiddlewareClient`, `updateSession`, and `createOrvanoRouteHandler`, and list your server on the **App servers** card of the project's [Security](/docs/console/security/) page. [Rate limits](/docs/concepts/rate-limits/#from-nextjs) has the header for each host.
+
 ## Emailed links and codes
 
 The page an emailed link lands on is a client component with a **Continue** button that calls `orvano.client.redeemLink()`. A password reset link needs the new password: `redeemLink(undefined, { password })`. An emailed code signs in with `orvano.client.signInWithEmailCode(email, code)`. Send the emails themselves from a server action with `createServerClient`. Each [auth guide](/docs/auth/email-verification/) has the Next.js version of its flow.

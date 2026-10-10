@@ -1,0 +1,45 @@
+---
+title: Security
+description: "Set a project's sign up, email, password, session, and rate limit rules."
+sidebar:
+  order: 6
+---
+
+The project's **Security** page holds the rules every sign up and sign in follows. It has six cards, and each one saves on its own with its **Save** button. Owners and developers change them; viewers see every value with the fields turned off. A value the server refuses shows its message under its field, and a bad line in a list names the line.
+
+[Security policies](/docs/auth/security-policies/) explains what each rule does to your app, with code.
+
+## Sign ups
+
+- **Allow sign ups**, on by default. Turned off, only existing users sign in: sign up, guest sign in, and new users from magic links, email codes, and providers get [`sign_up_disabled`](/errors/sign_up_disabled/). Your servers and the console can still create users.
+- **Require a verified email**, off by default. New users open a link from their inbox before they can sign in with a password, and sign up answers the same whether or not the email has an account. It needs an email server: without one the switch is refused with a link to the [email settings](/docs/console/email/#settings), and if the server goes away later, the card warns that sign ups are failing.
+
+## Email domains
+
+- **Block disposable addresses** refuses throwaway inboxes from a list of about 9,000 disposable domains kept on your server.
+- **Allowed domains** and **Blocked domains**, one domain per line, at most 500 each. A domain covers its subdomains. When you allow any, only those domains can sign up.
+
+## Passwords
+
+- **Minimum length**, 8 to 64 characters, 8 by default.
+- **Refuse common passwords**, on by default: a list of the 100,000 most common passwords kept on your server.
+- **Refuse breached passwords**, off by default: checks Have I Been Pwned, sending `api.pwnedpasswords.com` only the first 5 characters of the password's SHA-1 hash.
+
+The rules apply to new passwords only; passwords people already have keep working.
+
+## Sessions
+
+- **Access token lifetime**, 5 to 60 minutes (15 by default).
+- **Idle session lifetime**, 1 hour to 90 days (30 days by default).
+- **Longest session lifetime**, 1 to 365 days (365 by default).
+- **Sessions per user**: empty for no limit, or 1 to 1,000. A new sign in past it ends the user's least recently used session.
+
+Changes apply to tokens and sessions that start or refresh after them.
+
+## App servers
+
+**Server addresses**: your own servers that call Orvano for your users, such as a Next.js app, one address or range per line. Requests from them may name the visitor in `X-Orvano-Client-IP`, so rate limits count each visitor rather than your server. [Rate limits](/docs/concepts/rate-limits/#the-address-a-limit-counts) has the rule and the header to read on each host.
+
+## Rate limits
+
+The five limits you can change: failed sign ins per email and address (and their window), failed sign ins per address, sign ups per address, guest sign ins per address, and emails sent per address. Each shows its default, with a button that puts it back. [Rate limits](/docs/concepts/rate-limits/#the-limits) lists every limit, the fixed ones too.

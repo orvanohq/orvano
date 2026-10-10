@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using System.Net;
 using Orvano.Core;
 using Orvano.Core.Http;
@@ -88,6 +89,35 @@ public class KernelSettingsTests
         Assert.False(refused.Allowed);
         Assert.InRange(refused.RetryAfterSeconds, 1, 15 * 60);
         Assert.True(limits.Acquire(policy, "b").Allowed);
+    }
+
+    // Spec 0014 AC-39: each refusal adds 1 to orvano.auth.limit_refused, tagged with the policy name and nothing else,
+    // so the email or address a limit counted never reaches a metric.
+    [Fact]
+    public void A_refusal_counts_on_the_metric_by_policy_name_only()
+    {
+        using var limits = new RateLimits();
+        var policy = new RateLimitPolicy($"test.metric.{Guid.NewGuid():N}", 1, TimeSpan.FromMinutes(15));
+        var seen = new List<KeyValuePair<string, object?>[]>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, l) =>
+        {
+            if (instrument.Name == "orvano.auth.limit_refused") l.EnableMeasurementEvents(instrument);
+        };
+        listener.SetMeasurementEventCallback<long>((_, value, tags, _) =>
+        {
+            var copy = tags.ToArray();
+            if (copy.Any(t => Equals(t.Value, policy.Name)))
+                lock (seen) seen.AddRange(Enumerable.Repeat(copy, (int)value));
+        });
+        listener.Start();
+
+        Assert.True(limits.Acquire(policy, "ada@example.com\n203.0.113.7").Allowed);
+        Assert.False(limits.Acquire(policy, "ada@example.com\n203.0.113.7").Allowed);
+        Assert.False(limits.Check(policy, "ada@example.com\n203.0.113.7").Allowed);
+
+        Assert.Equal(2, seen.Count);
+        Assert.All(seen, tags => Assert.Equal([new KeyValuePair<string, object?>("policy", policy.Name)], tags));
     }
 
     [Fact]

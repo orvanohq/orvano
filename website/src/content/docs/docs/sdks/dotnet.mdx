@@ -65,7 +65,7 @@ await foreach (var user in orvano.Users.ListAllAsync(emailVerified: false))
 
 ```csharp
 var token = await orvano.VerifyAccessTokenAsync(accessToken);
-// token.UserId, token.SessionId, token.ExpiresAt, token.EmailVerified
+// token.UserId, token.SessionId, token.ExpiresAt, token.EmailVerified, token.Aal, token.Amr, token.IsAnonymous
 ```
 
 Pass the token without the `Bearer ` prefix. It checks the token against the project's public keys without a call to Orvano once the keys are cached. Pass `online: true` to also catch a session that ended in the last 15 minutes. [Verify tokens on your server](/docs/auth/verify-tokens/) explains both.

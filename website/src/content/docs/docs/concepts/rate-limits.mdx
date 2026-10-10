@@ -1,0 +1,84 @@
+---
+title: Rate limits
+description: "Every auth rate limit, what it counts, and how your servers pass on the visitor's address."
+sidebar:
+  order: 7
+---
+
+Orvano limits auth calls so that guessing, flooding, and mail bombing stay expensive. A refused call answers 429 [`rate_limited`](/errors/rate_limited/) with a `Retry-After` header that says how many seconds to wait. The SDKs surface it as their typed error, with `retryAfter`.
+
+## How failures are counted
+
+A failed sign in counts per **email plus address**, not per email alone. Someone guessing at an account from their own network is slowed down there, while the owner keeps signing in from theirs. A right password never counts, and never resets earlier failures.
+
+The 6 digit codes are the exception. Wrong authenticator app codes and wrong email codes also have a ceiling per account, whatever the address, since 6 digits could otherwise be guessed from many addresses. Over it, that kind of code is refused for the rest of the hour, while the stronger ways in (recovery codes, passkeys, magic links) still work.
+
+Counters live in memory in each `api` process, in fixed windows: up to twice a limit can pass around a window's edge, and a restart forgets them.
+
+## The address a limit counts
+
+Limits keyed by address use the **limit IP**: the caller's IP, read through your [trusted proxies](/docs/self-hosting/configuration/), with two refinements:
+
+- An IPv6 address counts by its `/64`, so one host's block of addresses counts as one, and an IPv4 address mapped into IPv6 counts as the IPv4 address.
+- A request from one of the project's **app servers** may name the visitor in the `X-Orvano-Client-IP` header, which must hold exactly one IP address. Orvano then counts the visitor, not your server. From any other address the header is ignored, and the `console` project never trusts it.
+
+List your app servers (one address or range per line, at most 20, no wider than `/12` for IPv4 or `/48` for IPv6) on the **App servers** card of the project's [Security](/docs/console/security/) page. Without that, every user behind your server shares one bucket, and one user's failures can slow everyone down.
+
+## From Next.js
+
+`@orvano/nextjs` sends `X-Orvano-Client-IP` for you on every server side call. By default it uses the `x-real-ip` header, else the last (rightmost) value of `x-forwarded-for`, the one the proxy nearest your server appended. It never uses the first value, which the visitor can set to anything.
+
+When your host puts the visitor's address somewhere else, pass `clientIp` to `createServerClient`, `createMiddlewareClient`, `updateSession`, and `createOrvanoRouteHandler`:
+
+```ts
+import type { ClientIpResolver } from '@orvano/nextjs'
+
+// Cloudflare in front of your app:
+const clientIp: ClientIpResolver = (request) => request.headers.get('cf-connecting-ip')
+
+const config = {
+  endpoint: process.env.NEXT_PUBLIC_ORVANO_ENDPOINT!,
+  project: process.env.NEXT_PUBLIC_ORVANO_PROJECT!,
+  clientIp,
+}
+```
+
+Read the header your host sets and a visitor can't:
+
+| Your app runs on | Read |
+|---|---|
+| Vercel | `x-real-ip` (the default) |
+| Netlify | `x-nf-client-connection-ip` |
+| Cloudflare in front | `cf-connecting-ip` |
+| Fly.io | `fly-client-ip` |
+| Your own server behind nginx | `x-real-ip`, with `proxy_set_header X-Real-IP $remote_addr;` in nginx |
+| Behind several proxies you run | `x-forwarded-for` at the position your nearest trusted proxy writes |
+
+Trusting an app server means trusting the address it forwards. A server that passed on a header the visitor sets would let one visitor spread guesses across made up addresses, so list only servers whose `clientIp` reads a header your host controls.
+
+## The limits
+
+You can change the five marked **yes** on the **Rate limits** card of the project's Security page; a change starts fresh counters for that limit. The others are fixed.
+
+| Limit | Counts | Key | Default | Editable |
+|---|---|---|---|---|
+| `auth.sign_in.ip` | every password sign in, app and console | project and limit IP | 300 per 15 minutes | no |
+| `auth.sign_in_failed.email_ip` | password sign ins answered `invalid_credentials` | project, email, and limit IP | 10 per 15 minutes | yes, the count and the window |
+| `auth.sign_in_failed.ip` | the same | project and limit IP | 100 per 15 minutes | yes |
+| `auth.sign_up.ip` | sign up, and magic link, email code, and provider sign ins that create a user, and `users.create` | project and limit IP | 60 per hour | yes |
+| `auth.anonymous.ip` | [guest](/docs/auth/anonymous-users/) sign ins | project and limit IP | 30 per hour | yes |
+| `auth.anonymous.project` | guest sign ins | project | 1,000 per hour | no |
+| `auth.email_send.ip` | the open email requests: recovery, magic link, email code | project and limit IP | 300 per hour | yes |
+| `auth.email_send.recipient_short` | every auth email | project, address, kind, and limit IP | 1 per 60 seconds | no |
+| `auth.email_send.recipient` | every auth email | project, address, kind, and limit IP | 5 per hour | no |
+| `auth.email_send.recipient_total` | every auth email | project, address, and kind | 20 per hour | no |
+| `auth.email_code_failed.recipient_ip` | wrong email codes | project, email, and limit IP | 5 per 15 minutes | no |
+| `auth.email_code_failed.recipient` | wrong email codes | project and email | 30 per hour | no |
+| `auth.mfa_failed.user_ip` | wrong second factors at sign in, step up, and enrollment | user and limit IP | 10 per 15 minutes | no |
+| `auth.mfa_totp_failed.user` | wrong authenticator app codes | user | 60 per hour | no |
+| `auth.api_key_failed.ip` | requests whose API key is refused (a valid key always passes) | caller's IP | 60 per 15 minutes | no |
+| `console.invite_email.recipient` | console invitation emails | address | 5 per hour | no |
+
+An email code is also used up after 10 wrong tries. Messaging's own limit on how many emails a project sends through the install's server in an hour answers [`email_rate_limited`](/errors/email_rate_limited/) instead.
+
+The server records each refusal in the `orvano.auth.limit_refused` metric, tagged with the limit's name only, never the email or address it counted.
