@@ -1,3 +1,5 @@
+using Npgsql;
+
 using Testcontainers.PostgreSql;
 
 using Xunit;
@@ -41,6 +43,28 @@ public sealed class PostgresFixture : IAsyncLifetime
     public IReadOnlyDictionary<string, string> DatabaseEnvironment => DatabaseSettings.ToDictionary(
         pair => "ORVANO_" + pair.Key.Replace(":", "__", StringComparison.Ordinal).ToUpperInvariant(),
         pair => pair.Value);
+
+    /// <summary>A connection string for <paramref name="database"/> on this server, five connections at most (TST-5).</summary>
+    public string ConnectionString(string database) => new NpgsqlConnectionStringBuilder
+    {
+        Host = Host,
+        Port = Port,
+        Database = database,
+        Username = Username,
+        Password = Password,
+        SslMode = SslMode.Disable,
+        MaxPoolSize = 5,
+    }.ConnectionString;
+
+    /// <summary>Creates an empty database with a unique name and returns that name, for a test class of its own.</summary>
+    public async Task<string> CreateDatabaseAsync(string prefix, CancellationToken cancellationToken)
+    {
+        string name = $"{prefix}_{Guid.CreateVersion7():N}";
+        await using var server = NpgsqlDataSource.Create(ConnectionString(Database));
+        await using NpgsqlCommand command = server.CreateCommand($"CREATE DATABASE \"{name}\"");
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        return name;
+    }
 
     public ValueTask InitializeAsync() => new(_container.StartAsync());
 

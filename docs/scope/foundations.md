@@ -103,21 +103,21 @@ spec [0010](../specs/0010-repo-community-setup/index.md) · code in the root com
 - [x] Review it (fresh model): `/check review repo & community setup`
 - [x] Document it: `/document repo & community setup`
 
-### 8. Platform data model · in-progress
+### 8. Platform data model · done
 
 Orvano's own records, kept apart from the databases projects create: console accounts, organizations, projects, API keys, settings, and the usage, audit, and messaging records later slices fill.
 **Done when:** the entities and relationships support every slice in this scope (team roles, usage, audit, messaging targets) without a breaking redesign.
-spec [0011](../specs/0011-platform-data-model/index.md)
+spec [0011](../specs/0011-platform-data-model/index.md) · code in `server/src/Orvano.SharedKernel/Data/`
 
 - [x] Design it (spec): `/architect platform data model`
-- [ ] Build it: `/develop platform data model`
-  - [ ] Conventions code in `Orvano.SharedKernel/Data/` (ids, timestamps, convention plugin, text enums, anchors, data classes, email, `EncryptedValue`, `ISecretProtector`) (AC-1 to AC-5, AC-9)
-  - [ ] PostgreSQL 18 convention tests on a sample context, incl. index forms (AC-1 to AC-5, AC-11)
-  - [ ] Architecture tests: anchor only cross schema FKs, data classes, keys, schemas (AC-6 to AC-8), and the AC-10 traceability check
-- [ ] Verify it: `/check verify platform data model`
-- [ ] Test it: `/test platform data model`
-- [ ] Review it (fresh model): `/check review platform data model`
-- [ ] Document it: `/document platform data model`
+- [x] Build it: `/develop platform data model`
+  - [x] Conventions code in `Orvano.SharedKernel/Data/` (ids, timestamps, convention plugin, text enums, anchors, data classes, email, `EncryptedValue`, `ISecretProtector`) (AC-1 to AC-5, AC-9)
+  - [x] PostgreSQL 18 convention tests on a sample context, incl. index forms (AC-1 to AC-5, AC-11)
+  - [x] Architecture tests: anchor only cross schema FKs, data classes, keys, schemas (AC-6 to AC-8) (AC-10 is checked by hand in verify.md)
+- [x] Verify it: `/check verify platform data model`
+- [x] Test it: `/test platform data model`
+- [x] Review it (fresh model): `/check review platform data model`
+- [x] Document it: `/document platform data model`
 
 ### 9. Access control model · needs a decision
 

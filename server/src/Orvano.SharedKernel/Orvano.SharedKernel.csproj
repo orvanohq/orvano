@@ -1,6 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Spec 0002 LAY-3: may reference the ASP.NET Core shared framework, EF Core relational, and Npgsql, nothing else. -->
+  <!-- Spec 0011 build plan step 1 adds EFCore.NamingConventions for the snake case names (DAT-2). -->
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="EFCore.NamingConventions" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
 </Project>
