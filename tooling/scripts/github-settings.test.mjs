@@ -961,7 +961,10 @@ printf '%s\\n' "$@" > "${argsFile}"
   test("a missing gh throws a SettingsError with the install link", () => {
     assert.throws(
       () => call("", { path_env: empty }),
-      (error) => error instanceof SettingsError && /https:\/\/cli\.github\.com/.test(error.message),
+      (error) =>
+        error instanceof SettingsError &&
+        error.message ===
+          "The gh CLI isn't installed or isn't on PATH. Install it from https://cli.github.com, then run `gh auth login`.",
     );
   });
 
