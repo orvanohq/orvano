@@ -961,7 +961,7 @@ printf '%s\\n' "$@" > "${argsFile}"
   test("a missing gh throws a SettingsError with the install link", () => {
     assert.throws(
       () => call("", { path_env: empty }),
-      (error) => error instanceof SettingsError && /https:\/\/cli\.github\.com/.test(error.message),
+      (error) => error instanceof SettingsError && error.message.includes("https://cli.github.com"),
     );
   });
 
