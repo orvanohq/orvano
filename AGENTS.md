@@ -55,6 +55,7 @@ Stored in `docs/specs/`, one folder per spec: `docs/specs/NNNN-title/index.md`. 
 - Usage is metered from the start. New billable operations must be countable.
 - Console strings are translation ready from day one (see spec 0003).
 - Coding standards and tooling are spec 0008: Oxfmt and Oxlint through Vite+, a small ESLint config for the rest, `dotnet format` for C#, a staged pre-commit hook, and CI behind one `ci-gate` check. PR titles follow Conventional Commits and PRs are squash merged (GIT-2). A rule disable says why on the same line (LNT-5). A pinned tool version must be at least 3 days old, like pnpm's release wait (TL-8).
+- A PR whose CodeQL run finds a new high or critical security alert, or a new error, can't merge (spec 0010 RUL-4); fix the code rather than dismiss the alert.
 - Every repo is Apache 2.0 (spec 0009). Sign off every commit with `git commit -s` (DCO, CTB-1, CTB-5). A new dependency needs a license on spec 0009 DEP-1's lists; any other is a named dev exception in DEP-5 and `.github/dependency-review-config.yml`.
 
 ## Agent skills
