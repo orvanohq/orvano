@@ -44,10 +44,25 @@ jobs:
         uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
         with:
           sdk: ${{ matrix.sdk == 'floor' && steps.floor.outputs.version || 'stable' }}
+      # Not subosito/flutter-action: it calls actions/cache by tag inside itself, which the org's SHA pinning rule
+      # refuses when the job starts, even when this step is skipped. The archive is checked against the
+      # sha256 in Flutter's own release manifest.
       - if: ${{ inputs.flutter }}
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          channel: stable
+        name: Install the latest stable Flutter
+        working-directory: ${{ runner.temp }}
+        run: |
+          manifest="$(curl -fsSL --retry 3 https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json)"
+          base_url="$(jq -er '.base_url' <<< "$manifest")"
+          release="$(jq -ec '.current_release.stable as $hash | .releases[] | select(.hash == $hash and .channel == "stable")' <<< "$manifest")"
+          archive="$(jq -er '.archive' <<< "$release")"
+          echo "Flutter $(jq -er '.version' <<< "$release") (Dart $(jq -er '.dart_sdk_version' <<< "$release"))"
+          curl -fsSL --retry 3 -o flutter.tar.xz "$base_url/$archive"
+          echo "$(jq -er '.sha256' <<< "$release")  flutter.tar.xz" | sha256sum --check --strict
+          tar -xJf flutter.tar.xz
+          rm flutter.tar.xz
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --disable-analytics
+          "$RUNNER_TEMP/flutter/bin/flutter" --version
       - name: Dependencies (lowest versions on the floor, DRT-3)
         env:
           SDK: ${{ matrix.sdk }}
