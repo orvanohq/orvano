@@ -95,7 +95,7 @@ An independent model read the first draft. The engineer accepted every recommend
 - **Revocation expiry** is a constant 61 minutes (the TOK-2 maximum plus skew), so it works after the project row is gone and survives a change to the project's lifetime.
 - **Short codes** use an HMAC under a key derived from the root key: a plain SHA-256 of a 6 digit code is reversed by trying all million codes.
 
-The remaining fixes corrected how the conventions are built on EF Core 10 and Npgsql 10: a convention plugin, named CHECKs, xmin, anchor overloads, a pass through `EncryptedValue` with an `ISecretProtector`, index APIs, and the `labels` CHECK. They also covered races (atomic token use, lock order for owners and user deletes), partition safety (a `DEFAULT` partition, the trigger on the parent), and the DAT-2a exceptions.
+The remaining fixes corrected how the conventions are built on EF Core 10 and Npgsql 10: a convention plugin, named CHECK constraints, xmin, anchor overloads, a pass through `EncryptedValue` with an `ISecretProtector`, index APIs, and the `labels` CHECK. They also covered races (atomic token use, lock order for owners and user deletes), partition safety (a `DEFAULT` partition, the trigger on the parent), and the DAT-2a exceptions.
 
 ## AC-10 traceability: scope features to tables
 
