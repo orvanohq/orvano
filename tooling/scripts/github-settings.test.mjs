@@ -475,7 +475,7 @@ describe("check mode", () => {
     assert.match(result.out, /actions\.enabled: want false, got true/);
   });
 
-  test("on a private repo the four needsPublic fields wait for public instead of drifting (OPN-1 item 6)", () => {
+  test("on a private repo the five needsPublic fields wait for public instead of drifting (OPN-1 item 6)", () => {
     const state = matchingState("core");
     state.repo.private = true;
     delete (/** @type {any} */ (state.repo).security_and_analysis);
@@ -491,12 +491,55 @@ describe("check mode", () => {
         "security.push_protection",
         "security.private_vulnerability_reporting",
         "ruleset.main",
+        "repo.allow_auto_merge",
       ],
     );
+  });
+
+  test("a private repo with auto merge off exits 0, since GitHub Free can't turn it on there (step 11a)", () => {
+    const state = matchingState("core");
+    state.repo.private = true;
+    state.repo.allow_auto_merge = false;
+    const result = run([repo, "--profile", "core"], state);
+    assert.equal(result.code, 0, result.out);
+    assert.match(
+      result.out,
+      /waiting for public {2}repo\.allow_auto_merge: want true once the repo is public/,
+    );
+    assert.doesNotMatch(result.out, /drift {2}repo\.allow_auto_merge/);
+  });
+
+  test("a public repo with auto merge off is drift (step 11a)", () => {
+    const state = matchingState("core");
+    state.repo.allow_auto_merge = false;
+    const result = run([repo, "--profile", "core"], state);
+    assert.equal(result.code, 1);
+    assert.match(result.out, /drift {2}repo\.allow_auto_merge: want true, got false/);
   });
 });
 
 describe("--apply", () => {
+  test("on a private repo, the PATCH leaves out allow_auto_merge (step 11a)", () => {
+    const state = matchingState("core");
+    state.repo.private = true;
+    state.repo.allow_auto_merge = false;
+    state.repo.has_wiki = true;
+    const result = run([repo, "--profile", "core", "--apply"], state);
+    assert.equal(result.code, 0, result.out);
+    const patch = result.calls.find((c) => c.method === "PATCH" && c.path === `repos/${repo}`);
+    assert.deepEqual(patch?.body, { has_wiki: false });
+  });
+
+  test("on a public repo, --apply turns auto merge on (step 11a)", () => {
+    const state = matchingState("core");
+    state.repo.allow_auto_merge = false;
+    const result = run([repo, "--profile", "core", "--apply"], state);
+    assert.equal(result.code, 0, result.out);
+    const patch = result.calls.find((c) => c.method === "PATCH" && c.path === `repos/${repo}`);
+    assert.deepEqual(patch?.body, { allow_auto_merge: true });
+    assert.equal(state.repo.allow_auto_merge, true);
+  });
+
   test("writes every difference, then checks again and exits 0", () => {
     const state = matchingState("core");
     state.repo.allow_merge_commit = true;

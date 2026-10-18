@@ -297,9 +297,13 @@ export function diffRulesets(profile, rulesets) {
  * }} Live
  */
 
+/** Repo fields GitHub Free only honors on a public repo: a PATCH on a private repo is accepted but changes nothing. */
+const needsPublicRepoFields = new Set(["allow_auto_merge"]);
+
 /**
  * The whole diff for a repo. On a private repo, needsPublic fields (secret scanning, push protection, private
- * vulnerability reporting, the ruleset) are reported as waiting for public instead of drift (SET-2, SET-4).
+ * vulnerability reporting, the ruleset, auto merge) are reported as waiting for public instead of drift, whatever
+ * their live value, and `--apply` leaves them alone (SET-2, SET-4).
  * @param {Profile} profile
  * @param {Live} live
  * @returns {Difference[]}
@@ -309,7 +313,10 @@ export function diffRepo(profile, live) {
   const out = [];
   const isPrivate = live.repo.private === true;
 
-  subsetDiff(profile.repo, live.repo, "repo", out);
+  const repoFields = Object.fromEntries(
+    Object.entries(profile.repo).filter(([key]) => !isPrivate || !needsPublicRepoFields.has(key)),
+  );
+  subsetDiff(repoFields, live.repo, "repo", out);
 
   const analysis = live.repo.security_and_analysis ?? {};
   /** @type {[string, boolean, unknown, boolean][]} [field, want, got, needsPublic] */
@@ -352,6 +359,17 @@ export function diffRepo(profile, live) {
     out.push({ field: "ruleset.main", want: "present", got: "not checked", waiting: true });
   } else {
     out.push(...diffRulesets(profile, live.rulesets));
+  }
+
+  if (isPrivate) {
+    for (const key of Object.keys(profile.repo).filter((k) => needsPublicRepoFields.has(k))) {
+      out.push({
+        field: `repo.${key}`,
+        want: profile.repo[key],
+        got: live.repo[key],
+        waiting: true,
+      });
+    }
   }
 
   for (const label of profile.labels) {
