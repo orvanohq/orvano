@@ -485,7 +485,7 @@ New code immediately. There is no existing code, so every rule holds from the fi
 - [ ] Feature 7 (`/audit`): lift these rules into root `AGENTS.md`; record the 13 installed skills under `## Agent skills` with the GEN-0 overrides; note `microsoft/postgres-mcp` as an MCP server to connect (read only role) once a local database exists.
 - [ ] Feature 10: settle JSON naming, error body and code format, the final kind to status mapping (ERR-4 holds interim defaults), health check paths, pagination, the API key header, idempotency keys (LIB-7 depends on it), and confirm the generator can emit LIB-11 compliant C#.
 - [ ] Feature 5: set the PII redaction approach (LOG-2) and the NuGet audit failure level (GEN-4).
-- [ ] Feature 8: confirm schema per module (DAT-1) and choose the ID format.
+- [x] Feature 8: confirm schema per module (DAT-1) and choose the ID format. Closed by spec 0011: MOD-1 confirms one schema per module, and IDS-1 chooses app made uuid v7 ids (`Guid.CreateVersion7()`).
 - [ ] Feature 12: confirm the reference box used by the PRF-5 budget.
 - [ ] Feature 52: reserve the `Orvano` NuGet ID prefix and set up trusted publishing (the installed `nuget-trusted-publishing` skill covers it).
 - [ ] The registry still lists `dotnet/skills@configuring-opentelemetry-dotnet`, but the repo no longer has it; check again at `/audit`.
