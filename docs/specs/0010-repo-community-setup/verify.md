@@ -1,4 +1,4 @@
-# Verify: Repo and community setup · spec 0010 · updated 2026-10-17
+# Verify: Repo and community setup · spec 0010 · updated 2026-10-18
 
 _Steps derived from spec 0010 acceptance criteria. `/check verify` runs these; `/test` locks the durable ones. OPN-1 and OPN-2 record their ticks, dates, and times here too._
 
@@ -55,13 +55,19 @@ The old local clones are moved to `~/orvano-backups/` and the repo cloned fresh 
 
 ## After the flip (OPN-2)
 
-- [ ] Flip time and `--apply` time noted here; `github-settings.mjs orvanohq/orvano --profile core` then exits 0 → AC-8, AC-15
-- [ ] Change merge commits on by hand → check exits 1 naming `repo.allow_merge_commit`; `--apply` restores it → AC-8
-- [ ] `gh api repos/orvanohq/orvano/private-vulnerability-reporting` → `"enabled": true` → AC-1
-- [ ] Secret scanning, push protection, Dependabot alerts, and security updates on (settings page and the script) → AC-11
-- [ ] Discussions shows exactly Announcements, Q&A, Ideas, Show and tell → AC-6
+- [x] Flip time and `--apply` time noted here; `github-settings.mjs orvanohq/orvano --profile core` then exits 0 → AC-8, AC-15
+  - 2026-10-18 (UTC): the OPN-1 checklist was all ticked and PR 9 merged at 14:52:37. The flip ran at 14:54:33 and returned at 14:54:34. `--apply` started at once and finished at 14:54:44, so `main` was public and unprotected for about 10 seconds. Check mode at 14:54:54 printed `orvanohq/orvano: matches the core profile.` and exited 0, with no `waiting for public` lines left.
+- [x] Change merge commits on by hand → check exits 1 naming `repo.allow_merge_commit`; `--apply` restores it → AC-8
+  - 2026-10-18: merge commits turned on with `gh api -X PATCH`. Check mode printed `drift  repo.allow_merge_commit: want false, got true` and exited 1; `--apply` restored it, and check mode exited 0 again (14:55:35).
+- [x] `gh api repos/orvanohq/orvano/private-vulnerability-reporting` → `"enabled": true` → AC-1
+  - 2026-10-18: `{"enabled":true}`.
+- [x] Secret scanning, push protection, Dependabot alerts, and security updates on (settings page and the script) → AC-11
+  - 2026-10-18, through the API and the script: `secret_scanning`, `secret_scanning_push_protection`, and `dependabot_security_updates` are `enabled`; `vulnerability-alerts` returns 204; `automated-security-fixes` is enabled and not paused.
+- [x] Discussions shows exactly Announcements, Q&A, Ideas, Show and tell → AC-6
+  - 2026-10-18: the GraphQL `discussionCategories` list is exactly those four (set by hand on 2026-10-17, checked by the script).
 - [ ] Proof PR: `ci-gate`, `analyze (csharp)`, `analyze (javascript-typescript)`, `dependency-review` all run with exactly those names; only squash offered; no bypass option; branch deleted after merge → AC-9, AC-10
-- [ ] Direct `git push origin main` is refused → AC-9
+- [x] Direct `git push origin main` is refused → AC-9
+  - 2026-10-18 14:56:24: a signed off empty commit on a throwaway local branch, pushed with `git push origin HEAD:main`, was rejected with `GH013: Repository rule violations`, naming "Changes must be made through a pull request" and "4 of 4 required status checks are expected". `main` stayed at `6f503ef`; the local branch was deleted.
 - [ ] Spec 0009's dependency review scratch proof: an unlisted license fails, a listed dev exception passes → AC-10
 - [ ] Confirmed check names written into spec 0010 RUL-3 and spec 0009 CTB-3 → AC-9
 
