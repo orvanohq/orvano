@@ -37,10 +37,21 @@ _Steps derived from spec 0010 acceptance criteria. `/check verify` runs these; `
   - 2026-10-17: 0 blank lines; the first term finds itself.
 - [x] On a scratch clone, the two HIS-0 regex lines work: no sweep term in any old version of spec 0010, and each merge message reads `Merge old pull request N from ...` → AC-13, AC-21
   - 2026-10-17: no sweep term in any commit; merges read `Merge old pull request N` for 4 to 12 (rationale.md, OPN-1 record).
-- [ ] HIS-4 sweep on the rewritten clone and again on a fresh clone right before the flip: only `atteprojects@gmail.com` and `noreply` emails, nothing from the HIS-0 sweep terms file, gitleaks clean or every finding explained; `git ls-remote origin` right after the push lists only `refs/heads/main` and `HEAD` → AC-13
-  - 2026-10-17: first run on the rewritten clone passed (rationale.md, OPN-1 record). The second run (fresh clone of GitHub right before the flip) and the `ls-remote` check after the push are still to come.
+- [x] HIS-4 sweep on the rewritten clone and again on a fresh clone right before the flip: only `atteprojects@gmail.com` and `noreply` emails, nothing from the HIS-0 sweep terms file, gitleaks clean or every finding explained; `git ls-remote origin` right after the push lists only `refs/heads/main` and `HEAD` → AC-13
+  - 2026-10-17: first run on the rewritten clone passed (rationale.md, OPN-1 record). Right after the push, `git ls-remote origin` listed only `HEAD` and `refs/heads/main` (`7737fda`). 2026-10-18, second run on a fresh clone of GitHub with `refs/pull/*` fetched (`main` at `10a81cb` plus PRs 1 to 8, 58 commits): emails only `atteprojects@gmail.com` and GitHub `noreply` addresses (yours, Dependabot's, GitHub's); no sweep term in messages, names, file contents, paths, or ref names; gitleaks found only the two explained placeholder hits.
 - [x] First HIS-4 run only: no `Merge pull request #` subject, and every old PR in tracked text is in the `` `<sha>` (old PR N) `` form, each SHA a merge commit on the new `main` → AC-21
   - 2026-10-17: both counts 0 on the rewritten clone.
+
+### OPN-1 checklist (the flip is blocked until every item is ticked)
+
+- [x] 1. `{{SECURITY_EMAIL}}` replaced with `security@orvano.dev`, and a test mail arrived (2026-10-17)
+- [x] 2. The COM-1 files, CODEOWNERS, issue forms, the `dco` job, and the README Community section and status line are on `main` (checked on the recreated repo, 2026-10-18)
+- [x] 3. SKL-1 and SKL-2 done (2026-10-16), HIS-1 to HIS-3 done (2026-10-17), HIS-4 second run clean (2026-10-18)
+- [x] 4. CI green on a PR of the recreated private repo, and the AC-7 `dco` proof passed (2026-10-17)
+- [x] 5. ORG-1 done, and `github-settings.mjs --org orvanohq` exited 0 (2026-10-17)
+- [x] 6. `github-settings.mjs orvanohq/orvano --profile core` exited 0 with exactly the five needsPublic fields waiting (2026-10-17)
+
+The old local clones are moved to `~/orvano-backups/` and the repo cloned fresh (HIS-3 item 4, 2026-10-18). The four SKL-2 skills are restored locally and gitignored.
 
 ## After the flip (OPN-2)
 
