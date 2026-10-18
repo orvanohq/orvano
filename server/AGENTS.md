@@ -18,7 +18,7 @@ Run from `server/`: `global.json` here pins the SDK and picks the Microsoft.Test
 ## Layout
 
 - `src/Orvano.Host`: composition, middleware, and the commands in `Commands/` (`serve`, `migrate`, `init`, `healthcheck`, `admin selftest`). No feature code.
-- `src/Orvano.SharedKernel`: config sources and helpers (`Configuration/`), `LogEventIds`. References no other Orvano project.
+- `src/Orvano.SharedKernel`: config sources and helpers (`Configuration/`), `LogEventIds`, and the shared EF Core data conventions (`Data/`, spec 0011). References no other Orvano project.
 - `src/Orvano.Infrastructure`: root key, TLS options, and later the job runner, outbox, signals, and file stores (spec 0007 REP-2). References only SharedKernel; modules never reference it (architecture test).
 - `src/Orvano.Modules.<Name>`: one project per module. Auth holds `IPasswordHasher` (Argon2id via NSec) in `Contracts/`.
 - `tests/`: `<Project>.Tests` for unit tests, `Orvano.Host.IntegrationTests` (HTTP and CLI), `Orvano.ArchitectureTests`, and shared helpers in `Orvano.Testing`.
@@ -27,6 +27,8 @@ Run from `server/`: `global.json` here pins the SDK and picks the Microsoft.Test
 
 - Configuration comes from `ORVANO_<SECTION>__<KEY>` variables, and any key also takes a `_FILE` form. Options classes have a `Section` constant, a source generated `[OptionsValidator]`, and XML docs. Bad config fails startup with a message naming the variable (`ConfigurationNames`, `OptionsErrors`).
 - Checks that must pass before serving (PostgreSQL 18, no pending migrations, hasher self test) go in `Startup/StartupChecks.cs`. New module `DbContext`s go in `Database/MigrationOrder.cs`.
+- A module `DbContext` calls `UseOrvanoConventions(schema, services)` in place of its own `UseNpgsql`: it sets the schema, snake case names, `<schema>.__ef_migrations_history`, the retry, and the `TimestampInterceptor` (spec 0011 AC-3). Pass Npgsql tweaks through its `npgsql` callback; don't register your own `IModelCacheKeyFactory`. Read [spec 0011](../docs/specs/0011-platform-data-model/index.md) before adding a table: its catalog already designs it.
+- Entities derive from `Entity` (app made uuid v7 `Id`; an `OwnsMany` item too, keyed with `HasKey(x => x.Id)`), and implement `ITimestamped` and `IVersioned` (xmin) where needed. Store enums with `HasTextEnum()` (snake case text plus a `ck_<table>_<column>` CHECK). Point into another module's schema only with `HasAnchor(Anchor.X, fk, onDelete)`. Mark every text, bytes, address, or JSON property `[DataClass(...)]`; ciphertext is an `EncryptedValue` marked `DataClass.Secret` with a `Purpose`. The rules in `tests/Orvano.ArchitectureTests/Data/` fail the build otherwise.
 - A module that maps endpoints calls the plain `services.AddValidation()` in its `Add<Module>Module`; without it, its request types are never validated (spec 0002 VAL-1). Each endpoint's invalid body test (TST-4) catches a missing call.
 - Log through `[LoggerMessage]` methods in `<Module>Log`, with event IDs from that module's block in `LogEventIds`.
 - Package versions live only in `Directory.Packages.props`. Every project has a `packages.lock.json` covering `linux-x64` and `linux-arm64`. After changing packages, run `dotnet restore Orvano.slnx --force-evaluate` and commit the lock files: the image restores in locked mode. A new `src/` project also needs its `.csproj` and lock file added to the restore layer in `deploy/Dockerfile`.
@@ -45,7 +47,7 @@ Run from `server/`: `global.json` here pins the SDK and picks the Microsoft.Test
 ## Tests
 
 - Names are `<Behavior>_<expected>_when_<condition>` (CA1707 is off for `tests/` in `.editorconfig`). Tag rule coverage with `[Trait("Spec", "NNNN:RULE-ID")]`.
-- `PostgresFixture` is an assembly fixture, pinned to the same tag as the compose files. `OrvanoApiFactory` passes settings with `UseSetting`, which reaches config before the host builds. `ConsoleBuild` fakes `wwwroot/console`.
+- `PostgresFixture` is an assembly fixture, pinned to the same tag as the compose files. A test class that needs its own database calls `CreateDatabaseAsync(prefix)` and `ConnectionString(name)` on it; never start a second container (TST-5). `OrvanoApiFactory` passes settings with `UseSetting`, which reaches config before the host builds. `ConsoleBuild` fakes `wwwroot/console`.
 - Test startup failures and CLI behavior through `OrvanoCli` (the real process). `WebApplicationFactory` cannot observe them, because `serve` catches startup errors and disposes the app.
 
 ## Agent skills
