@@ -19,7 +19,7 @@ public static class OrvanoConventions
     /// Sets up a module's <see cref="DbContext"/> on the platform database with Orvano's conventions (spec 0011 AC-3):
     /// snake case names (DAT-2), <paramref name="schema"/> as the default schema with its own history table (DAT-1),
     /// <c>ValueGeneratedNever</c> on <see cref="Entity"/> keys (IDS-1), <c>xmin</c> for <see cref="IVersioned"/>
-    /// (DAT-9), the <c>HasTextEnum</c> CHECKs (COL-2), the anchor stubs (REF-2), the <see cref="EncryptedValue"/>
+    /// (DAT-9), the <c>HasTextEnum</c> CHECK constraints (COL-2), the anchor stubs (REF-2), the <see cref="EncryptedValue"/>
     /// mapping (ENC-1), and <see cref="TimestampInterceptor"/> ahead of any other <c>SaveChanges</c> interceptor.
     /// The <see cref="NpgsqlDataSource"/> and <see cref="TimeProvider"/> come from <paramref name="services"/>.
     /// It replaces EF's <see cref="IModelCacheKeyFactory"/> so the cached model keys on the schema, so a module cannot
