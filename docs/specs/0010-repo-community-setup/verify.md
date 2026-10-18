@@ -76,9 +76,13 @@ The old local clones are moved to `~/orvano-backups/` and the repo cloned fresh 
 
 ## Templates and the org repo
 
-- [ ] `orvanohq/.github` is public and an SDK repo with no files of its own shows its security policy, code of conduct, support, contributing, and SDK issue forms → AC-17
-- [ ] Each `sdk-template-*` is public, a template, with Actions off, and `export-template.mjs <target> <clone> --check` exits 0 → AC-16
-- [ ] A throwaway repo from each template has the TPL-3 tree with only the SETUP.md placeholders left → AC-16
+- [x] `orvanohq/.github` is public and an SDK repo with no files of its own shows its security policy, code of conduct, support, contributing, and SDK issue forms → AC-17
+  - 2026-10-18: checked on the private throwaway `tpl-check-dotnet` (made from the template, so no community files of its own). Its new issue chooser lists the `.github` Bug report and Feature request SDK forms and the three `config.yml` contact links; the form links contributing, code of conduct, and Support to `orvanohq/.github/blob/main/`; its security policy page shows the `.github` `SECURITY.md`. The community profile API and GraphQL agree for contributing, code of conduct, and the security policy (`tpl-check-dart` gave the same GraphQL result).
+- [x] Each `sdk-template-*` is public, a template, with Actions off, and `export-template.mjs <target> <clone> --check` exits 0 → AC-16
+  - 2026-10-18: the four repos were made public and empty, exported from core `cb12f1d` (one signed-off commit each), then `--apply` with `template` (the three templates) and `org-github` (`.github`). Check mode then printed `matches the template profile.` (or `org-github`) and exited 0 for all four, and `export-template.mjs <target> <clone> --check` exited 0 for all four. The API shows `is_template: true` (templates only), Actions `enabled: false`, and the `main` ruleset active on all four.
+  - The first push ran CI, CodeQL, and Dependabot once before `--apply` turned Actions off. The .NET CI and CodeQL failures are expected (no project yet). The Dart CI failure is not: the core's `sdk-dart.yml` uses `subosito/flutter-action`, which calls `actions/cache@v5` by tag, and ORG-1 SHA pinning blocks it. It will also fail in the first real Dart SDK repo; a follow-up fixes it in the core.
+- [x] A throwaway repo from each template has the TPL-3 tree with only the SETUP.md placeholders left → AC-16
+  - 2026-10-18: private `tpl-check-dotnet`, `tpl-check-typescript`, `tpl-check-dart` made with "Use this template". Each clone is identical to its template (`diff -r` empty), has `.github/CODEOWNERS`, `SETUP.md`, and the `README.md` skeleton, and Dart has no `codeql.yml`. The only `{{...}}` left are `{{PRODUCT_NAME}}` (`NOTICE`, `README.md`) and `{{PACKAGE_NAME}}` (`README.md`), as SETUP.md lists; no `<FULL_SHA>`, `<date>`, or `<lang>` is left. All three were deleted afterwards with the user's OK.
 - [ ] After a fork PR and a Dependabot PR both upload CodeQL results, RUL-4 added and a PR with a new high alert can't merge → AC-20
 
 ## Value sourcing
@@ -88,10 +92,11 @@ The old local clones are moved to `~/orvano-backups/` and the repo cloned fresh 
 - [x] Required check names: each name in the `core` profile matches a job `name:` in `ci.yml`, `codeql.yml`, `dependency-review.yml`, and the first public run → RUL-3
   - 2026-10-18: PR 10 ran `ci-gate`, `analyze (csharp)`, `analyze (javascript-typescript)`, and `dependency-review`, exactly the four in the `core` profile and in the ruleset (each pinned to `integration_id: 15368`).
 - [ ] `integration_id`: a status from another app (for example a commit status set with the API) does not satisfy a required check → RUL-3
-- [ ] Template pin: the exported `ci.yml` SHA equals `git rev-parse origin/main` in the core and the date is the export day; `--check` later keeps that pin → TPL-3
-- [ ] Template CodeQL language: `csharp` for .NET, `javascript-typescript` for TypeScript, none for Dart → TPL-3
+- [x] Template pin: the exported `ci.yml` SHA equals `git rev-parse origin/main` in the core and the date is the export day; `--check` later keeps that pin → TPL-3
+  - 2026-10-18: every `uses:` pin is `cb12f1df33e00f892de7040a05e3ab17cf9410d4 # main as of 2026-10-18`, core `origin/main` at export time.
+- [x] Template CodeQL language: `csharp` for .NET, `javascript-typescript` for TypeScript, none for Dart → TPL-3
 - [ ] `dco` inputs: a commit whose email isn't linked to an account (null `author`) is still checked against `commit.author.email` → DCO-2
-- [ ] SDK issue forms list exactly the six REP-3 packages → ISS-3
+- [x] SDK issue forms list exactly the six REP-3 packages → ISS-3
 
 ## Acceptance-criteria coverage
 
