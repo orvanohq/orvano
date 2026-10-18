@@ -3,6 +3,10 @@
 # allow-dependencies-licenses exempts the named dev exceptions in spec 0009 DEP-5's table, by package URL without a
 # version. Add or remove one only with that table, in the same PR.
 fail-on-severity: moderate
+fail-on-scopes:
+  - runtime
+  - development
+  - unknown
 allow-licenses:
   - MIT
   - MIT-0
