@@ -17,9 +17,11 @@ _Steps derived from spec 0010 acceptance criteria. `/check verify` runs these; `
 ## On GitHub, while private (OPN-1)
 
 - [ ] New issue on `orvano` offers only Bug report and Feature request, plus Ask a question, Report a vulnerability, and A bug in an SDK; no blank issue → AC-5
-- [ ] Open a PR with one unsigned commit → `ci-gate` fails through `repo / hygiene / dco`, which prints the SHA and the `git rebase --signoff` fix; after the fix and `git push --force-with-lease` it passes → AC-7
+- [x] Open a PR with one unsigned commit → `ci-gate` fails through `repo / hygiene / dco`, which prints the SHA and the `git rebase --signoff` fix; after the fix and `git push --force-with-lease` it passes → AC-7
+  - 2026-10-17, on the recreated private repo (OPN-1 item 4): this PR's first commit, `07d5445`, had no sign off. `ci-gate` failed only through `repo / hygiene / dco`, which printed `07d5445…: no Signed-off-by line.` and the `git rebase --signoff origin/main` and `git push --force-with-lease` fix. After that fix (new head `7b9f037`), `dco` printed `dco: 1 commit(s) signed off, 0 skipped (merge or bot PR).` and `ci-gate` passed.
 - [ ] Same PR with a sign off whose email differs from the author → fails naming the author email → AC-7
 - [ ] A Dependabot PR's bot commits and a merge commit from "Update branch" are skipped by `dco` → AC-7
+  - 2026-10-17, half done: Dependabot's grouped PRs (new repo, actions and npm groups) passed `dco` with their bot commits skipped in a bot PR (DCO-2). A merge commit from "Update branch" is still to be seen.
 - [ ] A PR opened by a person with a commit authored as `dependabot[bot]` (the `noreply` email) and no sign off fails `dco` with the reset author fix → AC-7, DCO-2
 - [ ] The weekly `Scheduled` run starts (the `pull-requests: read` grant reaches `dco`, which skips) → AC-7
 - [x] `github-settings.mjs --org orvanohq` (with `gh auth refresh -s admin:org`) exits 0, or SHA pinning is ticked here by hand if the API doesn't return it; fork PR approval setting name written here → AC-12
