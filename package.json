@@ -23,6 +23,7 @@
     "eslint-plugin-oxlint": "1.87.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "jiti": "2.7.0",
+    "spdx-exceptions": "2.5.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "8.71.2",
     "vite-plus": "1.2.0"
