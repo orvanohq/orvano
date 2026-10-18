@@ -15,7 +15,7 @@
     "test:tooling": "node --test \"tooling/scripts/*.test.mjs\""
   },
   "devDependencies": {
-    "@tanstack/eslint-plugin-query": "5.104.2",
+    "@tanstack/eslint-plugin-query": "5.104.3",
     "@tanstack/eslint-plugin-router": "1.162.0",
     "@types/node": "^24.19.2",
     "eslint": "10.12.0",
