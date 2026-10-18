@@ -1,4 +1,4 @@
-// Spec 0010 SET-4, RUL-1 to RUL-3, ORG-1, AC-8: github-settings.mjs against a fake GitHub API (no network).
+// Spec 0010 SET-4, RUL-1 to RUL-4, ORG-1, AC-8: github-settings.mjs against a fake GitHub API (no network).
 // The fake keeps state, so --apply is proven by the check that follows it.
 import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -239,6 +239,27 @@ describe("profiles", () => {
     }
   });
 
+  test("RUL-4: code scanning blocks high or critical CodeQL alerts, only where CodeQL runs", () => {
+    for (const p of Object.values(profiles)) {
+      const rule = /** @type {any[]} */ (p.ruleset.rules).find((r) => r.type === "code_scanning");
+      if (["core", "sdk-dotnet", "sdk-typescript"].includes(p.name)) {
+        assert.deepEqual(
+          rule?.parameters.code_scanning_tools,
+          [
+            {
+              tool: "CodeQL",
+              alerts_threshold: "errors",
+              security_alerts_threshold: "high_or_higher",
+            },
+          ],
+          p.name,
+        );
+      } else {
+        assert.equal(rule, undefined, p.name);
+      }
+    }
+  });
+
   test("template and org-github keep only deletion and non_fast_forward, with Actions off", () => {
     for (const name of ["template", "org-github"]) {
       const p = profile(name);
@@ -357,6 +378,24 @@ describe("check mode", () => {
         ).parameters.required_status_checks[0].integration_id = 1;
       },
       /integration_id/,
+    ],
+    [
+      "the code scanning rule removed (RUL-4)",
+      (s) => {
+        s.rulesets[0].rules = s.rulesets[0].rules.filter(
+          (/** @type {any} */ r) => r.type !== "code_scanning",
+        );
+      },
+      /ruleset\.rules\.code_scanning/,
+    ],
+    [
+      "a looser code scanning threshold (RUL-4)",
+      (s) => {
+        s.rulesets[0].rules.find(
+          (/** @type {any} */ r) => r.type === "code_scanning",
+        ).parameters.code_scanning_tools[0].security_alerts_threshold = "critical";
+      },
+      /security_alerts_threshold/,
     ],
     [
       "an extra rule",

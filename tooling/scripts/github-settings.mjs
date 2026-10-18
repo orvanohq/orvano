@@ -1,4 +1,4 @@
-// Spec 0010 SET-1 to SET-4, RUL-1 to RUL-3, ISS-4, ISS-5, ORG-1: GitHub settings as code. Check mode (the default)
+// Spec 0010 SET-1 to SET-4, RUL-1 to RUL-4, ISS-4, ISS-5, ORG-1: GitHub settings as code. Check mode (the default)
 // is read only: it prints every field that differs from the profile and exits 1 on any difference. --apply writes
 // the differences with your own `gh` login, then checks again. Never run in CI (no workflow gets an admin token).
 // Usage:
@@ -59,11 +59,23 @@ const labels = [
   { name: "triage", color: "fbca04", description: "Needs a first look from a maintainer" },
 ];
 
+/** RUL-4: a new CodeQL alert of high or critical security severity, or of error severity, blocks the merge. */
+const codeScanningRule = {
+  type: "code_scanning",
+  parameters: {
+    code_scanning_tools: [
+      { tool: "CodeQL", alerts_threshold: "errors", security_alerts_threshold: "high_or_higher" },
+    ],
+  },
+};
+
 /**
- * RUL-1 to RUL-3. `checks` undefined leaves out the PR, linear history, and status check rules (template, org-github).
+ * RUL-1 to RUL-4. `checks` undefined leaves out the PR, linear history, and status check rules (template, org-github).
+ * `codeScanning` adds RUL-4, for the repos that run CodeQL (not Dart).
  * @param {string[] | undefined} checks
+ * @param {boolean} [codeScanning]
  */
-function ruleset(checks) {
+function ruleset(checks, codeScanning = false) {
   /** @type {Record<string, unknown>[]} */
   const rules = [{ type: "deletion" }, { type: "non_fast_forward" }];
   if (checks) {
@@ -92,6 +104,7 @@ function ruleset(checks) {
         },
       },
     );
+    if (codeScanning) rules.push(codeScanningRule);
   }
   return {
     name: "main",
@@ -106,14 +119,15 @@ function ruleset(checks) {
 /**
  * @param {string} name
  * @param {string[]} checks
+ * @param {boolean} [codeScanning]
  * @returns {Profile}
  */
-function sdk(name, checks) {
+function sdk(name, checks, codeScanning = false) {
   return {
     name,
     repo: { ...baseRepo, has_issues: true, has_discussions: false, is_template: false },
     security,
-    ruleset: ruleset(checks),
+    ruleset: ruleset(checks, codeScanning),
     labels,
   };
 }
@@ -124,12 +138,10 @@ export const profiles = {
     name: "core",
     repo: { ...baseRepo, has_issues: true, has_discussions: true, is_template: false },
     security,
-    ruleset: ruleset([
-      "ci-gate",
-      "analyze (csharp)",
-      "analyze (javascript-typescript)",
-      "dependency-review",
-    ]),
+    ruleset: ruleset(
+      ["ci-gate", "analyze (csharp)", "analyze (javascript-typescript)", "dependency-review"],
+      true,
+    ),
     labels,
     // ISS-4. GitHub's API can't read a category's format, only whether it takes answers.
     discussionCategories: [
@@ -139,12 +151,12 @@ export const profiles = {
       { name: "Show and tell", isAnswerable: false },
     ],
   },
-  "sdk-dotnet": sdk("sdk-dotnet", ["ci-gate", "analyze (csharp)", "dependency-review"]),
-  "sdk-typescript": sdk("sdk-typescript", [
-    "ci-gate",
-    "analyze (javascript-typescript)",
-    "dependency-review",
-  ]),
+  "sdk-dotnet": sdk("sdk-dotnet", ["ci-gate", "analyze (csharp)", "dependency-review"], true),
+  "sdk-typescript": sdk(
+    "sdk-typescript",
+    ["ci-gate", "analyze (javascript-typescript)", "dependency-review"],
+    true,
+  ),
   "sdk-dart": sdk("sdk-dart", ["ci-gate", "dependency-review"]),
   template: {
     name: "template",
