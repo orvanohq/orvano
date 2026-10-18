@@ -66,10 +66,13 @@ The old local clones are moved to `~/orvano-backups/` and the repo cloned fresh 
 - [x] Discussions shows exactly Announcements, Q&A, Ideas, Show and tell → AC-6
   - 2026-10-18: the GraphQL `discussionCategories` list is exactly those four (set by hand on 2026-10-17, checked by the script).
 - [ ] Proof PR: `ci-gate`, `analyze (csharp)`, `analyze (javascript-typescript)`, `dependency-review` all run with exactly those names; only squash offered; no bypass option; branch deleted after merge → AC-9, AC-10
+  - 2026-10-18, PR 10: all four ran and passed under exactly those names. Before they passed, the PR was `BLOCKED`. The API showed squash as the only merge method and `viewerCanMergeAsAdmin: false`. The ruleset is `main`, active, with `bypass_actors: []`. Still to see: the branch deleted after the squash merge (ticked in a later PR).
 - [x] Direct `git push origin main` is refused → AC-9
   - 2026-10-18 14:56:24: a signed off empty commit on a throwaway local branch, pushed with `git push origin HEAD:main`, was rejected with `GH013: Repository rule violations`, naming "Changes must be made through a pull request" and "4 of 4 required status checks are expected". `main` stayed at `6f503ef`; the local branch was deleted.
-- [ ] Spec 0009's dependency review scratch proof: an unlisted license fails, a listed dev exception passes → AC-10
-- [ ] Confirmed check names written into spec 0010 RUL-3 and spec 0009 CTB-3 → AC-9
+- [x] Spec 0009's dependency review scratch proof: an unlisted license fails, a listed dev exception passes → AC-10
+  - 2026-10-18: passed once `fail-on-scopes` covered dev dependencies (spec 0009 verify.md has the runs). Without that key, dependency review ignored the license of every dev dependency, so both configs (core and starter) now set it.
+- [x] Confirmed check names written into spec 0010 RUL-3 and spec 0009 CTB-3 → AC-9
+  - 2026-10-18: no name differed from RUL-3.
 
 ## Templates and the org repo
 
@@ -82,7 +85,8 @@ The old local clones are moved to `~/orvano-backups/` and the repo cloned fresh 
 
 - [x] Contact address: the same `{{SECURITY_EMAIL}}` value in `SECURITY.md`, `CODE_OF_CONDUCT.md`, and `TRADEMARKS.md` after VRP-1 → VRP-1, COC-1, TMK-1
   - 2026-10-17: all three link to `security@orvano.dev`.
-- [ ] Required check names: each name in the `core` profile matches a job `name:` in `ci.yml`, `codeql.yml`, `dependency-review.yml`, and the first public run → RUL-3
+- [x] Required check names: each name in the `core` profile matches a job `name:` in `ci.yml`, `codeql.yml`, `dependency-review.yml`, and the first public run → RUL-3
+  - 2026-10-18: PR 10 ran `ci-gate`, `analyze (csharp)`, `analyze (javascript-typescript)`, and `dependency-review`, exactly the four in the `core` profile and in the ruleset (each pinned to `integration_id: 15368`).
 - [ ] `integration_id`: a status from another app (for example a commit status set with the API) does not satisfy a required check → RUL-3
 - [ ] Template pin: the exported `ci.yml` SHA equals `git rev-parse origin/main` in the core and the date is the export day; `--check` later keeps that pin → TPL-3
 - [ ] Template CodeQL language: `csharp` for .NET, `javascript-typescript` for TypeScript, none for Dart → TPL-3

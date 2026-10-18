@@ -125,6 +125,8 @@ Decided elsewhere, not here:
 
   `dco` and `pr-title` are not listed. They run inside `ci-gate` (core: `repo / hygiene / dco`; SDK repos: `hygiene / dco`), so `ci-gate` fails when they fail, and their nested names never need to be copied. This replaces spec 0009 CTB-3's "a required check next to `ci-gate`". OPN-2 confirms each name from the first public run; a name that differs is fixed in the profile and this table in the same PR.
 
+  Confirmed at OPN-2 (2026-10-18, core, PR 10, the first public run): `ci-gate`, `analyze (csharp)`, `analyze (javascript-typescript)`, and `dependency-review` ran under exactly these names, and the nested `repo / hygiene / dco` and `repo / hygiene / pr-title` ran inside `ci-gate`. No name differed, so the profile is unchanged. The SDK names are confirmed when each SDK repo's first PR runs.
+
 - **RUL-4 (MUST, deferred)**: `code_scanning` with tool `CodeQL`, `alerts_threshold: "errors"`, `security_alerts_threshold: "high_or_higher"`, for the `core`, `sdk-dotnet`, and `sdk-typescript` profiles only. It's **not** in any profile at first: a PR whose upload is skipped or refused would wait on this rule forever, and only an emergency ruleset edit would unblock it. It's added in one PR (profiles, then `--apply` per repo) once both RUL-5 proofs pass (AC-20). Until then the `analyze (...)` checks still have to pass, and you review alerts in the Security tab.
 - **RUL-5 (MUST)**: CodeQL uploads on fork PRs and Dependabot PRs too. `codeql.yml`'s `upload` input becomes `always` for every event (both kinds of PR get a read only token by default, and the job already asks for `security-events: write`). Two proofs, recorded in `verify.md`: a fork PR (from a second account, or the first outside PR) and the first Dependabot PR after the flip, each with the `analyze` job green and results shown on the PR. If either upload is refused, set `upload` back to `never` for that kind of PR only (forks: `head.repo.full_name != github.repository`; Dependabot: `github.actor == 'dependabot[bot]'`), leave RUL-4 out for good, and record why here and in spec 0008 CI-3.
 
@@ -331,8 +333,8 @@ The build approach is Tracer Bullet. Here the thin thread is the core repo's pat
 
 ## Follow-up
 
-- [ ] Spec 0009 CTB-3: replace "it becomes a required check next to `ci-gate`" with "it runs inside `ci-gate`, which is the required check (spec 0010 RUL-3)", and record the confirmed nested names at OPN-2. CTB-4 is applied by SET-1.
-- [ ] Spec 0009 `verify.md`: tick the dependency review scratch proof at OPN-2.
+- [x] Spec 0009 CTB-3: replace "it becomes a required check next to `ci-gate`" with "it runs inside `ci-gate`, which is the required check (spec 0010 RUL-3)", and record the confirmed nested names at OPN-2. CTB-4 is applied by SET-1.
+- [x] Spec 0009 `verify.md`: tick the dependency review scratch proof at OPN-2.
 - [ ] Spec 0008 CI-1 (branch protection bullet) and the Enforcement row "Branch protection requiring `ci-gate`...": point to spec 0010 RUL-1 to RUL-3. CI-3's fork note: record the RUL-5 outcome. Rollout step 11: close the "required checks, once feature 58 makes the repo public" item.
 - [ ] Spec 0008 KIT-2: "Feature 58 turns them into template repos" becomes "exported to the template repos by `export-template.mjs` (spec 0010 TPL-2, TPL-3)", and KIT-2's `common/` list gains `codeql.yml` and `dependency-review.yml` (TPL-5).
 - [ ] Root `AGENTS.md` (for `/sync`): every change to `main` goes through a PR (RUL-2); `github-settings.mjs` and `export-template.mjs` are the ways to change GitHub settings and templates; any skill SKL-2 removes is dropped from the Agent skills list.

@@ -2,6 +2,11 @@
 # allow-dependencies-licenses holds this SDK's dev exceptions from spec 0009 DEP-5's table, by package URL without a
 # version. Keep the entries your repo needs and delete the rest; add one only with that table, in the same PR.
 fail-on-severity: moderate
+# The action checks only runtime dependencies by default, so a dev dependency (DEP-5) would skip the license gate.
+fail-on-scopes:
+  - runtime
+  - development
+  - unknown
 allow-licenses:
   - MIT
   - MIT-0

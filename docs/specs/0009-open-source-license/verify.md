@@ -25,7 +25,8 @@ criteria, so each step names the rule it proves. Step 6 (the `dco` job, required
 
 ## After the repo goes public (feature 58)
 
-- [ ] A PR adding an unlisted license fails dependency review, and a listed dev exception passes (DEP-8's scratch branch proof) → DEP-8
+- [x] A PR adding an unlisted license fails dependency review, and a listed dev exception passes (DEP-8's scratch branch proof) → DEP-8
+  - 2026-10-18 (OPN-2), throwaway draft PRs 11 and 12, both closed unmerged and their branches deleted. On the first run both passed: GitHub had the licenses (`CC-BY-3.0` and `CC-BY-4.0`) but marked both packages `development`, and the action checks only `runtime` dependencies unless `fail-on-scopes` says otherwise. With `fail-on-scopes: [runtime, development, unknown]`, PR 11 (`spdx-exceptions`, `CC-BY-3.0`, unlisted) failed with "incompatible licenses", and PR 12 (`caniuse-lite` 1.0.30001800, a listed dev exception) passed. The core and starter configs got that key in PR 10.
 
 ## Rule coverage
 
