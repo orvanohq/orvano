@@ -122,6 +122,20 @@ A cross check on another model then ran these rules on a scratch clone (all work
 
 The vendored skills keep their own `#N` (other projects' issues, CSS colors), so the old PR check leaves `.claude/skills/` and `.agents/skills/` out. The dry run tried only literal rules, so the two regex lines get their own scratch clone check before the real run.
 
+## Auto merge as a fifth needsPublic field (decided 2026-10-17, after the step 11 apply)
+
+On the recreated private repo, `--apply` set every SET-1 field but one. GitHub accepted `allow_auto_merge: true` in the PATCH and still returned `false`. GitHub's docs (_Automatically merging a pull request_) say why: on GitHub Free and Free for organizations, auto merge is available only in public repos; it works in private repos only on Pro, Team, and Enterprise. So check mode printed one drift line plus the four waiting lines and exited 1, and OPN-1 item 6 could never pass while the repo is private.
+
+Options weighed:
+
+- **Make it a fifth `needsPublic` field (chosen).** This is exactly the case `needsPublic` exists for: a setting the profile wants, that Free allows only once the repo is public. Check mode shows it as waiting, `--apply` skips it while private, and OPN-2 step 1 turns it on after the flip, together with the other four. The list stays one fixed list in the script, not a per profile flag, because the plan limit is the org's, not the repo kind's.
+- **Drop `allow_auto_merge` from SET-1.** Rejected: with 0 approvals and strict "up to date", auto merge is what lets you queue a PR and walk away while CI runs, and it costs nothing once public. The SDK repos start public (TPL-4), so they'd lose it for no reason.
+- **Let OPN-1 item 6 accept this one drift line.** Rejected: "check mode exits 0" is the invariant the whole SET design rests on. A known drift line people learn to ignore hides the next real one.
+
+Other fields checked the same day. The SET-1 fields other than auto merge all stuck on the private repo. In SET-3, issues, Discussions (the docs say public and private repos), `is_template`, and the Actions switch all work on a private Free repo. Wikis are public only on Free as well, but the profile sets `has_wiki: false`, and turning a feature off works on any plan, so it isn't `needsPublic`. Dependabot alerts and security updates work on private repos and are already applied. CodeQL default setup already reads as `needs-public` in the script. So auto merge is the only addition.
+
+`--apply` leaves `allow_auto_merge` out of the PATCH while private, rather than sending it and ignoring the result. Sending a value GitHub silently keeps at `false` would make the check after the apply report drift right after a "successful" write.
+
 ## Skills license inventory
 
 _Filled by the build (SKL-1) before the history rewrite: one row per skill in `skills-lock.json`, with its source, the source license, and whether it stays (license file added) or is removed from history._
@@ -217,4 +231,4 @@ _Filled by the build: the HIS-1 inventory, the HIS-4 sweep output (email list, g
 
 **First CI on the recreated repo**: the `text` job failed on `main`, because the rewrite gave a quoted short SHA a prefix `typos` reads as a misspelling. Fixed by ignoring 7 to 40 character hex identifiers in `typos.toml`.
 
-**Step 11 settings (2026-10-17)**: `github-settings.mjs orvanohq/orvano --profile core --apply` set every SET-1 and SET-3 field, Dependabot alerts and security updates, and the `triage` label. Two items remain: `allow_auto_merge` stays off, because GitHub Free allows auto merge only on public repos (a fifth needs public field the profile doesn't mark yet), and the Discussions categories still hold GitHub's defaults until you set them by hand (ISS-4).
+**Step 11 settings (2026-10-17)**: `github-settings.mjs orvanohq/orvano --profile core --apply` set every SET-1 and SET-3 field, Dependabot alerts and security updates, and the `triage` label. Two items remain: `allow_auto_merge` stays off, because GitHub Free allows auto merge only on public repos (build step 11a makes it the fifth `needsPublic` field; see _Auto merge as a fifth needsPublic field_), and the Discussions categories still hold GitHub's defaults until you set them by hand (ISS-4).

@@ -12,7 +12,8 @@ _Steps derived from spec 0010 acceptance criteria. `/check verify` runs these; `
 - [x] Read `CONTRIBUTING.md` → the COM-2 sections in order, the full DCO 1.1 text, the CTB-6 sentence, the `git rebase --signoff origin/main` fix, the DPB-3 step, the Windows notes → AC-3
 - [x] `ls SUPPORT.md TRADEMARKS.md .github/CODEOWNERS` and `README.md` has the status line and a Community section linking all five files → AC-4
 - [x] `ls tooling/starters/common/.github/workflows/` shows `codeql.yml` and `dependency-review.yml`; `node tooling/scripts/export-template.mjs sdk-template-dart <clone>` writes no `codeql.yml` → AC-18
-- [x] `node tooling/scripts/github-settings.mjs orvanohq/orvano --profile core` on the private repo → only drift you expect, and exactly four `waiting for public` lines (secret scanning, push protection, private vulnerability reporting, the ruleset) → AC-8 (OPN-1 item 6)
+- [ ] `node tooling/scripts/github-settings.mjs orvanohq/orvano --profile core` on the private repo → exits 0, with exactly five `waiting for public` lines (secret scanning, push protection, private vulnerability reporting, the ruleset, `repo.allow_auto_merge`) → AC-8 (OPN-1 item 6)
+  - 2026-10-17, after the step 11 apply: exit 1, with one drift line (`repo.allow_auto_merge: want true, got false`) and the four waiting lines. Auto merge needs a public repo on Free, so build step 11a makes it the fifth `needsPublic` field. Run this again after step 11a.
 
 ## On GitHub, while private (OPN-1)
 
