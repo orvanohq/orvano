@@ -1,0 +1,15 @@
+name: scratch_flutter
+description: A scratch package that proves sdk-dart.yml runs with Flutter. Removed before merge.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.7.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
