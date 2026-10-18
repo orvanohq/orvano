@@ -24,7 +24,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 57  | [Open source license](foundations.md)             | Foundation    | done        |
 | 6   | [Stack & architecture](foundations.md)            | Foundation    | done        |
 | 7   | [Coding standards & tooling](foundations.md)      | Foundation    | done        |
-| 58  | [Repo & community setup](foundations.md)          | Foundation    | in-progress |
+| 58  | [Repo & community setup](foundations.md)          | Foundation    | done        |
 | 8   | [Platform data model](foundations.md)             | Foundation    | planned     |
 | 9   | [Access control model](foundations.md)            | Foundation    | planned     |
 | 10  | [API contract & SDK generation](sdks.md)          | Foundation    | planned     |
@@ -92,7 +92,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 
 ## Epics
 
-- [Foundations](foundations.md): 13 features, 6 done
+- [Foundations](foundations.md): 13 features, 10 done
 - [SDKs](sdks.md): 5 features, 0 done
 - [Platform](platform.md): 7 features, 0 done
 - [Auth](auth.md): 6 features, 0 done

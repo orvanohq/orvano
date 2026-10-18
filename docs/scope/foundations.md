@@ -85,20 +85,20 @@ spec [0008](../specs/0008-coding-standards-tooling/index.md) · code in `package
 - [x] Install the tooling: `/develop tooling`
 - [x] Check it runs clean: `/test`
 
-### 58. Repo & community setup · in-progress
+### 58. Repo & community setup · done
 
 Set up the GitHub side of every repo in the org from the license spec (feature 57) and the tooling (feature 7): branch protection, code owners, a security policy, a contributing guide, issue and PR templates, and contributor sign off. SDK repos copy the same template.
 **Done when:** the `orvano` repo has protected `main`, code owners, `SECURITY.md` (how to report a vulnerability), `CONTRIBUTING.md`, templates, and sign off checks running, and a template repo lets each SDK repo start the same way.
 spec [0010](../specs/0010-repo-community-setup/index.md) · code in the root community files, `.github/`, `tooling/scripts/` (`github-settings.mjs`, `export-template.mjs`, `dco.test.mjs`), `tooling/starters/`
 
 - [x] Design it (spec): `/architect repo & community setup`
-- [ ] Build it: `/develop repo & community setup`
+- [x] Build it: `/develop repo & community setup`
   - [x] Community files, issue forms, CODEOWNERS, and the `dco` job on `main` (AC-1 to AC-5, AC-7)
   - [x] `github-settings.mjs`, `export-template.mjs`, and the SDK starter CodeQL and dependency review workflows (AC-8, AC-16 to AC-19)
-  - [ ] Clean history: skills license check, rewrite, sweep, repo recreated, org settings (AC-12 to AC-14)
-  - [ ] Go public and prove it: the flip, settings applied, Discussions, the proof PR (AC-6, AC-9 to AC-11, AC-15)
-  - [ ] Org `.github` and the three template repos, then the CodeQL gate once uploads are proven (AC-16, AC-17, AC-20)
-- [ ] Verify it: `/check verify repo & community setup`
+  - [x] Clean history: skills license check, rewrite, sweep, repo recreated, org settings (AC-12 to AC-14)
+  - [x] Go public and prove it: the flip, settings applied, Discussions, the proof PR (AC-6, AC-9 to AC-11, AC-15)
+  - [x] Org `.github` and the three template repos, then the CodeQL gate once uploads are proven (AC-16, AC-17, AC-20)
+- [x] Verify it: `/check verify repo & community setup`
 - [x] Test it: `/test repo & community setup`
 - [x] Review it (fresh model): `/check review repo & community setup`
 - [x] Document it: `/document repo & community setup`

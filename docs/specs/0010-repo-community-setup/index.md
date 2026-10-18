@@ -1,7 +1,7 @@
 # 0010. Repo and community setup: settings as code, a checked public flip, per language SDK templates
 
 **Date**: 2026-10-16
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 
