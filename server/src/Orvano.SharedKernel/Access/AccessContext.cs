@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace Orvano.SharedKernel.Access;
@@ -66,8 +67,8 @@ internal sealed class AccessContext : ICallerContext, IProjectContext
 public static class AccessServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the per request caller and project contexts, and a startup check that builds every endpoint, so a
-    /// misdeclared access requirement fails startup rather than the first request.
+    /// Registers the per request caller and project contexts, and a startup check that builds every endpoint and fails
+    /// startup naming each one whose access declaration breaks spec 0012 EPT-3 (EPT-4).
     /// </summary>
     public static IServiceCollection AddAccessContext(this IServiceCollection services)
     {
@@ -77,16 +78,46 @@ public static class AccessServiceCollectionExtensions
         services.AddScoped<IProjectContext>(provider => provider.GetRequiredService<AccessContext>());
         return services;
     }
+
+    /// <summary>
+    /// Registers a credential resolver (spec 0012 RSV-1), scoped. The access layer middleware runs every registered
+    /// resolver in <see cref="ICallerResolver.Order"/>; registering the same type twice adds it once.
+    /// </summary>
+    public static IServiceCollection AddCallerResolver<T>(this IServiceCollection services)
+        where T : class, ICallerResolver
+    {
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ICallerResolver, T>());
+        return services;
+    }
 }
 
-// Building the endpoints runs the conventions RequireConsolePermission adds, which throw on a bad route pattern.
-internal sealed class AccessEndpointCheck(IServiceProvider services) : IHostedService
+// EPT-4 (1): every endpoint of the host declares its access, or the host does not start. Hosted services start before
+// the web host wires the app's endpoints, so the check runs in StartedAsync, once they exist; until then the access
+// layer answers 404 for any undeclared endpoint (EPT-4 (3)).
+internal sealed class AccessEndpointCheck(IServiceProvider services) : IHostedLifecycleService
 {
-    public Task StartAsync(CancellationToken cancellationToken)
+    public Task StartedAsync(CancellationToken cancellationToken)
     {
-        _ = services.GetService<EndpointDataSource>()?.Endpoints;
+        string[] problems = [.. (services.GetService<EndpointDataSource>()?.Endpoints ?? [])
+            .Select(endpoint => AccessDeclaration.Problem(endpoint) is { } problem ? $"{AccessDeclaration.Name(endpoint)}: {problem}" : null)
+            .OfType<string>()];
+        if (problems.Length > 0)
+        {
+            throw new InvalidOperationException(
+                "Every endpoint must declare its access (spec 0012 EPT-3). Fix these endpoints:" + Environment.NewLine
+                + string.Join(Environment.NewLine, problems.Select(problem => "  " + problem)));
+        }
+
         return Task.CompletedTask;
     }
 
+    public Task StartingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StoppingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StoppedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
