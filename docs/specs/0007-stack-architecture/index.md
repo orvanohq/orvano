@@ -3,6 +3,7 @@
 **Date**: 2026-10-16
 **Status**: Accepted
 **Updated**: 2026-10-16, from the scaffold: INS-3 and the new INS-5 (root key file permissions on Linux), INS-2 (migrate gets no root key), HSH-2 result recorded.
+**Updated**: 2026-10-18, for spec 0012: CCH-2 names end user labels and resource grants as security related entries and says what "permission answers" means; feature 61 builds the signal, cache, job, and outbox runtime.
 
 ## Summary
 
@@ -109,7 +110,7 @@ Each rule has an ID so reviews and later specs can cite it. **MUST** fails the r
 ### Cache
 
 - **CCH-1 (MUST)**: `HybridCache` with only its in memory level. No `IDistributedCache` is registered. Keys and tags follow spec 0002 PRF-2.
-- **CCH-2 (MUST)**: `RemoveByTagAsync` is wrapped by an `ICacheInvalidator` that removes locally and sends a `cache` signal; every process applies received tags to its own cache. With SIG-2 in place, the PRF-2 cap rises from 60 seconds to 5 minutes for entries that have a named invalidation path and are not security related. Security related entries (roles, memberships, project status, API key metadata, signing key lookups) keep the 60 second cap. Permission answers and API key validity stay uncached (unchanged).
+- **CCH-2 (MUST)**: `RemoveByTagAsync` is wrapped by an `ICacheInvalidator` that removes locally and sends a `cache` signal; every process applies received tags to its own cache. With SIG-2 in place, the PRF-2 cap rises from 60 seconds to 5 minutes for entries that have a named invalidation path and are not security related. Security related entries (roles, memberships, end user labels, resource grants, project status, API key metadata, signing key lookups) keep the 60 second cap. Permission answers (an allow or deny decision) and API key validity stay uncached (unchanged); the inputs a decision reads, such as a user's labels or a table's grant array, may be cached under the 60 second cap (spec 0012 LBL-2, EVL-5). Every cached entry also carries its project tag `orvano:project:<project id>`, so a project wide change can clear it.
 
 ### Password hashing
 
@@ -225,6 +226,7 @@ Set by the install from earlier specs: `ORVANO_PUBLIC_URL`, `ORVANO_TRUSTED_PROX
 - [x] Spec 0004: name `sdk-flutter` and `sdk-dart` and the GHCR image (REP-3, IMG-3) and close its feature 6 follow up.
 - [x] Spec 0005: name `sdk-js`, `sdk-js-server`, `sdk-nextjs` (REP-3), recording that one repo per package was kept over one TypeScript repo.
 - [x] Spec 0006: PWD-6 is closed by HSH-1, NET-1 by TLS-1 and TLS-2, TEN-3's pooling plan by PG-3 and PG-4.
+- [ ] Feature 61 (Background runtime): build REP-2's runtime pieces in `Orvano.Infrastructure`, signals and cache invalidation first (SIG-1 to SIG-3, CCH-1, CCH-2: `ISignalBus`, `ICacheInvalidator`, the listener, heartbeat, and reconnect), then the job runner and schedules (JOB-1 to JOB-6), then the outbox (EVT-1 to EVT-4). Spec 0012's label cache test (AC-10) and features 13 and 14 wait on the first part.
 - [ ] Feature 10: the API prefix must stay outside `/console` and `/health` (RUN-4); fill `OrvanoHeaders` with every Orvano request and response header and the trace header name (COR-3).
 - [ ] Feature 13: the console's create project flow asks for app origins and validates them as exact origins (COR-2); changing them invalidates the CORS cache tag (COR-1).
 - [ ] Later: consider origin patterns (for example any port on `localhost`) if developers ask; not in the first release (COR-2).

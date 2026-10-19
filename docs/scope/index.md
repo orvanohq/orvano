@@ -13,72 +13,73 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 
 ## At a glance
 
-| #   | Feature                                           | Phase         | Status  |
-| --- | ------------------------------------------------- | ------------- | ------- |
-| 1   | [.NET backend practices](foundations.md)          | Foundation    | done    |
-| 2   | [React console practices](foundations.md)         | Foundation    | done    |
-| 3   | [Dart and Flutter practices](foundations.md)      | Foundation    | done    |
-| 4   | [TypeScript SDK practices](foundations.md)        | Foundation    | done    |
-| 54  | [Console UX patterns](foundations.md)             | Foundation    | done    |
-| 5   | [Security baseline](foundations.md)               | Foundation    | done    |
-| 57  | [Open source license](foundations.md)             | Foundation    | done    |
-| 6   | [Stack & architecture](foundations.md)            | Foundation    | done    |
-| 7   | [Coding standards & tooling](foundations.md)      | Foundation    | done    |
-| 58  | [Repo & community setup](foundations.md)          | Foundation    | done    |
-| 8   | [Platform data model](foundations.md)             | Foundation    | done    |
-| 9   | [Access control model](foundations.md)            | Foundation    | planned |
-| 10  | [API contract & SDK generation](sdks.md)          | Foundation    | planned |
-| 11  | [Design system & console shell](foundations.md)   | Foundation    | planned |
-| 12  | [Self host install](platform.md)                  | Slice 1       | planned |
-| 13  | [Console accounts & projects](platform.md)        | Slice 1       | planned |
-| 14  | [Email and password auth](auth.md)                | Slice 1       | planned |
-| 15  | [Project databases](databases.md)                 | Slice 1       | planned |
-| 16  | [Tables and rows API](databases.md)               | Slice 1       | planned |
-| 17  | [Email delivery & templates](auth.md)             | Slice 2       | planned |
-| 18  | [Magic link, email code, verify & reset](auth.md) | Slice 2       | planned |
-| 19  | [Anonymous sessions](auth.md)                     | Slice 2       | planned |
-| 20  | [Phone SMS sign in](auth.md)                      | Slice 2       | planned |
-| 21  | [Next.js server sessions](sdks.md)                | Slice 2       | planned |
-| 22  | [End user management](auth.md)                    | Slice 2       | planned |
-| 23  | [Rate limits & abuse guards](operations.md)       | Slice 2       | planned |
-| 24  | [Schema management](databases.md)                 | Slice 3       | planned |
-| 25  | [Queries & relations](databases.md)               | Slice 3       | planned |
-| 26  | [Row permissions](databases.md)                   | Slice 3       | planned |
-| 27  | [SQL editor](databases.md)                        | Slice 3       | planned |
-| 55  | [Row import & export](databases.md)               | Slice 3       | planned |
-| 28  | [CLI core](platform.md)                           | Slice 3       | planned |
-| 56  | [Type generation](sdks.md)                        | Slice 3       | planned |
-| 29  | [Buckets & files](storage.md)                     | Slice 4       | planned |
-| 30  | [Resumable uploads](storage.md)                   | Slice 4       | planned |
-| 31  | [Image transformations](storage.md)               | Slice 4       | planned |
-| 32  | [Developer docs site](platform.md)                | Slice 4       | planned |
-| 33  | [Platform events](realtime.md)                    | Slice 5       | planned |
-| 34  | [Database change subscriptions](realtime.md)      | Slice 5       | planned |
-| 35  | [Broadcast & presence](realtime.md)               | Slice 5       | planned |
-| 36  | [Webhooks](realtime.md)                           | Slice 5       | planned |
-| 37  | [Function runtimes & deployments](functions.md)   | Slice 6       | planned |
-| 38  | [Function triggers](functions.md)                 | Slice 6       | planned |
-| 39  | [Function variables & secrets](functions.md)      | Slice 6       | planned |
-| 40  | [Static sites](sites.md)                          | Slice 7       | planned |
-| 41  | [Server rendered sites](sites.md)                 | Slice 7       | planned |
-| 42  | [Custom domains & certificates](sites.md)         | Slice 7       | planned |
-| 43  | [Email & SMS messaging](messaging.md)             | Slice 8       | planned |
-| 44  | [Push notifications](messaging.md)                | Slice 8       | planned |
-| 45  | [Usage metrics & metering](operations.md)         | Slice 9       | planned |
-| 46  | [Request & function logs](operations.md)          | Slice 9       | planned |
-| 47  | [Platform error monitoring](operations.md)        | Slice 9       | planned |
-| 48  | [Audit logs](operations.md)                       | Slice 9       | planned |
-| 49  | [End user data export & delete](operations.md)    | Slice 9       | planned |
-| 50  | [Backups & restore](operations.md)                | Slice 9       | planned |
-| 51  | [Console team members & roles](platform.md)       | Slice 9       | planned |
-| 52  | [SDK publishing & versioning](sdks.md)            | Alpha release | planned |
-| 59  | [Server releases](platform.md)                    | Alpha release | planned |
-| 60  | [Example apps & starters](sdks.md)                | Alpha release | planned |
-| 53  | [Instance upgrades](platform.md)                  | Alpha release | planned |
+| #   | Feature                                           | Phase         | Status      |
+| --- | ------------------------------------------------- | ------------- | ----------- |
+| 1   | [.NET backend practices](foundations.md)          | Foundation    | done        |
+| 2   | [React console practices](foundations.md)         | Foundation    | done        |
+| 3   | [Dart and Flutter practices](foundations.md)      | Foundation    | done        |
+| 4   | [TypeScript SDK practices](foundations.md)        | Foundation    | done        |
+| 54  | [Console UX patterns](foundations.md)             | Foundation    | done        |
+| 5   | [Security baseline](foundations.md)               | Foundation    | done        |
+| 57  | [Open source license](foundations.md)             | Foundation    | done        |
+| 6   | [Stack & architecture](foundations.md)            | Foundation    | done        |
+| 7   | [Coding standards & tooling](foundations.md)      | Foundation    | done        |
+| 58  | [Repo & community setup](foundations.md)          | Foundation    | done        |
+| 8   | [Platform data model](foundations.md)             | Foundation    | done        |
+| 9   | [Access control model](foundations.md)            | Foundation    | in-progress |
+| 61  | [Background runtime](foundations.md)              | Foundation    | planned     |
+| 10  | [API contract & SDK generation](sdks.md)          | Foundation    | planned     |
+| 11  | [Design system & console shell](foundations.md)   | Foundation    | planned     |
+| 12  | [Self host install](platform.md)                  | Slice 1       | planned     |
+| 13  | [Console accounts & projects](platform.md)        | Slice 1       | planned     |
+| 14  | [Email and password auth](auth.md)                | Slice 1       | planned     |
+| 15  | [Project databases](databases.md)                 | Slice 1       | planned     |
+| 16  | [Tables and rows API](databases.md)               | Slice 1       | planned     |
+| 17  | [Email delivery & templates](auth.md)             | Slice 2       | planned     |
+| 18  | [Magic link, email code, verify & reset](auth.md) | Slice 2       | planned     |
+| 19  | [Anonymous sessions](auth.md)                     | Slice 2       | planned     |
+| 20  | [Phone SMS sign in](auth.md)                      | Slice 2       | planned     |
+| 21  | [Next.js server sessions](sdks.md)                | Slice 2       | planned     |
+| 22  | [End user management](auth.md)                    | Slice 2       | planned     |
+| 23  | [Rate limits & abuse guards](operations.md)       | Slice 2       | planned     |
+| 24  | [Schema management](databases.md)                 | Slice 3       | planned     |
+| 25  | [Queries & relations](databases.md)               | Slice 3       | planned     |
+| 26  | [Row permissions](databases.md)                   | Slice 3       | planned     |
+| 27  | [SQL editor](databases.md)                        | Slice 3       | planned     |
+| 55  | [Row import & export](databases.md)               | Slice 3       | planned     |
+| 28  | [CLI core](platform.md)                           | Slice 3       | planned     |
+| 56  | [Type generation](sdks.md)                        | Slice 3       | planned     |
+| 29  | [Buckets & files](storage.md)                     | Slice 4       | planned     |
+| 30  | [Resumable uploads](storage.md)                   | Slice 4       | planned     |
+| 31  | [Image transformations](storage.md)               | Slice 4       | planned     |
+| 32  | [Developer docs site](platform.md)                | Slice 4       | planned     |
+| 33  | [Platform events](realtime.md)                    | Slice 5       | planned     |
+| 34  | [Database change subscriptions](realtime.md)      | Slice 5       | planned     |
+| 35  | [Broadcast & presence](realtime.md)               | Slice 5       | planned     |
+| 36  | [Webhooks](realtime.md)                           | Slice 5       | planned     |
+| 37  | [Function runtimes & deployments](functions.md)   | Slice 6       | planned     |
+| 38  | [Function triggers](functions.md)                 | Slice 6       | planned     |
+| 39  | [Function variables & secrets](functions.md)      | Slice 6       | planned     |
+| 40  | [Static sites](sites.md)                          | Slice 7       | planned     |
+| 41  | [Server rendered sites](sites.md)                 | Slice 7       | planned     |
+| 42  | [Custom domains & certificates](sites.md)         | Slice 7       | planned     |
+| 43  | [Email & SMS messaging](messaging.md)             | Slice 8       | planned     |
+| 44  | [Push notifications](messaging.md)                | Slice 8       | planned     |
+| 45  | [Usage metrics & metering](operations.md)         | Slice 9       | planned     |
+| 46  | [Request & function logs](operations.md)          | Slice 9       | planned     |
+| 47  | [Platform error monitoring](operations.md)        | Slice 9       | planned     |
+| 48  | [Audit logs](operations.md)                       | Slice 9       | planned     |
+| 49  | [End user data export & delete](operations.md)    | Slice 9       | planned     |
+| 50  | [Backups & restore](operations.md)                | Slice 9       | planned     |
+| 51  | [Console team members & roles](platform.md)       | Slice 9       | planned     |
+| 52  | [SDK publishing & versioning](sdks.md)            | Alpha release | planned     |
+| 59  | [Server releases](platform.md)                    | Alpha release | planned     |
+| 60  | [Example apps & starters](sdks.md)                | Alpha release | planned     |
+| 53  | [Instance upgrades](platform.md)                  | Alpha release | planned     |
 
 ## Phases
 
-- **Foundation (1 to 11, plus 54, 57, 58):** research and record best practices first (you asked for this before any code), including console UX patterns (54), then the security bar, the license (57), the repo setup (58), the architecture, tooling, Orvano's own data model, the shared permissions model, the API contract that generates every SDK, and the console design system.
+- **Foundation (1 to 11, plus 54, 57, 58, 61):** research and record best practices first (you asked for this before any code), including console UX patterns (54), then the security bar, the license (57), the repo setup (58), the architecture, tooling, Orvano's own data model, the shared permissions model, the background runtime (signals, cache invalidation, jobs, outbox, 61), the API contract that generates every SDK, and the console design system.
 - **Slice 1, core loop (12 to 16):** the walking skeleton. Install Orvano, sign into the console, create a project and key, sign up an end user with email and password, and write and read one row, from every SDK. Thin, but every layer is real.
 - **Slice 2, auth breadth (17 to 23):** the rest of the chosen sign in methods, Next.js server side sessions, user management, and rate limits.
 - **Slice 3, database breadth (24 to 28, plus 55 and 56):** schema and migrations, the full query language, row permissions, the SQL editor, row import and export, the CLI (usable in CI), and type generation.
@@ -92,7 +93,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 
 ## Epics
 
-- [Foundations](foundations.md): 13 features, 10 done
+- [Foundations](foundations.md): 14 features, 10 done
 - [SDKs](sdks.md): 5 features, 0 done
 - [Platform](platform.md): 7 features, 0 done
 - [Auth](auth.md): 6 features, 0 done

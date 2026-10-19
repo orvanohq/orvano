@@ -13,6 +13,7 @@ using Orvano.Infrastructure;
 using Orvano.Infrastructure.RootKeys;
 using Orvano.Infrastructure.Tls;
 using Orvano.Modules.Auth;
+using Orvano.SharedKernel.Access;
 using Orvano.SharedKernel.Configuration;
 
 namespace Orvano.Host.Commands;
@@ -82,6 +83,7 @@ internal static class ServeCommand
         builder.Services.AddValidation(); // spec 0002 VAL-1: once here, plus once in each module that maps endpoints
         builder.Services.AddProblemDetails();
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+        builder.Services.AddAccessContext(); // spec 0012 PRJ-3: the per request caller and project
         builder.Services.AddHealthChecks().AddCheck<PlatformDatabaseHealthCheck>("platform-database", tags: ["ready"]);
 
         string? trustedProxies = builder.Configuration[TrustedProxies.ConfigurationKey];
