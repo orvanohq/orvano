@@ -133,6 +133,7 @@ spec [0012](../specs/0012-access-control-model/index.md) · code in `server/src/
   - [ ] Contexts, architecture tests, the PostgreSQL `WhereGranted` test, and the label cache test (AC-4, AC-9, AC-10, AC-12)
     - built: contexts, architecture tests, `WhereGranted` test. Waiting: the label cache test (AC-10, build plan step 8). Spec 0012 now matches spec 0007 (labels ride `cache` tags, 60 second expiry, 2026-10-18); the test waits for feature 61 to build `ISignalBus` and `ICacheInvalidator`
   - [x] Amend specs 0011 and 0006 for the new columns, CHECK constraints, and closed follow ups (AC-8, AC-9) (done by `/architect`, 2026-10-18)
+  - [ ] Access layer entry and endpoint default deny: `ICallerResolver` and the resolving middleware, `AllowPublicAccess`, generic endpoint requirements for `MapGroup`, the startup check, and the endpoint list test (AC-9, AC-13; build plan steps 10 and 11, added by `/architect` 2026-10-19)
 - [ ] Verify it: `/check verify access control model`
 - [ ] Test it: `/test access control model`
 - [ ] Review it (fresh model): `/check review access control model`
