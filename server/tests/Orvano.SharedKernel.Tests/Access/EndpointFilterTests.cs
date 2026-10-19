@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations;
 using System.Net;
+using System.Text;
 using System.Text.Json;
 
 using Microsoft.AspNetCore.Builder;
@@ -15,7 +17,7 @@ using static Orvano.SharedKernel.Tests.Access.Callers;
 
 namespace Orvano.SharedKernel.Tests.Access;
 
-// Spec 0012 build plan steps 4 to 6: the endpoint filters on a sample minimal API, with a fake membership lookup.
+// Spec 0012 build plan steps 4 to 6: the endpoint requirements on a sample minimal API, with a fake membership lookup.
 public sealed class EndpointFilterTests
 {
     private static readonly Guid Organization = Guid.Parse("0192f7a4-0000-7000-8000-0000000000a1");
@@ -239,6 +241,85 @@ public sealed class EndpointFilterTests
     public async Task Console_permission_throws_when_the_route_has_no_organization_or_project() =>
         await Should.ThrowAsync<InvalidOperationException>(() => SendAsync(Operator, "/console/nowhere", new FakeMemberships("owner")));
 
+    // One body fails validation, the other fails binding.
+    public static TheoryData<string> BadBodies => ["""{ "name": "" }""", "{ not json"];
+
+    [Theory]
+    [Trait("Spec", "0012:DEN-5")]
+    [MemberData(nameof(BadBodies))]
+    public async Task Bad_body_answers_validation_when_the_caller_passes_the_requirement(string body)
+    {
+        using HttpResponseMessage response = await PostAsync(Caller.SecretKey(Project, [Scopes.StorageWrite]), "/server/storage", body);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest); // the control: binding and validation are on
+    }
+
+    [Theory]
+    [Trait("Spec", "0012:DEN-5")]
+    [MemberData(nameof(BadBodies))]
+    public async Task Require_scope_answers_insufficient_scope_before_the_body_when_the_key_lacks_it(string body)
+    {
+        (HttpStatusCode status, string? code) = await PostCodeAsync(Caller.SecretKey(Project, [Scopes.StorageRead]), "/server/storage", body);
+
+        status.ShouldBe(HttpStatusCode.Forbidden);
+        code.ShouldBe("insufficient_scope");
+    }
+
+    [Theory]
+    [Trait("Spec", "0012:DEN-5")]
+    [MemberData(nameof(BadBodies))]
+    public async Task Require_client_api_answers_forbidden_before_the_body_when_the_api_is_off(string body)
+    {
+        (HttpStatusCode status, string? code) = await PostCodeAsync(Caller.Guest(Project, [Scopes.ClientAuth]), "/client/storage", body);
+
+        status.ShouldBe(HttpStatusCode.Forbidden);
+        code.ShouldBe("forbidden");
+    }
+
+    [Theory]
+    [Trait("Spec", "0012:DEN-5")]
+    [MemberData(nameof(BadBodies))]
+    public async Task Console_permission_answers_not_found_before_the_body_when_the_operator_is_not_a_member(string body)
+    {
+        (HttpStatusCode status, string? code) = await PostCodeAsync(
+            Operator, $"/console/projects/{Project}", body, new FakeMemberships(null));
+
+        status.ShouldBe(HttpStatusCode.NotFound);
+        code.ShouldBe("not_found");
+    }
+
+    [Theory]
+    [Trait("Spec", "0012:DEN-5")]
+    [MemberData(nameof(BadBodies))]
+    public async Task Console_permission_answers_forbidden_before_the_body_when_the_role_lacks_the_permission(string body)
+    {
+        (HttpStatusCode status, string? code) = await PostCodeAsync(
+            Operator, $"/console/projects/{Project}", body, new FakeMemberships("viewer"));
+
+        status.ShouldBe(HttpStatusCode.Forbidden);
+        code.ShouldBe("forbidden");
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:DEN-5")]
+    public async Task Requirement_fails_closed_when_the_pipeline_has_no_access_requirements_middleware()
+    {
+        WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Services.AddAccessContext();
+        await using WebApplication app = builder.Build();
+        app.Use((http, next) =>
+        {
+            http.RequestServices.GetRequiredService<AccessContext>().Establish(Caller.SecretKey(Project, []), null);
+            return next(http);
+        });
+        app.MapGet("/server/storage", () => "ok").RequireScope(Scopes.StorageWrite);
+        await app.StartAsync(Token);
+
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => app.GetTestClient().GetAsync(new Uri("/server/storage", UriKind.Relative), Token));
+    }
+
     private static async Task<(HttpStatusCode Status, string? Code)> CallAsync(
         Caller caller,
         string path,
@@ -250,12 +331,34 @@ public sealed class EndpointFilterTests
         return (response.StatusCode, code);
     }
 
-    private static async Task<HttpResponseMessage> SendAsync(Caller caller, string path, FakeMemberships memberships)
+    private static async Task<(HttpStatusCode Status, string? Code)> PostCodeAsync(
+        Caller caller,
+        string path,
+        string body,
+        FakeMemberships? memberships = null)
+    {
+        using HttpResponseMessage response = await PostAsync(caller, path, body, memberships);
+        string text = await response.Content.ReadAsStringAsync(Token);
+        string? code = response.IsSuccessStatusCode ? null : JsonDocument.Parse(text).RootElement.GetProperty("code").GetString();
+        return (response.StatusCode, code);
+    }
+
+    private static Task<HttpResponseMessage> PostAsync(Caller caller, string path, string body, FakeMemberships? memberships = null) =>
+        SendAsync(caller, new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative))
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        }, memberships ?? new FakeMemberships(null));
+
+    private static Task<HttpResponseMessage> SendAsync(Caller caller, string path, FakeMemberships memberships) =>
+        SendAsync(caller, new HttpRequestMessage(HttpMethod.Get, new Uri(path, UriKind.Relative)), memberships);
+
+    private static async Task<HttpResponseMessage> SendAsync(Caller caller, HttpRequestMessage request, FakeMemberships memberships)
     {
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseTestServer();
         builder.Services.AddAccessContext();
         builder.Services.AddProblemDetails();
+        builder.Services.AddValidation();
         builder.Services.AddSingleton<IMembershipLookup>(memberships);
 
         await using WebApplication app = builder.Build();
@@ -265,7 +368,12 @@ public sealed class EndpointFilterTests
             http.RequestServices.GetRequiredService<AccessContext>().Establish(caller, null);
             return next(http);
         });
+        app.UseRouting();
+        app.UseAccessRequirements();
         app.MapGet("/server/storage", () => "ok").RequireScope(Scopes.StorageWrite);
+        app.MapPost("/server/storage", (SampleBody body) => body.Name).RequireScope(Scopes.StorageWrite);
+        app.MapPost("/client/storage", (SampleBody body) => body.Name).RequireClientApi(Scopes.ClientStorage);
+        app.MapPost("/console/projects/{projectId}", (SampleBody body) => body.Name).RequireConsolePermission(ConsolePermission.DataWrite);
         app.MapGet("/client/storage", () => "ok").RequireClientApi(Scopes.ClientStorage);
         app.MapGet("/console/orgs/{organizationId}", () => "ok").RequireConsolePermission(ConsolePermission.OrgRead);
         app.MapGet("/console/orgs/{organizationId}/projects/{projectId}", (IProjectContext project) => project.Id.ToString())
@@ -275,9 +383,12 @@ public sealed class EndpointFilterTests
         app.MapGet("/console/nowhere", () => "ok").RequireConsolePermission(ConsolePermission.OrgRead);
         await app.StartAsync(Token);
 
-        HttpResponseMessage response = await app.GetTestClient().GetAsync(new Uri(path, UriKind.Relative), Token);
-        await response.Content.LoadIntoBufferAsync(Token);
-        return response;
+        using (request)
+        {
+            HttpResponseMessage response = await app.GetTestClient().SendAsync(request, Token);
+            await response.Content.LoadIntoBufferAsync(Token);
+            return response;
+        }
     }
 
     private sealed class FakeMemberships(string? role) : IMembershipLookup
@@ -290,4 +401,12 @@ public sealed class EndpointFilterTests
         public Task<Guid?> FindProjectOrganizationAsync(Guid projectId, CancellationToken cancellationToken) =>
             Task.FromResult(ProjectOrganizations.TryGetValue(projectId, out Guid organization) ? organization : (Guid?)null);
     }
+}
+
+/// <summary>A sample body with one validated field, so a bad body would answer 400 if it were read first.</summary>
+public sealed class SampleBody
+{
+    [Required]
+    [MinLength(1)]
+    public string? Name { get; init; }
 }

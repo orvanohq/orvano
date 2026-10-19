@@ -1,7 +1,7 @@
 using System.Diagnostics;
 
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.DependencyInjection;
 
 using Shouldly;
 
@@ -30,7 +30,7 @@ public sealed class ErrorProblemsTests
     {
         ErrorProblems.StatusFor(kind).ShouldBe(status);
 
-        ProblemHttpResult problem = new Error("some_code", "Some message.", kind).ToProblem();
+        ErrorProblemResult problem = new Error("some_code", "Some message.", kind).ToProblem();
 
         problem.StatusCode.ShouldBe(status);
         problem.ProblemDetails.Status.ShouldBe(status);
@@ -50,7 +50,7 @@ public sealed class ErrorProblemsTests
     [Trait("Spec", "0002:ERR-4")]
     public void Problem_carries_the_code_and_the_message_as_detail_when_made()
     {
-        ProblemHttpResult problem = Error.Conflict("name_taken", "That name is taken.").ToProblem();
+        ErrorProblemResult problem = Error.Conflict("name_taken", "That name is taken.").ToProblem();
 
         problem.ProblemDetails.Detail.ShouldBe("That name is taken.");
         problem.ProblemDetails.Extensions["code"].ShouldBe("name_taken");
@@ -62,7 +62,7 @@ public sealed class ErrorProblemsTests
     {
         using Activity activity = new Activity("request").SetIdFormat(ActivityIdFormat.W3C).Start();
 
-        ProblemHttpResult problem = Error.NotFound("not_found", "Not here.").ToProblem();
+        ErrorProblemResult problem = Error.NotFound("not_found", "Not here.").ToProblem();
 
         problem.ProblemDetails.Extensions["traceId"].ShouldBe(activity.TraceId.ToString());
     }
@@ -89,7 +89,7 @@ public sealed class ErrorProblemsTests
     {
         var fields = new Dictionary<string, string[]> { ["permissions"] = ["'read:x': not a valid grant."] };
 
-        ProblemHttpResult problem = Error.Validation("validation_failed", "Some entries are not valid.", fields).ToProblem();
+        ErrorProblemResult problem = Error.Validation("validation_failed", "Some entries are not valid.", fields).ToProblem();
 
         problem.ProblemDetails.Extensions["errors"].ShouldBe(fields);
     }
@@ -107,7 +107,7 @@ public sealed class ErrorProblemsTests
     [Trait("Spec", "0002:ERR-4")]
     public void Problem_copies_the_errors_extensions_when_made()
     {
-        ProblemHttpResult problem = Error.RateLimited("rate_limited", "Slow down.", retryAfterSeconds: 12).ToProblem();
+        ErrorProblemResult problem = Error.RateLimited("rate_limited", "Slow down.", retryAfterSeconds: 12).ToProblem();
 
         problem.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
         problem.ProblemDetails.Extensions["retryAfterSeconds"].ShouldBe(12);
@@ -115,6 +115,51 @@ public sealed class ErrorProblemsTests
 
     [Fact]
     [Trait("Spec", "0002:ERR-4")]
+    public async Task Rate_limited_problem_sets_the_retry_after_header_when_written()
+    {
+        DefaultHttpContext http = await WriteAsync(Error.RateLimited("rate_limited", "Slow down.", retryAfterSeconds: 12));
+
+        http.Response.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
+        http.Response.Headers.RetryAfter.ToString().ShouldBe("12");
+    }
+
+    [Fact]
+    [Trait("Spec", "0002:ERR-4")]
+    public async Task Rate_limited_problem_has_no_retry_after_header_when_the_error_has_no_wait()
+    {
+        var error = new Error("rate_limited", "Slow down.", ErrorKind.RateLimited);
+
+        error.ToProblem().RetryAfterSeconds.ShouldBeNull();
+        DefaultHttpContext http = await WriteAsync(error);
+
+        http.Response.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
+        http.Response.Headers.ShouldNotContainKey("Retry-After");
+    }
+
+    [Fact]
+    [Trait("Spec", "0002:ERR-4")]
+    public async Task Problem_has_no_retry_after_header_when_the_error_is_not_rate_limited()
+    {
+        var extensions = new Dictionary<string, object?> { [ErrorProblems.RetryAfterSecondsExtension] = 5 };
+
+        DefaultHttpContext http = await WriteAsync(new Error("busy", "Busy.", ErrorKind.Unavailable, Extensions: extensions));
+
+        http.Response.StatusCode.ShouldBe(StatusCodes.Status503ServiceUnavailable);
+        http.Response.Headers.ShouldNotContainKey("Retry-After");
+    }
+
+    [Fact]
+    [Trait("Spec", "0002:ERR-4")]
     public void Problem_throws_when_the_error_is_null() =>
         Should.Throw<ArgumentNullException>(() => ErrorProblems.ToProblem(null!));
+
+    private static async Task<DefaultHttpContext> WriteAsync(Error error)
+    {
+        await using ServiceProvider services = new ServiceCollection().AddLogging().AddProblemDetails().BuildServiceProvider();
+        var http = new DefaultHttpContext { RequestServices = services };
+        http.Response.Body = new MemoryStream();
+
+        await error.ToProblem().ExecuteAsync(http);
+        return http;
+    }
 }
