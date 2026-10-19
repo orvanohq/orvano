@@ -126,12 +126,12 @@ One permissions model shared by databases, storage, realtime, and functions: who
 spec [0012](../specs/0012-access-control-model/index.md) · code in `server/src/Orvano.SharedKernel/Access/`
 
 - [x] Design it (spec): `/architect access control model`
-- [ ] Build it: `/develop access control model`
+- [x] Build it: `/develop access control model`
   - [x] Grant grammar and `GrantSet` (parse, `write` expansion, writer rules, creator defaults, limit) (AC-1, AC-6, AC-7)
   - [x] `Caller`, role sets, `AccessEvaluator`, and the denial rules (AC-2, AC-3, AC-5)
   - [x] Scope catalog and ceilings, console permissions, and their endpoint filters (AC-8, AC-11)
-  - [ ] Contexts, architecture tests, the PostgreSQL `WhereGranted` test, and the label cache test (AC-4, AC-9, AC-10, AC-12)
-    - built: contexts, architecture tests, `WhereGranted` test. Waiting: the label cache test (AC-10, build plan step 8). Spec 0012 now matches spec 0007 (labels ride `cache` tags, 60 second expiry, 2026-10-18); the test waits for feature 61 to build `ISignalBus` and `ICacheInvalidator`
+  - [x] Contexts, architecture tests, the PostgreSQL `WhereGranted` test, and the label cache test (AC-4, AC-9, AC-10, AC-12)
+    - built: contexts, architecture tests, `WhereGranted` test, and the two host label cache contract test over spec 0013's signals (build plan step 8, `server/tests/Orvano.Host.IntegrationTests/Access/`), 2026-10-19
   - [x] Amend specs 0011 and 0006 for the new columns, CHECK constraints, and closed follow ups (AC-8, AC-9) (done by `/architect`, 2026-10-18)
   - [x] Access layer entry and endpoint default deny: `ICallerResolver` and the resolving middleware, `AllowPublicAccess`, generic endpoint requirements for `MapGroup`, the startup check, and the endpoint list test (AC-9, AC-13; build plan steps 10 and 11, added by `/architect` 2026-10-19)
 - [ ] Verify it: `/check verify access control model`
