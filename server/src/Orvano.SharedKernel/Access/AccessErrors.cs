@@ -13,7 +13,7 @@ public static class AccessErrors
     public static Error Forbidden { get; } = Error.Forbidden("forbidden", "You are not allowed to do this.");
 
     public static Error InsufficientScope { get; } =
-        Error.Forbidden("insufficient_scope", "The key used does not have the scope this needs.");
+        Error.Forbidden("insufficient_scope", "The credential used does not have the scope this needs.");
 
     public static Error Unauthorized { get; } =
         Error.Unauthorized("unauthorized", "The credential is missing, invalid, expired, or not for this project.");

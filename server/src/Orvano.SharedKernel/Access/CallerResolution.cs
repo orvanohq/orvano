@@ -43,7 +43,12 @@ public abstract record CallerResolution
     /// <summary>Replaces the caller so far. <see cref="Caller.ProjectId"/> is the project the credential proves (RSV-4).</summary>
     public sealed record Resolved(Caller Caller) : CallerResolution;
 
-    /// <summary>Stops the chain with <c>401 unauthorized</c>. The reason is logged, never sent (PRJ-4).</summary>
+    /// <summary>
+    /// Stops the chain with <c>401 unauthorized</c>. The reason is logged at Information, never sent (PRJ-4). Make it a
+    /// fixed phrase, optionally with an id the server issued (a key id, a session id), such as "revoked key" or "expired
+    /// token": never the credential, a secret, or a value copied from the request. The log keeps its first 100
+    /// characters.
+    /// </summary>
     public sealed record Failed(string Reason) : CallerResolution;
 }
 

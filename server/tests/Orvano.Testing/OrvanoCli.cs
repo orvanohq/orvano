@@ -9,6 +9,12 @@ public static class OrvanoCli
 
     public sealed record Result(int ExitCode, string Output, string Error);
 
+    /// <summary>
+    /// A <c>DOTNET_STARTUP_HOOKS</c> value that makes the real process map an endpoint declaring no access (see
+    /// <c>StartupHook</c> in this assembly).
+    /// </summary>
+    public static string UndeclaredEndpointHook { get; } = typeof(OrvanoCli).Assembly.Location;
+
     public static ProcessStartInfo StartInfo(IEnumerable<string> args, IReadOnlyDictionary<string, string>? environment = null,
         string? workingDirectory = null)
     {

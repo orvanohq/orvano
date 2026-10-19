@@ -45,7 +45,7 @@ Run from `server/`: `global.json` here pins the SDK and picks the Microsoft.Test
 ## Gotchas
 
 - `UseConsoleFiles` (static files) must run before `UseRouting`, or the `/console/{**path}` fallback swallows every asset.
-- In `ServeCommand`, `UseAccessRequirements()` runs right after `UseRouting` and resolves the caller itself. Register a new credential (the API key and session resolvers of features 13 and 14) with `AddCallerResolver<T>()`, not as middleware between the two: the access layer is the only place that sets the caller.
+- In `ServeCommand`, the order is `UseRouting`, `UseCors` (so a browser preflight is answered without a credential, spec 0007 COR-1), then `UseAccessRequirements()`, which resolves the caller itself. Only endpoints may answer after the access layer: it answers a request that matched no endpoint with 404, so a later `Map` branch or `Run` delegate is never reached. Register a new credential (the API key and session resolvers of features 13 and 14) with `AddCallerResolver<T>()`, not as middleware between the two: the access layer is the only place that sets the caller.
 - ASP.NET Core's forwarded headers middleware trusts everyone when both known lists are empty. `UseForwardedHeaders` is registered only when `ORVANO_TRUSTED_PROXIES` has entries; keep it that way.
 - System.CommandLine 2 has no parser for `Uri`. Take a string option and validate it with `Uri.TryCreate`.
 - `init`'s file and folder modes follow spec 0007 INS-5 (folder 0700, `root.key` 0644, `.env` 0600), in that order of steps.

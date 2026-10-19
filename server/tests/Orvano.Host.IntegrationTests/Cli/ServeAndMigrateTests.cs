@@ -185,6 +185,21 @@ public sealed class ServeAndMigrateTests(PostgresFixture postgres)
         }
     }
 
+    [Fact, Trait("Spec", "0012:EPT-4"), Trait("Spec", "0012:AC-13")]
+    public async Task Serve_exits_1_naming_the_endpoint_without_a_stack_trace_when_an_endpoint_declares_no_access()
+    {
+        OrvanoCli.Result result = await OrvanoCli.RunAsync(["serve"], ServeEnvironment(new()
+        {
+            ["DOTNET_STARTUP_HOOKS"] = OrvanoCli.UndeclaredEndpointHook,
+            ["ASPNETCORE_HTTP_PORTS"] = Ports.Free().ToString(CultureInfo.InvariantCulture),
+        }), TestContext.Current.CancellationToken);
+
+        result.ExitCode.ShouldBe(1, result.Error);
+        result.Error.ShouldContain("Every endpoint must declare its access");
+        result.Error.ShouldContain("/test/undeclared: it declares no access");
+        result.Error.ShouldNotContain(" at "); // no stack trace frames
+    }
+
     private Dictionary<string, string> ServeEnvironment(Dictionary<string, string> extra)
     {
         var environment = new Dictionary<string, string>(postgres.DatabaseEnvironment) { ["ORVANO_ROOT_KEY"] = TestRootKey.Create() };

@@ -28,7 +28,7 @@ public sealed class DefaultDenyTests
     [Trait("Spec", "0012:EPT-4")]
     public async Task Startup_fails_naming_the_endpoint_when_it_declares_nothing()
     {
-        InvalidOperationException error = await StartupErrorAsync(app => app.MapGet("/forgotten", () => "ok"));
+        AccessDeclarationException error = await StartupErrorAsync(app => app.MapGet("/forgotten", () => "ok"));
 
         error.Message.ShouldContain("/forgotten");
         error.Message.ShouldContain("declares no access");
@@ -39,7 +39,7 @@ public sealed class DefaultDenyTests
     [Trait("Spec", "0012:EPT-3")]
     public async Task Startup_fails_when_an_endpoint_declares_a_requirement_and_public_access()
     {
-        InvalidOperationException error = await StartupErrorAsync(app =>
+        AccessDeclarationException error = await StartupErrorAsync(app =>
             app.MapGet("/both", () => "ok").RequireScope(Scopes.StorageRead).AllowPublicAccess());
 
         error.Message.ShouldContain("/both");
@@ -51,7 +51,7 @@ public sealed class DefaultDenyTests
     [Trait("Spec", "0012:EPT-3")]
     public async Task Startup_fails_when_an_endpoint_mixes_a_scope_and_a_console_permission()
     {
-        InvalidOperationException error = await StartupErrorAsync(app => app.MapGet("/p/{projectId}/mixed", () => "ok")
+        AccessDeclarationException error = await StartupErrorAsync(app => app.MapGet("/p/{projectId}/mixed", () => "ok")
             .RequireScope(Scopes.StorageRead)
             .RequireConsolePermission(ConsolePermission.DataRead));
 
@@ -64,7 +64,7 @@ public sealed class DefaultDenyTests
     [Trait("Spec", "0012:EPT-3")]
     public async Task Startup_fails_when_a_group_requirement_meets_an_endpoint_marked_public()
     {
-        InvalidOperationException error = await StartupErrorAsync(app =>
+        AccessDeclarationException error = await StartupErrorAsync(app =>
             app.MapGroup("/server").RequireScope(Scopes.StorageRead).MapGet("/open", () => "ok").AllowPublicAccess());
 
         error.Message.ShouldContain("/server/open");
@@ -75,7 +75,7 @@ public sealed class DefaultDenyTests
     [Trait("Spec", "0012:EPT-4")]
     public async Task Startup_names_every_broken_endpoint_in_one_error()
     {
-        InvalidOperationException error = await StartupErrorAsync(app =>
+        AccessDeclarationException error = await StartupErrorAsync(app =>
         {
             app.MapGet("/one", () => "ok");
             app.MapGet("/two", () => "ok").AllowAnonymous();
@@ -92,7 +92,7 @@ public sealed class DefaultDenyTests
     [Trait("Spec", "0012:CPL-3")]
     public async Task Startup_fails_when_a_group_console_permission_has_no_organization_or_project()
     {
-        InvalidOperationException error = await StartupErrorAsync(app =>
+        AccessDeclarationException error = await StartupErrorAsync(app =>
             app.MapGroup("/console").RequireConsolePermission(ConsolePermission.OrgRead).MapGet("/nowhere", () => "ok"));
 
         error.Message.ShouldContain("/console/nowhere");
@@ -199,6 +199,29 @@ public sealed class DefaultDenyTests
 
     [Fact]
     [Trait("Spec", "0012:AC-13")]
+    [Trait("Spec", "0012:EPT-3")]
+    public async Task Request_that_matches_no_endpoint_answers_not_found_when_a_later_branch_would_answer_it()
+    {
+        bool ran = false;
+        await using WebApplication app = await StartAsync(new FixedResolver(new CallerResolution.NotPresent()), app =>
+        {
+            app.MapGet("/open", () => "ok").AllowPublicAccess();
+            ((IApplicationBuilder)app).Map(new PathString("/branch"), branch => branch.Run(http =>
+            {
+                ran = true;
+                return http.Response.WriteAsync("open to everyone", http.RequestAborted);
+            }));
+        });
+
+        using HttpResponseMessage response = await GetAsync(app, "/branch");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        response.Content.Headers.ContentLength.ShouldBe(0);
+        ran.ShouldBeFalse();
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:AC-13")]
     [Trait("Spec", "0012:EPT-1")]
     public async Task Wrong_method_on_an_endpoint_answers_not_found_when_routing_would_answer_405()
     {
@@ -230,7 +253,7 @@ public sealed class DefaultDenyTests
     [Trait("Spec", "0012:EPT-3")]
     public async Task Startup_fails_when_an_endpoint_mixes_a_scope_and_a_client_api()
     {
-        InvalidOperationException error = await StartupErrorAsync(app => app.MapGet("/p/{projectId}/rows", () => "ok")
+        AccessDeclarationException error = await StartupErrorAsync(app => app.MapGet("/p/{projectId}/rows", () => "ok")
             .RequireScope(Scopes.DatabasesRead)
             .RequireClientApi(Scopes.ClientDatabases));
 
@@ -243,7 +266,7 @@ public sealed class DefaultDenyTests
     [Trait("Spec", "0012:EPT-3")]
     public async Task Startup_fails_when_a_group_requirement_and_an_endpoint_requirement_are_different_kinds()
     {
-        InvalidOperationException error = await StartupErrorAsync(app =>
+        AccessDeclarationException error = await StartupErrorAsync(app =>
             app.MapGroup("/p/{projectId}").RequireScope(Scopes.DatabasesRead).MapGet("/rows", () => "ok").RequireClientApi(Scopes.ClientDatabases));
 
         error.Message.ShouldContain("/p/{projectId}/rows");
@@ -255,7 +278,7 @@ public sealed class DefaultDenyTests
     [Trait("Spec", "0012:EPT-3")]
     public async Task Startup_fails_when_a_public_group_holds_an_endpoint_with_a_requirement()
     {
-        InvalidOperationException error = await StartupErrorAsync(app =>
+        AccessDeclarationException error = await StartupErrorAsync(app =>
             app.MapGroup("/open").AllowPublicAccess().MapGet("/secret", () => "ok").RequireScope(Scopes.StorageRead));
 
         error.Message.ShouldContain("/open/secret");
@@ -326,7 +349,7 @@ public sealed class DefaultDenyTests
     public async Task Endpoint_mapped_after_startup_answers_not_found_and_logs_an_error_naming_it_when_it_declares_nothing()
     {
         bool ran = false;
-        var logs = new ErrorLog();
+        var logs = new LogCapture(LogLevel.Error);
         await using WebApplication app = await StartAsync(
             new FixedResolver(Secret),
             app => app.MapGet("/open", () => "ok").AllowPublicAccess(),
@@ -335,7 +358,7 @@ public sealed class DefaultDenyTests
 
         (await CodeAsync(app, "/late")).ShouldBe((HttpStatusCode.NotFound, "not_found"));
         ran.ShouldBeFalse();
-        logs.Errors.ShouldHaveSingleItem().ShouldContain("/late");
+        logs.Messages.ShouldHaveSingleItem().ShouldContain("/late");
     }
 
     [Fact]
@@ -343,7 +366,7 @@ public sealed class DefaultDenyTests
     [Trait("Spec", "0012:EPT-1")]
     public async Task Wrong_method_answers_not_found_without_an_error_log_when_routing_rejects_it()
     {
-        var logs = new ErrorLog();
+        var logs = new LogCapture(LogLevel.Error);
         await using WebApplication app = await StartAsync(
             new FixedResolver(Secret),
             app => app.MapGet("/storage", () => "ok").RequireScope(Scopes.StorageRead),
@@ -352,10 +375,10 @@ public sealed class DefaultDenyTests
         using HttpResponseMessage response = await app.GetTestClient().PostAsync(new Uri("/storage", UriKind.Relative), null, Token);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
-        logs.Errors.ShouldBeEmpty();
+        logs.Messages.ShouldBeEmpty();
     }
 
-    private static async Task<InvalidOperationException> StartupErrorAsync(Action<WebApplication> map)
+    private static async Task<AccessDeclarationException> StartupErrorAsync(Action<WebApplication> map)
     {
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseTestServer();
@@ -365,7 +388,7 @@ public sealed class DefaultDenyTests
         app.UseAccessRequirements();
         map(app);
 
-        return await Should.ThrowAsync<InvalidOperationException>(() => app.StartAsync(Token));
+        return await Should.ThrowAsync<AccessDeclarationException>(() => app.StartAsync(Token));
     }
 
     private static async Task<WebApplication> StartAsync(
@@ -414,44 +437,5 @@ public sealed class DefaultDenyTests
         request.Headers.TryAddWithoutValidation("Authorization", "Bearer expired");
         request.Headers.Add("Cookie", "session=junk");
         return await app.GetTestClient().SendAsync(request, Token);
-    }
-
-    /// <summary>Keeps the message of each error the app logs.</summary>
-    private sealed class ErrorLog : ILoggerProvider, ILogger
-    {
-        private readonly List<string> _errors = [];
-
-        public IReadOnlyList<string> Errors
-        {
-            get
-            {
-                lock (_errors)
-                {
-                    return [.. _errors];
-                }
-            }
-        }
-
-        public ILogger CreateLogger(string categoryName) => this;
-
-        public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull => null;
-
-        public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Error;
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-            if (IsEnabled(logLevel))
-            {
-                lock (_errors)
-                {
-                    _errors.Add(formatter(state, exception));
-                }
-            }
-        }
-
-        public void Dispose()
-        {
-        }
     }
 }
