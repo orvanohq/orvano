@@ -36,6 +36,7 @@ Read the matching practice spec first. Each rule has an ID (for example `API-1`,
 | Lint, format, hooks, CI workflows, or the SDK starters          | [0008 Coding standards and tooling](docs/specs/0008-coding-standards-tooling/index.md)                                                                        |
 | A new dependency, package metadata, or a LICENSE or NOTICE file | [0009 Open source license](docs/specs/0009-open-source-license/index.md)                                                                                      |
 | A platform table, entity, or module `DbContext`                 | [0011 Platform data model](docs/specs/0011-platform-data-model/index.md)                                                                                      |
+| An endpoint's access check, a permission, or a grant filter     | [0012 Access control model](docs/specs/0012-access-control-model/index.md)                                                                                    |
 
 Each spec has a `rationale.md` beside it; read it only when you need the why. Each spec also lists its implementation skills under `.claude/skills/`; load only the ones the task needs.
 

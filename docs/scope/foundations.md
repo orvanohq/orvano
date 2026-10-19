@@ -136,7 +136,7 @@ spec [0012](../specs/0012-access-control-model/index.md) · code in `server/src/
 - [ ] Verify it: `/check verify access control model`
 - [ ] Test it: `/test access control model`
 - [ ] Review it (fresh model): `/check review access control model`
-- [ ] Document it: `/document access control model`
+- [x] Document it: `/document access control model`
 
 ### 61. Background runtime
 
