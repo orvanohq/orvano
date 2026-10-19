@@ -1,7 +1,9 @@
 using System.Diagnostics;
+using System.Globalization;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Orvano.SharedKernel;
 
@@ -23,7 +25,10 @@ public static class ErrorProblems
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 
-    public static ProblemHttpResult ToProblem(this Error error)
+    /// <summary>The extension a <see cref="ErrorKind.RateLimited"/> error carries its wait in.</summary>
+    public const string RetryAfterSecondsExtension = "retryAfterSeconds";
+
+    public static ErrorProblemResult ToProblem(this Error error)
     {
         ArgumentNullException.ThrowIfNull(error);
 
@@ -43,6 +48,55 @@ public static class ErrorProblems
             extensions[key] = value;
         }
 
-        return TypedResults.Problem(detail: error.Message, statusCode: StatusFor(error.Kind), extensions: extensions);
+        int? retryAfterSeconds = error.Kind == ErrorKind.RateLimited
+            && error.Extensions?.GetValueOrDefault(RetryAfterSecondsExtension) is int seconds and >= 0
+                ? seconds
+                : null;
+        return new ErrorProblemResult(
+            TypedResults.Problem(detail: error.Message, statusCode: StatusFor(error.Kind), extensions: extensions),
+            retryAfterSeconds);
+    }
+}
+
+/// <summary>
+/// The problem an <see cref="Error"/> answers with. A rate limited error also sets <c>Retry-After</c> from its
+/// <c>retryAfterSeconds</c> extension (ERR-4); without one, there is no header.
+/// </summary>
+public sealed class ErrorProblemResult : IResult, IStatusCodeHttpResult, IValueHttpResult, IValueHttpResult<ProblemDetails>, IContentTypeHttpResult
+{
+    private readonly ProblemHttpResult _problem;
+
+    internal ErrorProblemResult(ProblemHttpResult problem, int? retryAfterSeconds)
+    {
+        _problem = problem;
+        RetryAfterSeconds = retryAfterSeconds;
+    }
+
+    public ProblemDetails ProblemDetails => _problem.ProblemDetails;
+
+    public int StatusCode => _problem.StatusCode;
+
+    /// <summary>The <c>Retry-After</c> value in seconds, or null when the response has no such header.</summary>
+    public int? RetryAfterSeconds { get; }
+
+    public string ContentType => _problem.ContentType;
+
+    int? IStatusCodeHttpResult.StatusCode => StatusCode;
+
+    ProblemDetails? IValueHttpResult<ProblemDetails>.Value => ProblemDetails;
+
+    object? IValueHttpResult.Value => ProblemDetails;
+
+    string? IContentTypeHttpResult.ContentType => ContentType;
+
+    public Task ExecuteAsync(HttpContext httpContext)
+    {
+        ArgumentNullException.ThrowIfNull(httpContext);
+        if (RetryAfterSeconds is { } seconds)
+        {
+            httpContext.Response.Headers.RetryAfter = seconds.ToString(CultureInfo.InvariantCulture);
+        }
+
+        return _problem.ExecuteAsync(httpContext);
     }
 }

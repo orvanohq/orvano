@@ -110,6 +110,10 @@ internal static class ServeCommand
 
         app.UseRouting();
 
+        // Spec 0012 DEN-5: endpoint access requirements answer before binding and validation. The credential resolvers
+        // of features 13 and 14 go between UseRouting and this.
+        app.UseAccessRequirements();
+
         // Health checks answer in every role, so container health checks work for workers too (spec 0007 IMG-4).
         app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();
         app.MapHealthChecks("/health/ready", new() { Predicate = check => check.Tags.Contains("ready") }).AllowAnonymous();

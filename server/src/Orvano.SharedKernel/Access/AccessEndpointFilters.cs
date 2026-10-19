@@ -1,8 +1,5 @@
-using System.Globalization;
-
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Orvano.SharedKernel.Access;
 
@@ -20,12 +17,13 @@ public interface IMembershipLookup
 }
 
 /// <summary>
-/// How endpoints declare what they need (spec 0012 SCP-5, CPL-3). Each filter reads the caller the access layer
-/// set; the answers follow DEN-4 and CPL-3.
+/// How endpoints declare what they need (spec 0012 SCP-5, CPL-3). Each method adds the requirement as endpoint
+/// metadata, and <see cref="AccessRequirementsMiddleware.UseAccessRequirements"/> enforces it before binding and
+/// validation (DEN-5). The answers follow DEN-4 and CPL-3.
 /// </summary>
 public static class AccessEndpointFilters
 {
-    /// <summary>The route values the console permission filter reads.</summary>
+    /// <summary>The route values the console permission check reads.</summary>
     public const string OrganizationIdRouteValue = "organizationId";
 
     public const string ProjectIdRouteValue = "projectId";
@@ -39,16 +37,7 @@ public static class AccessEndpointFilters
             throw new ArgumentException($"'{scope}' is not a secret key scope (SCP-1).", nameof(scope));
         }
 
-        return builder
-            .AddEndpointFilter(async (context, next) =>
-            {
-                Caller caller = CallerOf(context.HttpContext);
-                bool passes = caller.Kind is CallerKind.SecretKey or CallerKind.RunKey
-                    && Scopes.WithinCeiling(KeyType.Secret, caller.Scopes) // KEY-4, and FNC-2 for run keys
-                    && caller.Scopes.Contains(scope);
-                return passes ? await next(context) : AccessErrors.InsufficientScope.ToProblem();
-            })
-            .ProducesProblem(StatusCodes.Status403Forbidden);
+        return builder.Require(new ScopeRequirement(scope)).ProducesProblem(StatusCodes.Status403Forbidden);
     }
 
     /// <summary>A client route: only guests and end users whose publishable key has <paramref name="clientApi"/> on.</summary>
@@ -60,23 +49,7 @@ public static class AccessEndpointFilters
             throw new ArgumentException($"'{clientApi}' is not a client API scope (SCP-2).", nameof(clientApi));
         }
 
-        return builder
-            .AddEndpointFilter(async (context, next) =>
-            {
-                Caller caller = CallerOf(context.HttpContext);
-                if (caller.Kind is not (CallerKind.Guest or CallerKind.EndUser))
-                {
-                    return AccessErrors.Forbidden.ToProblem();
-                }
-
-                if (!Scopes.WithinCeiling(KeyType.Publishable, caller.Scopes))
-                {
-                    return AccessErrors.InsufficientScope.ToProblem();
-                }
-
-                return caller.Scopes.Contains(clientApi) ? await next(context) : AccessErrors.Forbidden.ToProblem();
-            })
-            .ProducesProblem(StatusCodes.Status403Forbidden);
+        return builder.Require(new ClientApiRequirement(clientApi)).ProducesProblem(StatusCodes.Status403Forbidden);
     }
 
     /// <summary>
@@ -89,79 +62,17 @@ public static class AccessEndpointFilters
         ArgumentNullException.ThrowIfNull(builder);
 
         return builder
-            .AddEndpointFilter(async (context, next) =>
-            {
-                HttpContext http = context.HttpContext;
-                Error? error = await CheckConsolePermissionAsync(http, permission, http.RequestAborted);
-                return error is null ? await next(context) : error.ToProblem();
-            })
+            .Require(new ConsolePermissionRequirement(permission))
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
-    private static async Task<Error?> CheckConsolePermissionAsync(
-        HttpContext http,
-        ConsolePermission permission,
-        CancellationToken cancellationToken)
-    {
-        Caller caller = CallerOf(http);
-        if (caller.Kind != CallerKind.Operator)
-        {
-            return AccessErrors.NotFound;
-        }
-
-        IMembershipLookup memberships = http.RequestServices.GetRequiredService<IMembershipLookup>();
-        Guid? organizationId = null;
-        if (http.Request.RouteValues.ContainsKey(OrganizationIdRouteValue))
-        {
-            if (RouteGuid(http, OrganizationIdRouteValue) is not { } fromRoute)
-            {
-                return AccessErrors.NotFound;
-            }
-
-            organizationId = fromRoute;
-        }
-
-        Guid? projectId = null;
-        if (http.Request.RouteValues.ContainsKey(ProjectIdRouteValue))
-        {
-            projectId = RouteGuid(http, ProjectIdRouteValue);
-            Guid? owner = projectId is { } id ? await memberships.FindProjectOrganizationAsync(id, cancellationToken) : null;
-            if (owner is null || (organizationId is not null && organizationId != owner))
-            {
-                return AccessErrors.NotFound;
-            }
-
-            organizationId = owner;
-        }
-
-        if (organizationId is not { } organization)
-        {
-            throw new InvalidOperationException(
-                $"RequireConsolePermission needs an '{OrganizationIdRouteValue}' or '{ProjectIdRouteValue}' route value.");
-        }
-
-        string? role = await memberships.FindRoleAsync(caller.OperatorId!.Value, organization, cancellationToken);
-        if (role is null)
-        {
-            return AccessErrors.NotFound;
-        }
-
-        if (!RolePermissions.For(role).Contains(permission))
-        {
-            return AccessErrors.Forbidden;
-        }
-
-        if (projectId is not null)
-        {
-            http.RequestServices.GetRequiredService<AccessContext>().Establish(caller, projectId);
-        }
-
-        return null;
-    }
-
-    private static Caller CallerOf(HttpContext http) => http.RequestServices.GetRequiredService<ICallerContext>().Current;
-
-    private static Guid? RouteGuid(HttpContext http, string name) =>
-        Guid.TryParse(Convert.ToString(http.Request.RouteValues[name], CultureInfo.InvariantCulture), out Guid id) ? id : null;
+    // The filter is only a guard: it fails closed when the middleware that enforces the requirement is missing.
+    private static RouteHandlerBuilder Require(this RouteHandlerBuilder builder, AccessRequirement requirement) =>
+        builder
+            .WithMetadata(requirement)
+            .AddEndpointFilter((context, next) => context.HttpContext.Items.ContainsKey(AccessRequirementsMiddleware.CheckedKey)
+                ? next(context)
+                : throw new InvalidOperationException(
+                    "This endpoint declares an access requirement, but UseAccessRequirements is not in the pipeline."));
 }
