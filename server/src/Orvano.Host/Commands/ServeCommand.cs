@@ -84,6 +84,7 @@ internal static class ServeCommand
         builder.AddOrvanoTelemetry();
         builder.AddPlatformDatabase();
         builder.Services.AddInfrastructure();
+        builder.Services.AddSignalListener(); // spec 0013 LSN-1: serve only, in every role
         builder.Services.AddSingleton(roles);
         builder.Services.AddHostedService<StartupChecks>();
         builder.Services.AddValidation(); // spec 0002 VAL-1: once here, plus once in each module that maps endpoints
