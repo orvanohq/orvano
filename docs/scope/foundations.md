@@ -136,7 +136,7 @@ spec [0012](../specs/0012-access-control-model/index.md) · code in `server/src/
   - [x] Access layer entry and endpoint default deny: `ICallerResolver` and the resolving middleware, `AllowPublicAccess`, generic endpoint requirements for `MapGroup`, the startup check, and the endpoint list test (AC-9, AC-13; build plan steps 10 and 11, added by `/architect` 2026-10-19)
 - [ ] Verify it: `/check verify access control model`
 - [ ] Test it: `/test access control model`
-- [ ] Review it (fresh model): `/check review access control model`
+- [x] Review it (fresh model): `/check review access control model`
 - [x] Document it: `/document access control model`
 
 ### 61. Background runtime

@@ -192,6 +192,104 @@ public sealed class ResolverChainTests
 
     [Fact]
     [Trait("Spec", "0012:AC-9")]
+    [Trait("Spec", "0012:PRJ-4")]
+    public async Task Failed_resolver_answers_unauthorized_and_skips_the_rest_when_an_earlier_resolver_resolved()
+    {
+        bool ran = false;
+        var resolving = new FixedResolver(new CallerResolution.Resolved(Secret), order: 100);
+        var failing = new FixedResolver(new CallerResolution.Failed("expired token"), order: 200);
+        var later = new FixedResolver(new CallerResolution.NotPresent(), order: 300);
+        await using WebApplication app = await StartAsync(
+            services => services.AddSingleton<ICallerResolver>(later).AddSingleton<ICallerResolver>(failing).AddSingleton<ICallerResolver>(resolving),
+            app => app.MapGet("/counted", () => ran = true).RequireScope(Scopes.StorageWrite));
+
+        (await CodeAsync(app, "/counted")).ShouldBe((HttpStatusCode.Unauthorized, "unauthorized")); // the earlier caller is dropped
+        failing.Calls.ShouldHaveSingleItem().Resolved.ShouldBeSameAs(Secret);
+        later.Calls.ShouldBeEmpty();
+        ran.ShouldBeFalse();
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:AC-9")]
+    [Trait("Spec", "0012:RSV-3")]
+    public async Task Later_registered_resolver_type_wins_a_tie_when_both_use_the_api_key_order()
+    {
+        await using WebApplication app = await StartAsync(services => services
+            .AddCallerResolver<TieGuestResolver>()
+            .AddCallerResolver<TieSecretResolver>());
+
+        (await CodeAsync(app, "/storage")).ShouldBe((HttpStatusCode.OK, null)); // the secret key, registered second, wins
+        (await CodeAsync(app, $"/p/{Project}/whoami")).ShouldBe((HttpStatusCode.Forbidden, "forbidden")); // so no guest is left
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:AC-9")]
+    [Trait("Spec", "0012:RSV-2")]
+    public async Task Resolver_that_resolves_a_null_caller_fails_the_request()
+    {
+        await using WebApplication app = await StartAsync(services =>
+            services.AddSingleton<ICallerResolver>(new FixedResolver(new CallerResolution.Resolved(null!))));
+
+        await Should.ThrowAsync<InvalidOperationException>(() => GetAsync(app, "/storage"));
+    }
+
+    [Theory]
+    [Trait("Spec", "0012:AC-9")]
+    [Trait("Spec", "0012:PRJ-2")]
+    [InlineData("not-a-uuid")]
+    [InlineData("0192f7a4-0000-7000-8000-00000000000")] // one digit short
+    [InlineData("00000000-0000-0000-0000-000000000000")]
+    public async Task Caller_answers_unauthorized_when_the_route_project_is_malformed_or_empty(string projectId)
+    {
+        var resolver = new FixedResolver(Secret);
+        await using WebApplication app = await StartAsync(services => services.AddSingleton<ICallerResolver>(resolver));
+
+        (await CodeAsync(app, $"/p/{projectId}/storage")).ShouldBe((HttpStatusCode.Unauthorized, "unauthorized"));
+        resolver.Calls.ShouldHaveSingleItem().RouteProjectId.ShouldBe(Guid.TryParse(projectId, out Guid parsed) ? parsed : null);
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:AC-9")]
+    [Trait("Spec", "0012:RSV-4")]
+    public async Task Group_route_project_is_checked_like_an_endpoint_route_project_when_the_group_prefix_holds_it()
+    {
+        var spy = new FixedResolver(new CallerResolution.NotPresent(), order: 300);
+        await using WebApplication app = await StartAsync(
+            services => services.AddCallerResolver<SampleKeyResolver>().AddSingleton<ICallerResolver>(spy),
+            app => app.MapGroup("/g/{projectId}").RequireClientApi(Scopes.ClientDatabases)
+                .MapGet("/whoami", (ICallerContext caller, IProjectContext project) => Describe(caller.Current, project)));
+
+        using HttpResponseMessage own = await GetAsync(app, $"/g/{Project}/whoami", $"guest:{Project}");
+
+        (await own.Content.ReadAsStringAsync(Token)).Split(' ')[2].ShouldBe(Project.ToString());
+        spy.Calls.ShouldHaveSingleItem().RouteProjectId.ShouldBe(Project);
+        (await CodeAsync(app, $"/g/{OtherProject}/whoami", $"guest:{Project}")).ShouldBe((HttpStatusCode.Unauthorized, "unauthorized"));
+        (await CodeAsync(app, "/g/not-a-uuid/whoami", $"guest:{Project}")).ShouldBe((HttpStatusCode.Unauthorized, "unauthorized"));
+    }
+
+    [Theory]
+    [Trait("Spec", "0012:AC-9")]
+    [Trait("Spec", "0012:DEN-5")]
+    [InlineData("{ not json")]
+    [InlineData("")]
+    public async Task Request_with_no_credential_answers_unauthorized_before_the_body_when_the_body_is_bad(string body)
+    {
+        await using WebApplication app = await StartAsync(
+            services => services.AddCallerResolver<SampleKeyResolver>(),
+            app => app.MapPost("/p/{projectId}/rows", (Row row) => row.Name).RequireClientApi(Scopes.ClientDatabases));
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/p/{Project}/rows", UriKind.Relative))
+        {
+            Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
+        };
+
+        using HttpResponseMessage response = await app.GetTestClient().SendAsync(request, Token);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync(Token)).RootElement.GetProperty("code").GetString().ShouldBe("unauthorized");
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:AC-9")]
     [Trait("Spec", "0012:RSV-1")]
     public void Add_caller_resolver_registers_a_type_once_and_scoped_when_called_twice()
     {
@@ -204,7 +302,7 @@ public sealed class ResolverChainTests
         descriptor.Lifetime.ShouldBe(ServiceLifetime.Scoped);
     }
 
-    private static async Task<WebApplication> StartAsync(Action<IServiceCollection> configure)
+    private static async Task<WebApplication> StartAsync(Action<IServiceCollection> configure, Action<WebApplication>? map = null)
     {
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseTestServer();
@@ -222,6 +320,7 @@ public sealed class ResolverChainTests
             .RequireScope(Scopes.StorageWrite);
         app.MapGet("/console/projects/{projectId}", (IProjectContext project) => project.Id.ToString())
             .RequireConsolePermission(ConsolePermission.DataRead);
+        map?.Invoke(app);
         await app.StartAsync(Token);
         return app;
     }
@@ -268,6 +367,25 @@ public sealed class ResolverChainTests
         using HttpResponseMessage response = await GetAsync(app, path, key, authorization);
         string body = await response.Content.ReadAsStringAsync(Token);
         return (response.StatusCode, response.IsSuccessStatusCode ? null : JsonDocument.Parse(body).RootElement.GetProperty("code").GetString());
+    }
+
+    private sealed record Row(string Name);
+
+    // Two resolver types at the same order, so the tie is decided by AddCallerResolver's registration order.
+    private sealed class TieGuestResolver : ICallerResolver
+    {
+        public int Order => CallerResolverOrder.ApiKey;
+
+        public ValueTask<CallerResolution> ResolveAsync(CallerResolutionContext context, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<CallerResolution>(new CallerResolution.Resolved(Guest));
+    }
+
+    private sealed class TieSecretResolver : ICallerResolver
+    {
+        public int Order => CallerResolverOrder.ConsoleSession;
+
+        public ValueTask<CallerResolution> ResolveAsync(CallerResolutionContext context, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<CallerResolution>(new CallerResolution.Resolved(Secret));
     }
 
     private sealed class OwnerOfOrganization : IMembershipLookup
