@@ -140,10 +140,10 @@ public sealed class AccessEvaluatorTests
     {
         string[] rowOfA = [$"read:{UserRole(UserA)}", $"update:{UserRole(UserA)}"];
 
-        AccessEvaluator.MayChangeItemGrants(A, rowOfA).ShouldBeTrue();
-        AccessEvaluator.MayChangeItemGrants(B, rowOfA).ShouldBeFalse();
-        AccessEvaluator.MayChangeItemGrants(B, ["read:users"]).ShouldBeFalse();
-        AccessEvaluator.MayChangeItemGrants(Secret, None).ShouldBeTrue();
+        AccessEvaluator.MayChangeItemGrants(A, rowSecurity: true, rowOfA).ShouldBeTrue();
+        AccessEvaluator.MayChangeItemGrants(B, rowSecurity: true, rowOfA).ShouldBeFalse();
+        AccessEvaluator.MayChangeItemGrants(B, rowSecurity: true, ["read:users"]).ShouldBeFalse();
+        AccessEvaluator.MayChangeItemGrants(Secret, rowSecurity: true, None).ShouldBeTrue();
     }
 
     [Fact]
@@ -227,7 +227,39 @@ public sealed class AccessEvaluatorTests
     [Trait("Spec", "0012:AC-6")]
     public void Guest_may_change_row_grants_only_through_a_guests_or_any_update_grant()
     {
-        AccessEvaluator.MayChangeItemGrants(Guest, ["update:any"]).ShouldBeTrue();
-        AccessEvaluator.MayChangeItemGrants(Guest, ["update:users"]).ShouldBeFalse();
+        AccessEvaluator.MayChangeItemGrants(Guest, rowSecurity: true, ["update:any"]).ShouldBeTrue();
+        AccessEvaluator.MayChangeItemGrants(Guest, rowSecurity: true, ["update:users"]).ShouldBeFalse();
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:EVL-2")]
+    public void Row_update_grant_lets_no_client_change_row_grants_when_row_security_is_off()
+    {
+        string[] rowOfA = [$"update:{UserRole(UserA)}"];
+
+        AccessEvaluator.MayChangeItemGrants(A, rowSecurity: false, rowOfA).ShouldBeFalse();
+        AccessEvaluator.MayChangeItemGrants(Guest, rowSecurity: false, ["update:any"]).ShouldBeFalse();
+        AccessEvaluator.MayChangeItemGrants(Secret, rowSecurity: false, None).ShouldBeTrue();
+        AccessEvaluator.MayChangeItemGrants(Operator, rowSecurity: false, None).ShouldBeTrue();
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:EVL-2")]
+    public void Allows_and_Decide_agree_for_every_client_action_and_switch_when_only_the_row_grants()
+    {
+        foreach (Caller caller in new[] { Guest, A, AdminA })
+        {
+            foreach (GrantAction action in Enum.GetValues<GrantAction>())
+            {
+                foreach (bool rowSecurity in new[] { false, true })
+                {
+                    string[] row = caller.MatchTokens(action);
+                    bool allows = AccessEvaluator.Allows(caller, action, None, rowSecurity, row);
+                    AccessOutcome decided = AccessEvaluator.Decide(caller, action, None, rowSecurity).Outcome;
+
+                    allows.ShouldBe(decided == AccessOutcome.FilterRows, $"{caller.Kind} {action} rowSecurity={rowSecurity}");
+                }
+            }
+        }
     }
 }

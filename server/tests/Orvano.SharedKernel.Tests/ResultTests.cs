@@ -96,4 +96,17 @@ public sealed class ResultTests
         error.Kind.ShouldBe(ErrorKind.RateLimited);
         error.Extensions.ShouldNotBeNull()["retryAfterSeconds"].ShouldBe(30);
     }
+
+    [Fact]
+    [Trait("Spec", "0002:ERR-1")]
+    public void Default_result_carries_the_stable_default_error_when_nothing_set_it()
+    {
+        Result<int> value = default;
+        Result command = default;
+
+        value.Error.ShouldBe(DefaultResult.Error);
+        command.Error.ShouldBe(DefaultResult.Error);
+        DefaultResult.Error.Code.ShouldBe("default_result");
+        DefaultResult.Error.Kind.ShouldBe(ErrorKind.Unavailable);
+    }
 }

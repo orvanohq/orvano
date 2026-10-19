@@ -18,7 +18,9 @@ public static class GrantSet
     /// <summary>
     /// Normalizes <paramref name="input"/> written by <paramref name="writer"/> to <paramref name="target"/>.
     /// <paramref name="existing"/> is the stored array on an update (null on create). A guest or end user may add and
-    /// remove only tokens naming their own roles; stored tokens naming other roles are kept as they are (WRT-2).
+    /// remove only tokens naming their own roles; stored tokens naming other roles are kept as they are (WRT-2). A
+    /// client never writes table, bucket, or function grants (WRT-6): that answers <see cref="AccessErrors.Forbidden"/>
+    /// before any token is read.
     /// </summary>
     public static Result<string[]> Normalize(
         IEnumerable<string> input,
@@ -30,29 +32,46 @@ public static class GrantSet
         ArgumentNullException.ThrowIfNull(writer);
 
         IReadOnlySet<GrantAction> allowed = target.AllowedActions();
-        var problems = new List<string>();
+        if (!writer.BypassesGrants && target is not (GrantTarget.Row or GrantTarget.File))
+        {
+            return AccessErrors.Forbidden;
+        }
+
+        var problems = new InputProblems();
         var tokens = new SortedSet<string>(StringComparer.Ordinal);
+        int read = 0;
 
         foreach (string raw in input)
         {
+            if (++read > InputProblems.MaxEntries)
+            {
+                problems.AddTooLong();
+                break;
+            }
+
             foreach (string token in Expand(raw, allowed, problems))
             {
-                if (!Grant.TryParse(token, out Grant grant))
+                if (!Grant.TryParse(token, out Grant grant) || grant.Role.IsDefault)
                 {
                     problems.Add(DescribeBadToken(raw));
                 }
                 else if (!allowed.Contains(grant.Action))
                 {
-                    problems.Add($"'{raw}': {grant.Action.ToToken()} is not a valid grant on a {Describe(target)}.");
+                    problems.Add($"{InputProblems.Quote(raw)}: {grant.Action.ToToken()} is not a valid grant on a {Describe(target)}.");
                 }
                 else if (!writer.BypassesGrants && !writer.HasRole(grant.Role.ToString()) && existing?.Contains(token) != true)
                 {
-                    problems.Add($"'{raw}': you can only grant roles you hold.");
+                    problems.Add($"{InputProblems.Quote(raw)}: you can only grant roles you hold.");
                 }
                 else
                 {
                     tokens.Add(token);
                 }
+            }
+
+            if (problems.IsFull)
+            {
+                break;
             }
         }
 
@@ -74,7 +93,7 @@ public static class GrantSet
             problems.Add($"A grant list holds at most {MaxTokens} entries; this one has {tokens.Count}.");
         }
 
-        return problems.Count > 0 ? AccessErrors.Invalid(Field, problems) : tokens.ToArray();
+        return problems.Count > 0 ? AccessErrors.Invalid(Field, problems.Items) : tokens.ToArray();
     }
 
     /// <summary>
@@ -99,8 +118,9 @@ public static class GrantSet
         ];
     }
 
-    // GRM-4: write:<role> becomes the write actions the target allows. It is never stored.
-    private static string[] Expand(string raw, IReadOnlySet<GrantAction> allowed, List<string> problems)
+    // GRM-4: write:<role> becomes the write actions the target allows. It is never stored. The role is checked once
+    // here, so a bad one is reported once, not once per expanded action.
+    private static string[] Expand(string raw, IReadOnlySet<GrantAction> allowed, InputProblems problems)
     {
         if (raw is null || !raw.StartsWith(WritePrefix, StringComparison.Ordinal))
         {
@@ -108,10 +128,16 @@ public static class GrantSet
         }
 
         string role = raw[WritePrefix.Length..];
+        if (!Role.TryParse(role, out _))
+        {
+            problems.Add(DescribeBadToken(raw));
+            return [];
+        }
+
         string[] expanded = [.. WriteActions.Where(allowed.Contains).Select(action => $"{action.ToToken()}:{role}")];
         if (expanded.Length == 0)
         {
-            problems.Add($"'{raw}': write is not a valid grant here.");
+            problems.Add($"{InputProblems.Quote(raw)}: write is not a valid grant here.");
         }
 
         return expanded;
@@ -121,8 +147,8 @@ public static class GrantSet
     {
         int colon = raw?.IndexOf(':', StringComparison.Ordinal) ?? -1;
         return colon > 0 && Role.IsReserved(raw![(colon + 1)..])
-            ? $"'{raw}': this role is reserved for later and cannot be used yet."
-            : $"'{raw}': not a valid grant. Use <action>:<role>, for example read:users.";
+            ? $"{InputProblems.Quote(raw)}: this role is reserved for later and cannot be used yet."
+            : $"{InputProblems.Quote(raw)}: not a valid grant. Use <action>:<role>, for example read:users.";
     }
 
     private static string Describe(GrantTarget target) => target switch

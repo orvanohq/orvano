@@ -69,9 +69,7 @@ public static class AccessEvaluator
             return AccessPlan.NotFound;
         }
 
-        // EVL-3: create (and a function's execute) is decided at the resource only.
-        bool rowLevel = action is GrantAction.Read or GrantAction.Update or GrantAction.Delete;
-        return rowSecurity && rowLevel ? AccessPlan.FilterRows(tokens) : AccessPlan.Forbidden;
+        return rowSecurity && IsRowLevel(action) ? AccessPlan.FilterRows(tokens) : AccessPlan.Forbidden;
     }
 
     /// <summary>EVL-2 in memory, for one known row or file (realtime checks each event this way, RTM-1).</summary>
@@ -92,20 +90,24 @@ public static class AccessEvaluator
         }
 
         string[] tokens = caller.MatchTokens(action);
-        return Overlaps(resourceGrants, tokens) || (rowSecurity && action != GrantAction.Create && Overlaps(rowGrants, tokens));
+        return Overlaps(resourceGrants, tokens) || (rowSecurity && IsRowLevel(action) && Overlaps(rowGrants, tokens));
     }
 
     /// <summary>
     /// WRT-1, WRT-3, WRT-7: who may change (and so may see) a row's or file's own grants. Clients need an
-    /// <c>update</c> grant on the row itself; a table level <c>update</c> is not enough.
+    /// <c>update</c> grant on the row itself, which counts only while row (or file) security is on (EVL-2); a table
+    /// level <c>update</c> is not enough.
     /// </summary>
-    public static bool MayChangeItemGrants(Caller caller, IReadOnlyCollection<string> rowGrants)
+    public static bool MayChangeItemGrants(Caller caller, bool rowSecurity, IReadOnlyCollection<string> rowGrants)
     {
         ArgumentNullException.ThrowIfNull(caller);
         ArgumentNullException.ThrowIfNull(rowGrants);
 
-        return caller.BypassesGrants || Overlaps(rowGrants, caller.MatchTokens(GrantAction.Update));
+        return caller.BypassesGrants || (rowSecurity && Overlaps(rowGrants, caller.MatchTokens(GrantAction.Update)));
     }
+
+    // EVL-3: create (and a function's execute) is decided at the resource only; row and file grants never count for it.
+    private static bool IsRowLevel(GrantAction action) => action is GrantAction.Read or GrantAction.Update or GrantAction.Delete;
 
     private static bool Overlaps(IReadOnlyCollection<string> grants, string[] tokens) =>
         grants.Count > 0 && tokens.Any(grants.Contains);

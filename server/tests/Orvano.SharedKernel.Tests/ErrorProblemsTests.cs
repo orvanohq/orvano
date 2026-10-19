@@ -150,6 +150,30 @@ public sealed class ErrorProblemsTests
 
     [Fact]
     [Trait("Spec", "0002:ERR-4")]
+    public void Problem_keeps_its_own_code_trace_id_and_errors_when_the_extensions_name_them()
+    {
+        var fields = new Dictionary<string, string[]> { ["name"] = ["Enter a name."] };
+        var extensions = new Dictionary<string, object?> { ["code"] = "forged", ["traceId"] = "forged", ["errors"] = "forged", ["other"] = 1 };
+        Activity? previous = Activity.Current;
+        Activity.Current = null;
+        try
+        {
+            IDictionary<string, object?> body = new Error("real_code", "Bad.", ErrorKind.Validation, fields, extensions)
+                .ToProblem().ProblemDetails.Extensions;
+
+            body["code"].ShouldBe("real_code");
+            body["errors"].ShouldBe(fields);
+            body.ShouldNotContainKey("traceId");
+            body["other"].ShouldBe(1);
+        }
+        finally
+        {
+            Activity.Current = previous;
+        }
+    }
+
+    [Fact]
+    [Trait("Spec", "0002:ERR-4")]
     public void Problem_throws_when_the_error_is_null() =>
         Should.Throw<ArgumentNullException>(() => ErrorProblems.ToProblem(null!));
 

@@ -25,8 +25,9 @@ public enum CallerKind
 /// Who is calling (spec 0012 CLR-1 to CLR-3). Built only through the factories, so the role set always matches the
 /// kind. <see cref="Scopes"/> holds a key's stored scopes: client APIs for guests and end users (SCP-2), server
 /// scopes for secret and run keys (SCP-1). Operators carry none; console permissions come from their membership.
+/// A class, not a record: it holds sets and arrays by reference, so two callers are the same only by reference.
 /// </summary>
-public sealed record Caller
+public sealed class Caller
 {
     private static readonly IReadOnlySet<string> NoScopes = new HashSet<string>(StringComparer.Ordinal);
 

@@ -136,4 +136,24 @@ public sealed class ScopeAndPermissionTests
         error.Code.ShouldBe("validation_failed");
         error.Fields!["permissions"].ShouldBe(["one", "two"]);
     }
+
+    [Fact]
+    [Trait("Spec", "0012:SCP-3")]
+    public void Validate_quotes_a_bad_scope_short_and_escaped_when_reporting_it()
+    {
+        string problem = Scopes.Validate(KeyType.Secret, ["x\r\n" + new string('y', 500)]).Error!.Fields!["scopes"].ShouldHaveSingleItem();
+
+        problem.ShouldStartWith(@"'x\u000D\u000A");
+        problem.ShouldContain("…'");
+        problem.Length.ShouldBeLessThan(200);
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:SCP-3")]
+    public void Validate_lists_at_most_20_problems_and_stops_past_500_entries_when_the_input_is_large()
+    {
+        Scopes.Validate(KeyType.Secret, [.. Enumerable.Range(0, 300).Select(i => $"bad.{i}")]).Error!.Fields!["scopes"].Length.ShouldBe(20);
+        Scopes.Validate(KeyType.Secret, Enumerable.Repeat(Scopes.StorageRead, int.MaxValue)).Error!.Fields!["scopes"]
+            .ShouldHaveSingleItem().ShouldContain("at most 500");
+    }
 }

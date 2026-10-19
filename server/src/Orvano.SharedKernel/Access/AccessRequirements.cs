@@ -121,10 +121,13 @@ public static class AccessRequirementsMiddleware
 
         if (organizationId is not { } organization)
         {
+            // RequireConsolePermission refuses such a route when the endpoint is built; this is only the backstop.
             throw new InvalidOperationException(
                 $"RequireConsolePermission needs an '{AccessEndpointFilters.OrganizationIdRouteValue}' or '{AccessEndpointFilters.ProjectIdRouteValue}' route value.");
         }
 
+        // A known project costs a second lookup (the membership) and an unknown one stops early, so timing can tell
+        // them apart. The ids are uuid v7 and the answers are identical; revisit if timing ever matters here.
         string? role = await memberships.FindRoleAsync(caller.OperatorId!.Value, organization, cancellationToken);
         if (role is null)
         {

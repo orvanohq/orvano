@@ -85,6 +85,12 @@ public readonly partial record struct Role
         return false;
     }
 
+    /// <summary>
+    /// True for <c>default(Role)</c>, which no factory or parse makes. Its text is empty, so it never matches a grant;
+    /// <see cref="GrantSet"/> refuses it.
+    /// </summary>
+    public bool IsDefault => _value is null;
+
     public override string ToString() => _value ?? string.Empty;
 
     [GeneratedRegex(@"^[A-Za-z0-9_-]{1,36}\z", RegexOptions.CultureInvariant)]
