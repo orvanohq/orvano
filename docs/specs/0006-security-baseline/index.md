@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-16
 **Status**: Accepted
-**Updated**: 2026-10-18, to agree with spec 0011: TOK-5's reuse window issues a sibling token, TOK-6 loads revocations from `auth.session_revocation`, TOK-9 stores short codes as HMAC (ENC-4).
+**Updated**: 2026-10-18, to agree with spec 0011: TOK-5's reuse window issues a sibling token, TOK-6 loads revocations from `auth.session_revocation`, TOK-9 stores short codes as HMAC (ENC-4). 2026-10-18, for spec 0012: KEY-4's scope list and TEN-2's token and control plane checks now point to spec 0012, and the feature 9 follow up is closed.
 
 ## Summary
 
@@ -26,7 +26,7 @@ Decided elsewhere, not here:
 
 | Topic                                                                       | Owner                                                                                           |
 | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Who may do what: roles, permission checks, not found versus forbidden       | Feature 9, Access control model                                                                 |
+| Who may do what: roles, permission checks, not found versus forbidden       | Feature 9, Access control model ([spec 0012](../0012-access-control-model/index.md))            |
 | Wire format, error body shape, the exact header names for API keys and CSRF | Feature 10, API contract and SDK generation                                                     |
 | The generic rate limiting engine and its limits                             | Feature 23, Rate limits and abuse guards                                                        |
 | Audit log storage, search, and retention                                    | Feature 48, Audit logs                                                                          |
@@ -92,7 +92,7 @@ Out of scope for this baseline: a hostile operator with root on the host (they h
 - **KEY-1 (MUST)**: Two key types. A **publishable key** `orv_pk_<43 characters>` is safe in client code and carries only client safe scopes. A **secret key** `orv_sk_<43 characters>` is server only. The 43 characters are base64url of 32 random bytes. Both prefixes are fixed so secret scanning tools can match them. A secret key must never be sent from a browser; the server rejects a request that has an `Origin` header and a secret key unless the operator allows it. Spec 0005 KEY-4 uses the `orv_sk_` prefix.
 - **KEY-2 (MUST)**: Only the SHA-256 hash of a key is stored, plus the type, a display prefix (the type prefix plus the next 8 characters, 15 characters in all), the project, scopes, creation time, last used time, and optional expiry. A full key is shown once, at creation (SEC-3 in spec 0003). Lookup is by hash with a unique index; because the lookup is an exact match, a constant time compare is only defence in depth. A request that carries both a key and a bearer token is rejected with 400.
 - **KEY-3 (MUST)**: Keys are revocable at once and rotatable (create a new key, then revoke the old). Revoking takes effect on the next request. Last used time is updated at most once a minute per key.
-- **KEY-4 (MUST)**: A key is bound to one project. Each key type has a ceiling set of scopes in code (a publishable key can never hold a secret scope), and the server checks that the granted scopes are within the ceiling at creation and on every request. The scope list and what each scope allows belong to feature 9.
+- **KEY-4 (MUST)**: A key is bound to one project. Each key type has a ceiling set of scopes in code (a publishable key can never hold a secret scope), and the server checks that the granted scopes are within the ceiling at creation and on every request. The scope list, the ceilings, and what each scope allows are spec 0012 SCP-1 to SCP-5.
 - **KEY-5 (SHOULD)**: The fixed `orv_pk_` and `orv_sk_` prefixes let customers' secret scanning tools find leaked keys. Each install mints its own keys, so Orvano's own repo scanning (SUP-4) cannot catch them.
 - **KEY-6 (MUST)**: Every SDK request, including sign up, sign in, refresh, and reset (which have no token yet), carries the project's publishable key in a header (name from feature 10). The server requires that the key's project equals the project in the route. This amends specs 0004 and 0005: the `open` call and `createClient` take the publishable key too (see Follow-up).
 
@@ -107,7 +107,7 @@ Out of scope for this baseline: a hostile operator with root on the host (they h
 ### Isolation between projects (server)
 
 - **TEN-1 (MUST)**: Each project has its own PostgreSQL database (feature 15). Orvano's own platform database uses different credentials from every project database, and a project database role can reach only that database.
-- **TEN-2 (MUST)**: On the data plane, the project is the one in the route (or host). The caller's publishable key, secret key, or verified token (TOK-3) must belong to that same project, or the request is denied. The project is never taken from a body or query value the caller controls. Every data path takes the resolved project id. The control plane (console management routes) carries the project id in the path by design and checks the operator's membership instead (feature 9).
+- **TEN-2 (MUST)**: On the data plane, the project is the one in the route (or host). The caller's publishable key, secret key, or verified token (TOK-3) must belong to that same project, or the request is denied. The project is never taken from a body or query value the caller controls. Every data path takes the resolved project id. The control plane (console management routes) carries the project id in the path by design and checks the operator's membership instead (spec 0012 CPL-3). How a key or token resolves the project, and why a mismatch answers `401`, is spec 0012 PRJ-1 to PRJ-4.
 - **TEN-3 (MUST)**: Project database roles have the least rights needed. The SQL editor (feature 27) and user supplied queries run as the project role, never the platform role. Concretely: `REVOKE CONNECT ON DATABASE ... FROM PUBLIC` on every project database; project roles are `NOSUPERUSER NOCREATEROLE NOCREATEDB`, hold none of `pg_read_server_files`, `pg_write_server_files`, `pg_execute_server_program`, and may use only trusted languages and an extension allow list that leaves out `dblink` and `postgres_fdw`. The connection pooling plan, needed because a database per project multiplies pools, is spec 0007 PG-3 and PG-4 (one small, lazily created pool per project database under one install wide cap), with PgBouncer as an option for large installs (PG-5).
 - **TEN-4 (MUST)**: Storage object paths, realtime channels, function variables, and signing keys are all keyed by project id.
 - **TEN-5 (MUST)**: A cross project leak test is a release blocker: for every module, a test uses project A's credentials against project B's resources and expects a denial (this extends spec 0002 DAT-2a).
@@ -239,7 +239,7 @@ New code immediately. There is no existing code, so every rule holds from the fi
 - [ ] Specs 0004 and 0005: amend the SDK entry points (`open` in Dart, `createClient` in TypeScript) to take the publishable key, and send it on every request including sign up and sign in (KEY-6). Feature 14 and the generated SDKs follow.
 - [x] Feature 6: choose the Argon2 library and benchmark it (PWD-6), decide how TLS is provided in the install (NET-1), and record the root key interface (SCR-2). Closed by spec 0007: PWD-6 by HSH-1 (the benchmark runs at the scaffold per HSH-2), NET-1 by TLS-1 and TLS-2, SCR-2's interface by REP-2 (`IRootKeyProvider`), and TEN-3's pooling plan by PG-3 and PG-4.
 - [x] Feature 8: platform tables for sessions, refresh token families, API keys, signing keys, encrypted secrets, operator TOTP, and security events, shaped by TOK, KEY, and SCR rules. Closed by spec 0011 (its CAT-1 catalog); TOK-5, TOK-6, and TOK-9 were amended to match it (2026-10-18).
-- [ ] Feature 9: the scope names for publishable and secret keys (KEY-4) and how a token's `aud` resolves the project (TEN-2).
+- [x] Feature 9: the scope names for publishable and secret keys (KEY-4) and how a token's `aud` resolves the project (TEN-2). Closed by spec 0012 (2026-10-18): SCP-1 to SCP-5 for scopes and ceilings, PRJ-1 to PRJ-4 for project resolution (`aud` and `kid` must match the route's project).
 - [ ] Feature 10: the CSRF header name (CON-2), the API key header, and no store caching on auth responses (NET-3).
 - [ ] Features 7 and 58: turn on SUP-1 to SUP-6 and VUL-1, add the PR checklist lines, add `BannedSymbols.txt` entries from the Enforcement table.
 - [ ] Feature 13 and 14: build CON-1 to CON-5 and PWD-1 to PWD-5, TOK-1 to TOK-6.

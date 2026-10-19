@@ -119,12 +119,40 @@ spec [0011](../specs/0011-platform-data-model/index.md) · code in `server/src/O
 - [x] Review it (fresh model): `/check review platform data model`
 - [x] Document it: `/document platform data model`
 
-### 9. Access control model · needs a decision
+### 9. Access control model · in-progress
 
 One permissions model shared by databases, storage, realtime, and functions: who a caller is (anyone, guest, signed in user, a specific user, a label, a server key), what they may do, and where the check runs. Features 16, 26, 29, 34, and 38 build on it.
 **Done when:** one model decides who can read or write any resource for both end user sessions and server API keys, and any database engine can enforce it.
+spec [0012](../specs/0012-access-control-model/index.md) · code in `server/src/Orvano.SharedKernel/Access/`
 
-- [ ] Design it (spec): `/architect access control model`
+- [x] Design it (spec): `/architect access control model`
+- [ ] Build it: `/develop access control model`
+  - [x] Grant grammar and `GrantSet` (parse, `write` expansion, writer rules, creator defaults, limit) (AC-1, AC-6, AC-7)
+  - [x] `Caller`, role sets, `AccessEvaluator`, and the denial rules (AC-2, AC-3, AC-5)
+  - [x] Scope catalog and ceilings, console permissions, and their endpoint filters (AC-8, AC-11)
+  - [ ] Contexts, architecture tests, the PostgreSQL `WhereGranted` test, and the label cache test (AC-4, AC-9, AC-10, AC-12)
+    - built: contexts, architecture tests, `WhereGranted` test. Waiting: the label cache test (AC-10, build plan step 8). Spec 0012 now matches spec 0007 (labels ride `cache` tags, 60 second expiry, 2026-10-18); the test waits for feature 61 to build `ISignalBus` and `ICacheInvalidator`
+  - [x] Amend specs 0011 and 0006 for the new columns, CHECKs, and closed follow ups (AC-8, AC-9) (done by `/architect`, 2026-10-18)
+- [ ] Verify it: `/check verify access control model`
+- [ ] Test it: `/test access control model`
+- [ ] Review it (fresh model): `/check review access control model`
+- [ ] Document it: `/document access control model`
+
+### 61. Background runtime
+
+The shared machinery spec 0007 designed but no feature built yet: cross replica signals over `LISTEN/NOTIFY`, cache invalidation that reaches every replica, the PostgreSQL job queue with schedules, and the per module outbox. Features 9 (the label cache test), 13 (CORS cache), 14 (session revocation, signing key rotation), and every later feature that queues work or announces events build on it.
+**Done when:** a cache tag invalidated or a job enqueued on one server instance reaches a second instance through `orvano_signal`, a lost signal is recovered by SIG-2's bypass, poll, and clear, jobs run at least once with leases, backoff, and schedules firing once across workers, and an outbox event reaches its subscriber as a job.
+spec [0007](../specs/0007-stack-architecture/index.md) · code in `server/src/Orvano.Infrastructure/`
+
+- [x] Design it (spec): `/architect stack & architecture` (spec 0007 SIG, CCH, JOB, EVT)
+- [ ] Build it: `/develop background runtime`
+  - [ ] Signals and cache invalidation: `ISignalBus`, `ICacheInvalidator`, the listener, heartbeat, disconnect bypass, and reconnect clear (SIG-1 to SIG-3, CCH-1, CCH-2); unblocks feature 9's AC-10
+  - [ ] Job queue, runner, leases, backoff, and schedules (JOB-1 to JOB-6)
+  - [ ] Module outbox and dispatcher (EVT-1 to EVT-4)
+- [ ] Verify it: `/check verify background runtime`
+- [ ] Test it: `/test background runtime`
+- [ ] Review it (fresh model): `/check review background runtime`
+- [ ] Document it: `/document background runtime`
 
 ### 11. Design system & console shell · needs a decision
 
