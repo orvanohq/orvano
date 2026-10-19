@@ -78,14 +78,21 @@ public static class AccessDeclaration
 /// undeclared endpoint, skips a public one, resolves the caller through the <see cref="ICallerResolver"/> chain,
 /// checks the project and establishes the caller, and enforces the endpoint's requirements. All of it happens before
 /// body binding and validation, so a refused caller never gets a 400 with field names (DEN-5). The answers follow
-/// DEN-4, PRJ-2, and CPL-3.
+/// DEN-4, PRJ-2, and CPL-3. A request that matched no endpoint gets routing's 404 here, so nothing placed after the
+/// access layer can answer a request without an endpoint, and so without a declaration.
 /// </summary>
 public static class AccessRequirementsMiddleware
 {
     // Set once the middleware ran, so an endpoint with requirements fails closed when the middleware is missing.
     internal static readonly object CheckedKey = new();
 
-    /// <summary>Place right after <c>UseRouting</c>, before anything that runs an endpoint.</summary>
+    // Failed reasons come from resolver code and may hold request data; the log keeps at most this many characters.
+    internal const int MaxReasonLength = 100;
+
+    /// <summary>
+    /// Place after <c>UseRouting</c> and <c>UseCors</c> (which answers a preflight without a credential, spec 0007
+    /// COR-1), before anything that runs an endpoint. Only endpoints may answer after it.
+    /// </summary>
     public static IApplicationBuilder UseAccessRequirements(this IApplicationBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
@@ -95,7 +102,9 @@ public static class AccessRequirementsMiddleware
         {
             if (http.GetEndpoint() is not { } endpoint)
             {
-                await next(http); // routing's own 404
+                // Routing's own 404, answered here rather than by passing on, so a later branch, Map, or Run delegate
+                // cannot answer without an endpoint and skip default deny (EPT-3).
+                http.Response.StatusCode = StatusCodes.Status404NotFound;
                 return;
             }
 
@@ -124,13 +133,28 @@ public static class AccessRequirementsMiddleware
                 return;
             }
 
+            ConsoleMembership? membership = null; // read once, however many console permissions the endpoint needs
             foreach (AccessRequirement requirement in endpoint.Metadata.GetOrderedMetadata<AccessRequirement>())
             {
-                if (await CheckAsync(http, caller, requirement) is { } error)
+                Error? error = requirement switch
+                {
+                    ScopeRequirement scope => CheckScope(caller, scope.Scope),
+                    ClientApiRequirement clientApi => CheckClientApi(caller, clientApi.ClientApi),
+                    ConsolePermissionRequirement console => CheckConsolePermission(
+                        membership ??= await FindConsoleMembershipAsync(http, caller, http.RequestAborted), console.Permission),
+                    _ => throw new InvalidOperationException($"Unknown access requirement {requirement.GetType().Name}."),
+                };
+                if (error is not null)
                 {
                     await error.ToProblem().ExecuteAsync(http);
                     return;
                 }
+            }
+
+            if (membership is { ProjectId: { } projectId })
+            {
+                // CPL-3: the operator's project is set only once every console permission passed.
+                http.RequestServices.GetRequiredService<AccessContext>().Establish(caller, projectId);
             }
 
             http.Items[CheckedKey] = true;
@@ -158,7 +182,7 @@ public static class AccessRequirementsMiddleware
                     caller = resolved.Caller ?? throw new InvalidOperationException($"{resolver.GetType().Name} resolved a null caller.");
                     break;
                 case CallerResolution.Failed failed:
-                    logger.CredentialRefused(resolver.GetType().Name, failed.Reason);
+                    logger.CredentialRefused(resolver.GetType().Name, Truncate(failed.Reason));
                     return null; // PRJ-4: no fallback
                 default:
                     throw new InvalidOperationException($"{resolver.GetType().Name} returned an unknown resolution.");
@@ -192,14 +216,6 @@ public static class AccessRequirementsMiddleware
         return caller;
     }
 
-    private static ValueTask<Error?> CheckAsync(HttpContext http, Caller caller, AccessRequirement requirement) => requirement switch
-    {
-        ScopeRequirement scope => ValueTask.FromResult(CheckScope(caller, scope.Scope)),
-        ClientApiRequirement clientApi => ValueTask.FromResult(CheckClientApi(caller, clientApi.ClientApi)),
-        ConsolePermissionRequirement console => new(CheckConsolePermissionAsync(http, caller, console.Permission, http.RequestAborted)),
-        _ => throw new InvalidOperationException($"Unknown access requirement {requirement.GetType().Name}."),
-    };
-
     private static Error? CheckScope(Caller caller, string scope)
     {
         bool passes = caller.Kind is CallerKind.SecretKey or CallerKind.RunKey
@@ -223,15 +239,12 @@ public static class AccessRequirementsMiddleware
         return caller.Scopes.Contains(clientApi) ? null : AccessErrors.Forbidden;
     }
 
-    private static async Task<Error?> CheckConsolePermissionAsync(
-        HttpContext http,
-        Caller caller,
-        ConsolePermission permission,
-        CancellationToken cancellationToken)
+    // CPL-3: the operator's membership for the route's organization (or the project's organization), or the refusal.
+    private static async Task<ConsoleMembership> FindConsoleMembershipAsync(HttpContext http, Caller caller, CancellationToken cancellationToken)
     {
         if (caller.Kind != CallerKind.Operator)
         {
-            return AccessErrors.NotFound;
+            return ConsoleMembership.Refused(AccessErrors.NotFound);
         }
 
         IMembershipLookup memberships = http.RequestServices.GetRequiredService<IMembershipLookup>();
@@ -240,7 +253,7 @@ public static class AccessRequirementsMiddleware
         {
             if (RouteGuid(http, AccessEndpointFilters.OrganizationIdRouteValue) is not { } fromRoute)
             {
-                return AccessErrors.NotFound;
+                return ConsoleMembership.Refused(AccessErrors.NotFound);
             }
 
             organizationId = fromRoute;
@@ -253,7 +266,7 @@ public static class AccessRequirementsMiddleware
             Guid? owner = projectId is { } id ? await memberships.FindProjectOrganizationAsync(id, cancellationToken) : null;
             if (owner is null || (organizationId is not null && organizationId != owner))
             {
-                return AccessErrors.NotFound;
+                return ConsoleMembership.Refused(AccessErrors.NotFound);
             }
 
             organizationId = owner;
@@ -269,24 +282,33 @@ public static class AccessRequirementsMiddleware
         // A known project costs a second lookup (the membership) and an unknown one stops early, so timing can tell
         // them apart. The ids are uuid v7 and the answers are identical; revisit if timing ever matters here.
         string? role = await memberships.FindRoleAsync(caller.OperatorId!.Value, organization, cancellationToken);
-        if (role is null)
-        {
-            return AccessErrors.NotFound;
-        }
-
-        if (!RolePermissions.For(role).Contains(permission))
-        {
-            return AccessErrors.Forbidden;
-        }
-
-        if (projectId is not null)
-        {
-            http.RequestServices.GetRequiredService<AccessContext>().Establish(caller, projectId);
-        }
-
-        return null;
+        return role is null ? ConsoleMembership.Refused(AccessErrors.NotFound) : new ConsoleMembership(null, role, projectId);
     }
 
-    private static Guid? RouteGuid(HttpContext http, string name) =>
-        Guid.TryParse(Convert.ToString(http.Request.RouteValues[name], CultureInfo.InvariantCulture), out Guid id) ? id : null;
+    private static Error? CheckConsolePermission(ConsoleMembership membership, ConsolePermission permission)
+    {
+        if (membership.Refusal is { } refusal)
+        {
+            return refusal;
+        }
+
+        return RolePermissions.For(membership.Role!).Contains(permission) ? null : AccessErrors.Forbidden;
+    }
+
+    private static string Truncate(string reason) =>
+        reason.Length <= MaxReasonLength ? reason : string.Concat(reason.AsSpan(0, MaxReasonLength), "…");
+
+    // RSV-2: only the canonical form (lower case, hyphenated, no braces or spaces), so one project has one spelling
+    // for anything that keys on the raw route value.
+    private static Guid? RouteGuid(HttpContext http, string name)
+    {
+        string? value = Convert.ToString(http.Request.RouteValues[name], CultureInfo.InvariantCulture);
+        return Guid.TryParseExact(value, "D", out Guid id) && string.Equals(id.ToString("D"), value, StringComparison.Ordinal) ? id : null;
+    }
+
+    // The membership the console permissions of one request are checked against: a refusal, or the role and project.
+    private sealed record ConsoleMembership(Error? Refusal, string? Role, Guid? ProjectId)
+    {
+        public static ConsoleMembership Refused(Error refusal) => new(refusal, null, null);
+    }
 }

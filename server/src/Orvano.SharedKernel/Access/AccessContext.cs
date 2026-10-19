@@ -91,6 +91,12 @@ public static class AccessServiceCollectionExtensions
     }
 }
 
+/// <summary>
+/// The startup check found endpoints that break spec 0012 EPT-3; the message names each one. <c>orvano serve</c> prints
+/// it and exits 1.
+/// </summary>
+public sealed class AccessDeclarationException(string message) : InvalidOperationException(message);
+
 // EPT-4 (1): every endpoint of the host declares its access, or the host does not start. Hosted services start before
 // the web host wires the app's endpoints, so the check runs in StartedAsync, once they exist; until then the access
 // layer answers 404 for any undeclared endpoint (EPT-4 (3)).
@@ -98,12 +104,12 @@ internal sealed class AccessEndpointCheck(IServiceProvider services) : IHostedLi
 {
     public Task StartedAsync(CancellationToken cancellationToken)
     {
-        string[] problems = [.. (services.GetService<EndpointDataSource>()?.Endpoints ?? [])
+        string[] problems = [.. services.GetRequiredService<EndpointDataSource>().Endpoints
             .Select(endpoint => AccessDeclaration.Problem(endpoint) is { } problem ? $"{AccessDeclaration.Name(endpoint)}: {problem}" : null)
             .OfType<string>()];
         if (problems.Length > 0)
         {
-            throw new InvalidOperationException(
+            throw new AccessDeclarationException(
                 "Every endpoint must declare its access (spec 0012 EPT-3). Fix these endpoints:" + Environment.NewLine
                 + string.Join(Environment.NewLine, problems.Select(problem => "  " + problem)));
         }

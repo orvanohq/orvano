@@ -3,8 +3,11 @@ using System.Text.Json;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
+using Orvano.SharedKernel.Access;
 using Orvano.Testing;
 
 namespace Orvano.Host.IntegrationTests.Web;
@@ -47,27 +50,26 @@ public sealed class ErrorHandlingTests(PostgresFixture postgres) : IDisposable
         problem.RootElement.GetProperty("code").GetString().ShouldBe("timeout");
     }
 
-    /// <summary>Adds two failing paths at the end of the real pipeline, inside its exception handler.</summary>
+    /// <summary>Adds two failing endpoints to the real pipeline, inside its exception handler.</summary>
     private sealed class ThrowingServer(IReadOnlyDictionary<string, string> settings) : OrvanoApiFactory(settings)
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             base.ConfigureWebHost(builder);
-            builder.ConfigureServices(services => services.AddSingleton<IStartupFilter, ThrowAtTheEnd>());
+            builder.ConfigureServices(services => services.AddSingleton<IStartupFilter, ThrowingEndpoints>());
         }
     }
 
-    private sealed class ThrowAtTheEnd : IStartupFilter
+    // Endpoints, since only endpoints answer after the access layer (spec 0012 EPT-3); public, so no credential is
+    // needed. They go on the host's own route builder (the WebApplication, handed on in the builder's properties).
+    private sealed class ThrowingEndpoints : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
         {
             next(app);
-            app.Run(context => context.Request.Path.Value switch
-            {
-                "/test/throw" => throw new InvalidOperationException(SecretDetail),
-                "/test/timeout" => throw new OperationCanceledException("query timed out"),
-                _ => Task.CompletedTask,
-            });
+            IEndpointRouteBuilder routes = app.Properties.Values.OfType<IEndpointRouteBuilder>().Single();
+            routes.Map("/test/throw", (RequestDelegate)(_ => throw new InvalidOperationException(SecretDetail))).AllowPublicAccess();
+            routes.Map("/test/timeout", (RequestDelegate)(_ => throw new OperationCanceledException("query timed out"))).AllowPublicAccess();
         };
     }
 }

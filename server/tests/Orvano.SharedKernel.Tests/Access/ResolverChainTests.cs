@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using Orvano.SharedKernel.Access;
 
@@ -236,16 +237,57 @@ public sealed class ResolverChainTests
     [Theory]
     [Trait("Spec", "0012:AC-9")]
     [Trait("Spec", "0012:PRJ-2")]
-    [InlineData("not-a-uuid")]
-    [InlineData("0192f7a4-0000-7000-8000-00000000000")] // one digit short
-    [InlineData("00000000-0000-0000-0000-000000000000")]
-    public async Task Caller_answers_unauthorized_when_the_route_project_is_malformed_or_empty(string projectId)
+    [Trait("Spec", "0012:RSV-2")]
+    [InlineData("not-a-uuid", null)]
+    [InlineData("0192f7a4-0000-7000-8000-00000000000", null)] // one digit short
+    [InlineData("00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000000")]
+    [InlineData("0192F7A4-0000-7000-8000-000000000001", null)] // the caller's project, upper case
+    [InlineData("0192f7a4000070008000000000000001", null)] // without hyphens
+    [InlineData("%7B0192f7a4-0000-7000-8000-000000000001%7D", null)] // in braces
+    [InlineData("%200192f7a4-0000-7000-8000-000000000001%20", null)] // with spaces
+    public async Task Caller_answers_unauthorized_when_the_route_project_is_malformed_empty_or_not_canonical(
+        string projectId,
+        string? routeProjectId)
     {
         var resolver = new FixedResolver(Secret);
         await using WebApplication app = await StartAsync(services => services.AddSingleton<ICallerResolver>(resolver));
 
         (await CodeAsync(app, $"/p/{projectId}/storage")).ShouldBe((HttpStatusCode.Unauthorized, "unauthorized"));
-        resolver.Calls.ShouldHaveSingleItem().RouteProjectId.ShouldBe(Guid.TryParse(projectId, out Guid parsed) ? parsed : null);
+        resolver.Calls.ShouldHaveSingleItem().RouteProjectId.ShouldBe(routeProjectId is null ? null : Guid.Parse(routeProjectId));
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:AC-9")]
+    [Trait("Spec", "0012:CPL-3")]
+    public async Task Operator_membership_is_read_once_when_a_group_and_its_endpoint_each_need_a_console_permission()
+    {
+        var memberships = new OwnerOfOrganization();
+        await using WebApplication app = await StartAsync(
+            services => services.AddSingleton<ICallerResolver>(new FixedResolver(Operator)).AddSingleton<IMembershipLookup>(memberships),
+            app => app.MapGroup("/console/projects/{projectId}").RequireConsolePermission(ConsolePermission.ProjectRead)
+                .MapGet("/rows", (IProjectContext project) => project.Id.ToString()).RequireConsolePermission(ConsolePermission.DataRead));
+
+        using HttpResponseMessage response = await GetAsync(app, $"/console/projects/{Project}/rows");
+
+        (await response.Content.ReadAsStringAsync(Token)).ShouldBe(Project.ToString());
+        memberships.Lookups.ShouldBe(2); // the project's organization, then the role, once for both permissions
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:AC-9")]
+    [Trait("Spec", "0012:RSV-2")]
+    public async Task Failed_reason_is_logged_cut_to_100_characters_when_the_resolver_gives_a_longer_one()
+    {
+        var logs = new LogCapture(LogLevel.Information);
+        await using WebApplication app = await StartAsync(services => services
+            .AddSingleton<ICallerResolver>(new FixedResolver(new CallerResolution.Failed(new string('x', 500))))
+            .AddSingleton<ILoggerProvider>(logs));
+
+        (await CodeAsync(app, "/storage")).ShouldBe((HttpStatusCode.Unauthorized, "unauthorized"));
+
+        string logged = logs.Messages.Where(message => message.StartsWith("Credential refused by", StringComparison.Ordinal)).ShouldHaveSingleItem();
+        logged.ShouldEndWith(new string('x', 100) + "…");
+        logged.ShouldNotContain(new string('x', 101));
     }
 
     [Fact]
@@ -390,10 +432,20 @@ public sealed class ResolverChainTests
 
     private sealed class OwnerOfOrganization : IMembershipLookup
     {
-        public Task<string?> FindRoleAsync(Guid operatorId, Guid organizationId, CancellationToken cancellationToken) =>
-            Task.FromResult(organizationId == Organization ? "owner" : null);
+        private int _lookups;
 
-        public Task<Guid?> FindProjectOrganizationAsync(Guid projectId, CancellationToken cancellationToken) =>
-            Task.FromResult(projectId == Project ? Organization : (Guid?)null);
+        public int Lookups => _lookups;
+
+        public Task<string?> FindRoleAsync(Guid operatorId, Guid organizationId, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _lookups);
+            return Task.FromResult(organizationId == Organization ? "owner" : null);
+        }
+
+        public Task<Guid?> FindProjectOrganizationAsync(Guid projectId, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _lookups);
+            return Task.FromResult(projectId == Project ? Organization : (Guid?)null);
+        }
     }
 }
