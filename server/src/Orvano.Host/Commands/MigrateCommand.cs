@@ -9,6 +9,7 @@ using Orvano.Host.Configuration;
 using Orvano.Host.Database;
 using Orvano.Host.Startup;
 using Orvano.Host.Telemetry;
+using Orvano.Infrastructure;
 using Orvano.SharedKernel.Configuration;
 
 namespace Orvano.Host.Commands;
@@ -45,6 +46,7 @@ internal static class MigrateCommand
             builder.Configuration.AddOrvanoConfiguration(configArgs);
             builder.AddOrvanoLogging();
             builder.AddPlatformDatabase();
+            builder.Services.AddInfrastructure(); // spec 0013 LSN-1: the cache and signals, with no listener
 
             using IHost host = builder.Build();
             ILogger logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Orvano.Host.Migrate");

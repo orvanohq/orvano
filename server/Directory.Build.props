@@ -24,4 +24,8 @@
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
     <AdditionalFiles Include="$(MSBuildProjectDirectory)/BannedSymbols.*.txt" />
   </ItemGroup>
+  <!-- Spec 0013 CAC-5: modules invalidate the cache only through ICacheInvalidator. -->
+  <ItemGroup Condition="$(MSBuildProjectName.StartsWith('Orvano.Modules.'))">
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)src/BannedSymbols.Modules.txt" />
+  </ItemGroup>
 </Project>

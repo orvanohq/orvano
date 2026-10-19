@@ -18,6 +18,10 @@
     <PackageReference Include="System.CommandLine" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Spec 0013 LSN-1: tests find a host's listener backend by its SignalInstance. -->
+    <InternalsVisibleTo Include="Orvano.Host.IntegrationTests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Orvano.Infrastructure\Orvano.Infrastructure.csproj" />
     <ProjectReference Include="..\Orvano.Modules.Auth\Orvano.Modules.Auth.csproj" />
     <ProjectReference Include="..\Orvano.SharedKernel\Orvano.SharedKernel.csproj" />

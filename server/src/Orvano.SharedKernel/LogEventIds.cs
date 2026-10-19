@@ -15,4 +15,5 @@ public static class LogEventIds
     public const int Messaging = 7000;
     public const int Operations = 8000;
     public const int Platform = 9000;
+    public const int Infrastructure = 10000;
 }

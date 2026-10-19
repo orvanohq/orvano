@@ -20,7 +20,8 @@ public static class OrvanoConventions
     /// snake case names (DAT-2), <paramref name="schema"/> as the default schema with its own history table (DAT-1),
     /// <c>ValueGeneratedNever</c> on <see cref="Entity"/> keys (IDS-1), <c>xmin</c> for <see cref="IVersioned"/>
     /// (DAT-9), the <c>HasTextEnum</c> CHECK constraints (COL-2), the anchor stubs (REF-2), the <see cref="EncryptedValue"/>
-    /// mapping (ENC-1), and <see cref="TimestampInterceptor"/> ahead of any other <c>SaveChanges</c> interceptor.
+    /// mapping (ENC-1), <see cref="TimestampInterceptor"/> ahead of any other <c>SaveChanges</c> interceptor, and the
+    /// transaction interceptor that sends enlisted signals on commit (spec 0013 SND-2).
     /// The <see cref="NpgsqlDataSource"/> and <see cref="TimeProvider"/> come from <paramref name="services"/>.
     /// It replaces EF's <see cref="IModelCacheKeyFactory"/> so the cached model keys on the schema, so a module cannot
     /// bring a model cache key factory of its own.
@@ -95,6 +96,10 @@ internal sealed class OrvanoOptionsExtension(string schema, TimeProvider timePro
         // this context's options, so a new clock does not need a new EF service provider.
         services.AddScoped<IInterceptor>(provider => new TimestampInterceptor(
             provider.GetRequiredService<IDbContextOptions>().FindExtension<OrvanoOptionsExtension>()!.TimeProvider));
+
+        // Spec 0013 SND-1, SND-2: one signal batch per context instance, sent by the transaction interceptor.
+        services.AddScoped<PendingSignals>();
+        services.AddScoped<IInterceptor>(provider => new SignalTransactionInterceptor(provider.GetRequiredService<PendingSignals>()));
     }
 
     public void Validate(IDbContextOptions options)

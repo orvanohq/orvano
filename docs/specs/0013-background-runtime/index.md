@@ -1,7 +1,7 @@
 # 0013. Background runtime: signal and cache contracts, and how a signal joins a transaction
 
 **Date**: 2026-10-19
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
