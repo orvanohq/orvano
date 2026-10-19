@@ -58,6 +58,9 @@ public sealed class SignalListenerTests(PostgresFixture postgres) : IAsyncLifeti
         using var meters = new MeterRecorder(a.Services.GetRequiredService<IMeterFactory>());
         await a.WaitUntilConnectedAsync(Token);
         await b.WaitUntilConnectedAsync(Token);
+        // The first connect can clear the cache before the recorder exists (the host starts in Observer), and the clear
+        // comes before IsConnected (LSN-2), so count from here: the reconnect must add exactly one.
+        long clearsOnFirstConnect = meters.Sum("orvano.infrastructure.cache.clears", "reason", "connect");
         meters.Observe("orvano.infrastructure.signals.connected").ShouldBe(1);
         int calls = 0;
         (await ReadAsync(a, () => ++calls)).ShouldBe(1);
@@ -88,7 +91,7 @@ public sealed class SignalListenerTests(PostgresFixture postgres) : IAsyncLifeti
         observer.Count("disconnected").ShouldBe(1);
         observer.Events.First().ShouldBe("connected");
         observer.Events.Skip(1).First().ShouldBe("disconnected");
-        meters.Sum("orvano.infrastructure.cache.clears", "reason", "connect").ShouldBe(2);
+        meters.Sum("orvano.infrastructure.cache.clears", "reason", "connect").ShouldBe(clearsOnFirstConnect + 1);
         meters.Observe("orvano.infrastructure.signals.connected").ShouldBe(1);
     }
 
