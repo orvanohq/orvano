@@ -26,7 +26,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 7   | [Coding standards & tooling](foundations.md)      | Foundation    | done        |
 | 58  | [Repo & community setup](foundations.md)          | Foundation    | done        |
 | 8   | [Platform data model](foundations.md)             | Foundation    | done        |
-| 9   | [Access control model](foundations.md)            | Foundation    | in-progress |
+| 9   | [Access control model](foundations.md)            | Foundation    | done        |
 | 61  | [Background runtime](foundations.md)              | Foundation    | in-progress |
 | 10  | [API contract & SDK generation](sdks.md)          | Foundation    | planned     |
 | 11  | [Design system & console shell](foundations.md)   | Foundation    | planned     |
