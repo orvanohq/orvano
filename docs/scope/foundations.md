@@ -119,7 +119,7 @@ spec [0011](../specs/0011-platform-data-model/index.md) · code in `server/src/O
 - [x] Review it (fresh model): `/check review platform data model`
 - [x] Document it: `/document platform data model`
 
-### 9. Access control model · in-progress
+### 9. Access control model · done
 
 One permissions model shared by databases, storage, realtime, and functions: who a caller is (anyone, guest, signed in user, a specific user, a label, a server key), what they may do, and where the check runs. Features 16, 26, 29, 34, and 38 build on it.
 **Done when:** one model decides who can read or write any resource for both end user sessions and server API keys, and any database engine can enforce it.
@@ -134,8 +134,8 @@ spec [0012](../specs/0012-access-control-model/index.md) · code in `server/src/
     - built: contexts, architecture tests, `WhereGranted` test, and the two host label cache contract test over spec 0013's signals (build plan step 8, `server/tests/Orvano.Host.IntegrationTests/Access/`), 2026-10-19
   - [x] Amend specs 0011 and 0006 for the new columns, CHECK constraints, and closed follow ups (AC-8, AC-9) (done by `/architect`, 2026-10-18)
   - [x] Access layer entry and endpoint default deny: `ICallerResolver` and the resolving middleware, `AllowPublicAccess`, generic endpoint requirements for `MapGroup`, the startup check, and the endpoint list test (AC-9, AC-13; build plan steps 10 and 11, added by `/architect` 2026-10-19)
-- [ ] Verify it: `/check verify access control model`
-- [ ] Test it: `/test access control model`
+- [x] Verify it: `/check verify access control model`
+- [x] Test it: `/test access control model`
 - [x] Review it (fresh model): `/check review access control model`
 - [x] Document it: `/document access control model`
 

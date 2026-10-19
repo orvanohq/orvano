@@ -1,7 +1,7 @@
 # 0012. Access control model: declarative grants, scoped keys, checks pushed into the query
 
 **Date**: 2026-10-18
-**Status**: In Progress
+**Status**: Accepted
 **Updated**: 2026-10-18, to agree with spec 0007: label and resource grant changes travel as `cache` tags (SIG-1, CCH-2), both caches expire after 60 seconds (security related entries), feature 61 builds the signal bus, and specs 0011 and 0006 carry this spec's amendments (build plan step 9). 2026-10-19, after the review of PRs #32 to #35: the access layer entry point for credential resolvers (RSV, `ICallerResolver`), default deny at the endpoint level (EPT, AC-13), endpoint requirements described as metadata the access layer middleware enforces (SCP-5, CPL-3), `MayChangeItemGrants` taking `rowSecurity` (WRT-1), and `Normalize` refusing client writers on table, bucket, and function grants (WRT-6). Build plan steps 10 and 11 are new.
 
 ## Summary
