@@ -5,6 +5,10 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Spec 0012 PRJ-3: only the access layer sets IProjectContext; the tests reach its internal setter. -->
+    <InternalsVisibleTo Include="Orvano.SharedKernel.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="EFCore.NamingConventions" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
