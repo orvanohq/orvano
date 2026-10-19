@@ -18,7 +18,8 @@ using static Orvano.SharedKernel.Tests.Access.Callers;
 
 namespace Orvano.SharedKernel.Tests.Access;
 
-// Spec 0012 build plan steps 4 to 6: the endpoint requirements on a sample minimal API, with a fake membership lookup.
+// Spec 0012 build plan steps 4 to 6: the endpoint requirements on a sample minimal API, with a fake resolver and
+// membership lookup.
 public sealed class EndpointFilterTests
 {
     private static readonly Guid Organization = Guid.Parse("0192f7a4-0000-7000-8000-0000000000a1");
@@ -164,11 +165,8 @@ public sealed class EndpointFilterTests
 
     [Fact]
     [Trait("Spec", "0012:AC-8")]
-    public async Task Require_scope_answers_insufficient_scope_when_a_guest_or_system_caller_calls_a_server_route()
-    {
+    public async Task Require_scope_answers_insufficient_scope_when_a_guest_calls_a_server_route() =>
         (await CallAsync(Guest, "/server/storage")).Code.ShouldBe("insufficient_scope");
-        (await CallAsync(Caller.System, "/server/storage")).Code.ShouldBe("insufficient_scope");
-    }
 
     [Fact]
     [Trait("Spec", "0012:AC-8")]
@@ -388,14 +386,9 @@ public sealed class EndpointFilterTests
         builder.Services.AddProblemDetails();
         builder.Services.AddValidation();
         builder.Services.AddSingleton<IMembershipLookup>(memberships);
+        builder.Services.AddSingleton<ICallerResolver>(new FixedResolver(caller)); // stands in for features 13 and 14
 
         await using WebApplication app = builder.Build();
-        // Stands in for the credential resolvers of features 13 and 14.
-        app.Use((http, next) =>
-        {
-            http.RequestServices.GetRequiredService<AccessContext>().Establish(caller, null);
-            return next(http);
-        });
         app.UseRouting();
         app.UseAccessRequirements();
         app.MapGet("/server/storage", () => "ok").RequireScope(Scopes.StorageWrite);

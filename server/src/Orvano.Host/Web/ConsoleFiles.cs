@@ -1,5 +1,7 @@
 using Microsoft.Extensions.FileProviders;
 
+using Orvano.SharedKernel.Access;
+
 namespace Orvano.Host.Web;
 
 /// <summary>
@@ -33,10 +35,12 @@ internal static class ConsoleFiles
     /// <summary>The <c>/</c> redirect (spec 0007 RUN-4) and the <c>index.html</c> fallback for client side routes.</summary>
     public static WebApplication MapConsole(this WebApplication app)
     {
+        // Public (spec 0012 EPT-5): the console page loads before anyone signs in, is the same for every caller, and
+        // must not break on a stale session cookie; its API calls carry the access checks.
         IFileProvider files = Files(app);
-        app.MapGet("/", () => TypedResults.Redirect(BasePath + "/")).ExcludeFromDescription().AllowAnonymous();
-        app.MapGet(BasePath, (HttpContext context) => IndexPage(context, files)).ExcludeFromDescription().AllowAnonymous();
-        app.MapGet(BasePath + "/{**path}", (HttpContext context) => IndexPage(context, files)).ExcludeFromDescription().AllowAnonymous();
+        app.MapGet("/", () => TypedResults.Redirect(BasePath + "/")).ExcludeFromDescription().AllowPublicAccess();
+        app.MapGet(BasePath, (HttpContext context) => IndexPage(context, files)).ExcludeFromDescription().AllowPublicAccess();
+        app.MapGet(BasePath + "/{**path}", (HttpContext context) => IndexPage(context, files)).ExcludeFromDescription().AllowPublicAccess();
         return app;
     }
 

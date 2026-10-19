@@ -110,13 +110,14 @@ internal static class ServeCommand
 
         app.UseRouting();
 
-        // Spec 0012 DEN-5: endpoint access requirements answer before binding and validation. The credential resolvers
-        // of features 13 and 14 go between UseRouting and this.
+        // Spec 0012 EPT-1: the access layer resolves the caller (resolvers registered with AddCallerResolver) and
+        // enforces each endpoint's declaration before binding and validation.
         app.UseAccessRequirements();
 
         // Health checks answer in every role, so container health checks work for workers too (spec 0007 IMG-4).
-        app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();
-        app.MapHealthChecks("/health/ready", new() { Predicate = check => check.Tags.Contains("ready") }).AllowAnonymous();
+        // Public (spec 0012 EPT-5): probes carry no credential, and the answer is the same for every caller.
+        app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowPublicAccess();
+        app.MapHealthChecks("/health/ready", new() { Predicate = check => check.Tags.Contains("ready") }).AllowPublicAccess();
 
         if (roles.Api)
         {
