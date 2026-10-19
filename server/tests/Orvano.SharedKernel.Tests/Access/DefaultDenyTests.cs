@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using Orvano.SharedKernel.Access;
 
@@ -224,6 +225,136 @@ public sealed class DefaultDenyTests
         (await CodeAsync(app, "/raw")).ShouldBe((HttpStatusCode.OK, null));
     }
 
+    [Fact]
+    [Trait("Spec", "0012:AC-13")]
+    [Trait("Spec", "0012:EPT-3")]
+    public async Task Startup_fails_when_an_endpoint_mixes_a_scope_and_a_client_api()
+    {
+        InvalidOperationException error = await StartupErrorAsync(app => app.MapGet("/p/{projectId}/rows", () => "ok")
+            .RequireScope(Scopes.DatabasesRead)
+            .RequireClientApi(Scopes.ClientDatabases));
+
+        error.Message.ShouldContain("/p/{projectId}/rows");
+        error.Message.ShouldContain("mixes requirement kinds");
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:AC-13")]
+    [Trait("Spec", "0012:EPT-3")]
+    public async Task Startup_fails_when_a_group_requirement_and_an_endpoint_requirement_are_different_kinds()
+    {
+        InvalidOperationException error = await StartupErrorAsync(app =>
+            app.MapGroup("/p/{projectId}").RequireScope(Scopes.DatabasesRead).MapGet("/rows", () => "ok").RequireClientApi(Scopes.ClientDatabases));
+
+        error.Message.ShouldContain("/p/{projectId}/rows");
+        error.Message.ShouldContain("mixes requirement kinds");
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:AC-13")]
+    [Trait("Spec", "0012:EPT-3")]
+    public async Task Startup_fails_when_a_public_group_holds_an_endpoint_with_a_requirement()
+    {
+        InvalidOperationException error = await StartupErrorAsync(app =>
+            app.MapGroup("/open").AllowPublicAccess().MapGet("/secret", () => "ok").RequireScope(Scopes.StorageRead));
+
+        error.Message.ShouldContain("/open/secret");
+        error.Message.ShouldContain("both a requirement and AllowPublicAccess");
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:AC-13")]
+    [Trait("Spec", "0012:EPT-5")]
+    public async Task Public_group_covers_each_endpoint_in_the_group_when_called()
+    {
+        var resolver = new FixedResolver(Secret);
+        await using WebApplication app = await StartAsync(resolver, app =>
+        {
+            RouteGroupBuilder group = app.MapGroup("/health").AllowPublicAccess();
+            group.MapGet("/live", () => "ok");
+            group.MapGet("/ready", () => "ok");
+        });
+
+        (await CodeAsync(app, "/health/live")).ShouldBe((HttpStatusCode.OK, null));
+        (await CodeAsync(app, "/health/ready")).ShouldBe((HttpStatusCode.OK, null));
+        resolver.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:AC-13")]
+    [Trait("Spec", "0012:EPT-5")]
+    public async Task Public_endpoint_ignores_a_bad_key_and_an_expired_bearer_token_when_the_sample_resolvers_would_refuse_them()
+    {
+        bool ran = false;
+        WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Services.AddAccessContext().AddCallerResolver<SampleKeyResolver>().AddCallerResolver<SampleTokenResolver>();
+        builder.Services.AddProblemDetails();
+        await using WebApplication app = builder.Build();
+        app.UseRouting();
+        app.UseAccessRequirements();
+        app.MapGet("/health/live", () => ran = true).AllowPublicAccess();
+        app.MapGet("/storage", () => "ok").RequireScope(Scopes.StorageWrite);
+        await app.StartAsync(Token);
+
+        using HttpResponseMessage open = await SendWithCredentialsAsync(app, "/health/live");
+        using HttpResponseMessage declared = await SendWithCredentialsAsync(app, "/storage");
+
+        open.StatusCode.ShouldBe(HttpStatusCode.OK);
+        ran.ShouldBeTrue();
+        declared.StatusCode.ShouldBe(HttpStatusCode.Unauthorized); // the control: the same credentials are refused elsewhere
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:AC-13")]
+    [Trait("Spec", "0012:EPT-5")]
+    public async Task Public_endpoint_answers_when_the_pipeline_has_no_access_layer()
+    {
+        WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Services.AddAccessContext();
+        await using WebApplication app = builder.Build();
+        app.MapGet("/health/live", () => "ok").AllowPublicAccess();
+        await app.StartAsync(Token);
+
+        (await CodeAsync(app, "/health/live")).ShouldBe((HttpStatusCode.OK, null));
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:AC-13")]
+    [Trait("Spec", "0012:EPT-4")]
+    public async Task Endpoint_mapped_after_startup_answers_not_found_and_logs_an_error_naming_it_when_it_declares_nothing()
+    {
+        bool ran = false;
+        var logs = new ErrorLog();
+        await using WebApplication app = await StartAsync(
+            new FixedResolver(Secret),
+            app => app.MapGet("/open", () => "ok").AllowPublicAccess(),
+            services => services.AddSingleton<ILoggerProvider>(logs));
+        app.MapGet("/late", () => ran = true); // after the startup check ran
+
+        (await CodeAsync(app, "/late")).ShouldBe((HttpStatusCode.NotFound, "not_found"));
+        ran.ShouldBeFalse();
+        logs.Errors.ShouldHaveSingleItem().ShouldContain("/late");
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:AC-13")]
+    [Trait("Spec", "0012:EPT-1")]
+    public async Task Wrong_method_answers_not_found_without_an_error_log_when_routing_rejects_it()
+    {
+        var logs = new ErrorLog();
+        await using WebApplication app = await StartAsync(
+            new FixedResolver(Secret),
+            app => app.MapGet("/storage", () => "ok").RequireScope(Scopes.StorageRead),
+            services => services.AddSingleton<ILoggerProvider>(logs));
+
+        using HttpResponseMessage response = await app.GetTestClient().PostAsync(new Uri("/storage", UriKind.Relative), null, Token);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        logs.Errors.ShouldBeEmpty();
+    }
+
     private static async Task<InvalidOperationException> StartupErrorAsync(Action<WebApplication> map)
     {
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
@@ -275,5 +406,52 @@ public sealed class DefaultDenyTests
         using HttpResponseMessage response = await GetAsync(app, path);
         string body = await response.Content.ReadAsStringAsync(Token);
         return (response.StatusCode, response.IsSuccessStatusCode ? null : JsonDocument.Parse(body).RootElement.GetProperty("code").GetString());
+    }
+    private static async Task<HttpResponseMessage> SendWithCredentialsAsync(WebApplication app, string path)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(path, UriKind.Relative));
+        request.Headers.Add("X-Key", "bad");
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer expired");
+        request.Headers.Add("Cookie", "session=junk");
+        return await app.GetTestClient().SendAsync(request, Token);
+    }
+
+    /// <summary>Keeps the message of each error the app logs.</summary>
+    private sealed class ErrorLog : ILoggerProvider, ILogger
+    {
+        private readonly List<string> _errors = [];
+
+        public IReadOnlyList<string> Errors
+        {
+            get
+            {
+                lock (_errors)
+                {
+                    return [.. _errors];
+                }
+            }
+        }
+
+        public ILogger CreateLogger(string categoryName) => this;
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Error;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (IsEnabled(logLevel))
+            {
+                lock (_errors)
+                {
+                    _errors.Add(formatter(state, exception));
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+        }
     }
 }
