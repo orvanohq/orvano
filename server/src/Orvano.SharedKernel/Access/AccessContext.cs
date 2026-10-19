@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Orvano.SharedKernel.Access;
 
@@ -63,12 +65,28 @@ internal sealed class AccessContext : ICallerContext, IProjectContext
 
 public static class AccessServiceCollectionExtensions
 {
-    /// <summary>Registers the per request caller and project contexts.</summary>
+    /// <summary>
+    /// Registers the per request caller and project contexts, and a startup check that builds every endpoint, so a
+    /// misdeclared access requirement fails startup rather than the first request.
+    /// </summary>
     public static IServiceCollection AddAccessContext(this IServiceCollection services)
     {
+        services.AddHostedService<AccessEndpointCheck>();
         services.AddScoped<AccessContext>();
         services.AddScoped<ICallerContext>(provider => provider.GetRequiredService<AccessContext>());
         services.AddScoped<IProjectContext>(provider => provider.GetRequiredService<AccessContext>());
         return services;
     }
+}
+
+// Building the endpoints runs the conventions RequireConsolePermission adds, which throw on a bad route pattern.
+internal sealed class AccessEndpointCheck(IServiceProvider services) : IHostedService
+{
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        _ = services.GetService<EndpointDataSource>()?.Endpoints;
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

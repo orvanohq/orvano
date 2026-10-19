@@ -236,4 +236,105 @@ public sealed class GrantSetTests
 
         GrantSet.Normalize(defaults, A, GrantTarget.Row).Value.ShouldBe(defaults);
     }
+
+    public static TheoryData<GrantTarget, string[]> ClientWrites => new()
+    {
+        { GrantTarget.Table, ["read:users"] },
+        { GrantTarget.Bucket, ["create:any"] },
+        { GrantTarget.Function, ["execute:guests"] },
+        { GrantTarget.Table, ["not a grant"] }, // refused before parsing, so no validation answer
+    };
+
+    [Theory]
+    [Trait("Spec", "0012:WRT-6")]
+    [MemberData(nameof(ClientWrites))]
+    public void Normalize_answers_forbidden_when_a_client_writes_table_bucket_or_function_grants(GrantTarget target, string[] input)
+    {
+        GrantSet.Normalize(input, A, target).Error.ShouldBe(AccessErrors.Forbidden);
+        GrantSet.Normalize(input, Guest, target).Error.ShouldBe(AccessErrors.Forbidden);
+    }
+
+    [Theory]
+    [Trait("Spec", "0012:WRT-6")]
+    [InlineData(GrantTarget.Table)]
+    [InlineData(GrantTarget.Bucket)]
+    public void Normalize_lets_a_secret_key_and_an_operator_write_container_grants_when_saving(GrantTarget target)
+    {
+        GrantSet.Normalize(["read:users"], Secret, target).IsSuccess.ShouldBeTrue();
+        GrantSet.Normalize(["read:users"], Operator, target).IsSuccess.ShouldBeTrue();
+        GrantSet.Normalize(["execute:users"], Run, GrantTarget.Function).IsSuccess.ShouldBeTrue();
+    }
+
+    [Theory]
+    [Trait("Spec", "0012:GRM-4")]
+    [InlineData("write:Users")]
+    [InlineData("write:team:x")]
+    [InlineData("write:")]
+    public void Write_with_a_bad_role_is_reported_once_when_expanded(string token)
+    {
+        string problem = GrantSet.Normalize([token], Secret, GrantTarget.Table).Error!.Fields!["permissions"].ShouldHaveSingleItem();
+
+        problem.ShouldContain($"'{token}'");
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:GRM-4")]
+    public void Write_naming_a_role_the_client_lacks_is_reported_once_when_expanded() =>
+        GrantSet.Normalize(["write:label:admin"], A, GrantTarget.Row).Error!.Fields!["permissions"]
+            .ShouldHaveSingleItem().ShouldContain("roles you hold");
+
+    [Fact]
+    [Trait("Spec", "0012:GRM-2")]
+    public void Problem_quotes_a_long_token_cut_short_when_reporting_it()
+    {
+        string token = "read:label:" + new string('x', 1000);
+
+        string problem = GrantSet.Normalize([token], Secret, GrantTarget.Row).Error!.Fields!["permissions"].ShouldHaveSingleItem();
+
+        problem.ShouldStartWith($"'{token[..64]}…'");
+        problem.Length.ShouldBeLessThan(200);
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:GRM-2")]
+    public void Problem_shows_control_characters_escaped_when_the_token_holds_them()
+    {
+        string problem = GrantSet.Normalize(["read:label:x\nINFO forged\u202e"], Secret, GrantTarget.Row).Error!.Fields!["permissions"]
+            .ShouldHaveSingleItem();
+
+        problem.ShouldStartWith(@"'read:label:x\u000AINFO forged\u202E'");
+        problem.ShouldNotContain('\n');
+        problem.ShouldNotContain('\u202e');
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:GRM-2")]
+    public void Normalize_lists_at_most_20_problems_when_many_tokens_are_bad()
+    {
+        string[] bad = [.. Enumerable.Range(0, 300).Select(i => $"bad{i}")];
+
+        GrantSet.Normalize(bad, Secret, GrantTarget.Row).Error!.Fields!["permissions"].Length.ShouldBe(20);
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:GRM-2")]
+    public void Normalize_stops_reading_and_refuses_the_list_when_it_holds_more_than_500_entries()
+    {
+        IEnumerable<string> endless = Enumerable.Repeat("read:any", int.MaxValue);
+
+        string problem = GrantSet.Normalize(endless, Secret, GrantTarget.Row).Error!.Fields!["permissions"].ShouldHaveSingleItem();
+
+        problem.ShouldContain("at most 500");
+        GrantSet.Normalize(Enumerable.Repeat("read:any", 500), Secret, GrantTarget.Row).Value.ShouldBe(["read:any"]);
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:GRM-1")]
+    public void Role_is_default_only_when_no_factory_or_parse_made_it()
+    {
+        default(Role).IsDefault.ShouldBeTrue();
+        Role.Any.IsDefault.ShouldBeFalse();
+        Role.TryParse("users", out Role users).ShouldBeTrue();
+        users.IsDefault.ShouldBeFalse();
+    }
 }

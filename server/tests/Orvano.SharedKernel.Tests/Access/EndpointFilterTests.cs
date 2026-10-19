@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -237,9 +238,36 @@ public sealed class EndpointFilterTests
     }
 
     [Fact]
-    [Trait("Spec", "0012:AC-11")]
-    public async Task Console_permission_throws_when_the_route_has_no_organization_or_project() =>
-        await Should.ThrowAsync<InvalidOperationException>(() => SendAsync(Operator, "/console/nowhere", new FakeMemberships("owner")));
+    [Trait("Spec", "0012:CPL-3")]
+    public async Task Console_permission_fails_startup_when_the_route_has_no_organization_or_project()
+    {
+        WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Services.AddAccessContext();
+        await using WebApplication app = builder.Build();
+        app.UseRouting();
+        app.UseAccessRequirements();
+        app.MapGet("/console/nowhere", () => "ok").RequireConsolePermission(ConsolePermission.OrgRead);
+
+        InvalidOperationException error = await Should.ThrowAsync<InvalidOperationException>(() => app.StartAsync(Token));
+
+        error.Message.ShouldContain("/console/nowhere");
+    }
+
+    [Fact]
+    [Trait("Spec", "0012:CPL-3")]
+    public async Task Console_permission_builds_when_a_group_prefix_holds_the_route_value()
+    {
+        WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Services.AddAccessContext();
+        await using WebApplication app = builder.Build();
+        app.MapGroup("/console/orgs/{organizationId}").MapGet("/settings", () => "ok").RequireConsolePermission(ConsolePermission.OrgRead);
+
+        await app.StartAsync(Token);
+
+        ((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints).ShouldHaveSingleItem();
+    }
 
     // One body fails validation, the other fails binding.
     public static TheoryData<string> BadBodies => ["""{ "name": "" }""", "{ not json"];
@@ -380,7 +408,6 @@ public sealed class EndpointFilterTests
             .RequireConsolePermission(ConsolePermission.ProjectRead);
         app.MapGet("/console/projects/{projectId}", (IProjectContext project) => project.Id.ToString())
             .RequireConsolePermission(ConsolePermission.DataRead);
-        app.MapGet("/console/nowhere", () => "ok").RequireConsolePermission(ConsolePermission.OrgRead);
         await app.StartAsync(Token);
 
         using (request)

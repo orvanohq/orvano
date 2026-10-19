@@ -1,3 +1,5 @@
+using System.Data.Common;
+
 using Microsoft.EntityFrameworkCore;
 
 using Npgsql;
@@ -14,7 +16,7 @@ using static Orvano.SharedKernel.Tests.Access.Callers;
 
 namespace Orvano.SharedKernel.Tests.Access;
 
-// Spec 0012 build plan step 7: the row filter runs in PostgreSQL 18, over a GIN index, with correct pages and counts.
+// Spec 0012 build plan step 7: the row filter runs in PostgreSQL 18, over a GIN index the planner picks, with correct pages and counts.
 public sealed class WhereGrantedTests(GrantedDatabase db) : IClassFixture<GrantedDatabase>
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -32,18 +34,26 @@ public sealed class WhereGrantedTests(GrantedDatabase db) : IClassFixture<Grante
 
     [Fact]
     [Trait("Spec", "0012:AC-4")]
-    public async Task Overlap_filter_is_served_by_the_GIN_index_when_the_planner_may_use_it()
+    public async Task Planner_serves_the_generated_filter_from_the_GIN_index_when_the_table_is_large_and_analyzed()
     {
-        await using NpgsqlConnection connection = await db.DataSource.OpenConnectionAsync(Token);
-        await using (NpgsqlCommand off = new("SET enable_seqscan = off", connection))
-        {
-            await off.ExecuteNonQueryAsync(Token);
-        }
+        // 50,000 rows, each owned by a different user, plus 100 of A's: A's tokens are rare, as in a real table.
+        await db.ExecuteAsync("""
+            INSERT INTO granted_row (tag, owner, _permissions)
+            SELECT 'planner', owner, ARRAY['delete:user:' || owner, 'read:user:' || owner, 'update:user:' || owner]
+            FROM (SELECT gen_random_uuid() AS owner FROM generate_series(1, 50000)) AS t;
+            ANALYZE granted_row;
+            """);
+        await db.SeedAsync(total: 100, everyNth: (1, 1));
+        await db.ExecuteAsync("ANALYZE granted_row");
+        await using GrantedContext context = db.CreateContext();
+        IQueryable<GrantedRow> query = context.Rows.WhereGranted(row => row.Permissions, A.MatchTokens(GrantAction.Read));
 
-        await using NpgsqlCommand explain = new("EXPLAIN SELECT id FROM granted_row WHERE _permissions && $1", connection);
-        explain.Parameters.AddWithValue(A.MatchTokens(GrantAction.Read));
+        // The SQL and parameters EF really sends, explained as they are, with sequential scans left on.
+        await using DbCommand command = query.CreateDbCommand();
+        command.CommandText = "EXPLAIN " + command.CommandText;
+        await context.Database.OpenConnectionAsync(Token);
         var plan = new List<string>();
-        await using (NpgsqlDataReader reader = await explain.ExecuteReaderAsync(Token))
+        await using (DbDataReader reader = await command.ExecuteReaderAsync(Token))
         {
             while (await reader.ReadAsync(Token))
             {
@@ -51,7 +61,9 @@ public sealed class WhereGrantedTests(GrantedDatabase db) : IClassFixture<Grante
             }
         }
 
-        string.Join('\n', plan).ShouldContain("ix_granted_row_permissions");
+        string text = string.Join('\n', plan);
+        text.ShouldContain("ix_granted_row_permissions", Case.Sensitive, text);
+        text.ShouldNotContain("Seq Scan", Case.Sensitive, text);
     }
 
     [Fact]

@@ -70,21 +70,33 @@ public static class Scopes
         ArgumentNullException.ThrowIfNull(scopes);
 
         IReadOnlySet<string> ceiling = CeilingFor(type);
-        var problems = new List<string>();
+        var problems = new InputProblems();
         var result = new SortedSet<string>(StringComparer.Ordinal);
+        int read = 0;
         foreach (string scope in scopes)
         {
+            if (++read > InputProblems.MaxEntries)
+            {
+                problems.AddTooLong();
+                break;
+            }
+
             if (scope == UsersImpersonate)
             {
-                problems.Add($"'{scope}': this scope is reserved for later and cannot be used yet.");
+                problems.Add($"{InputProblems.Quote(scope)}: this scope is reserved for later and cannot be used yet.");
             }
             else if (!ceiling.Contains(scope))
             {
-                problems.Add($"'{scope}': not a scope a {(type == KeyType.Secret ? "secret" : "publishable")} key can hold.");
+                problems.Add($"{InputProblems.Quote(scope)}: not a scope a {(type == KeyType.Secret ? "secret" : "publishable")} key can hold.");
             }
             else
             {
                 result.Add(scope);
+            }
+
+            if (problems.IsFull)
+            {
+                break;
             }
         }
 
@@ -93,7 +105,7 @@ public static class Scopes
             problems.Add($"'{ClientAuthSignup}': needs '{ClientAuth}' too.");
         }
 
-        return problems.Count > 0 ? AccessErrors.Invalid(Field, problems) : result.ToArray();
+        return problems.Count > 0 ? AccessErrors.Invalid(Field, problems.Items) : result.ToArray();
     }
 
     /// <summary>KEY-4: the per request recheck of stored scopes against the ceiling.</summary>

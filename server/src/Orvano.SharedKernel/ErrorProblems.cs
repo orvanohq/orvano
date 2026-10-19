@@ -28,11 +28,23 @@ public static class ErrorProblems
     /// <summary>The extension a <see cref="ErrorKind.RateLimited"/> error carries its wait in.</summary>
     public const string RetryAfterSecondsExtension = "retryAfterSeconds";
 
+    private static readonly HashSet<string> ReservedExtensions = new(StringComparer.Ordinal) { "code", "traceId", "errors" };
+
     public static ErrorProblemResult ToProblem(this Error error)
     {
         ArgumentNullException.ThrowIfNull(error);
 
-        var extensions = new Dictionary<string, object?> { ["code"] = error.Code };
+        // The error's own extensions never supply code, traceId, or errors: those come only from the error itself.
+        var extensions = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach ((string key, object? value) in error.Extensions ?? new Dictionary<string, object?>())
+        {
+            if (!ReservedExtensions.Contains(key))
+            {
+                extensions[key] = value;
+            }
+        }
+
+        extensions["code"] = error.Code;
         if (Activity.Current is { } activity)
         {
             extensions["traceId"] = activity.TraceId.ToString();
@@ -41,11 +53,6 @@ public static class ErrorProblems
         if (error.Fields is { Count: > 0 } fields)
         {
             extensions["errors"] = fields;
-        }
-
-        foreach ((string key, object? value) in error.Extensions ?? new Dictionary<string, object?>())
-        {
-            extensions[key] = value;
         }
 
         int? retryAfterSeconds = error.Kind == ErrorKind.RateLimited

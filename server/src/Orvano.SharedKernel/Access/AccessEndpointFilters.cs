@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 
 namespace Orvano.SharedKernel.Access;
 
@@ -55,11 +56,24 @@ public static class AccessEndpointFilters
     /// <summary>
     /// A control plane route (CPL-3). The organization comes from the route, or from the project in the route. No
     /// membership, an unknown project, or a project outside the organization answers 404; a member without
-    /// <paramref name="permission"/> gets 403. A project that passes becomes the request's project (PRJ-3).
+    /// <paramref name="permission"/> gets 403. A project that passes becomes the request's project (PRJ-3). A route
+    /// pattern with neither route value throws when the endpoint is built, which <see cref="AccessServiceCollectionExtensions.AddAccessContext"/>
+    /// forces at startup.
     /// </summary>
     public static RouteHandlerBuilder RequireConsolePermission(this RouteHandlerBuilder builder, ConsolePermission permission)
     {
         ArgumentNullException.ThrowIfNull(builder);
+
+        builder.Add(endpoint =>
+        {
+            if (endpoint is RouteEndpointBuilder { RoutePattern: var pattern }
+                && pattern.GetParameter(OrganizationIdRouteValue) is null
+                && pattern.GetParameter(ProjectIdRouteValue) is null)
+            {
+                throw new InvalidOperationException(
+                    $"RequireConsolePermission on '{pattern.RawText}' needs an '{{{OrganizationIdRouteValue}}}' or '{{{ProjectIdRouteValue}}}' route value.");
+            }
+        });
 
         return builder
             .Require(new ConsolePermissionRequirement(permission))
