@@ -182,7 +182,11 @@ public static class AccessRequirementsMiddleware
                     caller = resolved.Caller ?? throw new InvalidOperationException($"{resolver.GetType().Name} resolved a null caller.");
                     break;
                 case CallerResolution.Failed failed:
-                    logger.CredentialRefused(resolver.GetType().Name, Truncate(failed.Reason));
+                    if (logger.IsEnabled(LogLevel.Information))
+                    {
+                        logger.CredentialRefused(resolver.GetType().Name, Truncate(failed.Reason));
+                    }
+
                     return null; // PRJ-4: no fallback
                 default:
                     throw new InvalidOperationException($"{resolver.GetType().Name} returned an unknown resolution.");
