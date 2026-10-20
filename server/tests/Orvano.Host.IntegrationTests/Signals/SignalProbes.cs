@@ -44,6 +44,15 @@ internal sealed class SilentHeartbeat : IHeartbeatSender
     public Task SendAsync(NpgsqlConnection connection, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
+/// <summary>
+/// A heartbeat sender whose send never returns and ignores cancellation, like <c>SELECT pg_notify</c> on a connection
+/// that went silent without closing (spec 0013 LSN-3).
+/// </summary>
+internal sealed class HangingHeartbeat : IHeartbeatSender
+{
+    public Task SendAsync(NpgsqlConnection connection, CancellationToken cancellationToken) => new TaskCompletionSource().Task;
+}
+
 /// <summary>Raw access to a test database: the platform owner's connection, for NOTIFY and backend control.</summary>
 internal sealed class TestDatabase(NpgsqlDataSource dataSource) : IAsyncDisposable
 {

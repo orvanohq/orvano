@@ -209,17 +209,22 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
             while (true)
             {
                 DateTimeOffset now = _time.GetUtcNow();
-                if (now - _lastSent >= _options.HeartbeatInterval)
-                {
-                    await _heartbeat.SendAsync(connection, cancellationToken);
-                    _lastSent = now;
-                }
-
                 DateTimeOffset deadline = _lastHeartbeat + _options.HeartbeatTimeout;
                 if (now >= deadline)
                 {
                     _connected = false; // the bypass starts before any queued work runs
                     return;
+                }
+
+                if (now - _lastSent >= _options.HeartbeatInterval)
+                {
+                    if (!await SendHeartbeatAsync(connection, deadline - now, cancellationToken))
+                    {
+                        _connected = false; // a send still waiting at the deadline means a silent connection (LSN-3)
+                        return;
+                    }
+
+                    _lastSent = now;
                 }
 
                 DateTimeOffset nextSend = _lastSent + _options.HeartbeatInterval;
@@ -230,6 +235,26 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
         catch (Exception) when (MarkDisconnected())
         {
             // Never reached: the filter only flips the state before the connection is disposed.
+        }
+    }
+
+    /// <summary>
+    /// Sends one heartbeat, bounded by <paramref name="left"/> (the time to the timeout deadline). Returns false when the
+    /// send is still waiting then, as on a connection that went silent without closing. The send is cancelled and left
+    /// behind, so a sender that ignores the cancel cannot hold the read loop.
+    /// </summary>
+    private async Task<bool> SendHeartbeatAsync(NpgsqlConnection connection, TimeSpan left, CancellationToken cancellationToken)
+    {
+        using var deadline = new CancellationTokenSource(left, _time);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
+        try
+        {
+            await _heartbeat.SendAsync(connection, linked.Token).WaitAsync(linked.Token);
+            return true;
+        }
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            return false;
         }
     }
 
