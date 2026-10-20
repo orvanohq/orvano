@@ -1,11 +1,12 @@
-# 0013. Background runtime: signal and cache contracts, and how a signal joins a transaction
+# 0013. Background runtime: signal and cache contracts, how a signal joins a transaction, and the job queue
 
 **Date**: 2026-10-19
 **Status**: In Progress
+**Updated**: 2026-10-19, milestone 2 (job queue, runner, and schedules): user stories, AC-14 to AC-30, the _Job queue design_ section (JQ, JDB, ENQ, CLM, OUT, WAK, SCH, JOP, JTL, JTS rules), build plan steps 13 to 20, and their consequences and follow ups.
 
 ## Summary
 
-Spec 0007 decided that Orvano's server instances tell each other about changes over PostgreSQL's `LISTEN/NOTIFY` (a built in message channel), but left open the exact code contracts and how a signal rides along with the database write it announces. This spec settles both for feature 61's first milestone (signals and cache invalidation). A module hands a signal or a cache tag to the `DbContext` (the database session object) whose transaction is open; the signal is written into that transaction just before it commits, so it goes out only if the change does, and the writer's own cache entry is removed as soon as the commit returns. Each instance runs one listener that applies incoming cache tags, falls back to reading the database whenever it might have missed a signal, and gives later features (the job runner, session revocation) a small plug in point. A review on 2026-10-19 tightened the edges: a slow handler is cut off after 10 seconds and a lagging loop counts as disconnected, a flapping connection backs off, observers hear "disconnected" at boot, only confirmed commits count as sent, a context that only joined a transaction cannot enlist, and modules cannot reach raw connections or the undecorated cache. The job queue and outbox (milestones 2 and 3) add their own sections to this spec later.
+Spec 0007 decided that Orvano's server instances tell each other about changes over PostgreSQL's `LISTEN/NOTIFY` (a built in message channel), but left open the exact code contracts and how a signal rides along with the database write it announces. This spec settles both for feature 61's first milestone (signals and cache invalidation). A module hands a signal or a cache tag to the `DbContext` (the database session object) whose transaction is open; the signal is written into that transaction just before it commits, so it goes out only if the change does, and the writer's own cache entry is removed as soon as the commit returns. Each instance runs one listener that applies incoming cache tags, falls back to reading the database whenever it might have missed a signal, and gives later features (the job runner, session revocation) a small plug in point. A review on 2026-10-19 tightened the edges: a slow handler is cut off after 10 seconds and a lagging loop counts as disconnected, a flapping connection backs off, observers hear "disconnected" at boot, only confirmed commits count as sent, a context that only joined a transaction cannot enlist, and modules cannot reach raw connections or the undecorated cache. Milestone 2 adds the job queue: a module hands a job to `IJobQueue` on the same `DbContext` whose transaction is open, so the job row is written by that transaction and a `job` signal wakes the workers only if it commits. Workers claim due jobs with `FOR UPDATE SKIP LOCKED` (a lock that skips rows another worker holds), hold each with a lease they renew while the handler runs, retry failures with backoff, and mark a job dead after its last attempt. Schedules are declared in code, synced into `jobs.schedule` at worker start, and fire exactly once across workers through the job's unique dedupe key. Every time the runner reads comes from the injected clock, so tests drive it. The outbox (milestone 3) adds its own section later.
 
 ## Requirements
 
@@ -14,6 +15,9 @@ Spec 0007 decided that Orvano's server instances tell each other about changes o
 - As the engineer of features 9, 13, and 14, I want one small, fixed contract for "invalidate this cache tag everywhere" and "tell every instance about this", so that my module code never touches the listener or `pg_notify`.
 - As a self hoster running two replicas, I want a change made through one replica to show on the other on the next request, and a dropped signal connection to cost speed, not correctness.
 - As the engineer of the job runner and session revocation, I want to be told when signals may have been lost and when they flow again, so that I can catch up without my own timers for it.
+- As the engineer of features 13, 14, 15, and 29, I want to queue work in the same transaction as the change that needs it, with one small contract and a handler per job type, so that the work runs if and only if the change committed, even when the request ends or the process dies.
+- As a self hoster running several workers, I want each job to run on one worker at a time, a crashed worker's job to be picked up again, and a recurring job to fire once per tick no matter how many workers run, so that adding replicas never runs work twice on purpose.
+- As an operator, I want failing jobs to back off and finally stop as `dead` with their last error, and the runner's state in metrics and logs, so that one bad job type cannot spin forever and I can see what failed.
 
 **Acceptance criteria**:
 
@@ -31,11 +35,33 @@ Spec 0007 decided that Orvano's server instances tell each other about changes o
 - **AC-12**: Modules cannot call `HybridCache.RemoveAsync` or `HybridCache.RemoveByTagAsync` (banned symbols); they invalidate only through `ICacheInvalidator`. They also cannot use `TransactionSignals`, `SignalPayload`, `NpgsqlConnection.Notification`, `Wait` or `WaitAsync`, or open connections from an `NpgsqlDataSource`, no module source file contains `pg_notify` or `orvano_signal`, and the undecorated cache is registered under a key modules cannot name (CAC-1, CAC-5). Only `serve` runs the listener, in every role; other commands get the cache, the invalidator, and the interceptor with the listener absent, so their cache stays bypassed (CAC-5, LSN-1).
 - **AC-13**: The listener's state and traffic are observable: Information logs on connect, Warning on disconnect and on each failed reconnect attempt, and the metrics `orvano.infrastructure.signals.connected` (observable gauge, 1 or 0), `orvano.infrastructure.signals.sent` and `orvano.infrastructure.signals.received` (counters tagged `kind`, `hb` not counted; `sent` counts only confirmed commits, never an unknown commit outcome), and `orvano.infrastructure.cache.clears` (counter tagged `reason`: `connect` or `wildcard`) (LSN-7).
 
+**Acceptance criteria, milestone 2 (job queue, runner, and schedules)**:
+
+- **AC-14**: `Orvano.SharedKernel` exposes `IJob`, `IJobHandler<TJob>`, `IJobQueue`, `JobContext`, `EnqueueOptions`, `JobKindOptions`, `PermanentJobFailureException`, `JobAccessScope`, and the `AddJobHandler<TJob, THandler>` and `AddJobSchedule<TJob>` registrations, with the signatures in _Job queue API surface_; `Orvano.Infrastructure` implements them and `Orvano.Host` registers them. No module references `Orvano.Infrastructure` (JQ-1 to JQ-6).
+- **AC-15**: `orvano migrate` creates `jobs.job` and `jobs.schedule` through `JobsDbContext`, first in `MigrationOrder`, with exactly the columns, CHECK constraints, indexes, and storage parameters in _Job tables_; `HasPendingModelChanges()` is false, and the spec 0011 architecture tests pass for the new context (JDB-1 to JDB-4).
+- **AC-16**: `EnqueueAsync(context, job, options, cancellationToken)` inside an open platform transaction inserts one `queued` row on that transaction's connection: no other connection sees it before the commit, a rollback leaves none, and an execution strategy retry leaves exactly one. The transaction sends one `job` signal (`[]`) on commit when at least one job it enqueued is due (`run_at` at or before now), and none when every job it enqueued is in the future or was a dedupe hit. It returns the new id, or `null` when a row with the same `dedupe_key` exists in any status (ENQ-1 to ENQ-5).
+- **AC-17**: `EnqueueAsync` with a context throws `InvalidOperationException`, and inserts nothing, when the context has no open transaction, is not a platform database context, or joined its transaction with `UseTransaction` (the SND-5 messages). Both overloads throw `InvalidOperationException` for a kind with no registered handler, and `ArgumentException` for a payload over 65,536 UTF-8 bytes, a dedupe key outside 1 to 200 characters, or an empty project id (ENQ-2, ENQ-3).
+- **AC-18**: `EnqueueAsync(job, options, cancellationToken)` with no context commits its own transaction on a fresh `JobsDbContext` and sends the `job` signal the same way; the caller's context, if any, is untouched (ENQ-6).
+- **AC-19**: A worker claims at most its free slots in one statement with `FOR UPDATE SKIP LOCKED`, in `run_at, id` order, taking `queued` rows that are due and `running` rows whose lease expired and that have attempts left. Each claim adds 1 to `attempt` and sets `locked_by` and `locked_until` from the kind's lease. Two workers polling the same 50 due jobs at once run each job exactly once between them, and no worker ever runs more jobs at once than its `Concurrency` (CLM-1 to CLM-3).
+- **AC-20**: While a handler runs, the runner renews its lease every third of the kind's lease. A renewal or an outcome write that finds the row no longer held by this worker and attempt (lease lost) cancels the handler's token and writes nothing. A job whose worker stopped renewing (process killed) is claimed again after `locked_until` passes, and one whose expired lease was on its last attempt becomes `dead` with `last_error` saying so, without running again (CLM-4 to CLM-6, OUT-4).
+- **AC-21**: A handler that returns marks the job `succeeded` with `finished_at`. One that throws, or runs past the kind's `Timeout`, puts the job back to `queued` with `run_at` = now + a delay between d / 2 and d, where d = min(1 hour, 10 s × 2^(attempt − 1)), and the exception type and message in `last_error`; at `attempt` = `max_attempts` it becomes `dead`. `PermanentJobFailureException`, an unregistered kind, and a payload that does not deserialize make it `dead` at once. A job cancelled by host shutdown goes back to `queued`, due now, with `attempt` restored (OUT-1 to OUT-6).
+- **AC-22**: With `PollInterval` set to 1 minute, a due job enqueued and committed through host A (role `api`) starts on host B (role `worker`) within 2 seconds, woken by the `job` signal. With host B's signal connection terminated, it starts within one `PollInterval`. A job enqueued with a future `run_at` starts within one `PollInterval` after `run_at`. On every signal connect, the runner claims at once (WAK-1 to WAK-4).
+- **AC-23**: A job with `project_id` runs in a DI scope whose `ICallerContext.Current` is `Caller.System` and whose `IProjectContext.Id` equals the job's `project_id`; a job without one has `Caller.System` and `IProjectContext.Id` throws. `JobContext` carries the id, kind, attempt, max attempts, project id, `run_at`, and `created_at` from the row (CLM-7, JQ-2).
+- **AC-24**: `AddJobSchedule` rejects at startup a bad name, a cron expression `Cronos` cannot parse in the five field format, a duplicate name, or a kind with no registered handler, naming the schedule. At worker start the runner upserts every registered schedule and deletes rows for names no longer registered. Two workers ticking at the same instant fire a due schedule exactly once, as a job with `dedupe_key` `<name>:<fire time as yyyyMMddTHHmmssZ>`; a schedule whose fires were missed while no worker ran fires once, then moves `next_run_at` to the next occurrence after now; changing a schedule's cron recomputes `next_run_at`; a disabled schedule never fires (SCH-1 to SCH-6).
+- **AC-25**: The built in `jobs.cleanup` schedule (daily at 03:17 UTC) deletes `succeeded` jobs whose `finished_at` is more than 7 days old and `dead` jobs more than 30 days old, 5000 rows per statement until none remain, which frees their dedupe keys (SCH-7, spec 0007 JOB-3).
+- **AC-26**: `JobOptions` binds from `ORVANO_JOBS__POLLINTERVAL` (default 5 s, 1 s to 5 minutes) and `ORVANO_JOBS__CONCURRENCY` (default the smallest of processor count × 2, 16, and half of `ORVANO_DATABASE__POOLSIZE`, at least 1; explicit values 1 to 256). An explicit concurrency above half the platform pool stops startup with a message naming `ORVANO_JOBS__CONCURRENCY` and `ORVANO_DATABASE__POOLSIZE`. Only `serve` with the `worker` role runs the runner, the schedule sync, and the `job` handler; every command can enqueue (JOP-1 to JOP-4).
+- **AC-27**: The runner is observable: the metrics `orvano.infrastructure.jobs.enqueued`, `.attempts`, `.duration`, `.lag`, `.running`, and `.schedules.fired` and the log events in JTL-2, with `kind`, `outcome`, and `schedule` tags only (no ids), and each attempt runs in an activity linked to the enqueuing trace. Payloads and dedupe keys never appear in logs above Debug (JTL-1 to JTL-3).
+- **AC-28**: Modules cannot set the job access scope or write the jobs schema directly: `JobAccessScope` is in `BannedSymbols.Modules.txt`, the module source scan also fails on `jobs.job` and `jobs.schedule`, and the spec 0012 PRJ-3 architecture test allows `AccessContext.Establish` only from the access layer and `JobAccessScope` (JQ-6, JTS-4).
+- **AC-29**: Every time the runner and queue use (now, `run_at`, `locked_until`, backoff, renewal, poll, timeout, cron) comes from the injected `TimeProvider`; no SQL they send calls `now()`, `clock_timestamp()`, or `CURRENT_TIMESTAMP`. `Orvano.Testing`'s `JobsDriver.RunDueAsync` runs every due job on the current clock to its outcome and returns the outcomes, with no background loop (JTS-1 to JTS-3).
+- **AC-30**: `CancelProjectJobsAsync(projectId, exceptJobId, cancellationToken)` marks every `queued` and `running` job of that project `dead` with `last_error` `cancelled: project deleted`, except `exceptJobId`, and returns the count; a running handler of such a job loses its lease at its next renewal (ENQ-7, spec 0011 LIF-2 step 1).
+
 ## Decision
 
 **Chosen option**: Option 1, an explicit `DbContext` argument with a per context batch that a transaction interceptor sends just before commit; the writer removes its own entries once the commit returns; a `HybridCache` decorator gives modules the disconnect bypass without code changes.
 
 Modules call `ICacheInvalidator.Invalidate(db, tags)` or `ISignalBus.Enlist(db, kind, values)` inside an open platform database transaction, normally through `InTransactionAsync`; the batch starts empty with every transaction, so retries, rollbacks, and several module contexts in one request each behave by construction.
+
+**Milestone 2 chosen option**: Option J1 in [rationale.md](rationale.md#milestone-2-job-queue-2026-10-19), Infrastructure writes the job row with SQL on the caller's own `DbContext` connection and enlists the `job` signal on that context, so the job joins the caller's transaction through the same SND machinery as a signal; a context free overload runs its own transaction on `JobsDbContext`. Jobs are typed records with a static `Kind`, each kind has one scoped `IJobHandler<TJob>` registered with its JSON type info, and schedules are declared in code and synced into `jobs.schedule` by each worker.
 
 **Implementation skills**: none installed for this area. The `caching` skill named in spec 0007 shows a Redis backplane; spec 0007 CCH-1 and this spec win over it (GEN-0).
 
@@ -48,7 +74,8 @@ Reasoning and options: see [rationale.md](rationale.md).
 ### Scope and boundaries
 
 - In: the SharedKernel contracts, the transaction join, the payload codec, the listener (connect, `LISTEN`, heartbeat, timeout, backoff, dispatch), `SignalOptions`, `HybridCache` registration and its decorator, `ICacheInvalidator`, the `cache` handler, the clear on connect, telemetry, and the tests.
-- Out (later milestones of feature 61): the job queue and runner (the `job` handler and its `OnConnectedAsync` wake), schedules, and the outbox. Out (feature 14): the `session` handler, the revoked session set, and its fallback poll body. They plug into HND-1 to HND-3.
+- In (milestone 2): the job queue and runner, the `job` handler and its `OnConnectedAsync` wake, and schedules; see _Job queue design_ below.
+- Out (milestone 3 of feature 61): the outbox. It plugs into the runner through `WorkerWake` (WAK-5) and enqueues through ENQ-1. Out (feature 14): the `session` handler, the revoked session set, and its fallback poll body. They plug into HND-1 to HND-3.
 - Out: project databases. They never send signals (spec 0007 SIG-3), which SND-5 enforces.
 
 ### Rules
@@ -212,6 +239,242 @@ No caller facing surface. The channel is on the platform database, reachable onl
 - Bad options: `ORVANO_SIGNALS__HANDLERTIMEOUT` above the heartbeat timeout stops startup naming the variable; verifies **AC-11**.
 - Module isolation: the reflection test finds every public overload of each newly banned member in `BannedSymbols.Modules.txt`; the source scan test fails on a module file holding `pg_notify`; `SignalAwareHybridCache.InnerKey` is not a `string`; verifies **AC-12**.
 
+## Job queue design (milestone 2)
+
+Builds spec 0007 JOB-1 to JOB-6 on the signal machinery above. Rules here win where they add detail to JOB-1 to JOB-6; spec 0007 points back to them.
+
+### Job queue scope and boundaries
+
+- In: the SharedKernel job contracts, `JobsDbContext` and its first migration (`jobs.job`, `jobs.schedule`), enqueue in and out of a transaction, the runner (claim, lease, renewal, outcomes, backoff, dead jobs, shutdown), the `job` signal handler and connection observer, `JobOptions` with the half pool rule, schedules and their sync, the built in `jobs.cleanup` schedule, `CancelProjectJobsAsync`, the project and caller scope for project jobs, telemetry, the test driver, and the tests.
+- Out (milestone 3): the outbox dispatcher. It needs `WorkerWake` (WAK-5) and ENQ-1 on its module's context, nothing more from this section.
+- Out (features 13, 14, 15, 29): every other job kind and schedule (project teardown and provisioning, signing key rotation, expired session cleanup, local file store temp cleanup). Each feature registers its own with JQ-5.
+- Out (feature 46): an operator view of jobs, retrying a dead job, and toggling a schedule's `enabled` flag. Out (feature 23): per project fairness. There is no priority (JOB-2).
+
+### Rules
+
+**Contracts (JQ, `Orvano.SharedKernel/Jobs/`)**
+
+- **JQ-1 (MUST)**: A job type is a record that implements `IJob`, which has one member, `static abstract string Kind { get; }`. The kind is the job's wire name: 3 to 100 characters matching `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$` (for example `jobs.cleanup`, `project.teardown`). Changing a payload in a way old rows cannot deserialize takes a new kind name (`auth.session_cleanup.v2`); old rows of the old kind drain or die (OUT-5). The payload holds ids and codes only, never personal values or secrets (spec 0011 CLS-2).
+- **JQ-2 (MUST)**: `IJobHandler<in TJob> where TJob : IJob` has `Task HandleAsync(TJob job, JobContext context, CancellationToken cancellationToken)`. `JobContext` is a sealed record: `Guid Id`, `string Kind`, `int Attempt` (1 on the first run), `int MaxAttempts`, `Guid? ProjectId`, `DateTimeOffset RunAt`, `DateTimeOffset CreatedAt`. Handlers are idempotent (JOB-2): a job can run again after a crash, a lost lease, or an outcome write that failed. The token cancels on timeout (OUT-2), lease loss (CLM-5), and host shutdown (OUT-6).
+- **JQ-3 (MUST)**: `IJobQueue` has three members, all `Task` returning with a required `CancellationToken` (spec 0002 ASY-2, ASY-4):
+  - `Task<Guid?> EnqueueAsync<TJob>(DbContext context, TJob job, EnqueueOptions? options, CancellationToken cancellationToken) where TJob : IJob` joins `context`'s open transaction (ENQ-1);
+  - `Task<Guid?> EnqueueAsync<TJob>(TJob job, EnqueueOptions? options, CancellationToken cancellationToken) where TJob : IJob` runs its own transaction (ENQ-6);
+  - `Task<int> CancelProjectJobsAsync(Guid projectId, Guid? exceptJobId, CancellationToken cancellationToken)` (ENQ-7).
+    `EnqueueOptions` is a sealed record with `init` properties `DateTimeOffset? RunAt` (null means now), `string? DedupeKey`, `Guid? ProjectId`.
+- **JQ-4 (MUST)**: `PermanentJobFailureException(string message, Exception? inner = null)` is the one way a handler says "retrying will not help" (OUT-3). Any other exception is a failed attempt.
+- **JQ-5 (MUST)**: `services.AddJobHandler<TJob, THandler>(JsonTypeInfo<TJob> jsonTypeInfo, Action<JobKindOptions>? configure = null) where TJob : IJob where THandler : class, IJobHandler<TJob>` registers `THandler` as a scoped `IJobHandler<TJob>` and a singleton `JobRegistration` (kind, job type, the `JsonTypeInfo` from the module's source generated `JsonSerializerContext`, spec 0002 JSN-1, the kind options, and a delegate that deserializes and calls the handler, so Infrastructure needs no reflection). `JobKindOptions` has `TimeSpan Lease` (default 5 minutes, 30 seconds to 1 hour), `int MaxAttempts` (default 10, 1 to 100), and `TimeSpan Timeout` (default 1 hour, at least 1 second). `services.AddJobSchedule<TJob>(string name, string cron, TJob job) where TJob : IJob` registers a singleton `JobScheduleRegistration` (SCH-1). Modules call both in `Add<Module>Module`, for every command. Both registration types are public sealed classes with internal constructors, read by Infrastructure.
+- **JQ-6 (MUST)**: `JobAccessScope.Establish(IServiceProvider scopedServices, Guid? projectId)` (public static) sets the scope's `AccessContext` to `Caller.System` and the project, through the internal `AccessContext.Establish` (spec 0012 CLR-1: `system` is the caller for jobs). Only the runner calls it (CLM-7); `BannedSymbols.Modules.txt` bans the type, and the PRJ-3 architecture test allows it as the one setter outside the access layer (spec 0012 PRJ-3, amended).
+
+**Tables (JDB, `Orvano.Infrastructure/Jobs/Data/`)**
+
+- **JDB-1 (MUST)**: `JobsDbContext` (public sealed, so Host's `MigrationOrder` can name it) uses `UseOrvanoConventions("jobs", services)` on the shared platform `NpgsqlDataSource`, keeps its migrations in `Orvano.Infrastructure/Jobs/Data/Migrations` with history table `jobs.__ef_migrations_history`, has an `IDesignTimeDbContextFactory` (spec 0002 DAT-10), and is the first entry of `MigrationOrder` (spec 0011 MOD-2, spec 0007 INS-2). `AddInfrastructure` registers it with `AddDbContext` (scoped), so every command can enqueue and `/health/ready` sees its pending migrations.
+- **JDB-2 (MUST)**: `jobs.job`, entity `Job : Entity` (queue row; changed only by the SQL in ENQ, CLM, and OUT, so neither `ITimestamped` nor `IVersioned`; the attempt fence in CLM-4 replaces `xmin`). Columns are in _Job tables_ below. Storage parameters `fillfactor = 70` and `autovacuum_vacuum_scale_factor = 0.05` through Npgsql's `HasStorageParameter` (JOB-1). Indexes: `ux_job_dedupe_key` unique on `dedupe_key` (a plain unique index: PostgreSQL treats nulls as distinct, so rows without a key never collide and `ON CONFLICT (dedupe_key) DO NOTHING` needs no `WHERE`); `ix_job_due` on `(run_at, id)` where `status IN ('queued', 'running')`; `ix_job_finished` on `(finished_at)` where `status IN ('succeeded', 'dead')` for cleanup; `ix_job_project` on `(project_id)` where `project_id IS NOT NULL AND status IN ('queued', 'running')` for ENQ-7. `project_id` is a plain uuid with no FK (spec 0011 REF-4).
+- **JDB-3 (MUST)**: `jobs.schedule`, entity `JobSchedule : Entity, ITimestamped, IVersioned`. Columns are in _Job tables_ below. Index `ux_schedule_name` unique on `name`; `ix_schedule_due` on `(next_run_at)` where `enabled`.
+- **JDB-4 (MUST)**: CHECK constraints, each named per spec 0011 COL-7: `ck_job_status` (from `HasTextEnum<JobStatus>`, values `queued`, `running`, `succeeded`, `dead`), `ck_job_kind` (`char_length(kind) BETWEEN 3 AND 100`), `ck_job_attempt` (`attempt >= 0 AND attempt <= max_attempts`), `ck_job_max_attempts` (`max_attempts BETWEEN 1 AND 100`), `ck_job_dedupe_key` (`char_length(dedupe_key) BETWEEN 1 AND 200`), `ck_job_locked_by` (`char_length(locked_by) <= 100`), `ck_job_last_error` (`char_length(last_error) <= 2000`), `ck_job_trace_parent` (`char_length(trace_parent) <= 55`), `ck_job_lease` (`(status = 'running') = (locked_until IS NOT NULL AND locked_by IS NOT NULL)`), `ck_job_finished` (`(status IN ('succeeded', 'dead')) = (finished_at IS NOT NULL)`); `ck_schedule_name` (`char_length(name) BETWEEN 3 AND 100`), `ck_schedule_cron` (`char_length(cron) BETWEEN 9 AND 100`), `ck_schedule_kind` (as `ck_job_kind`). The kind and name patterns are checked in code (JQ-1, SCH-1), not in SQL.
+
+**Enqueue (ENQ)**
+
+- **ENQ-1 (MUST)**: `EnqueueAsync` with a context checks everything first (ENQ-2, ENQ-3), then runs one `INSERT INTO jobs.job (…) VALUES (…) ON CONFLICT (dedupe_key) DO NOTHING` through `context.Database.ExecuteSqlAsync` (interpolated, so every value is a parameter; spec 0002 DAT-6) on that context's connection and transaction. Rows affected 1 returns the new id; 0 returns `null` (a dedupe hit). The id is `Guid.CreateVersion7(now)`, `status` `queued`, `attempt` 0, `max_attempts` from the kind's options, `run_at` the option (normalized to UTC) or now, `created_at` now, `trace_parent` from `Activity.Current` when it is a W3C id, and the payload serialized with the registration's `JsonTypeInfo`. The caller's tracked entities are untouched; the row joins the transaction because the statement runs in it, so it commits or rolls back with the caller's change, and an execution strategy retry (SND-6) inserts it again in the new attempt only.
+- **ENQ-2 (MUST)**: The context checks are SND-5's, through a new `TransactionSignals.EnsureEnlistable(DbContext)` (public static, same messages, already banned in modules by the type ban) called before the insert: an open transaction, a platform database context, not joined. A context with no transaction gets the SND-5 message, which names `InTransactionAsync`.
+- **ENQ-3 (MUST)**: Argument checks, both overloads, before any I/O: the kind has a `JobRegistration` whose job type is `TJob` (else `InvalidOperationException` "No job handler is registered for kind '<kind>' (spec 0013 JQ-5)."); the serialized payload is at most 65,536 UTF-8 bytes; `DedupeKey`, when set, is 1 to 200 characters; `ProjectId`, when set, is not `Guid.Empty` (each else `ArgumentException`).
+- **ENQ-4 (MUST)**: When the insert affected a row and `run_at` is at or before now, the queue enlists `SignalKind.Job` with no values on the same context (through Infrastructure's `SignalBus`, so `signals.sent` counts it). SND-4 already makes it one `job` signal per transaction however many jobs it enqueues (SIG-3). A future job sends nothing; the poll finds it (WAK-2).
+- **ENQ-5 (MUST)**: The `jobs.enqueued` count (JTL-1) is an on committed action (SND-1) per inserted row, so a rolled back or unknown commit enqueues nothing in the metric.
+- **ENQ-6 (MUST)**: `EnqueueAsync` without a context creates a DI scope, resolves `JobsDbContext`, and runs ENQ-1 inside `InTransactionAsync` on it. Use it where no platform transaction is open: a handler queuing a follow up, startup work, or a request that writes nothing else. A caller that does have a transaction uses ENQ-1, so the job cannot outlive a rolled back change.
+- **ENQ-7 (MUST)**: `CancelProjectJobsAsync` runs one `UPDATE jobs.job SET status = 'dead', finished_at = @now, locked_until = NULL, locked_by = NULL, last_error = 'cancelled: project deleted' WHERE project_id = @project AND status IN ('queued', 'running') AND id IS DISTINCT FROM @except` in its own `InTransactionAsync` on `JobsDbContext` and returns the count. A running handler of such a job finds its lease lost at the next renewal (CLM-5). The project teardown job (feature 13, spec 0011 LIF-2 step 1) passes its own id as `exceptJobId`.
+
+**Claim and lease (CLM, `Orvano.Infrastructure/Jobs/`)**
+
+- **CLM-1 (MUST)**: `JobExecutor` (internal, registered by `AddInfrastructure`) runs one claim: first an `UPDATE` that marks `dead` every `running` row with `locked_until < @now AND attempt >= max_attempts` (`last_error` `lease expired on the last attempt`, `finished_at` now, lease columns null), then one claim statement: `UPDATE jobs.job SET status = 'running', attempt = attempt + 1, locked_by = @worker, locked_until = @now + <the kind's lease> FROM (SELECT id FROM jobs.job WHERE (status = 'queued' AND run_at <= @now) OR (status = 'running' AND locked_until < @now AND attempt < max_attempts) ORDER BY run_at, id LIMIT @free FOR UPDATE SKIP LOCKED) AS due WHERE job.id = due.id RETURNING …`. The kind's lease comes from two array parameters (registered kinds and their leases, `unnest`), with the 5 minute default for a kind not registered. Both statements run under the execution strategy, each in its own short transaction; nothing else holds a row lock.
+- **CLM-2 (MUST)**: `@free` is `Concurrency` minus the jobs this process is running; with no free slot there is no claim. Each claimed job runs on its own task, so at most `Concurrency` handlers run per process. `@worker` (`locked_by`) is the machine name cut to 80 characters, `:`, and the process instance id (the 8 hex characters of LSN-1, moved from Host's `SignalInstance` to an Infrastructure `OrvanoInstance` singleton that both the listener's application name and the runner read).
+- **CLM-3 (MUST)**: A claim whose commit outcome is unknown leaves its rows `running` under this worker, with no task running them; their lease expires and they are claimed again, costing one attempt. This is the accepted price of at least once delivery.
+- **CLM-4 (MUST)**: Every statement that touches a claimed row after the claim (renewal, outcome) is fenced: `WHERE id = @id AND status = 'running' AND locked_by = @worker AND attempt = @attempt`. A fenced statement that affects no row means another worker claimed the job after this lease expired, or ENQ-7 cancelled it: the lease is lost.
+- **CLM-5 (MUST)**: Renewal runs every lease ÷ 3 (a `TimeProvider` timer per running job) as `UPDATE … SET locked_until = @now + @lease` with the CLM-4 fence. A lost lease cancels the handler's token at once, logs a Warning, writes no outcome, and frees the slot when the handler returns. A renewal that throws (database down) is retried at the next tick; when the clock passes the last `locked_until` this worker set without a successful renewal, the runner treats the lease as lost too.
+- **CLM-6 (MUST)**: The lease is the only crash detector. A worker that dies leaves `running` rows that any worker claims once `locked_until` passes; the claim counts an attempt, so a job that keeps killing its worker reaches `max_attempts` and dies through CLM-1's first statement (JOB-3).
+- **CLM-7 (MUST)**: Each attempt runs in a new async DI scope: `JobAccessScope.Establish(scope, job.ProjectId)` first (JQ-6), then the registration's delegate deserializes the payload and calls `HandleAsync` with a token linked to the runner's stopping token, the lease loss token, and a `CancellationTokenSource(Timeout, timeProvider)` (spec 0002 ASY-7).
+- **CLM-8 (SHOULD)**: Time is the app's clock (AC-29). Lease expiry compares one host's clock with another's, so replica clocks should be within a few seconds (NTP); a skew far below the 5 minute lease only shifts when a crashed worker's job is picked up.
+
+**Outcomes and dead jobs (OUT)**
+
+- **OUT-1 (MUST)**: The handler returns: one fenced `UPDATE` sets `status = 'succeeded'`, `finished_at = @now`, lease columns null (`last_error` keeps the last failure, if any, for operators).
+- **OUT-2 (MUST)**: The handler throws (anything but JQ-4 and a shutdown cancel), or its `Timeout` passes: if `attempt < max_attempts`, a fenced `UPDATE` sets `status = 'queued'`, `run_at = @now + delay`, lease columns null, and `last_error`; else OUT-4. On timeout the runner cancels the token, writes the outcome at once, frees the slot, and keeps observing the abandoned task (its later exception is logged at Debug), like LSN-6; `last_error` is `timed out after <Timeout>`.
+- **OUT-3 (MUST)**: Backoff (JOB-3): d = min(1 hour, 10 s × 2^(attempt − 1)) and delay = d / 2 + random × d / 2, with `random` from `Random.Shared` in [0, 1) ("equal jitter", so a retry never comes sooner than half the curve). `JobBackoff.Delay(int attempt, double random)` is a pure internal function, unit tested at its bounds; the base, cap, and curve are constants, not options.
+- **OUT-4 (MUST)**: Dead: a fenced `UPDATE` sets `status = 'dead'`, `finished_at = @now`, lease columns null, and `last_error`. Reached at `max_attempts` (OUT-2), by `PermanentJobFailureException`, by an unregistered kind (`no handler registered for kind`), by a payload that does not deserialize (`payload could not be read: <JsonException message>`), by a lease that expired on the last attempt (CLM-1), or by ENQ-7. A dead job is logged at Error and counted (JTL-1), stays visible for 30 days (SCH-7), and keeps its dedupe key until then. Nothing in this milestone revives it (feature 46).
+- **OUT-5 (MUST)**: `last_error` is the exception's type name, `: `, and its message, cut to 2000 characters; the full exception goes to the log. It may quote input, so it is marked `DataClass.Personal`.
+- **OUT-6 (MUST)**: Host shutdown: the runner stops claiming, cancels every running handler's token, and for each handler that then ends with `OperationCanceledException` writes a fenced release: `status = 'queued'`, `attempt = attempt - 1`, `run_at = @now`, lease columns null, plus a `job` signal (the release runs in `InTransactionAsync` on `JobsDbContext`), so a deploy costs no attempt. It waits for handlers until the host's shutdown timeout; anything still running then is recovered by its lease (CLM-6).
+- **OUT-7 (MUST)**: An outcome write that fails after the execution strategy's retries is logged at Error; the job is recovered by its lease (CLM-6). A fenced write whose first try committed but reported failure finds no row on the retry and is logged as a lost lease; that misreport is harmless.
+
+**Wake and poll (WAK)**
+
+- **WAK-1 (MUST)**: `JobRunner` (internal `BackgroundService`, worker role only, JOP-3) loops on one wake: a `Channel<bool>` with capacity 1 and `DropWrite`, so any number of wakes between two claims coalesce into one. On each wake it runs `JobExecutor`'s claim (CLM-1) and starts what it claimed.
+- **WAK-2 (MUST)**: Wake sources: (1) the `job` signal handler (`ISignalHandler` for `SignalKind.Job`, which only writes to the channel, HND-4); (2) a `PeriodicTimer` on `TimeProvider` every `PollInterval`, always on, connected or not, which also runs the schedule tick (SCH-4) before its claim, and is the only path for future `run_at` and retry backoff (no signal is sent for them, ENQ-4); (3) the runner's `ISignalConnectionObserver.OnConnectedAsync` (HND-3: signals sent during the gap are lost); (4) a job finishing when the claim that started it filled every slot it asked for (more may be due).
+- **WAK-3 (MUST)**: The observer adds no fallback poll of its own: the always on poll (WAK-2 (2)) is already the fallback, so `OnDisconnectedAsync` and `OnFallbackPollAsync` keep their empty defaults.
+- **WAK-4 (MUST)**: A claim that throws logs an Error and waits for the next wake (at most `PollInterval`); the loop never ends while the host runs.
+- **WAK-5 (MUST)**: Milestone 3's hook: `WorkerWake` (internal singleton) lets another worker loop subscribe to the same wakes (signal, poll, connect), so the outbox dispatcher (EVT-3) needs no listener code of its own. It is built now with the runner as its first subscriber.
+
+**Schedules (SCH)**
+
+- **SCH-1 (MUST)**: `AddJobSchedule` names are 3 to 100 characters matching JQ-1's pattern (for example `jobs.cleanup`); cron is `Cronos` `CronFormat.Standard` (five fields, minute first), evaluated in UTC. `JobRegistry` (internal singleton, built from every `JobRegistration` and `JobScheduleRegistration`) throws `InvalidOperationException` naming the schedule or kind on a bad name, a cron `CronExpression.Parse` rejects, a duplicate kind or schedule name, or a schedule whose kind has no handler. `StartupChecks` resolves it in every `serve` role, so a bad registration stops startup in every role.
+- **SCH-2 (MUST)**: Code is the source for each schedule's `cron`, `kind`, and `payload`; the table holds `enabled`, `next_run_at`, and `last_fired_at`. At worker start, before its first claim, the runner syncs in one `InTransactionAsync` on `JobsDbContext`: an upsert per registered schedule (`INSERT … ON CONFLICT (name) DO UPDATE SET cron, kind, payload, updated_at` only when one of the three differs, recomputing `next_run_at` from now when the cron changed; a new row gets `enabled = true` and the next occurrence after now), then `DELETE` of rows whose name is not registered. Concurrent syncs from several workers converge (same input, row locks).
+- **SCH-3 (MUST)**: A sync that fails is logged at Error and retried on the next poll tick; the runner claims jobs meanwhile but fires no schedule until a sync succeeds.
+- **SCH-4 (MUST)**: The schedule tick (every poll, WAK-2) runs in one `InTransactionAsync` on `JobsDbContext`: `SELECT … FROM jobs.schedule WHERE enabled AND next_run_at <= @now ORDER BY next_run_at LIMIT 100 FOR UPDATE SKIP LOCKED`; for each row, ENQ-1 on that context with `dedupe_key = '<name>:<next_run_at as yyyyMMddTHHmmssZ>'` and `run_at = next_run_at`, then `next_run_at = <next occurrence strictly after @now>`, `last_fired_at = @now`, `updated_at = @now`. The row lock makes one worker fire a given occurrence; the dedupe key makes a second fire of the same occurrence (after a lost commit, or a lock released by a crash) a no op, so each occurrence fires exactly once (JOB-5).
+- **SCH-5 (MUST)**: Missed occurrences collapse: a schedule that is days behind fires once, for its stored `next_run_at`, and then jumps to the next occurrence after now. A disabled schedule never fires; when feature 46 turns one back on it fires once if `next_run_at` passed, then continues.
+- **SCH-6 (MUST)**: Schedules are instance wide: their jobs have no `project_id`. Their kinds follow JQ-1, and their handlers are idempotent like any other.
+- **SCH-7 (MUST)**: The built in `jobs.cleanup` schedule (cron `17 3 * * *`, kind `jobs.cleanup`, payload `{}`) and its handler, registered by `AddInfrastructure`: `DELETE FROM jobs.job WHERE id IN (SELECT id FROM jobs.job WHERE status = 'succeeded' AND finished_at < @now - 7 days LIMIT 5000)`, repeated until it deletes fewer than 5000, then the same for `dead` older than 30 days. Retentions are constants (JOB-3).
+
+**Options (JOP)**
+
+- **JOP-1 (MUST)**: `JobOptions` in `Orvano.Infrastructure/Jobs/` (`Section = "Jobs"`): `TimeSpan PollInterval` (default 5 s) and `int? Concurrency` (default null), each with an XML doc comment (CFG-1). A source generated validator requires `PollInterval` between 1 second and 5 minutes and an explicit `Concurrency` between 1 and 256.
+- **JOP-2 (MUST)**: The half pool rule (JOB-4, PG-4) lives in `Orvano.Host`, which owns `DatabaseOptions` (CFG-5): a `PostConfigure<JobOptions>` fills a null `Concurrency` with max(1, min(processor count × 2, 16, `PoolSize` / 2)), and an `IValidateOptions<JobOptions>` fails an explicit value above `PoolSize` / 2 with "ORVANO_JOBS__CONCURRENCY (<n>) must be at most half of ORVANO_DATABASE__POOLSIZE (<pool>) (spec 0007 JOB-4)." The default can therefore never fail startup (spec 0007 JOB-4, amended: at the default pool of 30 the default is at most 15, not 16).
+- **JOP-3 (MUST)**: `AddJobRunner()` registers `JobRunner`, its `job` signal handler, its connection observer, and `WorkerWake`; `ServeCommand` calls it only when `ServerRoles.Worker` is true. `AddInfrastructure` registers `JobsDbContext`, `IJobQueue`, `JobExecutor`, `JobRegistry`, `JobOptions`, and the `jobs.cleanup` handler and schedule for every command. An `api` only process enqueues and sends `job` signals but never claims.
+- **JOP-4 (MUST)**: Platform pool use: each running handler uses platform connections through its own contexts, and each renewal or outcome write takes one briefly, so `Concurrency` at most half the pool leaves the other half for requests (PG-4). Handlers that open project databases use the project cap as usual.
+
+**Telemetry (JTL)**
+
+- **JTL-1 (MUST)**: Metrics on `InfrastructureTelemetry` (meter `Orvano.Infrastructure`, spec 0002 LOG-5): `orvano.infrastructure.jobs.enqueued` (counter, `{job}`, tag `kind`; confirmed commits of inserted rows only, ENQ-5); `orvano.infrastructure.jobs.attempts` (counter, tags `kind` and `outcome`: `succeeded`, `failed` (will retry), `dead`, `released`, `lease_lost`); `orvano.infrastructure.jobs.duration` (histogram, `s`, tags `kind` and `outcome`, from handler start to outcome); `orvano.infrastructure.jobs.lag` (histogram, `s`, tag `kind`, claim time minus `run_at`); `orvano.infrastructure.jobs.running` (observable gauge, this process's running handlers); `orvano.infrastructure.jobs.schedules.fired` (counter, tag `schedule`, counted on confirmed commit when the enqueue inserted a row). Kinds and schedule names come from code, so the tags stay low in cardinality; no job, project, or user id tags.
+- **JTL-2 (MUST)**: Logs on `InfrastructureLog`, event ids `LogEventIds.Infrastructure + 100` to `+ 199`: runner started (Information: concurrency, poll interval, worker id); claim failed (Error); attempt started and succeeded (Debug: kind, id, attempt); attempt failed (Warning: kind, id, attempt of max, next `run_at`, exception); job dead (Error: kind, id, attempt, reason, exception when there is one); lease lost (Warning); timed out and abandoned (Warning, then Debug for the late exception); released at shutdown (Information: count); outcome write failed (Error); schedule sync (Information: added, updated, removed counts) and sync failed (Error); schedule fired (Debug: name, fire time); cleanup (Information: deleted counts). Payloads and dedupe keys only at Debug (they may hold user ids, spec 0006 LOG-2).
+- **JTL-3 (MUST)**: Each attempt runs in an activity on the `Orvano.Infrastructure` source, named `job <kind>`, kind `Consumer`, linked to the row's `trace_parent` when present, with tags `orvano.job.kind`, `orvano.job.id`, and `orvano.job.attempt` (traces may carry ids; metrics may not). An exception sets the activity status to error.
+
+**Testing time (JTS)**
+
+- **JTS-1 (MUST)**: Every time in this section comes from the injected `TimeProvider` (spec 0002 GEN-9, ASY-7): `@now` and every computed time are SQL parameters, and no statement calls `now()`, `clock_timestamp()`, or `CURRENT_TIMESTAMP`. Timers (`PeriodicTimer` for the poll, renewal timers, the timeout source) are built on the same `TimeProvider`, and cron occurrences are computed from it.
+- **JTS-2 (MUST)**: `Orvano.Testing` gains `JobsDriver` (reaching `JobExecutor` through `InternalsVisibleTo`): `RunDueAsync(IServiceProvider services, CancellationToken cancellationToken)` runs the schedule tick, then claims and runs every due job on the current clock inline (no background loop), repeating until a claim returns nothing, and returns each attempt's kind, id, and outcome. Module tests host with `ORVANO_ROLES=api` (no runner), advance the clock, and call it. The integration tests' `ManualClock` moves to `Orvano.Testing` so module tests share it.
+- **JTS-3 (MUST)**: Runner tests that need the real loop (signal wake, two workers, shutdown) use `OrvanoApiFactory` hosts with role `worker` and short `PollInterval`, and pin their claims with `JobsDriver` or by advancing `ManualClock`, never with sleeps longer than the wake bound they assert.
+- **JTS-4 (MUST)**: Module isolation: `BannedSymbols.Modules.txt` adds `T:Orvano.SharedKernel.Jobs.JobAccessScope` (JQ-6); the CAC-5 module source scan also fails on `jobs.job` and `jobs.schedule` (case insensitive), since a module writing the queue directly would skip ENQ-3 and ENQ-4.
+
+### Job tables
+
+`jobs.job` (JDB-2). Data classes per spec 0011 CLS-1.
+
+| Column         | Type          | Null | Notes                                                                                | Class    |
+| -------------- | ------------- | ---- | ------------------------------------------------------------------------------------ | -------- |
+| `id`           | `uuid`        | no   | PK, v7 made by ENQ-1                                                                 |          |
+| `kind`         | `text`        | no   | JQ-1, `ck_job_kind`                                                                  | Public   |
+| `payload`      | `jsonb`       | no   | the registration's `JsonTypeInfo`, at most 65,536 bytes as sent (ENQ-3)              | Personal |
+| `project_id`   | `uuid`        | yes  | plain id, no FK (REF-4); `ix_job_project`                                            |          |
+| `status`       | `text`        | no   | `HasTextEnum<JobStatus>`: `queued`, `running`, `succeeded`, `dead`                   |          |
+| `attempt`      | `integer`     | no   | 0 at enqueue, +1 per claim (CLM-1), −1 on release (OUT-6)                            |          |
+| `max_attempts` | `integer`     | no   | the kind's `MaxAttempts` at enqueue                                                  |          |
+| `run_at`       | `timestamptz` | no   | due time; `ix_job_due` with `id`                                                     |          |
+| `locked_until` | `timestamptz` | yes  | lease end while `running` (`ck_job_lease`)                                           |          |
+| `locked_by`    | `text`        | yes  | `<machine>:<instance id>` (CLM-2)                                                    | Public   |
+| `last_error`   | `text`        | yes  | OUT-5, at most 2000 characters                                                       | Personal |
+| `dedupe_key`   | `text`        | yes  | `ux_job_dedupe_key`, 1 to 200 characters; schedules use `<name>:<yyyyMMddTHHmmssZ>`  | Personal |
+| `trace_parent` | `text`        | yes  | W3C `traceparent` of the enqueuing activity, at most 55 characters (JTL-3); new here | Public   |
+| `created_at`   | `timestamptz` | no   | enqueue time from `TimeProvider`                                                     |          |
+| `finished_at`  | `timestamptz` | yes  | set on `succeeded` and `dead` (`ck_job_finished`); `ix_job_finished`                 |          |
+
+`jobs.schedule` (JDB-3).
+
+| Column          | Type          | Null | Notes                                                                   | Class  |
+| --------------- | ------------- | ---- | ----------------------------------------------------------------------- | ------ |
+| `id`            | `uuid`        | no   | PK, v7                                                                  |        |
+| `name`          | `text`        | no   | `ux_schedule_name`, SCH-1                                               | Public |
+| `cron`          | `text`        | no   | five field `Cronos` expression, UTC                                     | Public |
+| `kind`          | `text`        | no   | JQ-1                                                                    | Public |
+| `payload`       | `jsonb`       | no   | from the registration, holds no personal values                         | Public |
+| `enabled`       | `boolean`     | no   | `true` on insert; kept across syncs (feature 46 toggles it)             |        |
+| `next_run_at`   | `timestamptz` | no   | next occurrence to fire; `ix_schedule_due` where `enabled`              |        |
+| `last_fired_at` | `timestamptz` | yes  | when a worker last fired it (operators)                                 |        |
+| `created_at`    | `timestamptz` | no   | `ITimestamped`                                                          |        |
+| `updated_at`    | `timestamptz` | no   | `ITimestamped`; SQL in SCH-2 and SCH-4 sets it itself (spec 0011 COL-1) |        |
+| `xmin`          | system        |      | `IVersioned`                                                            |        |
+
+No relationships: `project_id` is a plain id, and a schedule links to its jobs only through the dedupe key text.
+
+### Job state transitions
+
+`queued` → (claim, CLM-1) `running` → one of: `succeeded` (OUT-1); `queued` with a later `run_at` (OUT-2); `queued` due now with `attempt` restored (OUT-6); `dead` (OUT-4). `running` with an expired lease → `running` under another worker (CLM-6) or `dead` on its last attempt (CLM-1). `queued` or `running` → `dead` by ENQ-7. `succeeded` and `dead` are final; cleanup deletes them (SCH-7). Every transition from `running` is fenced on worker and attempt (CLM-4).
+
+Runner: `Starting` (sync schedules, SCH-2) → `Running` (wake loop) → `Stopping` (no claims, cancel, release, OUT-6) → `Stopped`.
+
+### Job queue API surface
+
+In process contracts only; no HTTP endpoint.
+
+| Member                                                                              | Shape                                                          | ACs                 | Errors                                                                  |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------- |
+| `IJob`                                                                              | `static abstract string Kind { get; }` (JQ-1)                  | AC-14               | bad kind fails at registration (SCH-1)                                  |
+| `IJobHandler<TJob>`                                                                 | `Task HandleAsync(TJob, JobContext, CancellationToken)` (JQ-2) | AC-14, AC-21, AC-23 | exceptions are outcomes (OUT)                                           |
+| `JobContext`                                                                        | sealed record (JQ-2)                                           | AC-23               | none                                                                    |
+| `IJobQueue.EnqueueAsync<TJob>(DbContext, TJob, EnqueueOptions?, CancellationToken)` | `Task<Guid?>`, joins the open transaction (ENQ-1 to ENQ-5)     | AC-16, AC-17        | `InvalidOperationException` (ENQ-2, ENQ-3), `ArgumentException` (ENQ-3) |
+| `IJobQueue.EnqueueAsync<TJob>(TJob, EnqueueOptions?, CancellationToken)`            | `Task<Guid?>`, own transaction (ENQ-6)                         | AC-18               | as above, minus the context checks                                      |
+| `IJobQueue.CancelProjectJobsAsync(Guid, Guid?, CancellationToken)`                  | `Task<int>` (ENQ-7)                                            | AC-30               | none                                                                    |
+| `EnqueueOptions`                                                                    | `RunAt`, `DedupeKey`, `ProjectId` (JQ-3)                       | AC-16, AC-17        | checked by ENQ-3                                                        |
+| `PermanentJobFailureException`                                                      | thrown by a handler (JQ-4)                                     | AC-21               | none                                                                    |
+| `AddJobHandler<TJob, THandler>(JsonTypeInfo<TJob>, Action<JobKindOptions>?)`        | scoped handler and singleton registration (JQ-5)               | AC-14, AC-21        | duplicate kind fails startup (SCH-1)                                    |
+| `JobKindOptions`                                                                    | `Lease`, `MaxAttempts`, `Timeout` (JQ-5)                       | AC-19 to AC-21      | out of range fails startup                                              |
+| `AddJobSchedule<TJob>(string name, string cron, TJob job)`                          | singleton registration (JQ-5, SCH-1)                           | AC-24               | bad name, cron, duplicate, or kind fails startup                        |
+| `JobAccessScope.Establish(IServiceProvider, Guid?)`                                 | system caller and project for a job scope (JQ-6)               | AC-23, AC-28        | banned in modules                                                       |
+| `TransactionSignals.EnsureEnlistable(DbContext)`                                    | the SND-5 checks alone (ENQ-2)                                 | AC-17               | `InvalidOperationException`                                             |
+| `AddJobRunner()`                                                                    | worker role registrations (JOP-3)                              | AC-26               | none                                                                    |
+| `JobsDriver.RunDueAsync(IServiceProvider, CancellationToken)` (`Orvano.Testing`)    | runs due jobs inline, returns outcomes (JTS-2)                 | AC-29               | none                                                                    |
+
+### Job queue value sourcing
+
+| Action                     | Value                                | Source                                                                                                       |
+| -------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Enqueue                    | kind                                 | `TJob.Kind` (JQ-1)                                                                                           |
+| Enqueue                    | payload JSON                         | the kind's `JobRegistration.JsonTypeInfo` from the module's `JsonSerializerContext` (JQ-5)                   |
+| Enqueue                    | max attempts                         | the kind's `JobKindOptions.MaxAttempts`, copied into the row (JQ-5)                                          |
+| Enqueue                    | id, `created_at`, default `run_at`   | `Guid.CreateVersion7(now)` and now from `TimeProvider` (ENQ-1)                                               |
+| Enqueue                    | `run_at`, `dedupe_key`, `project_id` | `EnqueueOptions` from the caller (JQ-3); the caller reads the project from `IProjectContext` when it has one |
+| Enqueue                    | `trace_parent`                       | `Activity.Current.Id` when its format is W3C (ENQ-1)                                                         |
+| Enqueue                    | connection and transaction           | the caller's `context.Database` (ENQ-1), or a new `JobsDbContext` in `InTransactionAsync` (ENQ-6)            |
+| Enqueue                    | whether to send `job`                | rows affected 1 and `run_at <= now` (ENQ-4)                                                                  |
+| Claim                      | free slots                           | `Concurrency` (JOP-2) minus this process's running count (CLM-2)                                             |
+| Claim                      | worker id                            | machine name and `OrvanoInstance` id (CLM-2)                                                                 |
+| Claim                      | lease per kind                       | `JobKindOptions.Lease`, passed as arrays; 5 minutes for an unregistered kind (CLM-1)                         |
+| Renewal                    | interval                             | lease ÷ 3 (CLM-5, JOB-2)                                                                                     |
+| Outcome                    | fence                                | `id`, `locked_by`, `attempt` returned by the claim (CLM-4)                                                   |
+| Retry                      | delay                                | `JobBackoff.Delay(attempt, Random.Shared.NextDouble())`, base 10 s, cap 1 hour (OUT-3)                       |
+| Timeout                    | limit                                | `JobKindOptions.Timeout` (JQ-5, OUT-2)                                                                       |
+| Dead                       | reason text                          | OUT-4 and OUT-5                                                                                              |
+| Project scope              | caller and project                   | `Caller.System` and the row's `project_id` through `JobAccessScope` (JQ-6, CLM-7)                            |
+| Wake                       | signal, poll, connect, full claim    | `job` handler, `PeriodicTimer(PollInterval)`, `OnConnectedAsync`, claim count (WAK-2)                        |
+| Poll interval, concurrency | durations and counts                 | `JobOptions` from `ORVANO_JOBS__*` (JOP-1), pool size from `DatabaseOptions.PoolSize` (JOP-2)                |
+| Schedule sync              | cron, kind, payload                  | `JobScheduleRegistration`s (SCH-2); `enabled` and `next_run_at` from the table                               |
+| Schedule fire              | fire time and next occurrence        | stored `next_run_at`; `CronExpression.GetNextOccurrence(now, TimeZoneInfo.Utc)` (SCH-4)                      |
+| Schedule fire              | dedupe key                           | `<name>:` plus `next_run_at` formatted `yyyyMMddTHHmmssZ`, invariant culture (SCH-4)                         |
+| Cleanup                    | retentions, chunk                    | constants 7 days, 30 days, 5000 (SCH-7)                                                                      |
+| Telemetry                  | meter, activity source, event ids    | `Orvano.Infrastructure`; `LogEventIds.Infrastructure + 100` to `+ 199` (JTL-1 to JTL-3)                      |
+| Clock                      | now, timers                          | injected `TimeProvider` (JTS-1)                                                                              |
+
+### Job queue invariants
+
+- A job row exists only if the transaction that enqueued it committed; a `job` signal goes out only for a committed, due job.
+- At most one worker holds a job's lease, and only the holder of the current attempt can change the row.
+- A dedupe key is taken until the row is deleted, across every status, so a schedule occurrence fires once.
+- No job runs past `max_attempts`; every failure path ends in `queued` with a later `run_at`, or `dead`.
+- Every time the queue stores or compares comes from the app's `TimeProvider`.
+
+### Job queue security model
+
+No caller facing surface in this milestone. Jobs run as `Caller.System` (spec 0012 CLR-1) with the row's project, which only the enqueuing code chose, so a job can never act for another project than the one its code named; modules cannot set that scope themselves (JQ-6, JTS-4). Payloads hold ids and codes (spec 0011 CLS-2) and are marked `Personal`, like `last_error` and `dedupe_key`, so feature 49 and LOG-3 treat them that way; their retention is 7 or 30 days. Any session with the platform owner role can insert jobs directly (PG-2a); that role already owns every platform table.
+
+### Job queue configuration required
+
+- `ORVANO_JOBS__POLLINTERVAL` (5 s, 1 s to 5 minutes): how often a worker polls for due jobs and fires schedules
+- `ORVANO_JOBS__CONCURRENCY` (smallest of processor count × 2, 16, and half of `ORVANO_DATABASE__POOLSIZE`): jobs one worker process runs at once; at most half the platform pool
+
+### Job queue critical test scenarios
+
+- Join: `InTransactionAsync` on a sample platform context saves a row and enqueues a due job; a second connection sees neither before the commit, both after; a raw `LISTEN` connection sees one `job` notification; a rolled back twin leaves no job and no notification; a forced transient retry leaves one row; verifies **AC-16**.
+- Future and dedupe: a future job sends no notification; a second enqueue with the same dedupe key returns `null`, also after the first succeeded or died; verifies **AC-16**.
+- Refusal: no transaction, a context without `UseOrvanoConventions`, a joined context, an unregistered kind, a 70 KB payload, a 201 character dedupe key, and `Guid.Empty` each throw before any row is written; verifies **AC-17**.
+- Standalone: the context free overload commits and signals with no caller transaction; verifies **AC-18**.
+- Two workers: two `worker` hosts and 50 due jobs whose handler records its id with a unique insert; every job runs once, `attempt` is 1 for all, and neither host exceeds `Concurrency` running (a handler gauge); verifies **AC-19**.
+- Lease: on `ManualClock`, a long handler renews at lease ÷ 3; a row stolen by a test `UPDATE` of `locked_by` cancels the handler and writes no outcome; a host disposed mid job leaves a `running` row that a second host claims after the lease, with `attempt` 2; the same on the last attempt makes it `dead`; verifies **AC-20**.
+- Outcomes: success, a throwing handler (backoff within bounds on `ManualClock`, `last_error` set), the last attempt (dead), `PermanentJobFailureException`, an unregistered kind row inserted by the test, an unreadable payload, a timeout, and a shutdown during a cancellable handler (back to `queued`, `attempt` restored); `JobBackoff.Delay` unit tests at attempts 1, 2, 9, 20 and random 0 and just under 1; verifies **AC-21**.
+- Wake: `api` host A and `worker` host B with `PollInterval` 1 minute; a job enqueued on A starts on B within 2 s; with B's listener backend terminated, it starts within one poll; a future job starts within one poll after `run_at`; verifies **AC-22**.
+- Scope: a project job's handler reads `IProjectContext.Id` and `ICallerContext.Current`; a job without a project reads `Caller.System` and the project read throws; verifies **AC-23**.
+- Schedules: bad cron, bad name, duplicate, and unknown kind each stop startup naming the schedule; two workers tick at the same `ManualClock` instant and one job exists with the expected dedupe key; a 3 day gap fires once; a cron change moves `next_run_at`; a removed registration deletes its row; a disabled row stays unfired; verifies **AC-24**.
+- Cleanup: 12,000 old `succeeded` rows, old and new `dead` rows; `jobs.cleanup` through `JobsDriver` deletes only the old ones in three statements per status, and a deleted row's dedupe key can be used again; verifies **AC-25**.
+- Options: concurrency 16 with pool 30 stops startup naming both variables; the default on a 32 core machine with pool 30 is 15; `PollInterval` 0 stops startup; `migrate` and an `api` host run no runner; verifies **AC-26**.
+- Telemetry: `MeterRecorder` sees `enqueued` once per committed row (not on rollback or dedupe hit), `attempts{outcome}` for each outcome above, and `schedules.fired`; a log capture finds no payload at Information or above; verifies **AC-27**.
+- Isolation: the reflection test finds `JobAccessScope` in `BannedSymbols.Modules.txt`; the source scan fails on a module file holding `jobs.job`; the PRJ-3 test allows exactly the access layer and `JobAccessScope`; verifies **AC-28**.
+- Time: a source scan of `Orvano.Infrastructure/Jobs/` finds no `now()`, `clock_timestamp()`, or `CURRENT_TIMESTAMP`; module style tests run a delayed job only after `ManualClock` passes `run_at`; verifies **AC-29**.
+- Cancel: a project's queued and running jobs become `dead` except the given id, the running handler sees its token cancel at its next renewal, and other projects' jobs are untouched; verifies **AC-30**.
+
 ## Build plan
 
 Tracer Bullet: steps 1 to 5 thread one cache invalidation end to end across two hosts, then steps 6 and 7 thicken it with failure handling and telemetry.
@@ -231,6 +494,17 @@ Steps 8 to 12 settle the 2026-10-19 review ([report](../../reviews/2026-10-19-re
 10. Confirmed commit hook (minor 2): `PendingSignals` gets an on committed list, `TransactionSignals.AddOnCommitted`, the interceptor runs it only from `TransactionCommittedAsync` after the after commit actions, and `SignalBus` counts `sent` through it; test: an unknown commit outcome leaves `signals.sent` unchanged, satisfies **AC-13**.
 11. Joined context refusal (minor 3): the joined flag in `PendingSignals`, set and cleared by the interceptor's used and started events, and the SND-5 refusal in `TransactionSignals`; test: two contexts sharing one transaction, and the existing same connection retry test unchanged, satisfies **AC-3**, **AC-4**.
 12. Module isolation (rest of minor 10): replace the `"orvano:inner"` string with an internal object key, add `SignalPayload`, `NpgsqlConnection.Wait` and `WaitAsync`, and the `NpgsqlDataSource` open and create members to `BannedSymbols.Modules.txt`, extend the reflection test to them, and add the module source scan for `pg_notify` and `orvano_signal`, satisfies **AC-12**.
+
+Steps 13 to 20 build milestone 2, the job queue (JQ to JTS, AC-14 to AC-30), on main after steps 8 to 12. Tracer Bullet: steps 13 to 16 thread one job from a transaction on host A to its handler on host B; steps 17 to 20 thicken it with failure paths, schedules, and telemetry.
+
+13. Contracts in `Orvano.SharedKernel/Jobs/`: `IJob`, `IJobHandler<TJob>`, `JobContext`, `IJobQueue`, `EnqueueOptions`, `JobKindOptions`, `PermanentJobFailureException`, `JobRegistration`, `JobScheduleRegistration`, `AddJobHandler`, `AddJobSchedule`, `JobAccessScope` (with the PRJ-3 test allowance and the module ban), and `TransactionSignals.EnsureEnlistable`; unit tests for kind and name patterns and kind option ranges, satisfies **AC-14**, **AC-28**.
+14. Tables: `JobsDbContext` with `Job`, `JobSchedule`, `JobStatus`, the CHECKs, indexes, and storage parameters, the first migration, the design time factory, `MigrationOrder` gets `JobsDbContext` first, and `AddInfrastructure` registers it; tests: migrate creates both tables as specified, no pending model changes, the spec 0011 architecture tests cover the new context, satisfies **AC-15**.
+15. Enqueue: `JobRegistry`, `JobQueue` (both overloads, ENQ-1 to ENQ-6) on `SignalBus`; PostgreSQL tests for join, rollback, retry, dedupe, future job, refusals, and the standalone path with a raw `LISTEN` connection, satisfies **AC-16**, **AC-17**, **AC-18**.
+16. Runner happy path: `JobOptions` with its validator, Host's `PostConfigure` and half pool validator, `OrvanoInstance` (moved from `SignalInstance`), `JobExecutor` claim (CLM-1, CLM-2), scope and project setup (CLM-7), success outcome (OUT-1), `JobRunner` with the wake channel, the poll timer, the `job` signal handler, and the connect observer, `WorkerWake`, `AddJobRunner` from `ServeCommand` in the worker role, `JobsDriver` and the shared `ManualClock` in `Orvano.Testing`; tests: the two host wake test, the poll fallback, the project scope, options, satisfies **AC-19**, **AC-22**, **AC-23**, **AC-26**, **AC-29**.
+17. Failure paths: renewal timers and the fence (CLM-4, CLM-5), lease loss, `JobBackoff` and the failed outcome, dead jobs for every OUT-4 reason including the expired last attempt, timeout and abandon, shutdown release, outcome write failure; tests for each, plus the two worker exactly once test, satisfies **AC-19**, **AC-20**, **AC-21**.
+18. Project cancel: `CancelProjectJobsAsync` and its test, satisfies **AC-30**.
+19. Schedules: `Cronos` package (MIT, pinned to a release at least 3 days old, spec 0009 DEP-1 and TL-8), `JobRegistry` schedule checks run by `StartupChecks`, the sync (SCH-2, SCH-3), the tick (SCH-4, SCH-5), the `jobs.cleanup` schedule and handler (SCH-7); tests: registration failures, two worker single fire, missed fires, cron change, removal, disabled, cleanup chunks, satisfies **AC-24**, **AC-25**.
+20. Telemetry and logs: the JTL-1 metrics, the JTL-2 log events, the JTL-3 activity, and the source scans (JTS-1, JTS-4); tests: meter, log capture, time scan, module scan, satisfies **AC-27**, **AC-28**, **AC-29**.
 
 ## Consequences
 
@@ -253,17 +527,30 @@ Steps 8 to 12 settle the 2026-10-19 review ([report](../../reviews/2026-10-19-re
 - While disconnected, and in commands without a listener, every cached read hits the database; a long outage of the signal connection (but not of the database) raises platform database load.
 - The writer applies its own tags twice (on commit and on the echo). Cheap, but visible in metrics.
 - Handlers share one loop; a slow one delays the rest (HND-4).
+- Jobs run at least once, never exactly once: every handler must be idempotent, and a commit or outcome write with an unknown result costs an extra run or a lost attempt (CLM-3, OUT-7).
+- Enqueue inside a transaction is one SQL round trip at call time, not deferred to `SaveChanges`, and a dedupe key held by another open transaction makes the insert wait for that transaction.
+- A delayed job or a retry starts up to `PollInterval` (5 s) after it is due; only due now jobs get a signal.
+- Lease expiry trusts the replicas' clocks to agree within seconds (CLM-8).
+- A crashed worker's jobs wait for their lease (5 minutes by default) before another worker picks them up.
+- Schedules live in code: changing a cron is a release, and an operator can only toggle `enabled` (feature 46).
+- `Concurrency` defaults to at most half the platform pool, so a large machine with the default pool of 30 runs 15 jobs at once, not 16 (spec 0007 JOB-4 amended).
 
 **Neutral**:
 
 - Spec 0007 gains a `["*"]` meaning for `session`, `SignalOptions` in REP-2's list, and five `ORVANO_SIGNALS__*` variables.
 - Modules lose direct `NpgsqlDataSource` connections; none use them today, and spec 0007 PG-3 already routes project connections through `IProjectDbConnectionFactory`.
 - Feature 14's label writes (spec 0012 LBL-3) and every EVL-5 grant change call `Invalidate` inside `InTransactionAsync`.
+- Milestone 2 adds `Cronos` (MIT, already named in spec 0007 REP-2), the first `DbContext` and migration in the repo (`jobs`), and two `ORVANO_JOBS__*` variables; spec 0012 PRJ-3 gains `JobAccessScope` as the one setter outside the access layer.
 - A new package, `Microsoft.Extensions.Caching.Hybrid` (MIT, on spec 0009 DEP-1's list), and a new modules only banned symbols file.
 
 ## Follow-up
 
-- [ ] Milestone 2 (job queue, runner, schedules): extend this spec with the `IJobQueue` and `IJobHandler<T>` contracts, the `job` handler, and how enqueue without a transaction sends its signal (spec 0007 JOB-4), before `/develop` builds it.
+- [x] Milestone 2 (job queue, runner, schedules): extend this spec with the `IJobQueue` and `IJobHandler<T>` contracts, the `job` handler, and how enqueue without a transaction sends its signal (spec 0007 JOB-4), before `/develop` builds it. Done 2026-10-19: _Job queue design_, AC-14 to AC-30.
+- [ ] `/develop background runtime`: build steps 13 to 20 (the job queue), then `/check verify`, `/test`, and a fresh model `/check review` on them.
+- [ ] Milestone 3 needs from milestone 2 only `WorkerWake` (WAK-5) and ENQ-1 on a module context; the outbox section names its dispatcher loop there.
+- [ ] Feature 13: register `project.teardown` (and call `CancelProjectJobsAsync` as LIF-2 step 1) and the provisioning job kinds; feature 14: signing key rotation and expired session cleanup schedules; feature 29: local file store temp cleanup (FIL-2).
+- [ ] Feature 46: an operator view of jobs and schedules, retrying a dead job, and toggling `enabled` (SCH-5).
+- [ ] `/sync`: add `ORVANO_JOBS__POLLINTERVAL` and `ORVANO_JOBS__CONCURRENCY` (with the half pool default) to `server/AGENTS.md` and the install guide when they are built.
 - [ ] Milestone 3 (outbox): extend this spec with `IOutbox`, `IOutboxRegistry`, and the dispatcher wake (spec 0007 EVT-1 to EVT-3).
 - [ ] Feature 9: run spec 0012 build plan step 8 (AC-10) once step 5 here lands.
 - [ ] Feature 14: implement the `session` handler and an `ISignalConnectionObserver` for the revoked set (HND-1, HND-3), and wrap label writes in `InTransactionAsync` (LBL-3).
