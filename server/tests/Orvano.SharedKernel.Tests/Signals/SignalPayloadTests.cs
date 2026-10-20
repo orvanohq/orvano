@@ -110,6 +110,23 @@ public sealed class SignalPayloadTests
         SignalPayload.TryDecode(payload, out _, out _).ShouldBeFalse();
 
     [Theory]
+    [Trait("Spec", "0013:BUS-2"), Trait("Spec", "0013:AC-5")]
+    [InlineData("""{"v":1,"k":"cache","d":[""]}""")]
+    [InlineData("""{"v":1,"k":"cache","d":["a b"]}""")]
+    [InlineData("""{"v":1,"k":"cache","d":["a\nb"]}""")]
+    [InlineData("""{"v":1,"k":"session","d":["ok","\u00e9"]}""")]
+    public void Decode_fails_when_a_value_breaks_the_enlist_rule(string payload) =>
+        SignalPayload.TryDecode(payload, out _, out _).ShouldBeFalse();
+
+    [Fact]
+    [Trait("Spec", "0013:BUS-2"), Trait("Spec", "0013:AC-5")]
+    public void Decode_accepts_200_characters_and_fails_at_201_when_a_value_is_long()
+    {
+        SignalPayload.TryDecode($$"""{"v":1,"k":"cache","d":["{{new string('x', 200)}}"]}""", out _, out _).ShouldBeTrue();
+        SignalPayload.TryDecode($$"""{"v":1,"k":"cache","d":["{{new string('x', 201)}}"]}""", out _, out _).ShouldBeFalse();
+    }
+
+    [Theory]
     [Trait("Spec", "0013:BUS-1")]
     [InlineData(SignalKind.Job, "job")]
     [InlineData(SignalKind.Cache, "cache")]

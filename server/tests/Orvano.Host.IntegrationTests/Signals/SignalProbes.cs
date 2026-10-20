@@ -1,6 +1,9 @@
 using System.Collections.Concurrent;
+using System.Net;
+using System.Net.Sockets;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 using Npgsql;
 
@@ -59,6 +62,158 @@ internal sealed class HangingHeartbeat : IHeartbeatSender
     {
         Interlocked.Increment(ref _calls);
         return new TaskCompletionSource().Task;
+    }
+}
+
+/// <summary>
+/// A cache handler whose call never returns and ignores cancellation, like a handler stuck on a lock or a query that
+/// never answers (spec 0013 HND-4).
+/// </summary>
+internal sealed class HangingCacheHandler(ConcurrentQueue<string> calls) : ISignalHandler
+{
+    public SignalKind Kind => SignalKind.Cache;
+
+    public ValueTask HandleAsync(IReadOnlyList<string> values, CancellationToken cancellationToken)
+    {
+        calls.Enqueue($"hang:{values[0]}");
+        return new ValueTask(new TaskCompletionSource().Task);
+    }
+}
+
+/// <summary>Records the event id of every log entry the host writes, for checking that a log was written.</summary>
+internal sealed class RecordingLogs : ILoggerProvider
+{
+    private readonly ConcurrentQueue<(EventId Id, LogLevel Level)> _entries = new();
+
+    public int Count(int eventId, LogLevel level) => _entries.Count(e => e.Id.Id == eventId && e.Level == level);
+
+    public ILogger CreateLogger(string categoryName) => new Logger(_entries);
+
+    public void Dispose()
+    {
+    }
+
+    private sealed class Logger(ConcurrentQueue<(EventId Id, LogLevel Level)> entries) : ILogger
+    {
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            entries.Enqueue((eventId, logLevel));
+    }
+}
+
+/// <summary>
+/// A TCP proxy in front of PostgreSQL that can go silent: on the connections open at that moment it drops every byte
+/// in both directions and keeps the sockets open, like a network path that loses packets without a reset. Connections
+/// made later pass normally, so a client can reconnect (spec 0013 LSN-3).
+/// </summary>
+internal sealed class SilentProxy : IAsyncDisposable
+{
+    private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+    private readonly string _host;
+    private readonly int _port;
+    private readonly CancellationTokenSource _stop = new();
+    private readonly ConcurrentQueue<Link> _links = new();
+    private readonly Task _accepting;
+
+    private SilentProxy(string host, int port)
+    {
+        _host = host;
+        _port = port;
+        _listener.Start();
+        _accepting = AcceptAsync();
+    }
+
+    public int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
+
+    public static SilentProxy Start(string host, int port) => new(host, port);
+
+    /// <summary>Drops every byte on the connections open now, from now on. They stay open.</summary>
+    public void Silence()
+    {
+        foreach (Link link in _links)
+        {
+            link.Silent = true;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _stop.CancelAsync();
+        _listener.Stop();
+        try
+        {
+            await _accepting;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        foreach (Link link in _links)
+        {
+            link.Dispose();
+        }
+
+        _stop.Dispose();
+    }
+
+    private async Task AcceptAsync()
+    {
+        while (!_stop.IsCancellationRequested)
+        {
+            TcpClient client = await _listener.AcceptTcpClientAsync(_stop.Token);
+            var server = new TcpClient();
+            await server.ConnectAsync(_host, _port, _stop.Token);
+            var link = new Link(client, server);
+            _links.Enqueue(link);
+            link.Start(_stop.Token);
+        }
+    }
+
+    private sealed class Link(TcpClient client, TcpClient server) : IDisposable
+    {
+        private volatile bool _silent;
+
+        public bool Silent
+        {
+            get => _silent;
+            set => _silent = value;
+        }
+
+        public void Start(CancellationToken cancellationToken)
+        {
+            _ = PumpAsync(client.GetStream(), server.GetStream(), cancellationToken);
+            _ = PumpAsync(server.GetStream(), client.GetStream(), cancellationToken);
+        }
+
+        public void Dispose()
+        {
+            client.Dispose();
+            server.Dispose();
+        }
+
+        private async Task PumpAsync(NetworkStream from, NetworkStream to, CancellationToken cancellationToken)
+        {
+            byte[] buffer = new byte[16 * 1024];
+            try
+            {
+                int read;
+                while ((read = await from.ReadAsync(buffer, cancellationToken)) > 0)
+                {
+                    if (!_silent)
+                    {
+                        await to.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException or OperationCanceledException)
+            {
+                // The other side closed, or the proxy stopped.
+            }
+        }
     }
 }
 

@@ -2,3 +2,5 @@ M:Microsoft.Extensions.Caching.Hybrid.HybridCache.RemoveAsync(System.String,Syst
 M:Microsoft.Extensions.Caching.Hybrid.HybridCache.RemoveAsync(System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken); CAC-5: invalidate through ICacheInvalidator (spec 0013 CAC-5)
 M:Microsoft.Extensions.Caching.Hybrid.HybridCache.RemoveByTagAsync(System.String,System.Threading.CancellationToken); CAC-5: invalidate through ICacheInvalidator (spec 0013 CAC-5)
 M:Microsoft.Extensions.Caching.Hybrid.HybridCache.RemoveByTagAsync(System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken); CAC-5: invalidate through ICacheInvalidator (spec 0013 CAC-5)
+T:Orvano.SharedKernel.Data.TransactionSignals; SND-1: enlist through ISignalBus or ICacheInvalidator (spec 0013 SND-1)
+E:Npgsql.NpgsqlConnection.Notification; LSN-1: only the signal listener listens; handle signals with ISignalHandler (spec 0013 LSN-1)

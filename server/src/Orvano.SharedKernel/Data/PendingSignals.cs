@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 using Orvano.SharedKernel.Signals;
 
 namespace Orvano.SharedKernel.Data;
@@ -57,12 +59,22 @@ internal sealed class PendingSignals
 
     public void AddAfterCommit(Func<CancellationToken, ValueTask> action) => _afterCommit.Add(action);
 
-    /// <summary>Runs the after commit actions in the order they were added. Each catches its own exceptions (SND-3).</summary>
-    public async Task RunAfterCommitAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Runs the after commit actions in the order they were added. Each catches its own exceptions (SND-3); one that
+    /// throws anyway is logged at Error here, so it never turns a commit that happened into a failed one.
+    /// </summary>
+    public async Task RunAfterCommitAsync(Lazy<ILogger> logger, CancellationToken cancellationToken)
     {
         foreach (Func<CancellationToken, ValueTask> action in _afterCommit.ToArray())
         {
-            await action(cancellationToken);
+            try
+            {
+                await action(cancellationToken);
+            }
+            catch (Exception ex) // spec 0013 SND-3: an after commit action never fails a commit that happened
+            {
+                logger.Value.AfterCommitActionFailed(ex);
+            }
         }
     }
 

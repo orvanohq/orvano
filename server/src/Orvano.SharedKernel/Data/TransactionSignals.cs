@@ -54,7 +54,8 @@ public static class TransactionSignals
     public static IReadOnlyList<string> Enlisted(DbContext context, SignalKind kind) =>
         BatchOf(context, requireTransaction: false).ValuesOf(kind);
 
-    private static bool IsValidValue(string? value) =>
+    /// <summary>BUS-2's value rule, also applied to values received on the wire (<see cref="SignalPayload.TryDecode"/>).</summary>
+    internal static bool IsValidValue(string? value) =>
         value is { Length: > 0 and <= MaxValueLength } && value.All(c => c is >= '\x21' and <= '\x7E');
 
     private static PendingSignals BatchOf(DbContext context, bool requireTransaction)

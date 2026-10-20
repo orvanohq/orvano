@@ -51,4 +51,20 @@ internal static partial class InfrastructureLog
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 11, Level = LogLevel.Error,
         Message = "Removing cache tags after a commit failed; the entries expire on their own")]
     public static partial void CacheRemovalFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 12, Level = LogLevel.Error,
+        Message = "Signal handler {Handler} did not finish a {Kind} signal within {Limit}; it was cancelled and the dispatch loop moved on")]
+    public static partial void SignalHandlerTimedOut(this ILogger logger, string handler, SignalKind kind, TimeSpan limit);
+
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 13, Level = LogLevel.Error,
+        Message = "Signal connection observer {Observer} did not finish {Callback} within {Limit}; it was cancelled and the dispatch loop moved on")]
+    public static partial void SignalObserverTimedOut(this ILogger logger, string observer, string callback, TimeSpan limit);
+
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 14, Level = LogLevel.Error,
+        Message = "Signal dispatch failed on one item; the loop continues")]
+    public static partial void SignalDispatchFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 15, Level = LogLevel.Debug,
+        Message = "A {Call} given up at its deadline failed later")]
+    public static partial void SignalCallAbandonedFailed(this ILogger logger, string call, Exception exception);
 }
