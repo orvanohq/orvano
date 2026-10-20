@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -38,6 +39,12 @@ internal static class ProbeMode
 
     /// <summary>Takes 30 ms, for the concurrency count.</summary>
     public const string Slow = "slow";
+
+    /// <summary>
+    /// Opens a platform pool connection, then waits for <see cref="JobProbes.Release"/> holding it, as a handler mid query
+    /// would (spec 0013 JOP-4).
+    /// </summary>
+    public const string HoldConnection = "hold-connection";
 }
 
 internal interface IProbeJob
@@ -130,6 +137,9 @@ internal sealed class JobProbes
     /// <summary>Ids of handlers that started, in order; a blocking handler is here before it waits.</summary>
     public ConcurrentQueue<Guid> Started { get; } = new();
 
+    /// <summary>Ids of <see cref="ProbeMode.HoldConnection"/> handlers holding their platform connection open.</summary>
+    public ConcurrentQueue<Guid> Holding { get; } = new();
+
     /// <summary>Handlers whose token was cancelled while they waited.</summary>
     public ConcurrentQueue<Guid> Cancelled { get; } = new();
 
@@ -154,7 +164,8 @@ internal sealed class JobProbes
     public void Leave() => Interlocked.Decrement(ref _running);
 }
 
-internal sealed class ProbeHandler<TJob>(JobProbes probes, ICallerContext caller, IProjectContext project) : IJobHandler<TJob>
+internal sealed class ProbeHandler<TJob>(JobProbes probes, ICallerContext caller, IProjectContext project, NpgsqlDataSource platform)
+    : IJobHandler<TJob>
     where TJob : IJob, IProbeJob
 {
     public async Task HandleAsync(TJob job, JobContext context, CancellationToken cancellationToken)
@@ -212,6 +223,14 @@ internal sealed class ProbeHandler<TJob>(JobProbes probes, ICallerContext caller
                     break;
                 case ProbeMode.Slow:
                     await Task.Delay(30, CancellationToken.None);
+                    break;
+                case ProbeMode.HoldConnection:
+                    await using (NpgsqlConnection held = await platform.OpenConnectionAsync(cancellationToken))
+                    {
+                        probes.Holding.Enqueue(context.Id);
+                        await probes.Release.Task.WaitAsync(cancellationToken);
+                    }
+
                     break;
                 default:
                     break;
@@ -348,4 +367,48 @@ internal sealed class JobRows(NpgsqlDataSource dataSource)
 internal static class JobTestDatabase
 {
     public static JobRows Rows(this TestDatabase database) => new(database.DataSource);
+}
+
+/// <summary>
+/// Counts the runner's dead marking and claim statements on one test database, from Npgsql's command activities. Each
+/// runs in a transaction of its own (spec 0013 CLM-1), so the counts are transactions too.
+/// </summary>
+internal sealed class JobStatements : IDisposable
+{
+    private readonly ActivityListener _listener;
+    private int _claims;
+    private int _deadMarkings;
+
+    public JobStatements(string database)
+    {
+        _listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == "Npgsql",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activity =>
+            {
+                string[] values = [.. activity.TagObjects.Select(tag => tag.Value as string ?? string.Empty)];
+                if (!values.Contains(database, StringComparer.Ordinal))
+                {
+                    return;
+                }
+
+                if (values.Any(value => value.Contains("lease expired on the last attempt", StringComparison.Ordinal)))
+                {
+                    Interlocked.Increment(ref _deadMarkings);
+                }
+                else if (values.Any(value => value.Contains("UPDATE jobs.job AS j", StringComparison.Ordinal)))
+                {
+                    Interlocked.Increment(ref _claims);
+                }
+            },
+        };
+        ActivitySource.AddActivityListener(_listener);
+    }
+
+    public int Claims => Volatile.Read(ref _claims);
+
+    public int DeadMarkings => Volatile.Read(ref _deadMarkings);
+
+    public void Dispose() => _listener.Dispose();
 }

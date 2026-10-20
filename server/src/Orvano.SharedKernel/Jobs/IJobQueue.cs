@@ -10,7 +10,8 @@ public interface IJobQueue
     /// <summary>
     /// Inserts the job in <paramref name="context"/>'s open transaction, normally inside <c>InTransactionAsync</c>, so it
     /// exists only if that transaction commits; a due job wakes the workers on commit (ENQ-1 to ENQ-5). Returns the new
-    /// id, or <see langword="null"/> when a job with the same <see cref="EnqueueOptions.DedupeKey"/> exists in any status.
+    /// id, or <see langword="null"/> when a job of the same kind and project with the same
+    /// <see cref="EnqueueOptions.DedupeKey"/> exists in any status.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The context has no open transaction, is not a platform database context, or joined its transaction with
@@ -47,9 +48,9 @@ public sealed record EnqueueOptions
     public DateTimeOffset? RunAt { get; init; }
 
     /// <summary>
-    /// 1 to 200 characters. While a job with this key exists, in any status and of any kind, another enqueue with it
-    /// inserts nothing. The key is one space across every kind and the schedules' <c>&lt;name&gt;:&lt;time&gt;</c> keys, so
-    /// start it with your kind (<c>project.teardown:&lt;id&gt;</c>) or a dedupe hit may come from another module's job.
+    /// 1 to 200 characters. While a job of the same kind and project with this key exists, in any status, another
+    /// enqueue with it inserts nothing. The key is scoped to the kind and the project, so another kind's job or another
+    /// project's job never collides with it; two jobs with no project collide when their kind and key match.
     /// Cleanup frees the key 7 days after the job succeeded or 30 days after it died.
     /// </summary>
     public string? DedupeKey { get; init; }

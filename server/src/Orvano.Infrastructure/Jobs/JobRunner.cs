@@ -7,8 +7,9 @@ using Microsoft.Extensions.Options;
 namespace Orvano.Infrastructure.Jobs;
 
 /// <summary>
-/// The worker's job loop (spec 0013 WAK-1 to WAK-4, SCH-2, SCH-3, OUT-6): syncs the schedules, then claims on every
-/// wake and starts each claimed job on its own task. Only <c>serve</c> with the <c>worker</c> role runs it (JOP-3).
+/// The worker's job loop (spec 0013 WAK-1 to WAK-4, SCH-2, SCH-3, OUT-6): syncs the schedules, marks expired last
+/// attempts dead and ticks the schedules on each poll, then claims on every wake and starts each claimed job on its own
+/// task. Only <c>serve</c> with the <c>worker</c> role runs it (JOP-3).
 /// </summary>
 internal sealed class JobRunner : BackgroundService
 {
@@ -66,8 +67,11 @@ internal sealed class JobRunner : BackgroundService
             _wake.Wake();
             while (await WaitAsync(stoppingToken))
             {
+                // WAK-2 (2): only the poll tick runs the dead marking and the schedule tick, each on its own, before
+                // the claim every wake runs (CLM-1, SCH-3).
                 if (_wakes.Take())
                 {
+                    await TryMarkExpiredDeadAsync(stoppingToken);
                     synced = synced || await TrySyncAsync(stoppingToken);
                     if (synced)
                     {
@@ -172,6 +176,24 @@ internal sealed class JobRunner : BackgroundService
         catch (Exception ex) // spec 0013 CLM-6: the executor frees the slot whatever happens; the row is left to its lease
         {
             _logger.JobOutcomeWriteFailed(job.Kind, job.Id, ex);
+        }
+    }
+
+    private async Task TryMarkExpiredDeadAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            // Bounded like the claim, so a stalled database cannot hold the loop and the claim behind it (ASY-7).
+            using var bound = new CancellationTokenSource(JobExecutor.ClaimBound, _time);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, bound.Token);
+            await _executor.MarkExpiredDeadAsync(linked.Token);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex) // spec 0013 WAK-2: the schedule tick and the claim after it still run; retried on the next poll
+        {
+            _logger.JobMarkDeadFailed(ex);
         }
     }
 

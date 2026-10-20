@@ -86,7 +86,7 @@ internal sealed class JobQueue(
             $"""
             INSERT INTO jobs.job (id, kind, payload, project_id, status, attempt, max_attempts, run_at, dedupe_key, trace_parent, created_at)
             VALUES ({id}, {kind}, {payload}::jsonb, {projectId}, 'queued', 0, {maxAttempts}, {runAt}, {dedupeKey}, {traceParent}, {now})
-            ON CONFLICT (dedupe_key) DO NOTHING
+            ON CONFLICT (kind, project_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING
             """,
             cancellationToken);
         if (inserted == 0)
