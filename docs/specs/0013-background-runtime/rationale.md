@@ -127,3 +127,86 @@ The fresh model review ([report](../../reviews/2026-10-19-review-background-runt
 - **Dispatch limit (LSN-6, LSN-8, SOP-1, SOP-2, AC-8, AC-10, AC-11).** Options for the per call bound: (a) keep `HeartbeatTimeout`, (b) a new `HandlerTimeout` option, (c) a constant. Picked (b) at 10 seconds, at most `HeartbeatTimeout`: 90 seconds is far too long to hold every cache signal, and operators with a slow platform database may need to raise it, which a constant would not allow. For "no progress counts as disconnected", picked yes (LSN-8): the per call bound alone still lets a queue of slow calls delay cache signals without limit while `IsConnected` stays true, which breaks the promise that a lost or late signal costs speed, not correctness. The threshold reuses `HeartbeatTimeout`, the staleness a silent connection already gets; items from before the latest connect are ignored because the connect clear already covers them, which keeps a stuck old call from making the listener flap.
 
 Also recorded so the spec matches the code in `1a521f6`: `ISignalBus.Enlist` refuses `Cache` (BUS-2), `TryDecode` applies BUS-2's value rule on receive (SND-7), the signals data source sets `Timeout` and `CommandTimeout` explicitly (LSN-1), throwing after commit actions are caught inside `PendingSignals` (SND-3), and the dispatch loop catches per item (LSN-6).
+
+## Milestone 2: job queue (2026-10-19)
+
+### Context
+
+Spec 0007 JOB-1 to JOB-6 settled the queue's behavior: a `jobs` schema, at least once delivery, `SKIP LOCKED` claims, leases, backoff with jitter, a `job` signal per SIG-3, a 5 second poll, a concurrency cap at half the platform pool, and schedules that fire once through a dedupe key. REP-2 named `IJobQueue` and `IJobHandler<T>` but not their shapes. `/develop` would have had to invent the contract, the columns' details, how the row joins the caller's transaction, the lease and renewal mechanics, dead job handling, how wake and poll combine, how schedules are declared, the metrics, and how tests control time. Features 13, 14, 15, and 29 all code against this, and the outbox (milestone 3) enqueues through it.
+
+The forces: the job row lives in Infrastructure's `jobs` schema, while the caller's change lives in a module's own `DbContext` and schema (spec 0002 DAT-1, spec 0011 MOD-3), and the two must commit together. EF's execution strategy can run the caller's work twice (DAT-8, SND-6). The signal machinery already gives one transaction join per context (SND-1 to SND-8). `IProjectContext` has exactly one setter today (spec 0012 PRJ-3). This is the repo's first `DbContext` and first migration. And spec 0002 GEN-9 forbids reading the clock anywhere but `TimeProvider`.
+
+### Options considered (how a job joins the caller's transaction)
+
+#### Option J1: SQL on the caller's context, signal enlisted on the same context (chosen)
+
+`EnqueueAsync(context, job, …)` runs `INSERT INTO jobs.job … ON CONFLICT DO NOTHING` through `context.Database.ExecuteSqlAsync`, on the caller's connection and transaction, and enlists `job` on that context.
+
+- Pros: one transaction by construction, the same one the signal joins; retries and rollbacks need nothing new (SND-3, SND-6); works on any platform context, so the outbox dispatcher (EVT-3) and every module use one path; the module never sees `jobs` tables.
+- Cons: Infrastructure SQL runs on a module's context (a write into another schema, by Infrastructure code, not the module's); the insert happens at call time, not at `SaveChanges`; the column list lives in SQL as well as in the EF model, so a test must keep them in step (AC-15, AC-16).
+
+#### Option J2: `JobsDbContext` sharing the caller's connection with `UseTransaction`
+
+Build a `JobsDbContext` on the caller's `DbConnection` and join its `DbTransaction`, then `Add` and `SaveChanges`.
+
+- Pros: typed EF insert, change tracking.
+- Cons: SND-5 refuses signals on a joined context, so the signal would still need the caller's context; a second context per enqueue on a shared connection is easy to get wrong under the execution strategy; spec 0013 already names `UseTransaction` as unsupported.
+
+#### Option J3: Enqueue through an outbox like row in the caller's schema
+
+Each module writes a pending job row in its own schema, and a mover copies it into `jobs.job`.
+
+- Pros: modules write only their own schema.
+- Cons: a second queue per module, a mover loop, and seconds of delay for every job; it is the outbox's shape (milestone 3) applied to the queue itself, doubling the machinery.
+
+#### Option J4: Enqueue after commit
+
+The caller commits, then enqueues in its own transaction.
+
+- Pros: simplest code.
+- Cons: a crash between the two loses the job, which JOB-4 exists to prevent.
+
+### Rationale
+
+J1 is the only option that makes "the job exists if and only if the change committed" true with no new machinery, because it reuses the exact transaction the signal already rides. The schema boundary MOD-3 protects is about module code reading other modules' tables; here the code is Infrastructure's, and the module only calls `IJobQueue`. J2 fights SND-5, J3 builds a second outbox, and J4 breaks JOB-4.
+
+### Calls made while writing (recommend items, milestone 2)
+
+The engineer was not in this run (another session started it), so each pick is the recommendation and is overridable.
+
+- **Job identity**: a record implementing `IJob` with a `static abstract string Kind`, so enqueue needs no lookup to name the kind and the name sits beside the payload type. Runner up: a `[JobKind]` attribute, rejected because it needs reflection and fails at runtime instead of compile time.
+- **Registration**: `AddJobHandler<TJob, THandler>(JsonTypeInfo<TJob>, configure)`, with lease, max attempts, and timeout per kind. Taking the `JsonTypeInfo` follows JSN-1's source generation and lets Infrastructure call handlers through a delegate, with no reflection. Runner up: per enqueue options for attempts and lease, rejected because the same kind should behave the same way everywhere.
+- **No transaction**: a separate context free overload that runs its own transaction on `JobsDbContext`, rather than sending at once on the caller's context. The overload with a context still refuses a context without a transaction (SND-5), so a caller who has a transaction cannot accidentally enqueue outside it.
+- **Lease and fencing**: the claim's `attempt` plus `locked_by` fence every later write, so a worker whose lease expired cannot overwrite the new holder's outcome. Renewal every third of the lease is JOB-2's; a lost renewal cancels the handler. Runner up: `xmin` on the row, rejected because the claim itself changes `xmin` and the fence must survive renewals.
+- **Unknown kinds and bad payloads**: claimed and treated as a failed attempt with a clear `last_error`, rather than left queued forever or filtered out of claims. First written as "dead at once"; the cross check below changed it so a rollback to an older version drains them.
+- **Backoff**: equal jitter (half the curve plus a random half), not full jitter as for the listener (LSN-5). A retry of a failed job should never come back at once; the listener's reconnect should.
+- **Timeout**: a per kind `Timeout` (default 1 hour) on top of the lease, so a handler that hangs while renewing cannot hold a slot forever; at the limit the attempt fails and the task is abandoned, like LSN-6.
+- **Shutdown**: a cancelled handler is released with its attempt restored, so deploys do not burn attempts; a hard kill falls back to the lease.
+- **Wake and poll**: one coalescing wake channel fed by the `job` signal, an always on poll, the connect observer, and a full claim; no separate fallback poll while disconnected, since the poll is already the fallback and is the only path for future jobs.
+- **Schedules in code**: declared with `AddJobSchedule` and synced at worker start, the table keeping `cron` (for change detection), `enabled`, `next_run_at`, and `last_fired_at`, with kind and payload read from the registration by name. The first schedules are all Orvano's own maintenance, which belongs in code review, not in data. Runner up: schedules only in the table, seeded by migrations, rejected because a cron change would need a migration and drift is invisible.
+- **Missed fires**: collapse to one fire, because every planned schedule is cleanup or rotation, where running ten times after an outage is waste.
+- **Project scope**: `JobAccessScope`, a public SharedKernel type banned in modules, rather than `InternalsVisibleTo` from SharedKernel to Infrastructure, which would expose every SharedKernel internal. It amends spec 0012 PRJ-3 with exactly one more setter.
+- **Concurrency default**: also capped at half the pool. JOB-4's default (up to 16) breaks its own rule at the default pool of 30 on any machine with 8 or more cores; failing startup with default settings is wrong, so the default yields and only an explicit value fails.
+- **Clock**: the app's `TimeProvider` for every time, passed as SQL parameters, rather than PostgreSQL's `now()`. GEN-9 requires it, and it is what lets tests drive leases, backoff, and cron with `ManualClock`; the cost is trusting replica clocks (CLM-8).
+- **`trace_parent` column**: added to JOB-1's list so an attempt's trace links to the request that queued it; cheap, and the alternative (no link) makes a failing job hard to trace back.
+- **`CancelProjectJobsAsync`**: added now because spec 0011 LIF-2 step 1 needs it and modules cannot touch `jobs.job`; leaving it to feature 13 would reopen this contract.
+- **Log event IDs**: jobs take `LogEventIds.Infrastructure + 100` to `+ 199`, leaving the first hundred to signals.
+
+### Reconciled with specs 0007 and 0012 (2026-10-19)
+
+Spec 0007 was updated in the same change: JOB-1 adds `trace_parent` and notes the dedupe index is a plain unique index; JOB-2 points to CLM for the claim and fence; JOB-4 caps the default concurrency at half the pool and points to ENQ for the transaction join and the context free overload; JOB-5 says schedules are declared in code and synced (SCH-2); _Configuration required_ shows the new default. Spec 0012 PRJ-3 allows `JobAccessScope` as the one other setter.
+
+### Cross check of milestone 2 (2026-10-19)
+
+A read only cross check on another model (its report is kept outside the repo, in the session notes as `feature-61-job-queue-crosscheck.md`) found six gaps to settle before `/develop` and a set of smaller ones. The engineer approved applying its recommended fixes. Each change, by the report's IDs:
+
+- **G1, timed out handler (S1, V4)**: the slot stays taken, and the job id stays in an in process running set, until the handler returns; the outcome is still written at once, and the claim skips ids in that set (CLM-2, OUT-2, AC-19, AC-21). Lease loss already worked this way.
+- **G2, claim index (S2)**: `ix_job_due` covers `queued` rows only, a new `ix_job_lease` covers `running` rows by `locked_until`, and the claim takes due rows first, then expired leases, as two `SKIP LOCKED` subselects under one `LIMIT` (JDB-2, CLM-1, spec 0007 JOB-1). The claim SQL is now written out (V15). HOT updates are no longer promised.
+- **G3, renewal (S3, V3)**: one renewal in flight per job, a single attempt with no execution strategy retry, a command timeout of lease ÷ 3, stopped and awaited before the outcome write, and a no row result after the handler returned is ignored; the minimum lease rises to 1 minute (CLM-5, CLM-8, JQ-5, AC-20).
+- **G4, test driver (V12, V13)**: `JobsDriver.RunDueAsync` syncs schedules before the tick, so it works on `api` test hosts, and stops after 1000 attempts per call (JTS-2, AC-29).
+- **G5, cancellation (V2, V16, S4)**: a new OUT-8 fixes the cause order (lease lost, timed out, shutdown, else the handler's own) and runs outcome and release writes on a 10 second clock bound source, never the stopping token; OUT-6 stops the wake loop and awaits a claim or tick in flight before cancelling handlers, and a handler finishing during shutdown records its outcome (AC-21).
+- **G6, startup errors (V10)**: the registration extensions throw `ConfigurationException` (already caught in `ServeCommand.Build`), and `StartupChecks` turns `JobRegistry` errors into `StartupFailedException` (already caught in `RunAsync`), with `AddJobRunner` registered after it, so no bad registration ends in a stack trace (JQ-5, SCH-1, AC-24). This needs no change to `ServeCommand`'s catch blocks.
+- **Smaller gaps**: `/develop` picks and records the `Cronos` version (V1); the full claim wakes on any job finishing while the last claim was full (V5); a 25 second host shutdown timeout and `stop_grace_period: 35s` (V6); histogram buckets (V7); `jobs.cleanup` with `MaxAttempts` 3 and an `InfrastructureJsonContext` (V8); schedule payloads serialized and size checked by `JobRegistry` with the kind's type info (V9, S5 poison row); `RequiresProject` per kind (1b item 10, V11); the `::jsonb` cast (V14); backoff in `double` with a clamped exponent and a test at attempt 100; schedule tick errors isolated from the claim and syncs in name order (S5); a cron with no next occurrence rejected (S6); poll granularity of schedules documented; `CancelProjectJobsAsync`'s races stated in AC-30 for feature 13 (S7, V17 latency stated); unknown kinds and unreadable payloads retry instead of dying at once (S8); a one connection per handler rule (S9); the context free overload's limit documented (1b item 9); the instance id must be new every start; the NOTIFY commit lock, non HOT updates, and `MaxAttempts` 1 noted in Consequences and JQ-5 (S10); a per kind concurrency limit as a feature 23 follow up.
+- **`jobs.schedule` without `kind` and `payload` (S5, simpler option)**: taken. The registration is the only source, which removes a payload comparison and a second copy that could drift; the cost is that the table alone does not say what a schedule runs.
+
+Left open for the engineer, because the report gave no clear pick (listed in index.md _Follow-up_): capping the renewal interval at 1 minute (V17), lowering the default concurrency to a third of the pool (S9), queue depth and dead count gauges (S10), one renewal statement per worker, a `lease_token` fence column, and storing only the exception type in `last_error`.

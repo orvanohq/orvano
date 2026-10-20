@@ -3,6 +3,7 @@
 **Date**: 2026-10-18
 **Status**: Accepted
 **Updated**: 2026-10-18, to agree with spec 0007: label and resource grant changes travel as `cache` tags (SIG-1, CCH-2), both caches expire after 60 seconds (security related entries), feature 61 builds the signal bus, and specs 0011 and 0006 carry this spec's amendments (build plan step 9). 2026-10-19, after the review of PRs #32 to #35: the access layer entry point for credential resolvers (RSV, `ICallerResolver`), default deny at the endpoint level (EPT, AC-13), endpoint requirements described as metadata the access layer middleware enforces (SCP-5, CPL-3), `MayChangeItemGrants` taking `rowSecurity` (WRT-1), and `Normalize` refusing client writers on table, bucket, and function grants (WRT-6). Build plan steps 10 and 11 are new.
+**Updated**: 2026-10-19, for spec 0013 milestone 2: PRJ-3 allows `JobAccessScope` (JQ-6) as the one setter outside the access layer, for job scopes.
 
 ## Summary
 
@@ -131,7 +132,7 @@ Each rule has an ID so reviews and later specs can cite it. **MUST** fails the r
 
 - **PRJ-1 (MUST)**: On the data plane the project id comes from the route (TEN-2), as the `{projectId}` route value; a later host based scheme fills that same route value, never a second source. A resolver turns the credential into a `Caller` (RSV), and the checks below are split between them (RSV-4). Together they require: an API key's `project_id` equals it; a token's `aud` equals it and its `kid` belongs to it (TOK-3); a run key's `aud` equals it.
 - **PRJ-2 (MUST)**: Any mismatch answers `401 unauthorized`, the same as a bad credential, so a caller cannot probe which projects exist.
-- **PRJ-3 (MUST)**: Only the access layer sets `IProjectContext.Id`, after PRJ-1 passes (data plane) or after the membership check (control plane, CPL-3). An architecture test fails any other type that sets it. Spec 0002 DAT-2a stays as written: the `"project"` query filter reads this context.
+- **PRJ-3 (MUST)**: Only the access layer sets `IProjectContext.Id`, after PRJ-1 passes (data plane) or after the membership check (control plane, CPL-3). An architecture test fails any other type that sets it. The one other setter is the job runner, through `JobAccessScope.Establish` (spec 0013 JQ-6), which sets `Caller.System` and the job's own `project_id` for each job's scope (CLR-1); modules are banned from calling it, and the architecture test allows exactly the access layer and `JobAccessScope`. Spec 0002 DAT-2a stays as written: the `"project"` query filter reads this context.
 - **PRJ-4 (MUST)**: A credential that is sent but fails (bad, expired, revoked, wrong project, a secret key with an `Origin` header per KEY-1) answers `401 unauthorized`. It never falls back to `guest`. A request with no token but a valid publishable key is a `guest`. Resolvers find keys and signing keys through spec 0011 FLT-1's lookups and do not read `IProjectContext` before it is set.
 
 #### RSV: the resolver entry point
