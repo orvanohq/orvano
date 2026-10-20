@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Net;
 
@@ -128,6 +129,23 @@ public sealed class SignalListenerTests(PostgresFixture postgres) : IAsyncLifeti
         await a.WaitUntilConnectedAsync(Token);
 
         await Eventually.TrueAsync(() => observer.Count("disconnected") >= 1, TimeSpan.FromSeconds(10), "the heartbeat timeout never fired", Token);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-8"), Trait("Spec", "0013:LSN-3")]
+    public async Task A_heartbeat_send_that_never_returns_still_disconnects_within_the_timeout()
+    {
+        _settings["Signals:HeartbeatInterval"] = "00:00:01";
+        _settings["Signals:HeartbeatTimeout"] = "00:00:02";
+        OrvanoApiFactory a = Host(listenAsRole: false, services => services.AddSingleton<IHeartbeatSender, HangingHeartbeat>());
+        RecordingObserver observer = Observer(a);
+        await a.WaitUntilConnectedAsync(Token);
+        var elapsed = Stopwatch.StartNew();
+
+        // The first send starts at connect and hangs, so only the bound on the send can end it (Npgsql's own command
+        // timeout is 30 s). The listener reconnects at once, so the announced disconnect is what can be timed.
+        await Eventually.TrueAsync(() => observer.Count("disconnected") >= 1, TimeSpan.FromSeconds(10), "the hung heartbeat send was never timed out", Token);
+        elapsed.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(3)); // the 2 s timeout, plus scheduling slack
     }
 
     [Fact]
