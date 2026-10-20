@@ -4,7 +4,7 @@
 **Status**: Accepted
 **Updated**: 2026-10-16, from the scaffold: INS-3 and the new INS-5 (root key file permissions on Linux), INS-2 (migrate gets no root key), HSH-2 result recorded.
 **Updated**: 2026-10-18, for spec 0012: CCH-2 names end user labels and resource grants as security related entries and says what "permission answers" means; feature 61 builds the signal, cache, job, and outbox runtime.
-**Updated**: 2026-10-19, for spec 0013: SIG-1 gives `session` an `["*"]` value, SIG-3 and CCH-2 point to spec 0013 for how a signal joins its transaction and when the writer removes its own entry, REP-2 lists `SignalOptions`, and four `ORVANO_SIGNALS__*` variables are added.
+**Updated**: 2026-10-19, for spec 0013: SIG-1 gives `session` an `["*"]` value, SIG-3 and CCH-2 point to spec 0013 for how a signal joins its transaction and when the writer removes its own entry, REP-2 lists `SignalOptions`, and five `ORVANO_SIGNALS__*` variables are added (the fifth, `HANDLERTIMEOUT`, from the spec 0013 review settlement).
 
 ## Summary
 
@@ -182,7 +182,7 @@ New variables introduced here (all follow spec 0002 CFG rules and accept `_FILE`
 - `ORVANO_PROJECTDB__HOST`, `__PORT`, `__SSLMODE`, `__ADMINUSERNAME`, `__ADMINPASSWORD`: project database server and provisioning role (fall back to `ORVANO_DATABASE__*`)
 - `ORVANO_PROJECTDB__POOLSIZE` (5), `__MAXCONNECTIONS` (150), `__IDLEEVICTION` (10 minutes)
 - `ORVANO_DATABASE__POOLSIZE` (30)
-- `ORVANO_SIGNALS__HEARTBEATINTERVAL` (30 s), `__HEARTBEATTIMEOUT` (90 s), `__RECONNECTBACKOFFCAP` (30 s), `__FALLBACKPOLLINTERVAL` (5 s): SIG-2's timings (spec 0013 SOP-1)
+- `ORVANO_SIGNALS__HEARTBEATINTERVAL` (30 s), `__HEARTBEATTIMEOUT` (90 s), `__RECONNECTBACKOFFCAP` (30 s), `__FALLBACKPOLLINTERVAL` (5 s), `__HANDLERTIMEOUT` (10 s): SIG-2's timings and the per call limit for signal handlers (spec 0013 SOP-1)
 - `ORVANO_JOBS__CONCURRENCY` (smaller of processor count × 2 and 16), `ORVANO_JOBS__POLLINTERVAL` (5 s)
 - `ORVANO_STORAGE__PROVIDER`, `__LOCAL__PATH`, `__S3__ENDPOINT`, `__S3__REGION`, `__S3__BUCKET`, `__S3__ACCESSKEY`, `__S3__SECRETKEY`, `__S3__FORCEPATHSTYLE`
 - `ORVANO_TLS__CERTFILE`, `ORVANO_TLS__KEYFILE`

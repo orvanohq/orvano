@@ -73,10 +73,15 @@ public static class InfrastructureServices
 
         ServiceDescriptor inner = services.Last(descriptor => descriptor.ServiceType == typeof(HybridCache) && !descriptor.IsKeyedService);
         services.Remove(inner);
-        services.Add(inner.ImplementationType is { } type
-            ? ServiceDescriptor.KeyedSingleton(typeof(HybridCache), SignalAwareHybridCache.InnerKey, type)
-            : ServiceDescriptor.KeyedSingleton<HybridCache>(
-                SignalAwareHybridCache.InnerKey, (provider, _) => (HybridCache)inner.ImplementationFactory!(provider)));
+        services.Add(inner switch
+        {
+            { ImplementationType: { } type } => ServiceDescriptor.KeyedSingleton(typeof(HybridCache), SignalAwareHybridCache.InnerKey, type),
+            { ImplementationInstance: HybridCache instance } => ServiceDescriptor.KeyedSingleton(SignalAwareHybridCache.InnerKey, instance),
+            { ImplementationFactory: { } factory } => ServiceDescriptor.KeyedSingleton<HybridCache>(
+                SignalAwareHybridCache.InnerKey, (provider, _) => (HybridCache)factory(provider)),
+            _ => throw new InvalidOperationException(
+                "AddHybridCache registered HybridCache in a way the signal aware decorator cannot wrap (spec 0013 CAC-1)."),
+        });
         services.AddSingleton<HybridCache, SignalAwareHybridCache>();
     }
 }

@@ -1,6 +1,8 @@
 using System.Buffers;
 using System.Text.Json;
 
+using Orvano.SharedKernel.Data;
+
 namespace Orvano.SharedKernel.Signals;
 
 /// <summary>
@@ -83,7 +85,9 @@ public static class SignalPayload
 
     /// <summary>
     /// Reads a payload. Unknown properties are ignored; <c>v</c> must be 1, <c>k</c> a string, and <c>d</c> an array of
-    /// non null strings. The kind comes back as raw text, so the listener can tell <c>hb</c> and unknown kinds apart.
+    /// non null strings that each follow the enlist rule (1 to 200 printable ASCII characters, BUS-2), so a value no
+    /// sender could enlist never reaches a handler. The kind comes back as raw text, so the listener can tell
+    /// <c>hb</c> and unknown kinds apart.
     /// </summary>
     public static bool TryDecode(string payload, out string kind, out IReadOnlyList<string> values)
     {
@@ -114,12 +118,12 @@ public static class SignalPayload
             var list = new List<string>(data.GetArrayLength());
             foreach (JsonElement item in data.EnumerateArray())
             {
-                if (item.ValueKind != JsonValueKind.String)
+                if (item.ValueKind != JsonValueKind.String || item.GetString() is not { } value || !TransactionSignals.IsValidValue(value))
                 {
                     return false;
                 }
 
-                list.Add(item.GetString()!);
+                list.Add(value);
             }
 
             kind = name.GetString()!;

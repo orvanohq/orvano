@@ -257,6 +257,35 @@ public sealed class TransactionSignalTests(SampleDatabase db) : IClassFixture<Sa
     }
 
     [Fact]
+    [Trait("Spec", "0013:SND-3")]
+    public async Task Commit_stands_once_and_later_actions_still_run_when_an_after_commit_action_throws()
+    {
+        await using SignalListenerProbe probe = await SignalListenerProbe.StartAsync(db.DataSource, Token);
+        await using SampleContext context = db.CreateContext();
+        int attempts = 0;
+        bool laterRan = false;
+
+        await context.InTransactionAsync(
+            _ =>
+            {
+                attempts++;
+                TransactionSignals.Enlist(context, SignalKind.Cache, ["kept"]);
+                TransactionSignals.AddAfterCommit(context, _ => throw new InvalidOperationException("action failed"));
+                TransactionSignals.AddAfterCommit(context, _ =>
+                {
+                    laterRan = true;
+                    return ValueTask.CompletedTask;
+                });
+                return Task.CompletedTask;
+            },
+            Token);
+
+        attempts.ShouldBe(1); // a throwing action is not a failed commit, so the work is not run again
+        laterRan.ShouldBeTrue();
+        (await probe.TakeAsync(Token)).ShouldBe(["""{"v":1,"k":"cache","d":["kept"]}"""]);
+    }
+
+    [Fact]
     [Trait("Spec", "0013:SND-6")]
     public async Task Retry_clears_the_change_tracker_before_the_second_attempt()
     {

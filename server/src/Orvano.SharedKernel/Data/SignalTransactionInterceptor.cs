@@ -1,6 +1,7 @@
 using System.Data.Common;
 
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 using Orvano.SharedKernel.Signals;
 
@@ -11,7 +12,7 @@ namespace Orvano.SharedKernel.Data;
 /// <c>UseOrvanoConventions</c> registers it, so every platform context has it. A listener sees a signal only once the
 /// change it announces is visible, and never for a rolled back change.
 /// </summary>
-internal sealed class SignalTransactionInterceptor(PendingSignals batch) : DbTransactionInterceptor
+internal sealed class SignalTransactionInterceptor(PendingSignals batch, Lazy<ILogger> logger) : DbTransactionInterceptor
 {
     // The SQL names the channel as a constant; only the payload is a parameter.
     private const string NotifySql = "SELECT pg_notify('" + SignalPayload.Channel + "', @payload)";
@@ -85,7 +86,7 @@ internal sealed class SignalTransactionInterceptor(PendingSignals batch) : DbTra
         DbTransaction transaction, TransactionEndEventData eventData, CancellationToken cancellationToken = default)
     {
         // The commit happened, so the actions run even if the caller gives up now.
-        await batch.RunAfterCommitAsync(CancellationToken.None);
+        await batch.RunAfterCommitAsync(logger, CancellationToken.None);
         batch.Clear();
     }
 
@@ -120,7 +121,7 @@ internal sealed class SignalTransactionInterceptor(PendingSignals batch) : DbTra
         // A failed commit has an unknown outcome, and a local removal is always safe (SND-3).
         if (eventData.Action == "Commit")
         {
-            await batch.RunAfterCommitAsync(CancellationToken.None);
+            await batch.RunAfterCommitAsync(logger, CancellationToken.None);
         }
 
         batch.Clear();

@@ -4,6 +4,7 @@ using System.Net;
 
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using Npgsql;
 
@@ -11,6 +12,7 @@ using Orvano.Host.Database;
 using Orvano.Infrastructure;
 using Orvano.Infrastructure.Caching;
 using Orvano.Infrastructure.Signals;
+using Orvano.SharedKernel;
 using Orvano.SharedKernel.Signals;
 using Orvano.Testing;
 
@@ -166,6 +168,72 @@ public sealed class SignalListenerTests(PostgresFixture postgres) : IAsyncLifeti
         await Eventually.TrueAsync(() => observer.Count("connected") == 2, TimeSpan.FromSeconds(10), "the listener did not reconnect", Token);
         observer.Events.Take(2).ShouldBe(["connected", "disconnected"]); // a fallback poll may land before the reconnect
         heartbeat.Calls.ShouldBe(2); // the new connection's send hangs again, and the clock has not moved since
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-8"), Trait("Spec", "0013:LSN-3")]
+    public async Task A_connection_that_goes_silent_disconnects_with_the_real_heartbeat_sender_and_reconnects_when_connections_pass_again()
+    {
+        // Nothing is faked but the network: the real NotifyHeartbeatSender sends on a socket that never answers, so
+        // only the listener's deadline and Npgsql's cancel and close can end it. Wall clock, with a wide margin.
+        _settings["Signals:HeartbeatInterval"] = "00:00:01";
+        _settings["Signals:HeartbeatTimeout"] = "00:00:02";
+        var direct = new NpgsqlConnectionStringBuilder(postgres.ConnectionString(_settings["Database:Name"]));
+        await using var proxy = SilentProxy.Start(direct.Host!, direct.Port);
+        OrvanoApiFactory a = Host(listenAsRole: false, services => services.AddKeyedSingleton(
+            InfrastructureServices.SignalDataSourceKey,
+            (provider, _) => NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(direct.ConnectionString)
+            {
+                Host = IPAddress.Loopback.ToString(),
+                Port = proxy.Port,
+                Pooling = false,
+                ApplicationName = provider.GetRequiredService<SignalInstance>().ApplicationName,
+            }.ConnectionString)));
+        RecordingObserver observer = Observer(a);
+        await a.WaitUntilConnectedAsync(Token);
+        a.Services.GetRequiredService<IHeartbeatSender>().ShouldBeOfType<NotifyHeartbeatSender>();
+
+        proxy.Silence();
+
+        await Eventually.TrueAsync(() => observer.Count("disconnected") == 1, TimeSpan.FromSeconds(15), "the silent connection was never timed out", Token);
+        await Eventually.TrueAsync(() => observer.Count("connected") == 2, TimeSpan.FromSeconds(15), "the listener did not reconnect through a new connection", Token);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:HND-4"), Trait("Spec", "0013:LSN-6"), Trait("Spec", "0013:AC-10")]
+    public async Task A_handler_that_never_returns_is_given_up_at_the_heartbeat_timeout_and_not_before_and_the_next_signal_runs()
+    {
+        // Same clock as the hung heartbeat test: the limit fires when the test moves it, never on the wall clock. The
+        // handler ignores cancellation, so only the bound on the call can free the dispatch loop.
+        _settings["Signals:HeartbeatInterval"] = "00:00:01";
+        _settings["Signals:HeartbeatTimeout"] = "00:00:02";
+        var clock = new ManualClock();
+        var calls = new ConcurrentQueue<string>();
+        var logs = new RecordingLogs();
+        OrvanoApiFactory a = Host(listenAsRole: false, services =>
+        {
+            services.AddSingleton<TimeProvider>(clock);
+            services.AddSingleton(calls);
+            services.AddSingleton<ILoggerProvider>(logs);
+            services.AddSignalHandler<HangingCacheHandler>();
+            services.AddSignalHandler<SessionHandler>();
+        });
+        await a.WaitUntilConnectedAsync(Token);
+
+        await _database.NotifyAsync("""{"v":1,"k":"cache","d":["stuck"]}""", Token);
+        await Eventually.TrueAsync(() => calls.Contains("hang:stuck"), TimeSpan.FromSeconds(5), "the hanging handler never started", Token);
+        await _database.NotifyAsync("""{"v":1,"k":"session","d":["s"]}""", Token);
+
+        clock.Advance(TimeSpan.FromSeconds(2) - TimeSpan.FromMilliseconds(1));
+        await Task.Delay(TimeSpan.FromSeconds(2), Token);
+        calls.ShouldNotContain("session:s"); // one at a time (LSN-6): the session signal waits behind the hung call
+        logs.Count(LogEventIds.Infrastructure + 12, LogLevel.Error).ShouldBe(0);
+
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+
+        await Eventually.TrueAsync(() => calls.Contains("session:s"), TimeSpan.FromSeconds(10), "the hung handler still holds the dispatch loop", Token);
+        logs.Count(LogEventIds.Infrastructure + 12, LogLevel.Error).ShouldBe(1);
+        calls.ShouldBe(["hang:stuck", "session:s"]);
     }
 
     [Fact]

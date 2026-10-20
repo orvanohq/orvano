@@ -149,6 +149,7 @@ spec [0013](../specs/0013-background-runtime/index.md) (builds spec [0007](../sp
 - [ ] Build it: `/develop background runtime`
   - [x] Signals and cache invalidation: `ISignalBus`, `ICacheInvalidator`, the listener, heartbeat, disconnect bypass, and reconnect clear (SIG-1 to SIG-3, CCH-1, CCH-2; spec 0013 AC-1 to AC-13, build plan steps 1 to 7); unblocks feature 9's AC-10
     - built: spec 0013 build plan steps 1 to 7 (contracts and codec, transaction join, listener, cache, two host test, failure handling, telemetry), 2026-10-19
+  - [ ] Review settlement: handler limit and dispatch lag, reconnect floor, boot announce, confirmed commit count, joined context refusal, module isolation (spec 0013 AC-3, AC-8 to AC-13, build plan steps 8 to 12)
   - [ ] Job queue, runner, leases, backoff, and schedules (JOB-1 to JOB-6); extend spec 0013 with the `IJobQueue` contract first
   - [ ] Module outbox and dispatcher (EVT-1 to EVT-4); extend spec 0013 with the `IOutbox` contract first
 - [ ] Verify it: `/check verify background runtime`

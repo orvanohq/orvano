@@ -200,6 +200,26 @@ public sealed class CacheInvalidatorTests(PostgresFixture postgres) : IAsyncLife
         (await ReadAsync("t4", 2)).ShouldBe(1);
     }
 
+    [Fact]
+    [Trait("Spec", "0013:BUS-2"), Trait("Spec", "0013:AC-6")]
+    public async Task Bus_enlist_throws_and_enlists_nothing_when_the_kind_is_cache()
+    {
+        await using ProbeContext db = Context();
+        ISignalBus bus = _services.GetRequiredService<ISignalBus>();
+        IReadOnlyList<string> enlisted = ["not checked"];
+
+        await db.InTransactionAsync(
+            _ =>
+            {
+                Should.Throw<ArgumentException>(() => bus.Enlist(db, SignalKind.Cache, ["t5"])).Message.ShouldContain("ICacheInvalidator");
+                enlisted = [.. TransactionSignals.Enlisted(db, SignalKind.Cache)];
+                return Task.CompletedTask;
+            },
+            Token);
+
+        enlisted.ShouldBeEmpty();
+    }
+
     private ProbeContext Context() =>
         new(new DbContextOptionsBuilder<ProbeContext>().UseOrvanoConventions("probe", _services).Options);
 

@@ -33,6 +33,10 @@ internal static class PlatformDatabase
             NpgsqlConnectionStringBuilder connection = ConnectionString(options, development);
             connection.Pooling = false; // one long lived session connection outside the platform pool (spec 0007 SIG-1)
             connection.KeepAlive = 30;
+            // Npgsql's current defaults, written down so a package upgrade cannot lengthen the connect or the LISTEN
+            // (the only commands on this connection besides the heartbeat, which the listener bounds itself).
+            connection.Timeout = 15;
+            connection.CommandTimeout = 30;
             connection.ApplicationName = services.GetRequiredService<SignalInstance>().ApplicationName;
             return Build(connection, services);
         });

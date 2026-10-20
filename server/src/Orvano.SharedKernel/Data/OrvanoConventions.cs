@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using Npgsql;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
@@ -99,7 +100,11 @@ internal sealed class OrvanoOptionsExtension(string schema, TimeProvider timePro
 
         // Spec 0013 SND-1, SND-2: one signal batch per context instance, sent by the transaction interceptor.
         services.AddScoped<PendingSignals>();
-        services.AddScoped<IInterceptor>(provider => new SignalTransactionInterceptor(provider.GetRequiredService<PendingSignals>()));
+        // The logger is resolved only when an after commit action throws: EF's loggers take the interceptors, so
+        // resolving one here would resolve this interceptor again.
+        services.AddScoped<IInterceptor>(provider => new SignalTransactionInterceptor(
+            provider.GetRequiredService<PendingSignals>(),
+            new Lazy<ILogger>(() => provider.GetRequiredService<IDiagnosticsLogger<DbLoggerCategory.Database.Transaction>>().Logger)));
     }
 
     public void Validate(IDbContextOptions options)
