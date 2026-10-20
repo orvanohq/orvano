@@ -305,6 +305,153 @@ public sealed class JobRunnerTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Spec", "0013:AC-20"), Trait("Spec", "0013:CLM-5"), Trait("Spec", "0013:AC-27")]
+    public async Task A_renewal_that_throws_is_logged_and_the_next_tick_renews_the_lease()
+    {
+        Guid id = (await Queue.EnqueueAsync(new LeaseJob(ProbeMode.Block), null, Token))!.Value;
+        Task<IReadOnlyList<JobRun>> running = JobsDriver.RunDueAsync(_host.Services, Token);
+        await _probes.StartedAsync(id, Token);
+        await _database.ExecuteAsync(
+            """
+            CREATE FUNCTION jobs.test_refuse_renewal() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'renewal refused'; END $$;
+            CREATE TRIGGER test_refuse_renewal BEFORE UPDATE ON jobs.job FOR EACH ROW
+                WHEN (OLD.locked_until IS NOT NULL AND NEW.locked_until IS NOT NULL) EXECUTE FUNCTION jobs.test_refuse_renewal();
+            """,
+            Token);
+
+        _clock.Advance(TimeSpan.FromSeconds(20));
+        await Eventually.TrueAsync(
+            () => _logs.Count(LogEventIds.Infrastructure + 119, LogLevel.Warning) == 1, TimeSpan.FromSeconds(5), "the failed renewal was not logged", Token);
+        (await _rows.FindAsync(id, Token))!.LockedUntil.ShouldBe(Start.AddMinutes(1));
+        await _database.ExecuteAsync("DROP TRIGGER test_refuse_renewal ON jobs.job", Token);
+
+        _clock.Advance(TimeSpan.FromSeconds(20)); // still inside the first lease, so the next tick tries again
+
+        await Eventually.TrueAsync(
+            async () => (await _rows.FindAsync(id, Token))!.LockedUntil == Start.AddSeconds(100),
+            TimeSpan.FromSeconds(5), "the next tick did not renew the lease", Token);
+        _probes.Cancelled.ShouldBeEmpty();
+        _probes.Release.SetResult();
+        (await running.WaitAsync(TimeSpan.FromSeconds(10), Token)).ShouldBe([new JobRun("test.lease", id, "succeeded")]);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-20"), Trait("Spec", "0013:CLM-2"), Trait("Spec", "0013:CLM-5"), Trait("Spec", "0013:OUT-8")]
+    public async Task A_handler_that_ignores_its_token_after_losing_its_lease_keeps_its_slot_until_it_returns_and_writes_nothing()
+    {
+        Guid id = (await Queue.EnqueueAsync(new LeaseJob(ProbeMode.BlockIgnoringCancel), null, Token))!.Value;
+        Task<IReadOnlyList<JobRun>> running = JobsDriver.RunDueAsync(_host.Services, Token);
+        await _probes.StartedAsync(id, Token);
+        await _database.ExecuteAsync("UPDATE jobs.job SET locked_by = 'thief:00000000' WHERE id = $1", Token, id);
+
+        _clock.Advance(TimeSpan.FromSeconds(20)); // the renewal finds the row taken
+
+        // The outcome comes at once although the handler goes on running.
+        (await running.WaitAsync(TimeSpan.FromSeconds(10), Token)).ShouldBe([new JobRun("test.lease", id, "lease_lost")]);
+        Executor.RunningCount.ShouldBe(1);
+
+        _probes.Release.SetResult();
+
+        await Eventually.TrueAsync(() => Executor.RunningCount == 0, TimeSpan.FromSeconds(5), "the slot was not freed", Token);
+        JobRows.Row row = (await _rows.FindAsync(id, Token))!;
+        row.Status.ShouldBe("running"); // its late return wrote no outcome over the thief's row
+        row.LockedBy.ShouldBe("thief:00000000");
+        row.FinishedAt.ShouldBeNull();
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-20"), Trait("Spec", "0013:CLM-4"), Trait("Spec", "0013:AC-27")]
+    public async Task A_handler_that_returns_after_another_worker_took_its_row_writes_no_outcome_and_counts_a_lost_lease()
+    {
+        using var meters = new MeterRecorder(_host.Services.GetRequiredService<IMeterFactory>());
+        Guid id = (await Queue.EnqueueAsync(new LeaseJob(ProbeMode.Block), null, Token))!.Value;
+        Task<IReadOnlyList<JobRun>> running = JobsDriver.RunDueAsync(_host.Services, Token);
+        await _probes.StartedAsync(id, Token);
+        await _database.ExecuteAsync("UPDATE jobs.job SET locked_by = 'thief:00000000', attempt = 2 WHERE id = $1", Token, id);
+
+        _probes.Release.SetResult(); // returns before any renewal noticed the move
+
+        (await running.WaitAsync(TimeSpan.FromSeconds(10), Token)).ShouldBe([new JobRun("test.lease", id, "lease_lost")]);
+        JobRows.Row row = (await _rows.FindAsync(id, Token))!;
+        row.Status.ShouldBe("running");
+        row.LockedBy.ShouldBe("thief:00000000");
+        row.Attempt.ShouldBe(2);
+        row.FinishedAt.ShouldBeNull();
+        meters.Sum("orvano.infrastructure.jobs.attempts", "outcome", "lease_lost").ShouldBe(1);
+        meters.Sum("orvano.infrastructure.jobs.attempts", "outcome", "succeeded").ShouldBe(0);
+        _logs.Count(LogEventIds.Infrastructure + 106, LogLevel.Warning).ShouldBe(1);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-30"), Trait("Spec", "0013:CLM-4"), Trait("Spec", "0013:ENQ-7")]
+    public async Task A_handler_that_returns_after_its_project_was_cancelled_leaves_the_row_dead()
+    {
+        var project = Guid.CreateVersion7();
+        Guid id = (await Queue.EnqueueAsync(new ProjectJob(ProbeMode.Block), new EnqueueOptions { ProjectId = project }, Token))!.Value;
+        Task<IReadOnlyList<JobRun>> running = JobsDriver.RunDueAsync(_host.Services, Token);
+        await _probes.StartedAsync(id, Token);
+        (await Queue.CancelProjectJobsAsync(project, null, Token)).ShouldBe(1);
+
+        _probes.Release.SetResult();
+
+        (await running.WaitAsync(TimeSpan.FromSeconds(10), Token)).ShouldBe([new JobRun("test.project", id, "lease_lost")]);
+        JobRows.Row row = (await _rows.FindAsync(id, Token))!;
+        row.Status.ShouldBe("dead");
+        row.LastError.ShouldBe("cancelled: project deleted");
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-21"), Trait("Spec", "0013:OUT-7"), Trait("Spec", "0013:CLM-6")]
+    public async Task An_outcome_write_that_fails_is_logged_at_Error_and_the_lease_recovers_the_job()
+    {
+        await _database.ExecuteAsync(
+            """
+            CREATE FUNCTION jobs.test_refuse_outcome() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'outcome refused'; END $$;
+            CREATE TRIGGER test_refuse_outcome BEFORE UPDATE ON jobs.job FOR EACH ROW
+                WHEN (NEW.status = 'succeeded') EXECUTE FUNCTION jobs.test_refuse_outcome();
+            """,
+            Token);
+        Guid id = (await Queue.EnqueueAsync(new LeaseJob(ProbeMode.Ok), null, Token))!.Value;
+
+        (await JobsDriver.RunDueAsync(_host.Services, Token)).ShouldHaveSingleItem().Id.ShouldBe(id);
+
+        _logs.Count(LogEventIds.Infrastructure + 111, LogLevel.Error).ShouldBe(1);
+        JobRows.Row row = (await _rows.FindAsync(id, Token))!;
+        row.Status.ShouldBe("running");
+        row.LockedUntil.ShouldBe(Start.AddMinutes(1));
+        await _database.ExecuteAsync("DROP TRIGGER test_refuse_outcome ON jobs.job", Token);
+
+        _clock.Advance(TimeSpan.FromSeconds(61));
+
+        (await JobsDriver.RunDueAsync(_host.Services, Token)).ShouldBe([new JobRun("test.lease", id, "succeeded")]);
+        _probes.Runs.Select(run => run.Attempt).ShouldBe([1, 2]);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-19"), Trait("Spec", "0013:CLM-1"), Trait("Spec", "0013:CLM-2")]
+    public async Task Two_hosts_claiming_at_the_same_instant_take_each_due_job_exactly_once()
+    {
+        JobExecutor mine = Executor;
+        JobExecutor theirs = Host().Services.GetRequiredService<JobExecutor>();
+
+        for (int round = 0; round < 20; round++)
+        {
+            Guid id = (await Queue.EnqueueAsync(new ProbeJob(ProbeMode.Ok), null, Token))!.Value;
+
+            IReadOnlyList<ClaimedJob>[] claims = await Task.WhenAll(
+                Task.Run(() => mine.ClaimAsync(4, Token), Token), Task.Run(() => theirs.ClaimAsync(4, Token), Token));
+
+            ClaimedJob job = claims.SelectMany(claim => claim).ShouldHaveSingleItem($"round {round}");
+            job.Id.ShouldBe(id);
+            JobExecutor winner = claims[0].Count == 1 ? mine : theirs;
+            (await winner.RunAsync(job, Token)).Outcome.ShouldBe("succeeded");
+        }
+
+        _probes.Runs.Count.ShouldBe(20);
+        _probes.Runs.ShouldAllBe(run => run.Attempt == 1);
+    }
+
+    [Fact]
     [Trait("Spec", "0013:AC-20"), Trait("Spec", "0013:CLM-6"), Trait("Spec", "0013:AC-19")]
     public async Task A_job_whose_worker_died_is_claimed_by_another_host_after_its_lease_with_attempt_2()
     {

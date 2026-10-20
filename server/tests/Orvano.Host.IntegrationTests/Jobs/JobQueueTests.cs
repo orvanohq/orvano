@@ -104,6 +104,59 @@ public sealed class JobQueueTests(PostgresFixture postgres) : IAsyncLifetime
         (await NotesAsync(Token)).ShouldBe(0);
         (await tap.TakeAsync(Token)).ShouldBeEmpty();
         meters.Sum("orvano.infrastructure.jobs.enqueued").ShouldBe(0);
+        (await JobsDriver.RunDueAsync(_host.Services, Token)).ShouldBeEmpty(); // nothing left behind to run
+        _probes.Runs.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [Trait("Spec", "0013:AC-16"), Trait("Spec", "0013:ENQ-1"), Trait("Spec", "0013:JOB-5")]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Enqueue_racing_an_open_transaction_for_the_same_dedupe_key_waits_and_inserts_only_when_that_one_rolls_back(bool firstCommits)
+    {
+        var options = new EnqueueOptions { DedupeKey = "probe:race" };
+        var inserted = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var db = ProbeContext.On(_host.Services);
+        Task first = db.InTransactionAsync(
+            async token =>
+            {
+                inserted.TrySetResult((await Queue.EnqueueAsync(db, new ProbeJob(ProbeMode.Ok), options, token))!.Value);
+                await finish.Task.WaitAsync(token);
+                if (!firstCommits)
+                {
+                    throw new InvalidOperationException("the first change fails");
+                }
+            },
+            Token);
+        Guid firstId = await inserted.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
+
+        Task<Guid?> second = Queue.EnqueueAsync(new ProbeJob(ProbeMode.Ok), options, Token);
+        await Eventually.TrueAsync(async () => await WaitingInsertsAsync(Token) == 1, TimeSpan.FromSeconds(5), "the second insert did not wait", Token);
+        second.IsCompleted.ShouldBeFalse();
+
+        finish.SetResult();
+        if (firstCommits)
+        {
+            await first;
+        }
+        else
+        {
+            await Should.ThrowAsync<InvalidOperationException>(first);
+        }
+
+        Guid? secondId = await second.WaitAsync(TimeSpan.FromSeconds(10), Token);
+        IReadOnlyList<JobRows.Row> rows = await _rows.WhereAsync("dedupe_key = 'probe:race'", Token);
+        if (firstCommits)
+        {
+            secondId.ShouldBeNull();
+            rows.ShouldHaveSingleItem().Id.ShouldBe(firstId);
+        }
+        else
+        {
+            secondId.ShouldNotBeNull();
+            rows.ShouldHaveSingleItem().Id.ShouldBe(secondId.Value);
+        }
     }
 
     [Fact]
@@ -336,6 +389,14 @@ public sealed class JobQueueTests(PostgresFixture postgres) : IAsyncLifetime
     {
         await using NpgsqlCommand command = _database.DataSource.CreateCommand(sql);
         return await command.ExecuteScalarAsync(Token) as string;
+    }
+
+    /// <summary>Job inserts now blocked on another transaction's lock.</summary>
+    private async Task<long> WaitingInsertsAsync(CancellationToken cancellationToken)
+    {
+        await using NpgsqlCommand command = _database.DataSource.CreateCommand(
+            "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE '%INSERT INTO jobs.job%'");
+        return (long)(await command.ExecuteScalarAsync(cancellationToken))!;
     }
 
     private async Task<long> NotesAsync(CancellationToken cancellationToken)
