@@ -67,4 +67,12 @@ internal static partial class InfrastructureLog
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 15, Level = LogLevel.Debug,
         Message = "A {Call} given up at its deadline failed later")]
     public static partial void SignalCallAbandonedFailed(this ILogger logger, string call, Exception exception);
+
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 16, Level = LogLevel.Warning,
+        Message = "Signal dispatch is {Lag} behind, past the heartbeat timeout {Limit}; the listener counts as disconnected")]
+    public static partial void SignalDispatchLagging(this ILogger logger, TimeSpan lag, TimeSpan limit);
+
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 17, Level = LogLevel.Warning,
+        Message = "Signal listener connection dropped within {Stable} of connecting (failed attempt {Attempt}); next attempt in {Delay}")]
+    public static partial void SignalsConnectionShortLived(this ILogger logger, TimeSpan stable, int attempt, TimeSpan delay);
 }

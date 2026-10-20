@@ -26,7 +26,8 @@ internal sealed class SignalBus(InfrastructureTelemetry telemetry) : ISignalBus
         bool first = TransactionSignals.Enlist(context, kind, values);
         if (first)
         {
-            TransactionSignals.AddAfterCommit(context, _ =>
+            // LSN-7: only a confirmed commit counts; one with an unknown outcome may or may not have sent.
+            TransactionSignals.AddOnCommitted(context, _ =>
             {
                 telemetry.SignalSent(kind);
                 return ValueTask.CompletedTask;

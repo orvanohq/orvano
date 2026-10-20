@@ -5,17 +5,25 @@ using Orvano.SharedKernel.Signals;
 namespace Orvano.SharedKernel.Data;
 
 /// <summary>
-/// The signals and after commit actions one <c>DbContext</c>'s current transaction will send (spec 0013 SND-1, SND-4):
-/// per kind, distinct values in first enlisted order. A scoped EF internal service, so one per context instance.
+/// The signals and actions one <c>DbContext</c>'s current transaction will send and run (spec 0013 SND-1, SND-4, SND-5):
+/// per kind, distinct values in first enlisted order, the after commit and on committed actions, and whether the
+/// transaction was joined rather than begun. A scoped EF internal service, so one per context instance.
 /// </summary>
 internal sealed class PendingSignals
 {
     private readonly List<SignalKind> _kinds = [];
     private readonly Dictionary<SignalKind, (List<string> Values, HashSet<string> Seen)> _values = [];
     private readonly List<Func<CancellationToken, ValueTask>> _afterCommit = [];
+    private readonly List<Func<CancellationToken, ValueTask>> _onCommitted = [];
 
     /// <summary>True when there is nothing to send and nothing to run after the commit.</summary>
-    public bool IsEmpty => _kinds.Count == 0 && _afterCommit.Count == 0;
+    public bool IsEmpty => _kinds.Count == 0 && _afterCommit.Count == 0 && _onCommitted.Count == 0;
+
+    /// <summary>
+    /// True while the context's current transaction was joined with <c>UseTransaction</c> rather than begun (SND-5).
+    /// Set when the transaction is used, cleared when one is started and at every transaction end.
+    /// </summary>
+    public bool Joined { get; set; }
 
     /// <summary>The kinds present, in first enlisted order, each with its values.</summary>
     public IEnumerable<(SignalKind Kind, IReadOnlyList<string> Values)> Batches =>
@@ -59,13 +67,32 @@ internal sealed class PendingSignals
 
     public void AddAfterCommit(Func<CancellationToken, ValueTask> action) => _afterCommit.Add(action);
 
-    /// <summary>
-    /// Runs the after commit actions in the order they were added. Each catches its own exceptions (SND-3); one that
-    /// throws anyway is logged at Error here, so it never turns a commit that happened into a failed one.
-    /// </summary>
-    public async Task RunAfterCommitAsync(Lazy<ILogger> logger, CancellationToken cancellationToken)
+    public void AddOnCommitted(Func<CancellationToken, ValueTask> action) => _onCommitted.Add(action);
+
+    /// <summary>Runs the after commit actions, for a confirmed commit or one with an unknown outcome (SND-3).</summary>
+    public Task RunAfterCommitAsync(Lazy<ILogger> logger, CancellationToken cancellationToken) =>
+        RunAsync(_afterCommit, logger, cancellationToken);
+
+    /// <summary>Runs the on committed actions, only for a confirmed commit (SND-1, SND-3).</summary>
+    public Task RunOnCommittedAsync(Lazy<ILogger> logger, CancellationToken cancellationToken) =>
+        RunAsync(_onCommitted, logger, cancellationToken);
+
+    public void Clear()
     {
-        foreach (Func<CancellationToken, ValueTask> action in _afterCommit.ToArray())
+        _kinds.Clear();
+        _values.Clear();
+        _afterCommit.Clear();
+        _onCommitted.Clear();
+        Joined = false;
+    }
+
+    /// <summary>
+    /// Runs actions in the order they were added. Each catches its own exceptions (SND-3); one that throws anyway is
+    /// logged at Error here, so it never turns a commit that happened into a failed one.
+    /// </summary>
+    private static async Task RunAsync(List<Func<CancellationToken, ValueTask>> actions, Lazy<ILogger> logger, CancellationToken cancellationToken)
+    {
+        foreach (Func<CancellationToken, ValueTask> action in actions.ToArray())
         {
             try
             {
@@ -76,12 +103,5 @@ internal sealed class PendingSignals
                 logger.Value.AfterCommitActionFailed(ex);
             }
         }
-    }
-
-    public void Clear()
-    {
-        _kinds.Clear();
-        _values.Clear();
-        _afterCommit.Clear();
     }
 }

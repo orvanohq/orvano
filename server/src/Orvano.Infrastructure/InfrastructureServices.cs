@@ -40,15 +40,17 @@ public static class InfrastructureServices
         services.TryAddSingleton<IHeartbeatSender, NotifyHeartbeatSender>();
 
         AddCache(services);
-        services.TryAddSingleton<ICacheInvalidator, CacheInvalidator>();
-        services.AddSignalHandler<CacheSignalHandler>();
+        services.TryAddSingleton<ICacheInvalidator>(
+            provider => ActivatorUtilities.CreateInstance<CacheInvalidator>(provider, SignalAwareHybridCache.Inner(provider)));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ISignalHandler, CacheSignalHandler>(
+            provider => ActivatorUtilities.CreateInstance<CacheSignalHandler>(provider, SignalAwareHybridCache.Inner(provider))));
         return services;
     }
 
     /// <summary>The signal listener (spec 0013 LSN-1). Only <c>serve</c> calls this, in every role.</summary>
     public static IServiceCollection AddSignalListener(this IServiceCollection services)
     {
-        services.TryAddSingleton<SignalListener>();
+        services.TryAddSingleton(provider => ActivatorUtilities.CreateInstance<SignalListener>(provider, SignalAwareHybridCache.Inner(provider)));
         services.AddHostedService(provider => provider.GetRequiredService<SignalListener>());
         services.Replace(ServiceDescriptor.Singleton<ISignalConnectionState>(provider => provider.GetRequiredService<SignalListener>()));
         return services;
@@ -82,6 +84,7 @@ public static class InfrastructureServices
             _ => throw new InvalidOperationException(
                 "AddHybridCache registered HybridCache in a way the signal aware decorator cannot wrap (spec 0013 CAC-1)."),
         });
-        services.AddSingleton<HybridCache, SignalAwareHybridCache>();
+        services.AddSingleton<HybridCache>(
+            provider => ActivatorUtilities.CreateInstance<SignalAwareHybridCache>(provider, SignalAwareHybridCache.Inner(provider)));
     }
 }

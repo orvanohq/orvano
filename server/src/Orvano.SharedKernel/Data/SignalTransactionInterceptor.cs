@@ -8,7 +8,7 @@ using Orvano.SharedKernel.Signals;
 namespace Orvano.SharedKernel.Data;
 
 /// <summary>
-/// Sends a context's pending signals inside its transaction, just before the commit (spec 0013 SND-2, SND-3, SND-8).
+/// Sends a context's pending signals inside its transaction, just before the commit (spec 0013 SND-2, SND-3, SND-5, SND-8).
 /// <c>UseOrvanoConventions</c> registers it, so every platform context has it. A listener sees a signal only once the
 /// change it announces is visible, and never for a rolled back change.
 /// </summary>
@@ -33,9 +33,11 @@ internal sealed class SignalTransactionInterceptor(PendingSignals batch, Lazy<IL
         return ValueTask.FromResult(result);
     }
 
+    // SND-5: a joined transaction belongs to the context that began it, so this context refuses enlists until it ends.
     public override DbTransaction TransactionUsed(DbConnection connection, TransactionEventData eventData, DbTransaction result)
     {
         Reset();
+        batch.Joined = true;
         return result;
     }
 
@@ -43,6 +45,7 @@ internal sealed class SignalTransactionInterceptor(PendingSignals batch, Lazy<IL
         DbConnection connection, TransactionEventData eventData, DbTransaction result, CancellationToken cancellationToken = default)
     {
         Reset();
+        batch.Joined = true;
         return ValueTask.FromResult(result);
     }
 
@@ -85,8 +88,10 @@ internal sealed class SignalTransactionInterceptor(PendingSignals batch, Lazy<IL
     public override async Task TransactionCommittedAsync(
         DbTransaction transaction, TransactionEndEventData eventData, CancellationToken cancellationToken = default)
     {
-        // The commit happened, so the actions run even if the caller gives up now.
+        // The commit happened, so the actions run even if the caller gives up now. Only here, on a confirmed commit, do
+        // the on committed actions run (SND-3).
         await batch.RunAfterCommitAsync(logger, CancellationToken.None);
+        await batch.RunOnCommittedAsync(logger, CancellationToken.None);
         batch.Clear();
     }
 
@@ -118,7 +123,8 @@ internal sealed class SignalTransactionInterceptor(PendingSignals batch, Lazy<IL
             return;
         }
 
-        // A failed commit has an unknown outcome, and a local removal is always safe (SND-3).
+        // A failed commit has an unknown outcome, and a local removal is always safe; the on committed actions never run
+        // here (SND-3).
         if (eventData.Action == "Commit")
         {
             await batch.RunAfterCommitAsync(logger, CancellationToken.None);

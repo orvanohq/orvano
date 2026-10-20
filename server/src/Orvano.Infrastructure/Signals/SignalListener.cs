@@ -11,13 +11,12 @@ using Microsoft.Extensions.Options;
 
 using Npgsql;
 
-using Orvano.Infrastructure.Caching;
 using Orvano.SharedKernel.Signals;
 
 namespace Orvano.Infrastructure.Signals;
 
 /// <summary>
-/// One <c>LISTEN orvano_signal</c> connection per instance (spec 0013 LSN-1 to LSN-7, spec 0007 SIG-1, SIG-2). It
+/// One <c>LISTEN orvano_signal</c> connection per instance (spec 0013 LSN-1 to LSN-8, spec 0007 SIG-1, SIG-2). It
 /// reads notifications and heartbeats on its read loop, hands signals and connection events to one dispatch loop, and
 /// keeps the cache bypassed whenever it might have missed a signal. Only <c>serve</c> runs it.
 /// </summary>
@@ -42,8 +41,11 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
     private readonly IHeartbeatSender _heartbeat;
     private readonly InfrastructureTelemetry _telemetry;
     private readonly ILogger<SignalListener> _logger;
-    // One loop reads it, but it is not marked single reader: only the general unbounded channel can count its items.
-    private readonly Channel<DispatchItem> _queue = Channel.CreateUnbounded<DispatchItem>();
+    private readonly Channel<DispatchItem> _queue = Channel.CreateUnbounded<DispatchItem>(new() { SingleReader = true });
+    // Every item written to the queue and not yet finished, oldest first, in the queue's order (LSN-8). Writes to the
+    // queue happen under this lock too, so both orders match.
+    private readonly Queue<DispatchItem> _unfinished = new();
+    private readonly Lock _queueLock = new();
     private readonly Lock _queueWarningLock = new();
 
     private volatile bool _connected;
@@ -59,6 +61,10 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
     // Read loop only.
     private DateTimeOffset _lastHeartbeat;
     private DateTimeOffset _lastSent;
+    private long _connectionEpoch;
+    private int _failedAttempts;
+    // When the current connection counts as stable (LSN-5); null once it got there, so a drop is not a failed attempt.
+    private DateTimeOffset? _stableAt;
 
     public SignalListener(
         [FromKeyedServices(InfrastructureServices.SignalDataSourceKey)] NpgsqlDataSource dataSource,
@@ -66,7 +72,7 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
         TimeProvider time,
         IEnumerable<ISignalHandler> handlers,
         IEnumerable<ISignalConnectionObserver> observers,
-        [FromKeyedServices(SignalAwareHybridCache.InnerKey)] HybridCache cache,
+        HybridCache cache, // the undecorated cache (SignalAwareHybridCache.Inner), which the clear on connect empties
         IHeartbeatSender heartbeat,
         InfrastructureTelemetry telemetry,
         ILogger<SignalListener> logger)
@@ -91,14 +97,15 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
         FallbackPoll,
     }
 
-    public bool IsConnected => _connected;
+    /// <summary>Why the read loop gave up a connection without an I/O error.</summary>
+    private enum ReadEnd
+    {
+        NoHeartbeat,
+        SendAbandoned,
+        DispatchLag,
+    }
 
-    /// <summary>
-    /// HND-4's guard: the longest one handler or observer call may hold the dispatch loop. It is the heartbeat timeout,
-    /// the silence after which the listener stops trusting the channel, so a call still running then has held back the
-    /// signals behind it for as long as a lost connection would.
-    /// </summary>
-    private TimeSpan CallLimit => _options.HeartbeatTimeout;
+    public bool IsConnected => _connected;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -133,31 +140,31 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
 
     private async Task ListenAsync(CancellationToken stoppingToken)
     {
-        int failures = 0;
-        bool disconnectAnnounced = false; // the instance starts disconnected, so a failed first connect announces it
+        // LSN-2: the instance starts disconnected, and says so before the first attempt, so a slow or failed first
+        // connect never leaves an observer unloaded. A failed attempt then announces nothing new.
+        StartFallback();
         while (!stoppingToken.IsCancellationRequested)
         {
             bool wasConnected = false;
+            ReadEnd end = ReadEnd.NoHeartbeat;
             Exception? error = null;
             try
             {
                 NpgsqlConnection connection = await _dataSource.OpenConnectionAsync(stoppingToken);
-                bool sendAbandoned = false;
                 connection.Notification += OnNotification;
                 try
                 {
                     await ConnectAsync(connection, stoppingToken);
                     wasConnected = true;
-                    failures = 0;
-                    disconnectAnnounced = false;
-                    sendAbandoned = !await ReadAsync(connection, stoppingToken);
+                    _stableAt = _time.GetUtcNow() + _options.HeartbeatInterval;
+                    end = await ReadAsync(connection, stoppingToken);
                 }
                 finally
                 {
                     // A heartbeat send abandoned at the deadline may still read from this connection; nothing it reads
                     // reaches the listener once the connection is given up.
                     connection.Notification -= OnNotification;
-                    await CloseAsync(connection, sendAbandoned);
+                    await CloseAsync(connection, end == ReadEnd.SendAbandoned);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -170,21 +177,31 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
             }
 
             _connected = false;
+            TimeSpan delay;
             if (wasConnected)
             {
-                // The first attempt after a disconnect is immediate (LSN-5).
-                AnnounceDisconnect(error is null ? "no heartbeat" : "connection lost", error);
-                disconnectAnnounced = true;
-                continue;
-            }
+                AnnounceDisconnect(error is not null ? "connection lost" : end == ReadEnd.DispatchLag ? "dispatch lag" : "no heartbeat", error);
+                if (_stableAt is null || _stableAt <= _time.GetUtcNow())
+                {
+                    // A drop after a stable connection takes the immediate first attempt (LSN-5). Stable also counts
+                    // here, not only on a loop pass, for a read loop that sat in one heartbeat send past the mark.
+                    _stableAt = null;
+                    _failedAttempts = 0;
+                    continue;
+                }
 
-            failures++;
-            TimeSpan delay = Backoff(failures, _options.ReconnectBackoffCap);
-            _logger.SignalsConnectFailed(failures, delay, error!);
-            if (!disconnectAnnounced)
+                // LSN-5: a connection that dropped before it was stable counts as a failed attempt, so a flapping
+                // connection backs off instead of reconnecting (and clearing the cache) at full speed.
+                _stableAt = null;
+                _failedAttempts++;
+                delay = Backoff(_failedAttempts, _options.ReconnectBackoffCap);
+                _logger.SignalsConnectionShortLived(_options.HeartbeatInterval, _failedAttempts, delay);
+            }
+            else
             {
-                AnnounceDisconnect("could not connect", null);
-                disconnectAnnounced = true;
+                _failedAttempts++;
+                delay = Backoff(_failedAttempts, _options.ReconnectBackoffCap);
+                _logger.SignalsConnectFailed(_failedAttempts, delay, error!);
             }
 
             try
@@ -233,33 +250,48 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
 
         _connected = true;
         StopPolling();
+        _connectionEpoch = Interlocked.Read(ref _epoch);
         _logger.SignalsConnected(SignalPayload.Channel);
-        Enqueue(new ObserverItem(ObserverCall.Connected, Interlocked.Read(ref _epoch)));
+        Enqueue(new ObserverItem(ObserverCall.Connected, _connectionEpoch));
     }
 
     /// <summary>
-    /// LSN-2, LSN-3: waits for notifications, each wait bounded by the next heartbeat send and the timeout deadline.
-    /// Returns when no heartbeat arrived for <see cref="SignalOptions.HeartbeatTimeout"/>: false when a heartbeat send was
-    /// still running then and was given up, else true. Throws on any I/O failure.
+    /// LSN-2, LSN-3, LSN-8: waits for notifications, each wait bounded by the next heartbeat send and the timeout
+    /// deadline. Between waits it marks the connection stable once it has lasted <see cref="SignalOptions.HeartbeatInterval"/>
+    /// (LSN-5) and checks the dispatch loop's lag. Returns why it gave the connection up: no heartbeat for
+    /// <see cref="SignalOptions.HeartbeatTimeout"/>, a heartbeat send still running at that deadline, or a dispatch loop
+    /// that fell behind. Throws on any I/O failure.
     /// </summary>
-    private async Task<bool> ReadAsync(NpgsqlConnection connection, CancellationToken cancellationToken)
+    private async Task<ReadEnd> ReadAsync(NpgsqlConnection connection, CancellationToken cancellationToken)
     {
         try
         {
             while (true)
             {
                 DateTimeOffset now = _time.GetUtcNow();
+                if (_stableAt <= now)
+                {
+                    _stableAt = null;
+                    _failedAttempts = 0;
+                }
+
+                if (OldestUnfinishedSince(_connectionEpoch) is { } queued && now - queued > _options.HeartbeatTimeout)
+                {
+                    _logger.SignalDispatchLagging(now - queued, _options.HeartbeatTimeout);
+                    return ReadEnd.DispatchLag;
+                }
+
                 DateTimeOffset deadline = _lastHeartbeat + _options.HeartbeatTimeout;
                 if (now >= deadline)
                 {
-                    return true;
+                    return ReadEnd.NoHeartbeat;
                 }
 
                 if (now - _lastSent >= _options.HeartbeatInterval)
                 {
                     if (!await SendHeartbeatAsync(connection, deadline - now, cancellationToken))
                     {
-                        return false; // a send still waiting at the deadline means a silent connection (LSN-3)
+                        return ReadEnd.SendAbandoned; // a send still waiting at the deadline means a silent connection (LSN-3)
                     }
 
                     _lastSent = now;
@@ -302,12 +334,13 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
     }
 
     /// <summary>
-    /// Waits for a call no longer than <see cref="CallLimit"/>. Returns false when it is still running then: it is
-    /// cancelled and left behind, so a call that ignores the cancel cannot hold the dispatch loop (HND-4).
+    /// Waits for a call no longer than <see cref="SignalOptions.HandlerTimeout"/>. Returns false when it is still running
+    /// then: it is cancelled and left behind, so a call that ignores the cancel cannot hold the dispatch loop (LSN-6,
+    /// HND-4).
     /// </summary>
     private async Task<bool> RunBoundedAsync(Func<CancellationToken, ValueTask> call, string name, CancellationToken stoppingToken)
     {
-        using var deadline = new CancellationTokenSource(CallLimit, _time);
+        using var deadline = new CancellationTokenSource(_options.HandlerTimeout, _time);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, deadline.Token);
         Task task = call(linked.Token).AsTask();
         try
@@ -375,7 +408,7 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
             _logger.SignalReceived(kind, string.Join(',', values));
         }
 
-        Enqueue(new SignalItem(kind, values));
+        Enqueue(new SignalItem(kind, values, _connectionEpoch));
     }
 
     /// <summary>Wire text for a log line: at most 32 characters, control characters replaced, so it cannot forge lines.</summary>
@@ -390,14 +423,21 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
         return text.Length > LoggedTextLength ? safe.Append('…').ToString() : safe.ToString();
     }
 
-    /// <summary>LSN-3, LSN-4: tell the observers, then poll right away and every interval until connected.</summary>
+    /// <summary>LSN-3: log the disconnect, then start the fallback.</summary>
     private void AnnounceDisconnect(string reason, Exception? error)
     {
         _logger.SignalsDisconnected(reason, error);
+        StartFallback();
+    }
+
+    /// <summary>LSN-2 to LSN-4: tell the observers, then poll right away and every interval until connected.</summary>
+    private void StartFallback()
+    {
         long epoch = Interlocked.Increment(ref _epoch);
         Enqueue(new ObserverItem(ObserverCall.Disconnected, epoch));
+        QueuePoll(epoch);
         _pollTimer?.Dispose();
-        _pollTimer = _time.CreateTimer(_ => QueuePoll(epoch), null, TimeSpan.Zero, _options.FallbackPollInterval);
+        _pollTimer = _time.CreateTimer(_ => QueuePoll(epoch), null, _options.FallbackPollInterval, _options.FallbackPollInterval);
     }
 
     private void StopPolling()
@@ -420,12 +460,19 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
 
     private void Enqueue(DispatchItem item)
     {
-        if (!_queue.Writer.TryWrite(item))
+        int count;
+        lock (_queueLock)
         {
-            return; // shutting down
+            item.Queued = _time.GetUtcNow();
+            if (!_queue.Writer.TryWrite(item))
+            {
+                return; // shutting down
+            }
+
+            _unfinished.Enqueue(item);
+            count = _unfinished.Count;
         }
 
-        int count = _queue.Reader.Count;
         if (count <= QueueWarningLength)
         {
             return;
@@ -443,6 +490,26 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
         }
 
         _logger.SignalQueueLong(count);
+    }
+
+    /// <summary>
+    /// LSN-8: when the oldest item of <paramref name="epoch"/> that has not finished was queued, or null when there is
+    /// none. Items of an earlier epoch never count: the clear on connect (CAC-6) covers any cache signal they carry.
+    /// </summary>
+    private DateTimeOffset? OldestUnfinishedSince(long epoch)
+    {
+        lock (_queueLock)
+        {
+            foreach (DispatchItem item in _unfinished)
+            {
+                if (item.Epoch == epoch)
+                {
+                    return item.Queued;
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>LSN-6: one loop, so handlers and observers run one at a time, in arrival and registration order.</summary>
@@ -464,6 +531,13 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
                 catch (Exception ex) // a dispatch loop that died would leave a connected instance applying nothing
                 {
                     _logger.SignalDispatchFailed(ex);
+                }
+                finally
+                {
+                    lock (_queueLock)
+                    {
+                        _unfinished.Dequeue();
+                    }
                 }
             }
         }
@@ -509,7 +583,7 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
                 if (!await RunBoundedAsync(token => handler.HandleAsync(signal.Values, token), "signal handler", stoppingToken)
                     && _logger.IsEnabled(LogLevel.Error))
                 {
-                    _logger.SignalHandlerTimedOut(handler.GetType().Name, signal.Kind, CallLimit);
+                    _logger.SignalHandlerTimedOut(handler.GetType().Name, signal.Kind, _options.HandlerTimeout);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -540,7 +614,7 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
                 };
                 if (!await RunBoundedAsync(run, "connection observer", stoppingToken) && _logger.IsEnabled(LogLevel.Error))
                 {
-                    _logger.SignalObserverTimedOut(observer.GetType().Name, call.ToString(), CallLimit);
+                    _logger.SignalObserverTimedOut(observer.GetType().Name, call.ToString(), _options.HandlerTimeout);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -557,9 +631,13 @@ internal sealed class SignalListener : BackgroundService, ISignalConnectionState
         }
     }
 
-    private abstract record DispatchItem;
+    /// <summary>One unit of dispatch work, with the epoch it belongs to and when it was queued (LSN-8).</summary>
+    private abstract record DispatchItem(long Epoch)
+    {
+        public DateTimeOffset Queued { get; set; }
+    }
 
-    private sealed record SignalItem(SignalKind Kind, IReadOnlyList<string> Values) : DispatchItem;
+    private sealed record SignalItem(SignalKind Kind, IReadOnlyList<string> Values, long Epoch) : DispatchItem(Epoch);
 
-    private sealed record ObserverItem(ObserverCall Call, long Epoch) : DispatchItem;
+    private sealed record ObserverItem(ObserverCall Call, long Epoch) : DispatchItem(Epoch);
 }

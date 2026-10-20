@@ -122,10 +122,11 @@ public sealed class CacheInvalidatorTests(PostgresFixture postgres) : IAsyncLife
     }
 
     [Fact]
-    [Trait("Spec", "0013:SND-3"), Trait("Spec", "0013:AC-6")]
-    public async Task Tags_are_removed_when_the_commit_fails_with_an_unknown_outcome()
+    [Trait("Spec", "0013:SND-3"), Trait("Spec", "0013:AC-6"), Trait("Spec", "0013:LSN-7"), Trait("Spec", "0013:AC-13")]
+    public async Task Tags_are_removed_but_nothing_is_counted_as_sent_when_the_commit_fails_with_an_unknown_outcome()
     {
         await SeedAsync("t3");
+        using var meters = new MeterRecorder(_services.GetRequiredService<IMeterFactory>());
         await using var db = new ProbeContext(new DbContextOptionsBuilder<ProbeContext>()
             .AddInterceptors(new KillBackendOnCommit(_dataSource))
             .UseOrvanoConventions("probe", _services, npgsql => npgsql.ExecutionStrategy(d => new NonRetryingExecutionStrategy(d)))
@@ -138,6 +139,7 @@ public sealed class CacheInvalidatorTests(PostgresFixture postgres) : IAsyncLife
         }
 
         (await ReadAsync("t3", 2)).ShouldBe(2);
+        meters.Sum(Sent).ShouldBe(0); // the commit may or may not have gone through (SND-1, LSN-7)
     }
 
     [Fact]

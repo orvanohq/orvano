@@ -16,7 +16,7 @@ public sealed class SignalOptionsTests
 {
     [Fact]
     [Trait("Spec", "0013:SOP-1")]
-    public void Defaults_are_30_90_30_and_5_seconds_when_nothing_is_set()
+    public void Defaults_are_30_90_30_5_and_10_seconds_when_nothing_is_set()
     {
         SignalOptions options = Resolve(new());
 
@@ -24,6 +24,7 @@ public sealed class SignalOptionsTests
         options.HeartbeatTimeout.ShouldBe(TimeSpan.FromSeconds(90));
         options.ReconnectBackoffCap.ShouldBe(TimeSpan.FromSeconds(30));
         options.FallbackPollInterval.ShouldBe(TimeSpan.FromSeconds(5));
+        options.HandlerTimeout.ShouldBe(TimeSpan.FromSeconds(10));
     }
 
     [Theory]
@@ -32,6 +33,7 @@ public sealed class SignalOptionsTests
     [InlineData("HeartbeatTimeout", "ORVANO_SIGNALS__HEARTBEATTIMEOUT")]
     [InlineData("ReconnectBackoffCap", "ORVANO_SIGNALS__RECONNECTBACKOFFCAP")]
     [InlineData("FallbackPollInterval", "ORVANO_SIGNALS__FALLBACKPOLLINTERVAL")]
+    [InlineData("HandlerTimeout", "ORVANO_SIGNALS__HANDLERTIMEOUT")]
     public void Validation_fails_naming_the_variable_when_a_duration_is_under_1_second(string key, string variable)
     {
         OptionsValidationException error = Should.Throw<OptionsValidationException>(
@@ -52,9 +54,26 @@ public sealed class SignalOptionsTests
     }
 
     [Fact]
+    [Trait("Spec", "0013:SOP-2"), Trait("Spec", "0013:AC-11")]
+    public void Validation_fails_naming_the_handler_timeout_when_it_is_above_the_heartbeat_timeout()
+    {
+        OptionsValidationException error = Should.Throw<OptionsValidationException>(
+            () => Resolve(new() { ["Signals:HandlerTimeout"] = "00:01:31" }));
+
+        IReadOnlyList<string> lines = ConfigurationNames.Describe(error, SignalOptions.Section);
+        lines.ShouldHaveSingleItem().ShouldStartWith("ORVANO_SIGNALS__HANDLERTIMEOUT");
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:SOP-2")]
+    public void Validation_passes_when_the_handler_timeout_equals_the_heartbeat_timeout() =>
+        Resolve(new() { ["Signals:HeartbeatInterval"] = "00:00:01", ["Signals:HeartbeatTimeout"] = "00:00:02", ["Signals:HandlerTimeout"] = "00:00:02" })
+            .HandlerTimeout.ShouldBe(TimeSpan.FromSeconds(2));
+
+    [Fact]
     [Trait("Spec", "0013:SOP-2")]
     public void Validation_passes_when_the_timeout_is_exactly_twice_the_interval() =>
-        Resolve(new() { ["Signals:HeartbeatInterval"] = "00:00:01", ["Signals:HeartbeatTimeout"] = "00:00:02" })
+        Resolve(new() { ["Signals:HeartbeatInterval"] = "00:00:01", ["Signals:HeartbeatTimeout"] = "00:00:02", ["Signals:HandlerTimeout"] = "00:00:01" })
             .HeartbeatTimeout.ShouldBe(TimeSpan.FromSeconds(2));
 
     private static SignalOptions Resolve(Dictionary<string, string?> settings)

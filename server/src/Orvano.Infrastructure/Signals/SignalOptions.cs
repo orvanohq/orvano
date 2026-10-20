@@ -24,6 +24,12 @@ public sealed class SignalOptions : IValidatableObject
     /// <summary>How often connection observers poll the database while disconnected.</summary>
     public TimeSpan FallbackPollInterval { get; init; } = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// The longest one signal handler or connection observer call may run before it is cancelled and the dispatch loop
+    /// moves on (spec 0013 LSN-6). At most the heartbeat timeout, so one call alone never trips the lag rule (LSN-8).
+    /// </summary>
+    public TimeSpan HandlerTimeout { get; init; } = TimeSpan.FromSeconds(10);
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         foreach ((string name, TimeSpan value) in new[]
@@ -32,6 +38,7 @@ public sealed class SignalOptions : IValidatableObject
             (nameof(HeartbeatTimeout), HeartbeatTimeout),
             (nameof(ReconnectBackoffCap), ReconnectBackoffCap),
             (nameof(FallbackPollInterval), FallbackPollInterval),
+            (nameof(HandlerTimeout), HandlerTimeout),
         })
         {
             if (value < Minimum)
@@ -44,6 +51,12 @@ public sealed class SignalOptions : IValidatableObject
         {
             yield return new ValidationResult(
                 "must be at least twice ORVANO_SIGNALS__HEARTBEATINTERVAL", [nameof(HeartbeatTimeout)]);
+        }
+
+        if (HandlerTimeout > HeartbeatTimeout)
+        {
+            yield return new ValidationResult(
+                "must be at most ORVANO_SIGNALS__HEARTBEATTIMEOUT", [nameof(HandlerTimeout)]);
         }
     }
 }
