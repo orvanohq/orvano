@@ -164,9 +164,15 @@ public sealed class JobRunnerTests(PostgresFixture postgres) : IAsyncLifetime
     [InlineData("test.probe", """{"Mode":5}""", "payload could not be read: ")]
     public async Task An_unregistered_kind_or_unreadable_payload_is_a_failed_attempt_with_backoff(string kind, string payload, string lastError)
     {
+        using var meters = new MeterRecorder(_host.Services.GetRequiredService<IMeterFactory>());
         Guid id = await _rows.InsertQueuedAsync(kind, payload, Start, Token);
 
         (await JobsDriver.RunDueAsync(_host.Services, Token)).ShouldBe([new JobRun(kind, id, "failed")]);
+
+        // An unregistered kind is tagged unknown, so the tag values stay those in code (JTL-1).
+        string tag = kind == "test.gone" ? "unknown" : kind;
+        meters.Sum("orvano.infrastructure.jobs.attempts", "kind", tag).ShouldBe(1);
+        meters.Values("orvano.infrastructure.jobs.lag", "kind", tag).ShouldHaveSingleItem();
 
         JobRows.Row row = (await _rows.FindAsync(id, Token))!;
         row.Status.ShouldBe("queued");
@@ -174,6 +180,52 @@ public sealed class JobRunnerTests(PostgresFixture postgres) : IAsyncLifetime
         row.RunAt.ShouldBeInRange(Start.AddSeconds(5), Start.AddSeconds(10));
         row.LastError.ShouldStartWith(lastError);
         _probes.Runs.ShouldBeEmpty();
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-21"), Trait("Spec", "0013:OUT-2"), Trait("Spec", "0013:CLM-2")]
+    public async Task A_payload_reader_that_throws_something_other_than_JsonException_is_a_failed_attempt_and_frees_the_slot()
+    {
+        Guid id = (await Queue.EnqueueAsync(new UnreadableJob(ProbeMode.Ok), null, Token))!.Value;
+
+        (await JobsDriver.RunDueAsync(_host.Services, Token)).ShouldBe([new JobRun("test.unreadable", id, "failed")]);
+
+        JobRows.Row row = (await _rows.FindAsync(id, Token))!;
+        row.Status.ShouldBe("queued");
+        row.LastError!.ShouldStartWith("payload could not be read: ");
+        row.LastError.ShouldContain("this reader refuses");
+        Executor.RunningCount.ShouldBe(0);
+        _probes.Runs.ShouldBeEmpty();
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-21"), Trait("Spec", "0013:JQ-5"), Trait("Spec", "0013:CLM-2"), Trait("Spec", "0013:CLM-7")]
+    public async Task A_kind_whose_timeout_is_past_the_timer_limit_runs_with_no_deadline_and_frees_its_slot()
+    {
+        Guid id = (await Queue.EnqueueAsync(new UntimedJob(ProbeMode.Ok), null, Token))!.Value;
+
+        (await JobsDriver.RunDueAsync(_host.Services, Token)).ShouldBe([new JobRun("test.untimed", id, "succeeded")]);
+
+        (await _rows.FindAsync(id, Token))!.Status.ShouldBe("succeeded");
+        Executor.RunningCount.ShouldBe(0);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-20"), Trait("Spec", "0013:CLM-5")]
+    public async Task A_cancellation_callback_that_throws_when_the_lease_runs_out_is_logged_and_the_attempt_still_ends_lease_lost()
+    {
+        Guid id = (await Queue.EnqueueAsync(new LeaseJob(ProbeMode.ThrowOnCancel), null, Token))!.Value;
+        Task<IReadOnlyList<JobRun>> running = JobsDriver.RunDueAsync(_host.Services, Token);
+        await _probes.StartedAsync(id, Token);
+
+        // One tick, already past the only lease this worker set: the renewal timer finds it lost and cancels the handler.
+        Should.NotThrow(() => _clock.Advance(TimeSpan.FromSeconds(61)));
+
+        await Eventually.TrueAsync(
+            () => _logs.Count(LogEventIds.Infrastructure + 120, LogLevel.Warning) == 1, TimeSpan.FromSeconds(5), "the callback failure was not logged", Token);
+        _probes.Release.SetResult();
+        (await running.WaitAsync(TimeSpan.FromSeconds(10), Token)).ShouldBe([new JobRun("test.lease", id, "lease_lost")]);
+        await Eventually.TrueAsync(() => Executor.RunningCount == 0, TimeSpan.FromSeconds(5), "the slot was not freed", Token);
     }
 
     [Fact]
@@ -412,9 +464,12 @@ public sealed class JobRunnerTests(PostgresFixture postgres) : IAsyncLifetime
             """,
             Token);
         Guid id = (await Queue.EnqueueAsync(new LeaseJob(ProbeMode.Ok), null, Token))!.Value;
+        using var meters = new MeterRecorder(_host.Services.GetRequiredService<IMeterFactory>());
 
-        (await JobsDriver.RunDueAsync(_host.Services, Token)).ShouldHaveSingleItem().Id.ShouldBe(id);
+        // The write failed, so the job did not succeed: no outcome is returned or counted for it.
+        (await JobsDriver.RunDueAsync(_host.Services, Token)).ShouldBe([new JobRun("test.lease", id, "write_failed")]);
 
+        meters.Sum("orvano.infrastructure.jobs.attempts", "kind", "test.lease").ShouldBe(0);
         _logs.Count(LogEventIds.Infrastructure + 111, LogLevel.Error).ShouldBe(1);
         JobRows.Row row = (await _rows.FindAsync(id, Token))!;
         row.Status.ShouldBe("running");
@@ -425,6 +480,7 @@ public sealed class JobRunnerTests(PostgresFixture postgres) : IAsyncLifetime
 
         (await JobsDriver.RunDueAsync(_host.Services, Token)).ShouldBe([new JobRun("test.lease", id, "succeeded")]);
         _probes.Runs.Select(run => run.Attempt).ShouldBe([1, 2]);
+        meters.Sum("orvano.infrastructure.jobs.attempts", "outcome", "succeeded").ShouldBe(1); // once, for the run that was written
     }
 
     [Fact]

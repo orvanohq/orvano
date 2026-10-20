@@ -9,8 +9,8 @@ namespace Orvano.Infrastructure.Jobs;
 
 /// <summary>
 /// Every registered job kind and schedule, checked once (spec 0013 SCH-1): duplicate kinds and schedule names, crons
-/// <c>Cronos</c> cannot parse or that never fire, schedules whose kind has no handler, and schedule payloads over the
-/// limit. <c>StartupChecks</c> turns <see cref="Problems"/> into a startup failure in every <c>serve</c> role, so the
+/// <c>Cronos</c> cannot parse or that never fire, schedules whose kind has no handler or requires a project (SCH-6), and
+/// schedule payloads over the limit. <c>StartupChecks</c> turns <see cref="Problems"/> into a startup failure in every <c>serve</c> role, so the
 /// queue and the runner only ever see what passed.
 /// </summary>
 internal sealed class JobRegistry
@@ -119,6 +119,12 @@ internal sealed class JobRegistry
         if (!kinds.TryGetValue(schedule.Kind, out JobRegistration? registration) || registration.JobType != schedule.JobType)
         {
             return $"The job schedule {schedule.Name} runs kind {schedule.Kind}, which has no registered handler (spec 0013 SCH-1).";
+        }
+
+        if (registration.Options.RequiresProject)
+        {
+            // SCH-6: a schedule's jobs have no project, so every fire of a project kind would die (OUT-4).
+            return $"The job schedule {schedule.Name} runs kind {schedule.Kind}, which requires a project; schedules have none (spec 0013 SCH-6).";
         }
 
         string payload = registration.Serialize(schedule.Job);

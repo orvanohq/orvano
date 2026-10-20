@@ -159,4 +159,8 @@ internal static partial class InfrastructureLog
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 119, Level = LogLevel.Warning,
         Message = "Renewing the lease of job {Kind} {Id} failed; the next renewal tries again")]
     public static partial void JobRenewalFailed(this ILogger logger, string kind, Guid id, Exception exception);
+
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 120, Level = LogLevel.Warning,
+        Message = "A cancellation callback of job {Kind} {Id} threw; the job's outcome is unaffected")]
+    public static partial void JobCancelCallbackFailed(this ILogger logger, string kind, Guid id, Exception exception);
 }

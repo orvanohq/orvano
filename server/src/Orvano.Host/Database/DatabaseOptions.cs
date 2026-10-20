@@ -31,7 +31,10 @@ public sealed class DatabaseOptions
     /// <summary>TLS mode for the connection.</summary>
     public SslMode SslMode { get; init; } = SslMode.Prefer;
 
-    /// <summary>Maximum connections in the platform pool (spec 0007 PG-4).</summary>
-    [Range(1, 1000)]
+    /// <summary>
+    /// Maximum connections in the platform pool (spec 0007 PG-4). At least 2, so the default job concurrency of at least 1
+    /// passes the half pool rule (spec 0013 JOP-2).
+    /// </summary>
+    [Range(2, 1000)]
     public int PoolSize { get; init; } = 30;
 }

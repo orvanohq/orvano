@@ -254,12 +254,13 @@ public sealed class ServeAndMigrateTests(PostgresFixture postgres)
     [InlineData("ORVANO_JOBS__CONCURRENCY", "16", "ORVANO_JOBS__CONCURRENCY (16) must be at most half of ORVANO_DATABASE__POOLSIZE (30)")]
     [InlineData("ORVANO_JOBS__CONCURRENCY", "0", "ORVANO_JOBS__CONCURRENCY")]
     [InlineData("ORVANO_JOBS__POLLINTERVAL", "00:00:00", "ORVANO_JOBS__POLLINTERVAL")]
+    [InlineData("ORVANO_DATABASE__POOLSIZE", "1", "ORVANO_DATABASE__POOLSIZE")] // at least 2, so the default concurrency passes JOP-2
     public async Task Serve_exits_1_naming_the_variable_when_a_job_option_is_out_of_range(string variable, string value, string message)
     {
         OrvanoCli.Result result = await OrvanoCli.RunAsync(["serve"], ServeEnvironment(new()
         {
-            [variable] = value,
             ["ORVANO_DATABASE__POOLSIZE"] = "30",
+            [variable] = value,
             ["ASPNETCORE_HTTP_PORTS"] = Ports.Free().ToString(CultureInfo.InvariantCulture),
         }), TestContext.Current.CancellationToken);
 
