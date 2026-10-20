@@ -145,7 +145,7 @@ The shared machinery spec 0007 designed but no feature built yet: cross replica 
 **Done when:** a cache tag invalidated or a job enqueued on one server instance reaches a second instance through `orvano_signal`, a lost signal is recovered by SIG-2's bypass, poll, and clear, jobs run at least once with leases, backoff, and schedules firing once across workers, and an outbox event reaches its subscriber as a job.
 spec [0013](../specs/0013-background-runtime/index.md) (builds spec [0007](../specs/0007-stack-architecture/index.md) SIG, CCH, JOB, EVT) · code in `server/src/Orvano.Infrastructure/`
 
-- [x] Design it (spec): `/architect stack & architecture` (spec 0007 SIG, CCH, JOB, EVT); signal and cache contracts in spec 0013 (2026-10-19); job queue contracts, tables, runner, and schedules in spec 0013 _Job queue design_ (2026-10-19)
+- [x] Design it (spec): `/architect stack & architecture` (spec 0007 SIG, CCH, JOB, EVT); signal and cache contracts in spec 0013 (2026-10-19); job queue contracts, tables, runner, and schedules in spec 0013 _Job queue design_ (2026-10-19); job queue review settlement in spec 0013 steps 21 to 23 (2026-10-20)
 - [ ] Build it: `/develop background runtime`
   - [x] Signals and cache invalidation: `ISignalBus`, `ICacheInvalidator`, the listener, heartbeat, disconnect bypass, and reconnect clear (SIG-1 to SIG-3, CCH-1, CCH-2; spec 0013 AC-1 to AC-13, build plan steps 1 to 7); unblocks feature 9's AC-10
     - built: spec 0013 build plan steps 1 to 7 (contracts and codec, transaction join, listener, cache, two host test, failure handling, telemetry), 2026-10-19
@@ -153,6 +153,7 @@ spec [0013](../specs/0013-background-runtime/index.md) (builds spec [0007](../sp
     - built: spec 0013 build plan steps 8 to 12 (`HandlerTimeout` and the LSN-8 lag disconnect, the LSN-5 stable period and boot announce, `AddOnCommitted`, the SND-5 joined refusal, the object inner cache key and the wider modules ban list), 2026-10-19
   - [x] Job queue, runner, leases, backoff, and schedules (JOB-1 to JOB-6; spec 0013 AC-14 to AC-30, build plan steps 13 to 20)
     - built: spec 0013 build plan steps 13 to 20 (job contracts, `JobsDbContext` and the `jobs` migration, `IJobQueue` in and out of a transaction, the runner with leases, renewal, backoff, timeouts, and shutdown release, `CancelProjectJobsAsync`, schedules on `Cronos` 0.13.0 with the `jobs.cleanup` schedule, telemetry, and `JobsDriver`), 2026-10-19
+  - [ ] Job queue review settlement: dedupe key scoped per kind and project, one pool connection kept for the runner, dead marking on the poll (spec 0013 AC-16, AC-20, AC-26, build plan steps 21 to 23)
   - [ ] Module outbox and dispatcher (EVT-1 to EVT-4); extend spec 0013 with the `IOutbox` contract first
 - [ ] Verify it: `/check verify background runtime`
 - [ ] Test it: `/test background runtime`
