@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 
 using Npgsql;
 
-using Orvano.Host.Database;
 using Orvano.Infrastructure;
 using Orvano.Infrastructure.Caching;
 using Orvano.Infrastructure.Signals;
@@ -208,7 +207,7 @@ public sealed class SignalListenerTests(PostgresFixture postgres) : IAsyncLifeti
                 Host = IPAddress.Loopback.ToString(),
                 Port = proxy.Port,
                 Pooling = false,
-                ApplicationName = provider.GetRequiredService<SignalInstance>().ApplicationName,
+                ApplicationName = provider.GetRequiredService<OrvanoInstance>().ApplicationName,
             }.ConnectionString)));
         RecordingObserver observer = Observer(a);
         await SettledAsync(a, observer);
@@ -396,7 +395,7 @@ public sealed class SignalListenerTests(PostgresFixture postgres) : IAsyncLifeti
         a.Services.GetRequiredService<ISignalConnectionState>().IsConnected.ShouldBeTrue();
     }
 
-    private static string ApplicationName(OrvanoApiFactory host) => host.Services.GetRequiredService<SignalInstance>().ApplicationName;
+    private static string ApplicationName(OrvanoApiFactory host) => host.Services.GetRequiredService<OrvanoInstance>().ApplicationName;
 
     private static async Task<int> ReadAsync(OrvanoApiFactory host, Func<int> factory) =>
         await host.Services.GetRequiredService<HybridCache>().GetOrCreateAsync(
@@ -438,7 +437,7 @@ public sealed class SignalListenerTests(PostgresFixture postgres) : IAsyncLifeti
             if (listenAsRole)
             {
                 services.AddKeyedSingleton(InfrastructureServices.SignalDataSourceKey, (provider, _) => NpgsqlDataSource.Create(
-                    new NpgsqlConnectionStringBuilder(connection) { ApplicationName = provider.GetRequiredService<SignalInstance>().ApplicationName }.ConnectionString));
+                    new NpgsqlConnectionStringBuilder(connection) { ApplicationName = provider.GetRequiredService<OrvanoInstance>().ApplicationName }.ConnectionString));
             }
 
             configure?.Invoke(services);

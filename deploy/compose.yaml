@@ -55,6 +55,8 @@ services:
   orvano:
     <<: *orvano
     restart: unless-stopped
+    # Spec 0013 OUT-6: serve releases running jobs within 25 s of SIGTERM; give it that before Docker kills it.
+    stop_grace_period: 35s
     environment:
       <<: *orvano-environment
       # Only the server gets the root key; migrate needs none (spec 0007 INS-2).

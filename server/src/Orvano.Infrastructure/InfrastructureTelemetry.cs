@@ -17,9 +17,20 @@ internal sealed class InfrastructureTelemetry
 
     public const string ClearOnWildcard = "wildcard";
 
+    // Spec 0013 JTL-1: the default boundaries suit milliseconds; jobs take seconds to an hour.
+    private static readonly InstrumentAdvice<double> SecondsAdvice = new()
+    {
+        HistogramBucketBoundaries = [0.01, 0.05, 0.1, 0.5, 1, 5, 30, 60, 300, 1800, 3600],
+    };
+
     private readonly Counter<long> _sent;
     private readonly Counter<long> _received;
     private readonly Counter<long> _clears;
+    private readonly Counter<long> _jobsEnqueued;
+    private readonly Counter<long> _jobAttempts;
+    private readonly Histogram<double> _jobDuration;
+    private readonly Histogram<double> _jobLag;
+    private readonly Counter<long> _schedulesFired;
 
     public InfrastructureTelemetry(IMeterFactory meters)
     {
@@ -27,6 +38,13 @@ internal sealed class InfrastructureTelemetry
         _sent = Meter.CreateCounter<long>("orvano.infrastructure.signals.sent", "{signal}", "Signals sent by committed transactions.");
         _received = Meter.CreateCounter<long>("orvano.infrastructure.signals.received", "{signal}", "Signals received, heartbeats not counted.");
         _clears = Meter.CreateCounter<long>("orvano.infrastructure.cache.clears", "{clear}", "Times the whole local cache was cleared.");
+
+        // Spec 0013 JTL-1: kinds, outcomes, and schedule names come from code, so the tags stay low in cardinality.
+        _jobsEnqueued = Meter.CreateCounter<long>("orvano.infrastructure.jobs.enqueued", "{job}", "Jobs enqueued by committed transactions.");
+        _jobAttempts = Meter.CreateCounter<long>("orvano.infrastructure.jobs.attempts", "{attempt}", "Job attempts, by outcome.");
+        _jobDuration = Meter.CreateHistogram("orvano.infrastructure.jobs.duration", "s", "From handler start to outcome.", advice: SecondsAdvice);
+        _jobLag = Meter.CreateHistogram("orvano.infrastructure.jobs.lag", "s", "From a job's due time to its claim.", advice: SecondsAdvice);
+        _schedulesFired = Meter.CreateCounter<long>("orvano.infrastructure.jobs.schedules.fired", "{fire}", "Schedule occurrences enqueued.");
     }
 
     public static ActivitySource ActivitySource { get; } = new(Name);
@@ -38,4 +56,22 @@ internal sealed class InfrastructureTelemetry
     public void SignalReceived(SignalKind kind) => _received.Add(1, new KeyValuePair<string, object?>("kind", SignalPayload.WireName(kind)));
 
     public void CacheCleared(string reason) => _clears.Add(1, new KeyValuePair<string, object?>("reason", reason));
+
+    public void JobEnqueued(string kind) => _jobsEnqueued.Add(1, new KeyValuePair<string, object?>("kind", kind));
+
+    /// <summary>One attempt's outcome and, when a handler ran, its duration (JTL-1).</summary>
+    public void JobAttempted(string kind, string outcome, TimeSpan? duration)
+    {
+        var tags = new TagList { { "kind", kind }, { "outcome", outcome } };
+        _jobAttempts.Add(1, tags);
+        if (duration is { } elapsed)
+        {
+            _jobDuration.Record(elapsed.TotalSeconds, tags);
+        }
+    }
+
+    public void JobClaimed(string kind, TimeSpan lag) =>
+        _jobLag.Record(Math.Max(0, lag.TotalSeconds), new KeyValuePair<string, object?>("kind", kind));
+
+    public void ScheduleFired(string schedule) => _schedulesFired.Add(1, new KeyValuePair<string, object?>("schedule", schedule));
 }

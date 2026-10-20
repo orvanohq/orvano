@@ -87,6 +87,14 @@ internal static class ServeCommand
         builder.Services.AddSignalListener(); // spec 0013 LSN-1: serve only, in every role
         builder.Services.AddSingleton(roles);
         builder.Services.AddHostedService<StartupChecks>();
+        if (roles.Worker)
+        {
+            // Spec 0013 JOP-3, SCH-1: after StartupChecks, which checks the job registrations the runner reads.
+            builder.Services.AddJobRunner();
+        }
+
+        // Spec 0013 OUT-6: running jobs get 25 seconds to stop and be released; compose waits 35 before killing.
+        builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(25));
         builder.Services.AddValidation(); // spec 0002 VAL-1: once here, plus once in each module that maps endpoints
         builder.Services.AddProblemDetails();
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();

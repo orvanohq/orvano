@@ -11,6 +11,7 @@ public sealed class MeterRecorder : IDisposable
 {
     private readonly MeterListener _listener = new();
     private readonly ConcurrentQueue<(string Name, long Value, KeyValuePair<string, object?>[] Tags)> _measurements = new();
+    private readonly ConcurrentQueue<(string Name, double Value, KeyValuePair<string, object?>[] Tags)> _doubles = new();
 
     public MeterRecorder(IMeterFactory factory)
     {
@@ -23,6 +24,7 @@ public sealed class MeterRecorder : IDisposable
         };
         _listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) => _measurements.Enqueue((instrument.Name, value, tags.ToArray())));
         _listener.SetMeasurementEventCallback<int>((instrument, value, tags, _) => _measurements.Enqueue((instrument.Name, value, tags.ToArray())));
+        _listener.SetMeasurementEventCallback<double>((instrument, value, tags, _) => _doubles.Enqueue((instrument.Name, value, tags.ToArray())));
         _listener.Start();
     }
 
@@ -30,6 +32,12 @@ public sealed class MeterRecorder : IDisposable
     public long Sum(string name, string? tag = null, string? value = null) => _measurements
         .Where(m => m.Name == name && (tag is null || m.Tags.Any(t => t.Key == tag && Equals(t.Value, value))))
         .Sum(m => m.Value);
+
+    /// <summary>The values a histogram recorded, optionally only those with one tag value.</summary>
+    public IReadOnlyList<double> Values(string name, string? tag = null, string? value = null) =>
+        [.. _doubles
+            .Where(m => m.Name == name && (tag is null || m.Tags.Any(t => t.Key == tag && Equals(t.Value, value))))
+            .Select(m => m.Value)];
 
     /// <summary>The current value of an observable gauge.</summary>
     public long Observe(string name)

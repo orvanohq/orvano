@@ -226,6 +226,57 @@ public sealed class ServeAndMigrateTests(PostgresFixture postgres)
         result.Error.ShouldNotContain(" at "); // no stack trace frames
     }
 
+    [Theory]
+    [Trait("Spec", "0013:AC-24"), Trait("Spec", "0013:SCH-1"), Trait("Spec", "0013:JQ-5")]
+    [InlineData(BadJobRegistrations.BadName, "The job schedule name 'nightly' is not valid")]
+    [InlineData(BadJobRegistrations.BadCron, "The job schedule hook.schedule has a cron expression that is not valid")]
+    [InlineData(BadJobRegistrations.NeverFires, "The job schedule hook.schedule has the cron expression '0 0 30 2 *', which never fires")]
+    [InlineData(BadJobRegistrations.Duplicate, "The job schedule hook.schedule is registered more than once")]
+    [InlineData(BadJobRegistrations.UnknownKind, "The job schedule hook.schedule runs kind hook.job, which has no registered handler")]
+    [InlineData(BadJobRegistrations.LargePayload, "The job schedule hook.schedule has a payload over 65536 bytes")]
+    public async Task Serve_exits_1_naming_the_schedule_without_a_stack_trace_when_a_job_registration_is_bad(string registration, string message)
+    {
+        OrvanoCli.Result result = await OrvanoCli.RunAsync(["serve"], ServeEnvironment(new()
+        {
+            ["DOTNET_STARTUP_HOOKS"] = OrvanoCli.UndeclaredEndpointHook,
+            [OrvanoCli.JobsHookVariable] = registration,
+            ["ORVANO_ROLES"] = "api", // the check runs in every role, not only where the runner does
+            ["ASPNETCORE_HTTP_PORTS"] = Ports.Free().ToString(CultureInfo.InvariantCulture),
+        }), TestContext.Current.CancellationToken);
+
+        result.ExitCode.ShouldBe(1, result.Error);
+        result.Error.ShouldContain(message);
+        result.Error.ShouldNotContain(" at "); // no stack trace frames
+    }
+
+    [Theory]
+    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-1"), Trait("Spec", "0013:JOP-2")]
+    [InlineData("ORVANO_JOBS__CONCURRENCY", "16", "ORVANO_JOBS__CONCURRENCY (16) must be at most half of ORVANO_DATABASE__POOLSIZE (30)")]
+    [InlineData("ORVANO_JOBS__CONCURRENCY", "0", "ORVANO_JOBS__CONCURRENCY")]
+    [InlineData("ORVANO_JOBS__POLLINTERVAL", "00:00:00", "ORVANO_JOBS__POLLINTERVAL")]
+    public async Task Serve_exits_1_naming_the_variable_when_a_job_option_is_out_of_range(string variable, string value, string message)
+    {
+        OrvanoCli.Result result = await OrvanoCli.RunAsync(["serve"], ServeEnvironment(new()
+        {
+            [variable] = value,
+            ["ORVANO_DATABASE__POOLSIZE"] = "30",
+            ["ASPNETCORE_HTTP_PORTS"] = Ports.Free().ToString(CultureInfo.InvariantCulture),
+        }), TestContext.Current.CancellationToken);
+
+        result.ExitCode.ShouldBe(1, result.Error);
+        result.Error.ShouldContain(message);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-3")]
+    public async Task Migrate_runs_no_job_runner()
+    {
+        OrvanoCli.Result result = await OrvanoCli.RunAsync(["migrate"], postgres.DatabaseEnvironment, TestContext.Current.CancellationToken);
+
+        result.ExitCode.ShouldBe(0, result.Error);
+        (result.Output + result.Error).ShouldNotContain("Job runner started");
+    }
+
     private Dictionary<string, string> ServeEnvironment(Dictionary<string, string> extra)
     {
         var environment = new Dictionary<string, string>(postgres.DatabaseEnvironment) { ["ORVANO_ROOT_KEY"] = TestRootKey.Create() };

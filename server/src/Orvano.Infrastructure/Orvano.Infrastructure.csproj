@@ -6,10 +6,14 @@
   <ItemGroup>
     <!-- Spec 0013 CAC-1: the memory level only, no IDistributedCache (spec 0007 CCH-1). -->
     <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
+    <!-- Spec 0013 SCH-1: five field cron expressions for job schedules (MIT, spec 0009 DEP-1). -->
+    <PackageReference Include="Cronos" />
   </ItemGroup>
   <ItemGroup>
     <!-- Spec 0013 LSN-3: tests replace the heartbeat sender and reach the listener's internals. -->
     <InternalsVisibleTo Include="Orvano.Infrastructure.Tests" />
     <InternalsVisibleTo Include="Orvano.Host.IntegrationTests" />
+    <!-- Spec 0013 JTS-2: JobsDriver runs due jobs inline through JobExecutor. -->
+    <InternalsVisibleTo Include="Orvano.Testing" />
   </ItemGroup>
 </Project>
