@@ -20,6 +20,7 @@ The image and the compose files. Every rule here comes from [spec 0007](../docs/
 - PostgreSQL health checks use `pg_isready -h 127.0.0.1`, because during first start initialisation the server listens only on its socket.
 - `ORVANO_TRUSTED_PROXIES` must equal Caddy's fixed IP on the compose network (`172.30.80.10`). Only the `orvano` service gets the root key secret; `migrate` needs none (INS-2).
 - `init` runs as the operator, and the install folder is 0700 with `root.key` at 0644 (INS-3, INS-5). Run compose as the same user.
+- The `orvano` service keeps `stop_grace_period: 35s`, longer than `serve`'s 25 s shutdown timeout, so running jobs are released before Docker kills the container (spec 0013 OUT-6).
 - For throwaway test stacks, use `docker compose -p <test-name>` so they never reuse a real install's named volumes.
 
 ## Agent skills
