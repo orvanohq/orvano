@@ -1,3 +1,6 @@
+using System.Diagnostics.Metrics;
+
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -62,12 +65,16 @@ public sealed class TwoHostCacheTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
-    [Trait("Spec", "0013:AC-5"), Trait("Spec", "0013:SND-7")]
-    public async Task An_oversize_batch_clears_every_entry_on_the_other_host()
+    [Trait("Spec", "0013:AC-5"), Trait("Spec", "0013:AC-13"), Trait("Spec", "0013:SND-7"), Trait("Spec", "0013:CAC-6")]
+    public async Task An_oversize_batch_is_sent_as_the_star_and_clears_tagged_and_untagged_entries_on_both_hosts()
     {
         await _database.ExecuteAsync("INSERT INTO probe_value VALUES ('bystander', 'old')", Token);
         (await ReadAsync(_b, "bystander")).ShouldBe("old");
         await _database.ExecuteAsync("UPDATE probe_value SET value = 'new' WHERE id = 'bystander'", Token);
+        await UntaggedAsync(_a, 1);
+        await UntaggedAsync(_b, 1);
+        using var meters = new MeterRecorder(_b.Services.GetRequiredService<IMeterFactory>()); // both hosts already started
+        await using SignalTap tap = await SignalTap.StartAsync(_database.DataSource, Token);
 
         await using (var db = ProbeContext.On(_a.Services))
         {
@@ -81,8 +88,47 @@ public sealed class TwoHostCacheTests(PostgresFixture postgres) : IAsyncLifetime
                 Token);
         }
 
+        (await UntaggedAsync(_a, 2)).ShouldBe(2); // the writer's own removal ran before CommitAsync returned
+        (await tap.TakeAsync(Token)).ShouldBe(["""{"v":1,"k":"cache","d":["*"]}"""]);
         await Eventually.TrueAsync(async () => await ReadAsync(_b, "bystander") == "new", Arrival, "host B was not cleared", Token);
+        (await UntaggedAsync(_b, 2)).ShouldBe(2);
+        await Eventually.TrueAsync(() => meters.Sum("orvano.infrastructure.cache.clears", "reason", "wildcard") >= 1, Arrival, "host B did not count the clear", Token);
+        meters.Sum("orvano.infrastructure.cache.clears", "reason", "wildcard").ShouldBe(1);
     }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-2"), Trait("Spec", "0013:AC-6"), Trait("Spec", "0013:SND-3")]
+    public async Task A_rolled_back_invalidation_sends_nothing_and_both_hosts_keep_their_entries()
+    {
+        await _database.ExecuteAsync("INSERT INTO probe_value VALUES ('kept', 'old')", Token);
+        (await ReadAsync(_a, "kept")).ShouldBe("old");
+        (await ReadAsync(_b, "kept")).ShouldBe("old");
+        await using SignalTap tap = await SignalTap.StartAsync(_database.DataSource, Token);
+
+        await using (var db = ProbeContext.On(_a.Services))
+        {
+            ICacheInvalidator invalidator = _a.Services.GetRequiredService<ICacheInvalidator>();
+            await Should.ThrowAsync<InvalidOperationException>(() => db.InTransactionAsync(
+                async token =>
+                {
+                    await db.Database.ExecuteSqlRawAsync("UPDATE public.probe_value SET value = 'rolled back' WHERE id = 'kept'", token);
+                    invalidator.Invalidate(db, "probe:kept");
+                    throw new InvalidOperationException("roll back");
+                },
+                Token));
+        }
+
+        (await tap.TakeAsync(Token)).ShouldBeEmpty();
+        // Change the row outside any transaction: a host that dropped its entry would now read "changed".
+        await _database.ExecuteAsync("UPDATE probe_value SET value = 'changed' WHERE id = 'kept'", Token);
+        (await ReadAsync(_a, "kept")).ShouldBe("old");
+        (await ReadAsync(_b, "kept")).ShouldBe("old");
+    }
+
+    // An entry with no tags, which only a whole cache clear removes.
+    private static async Task<int> UntaggedAsync(OrvanoApiFactory host, int fresh) =>
+        await host.Services.GetRequiredService<HybridCache>().GetOrCreateAsync(
+            "probe:untagged", _ => ValueTask.FromResult(fresh), cancellationToken: Token);
 
     [Fact]
     [Trait("Spec", "0013:AC-5"), Trait("Spec", "0013:LSN-6")]

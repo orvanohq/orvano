@@ -93,6 +93,35 @@ public sealed class CacheInvalidatorTests(PostgresFixture postgres) : IAsyncLife
     }
 
     [Fact]
+    [Trait("Spec", "0013:AC-4"), Trait("Spec", "0013:SND-6"), Trait("Spec", "0013:LSN-7")]
+    public async Task Retry_removes_only_the_tags_of_the_attempt_that_commits_and_counts_one_sent_when_the_first_attempt_fails()
+    {
+        await SeedAsync("first-try", "second-try");
+        using var meters = new MeterRecorder(_services.GetRequiredService<IMeterFactory>());
+        await using ProbeContext db = Context();
+        int attempts = 0;
+
+        await db.InTransactionAsync(
+            _ =>
+            {
+                if (++attempts == 1)
+                {
+                    Invalidator.Invalidate(db, "first-try");
+                    throw new NpgsqlException("forced transient failure", new TimeoutException());
+                }
+
+                Invalidator.Invalidate(db, "second-try");
+                return Task.CompletedTask;
+            },
+            Token);
+
+        attempts.ShouldBe(2);
+        (await ReadAsync("first-try", 2)).ShouldBe(1);
+        (await ReadAsync("second-try", 2)).ShouldBe(2);
+        meters.Sum(Sent).ShouldBe(1);
+    }
+
+    [Fact]
     [Trait("Spec", "0013:SND-3"), Trait("Spec", "0013:AC-6")]
     public async Task Tags_are_removed_when_the_commit_fails_with_an_unknown_outcome()
     {
