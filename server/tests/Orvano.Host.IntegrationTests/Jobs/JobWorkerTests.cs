@@ -185,7 +185,9 @@ public sealed class JobWorkerTests(PostgresFixture postgres) : IAsyncLifetime
             await command.ExecuteNonQueryAsync(Token);
         }
 
-        clock.Advance(TimeSpan.FromMinutes(1)); // the poll wakes the loop into a claim
+        // A job signal wakes the loop into the claim alone; a poll would run the dead marking first (WAK-2).
+        await worker.WaitUntilConnectedAsync(Token);
+        await _database.NotifyAsync("""{"v":1,"k":"job","d":[]}""", Token);
         await Eventually.TrueAsync(async () => await StalledClaimsAsync() == 1, TimeSpan.FromSeconds(5), "no claim stalled", Token);
         Task stopping = worker.DisposeAsync().AsTask();
 
@@ -203,8 +205,7 @@ public sealed class JobWorkerTests(PostgresFixture postgres) : IAsyncLifetime
         async Task<long> StalledClaimsAsync()
         {
             await using NpgsqlCommand count = _database.DataSource.CreateCommand(
-                "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' "
-                + "AND (query LIKE '%lease expired on the last attempt%' OR query LIKE '%UPDATE jobs.job AS j%')");
+                "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE '%UPDATE jobs.job AS j%'");
             return (long)(await count.ExecuteScalarAsync(Token))!;
         }
     }
@@ -243,7 +244,7 @@ public sealed class JobWorkerTests(PostgresFixture postgres) : IAsyncLifetime
 
     [Fact]
     [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2"), Trait("Spec", "0013:JOP-3")]
-    public void Only_a_worker_host_runs_the_runner_and_an_unset_concurrency_follows_the_half_pool_default()
+    public void Only_a_worker_host_runs_the_runner_and_an_unset_concurrency_follows_the_pool_default()
     {
         OrvanoApiFactory api = Host(new JobProbes(), roles: "api");
         OrvanoApiFactory worker = Host(new JobProbes(), roles: "worker");
@@ -259,23 +260,24 @@ public sealed class JobWorkerTests(PostgresFixture postgres) : IAsyncLifetime
 
     [Theory]
     [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2")]
-    [InlineData(32, 30, 15)]
+    [InlineData(32, 30, 14)]
     [InlineData(4, 30, 8)]
     [InlineData(2, 100, 4)]
     [InlineData(64, 100, 16)]
-    [InlineData(8, 1, 1)]
-    public void Default_concurrency_is_the_smallest_of_twice_the_processors_16_and_half_the_pool_and_at_least_1(int processors, int pool, int expected) =>
+    [InlineData(8, 4, 1)]
+    [InlineData(8, 7, 2)] // half of an odd pool rounds down
+    public void Default_concurrency_is_the_smallest_of_twice_the_processors_16_and_the_pool_limit_and_at_least_1(int processors, int pool, int expected) =>
         JobConcurrency.Default(processors, pool).ShouldBe(expected);
 
     [Theory]
     [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2")]
-    [InlineData(30, 15, true)]
-    [InlineData(30, 16, false)]
-    [InlineData(31, 15, true)]
-    [InlineData(31, 16, false)] // half of an odd pool rounds down
-    [InlineData(2, 1, true)]
-    [InlineData(1, 1, false)]
-    public void The_half_pool_rule_allows_concurrency_up_to_half_the_pool_and_names_both_variables_past_it(int pool, int concurrency, bool allowed)
+    [InlineData(30, 14, true)]
+    [InlineData(30, 15, false)]
+    [InlineData(31, 14, true)]
+    [InlineData(31, 15, false)] // half of an odd pool rounds down
+    [InlineData(4, 1, true)]
+    [InlineData(4, 2, false)]
+    public void The_pool_rule_allows_concurrency_up_to_half_the_pool_less_one_and_names_both_variables_past_it(int pool, int concurrency, bool allowed)
     {
         var rule = new JobConcurrency(Options.Create(new DatabaseOptions { PoolSize = pool }));
 
@@ -284,17 +286,19 @@ public sealed class JobWorkerTests(PostgresFixture postgres) : IAsyncLifetime
         result.Succeeded.ShouldBe(allowed);
         if (!allowed)
         {
+            int limit = (pool / 2) - 1;
             result.FailureMessage.ShouldBe(
-                $"ORVANO_JOBS__CONCURRENCY ({concurrency}) must be at most half of ORVANO_DATABASE__POOLSIZE ({pool}) (spec 0007 JOB-4).");
+                $"ORVANO_JOBS__CONCURRENCY ({concurrency}) must be at most {limit}: half of ORVANO_DATABASE__POOLSIZE ({pool}) "
+                + "less one connection for the job runner (spec 0007 JOB-4).");
         }
     }
 
     [Fact]
     [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2")]
-    public void The_default_concurrency_passes_the_half_pool_rule_for_every_pool_size_the_options_allow()
+    public void The_default_concurrency_passes_the_pool_rule_for_every_pool_size_the_options_allow()
     {
         int[] processorCounts = [1, 2, 8, 64];
-        string[] refused = [.. Enumerable.Range(2, 999)
+        string[] refused = [.. Enumerable.Range(4, 997)
             .SelectMany(pool => processorCounts.Select(processors => (pool, processors)))
             .Where(pair => !new JobConcurrency(Options.Create(new DatabaseOptions { PoolSize = pair.pool }))
                 .Validate(null, new JobOptions { Concurrency = JobConcurrency.Default(pair.processors, pair.pool) }).Succeeded)
@@ -305,9 +309,9 @@ public sealed class JobWorkerTests(PostgresFixture postgres) : IAsyncLifetime
 
     [Fact]
     [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2")]
-    public void The_half_pool_rule_keeps_an_explicit_concurrency_and_fills_an_unset_one_with_a_default_that_passes()
+    public void The_pool_rule_keeps_an_explicit_concurrency_and_fills_an_unset_one_with_a_default_that_passes()
     {
-        var rule = new JobConcurrency(Options.Create(new DatabaseOptions { PoolSize = 1 }));
+        var rule = new JobConcurrency(Options.Create(new DatabaseOptions { PoolSize = 4 }));
         var explicitOptions = new JobOptions { Concurrency = 3 };
         var unset = new JobOptions();
 
@@ -315,8 +319,99 @@ public sealed class JobWorkerTests(PostgresFixture postgres) : IAsyncLifetime
         rule.PostConfigure(null, unset);
 
         explicitOptions.Concurrency.ShouldBe(3);
-        unset.Concurrency.ShouldBe(1); // at least 1, even past half of a one connection pool
+        unset.Concurrency.ShouldBe(1); // the smallest pool's limit
         rule.Validate(null, new JobOptions()).Succeeded.ShouldBeTrue(); // unset is never refused
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-20"), Trait("Spec", "0013:CLM-1"), Trait("Spec", "0013:WAK-2")]
+    public async Task An_expired_last_attempt_is_not_marked_dead_by_a_signal_wake_but_is_by_the_next_poll_tick()
+    {
+        _settings["Jobs:PollInterval"] = "00:01:00";
+        var clock = new ManualClock();
+        var probes = new JobProbes();
+        OrvanoApiFactory worker = Host(probes, roles: "worker", clock);
+        await worker.WaitUntilConnectedAsync(Token);
+        var expired = Guid.CreateVersion7();
+        await _database.ExecuteAsync(
+            """
+            INSERT INTO jobs.job (id, kind, payload, status, attempt, max_attempts, run_at, locked_until, locked_by, created_at)
+            VALUES ($1, 'test.probe', '{"Mode":"ok","Marker":""}', 'running', 1, 1, $2, $2, 'a-gone-worker', $2)
+            """,
+            Token,
+            expired,
+            clock.GetUtcNow().AddSeconds(-1));
+
+        // A signal wake claims the due job, and nothing else.
+        Guid signalled = (await worker.Services.GetRequiredService<IJobQueue>().EnqueueAsync(new ProbeJob(ProbeMode.Ok), null, Token))!.Value;
+        await Eventually.TrueAsync(
+            async () => (await _rows.FindAsync(signalled, Token))!.Status == "succeeded", TimeSpan.FromSeconds(5), "the signal did not wake the worker", Token);
+        (await _rows.FindAsync(expired, Token))!.Status.ShouldBe("running");
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+
+        await Eventually.TrueAsync(
+            async () => (await _rows.FindAsync(expired, Token))!.Status == "dead", TimeSpan.FromSeconds(5), "the poll tick did not mark it dead", Token);
+        JobRows.Row row = (await _rows.FindAsync(expired, Token))!;
+        row.LastError.ShouldBe("lease expired on the last attempt");
+        row.FinishedAt.ShouldBe(clock.GetUtcNow());
+        probes.Started.ShouldNotContain(expired);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:CLM-1"), Trait("Spec", "0013:WAK-2")]
+    public async Task A_wake_after_a_freed_slot_runs_only_the_claim_transaction()
+    {
+        _settings["Jobs:PollInterval"] = "00:01:00";
+        _settings["Jobs:Concurrency"] = "1";
+        var clock = new ManualClock();
+        var probes = new JobProbes();
+        OrvanoApiFactory worker = Host(probes, roles: "worker", clock);
+        await worker.WaitUntilConnectedAsync(Token);
+        Guid blocking = (await worker.Services.GetRequiredService<IJobQueue>().EnqueueAsync(new ProbeJob(ProbeMode.Block), null, Token))!.Value;
+        await probes.StartedAsync(blocking, Token); // the claim asked for 1 and got 1, so a freed slot wakes the loop
+        using var statements = new JobStatements(_settings["Database:Name"]);
+
+        probes.Release.SetResult();
+
+        await Eventually.TrueAsync(() => statements.Claims == 1, TimeSpan.FromSeconds(5), "the freed slot did not wake a claim", Token);
+        statements.DeadMarkings.ShouldBe(0);
+        (await _rows.FindAsync(blocking, Token))!.Status.ShouldBe("succeeded");
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2"), Trait("Spec", "0013:JOP-4")]
+    public async Task Handlers_holding_a_connection_each_while_every_renewal_fires_leave_a_request_a_pool_connection()
+    {
+        // Pool 8, so the limit is 3: 3 held, 3 renewals, and the request use 7, and none waits out the pool timeout.
+        _settings["Database:PoolSize"] = "8";
+        _settings["Jobs:Concurrency"] = "3";
+        _settings["Jobs:PollInterval"] = "00:01:00";
+        var clock = new ManualClock();
+        var probes = new JobProbes();
+        OrvanoApiFactory worker = Host(probes, roles: "worker", clock);
+        IJobQueue queue = worker.Services.GetRequiredService<IJobQueue>();
+        var ids = new Guid[3];
+        for (int i = 0; i < ids.Length; i++)
+        {
+            ids[i] = (await queue.EnqueueAsync(new LeaseJob(ProbeMode.HoldConnection), null, Token))!.Value;
+        }
+
+        await Eventually.TrueAsync(() => probes.Holding.Count == 3, TimeSpan.FromSeconds(10), "the handlers did not all hold a connection", Token);
+        DateTimeOffset renewedUntil = clock.GetUtcNow().AddSeconds(80);
+        using HttpClient client = worker.CreateClient();
+
+        clock.Advance(TimeSpan.FromSeconds(20)); // every handler's renewal is due at once (lease 1 minute ÷ 3)
+        using HttpResponseMessage ready = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), Token)
+            .WaitAsync(TimeSpan.FromSeconds(5), Token);
+
+        ready.StatusCode.ShouldBe(System.Net.HttpStatusCode.OK);
+        await Eventually.TrueAsync(
+            async () => await _rows.CountAsync("status = 'running' AND locked_until = $1", Token, renewedUntil) == 3,
+            TimeSpan.FromSeconds(5), "not every renewal completed", Token);
+        probes.Release.SetResult();
+        await Eventually.TrueAsync(
+            async () => await _rows.CountAsync("status = 'succeeded'", Token) == 3, TimeSpan.FromSeconds(10), "the jobs did not succeed", Token);
     }
 
     [Fact]

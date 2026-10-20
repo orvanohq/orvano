@@ -30,7 +30,7 @@ internal sealed class JobExecutor
     public static readonly TimeSpan WriteBound = TimeSpan.FromSeconds(10);
 
     /// <summary>
-    /// The bound of one claim (both statements, retries included), so a stalled database cannot hold the wake loop, or the
+    /// The bound of one claim (its statement, retries included), so a stalled database cannot hold the wake loop, or the
     /// shutdown behind it, past it (spec 0002 ASY-7). A claim it cuts off leaves any row it took to its lease (CLM-3).
     /// </summary>
     public static readonly TimeSpan ClaimBound = TimeSpan.FromSeconds(10);
@@ -120,17 +120,13 @@ internal sealed class JobExecutor
     public int RunningCount => _running.Count;
 
     /// <summary>
-    /// CLM-1: marks expired last attempts dead, then claims at most <paramref name="free"/> due jobs, never one this process
-    /// is still running. Each statement runs under the execution strategy in its own short transaction. The claimed jobs
-    /// hold slots until <see cref="RunAsync"/> frees them.
+    /// CLM-1 (1): marks running rows whose lease expired on their last attempt dead, in one statement under the execution
+    /// strategy in its own short transaction, and counts and logs each on commit (OUT-4). The runner calls it on each poll
+    /// tick and <c>JobsDriver</c> once per pass, never on a signal, connect, or freed slot wake: the claim never takes a
+    /// row on its last attempt, so waiting for the poll only delays <c>finished_at</c>.
     /// </summary>
-    public async Task<IReadOnlyList<ClaimedJob>> ClaimAsync(int free, CancellationToken cancellationToken)
+    public async Task MarkExpiredDeadAsync(CancellationToken cancellationToken)
     {
-        if (free <= 0)
-        {
-            return [];
-        }
-
         await using AsyncServiceScope scope = _scopes.CreateAsyncScope();
         JobsDbContext db = scope.ServiceProvider.GetRequiredService<JobsDbContext>();
 
@@ -159,6 +155,22 @@ internal sealed class JobExecutor
                 return ValueTask.CompletedTask;
             });
         }, cancellationToken);
+    }
+
+    /// <summary>
+    /// CLM-1 (2): claims at most <paramref name="free"/> due jobs, then expired leases with attempts left, never one this
+    /// process is still running, in one statement under the execution strategy in its own short transaction. The claimed
+    /// jobs hold slots until <see cref="RunAsync"/> frees them.
+    /// </summary>
+    public async Task<IReadOnlyList<ClaimedJob>> ClaimAsync(int free, CancellationToken cancellationToken)
+    {
+        if (free <= 0)
+        {
+            return [];
+        }
+
+        await using AsyncServiceScope scope = _scopes.CreateAsyncScope();
+        JobsDbContext db = scope.ServiceProvider.GetRequiredService<JobsDbContext>();
 
         Guid[] mine = [.. _running.Keys];
         List<ClaimedJob> claimed = await db.InTransactionAsync(async token =>

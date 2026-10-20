@@ -46,9 +46,11 @@ public sealed class JobsDbContext(DbContextOptions<JobsDbContext> options) : DbC
             job.Property(x => x.Payload).HasColumnType("jsonb").IsRequired();
             job.Property(x => x.Status).HasTextEnum();
 
-            // A plain unique index: nulls are distinct, so rows without a key never collide, and ON CONFLICT
-            // (dedupe_key) needs no WHERE.
-            job.HasIndex(x => x.DedupeKey).IsUnique().HasDatabaseName("ux_job_dedupe_key");
+            // A key is scoped to its kind and project (JDB-2): NULLS NOT DISTINCT makes jobs with no project collide,
+            // and the predicate keeps rows without a key out, so they never collide. ON CONFLICT names the same columns
+            // and predicate (ENQ-1).
+            job.HasIndex(x => new { x.Kind, x.ProjectId, x.DedupeKey }).IsUnique().AreNullsDistinct(false)
+                .HasFilter("dedupe_key IS NOT NULL").HasDatabaseName("ux_job_dedupe_key");
             // Due rows and leased rows each get their own index, so an idle poll is a short range scan however many
             // future jobs wait (CLM-1).
             job.HasIndex(x => new { x.RunAt, x.Id }).HasDatabaseName("ix_job_due").HasFilter("status = 'queued'");

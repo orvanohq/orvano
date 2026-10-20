@@ -163,4 +163,8 @@ internal static partial class InfrastructureLog
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 120, Level = LogLevel.Warning,
         Message = "A cancellation callback of job {Kind} {Id} threw; the job's outcome is unaffected")]
     public static partial void JobCancelCallbackFailed(this ILogger logger, string kind, Guid id, Exception exception);
+
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 121, Level = LogLevel.Error,
+        Message = "Marking expired jobs dead failed; the runner tries again at the next poll")]
+    public static partial void JobMarkDeadFailed(this ILogger logger, Exception exception);
 }

@@ -547,6 +547,29 @@ public sealed class JobRunnerTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Spec", "0013:AC-20"), Trait("Spec", "0013:CLM-1")]
+    public async Task A_claim_skips_an_expired_last_attempt_and_leaves_it_running_until_the_dead_marking_runs()
+    {
+        Guid id = (await Queue.EnqueueAsync(new LeaseJob(ProbeMode.Ok), null, Token))!.Value;
+        await _database.ExecuteAsync("UPDATE jobs.job SET max_attempts = 1 WHERE id = $1", Token, id);
+        (await Executor.ClaimAsync(1, Token)).ShouldHaveSingleItem();
+        await _host.DisposeAsync();
+        OrvanoApiFactory other = Host();
+        JobExecutor executor = other.Services.GetRequiredService<JobExecutor>();
+        _clock.Advance(TimeSpan.FromSeconds(61));
+
+        (await executor.ClaimAsync(1, Token)).ShouldBeEmpty();
+        (await _rows.FindAsync(id, Token))!.Status.ShouldBe("running");
+
+        await executor.MarkExpiredDeadAsync(Token);
+
+        JobRows.Row row = (await _rows.FindAsync(id, Token))!;
+        row.Status.ShouldBe("dead");
+        row.FinishedAt.ShouldBe(Start.AddSeconds(61));
+        _probes.Runs.ShouldBeEmpty();
+    }
+
+    [Fact]
     [Trait("Spec", "0013:AC-30"), Trait("Spec", "0013:ENQ-7")]
     public async Task Cancelling_a_projects_jobs_kills_its_queued_and_running_ones_but_the_given_one_and_other_projects()
     {

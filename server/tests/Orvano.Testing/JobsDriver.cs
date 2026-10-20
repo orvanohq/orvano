@@ -17,7 +17,7 @@ public static class JobsDriver
     public const int MaxAttempts = 1000;
 
     /// <summary>
-    /// Syncs the registered schedules, fires the due ones, then claims and runs every due job on the current clock to
+    /// Syncs the registered schedules, marks expired last attempts dead, fires the due schedules, then claims and runs every due job on the current clock to
     /// its outcome, one at a time, until a claim returns nothing. Returns each attempt in the order it ran.
     /// </summary>
     /// <exception cref="InvalidOperationException">More than <see cref="MaxAttempts"/> attempts ran; the message names their kinds.</exception>
@@ -28,6 +28,7 @@ public static class JobsDriver
         JobExecutor executor = services.GetRequiredService<JobExecutor>();
 
         await scheduler.SyncAsync(cancellationToken);
+        await executor.MarkExpiredDeadAsync(cancellationToken);
         await scheduler.TickAsync(cancellationToken);
 
         var runs = new List<JobRun>();

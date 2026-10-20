@@ -207,6 +207,7 @@ public sealed class JobQueueTests(PostgresFixture postgres) : IAsyncLifetime
     [InlineData("dead")]
     public async Task Enqueue_with_a_taken_dedupe_key_returns_null_and_sends_nothing_whatever_the_first_jobs_status(string status)
     {
+        // The same kind with no project on both: NULLS NOT DISTINCT makes them collide (JDB-2).
         var options = new EnqueueOptions { DedupeKey = "probe:once" };
         Guid first = (await Queue.EnqueueAsync(new ProbeJob(ProbeMode.Ok), options, Token))!.Value;
         if (status != "queued")
@@ -223,6 +224,63 @@ public sealed class JobQueueTests(PostgresFixture postgres) : IAsyncLifetime
         (await _rows.CountAsync("true", Token)).ShouldBe(1);
         (await tap.TakeAsync(Token)).ShouldBeEmpty();
         meters.Sum("orvano.infrastructure.jobs.enqueued").ShouldBe(0);
+    }
+
+    [Theory]
+    [Trait("Spec", "0013:AC-16"), Trait("Spec", "0013:ENQ-1"), Trait("Spec", "0013:JDB-2")]
+    [InlineData("other-kind")]
+    [InlineData("other-project")]
+    [InlineData("project-versus-none")]
+    [InlineData("none-versus-project")]
+    public async Task Enqueue_with_a_dedupe_key_taken_under_another_kind_or_project_inserts_when_the_key_is_scoped(string scope)
+    {
+        var project = Guid.CreateVersion7();
+        var first = new EnqueueOptions { DedupeKey = "probe:scoped", ProjectId = scope == "none-versus-project" ? null : project };
+        EnqueueOptions second = scope switch
+        {
+            "other-project" => first with { ProjectId = Guid.CreateVersion7() },
+            "project-versus-none" => first with { ProjectId = null },
+            "none-versus-project" => first with { ProjectId = project },
+            _ => first,
+        };
+        (await Queue.EnqueueAsync(new ProbeJob(ProbeMode.Ok), first, Token)).ShouldNotBeNull();
+
+        Guid? id = scope == "other-kind"
+            ? await Queue.EnqueueAsync(new ShortJob(ProbeMode.Ok), second, Token)
+            : await Queue.EnqueueAsync(new ProbeJob(ProbeMode.Ok), second, Token);
+
+        id.ShouldNotBeNull();
+        (await _rows.CountAsync("dedupe_key = 'probe:scoped'", Token)).ShouldBe(2);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-16"), Trait("Spec", "0013:ENQ-1"), Trait("Spec", "0013:JDB-2")]
+    public async Task Enqueue_with_a_dedupe_key_taken_by_the_same_kind_and_project_returns_null()
+    {
+        var options = new EnqueueOptions { DedupeKey = "probe:project", ProjectId = Guid.CreateVersion7() };
+        (await Queue.EnqueueAsync(new ProbeJob(ProbeMode.Ok), options, Token)).ShouldNotBeNull();
+
+        (await Queue.EnqueueAsync(new ProbeJob(ProbeMode.Ok), options, Token)).ShouldBeNull();
+
+        (await _rows.CountAsync("dedupe_key = 'probe:project'", Token)).ShouldBe(1);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-16"), Trait("Spec", "0013:ENQ-1"), Trait("Spec", "0013:JDB-2")]
+    public async Task Enqueue_without_a_dedupe_key_never_collides_with_or_without_a_project()
+    {
+        var project = new EnqueueOptions { ProjectId = Guid.CreateVersion7() };
+
+        Guid?[] ids =
+        [
+            await Queue.EnqueueAsync(new ProbeJob(ProbeMode.Ok), null, Token),
+            await Queue.EnqueueAsync(new ProbeJob(ProbeMode.Ok), null, Token),
+            await Queue.EnqueueAsync(new ProbeJob(ProbeMode.Ok), project, Token),
+            await Queue.EnqueueAsync(new ProbeJob(ProbeMode.Ok), project, Token),
+        ];
+
+        ids.ShouldAllBe(id => id != null);
+        (await _rows.CountAsync("dedupe_key IS NULL", Token)).ShouldBe(4);
     }
 
     [Fact]
@@ -376,6 +434,8 @@ public sealed class JobQueueTests(PostgresFixture postgres) : IAsyncLifetime
             .ShouldBe("ck_schedule_cron,ck_schedule_name");
         (await ScalarAsync("SELECT pg_get_indexdef('jobs.ix_job_due'::regclass)")).ShouldEndWith("(run_at, id) WHERE (status = 'queued'::text)");
         (await ScalarAsync("SELECT pg_get_indexdef('jobs.ix_job_lease'::regclass)")).ShouldEndWith("(locked_until, id) WHERE (status = 'running'::text)");
+        (await ScalarAsync("SELECT pg_get_indexdef('jobs.ux_job_dedupe_key'::regclass)"))
+            .ShouldEndWith("(kind, project_id, dedupe_key) NULLS NOT DISTINCT WHERE (dedupe_key IS NOT NULL)");
         (await ScalarAsync(
             "SELECT string_agg(column_name || ':' || data_type, ',' ORDER BY ordinal_position) FROM information_schema.columns "
             + "WHERE table_schema = 'jobs' AND table_name = 'schedule'"))

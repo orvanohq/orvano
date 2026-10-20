@@ -600,7 +600,7 @@ Steps 21 to 23 settle the 2026-10-20 review of milestone 2 ([report](../../revie
 
 - [x] Milestone 2 (job queue, runner, schedules): extend this spec with the `IJobQueue` and `IJobHandler<T>` contracts, the `job` handler, and how enqueue without a transaction sends its signal (spec 0007 JOB-4), before `/develop` builds it. Done 2026-10-19: _Job queue design_, AC-14 to AC-30.
 - [x] `/develop background runtime`: build steps 13 to 20 (the job queue), then `/check verify`, `/test`, and a fresh model `/check review` on them. Done 2026-10-20: #54, #55, #56; the review's spec items settled in steps 21 to 23.
-- [ ] `/develop background runtime`: build steps 21 to 23 (the milestone 2 review settlement), then `/check verify` and `/test` on them.
+- [ ] `/develop background runtime`: build steps 21 to 23 (the milestone 2 review settlement), then `/check verify` and `/test` on them. Built 2026-10-20; `/check verify` and `/test` remain.
 - [ ] Milestone 3 needs from milestone 2 only `WorkerWake` (WAK-5) and ENQ-1 on a module context; the outbox section names its dispatcher loop there.
 - [ ] Feature 13: register `project.teardown` (and call `CancelProjectJobsAsync` as LIF-2 step 1) and the provisioning job kinds; feature 14: signing key rotation and expired session cleanup schedules; feature 29: local file store temp cleanup (FIL-2).
 - [ ] Feature 46: an operator view of jobs and schedules, retrying a dead job, and toggling `enabled` (SCH-5).

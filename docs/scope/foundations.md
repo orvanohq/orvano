@@ -153,7 +153,8 @@ spec [0013](../specs/0013-background-runtime/index.md) (builds spec [0007](../sp
     - built: spec 0013 build plan steps 8 to 12 (`HandlerTimeout` and the LSN-8 lag disconnect, the LSN-5 stable period and boot announce, `AddOnCommitted`, the SND-5 joined refusal, the object inner cache key and the wider modules ban list), 2026-10-19
   - [x] Job queue, runner, leases, backoff, and schedules (JOB-1 to JOB-6; spec 0013 AC-14 to AC-30, build plan steps 13 to 20)
     - built: spec 0013 build plan steps 13 to 20 (job contracts, `JobsDbContext` and the `jobs` migration, `IJobQueue` in and out of a transaction, the runner with leases, renewal, backoff, timeouts, and shutdown release, `CancelProjectJobsAsync`, schedules on `Cronos` 0.13.0 with the `jobs.cleanup` schedule, telemetry, and `JobsDriver`), 2026-10-19
-  - [ ] Job queue review settlement: dedupe key scoped per kind and project, one pool connection kept for the runner, dead marking on the poll (spec 0013 AC-16, AC-20, AC-26, build plan steps 21 to 23)
+  - [x] Job queue review settlement: dedupe key scoped per kind and project, one pool connection kept for the runner, dead marking on the poll (spec 0013 AC-16, AC-20, AC-26, build plan steps 21 to 23)
+    - built: spec 0013 build plan steps 21 to 23 (the `ScopeJobDedupeKey` migration on `(kind, project_id, dedupe_key)` with `NULLS NOT DISTINCT`, the `PoolSize` / 2 − 1 limit with `PoolSize` at least 4, `MarkExpiredDeadAsync` on the poll tick and once per `JobsDriver` pass), 2026-10-20
   - [ ] Module outbox and dispatcher (EVT-1 to EVT-4); extend spec 0013 with the `IOutbox` contract first
 - [ ] Verify it: `/check verify background runtime`
 - [ ] Test it: `/test background runtime`

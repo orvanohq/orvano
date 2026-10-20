@@ -91,10 +91,6 @@ namespace Orvano.Infrastructure.Jobs.Data.Migrations
                     b.HasKey("Id")
                         .HasName("pk_job");
 
-                    b.HasIndex("DedupeKey")
-                        .IsUnique()
-                        .HasDatabaseName("ux_job_dedupe_key");
-
                     b.HasIndex("FinishedAt")
                         .HasDatabaseName("ix_job_finished")
                         .HasFilter("status IN ('succeeded', 'dead')");
@@ -110,6 +106,13 @@ namespace Orvano.Infrastructure.Jobs.Data.Migrations
                     b.HasIndex("RunAt", "Id")
                         .HasDatabaseName("ix_job_due")
                         .HasFilter("status = 'queued'");
+
+                    b.HasIndex("Kind", "ProjectId", "DedupeKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_job_dedupe_key")
+                        .HasFilter("dedupe_key IS NOT NULL");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("Kind", "ProjectId", "DedupeKey"), false);
 
                     b.ToTable("job", "jobs", t =>
                         {
