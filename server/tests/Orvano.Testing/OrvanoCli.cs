@@ -15,6 +15,12 @@ public static class OrvanoCli
     /// </summary>
     public static string UndeclaredEndpointHook { get; } = typeof(OrvanoCli).Assembly.Location;
 
+    /// <summary>
+    /// With the startup hook loaded, the bad job registration to make instead of the undeclared endpoint: one of the
+    /// <see cref="BadJobRegistrations"/> names.
+    /// </summary>
+    public const string JobsHookVariable = "TESTHOOK_JOBS";
+
     public static ProcessStartInfo StartInfo(IEnumerable<string> args, IReadOnlyDictionary<string, string>? environment = null,
         string? workingDirectory = null)
     {

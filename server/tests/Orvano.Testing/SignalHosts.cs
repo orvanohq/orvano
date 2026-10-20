@@ -11,13 +11,14 @@ namespace Orvano.Testing;
 public static class SignalHosts
 {
     /// <summary>
-    /// Settings for servers on a database of their own, so their signals and heartbeats reach only each other. Pass the
-    /// same settings to every host of the test, so they also share one root key, like replicas of one install.
+    /// Settings for servers on a migrated database of their own, so their signals, heartbeats, and jobs reach only each
+    /// other. Pass the same settings to every host of the test, so they also share one root key, like replicas of one
+    /// install.
     /// </summary>
     public static async Task<Dictionary<string, string>> SettingsOnOwnDatabaseAsync(
         PostgresFixture postgres, string prefix, CancellationToken cancellationToken)
     {
-        string database = await postgres.CreateDatabaseAsync(prefix, cancellationToken);
+        string database = await postgres.CreateMigratedDatabaseAsync(prefix, cancellationToken);
         Dictionary<string, string> settings = OrvanoApiFactory.DefaultSettings(postgres);
         settings["Database:Name"] = database;
         return settings;

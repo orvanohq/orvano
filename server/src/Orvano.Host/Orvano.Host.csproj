@@ -18,7 +18,7 @@
     <PackageReference Include="System.CommandLine" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Spec 0013 LSN-1: tests find a host's listener backend by its SignalInstance. -->
+    <!-- Spec 0002 TST-2: integration tests reach the host's internals. -->
     <InternalsVisibleTo Include="Orvano.Host.IntegrationTests" />
   </ItemGroup>
   <ItemGroup>

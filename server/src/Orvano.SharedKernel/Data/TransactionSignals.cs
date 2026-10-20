@@ -61,6 +61,13 @@ public static class TransactionSignals
         BatchOf(context, requireTransaction: true).AddOnCommitted(action);
     }
 
+    /// <summary>
+    /// The SND-5 checks alone, for work that joins the transaction the way a signal does (spec 0013 ENQ-2): an open
+    /// transaction, a platform database context, and a transaction this context began rather than joined.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">One of the checks fails; the message names the fix.</exception>
+    public static void EnsureEnlistable(DbContext context) => BatchOf(context, requireTransaction: true);
+
     /// <summary>The values of <paramref name="kind"/> enlisted so far in the current transaction, for an after commit action.</summary>
     public static IReadOnlyList<string> Enlisted(DbContext context, SignalKind kind) =>
         BatchOf(context, requireTransaction: false).ValuesOf(kind);

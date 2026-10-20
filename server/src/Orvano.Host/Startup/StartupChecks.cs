@@ -1,13 +1,14 @@
 using Npgsql;
 
 using Orvano.Host.Database;
+using Orvano.Infrastructure;
 using Orvano.Modules.Auth.Contracts;
 
 namespace Orvano.Host.Startup;
 
 /// <summary>
 /// Runs before the server accepts requests: PostgreSQL 18 or later (spec 0007 RUN-5), no pending migrations
-/// (spec 0002 DAT-10), and a working password hasher (spec 0007 HSH-3).
+/// (spec 0002 DAT-10), a working password hasher (spec 0007 HSH-3), and sound job registrations (spec 0013 SCH-1).
 /// </summary>
 internal sealed class StartupChecks(
     NpgsqlDataSource dataSource, IServiceProvider services, IPasswordHasher hasher) : IHostedLifecycleService
@@ -17,6 +18,13 @@ internal sealed class StartupChecks(
         if (PasswordHasherSelfTest.Run(hasher) is { } failure)
         {
             throw new StartupFailedException(failure);
+        }
+
+        // Spec 0013 SCH-1: a bad job kind or schedule stops startup in every role, with a message naming it.
+        IReadOnlyList<string> jobProblems = InfrastructureServices.JobRegistrationProblems(services);
+        if (jobProblems.Count > 0)
+        {
+            throw new StartupFailedException(string.Join(Environment.NewLine, jobProblems));
         }
 
         await PostgresVersion.EnsureSupportedAsync(dataSource, cancellationToken);

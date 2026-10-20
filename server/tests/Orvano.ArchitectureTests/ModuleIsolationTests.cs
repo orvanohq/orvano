@@ -18,6 +18,8 @@ public sealed class ModuleIsolationTests
 {
     private const string BannedFile = "src/BannedSymbols.Modules.txt";
 
+    private static readonly string[] ForbiddenSql = ["pg_notify", "orvano_signal", "jobs.job", "jobs.schedule"];
+
     [Fact]
     [Trait("Spec", "0013:CAC-5"), Trait("Spec", "0013:AC-12")]
     public void Modules_banned_list_names_every_HybridCache_removal_overload()
@@ -55,14 +57,16 @@ public sealed class ModuleIsolationTests
     }
 
     [Fact]
-    [Trait("Spec", "0013:CAC-5"), Trait("Spec", "0013:AC-12")]
-    public void Modules_banned_list_bans_the_signal_plumbing_types_and_the_notification_event()
+    [Trait("Spec", "0013:CAC-5"), Trait("Spec", "0013:AC-12"), Trait("Spec", "0013:JTS-4"), Trait("Spec", "0013:AC-28")]
+    public void Modules_banned_list_bans_the_signal_plumbing_types_the_notification_event_and_the_job_access_scope()
     {
         string[] banned = [.. BannedIds()];
 
         banned.ShouldContain("T:Orvano.SharedKernel.Data.TransactionSignals");
         banned.ShouldContain("T:Orvano.SharedKernel.Signals.SignalPayload");
         banned.ShouldContain("E:Npgsql.NpgsqlConnection.Notification");
+        banned.ShouldContain("T:Orvano.SharedKernel.Jobs.JobAccessScope"); // spec 0013 JQ-6, JTS-4
+        typeof(Orvano.SharedKernel.Jobs.JobAccessScope).FullName.ShouldBe("Orvano.SharedKernel.Jobs.JobAccessScope");
         typeof(Orvano.SharedKernel.Signals.SignalPayload).Assembly.GetType("Orvano.SharedKernel.Data.TransactionSignals").ShouldNotBeNull();
     }
 
@@ -77,8 +81,8 @@ public sealed class ModuleIsolationTests
     }
 
     [Fact]
-    [Trait("Spec", "0013:CAC-5"), Trait("Spec", "0013:AC-12")]
-    public void No_module_source_file_names_pg_notify_or_the_signal_channel()
+    [Trait("Spec", "0013:CAC-5"), Trait("Spec", "0013:AC-12"), Trait("Spec", "0013:JTS-4"), Trait("Spec", "0013:AC-28")]
+    public void No_module_source_file_names_pg_notify_the_signal_channel_or_the_jobs_tables()
     {
         string[] files = [.. ModuleSourceFiles()];
 
@@ -108,13 +112,37 @@ public sealed class ModuleIsolationTests
         }
     }
 
-    /// <summary>The files among <paramref name="files"/> that name <c>pg_notify</c> or <c>orvano_signal</c>, case insensitive.</summary>
+    [Fact]
+    [Trait("Spec", "0013:JTS-4"), Trait("Spec", "0013:AC-28")]
+    public void Source_scan_flags_a_file_when_it_names_the_jobs_tables_in_any_case()
+    {
+        string folder = Directory.CreateTempSubdirectory("orvano-scan-").FullName;
+        try
+        {
+            string job = Path.Combine(folder, "Job.cs");
+            string schedule = Path.Combine(folder, "Schedule.cs");
+            string clean = Path.Combine(folder, "Clean.cs");
+            File.WriteAllText(job, """var sql = "INSERT INTO Jobs.Job (id) VALUES (1)";""");
+            File.WriteAllText(schedule, """var sql = "UPDATE jobs.schedule SET enabled = false";""");
+            File.WriteAllText(clean, """var sql = "SELECT 1 FROM jobs_archive";""");
+
+            SignalSqlIn([job, schedule, clean]).ShouldBe([job, schedule]);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// The files among <paramref name="files"/> that name <c>pg_notify</c>, <c>orvano_signal</c>, <c>jobs.job</c>, or
+    /// <c>jobs.schedule</c>, case insensitive: a module writing the queue directly would skip ENQ-3 and ENQ-4 (JTS-4).
+    /// </summary>
     private static IEnumerable<string> SignalSqlIn(IEnumerable<string> files) =>
         files.Where(file =>
         {
             string text = File.ReadAllText(file);
-            return text.Contains("pg_notify", StringComparison.OrdinalIgnoreCase)
-                || text.Contains("orvano_signal", StringComparison.OrdinalIgnoreCase);
+            return ForbiddenSql.Any(name => text.Contains(name, StringComparison.OrdinalIgnoreCase));
         });
 
     private static IEnumerable<string> ModuleSourceFiles()

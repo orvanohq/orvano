@@ -75,13 +75,42 @@ public sealed class AccessRulesTests
     }
 
     [Fact]
+    [Trait("Spec", "0012:AC-9"), Trait("Spec", "0012:PRJ-3"), Trait("Spec", "0013:JQ-6"), Trait("Spec", "0013:AC-28")]
+    public void Only_the_access_layer_and_JobAccessScope_set_the_caller_and_project_when_built()
+    {
+        Type implementation = SharedKernel.GetType($"{AccessNamespace}.AccessContext", throwOnError: true)!;
+        MethodInfo establish = implementation.GetMethod("Establish", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        string[] setters = [.. Server
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => TypeReferences.MethodsOf(type).Any(method => TypeReferences.CalledMethods(method).Contains(establish)))
+            .Select(Outermost)
+            .Where(type => type.Namespace != AccessNamespace)
+            .Select(type => type.FullName!)
+            .Distinct()];
+
+        setters.ShouldBe(["Orvano.SharedKernel.Jobs.JobAccessScope"]);
+    }
+
+    [Fact]
     [Trait("Spec", "0012:AC-9")]
     public void Shared_kernel_shows_its_internals_only_to_test_projects_when_built() =>
         SharedKernel.GetCustomAttributes<InternalsVisibleToAttribute>()
             .Select(attribute => attribute.AssemblyName)
             .ShouldAllBe(name => name.EndsWith(".Tests", StringComparison.Ordinal));
 
-    // A sample offender for the rule above.
+    // A lambda or async method body compiles to a nested type; the rule judges the type that wrote it.
+    private static Type Outermost(Type type)
+    {
+        while (type.DeclaringType is { } declaring)
+        {
+            type = declaring;
+        }
+
+        return type;
+    }
+
+    // A sample offender for the engine rule.
     private static class UsesNpgsqlInside
     {
         public static string Describe() => new NpgsqlConnectionStringBuilder { Host = "x" }.ConnectionString;

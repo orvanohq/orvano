@@ -112,6 +112,37 @@ internal static class TypeReferences
         }
     }
 
+    /// <summary>Every method and constructor a method body calls, from its <c>call</c>, <c>callvirt</c>, and <c>newobj</c> tokens.</summary>
+    public static IEnumerable<MethodBase> CalledMethods(MethodBase method)
+    {
+        byte[]? il = method.GetMethodBody()?.GetILAsByteArray();
+        if (il is null)
+        {
+            yield break;
+        }
+
+        Type[]? typeArguments = method.DeclaringType is { IsGenericType: true } declaring ? declaring.GetGenericArguments() : null;
+        Type[]? methodArguments = method.IsGenericMethod ? method.GetGenericArguments() : null;
+        int position = 0;
+        while (position < il.Length)
+        {
+            short value = il[position] == 0xFE ? (short)(0xFE00 | il[position + 1]) : il[position];
+            position += il[position] == 0xFE ? 2 : 1;
+            OpCode code = OpCodesByValue[value];
+            if (code.OperandType == OperandType.InlineMethod
+                && Resolve(method.Module, BitConverter.ToInt32(il, position), typeArguments, methodArguments) is MethodBase called)
+            {
+                yield return called;
+            }
+
+            position += OperandSize(code, il, position);
+        }
+    }
+
+    /// <summary>Every method and constructor <paramref name="type"/> itself declares, with bodies or not.</summary>
+    public static IEnumerable<MethodBase> MethodsOf(Type type) =>
+        type.GetMethods(Everything).Cast<MethodBase>().Concat(type.GetConstructors(Everything));
+
     private static MemberInfo? Resolve(Module module, int token, Type[]? typeArguments, Type[]? methodArguments)
     {
         try

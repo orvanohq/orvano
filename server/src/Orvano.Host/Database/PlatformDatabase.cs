@@ -1,10 +1,10 @@
-using System.Security.Cryptography;
-
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 using Npgsql;
 
 using Orvano.Infrastructure;
+using Orvano.Infrastructure.Jobs;
 
 namespace Orvano.Host.Database;
 
@@ -12,12 +12,16 @@ internal static class PlatformDatabase
 {
     /// <summary>
     /// One <see cref="NpgsqlDataSource"/> for the platform database, used by every module (spec 0002 CFG-5), and the
-    /// keyed <c>"signals"</c> one the signal listener opens its single connection from (spec 0013 LSN-1).
+    /// keyed <c>"signals"</c> one the signal listener opens its single connection from (spec 0013 LSN-1). It also caps job
+    /// concurrency at half this pool (spec 0013 JOP-2).
     /// </summary>
     public static IHostApplicationBuilder AddPlatformDatabase(this IHostApplicationBuilder builder)
     {
         builder.Services.AddOptions<DatabaseOptions>().BindConfiguration(DatabaseOptions.Section).ValidateOnStart();
         builder.Services.AddSingleton<IValidateOptions<DatabaseOptions>, DatabaseOptionsValidator>();
+        builder.Services.AddSingleton<JobConcurrency>();
+        builder.Services.AddSingleton<IPostConfigureOptions<JobOptions>>(services => services.GetRequiredService<JobConcurrency>());
+        builder.Services.AddSingleton<IValidateOptions<JobOptions>>(services => services.GetRequiredService<JobConcurrency>());
 
         bool development = builder.Environment.IsDevelopment();
         builder.Services.AddSingleton(services =>
@@ -26,7 +30,7 @@ internal static class PlatformDatabase
             return Build(ConnectionString(options, development), services);
         });
 
-        builder.Services.AddSingleton<SignalInstance>();
+        builder.Services.TryAddSingleton<OrvanoInstance>();
         builder.Services.AddKeyedSingleton(InfrastructureServices.SignalDataSourceKey, (services, _) =>
         {
             DatabaseOptions options = services.GetRequiredService<IOptions<DatabaseOptions>>().Value;
@@ -37,7 +41,7 @@ internal static class PlatformDatabase
             // (the only commands on this connection besides the heartbeat, which the listener bounds itself).
             connection.Timeout = 15;
             connection.CommandTimeout = 30;
-            connection.ApplicationName = services.GetRequiredService<SignalInstance>().ApplicationName;
+            connection.ApplicationName = services.GetRequiredService<OrvanoInstance>().ApplicationName;
             return Build(connection, services);
         });
 
@@ -65,15 +69,4 @@ internal static class PlatformDatabase
         dataSource.UseLoggerFactory(services.GetRequiredService<ILoggerFactory>());
         return dataSource.Build();
     }
-}
-
-/// <summary>
-/// This process's signal listener identity (spec 0013 LSN-1): 8 random hex characters chosen at startup, so an
-/// operator (or a test) can find the listener's backend by its application name.
-/// </summary>
-internal sealed class SignalInstance
-{
-    public string Id { get; } = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4));
-
-    public string ApplicationName => "orvano-signals-" + Id;
 }
