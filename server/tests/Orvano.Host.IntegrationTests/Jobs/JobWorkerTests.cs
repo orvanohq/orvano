@@ -166,6 +166,50 @@ public sealed class JobWorkerTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Spec", "0013:AC-21"), Trait("Spec", "0013:OUT-6"), Trait("Spec", "0013:WAK-4")]
+    public async Task A_claim_stalled_at_shutdown_is_cut_off_at_its_bound_and_the_running_handler_is_still_released()
+    {
+        _settings["Jobs:PollInterval"] = "00:01:00";
+        var clock = new ManualClock();
+        var probes = new JobProbes();
+        var logs = new RecordingLogs();
+        OrvanoApiFactory worker = Host(probes, roles: "worker", clock, configure: services => services.AddSingleton<ILoggerProvider>(logs));
+        Guid running = (await worker.Services.GetRequiredService<IJobQueue>().EnqueueAsync(new ProbeJob(ProbeMode.Block), null, Token))!.Value;
+        await probes.StartedAsync(running, Token);
+
+        // The test's table lock stalls the next claim, as a stalled database would; SKIP LOCKED skips row locks only.
+        await using NpgsqlConnection locker = await _database.DataSource.OpenConnectionAsync(Token);
+        await using NpgsqlTransaction tableLock = await locker.BeginTransactionAsync(Token);
+        await using (var command = new NpgsqlCommand("LOCK TABLE jobs.job IN ACCESS EXCLUSIVE MODE", locker, tableLock))
+        {
+            await command.ExecuteNonQueryAsync(Token);
+        }
+
+        clock.Advance(TimeSpan.FromMinutes(1)); // the poll wakes the loop into a claim
+        await Eventually.TrueAsync(async () => await StalledClaimsAsync() == 1, TimeSpan.FromSeconds(5), "no claim stalled", Token);
+        Task stopping = worker.DisposeAsync().AsTask();
+
+        clock.Advance(JobExecutor.ClaimBound);
+
+        await Eventually.TrueAsync(async () => await StalledClaimsAsync() == 0, TimeSpan.FromSeconds(5), "the claim was not cut off", Token);
+        await tableLock.RollbackAsync(Token); // the release write waits on the lock too
+        await stopping.WaitAsync(TimeSpan.FromSeconds(15), Token);
+        JobRows.Row row = (await _rows.FindAsync(running, Token))!;
+        row.Status.ShouldBe("queued");
+        row.Attempt.ShouldBe(0);
+        probes.Cancelled.ShouldContain(running);
+        logs.Count(LogEventIds.Infrastructure + 101, LogLevel.Error).ShouldBe(1);
+
+        async Task<long> StalledClaimsAsync()
+        {
+            await using NpgsqlCommand count = _database.DataSource.CreateCommand(
+                "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' "
+                + "AND (query LIKE '%lease expired on the last attempt%' OR query LIKE '%UPDATE jobs.job AS j%')");
+            return (long)(await count.ExecuteScalarAsync(Token))!;
+        }
+    }
+
+    [Fact]
     [Trait("Spec", "0013:AC-24"), Trait("Spec", "0013:SCH-3"), Trait("Spec", "0013:WAK-2")]
     public async Task A_schedule_tick_that_fails_is_logged_and_the_claim_on_the_same_poll_still_runs()
     {
@@ -243,6 +287,20 @@ public sealed class JobWorkerTests(PostgresFixture postgres) : IAsyncLifetime
             result.FailureMessage.ShouldBe(
                 $"ORVANO_JOBS__CONCURRENCY ({concurrency}) must be at most half of ORVANO_DATABASE__POOLSIZE ({pool}) (spec 0007 JOB-4).");
         }
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2")]
+    public void The_default_concurrency_passes_the_half_pool_rule_for_every_pool_size_the_options_allow()
+    {
+        int[] processorCounts = [1, 2, 8, 64];
+        string[] refused = [.. Enumerable.Range(2, 999)
+            .SelectMany(pool => processorCounts.Select(processors => (pool, processors)))
+            .Where(pair => !new JobConcurrency(Options.Create(new DatabaseOptions { PoolSize = pair.pool }))
+                .Validate(null, new JobOptions { Concurrency = JobConcurrency.Default(pair.processors, pair.pool) }).Succeeded)
+            .Select(pair => $"pool {pair.pool}, {pair.processors} processors")];
+
+        refused.ShouldBeEmpty();
     }
 
     [Fact]

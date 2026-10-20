@@ -57,12 +57,13 @@ internal sealed class JobRunner : BackgroundService
         int concurrency = _options.Concurrency ?? 1;
         _logger.JobRunnerStarted(concurrency, _options.PollInterval, _executor.Worker);
 
-        // SCH-2: the sync comes before the first claim; until one succeeds, no schedule fires (SCH-3).
-        bool synced = await TrySyncAsync(stoppingToken);
-        Task poll = PollAsync(stoppingToken);
-        _wake.Wake();
+        Task poll = Task.CompletedTask;
         try
         {
+            // SCH-2: the sync comes before the first claim; until one succeeds, no schedule fires (SCH-3).
+            bool synced = await TrySyncAsync(stoppingToken);
+            poll = PollAsync(stoppingToken);
+            _wake.Wake();
             while (await WaitAsync(stoppingToken))
             {
                 if (_wakes.Take())
@@ -131,8 +132,11 @@ internal sealed class JobRunner : BackgroundService
         IReadOnlyList<ClaimedJob> claimed;
         try
         {
-            // Not the stopping token: a claim in flight at shutdown finishes, so its rows get tasks (OUT-6).
-            claimed = await _executor.ClaimAsync(free, CancellationToken.None);
+            // Not the stopping token: a claim in flight at shutdown finishes, so its rows get tasks (OUT-6). Its own bound
+            // keeps a stalled database from holding the loop, and the shutdown behind it (ASY-7); rows a claim it cuts off
+            // took wait out their lease (CLM-3).
+            using var bound = new CancellationTokenSource(JobExecutor.ClaimBound, _time);
+            claimed = await _executor.ClaimAsync(free, bound.Token);
         }
         catch (Exception ex) // spec 0013 WAK-4: the loop never ends while the host runs
         {
@@ -165,7 +169,7 @@ internal sealed class JobRunner : BackgroundService
                 Interlocked.Increment(ref _released);
             }
         }
-        catch (Exception ex) // an attempt that failed past its own handling is left to its lease (CLM-6)
+        catch (Exception ex) // spec 0013 CLM-6: the executor frees the slot whatever happens; the row is left to its lease
         {
             _logger.JobOutcomeWriteFailed(job.Kind, job.Id, ex);
         }
@@ -178,13 +182,13 @@ internal sealed class JobRunner : BackgroundService
             await _scheduler.SyncAsync(stoppingToken);
             return true;
         }
-        catch (Exception ex) when (!stoppingToken.IsCancellationRequested) // spec 0013 SCH-3: retried on the next poll
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            _logger.JobScheduleSyncFailed(ex);
             return false;
         }
-        catch (OperationCanceledException)
+        catch (Exception ex) // spec 0013 SCH-3: retried on the next poll; never ends the host, stopping or not
         {
+            _logger.JobScheduleSyncFailed(ex);
             return false;
         }
     }
@@ -195,12 +199,12 @@ internal sealed class JobRunner : BackgroundService
         {
             await _scheduler.TickAsync(stoppingToken);
         }
-        catch (Exception ex) when (!stoppingToken.IsCancellationRequested) // spec 0013 SCH-3: the claim after it still runs
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex) // spec 0013 SCH-3: the claim after it still runs; never ends the host, stopping or not
         {
             _logger.JobScheduleTickFailed(ex);
-        }
-        catch (OperationCanceledException)
-        {
         }
     }
 

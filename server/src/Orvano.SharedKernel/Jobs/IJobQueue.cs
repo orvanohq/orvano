@@ -47,7 +47,9 @@ public sealed record EnqueueOptions
     public DateTimeOffset? RunAt { get; init; }
 
     /// <summary>
-    /// 1 to 200 characters. While a job with this key exists, in any status, another enqueue with it inserts nothing.
+    /// 1 to 200 characters. While a job with this key exists, in any status and of any kind, another enqueue with it
+    /// inserts nothing. The key is one space across every kind and the schedules' <c>&lt;name&gt;:&lt;time&gt;</c> keys, so
+    /// start it with your kind (<c>project.teardown:&lt;id&gt;</c>) or a dedupe hit may come from another module's job.
     /// Cleanup frees the key 7 days after the job succeeded or 30 days after it died.
     /// </summary>
     public string? DedupeKey { get; init; }

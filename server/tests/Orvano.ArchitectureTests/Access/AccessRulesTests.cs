@@ -8,6 +8,7 @@ using Orvano.Modules.Auth;
 using Orvano.SharedKernel;
 using Orvano.SharedKernel.Access;
 using Orvano.SharedKernel.Data;
+using Orvano.SharedKernel.Jobs;
 
 using Shouldly;
 
@@ -90,6 +91,22 @@ public sealed class AccessRulesTests
             .Distinct()];
 
         setters.ShouldBe(["Orvano.SharedKernel.Jobs.JobAccessScope"]);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:JQ-6"), Trait("Spec", "0013:CLM-7"), Trait("Spec", "0013:AC-28")]
+    public void Only_the_job_runner_calls_JobAccessScope_Establish_when_built()
+    {
+        MethodInfo establish = typeof(JobAccessScope).GetMethod(nameof(JobAccessScope.Establish))!;
+
+        string[] callers = [.. Server
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => TypeReferences.MethodsOf(type).Any(method => TypeReferences.CalledMethods(method).Contains(establish)))
+            .Select(Outermost)
+            .Select(type => type.FullName!)
+            .Distinct()];
+
+        callers.ShouldBe(["Orvano.Infrastructure.Jobs.JobExecutor"]);
     }
 
     [Fact]

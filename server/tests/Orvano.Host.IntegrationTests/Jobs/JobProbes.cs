@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +29,12 @@ internal static class ProbeMode
 
     /// <summary>Waits until its token cancels, then returns normally a moment later: a handler that finishes during shutdown.</summary>
     public const string FinishOnCancel = "finish-on-cancel";
+
+    /// <summary>
+    /// Registers a cancellation callback that throws, then waits for <see cref="JobProbes.Release"/> whatever its token
+    /// says: a handler whose own callback misbehaves.
+    /// </summary>
+    public const string ThrowOnCancel = "throw-on-cancel";
 
     /// <summary>Takes 30 ms, for the concurrency count.</summary>
     public const string Slow = "slow";
@@ -77,7 +84,33 @@ internal sealed record ProjectJob(string Mode, string Marker = "") : IJob, IProb
     public static string Kind => "test.project";
 }
 
+/// <summary>A <c>Timeout</c> of <see cref="TimeSpan.MaxValue"/>, past what a timer can hold: no deadline.</summary>
+internal sealed record UntimedJob(string Mode, string Marker = "") : IJob, IProbeJob
+{
+    public static string Kind => "test.untimed";
+
+    public static void Options(JobKindOptions options) => options.Timeout = TimeSpan.MaxValue;
+}
+
+/// <summary>A kind whose payload reader throws something other than a <see cref="JsonException"/>.</summary>
+internal sealed record UnreadableJob([property: JsonConverter(typeof(RefusingConverter))] string Mode, string Marker = "") : IJob, IProbeJob
+{
+    public static string Kind => "test.unreadable";
+}
+
+/// <summary>Writes a string, and refuses to read one back.</summary>
+internal sealed class RefusingConverter : JsonConverter<string>
+{
+    public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        throw new NotSupportedException("this reader refuses");
+
+    public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value);
+}
+
 [JsonSerializable(typeof(ProbeJob))]
+[JsonSerializable(typeof(UntimedJob))]
+[JsonSerializable(typeof(UnreadableJob))]
 [JsonSerializable(typeof(ShortJob))]
 [JsonSerializable(typeof(ProjectJob))]
 [JsonSerializable(typeof(LeaseJob))]
@@ -137,6 +170,10 @@ internal sealed class ProbeHandler<TJob>(JobProbes probes, ICallerContext caller
             projectError = ex.Message;
         }
 
+        // Registered before the handler counts as started, so a test that waits for the start finds it in place.
+        using CancellationTokenRegistration throwing = job.Mode == ProbeMode.ThrowOnCancel
+            ? cancellationToken.Register(() => throw new InvalidOperationException("callback boom"))
+            : default;
         probes.Runs.Enqueue(new ProbeRun(context.Kind, context.Id, context.Attempt, job.Mode, caller.Current.Kind, projectId, projectError));
         probes.Started.Enqueue(context.Id);
         probes.Enter();
@@ -163,6 +200,9 @@ internal sealed class ProbeHandler<TJob>(JobProbes probes, ICallerContext caller
 
                     break;
                 case ProbeMode.BlockIgnoringCancel:
+                    await probes.Release.Task;
+                    break;
+                case ProbeMode.ThrowOnCancel:
                     await probes.Release.Task;
                     break;
                 case ProbeMode.FinishOnCancel:
@@ -193,6 +233,8 @@ internal static class JobHosts
         services.AddJobHandler<ProbeJob, ProbeHandler<ProbeJob>>(ProbeJsonContext.Default.ProbeJob);
         services.AddJobHandler<ShortJob, ProbeHandler<ShortJob>>(ProbeJsonContext.Default.ShortJob, ShortJob.Options);
         services.AddJobHandler<LeaseJob, ProbeHandler<LeaseJob>>(ProbeJsonContext.Default.LeaseJob, LeaseJob.Options);
+        services.AddJobHandler<UntimedJob, ProbeHandler<UntimedJob>>(ProbeJsonContext.Default.UntimedJob, UntimedJob.Options);
+        services.AddJobHandler<UnreadableJob, ProbeHandler<UnreadableJob>>(ProbeJsonContext.Default.UnreadableJob);
         services.AddJobHandler<ProjectJob, ProbeHandler<ProjectJob>>(
             ProbeJsonContext.Default.ProjectJob, options => options.RequiresProject = true);
     }

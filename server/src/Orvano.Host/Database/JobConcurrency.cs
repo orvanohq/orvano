@@ -7,6 +7,8 @@ namespace Orvano.Host.Database;
 /// <summary>
 /// The half pool rule (spec 0013 JOP-2, spec 0007 JOB-4, PG-4): job handlers may use at most half the platform pool, so
 /// the other half stays free for requests. It lives here because the Host owns <see cref="DatabaseOptions"/> (CFG-5).
+/// Half is the typical case, not a hard ceiling: each handler's renewal or outcome write takes one more connection
+/// briefly, so with every handler holding one at once the jobs can use up to twice <c>Concurrency</c> plus one (JOP-4).
 /// </summary>
 internal sealed class JobConcurrency(IOptions<DatabaseOptions> database) : IPostConfigureOptions<JobOptions>, IValidateOptions<JobOptions>
 {

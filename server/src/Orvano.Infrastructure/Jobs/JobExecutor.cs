@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
-using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +28,21 @@ internal sealed class JobExecutor
 
     /// <summary>The bound of an outcome or release write, which never uses the stopping token (OUT-8).</summary>
     public static readonly TimeSpan WriteBound = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// The bound of one claim (both statements, retries included), so a stalled database cannot hold the wake loop, or the
+    /// shutdown behind it, past it (spec 0002 ASY-7). A claim it cuts off leaves any row it took to its lease (CLM-3).
+    /// </summary>
+    public static readonly TimeSpan ClaimBound = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// The longest delay a timer takes (about 49.7 days). A kind's <c>Timeout</c> above it sets no deadline: the timer
+    /// cannot express it, and no process is expected to outlive it.
+    /// </summary>
+    internal static readonly TimeSpan MaxTimerDelay = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+
+    /// <summary>The <c>kind</c> tag of a row whose kind is not registered, so the tag values stay those in code (JTL-1).</summary>
+    internal const string UnknownKindTag = "unknown";
 
     private const int MaxLastErrorLength = 2000;
 
@@ -138,7 +152,7 @@ internal sealed class JobExecutor
             {
                 foreach ((Guid id, string kind, int attempt) in dead)
                 {
-                    _telemetry.JobAttempted(kind, JobOutcome.Dead, null);
+                    _telemetry.JobAttempted(KindTag(kind), JobOutcome.Dead, null);
                     _logger.JobDead(kind, id, attempt, "lease expired on the last attempt", null);
                 }
 
@@ -184,7 +198,7 @@ internal sealed class JobExecutor
         foreach (ClaimedJob job in claimed)
         {
             _running[job.Id] = 0;
-            _telemetry.JobClaimed(job.Kind, job.ClaimedAt - job.RunAt);
+            _telemetry.JobClaimed(KindTag(job.Kind), job.ClaimedAt - job.RunAt);
         }
 
         return claimed;
@@ -197,36 +211,38 @@ internal sealed class JobExecutor
     /// </summary>
     public async Task<JobAttemptResult> RunAsync(ClaimedJob job, CancellationToken stopping)
     {
-        using Activity? activity = StartActivity(job);
-        JobRegistration? registration = _registry.Find(job.Kind);
-        string? refusal = null;
-        string? deadReason = null;
-        object? payload = null;
-        Exception? refusalError = null;
-        if (registration is null)
+        // The slot is freed here unless an Attempt took it over, so no exception can leak it (CLM-2).
+        bool slotHandedOver = false;
+        try
         {
-            refusal = "no handler registered for kind"; // OUT-2: a rollback to the older version can still drain these rows
-        }
-        else if (registration.Options.RequiresProject && job.ProjectId is null)
-        {
-            deadReason = "project id missing"; // OUT-4
-        }
-        else
-        {
-            try
+            using Activity? activity = StartActivity(job);
+            JobRegistration? registration = _registry.Find(job.Kind);
+            string? refusal = null;
+            string? deadReason = null;
+            object? payload = null;
+            Exception? refusalError = null;
+            if (registration is null)
             {
-                payload = registration.Deserialize(job.Payload);
+                refusal = "no handler registered for kind"; // OUT-2: a rollback to the older version can still drain these rows
             }
-            catch (JsonException ex)
+            else if (registration.Options.RequiresProject && job.ProjectId is null)
             {
-                refusal = "payload could not be read: " + ex.Message;
-                refusalError = ex;
+                deadReason = "project id missing"; // OUT-4
             }
-        }
+            else
+            {
+                try
+                {
+                    payload = registration.Deserialize(job.Payload);
+                }
+                catch (Exception ex) // spec 0013 OUT-2: a payload that does not read, however it fails, is a failed attempt
+                {
+                    refusal = "payload could not be read: " + ex.Message;
+                    refusalError = ex;
+                }
+            }
 
-        if (payload is null)
-        {
-            try
+            if (payload is null)
             {
                 string outcome = deadReason is not null
                     ? await DieAsync(job, deadReason, null)
@@ -234,14 +250,18 @@ internal sealed class JobExecutor
                 activity?.SetStatus(ActivityStatusCode.Error, deadReason ?? refusal);
                 return new JobAttemptResult(job.Kind, job.Id, outcome);
             }
-            finally
+
+            using var attempt = new Attempt(this, job, registration!, stopping);
+            slotHandedOver = true;
+            return await attempt.RunAsync(payload, activity);
+        }
+        finally
+        {
+            if (!slotHandedOver)
             {
                 FreeSlot(job.Id);
             }
         }
-
-        using var attempt = new Attempt(this, job, registration!, stopping);
-        return await attempt.RunAsync(payload, activity);
     }
 
     /// <summary>
@@ -261,6 +281,33 @@ internal sealed class JobExecutor
     internal static string LastError(Exception exception) => Cut($"{exception.GetType().Name}: {exception.Message}");
 
     private static string Cut(string text) => text.Length > MaxLastErrorLength ? text[..MaxLastErrorLength] : text;
+
+    /// <summary>
+    /// Cancels <paramref name="source"/> with its callbacks off this thread, and logs one that throws, so a handler's
+    /// callback can neither stall a timer thread nor end the process with an unhandled exception.
+    /// </summary>
+    private void CancelQuietly(CancellationTokenSource source, ClaimedJob job)
+    {
+        _ = CancelAsync();
+
+        async Task CancelAsync()
+        {
+            try
+            {
+                await source.CancelAsync();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The handler returned and its sources were disposed; nothing is left to cancel.
+            }
+            catch (Exception ex) // a cancellation callback the handler registered threw
+            {
+                _logger.JobCancelCallbackFailed(job.Kind, job.Id, ex);
+            }
+        }
+    }
+
+    private string KindTag(string kind) => _registry.Find(kind) is null ? UnknownKindTag : kind;
 
     private static Activity? StartActivity(ClaimedJob job)
     {
@@ -374,7 +421,8 @@ internal sealed class JobExecutor
     /// <summary>
     /// Runs one fenced outcome write in its own transaction under the execution strategy, bounded by
     /// <see cref="WriteBound"/> and never by the stopping token (OUT-7, OUT-8). A fence that matches no row means the lease
-    /// was lost; a write that fails is logged, and the lease recovers the job.
+    /// was lost; a write that fails is logged, counted in no outcome, and returned as <see cref="JobOutcome.WriteFailed"/>,
+    /// and the lease recovers the job.
     /// </summary>
     private async Task<string> WriteAsync(
         ClaimedJob job,
@@ -392,7 +440,7 @@ internal sealed class JobExecutor
             if (rows == 0)
             {
                 _logger.JobLeaseLost(job.Kind, job.Id, job.Attempt);
-                _telemetry.JobAttempted(job.Kind, JobOutcome.LeaseLost, duration);
+                _telemetry.JobAttempted(KindTag(job.Kind), JobOutcome.LeaseLost, duration);
                 return JobOutcome.LeaseLost;
             }
 
@@ -400,10 +448,12 @@ internal sealed class JobExecutor
         }
         catch (Exception ex) // spec 0013 OUT-7: any failed outcome write is logged; the lease recovers the job
         {
+            // The row is still running and the job will run again, so the intended outcome did not happen.
             _logger.JobOutcomeWriteFailed(job.Kind, job.Id, ex);
+            return JobOutcome.WriteFailed;
         }
 
-        _telemetry.JobAttempted(job.Kind, outcome, duration);
+        _telemetry.JobAttempted(KindTag(job.Kind), outcome, duration);
         return outcome;
     }
 
@@ -452,69 +502,78 @@ internal sealed class JobExecutor
         {
             TimeProvider time = _executor._time;
             long started = time.GetTimestamp();
-            _executor._logger.JobAttemptStarted(_job.Kind, _job.Id, _job.Attempt);
 
             // Disposed only once the handler returns: disposing a linked source unlinks it, and a handler still running
             // must keep seeing its cancellation.
-            var timeout = new CancellationTokenSource(_registration.Options.Timeout, time);
+            var timeout = new CancellationTokenSource();
             var handlerToken = CancellationTokenSource.CreateLinkedTokenSource(_stopping, _leaseLost.Token, timeout.Token);
-            using var abandon = CancellationTokenSource.CreateLinkedTokenSource(_leaseLost.Token, timeout.Token);
-            ITimer renewTimer = time.CreateTimer(_ => OnRenewTick(), null, RenewEvery, RenewEvery);
-
-            // The handler runs on its own task and never throws here: its exception is its result.
-            Task<Exception?> handler = Task.Run(() => InvokeAsync(payload, handlerToken.Token), CancellationToken.None);
-            Exception? error = null;
-            bool returned;
-            try
-            {
-                error = await handler.WaitAsync(abandon.Token);
-                returned = true;
-            }
-            catch (OperationCanceledException) when (abandon.IsCancellationRequested)
-            {
-                returned = handler.IsCompleted;
-                if (returned)
-                {
-                    error = await handler;
-                }
-            }
-
-            _handlerReturned = returned;
-            if (!returned)
-            {
-                // This code can resume inside the cancel that abandoned the handler, before the cancel reached the
-                // handler's own linked token, so cancel that token here too.
-                await handlerToken.CancelAsync();
-            }
-
-            // CLM-5: the renewal stops, and one in flight finishes, before the outcome is written, so a job that
-            // succeeded is never counted as a lost lease.
-            await renewTimer.DisposeAsync();
-            Task renewal;
-            lock (_renewLock)
-            {
-                renewal = _renewal;
-            }
-
-            await renewal;
-
-            TimeSpan duration = time.GetElapsedTime(started);
+            ITimer? timeoutTimer = null;
+            ITimer? renewTimer = null;
+            Task<Exception?>? handler = null;
             string outcome;
             try
             {
-                outcome = await OutcomeAsync(returned, error, timeout.IsCancellationRequested, duration);
+                _executor._logger.JobAttemptStarted(_job.Kind, _job.Id, _job.Attempt);
+                timeoutTimer = StartTimeout(timeout);
+                using var abandon = CancellationTokenSource.CreateLinkedTokenSource(_leaseLost.Token, timeout.Token);
+                renewTimer = time.CreateTimer(_ => OnRenewTick(), null, RenewEvery, RenewEvery);
+
+                // The handler runs on its own task and never throws here: its exception is its result.
+                handler = Task.Run(() => InvokeAsync(payload, handlerToken.Token), CancellationToken.None);
+                Exception? error = null;
+                bool returned;
+                try
+                {
+                    error = await handler.WaitAsync(abandon.Token);
+                    returned = true;
+                }
+                catch (OperationCanceledException) when (abandon.IsCancellationRequested)
+                {
+                    returned = handler.IsCompleted;
+                    if (returned)
+                    {
+                        error = await handler;
+                    }
+                }
+
+                _handlerReturned = returned;
+                if (!returned)
+                {
+                    // This code can resume inside the cancel that abandoned the handler, before the cancel reached the
+                    // handler's own linked token, so cancel that token here too.
+                    _executor.CancelQuietly(handlerToken, _job);
+                }
+
+                await StopRenewalAsync(renewTimer);
+                outcome = await OutcomeAsync(returned, error, timeout.IsCancellationRequested, time.GetElapsedTime(started));
+            }
+            catch (Exception ex) // spec 0013 OUT-2: a fault around the handler is a failed attempt, never a leaked slot
+            {
+                _handlerReturned = true;
+                if (handler is { IsCompleted: false })
+                {
+                    _executor.CancelQuietly(handlerToken, _job);
+                }
+
+                if (renewTimer is not null)
+                {
+                    await StopRenewalAsync(renewTimer);
+                }
+
+                outcome = await _executor.FailAsync(_job, LastError(ex), ex, time.GetElapsedTime(started));
             }
             finally
             {
-                if (returned)
+                if (handler is null || handler.IsCompleted)
                 {
                     _executor.FreeSlot(_job.Id);
+                    timeoutTimer?.Dispose();
                     handlerToken.Dispose();
                     timeout.Dispose();
                 }
                 else
                 {
-                    KeepSlotUntilReturn(handler, handlerToken, timeout);
+                    KeepSlotUntilReturn(handler, handlerToken, timeout, timeoutTimer);
                 }
             }
 
@@ -526,13 +585,41 @@ internal sealed class JobExecutor
             return new JobAttemptResult(_job.Kind, _job.Id, outcome);
         }
 
+        /// <summary>
+        /// CLM-7: the kind's <c>Timeout</c> on the injected clock, cancelling quietly. A timeout past
+        /// <see cref="MaxTimerDelay"/> sets no deadline, since a timer cannot hold it.
+        /// </summary>
+        private ITimer? StartTimeout(CancellationTokenSource timeout)
+        {
+            TimeSpan after = _registration.Options.Timeout;
+            return after > MaxTimerDelay
+                ? null
+                : _executor._time.CreateTimer(_ => _executor.CancelQuietly(timeout, _job), null, after, Timeout.InfiniteTimeSpan);
+        }
+
+        /// <summary>
+        /// CLM-5: the renewal stops, and one in flight finishes, before the outcome is written, so a job that succeeded is
+        /// never counted as a lost lease.
+        /// </summary>
+        private async Task StopRenewalAsync(ITimer renewTimer)
+        {
+            await renewTimer.DisposeAsync();
+            Task renewal;
+            lock (_renewLock)
+            {
+                renewal = _renewal;
+            }
+
+            await renewal;
+        }
+
         /// <summary>OUT-8: the cause of a cancellation is judged lease lost, then timed out, then shutdown, else the handler's own.</summary>
         private async Task<string> OutcomeAsync(bool returned, Exception? error, bool timedOut, TimeSpan duration)
         {
             if (_leaseLost.IsCancellationRequested)
             {
                 _executor._logger.JobLeaseLost(_job.Kind, _job.Id, _job.Attempt);
-                _executor._telemetry.JobAttempted(_job.Kind, JobOutcome.LeaseLost, duration);
+                _executor._telemetry.JobAttempted(_executor.KindTag(_job.Kind), JobOutcome.LeaseLost, duration);
                 return JobOutcome.LeaseLost;
             }
 
@@ -581,7 +668,8 @@ internal sealed class JobExecutor
         /// OUT-2: a timed out handler keeps its slot and its place in the running set until it returns, with a Warning
         /// each lease period it has not, and its late exception at Debug.
         /// </summary>
-        private void KeepSlotUntilReturn(Task<Exception?> handler, CancellationTokenSource handlerToken, CancellationTokenSource timeout)
+        private void KeepSlotUntilReturn(
+            Task<Exception?> handler, CancellationTokenSource handlerToken, CancellationTokenSource timeout, ITimer? timeoutTimer)
         {
             TimeProvider time = _executor._time;
             long abandoned = time.GetTimestamp();
@@ -602,6 +690,7 @@ internal sealed class JobExecutor
             {
                 Exception? late = await handler;
                 await reminder.DisposeAsync();
+                timeoutTimer?.Dispose();
                 handlerToken.Dispose();
                 timeout.Dispose();
                 if (late is not null && _executor._logger.IsEnabled(LogLevel.Debug))
@@ -621,6 +710,7 @@ internal sealed class JobExecutor
                 return;
             }
 
+            bool expired;
             lock (_renewLock)
             {
                 if (!_renewal.IsCompleted)
@@ -629,13 +719,17 @@ internal sealed class JobExecutor
                 }
 
                 // The clock passed the last lease this worker set without a renewal that succeeded.
-                if (_executor._time.GetUtcNow() >= _lockedUntil)
+                expired = _executor._time.GetUtcNow() >= _lockedUntil;
+                if (!expired)
                 {
-                    LoseLease();
-                    return;
+                    _renewal = RenewAsync();
                 }
+            }
 
-                _renewal = RenewAsync();
+            // Outside the lock: the handler's cancellation callbacks never run under it (LoseLease runs them off this thread).
+            if (expired)
+            {
+                LoseLease();
             }
         }
 
@@ -674,7 +768,7 @@ internal sealed class JobExecutor
         {
             if (!_handlerReturned)
             {
-                _leaseLost.Cancel();
+                _executor.CancelQuietly(_leaseLost, _job);
             }
         }
     }
@@ -704,4 +798,10 @@ internal static class JobOutcome
     public const string Dead = "dead";
     public const string Released = "released";
     public const string LeaseLost = "lease_lost";
+
+    /// <summary>
+    /// The outcome write failed (OUT-7): the row is still running and its lease recovers it. Not a metric tag; such an
+    /// attempt is counted in no outcome, and the shutdown counts no release for it.
+    /// </summary>
+    public const string WriteFailed = "write_failed";
 }

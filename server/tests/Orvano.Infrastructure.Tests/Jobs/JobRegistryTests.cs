@@ -80,6 +80,17 @@ public sealed class JobRegistryTests
                 "The job schedule test.schedule runs kind test.job, which has no registered handler (spec 0013 SCH-1).");
 
     [Fact]
+    [Trait("Spec", "0013:SCH-1"), Trait("Spec", "0013:SCH-6"), Trait("Spec", "0013:AC-24")]
+    public void Registry_names_a_schedule_whose_kind_requires_a_project() =>
+        Registry(services =>
+            {
+                services.AddJobHandler<TestJob, TestHandler>(TestJsonContext.Default.TestJob, options => options.RequiresProject = true);
+                services.AddJobSchedule("test.schedule", "* * * * *", new TestJob(""));
+            })
+            .Problems.ShouldHaveSingleItem().ShouldBe(
+                "The job schedule test.schedule runs kind test.job, which requires a project; schedules have none (spec 0013 SCH-6).");
+
+    [Fact]
     [Trait("Spec", "0013:SCH-1"), Trait("Spec", "0013:AC-24")]
     public void Registry_names_a_schedule_whose_payload_is_over_64_KiB()
     {
