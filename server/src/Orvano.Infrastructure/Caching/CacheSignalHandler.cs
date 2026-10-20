@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Caching.Hybrid;
-using Microsoft.Extensions.DependencyInjection;
 
 using Orvano.SharedKernel.Signals;
 
@@ -10,7 +9,7 @@ namespace Orvano.Infrastructure.Caching;
 /// whole cache through HybridCache's reserved tag (CAC-6).
 /// </summary>
 internal sealed class CacheSignalHandler(
-    [FromKeyedServices(SignalAwareHybridCache.InnerKey)] HybridCache cache,
+    HybridCache cache,
     InfrastructureTelemetry telemetry) : ISignalHandler
 {
     public SignalKind Kind => SignalKind.Cache;

@@ -50,6 +50,17 @@ public static class TransactionSignals
         BatchOf(context, requireTransaction: true).AddAfterCommit(action);
     }
 
+    /// <summary>
+    /// Adds an action that runs only after a confirmed commit, after the after commit actions, before <c>CommitAsync</c>
+    /// returns; never for a commit with an unknown outcome (SND-1, SND-3). Use it for what must not happen for a commit
+    /// that may not have gone through, such as counting a signal as sent. It must catch its own exceptions.
+    /// </summary>
+    public static void AddOnCommitted(DbContext context, Func<CancellationToken, ValueTask> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        BatchOf(context, requireTransaction: true).AddOnCommitted(action);
+    }
+
     /// <summary>The values of <paramref name="kind"/> enlisted so far in the current transaction, for an after commit action.</summary>
     public static IReadOnlyList<string> Enlisted(DbContext context, SignalKind kind) =>
         BatchOf(context, requireTransaction: false).ValuesOf(kind);
@@ -71,6 +82,14 @@ public static class TransactionSignals
             throw new InvalidOperationException("Signals join a transaction. Wrap the write in InTransactionAsync (spec 0013 SND-6).");
         }
 
-        return context.GetService<PendingSignals>();
+        PendingSignals batch = context.GetService<PendingSignals>();
+        if (requireTransaction && batch.Joined)
+        {
+            // SND-5: signals belong to the context that began the transaction, which is also the one that commits it.
+            throw new InvalidOperationException(
+                "This context joined another context's transaction with UseTransaction. Enlist on the context that began it (spec 0013 SND-5).");
+        }
+
+        return batch;
     }
 }

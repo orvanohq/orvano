@@ -33,6 +33,18 @@ public sealed class SignalAwareHybridCacheTests
     }
 
     [Fact]
+    [Trait("Spec", "0013:CAC-1"), Trait("Spec", "0013:AC-12")]
+    public void Undecorated_cache_is_keyed_by_an_object_a_module_cannot_name_when_resolved_by_any_string()
+    {
+        using ServiceProvider services = Build(connected: true);
+
+        SignalAwareHybridCache.InnerKey.ShouldNotBeOfType<string>();
+        services.GetKeyedService<HybridCache>("orvano:inner").ShouldBeNull();
+        services.GetKeyedService<HybridCache>(SignalAwareHybridCache.InnerKey.ToString()!).ShouldBeNull();
+        services.GetServices<HybridCache>().ShouldHaveSingleItem().ShouldBeOfType<SignalAwareHybridCache>();
+    }
+
+    [Fact]
     [Trait("Spec", "0013:CAC-2"), Trait("Spec", "0013:AC-8")]
     public async Task Reads_run_the_factory_every_time_and_store_nothing_when_disconnected()
     {

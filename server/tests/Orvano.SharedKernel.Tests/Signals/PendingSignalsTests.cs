@@ -39,16 +39,30 @@ public sealed class PendingSignalsTests
     }
 
     [Fact]
-    [Trait("Spec", "0013:SND-3")]
-    public void Clear_empties_the_values_and_the_after_commit_actions()
+    [Trait("Spec", "0013:SND-3"), Trait("Spec", "0013:SND-5")]
+    public void Clear_empties_the_values_both_kinds_of_action_and_the_joined_flag()
     {
         var batch = new PendingSignals();
         batch.Add(SignalKind.Cache, ["t"]);
         batch.AddAfterCommit(_ => ValueTask.CompletedTask);
+        batch.AddOnCommitted(_ => ValueTask.CompletedTask);
+        batch.Joined = true;
 
         batch.Clear();
 
         batch.IsEmpty.ShouldBeTrue();
         batch.Batches.ShouldBeEmpty();
+        batch.Joined.ShouldBeFalse();
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:SND-1")]
+    public void Batch_is_not_empty_when_it_holds_only_an_on_committed_action()
+    {
+        var batch = new PendingSignals();
+
+        batch.AddOnCommitted(_ => ValueTask.CompletedTask);
+
+        batch.IsEmpty.ShouldBeFalse();
     }
 }

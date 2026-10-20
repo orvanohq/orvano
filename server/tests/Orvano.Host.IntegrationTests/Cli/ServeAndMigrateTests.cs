@@ -172,6 +172,19 @@ public sealed class ServeAndMigrateTests(PostgresFixture postgres)
         result.Error.ShouldContain("ORVANO_SIGNALS__HEARTBEATTIMEOUT");
     }
 
+    [Fact, Trait("Spec", "0013:AC-11"), Trait("Spec", "0013:SOP-2")]
+    public async Task Serve_exits_1_naming_the_variable_when_the_handler_timeout_is_above_the_heartbeat_timeout()
+    {
+        OrvanoCli.Result result = await OrvanoCli.RunAsync(["serve"], ServeEnvironment(new()
+        {
+            ["ORVANO_SIGNALS__HANDLERTIMEOUT"] = "00:01:31",
+            ["ASPNETCORE_HTTP_PORTS"] = Ports.Free().ToString(CultureInfo.InvariantCulture),
+        }), TestContext.Current.CancellationToken);
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("ORVANO_SIGNALS__HANDLERTIMEOUT");
+    }
+
     [Fact, Trait("Spec", "0007:IMG-4")]
     public async Task Serve_boots_and_healthcheck_exits_0_when_the_database_is_ready()
     {

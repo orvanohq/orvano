@@ -12,12 +12,18 @@ namespace Orvano.Infrastructure.Caching;
 /// so a module never serves an entry another instance has invalidated. Removals always pass through.
 /// </summary>
 internal sealed class SignalAwareHybridCache(
-    [FromKeyedServices(SignalAwareHybridCache.InnerKey)] HybridCache inner,
+    HybridCache inner,
     ISignalConnectionState connection,
     IOptions<HybridCacheOptions> options) : HybridCache
 {
-    /// <summary>The key of the default <see cref="HybridCache"/> this decorates.</summary>
-    public const string InnerKey = "orvano:inner";
+    /// <summary>
+    /// The key of the default <see cref="HybridCache"/> this decorates (spec 0013 CAC-1). An object, not a string, so a
+    /// module cannot name it in <c>[FromKeyedServices]</c> and reach the cache without the bypass.
+    /// </summary>
+    internal static readonly object InnerKey = new();
+
+    /// <summary>The undecorated cache, for Infrastructure's own consumers: the invalidator, the cache handler, the listener.</summary>
+    internal static HybridCache Inner(IServiceProvider services) => services.GetRequiredKeyedService<HybridCache>(InnerKey);
 
     private const HybridCacheEntryFlags Bypass = HybridCacheEntryFlags.DisableLocalCacheRead | HybridCacheEntryFlags.DisableLocalCacheWrite;
 

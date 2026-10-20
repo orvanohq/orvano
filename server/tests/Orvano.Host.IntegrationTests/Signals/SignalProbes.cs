@@ -80,12 +80,15 @@ internal sealed class HangingCacheHandler(ConcurrentQueue<string> calls) : ISign
     }
 }
 
-/// <summary>Records the event id of every log entry the host writes, for checking that a log was written.</summary>
+/// <summary>Records the event id and text of every log entry the host writes, for checking that a log was written.</summary>
 internal sealed class RecordingLogs : ILoggerProvider
 {
-    private readonly ConcurrentQueue<(EventId Id, LogLevel Level)> _entries = new();
+    private readonly ConcurrentQueue<(EventId Id, LogLevel Level, string Message)> _entries = new();
 
     public int Count(int eventId, LogLevel level) => _entries.Count(e => e.Id.Id == eventId && e.Level == level);
+
+    /// <summary>The formatted text of each entry with <paramref name="eventId"/>, in the order written.</summary>
+    public IReadOnlyList<string> Messages(int eventId) => [.. _entries.Where(e => e.Id.Id == eventId).Select(e => e.Message)];
 
     public ILogger CreateLogger(string categoryName) => new Logger(_entries);
 
@@ -93,7 +96,7 @@ internal sealed class RecordingLogs : ILoggerProvider
     {
     }
 
-    private sealed class Logger(ConcurrentQueue<(EventId Id, LogLevel Level)> entries) : ILogger
+    private sealed class Logger(ConcurrentQueue<(EventId Id, LogLevel Level, string Message)> entries) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state)
             where TState : notnull => null;
@@ -101,7 +104,7 @@ internal sealed class RecordingLogs : ILoggerProvider
         public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
-            entries.Enqueue((eventId, logLevel));
+            entries.Enqueue((eventId, logLevel, formatter(state, exception)));
     }
 }
 

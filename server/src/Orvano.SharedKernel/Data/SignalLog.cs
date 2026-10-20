@@ -6,6 +6,6 @@ namespace Orvano.SharedKernel.Data;
 internal static partial class SignalLog
 {
     [LoggerMessage(EventId = LogEventIds.Host + 50, Level = LogLevel.Error,
-        Message = "An after commit action threw; the commit stands and the remaining actions still run")]
+        Message = "An action run after a commit threw; the commit stands and the remaining actions still run")]
     public static partial void AfterCommitActionFailed(this ILogger logger, Exception exception);
 }

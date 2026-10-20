@@ -286,6 +286,70 @@ public sealed class TransactionSignalTests(SampleDatabase db) : IClassFixture<Sa
     }
 
     [Fact]
+    [Trait("Spec", "0013:SND-1"), Trait("Spec", "0013:SND-3")]
+    public async Task On_committed_actions_run_after_the_after_commit_actions_on_a_confirmed_commit_and_never_on_a_rollback()
+    {
+        await using SampleContext context = db.CreateContext();
+        List<string> calls = [];
+
+        await context.InTransactionAsync(
+            _ =>
+            {
+                TransactionSignals.AddOnCommitted(context, _ => Record(calls, "committed"));
+                TransactionSignals.AddAfterCommit(context, _ => Record(calls, "after"));
+                return Task.CompletedTask;
+            },
+            Token);
+        await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using IDbContextTransaction transaction = await context.Database.BeginTransactionAsync(Token);
+            TransactionSignals.AddOnCommitted(context, _ => Record(calls, "rolled back committed"));
+            TransactionSignals.AddAfterCommit(context, _ => Record(calls, "rolled back after"));
+            await transaction.RollbackAsync(Token);
+        });
+
+        calls.ShouldBe(["after", "committed"]);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:SND-5"), Trait("Spec", "0013:AC-3")]
+    public async Task Enlist_throws_on_a_context_that_joined_the_transaction_and_the_context_that_began_it_still_sends()
+    {
+        await using SignalListenerProbe probe = await SignalListenerProbe.StartAsync(db.DataSource, Token);
+        await using SampleContext owner = db.CreateContext();
+        await using var joined = new OtherModuleContext(SampleContext.Options<OtherModuleContext>("other", db.DataSource, db.Clock));
+
+        await using (IDbContextTransaction transaction = await owner.Database.BeginTransactionAsync(Token))
+        {
+            joined.Database.SetDbConnection(owner.Database.GetDbConnection(), contextOwnsConnection: false);
+            await joined.Database.UseTransactionAsync(transaction.GetDbTransaction(), Token);
+
+            InvalidOperationException error = Should.Throw<InvalidOperationException>(
+                () => TransactionSignals.Enlist(joined, SignalKind.Cache, ["joined"]));
+            error.Message.ShouldContain("UseTransaction");
+            error.Message.ShouldContain("Enlist on the context that began it");
+            Should.Throw<InvalidOperationException>(() => TransactionSignals.AddAfterCommit(joined, _ => ValueTask.CompletedTask));
+            Should.Throw<InvalidOperationException>(() => TransactionSignals.AddOnCommitted(joined, _ => ValueTask.CompletedTask));
+
+            TransactionSignals.Enlist(owner, SignalKind.Cache, ["owner"]);
+            await transaction.CommitAsync(Token);
+        }
+
+        (await probe.TakeAsync(Token)).ShouldBe(["""{"v":1,"k":"cache","d":["owner"]}"""]);
+
+        // A transaction the context begins itself clears the joined flag.
+        await joined.Database.UseTransactionAsync(null, Token);
+        await joined.InTransactionAsync(
+            _ =>
+            {
+                TransactionSignals.Enlist(joined, SignalKind.Cache, ["own"]);
+                return Task.CompletedTask;
+            },
+            Token);
+        (await probe.TakeAsync(Token)).ShouldBe(["""{"v":1,"k":"cache","d":["own"]}"""]);
+    }
+
+    [Fact]
     [Trait("Spec", "0013:SND-6")]
     public async Task Retry_clears_the_change_tracker_before_the_second_attempt()
     {
@@ -308,6 +372,12 @@ public sealed class TransactionSignalTests(SampleDatabase db) : IClassFixture<Sa
             Token);
 
         (await context.Gadgets.CountAsync(x => x.ProjectId == projectId, Token)).ShouldBe(1);
+    }
+
+    private static ValueTask Record(List<string> calls, string name)
+    {
+        calls.Add(name);
+        return ValueTask.CompletedTask;
     }
 
     private sealed class PlainContext(DbContextOptions<PlainContext> options) : DbContext(options);

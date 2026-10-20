@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using Orvano.Infrastructure.Signals;
@@ -16,7 +15,7 @@ namespace Orvano.Infrastructure.Caching;
 /// </summary>
 internal sealed class CacheInvalidator(
     SignalBus bus,
-    [FromKeyedServices(SignalAwareHybridCache.InnerKey)] HybridCache cache,
+    HybridCache cache,
     InfrastructureTelemetry telemetry,
     ILogger<CacheInvalidator> logger) : ICacheInvalidator
 {
