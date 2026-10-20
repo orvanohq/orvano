@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Serialization;
 
 using Microsoft.Extensions.Configuration;
@@ -105,6 +106,47 @@ public sealed class JobRegistryTests
         registry.Schedules.Select(schedule => schedule.Name).ShouldBe(["jobs.cleanup", "test.alpha", "test.zulu"]);
     }
 
+    [Theory]
+    [Trait("Spec", "0013:SCH-5"), Trait("Spec", "0013:AC-24")]
+    [InlineData("2026-10-24T00:00:00Z")] // Europe leaves summer time on 25 October 2026
+    [InlineData("2026-10-31T00:00:00Z")] // the United States leaves it on 1 November 2026
+    [InlineData("2027-03-13T00:00:00Z")] // the United States enters it on 14 March 2027, skipping 02:30 local
+    [InlineData("2027-03-27T00:00:00Z")] // Europe enters it on 28 March 2027
+    public void A_daily_schedule_fires_at_the_same_UTC_time_every_24_hours_across_a_daylight_saving_change(string from)
+    {
+        ScheduledJob schedule = Schedule("30 2 * * *");
+        var at = DateTimeOffset.Parse(from, CultureInfo.InvariantCulture);
+        var fires = new List<DateTimeOffset>();
+
+        for (int day = 0; day < 4; day++)
+        {
+            at = JobRegistry.NextOccurrence(schedule.Cron, at)!.Value;
+            fires.Add(at);
+        }
+
+        fires.ShouldAllBe(fire => fire.Offset == TimeSpan.Zero && fire.Hour == 2 && fire.Minute == 30);
+        fires.Zip(fires.Skip(1), (earlier, later) => later - earlier).ShouldAllBe(gap => gap == TimeSpan.FromDays(1));
+    }
+
+    [Theory]
+    [Trait("Spec", "0013:SCH-5"), Trait("Spec", "0013:AC-24")]
+    [InlineData("2026-10-25T00:00:00Z")] // a local clock in Europe repeats an hour this day
+    [InlineData("2027-03-14T00:00:00Z")] // a local clock in the United States skips an hour this day
+    public void An_hourly_schedule_fires_24_times_an_hour_apart_on_a_day_a_local_clock_changes(string from)
+    {
+        ScheduledJob schedule = Schedule("0 * * * *");
+        var start = DateTimeOffset.Parse(from, CultureInfo.InvariantCulture);
+        var fires = new List<DateTimeOffset>();
+
+        for (DateTimeOffset at = start; JobRegistry.NextOccurrence(schedule.Cron, at) is { } next && next <= start.AddDays(1); at = next)
+        {
+            fires.Add(next);
+        }
+
+        fires.Count.ShouldBe(24);
+        fires.Zip(fires.Skip(1), (earlier, later) => later - earlier).ShouldAllBe(gap => gap == TimeSpan.FromHours(1));
+    }
+
     [Fact]
     [Trait("Spec", "0013:ENQ-3"), Trait("Spec", "0013:AC-17")]
     public void For_throws_naming_the_kind_when_no_handler_is_registered() =>
@@ -141,6 +183,17 @@ public sealed class JobRegistryTests
             .AddInfrastructure();
         configure(services);
         return services.BuildServiceProvider().GetRequiredService<JobRegistry>();
+    }
+
+    private static ScheduledJob Schedule(string cron)
+    {
+        JobRegistry registry = Registry(services =>
+        {
+            services.AddJobHandler<TestJob, TestHandler>(TestJsonContext.Default.TestJob);
+            services.AddJobSchedule("test.schedule", cron, new TestJob(""));
+        });
+        registry.Problems.ShouldBeEmpty();
+        return registry.FindSchedule("test.schedule").ShouldNotBeNull();
     }
 
     private static JobOptions Options(Dictionary<string, string?> settings)

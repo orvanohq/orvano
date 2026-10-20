@@ -223,6 +223,81 @@ public sealed class JobWorkerTests(PostgresFixture postgres) : IAsyncLifetime
     public void Default_concurrency_is_the_smallest_of_twice_the_processors_16_and_half_the_pool_and_at_least_1(int processors, int pool, int expected) =>
         JobConcurrency.Default(processors, pool).ShouldBe(expected);
 
+    [Theory]
+    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2")]
+    [InlineData(30, 15, true)]
+    [InlineData(30, 16, false)]
+    [InlineData(31, 15, true)]
+    [InlineData(31, 16, false)] // half of an odd pool rounds down
+    [InlineData(2, 1, true)]
+    [InlineData(1, 1, false)]
+    public void The_half_pool_rule_allows_concurrency_up_to_half_the_pool_and_names_both_variables_past_it(int pool, int concurrency, bool allowed)
+    {
+        var rule = new JobConcurrency(Options.Create(new DatabaseOptions { PoolSize = pool }));
+
+        ValidateOptionsResult result = rule.Validate(null, new JobOptions { Concurrency = concurrency });
+
+        result.Succeeded.ShouldBe(allowed);
+        if (!allowed)
+        {
+            result.FailureMessage.ShouldBe(
+                $"ORVANO_JOBS__CONCURRENCY ({concurrency}) must be at most half of ORVANO_DATABASE__POOLSIZE ({pool}) (spec 0007 JOB-4).");
+        }
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2")]
+    public void The_half_pool_rule_keeps_an_explicit_concurrency_and_fills_an_unset_one_with_a_default_that_passes()
+    {
+        var rule = new JobConcurrency(Options.Create(new DatabaseOptions { PoolSize = 1 }));
+        var explicitOptions = new JobOptions { Concurrency = 3 };
+        var unset = new JobOptions();
+
+        rule.PostConfigure(null, explicitOptions);
+        rule.PostConfigure(null, unset);
+
+        explicitOptions.Concurrency.ShouldBe(3);
+        unset.Concurrency.ShouldBe(1); // at least 1, even past half of a one connection pool
+        rule.Validate(null, new JobOptions()).Succeeded.ShouldBeTrue(); // unset is never refused
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-21"), Trait("Spec", "0013:OUT-6"), Trait("Spec", "0013:CLM-6")]
+    public async Task A_handler_still_running_past_the_shutdown_timeout_is_left_running_and_its_lease_recovers_it_with_attempt_2()
+    {
+        _settings["Jobs:PollInterval"] = "00:00:01";
+        var probes = new JobProbes();
+        OrvanoApiFactory worker = Host(probes, roles: "worker", configure: services =>
+            services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(1)));
+        Guid id = (await worker.Services.GetRequiredService<IJobQueue>().EnqueueAsync(new ProbeJob(ProbeMode.BlockIgnoringCancel), null, Token))!.Value;
+        await probes.StartedAsync(id, Token);
+        string workerId = worker.Services.GetRequiredService<OrvanoInstance>().WorkerId;
+
+        try
+        {
+            await worker.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15), Token); // the shutdown does not wait on the handler
+
+            JobRows.Row row = (await _rows.FindAsync(id, Token))!;
+            row.Status.ShouldBe("running");
+            row.Attempt.ShouldBe(1);
+            row.LockedBy.ShouldBe(workerId);
+
+            var clock = new ManualClock();
+            TimeSpan untilExpired = row.LockedUntil!.Value - clock.GetUtcNow() + TimeSpan.FromSeconds(1);
+            clock.Advance(untilExpired > TimeSpan.Zero ? untilExpired : TimeSpan.Zero);
+            OrvanoApiFactory other = Host(new JobProbes(), roles: "api", clock);
+
+            ClaimedJob claimed = (await other.Services.GetRequiredService<JobExecutor>().ClaimAsync(1, Token)).ShouldHaveSingleItem();
+            claimed.Id.ShouldBe(id);
+            claimed.Attempt.ShouldBe(2);
+            (await _rows.FindAsync(id, Token))!.LockedBy.ShouldBe(other.Services.GetRequiredService<OrvanoInstance>().WorkerId);
+        }
+        finally
+        {
+            probes.Release.TrySetResult(); // the first host's handler returns; its fenced write finds the row moved on
+        }
+    }
+
     private OrvanoApiFactory Host(
         JobProbes probes,
         string roles,
