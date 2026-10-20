@@ -222,6 +222,41 @@ public sealed class TransactionSignalTests(SampleDatabase db) : IClassFixture<Sa
     }
 
     [Fact]
+    [Trait("Spec", "0013:AC-2"), Trait("Spec", "0013:SND-1"), Trait("Spec", "0013:SND-2")]
+    public async Task Each_module_context_sends_its_own_batch_on_its_own_commit_when_two_are_used_in_one_request()
+    {
+        await using SignalListenerProbe probe = await SignalListenerProbe.StartAsync(db.DataSource, Token);
+        await using SampleContext first = db.CreateContext();
+        await using var second = new OtherModuleContext(SampleContext.Options<OtherModuleContext>("other", db.DataSource, db.Clock));
+        List<string> afterSecondCommit = [];
+        IReadOnlyList<string> firstStillHolds = [];
+
+        await first.InTransactionAsync(
+            async token =>
+            {
+                TransactionSignals.Enlist(first, SignalKind.Cache, ["first"]);
+                await second.InTransactionAsync(
+                    _ =>
+                    {
+                        TransactionSignals.Enlist(second, SignalKind.Cache, ["second"]);
+                        TransactionSignals.Enlist(second, SignalKind.Session, ["s"]);
+                        return Task.CompletedTask;
+                    },
+                    token);
+                afterSecondCommit = await probe.TakeAsync(token);
+                firstStillHolds = [.. TransactionSignals.Enlisted(first, SignalKind.Cache)];
+            },
+            Token);
+
+        afterSecondCommit.ShouldBe([
+            """{"v":1,"k":"cache","d":["second"]}""",
+            """{"v":1,"k":"session","d":["s"]}""",
+        ]);
+        firstStillHolds.ShouldBe(["first"]);
+        (await probe.TakeAsync(Token)).ShouldBe(["""{"v":1,"k":"cache","d":["first"]}"""]);
+    }
+
+    [Fact]
     [Trait("Spec", "0013:SND-6")]
     public async Task Retry_clears_the_change_tracker_before_the_second_attempt()
     {
@@ -247,4 +282,7 @@ public sealed class TransactionSignalTests(SampleDatabase db) : IClassFixture<Sa
     }
 
     private sealed class PlainContext(DbContextOptions<PlainContext> options) : DbContext(options);
+
+    // A second module's platform context, on its own schema and its own connection.
+    private sealed class OtherModuleContext(DbContextOptions<OtherModuleContext> options) : DbContext(options);
 }

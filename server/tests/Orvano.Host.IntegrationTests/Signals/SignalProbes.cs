@@ -50,7 +50,189 @@ internal sealed class SilentHeartbeat : IHeartbeatSender
 /// </summary>
 internal sealed class HangingHeartbeat : IHeartbeatSender
 {
-    public Task SendAsync(NpgsqlConnection connection, CancellationToken cancellationToken) => new TaskCompletionSource().Task;
+    private int _calls;
+
+    /// <summary>How many sends have started.</summary>
+    public int Calls => Volatile.Read(ref _calls);
+
+    public Task SendAsync(NpgsqlConnection connection, CancellationToken cancellationToken)
+    {
+        Interlocked.Increment(ref _calls);
+        return new TaskCompletionSource().Task;
+    }
+}
+
+/// <summary>
+/// A clock that moves only when the test calls <see cref="Advance"/>, so the listener's deadlines fire at a time the
+/// test chooses, not after a wall clock wait (spec 0013 LSN-3). Timers due at once fire on the thread pool.
+/// </summary>
+internal sealed class ManualClock : TimeProvider
+{
+    private readonly Lock _lock = new();
+    private readonly List<ManualTimer> _timers = [];
+    private DateTimeOffset _now = new(2026, 10, 19, 12, 0, 0, TimeSpan.Zero);
+
+    public override DateTimeOffset GetUtcNow()
+    {
+        lock (_lock)
+        {
+            return _now;
+        }
+    }
+
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+    {
+        var timer = new ManualTimer(this, callback, state);
+        timer.Change(dueTime, period);
+        return timer;
+    }
+
+    /// <summary>Moves the clock forward and fires every timer that is due by then, once.</summary>
+    public void Advance(TimeSpan by)
+    {
+        List<ManualTimer> due;
+        lock (_lock)
+        {
+            _now += by;
+            due = [.. _timers.Where(t => t.Due <= _now)];
+            foreach (ManualTimer timer in due)
+            {
+                if (timer.Period == Timeout.InfiniteTimeSpan)
+                {
+                    _timers.Remove(timer);
+                }
+                else
+                {
+                    timer.Due = _now + timer.Period;
+                }
+            }
+        }
+
+        foreach (ManualTimer timer in due)
+        {
+            timer.Fire();
+        }
+    }
+
+    private void Schedule(ManualTimer timer, TimeSpan dueTime, TimeSpan period)
+    {
+        lock (_lock)
+        {
+            _timers.Remove(timer);
+            if (dueTime == Timeout.InfiniteTimeSpan)
+            {
+                return;
+            }
+
+            timer.Due = _now + dueTime;
+            timer.Period = period;
+            if (dueTime > TimeSpan.Zero)
+            {
+                _timers.Add(timer);
+                return;
+            }
+
+            if (period != Timeout.InfiniteTimeSpan)
+            {
+                timer.Due = _now + period;
+                _timers.Add(timer);
+            }
+        }
+
+        ThreadPool.QueueUserWorkItem(_ => timer.Fire());
+    }
+
+    private void Cancel(ManualTimer timer)
+    {
+        lock (_lock)
+        {
+            _timers.Remove(timer);
+        }
+    }
+
+    private sealed class ManualTimer(ManualClock clock, TimerCallback callback, object? state) : ITimer
+    {
+        private volatile bool _disposed;
+
+        public DateTimeOffset Due { get; set; }
+
+        public TimeSpan Period { get; set; } = Timeout.InfiniteTimeSpan;
+
+        public bool Change(TimeSpan dueTime, TimeSpan period)
+        {
+            if (_disposed)
+            {
+                return false;
+            }
+
+            clock.Schedule(this, dueTime, period);
+            return true;
+        }
+
+        public void Fire()
+        {
+            if (!_disposed)
+            {
+                callback(state);
+            }
+        }
+
+        public void Dispose()
+        {
+            _disposed = true;
+            clock.Cancel(this);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            return ValueTask.CompletedTask;
+        }
+    }
+}
+
+/// <summary>A raw <c>LISTEN orvano_signal</c> connection that collects every payload except heartbeats.</summary>
+internal sealed class SignalTap : IAsyncDisposable
+{
+    private readonly NpgsqlConnection _connection;
+    private readonly List<string> _payloads = [];
+
+    private SignalTap(NpgsqlConnection connection)
+    {
+        _connection = connection;
+        _connection.Notification += (_, e) =>
+        {
+            if (!SignalPayload.TryDecode(e.Payload, out string kind, out IReadOnlyList<string> _) || kind != SignalPayload.HeartbeatKind)
+            {
+                _payloads.Add(e.Payload);
+            }
+        };
+    }
+
+    public static async Task<SignalTap> StartAsync(NpgsqlDataSource dataSource, CancellationToken cancellationToken)
+    {
+        NpgsqlConnection connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using (NpgsqlCommand command = new($"LISTEN {SignalPayload.Channel}", connection))
+        {
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        return new SignalTap(connection);
+    }
+
+    /// <summary>Reads until no notification arrives for <paramref name="quietMilliseconds"/>, then returns and forgets what it heard.</summary>
+    public async Task<List<string>> TakeAsync(CancellationToken cancellationToken, int quietMilliseconds = 300)
+    {
+        while (await _connection.WaitAsync(TimeSpan.FromMilliseconds(quietMilliseconds), cancellationToken))
+        {
+        }
+
+        List<string> heard = [.. _payloads];
+        _payloads.Clear();
+        return heard;
+    }
+
+    public ValueTask DisposeAsync() => _connection.DisposeAsync();
 }
 
 /// <summary>Raw access to a test database: the platform owner's connection, for NOTIFY and backend control.</summary>

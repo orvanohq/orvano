@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Net;
 
@@ -10,6 +9,7 @@ using Npgsql;
 
 using Orvano.Host.Database;
 using Orvano.Infrastructure;
+using Orvano.Infrastructure.Caching;
 using Orvano.Infrastructure.Signals;
 using Orvano.SharedKernel.Signals;
 using Orvano.Testing;
@@ -77,6 +77,7 @@ public sealed class SignalListenerTests(PostgresFixture postgres) : IAsyncLifeti
         await ReadAsync(a, () => ++calls);
         await ReadAsync(a, () => ++calls);
         calls.ShouldBe(before + 2); // bypassed: the factory runs every time
+        (await InnerReadAsync(a)).ShouldBe(1); // the bypassed reads neither read nor replaced the entry cached before the drop
         b.Services.GetRequiredService<ISignalConnectionState>().IsConnected.ShouldBeTrue();
         using (HttpClient client = a.CreateClient())
         {
@@ -113,6 +114,7 @@ public sealed class SignalListenerTests(PostgresFixture postgres) : IAsyncLifeti
         await ReadAsync(a, () => ++calls);
         await ReadAsync(a, () => ++calls);
         calls.ShouldBe(2);
+        (await InnerReadAsync(a)).ShouldBe(-1); // the bypassed reads stored nothing
 
         await _database.ExecuteAsync($"ALTER ROLE {_role} LOGIN", Token);
         await a.WaitUntilConnectedAsync(Token);
@@ -133,19 +135,37 @@ public sealed class SignalListenerTests(PostgresFixture postgres) : IAsyncLifeti
 
     [Fact]
     [Trait("Spec", "0013:AC-8"), Trait("Spec", "0013:LSN-3")]
-    public async Task A_heartbeat_send_that_never_returns_still_disconnects_within_the_timeout()
+    public async Task A_heartbeat_send_that_never_returns_disconnects_at_the_timeout_and_not_before_when_the_clock_reaches_it()
     {
+        // The deadline runs on a clock only the test moves, so the check is exact and never races the wall clock. The
+        // first send starts at connect and ignores cancellation, so only the bound on the send can end it.
         _settings["Signals:HeartbeatInterval"] = "00:00:01";
         _settings["Signals:HeartbeatTimeout"] = "00:00:02";
-        OrvanoApiFactory a = Host(listenAsRole: false, services => services.AddSingleton<IHeartbeatSender, HangingHeartbeat>());
+        var clock = new ManualClock();
+        var heartbeat = new HangingHeartbeat();
+        OrvanoApiFactory a = Host(listenAsRole: false, services =>
+        {
+            services.AddSingleton<TimeProvider>(clock);
+            services.AddSingleton<IHeartbeatSender>(heartbeat);
+        });
         RecordingObserver observer = Observer(a);
+        ISignalConnectionState state = a.Services.GetRequiredService<ISignalConnectionState>();
         await a.WaitUntilConnectedAsync(Token);
-        var elapsed = Stopwatch.StartNew();
+        await Eventually.TrueAsync(() => heartbeat.Calls == 1, TimeSpan.FromSeconds(5), "the first heartbeat send never started", Token);
 
-        // The first send starts at connect and hangs, so only the bound on the send can end it (Npgsql's own command
-        // timeout is 30 s). The listener reconnects at once, so the announced disconnect is what can be timed.
-        await Eventually.TrueAsync(() => observer.Count("disconnected") >= 1, TimeSpan.FromSeconds(10), "the hung heartbeat send was never timed out", Token);
-        elapsed.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(3)); // the 2 s timeout, plus scheduling slack
+        // One tick short of the deadline, and longer than the timeout on the wall clock, so a bound taken from the
+        // wrong clock would show here too.
+        clock.Advance(TimeSpan.FromSeconds(2) - TimeSpan.FromMilliseconds(1));
+        await Task.Delay(TimeSpan.FromSeconds(3), Token);
+        observer.Count("disconnected").ShouldBe(0);
+        state.IsConnected.ShouldBeTrue();
+
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+
+        await Eventually.TrueAsync(() => observer.Count("disconnected") == 1, TimeSpan.FromSeconds(10), "the hung heartbeat send was never timed out", Token);
+        await Eventually.TrueAsync(() => observer.Count("connected") == 2, TimeSpan.FromSeconds(10), "the listener did not reconnect", Token);
+        observer.Events.Take(2).ShouldBe(["connected", "disconnected"]); // a fallback poll may land before the reconnect
+        heartbeat.Calls.ShouldBe(2); // the new connection's send hangs again, and the clock has not moved since
     }
 
     [Fact]
@@ -160,6 +180,7 @@ public sealed class SignalListenerTests(PostgresFixture postgres) : IAsyncLifeti
         await a.WaitUntilConnectedAsync(Token);
 
         await Task.Delay(TimeSpan.FromSeconds(4), Token);
+        meters.Sum("orvano.infrastructure.signals.received").ShouldBe(0); // about four heartbeats arrived, none counted
         await _database.NotifyAsync("""{"v":1,"k":"session","d":["u1"]}""", Token);
         await Eventually.TrueAsync(() => meters.Sum("orvano.infrastructure.signals.received") == 1, TimeSpan.FromSeconds(5), "the signal was not counted", Token);
 
@@ -196,6 +217,14 @@ public sealed class SignalListenerTests(PostgresFixture postgres) : IAsyncLifeti
     private static async Task<int> ReadAsync(OrvanoApiFactory host, Func<int> factory) =>
         await host.Services.GetRequiredService<HybridCache>().GetOrCreateAsync(
             "listener:entry", _ => ValueTask.FromResult(factory()), cancellationToken: Token);
+
+    // Reads the entry straight from the local cache under the decorator, without storing: -1 when nothing is there.
+    private static async Task<int> InnerReadAsync(OrvanoApiFactory host) =>
+        await host.Services.GetRequiredKeyedService<HybridCache>(SignalAwareHybridCache.InnerKey).GetOrCreateAsync(
+            "listener:entry",
+            _ => ValueTask.FromResult(-1),
+            new HybridCacheEntryOptions { Flags = HybridCacheEntryFlags.DisableLocalCacheWrite | HybridCacheEntryFlags.DisableDistributedCache },
+            cancellationToken: Token);
 
     private static RecordingObserver Observer(OrvanoApiFactory host) =>
         host.Services.GetServices<ISignalConnectionObserver>().OfType<RecordingObserver>().Single();
