@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-15
 **Status**: Accepted
-**Updated**: 2026-10-16, PRF-1 allows ReadyToRun (spec 0007); VAL-1 requires `AddValidation()` in each module. 2026-10-18, LAY-3, DAT-1, and DAT-9 point to the built conventions of spec 0011 (`UseOrvanoConventions`, `IVersioned`). 2026-10-18, PRF-2 lists end user labels and resource grants as security related entries (spec 0012).
+**Updated**: 2026-10-16, PRF-1 allows ReadyToRun (spec 0007); VAL-1 requires `AddValidation()` in each module. 2026-10-18, LAY-3, DAT-1, and DAT-9 point to the built conventions of spec 0011 (`UseOrvanoConventions`, `IVersioned`). 2026-10-18, PRF-2 lists end user labels and resource grants as security related entries (spec 0012). 2026-10-20, DAT-6 allows one spliced identifier, a registered outbox schema (spec 0013 DSP-8).
 
 ## Summary
 
@@ -138,7 +138,7 @@ Decided elsewhere, not here (this spec points to them and must not be read as de
 - **DAT-3 (MUST)**: Handlers use their module's `DbContext` directly. No generic repository. Reused queries are `IQueryable<T>` extension methods inside the module.
 - **DAT-4 (MUST)**: Reads project straight to response records with `Select`, or use `AsNoTracking()`. No lazy loading. Load related data on purpose (`Include` or projection), and watch for N+1 queries in review.
 - **DAT-5 (MUST)**: Every list query is bounded (`Take`), with pagination per feature 10 (keyset preferred).
-- **DAT-6 (MUST)**: SQL is always parameterized. Raw SQL uses `FromSql` or `ExecuteSql` with interpolation (which parameterizes). `FromSqlRaw` or `ExecuteSqlRaw` with built strings is banned (EF1002 as error).
+- **DAT-6 (MUST)**: SQL is always parameterized. Raw SQL uses `FromSql` or `ExecuteSql` with interpolation (which parameterizes). `FromSqlRaw` or `ExecuteSqlRaw` with built strings is banned (EF1002 as error). The one exception is an identifier, never a value: the outbox dispatcher and cleanup name each module's `outbox` table from a schema registered in code and pattern checked, quoted, through `FormattableStringFactory`, with a `// Deviation DAT-6` comment (spec 0013 DSP-8).
 - **DAT-7 (MUST)**: Bulk changes use `ExecuteUpdateAsync` or `ExecuteDeleteAsync`, not load, change, save loops. These bypass change tracking and the DAT-9 `xmin` check, so never use them on a single row a caller is editing concurrently.
 - **DAT-8 (MUST)**: One `SaveChangesAsync` is one transaction. Several saves that must succeed together go in `BeginTransactionAsync` inside `CreateExecutionStrategy().ExecuteAsync(...)`, because connection resiliency (`EnableRetryOnFailure`) is on.
 - **DAT-9 (SHOULD)**: Entities edited by more than one caller use optimistic concurrency on PostgreSQL's `xmin` (the entity implements `IVersioned` from `Orvano.SharedKernel`, whose `uint Version` the convention plugin maps to `xmin`, so no real column and no `[Timestamp]` attribute; spec 0011 COL-1 makes this required for every editable platform entity). A conflict returns a `Conflict` error.

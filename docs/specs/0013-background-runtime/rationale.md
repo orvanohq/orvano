@@ -223,3 +223,105 @@ The fresh model review of the built job queue ([report](../../reviews/2026-10-20
 - **Recorded from #56**: the rules now state what the review fixes built: a `Timeout` above the timer limit means no deadline (JQ-5, OUT-2), any early exception is a failed attempt and frees the slot (OUT-2), the 10 second claim bound (OUT-6), `write_failed` counted in no outcome (OUT-7), the `unknown` kind tag (JTL-1), the `+ 120` cancel callback log (JTL-2), the `RequiresProject` schedule refusal (SCH-1, AC-24), and the `JobAccessScope.Establish` caller test (JTS-4).
 
 Spec 0007 JOB-1 (the dedupe index and `ON CONFLICT`), JOB-4 (half the pool less one), and its configuration lines were updated in the same change.
+
+## Milestone 3: module outbox (2026-10-20)
+
+### Context
+
+Spec 0007 EVT-1 to EVT-4 settled the outbox's behavior: a `<module>.outbox` table per module through one shared EF configuration, versioned event records in the publisher's `Contracts/`, `IEventHandler<TEvent>` subscribers, a worker role dispatcher woken by the `job` signal and the poll that claims 100 rows at a time with `SKIP LOCKED`, enqueues one job per subscriber with `dedupe_key = '<event id>:<subscriber>'`, and marks the rows in one transaction, at least once delivery with no ordering, and a 7 day cleanup. Spec 0002 LAY-4 says the event is written in the same `SaveChanges` as the change. Milestone 2 left two hooks: `WorkerWake` (WAK-5), so a second worker loop shares the runner's wakes, and ENQ-1 on any platform context.
+
+What was still open, and what `/develop` would otherwise have invented: how the event joins the caller's transaction, what a subscriber's job looks like so the job queue's registry and dedupe accept it (the dedupe key is now scoped per kind and project, JDB-2), how the dispatcher names each module's table in SQL when Infrastructure cannot reference module code and DAT-6 bans raw SQL, what the dispatcher's loop costs the pool under JOP-2's half pool rule, how the cleanup finds old rows without a second index, and how tests drive it all.
+
+### Options considered (how an event joins the caller's transaction)
+
+#### Option O1: Add a tracked `OutboxEvent` to the caller's context, saved by the caller's `SaveChanges` (chosen)
+
+`Publish` adds the entity and enlists `job`; the caller's `SaveChangesAsync` inserts it with the change; a before commit check refuses a commit with the event still unsaved.
+
+- Pros: exactly spec 0007 EVT-1 and LAY-4's "same `SaveChanges`"; one round trip with the change (EF batches the insert); no SQL text naming the module's table at publish time; the module's own EF model creates and describes the table; retries need nothing new (SND-6 clears the tracker and reruns `work`).
+- Cons: an event can be added and never saved, so a before commit check (PUB-3) is needed to turn a silent loss into a failed commit; `Publish` cannot report a dedupe or write failure (there is none to report: events have no dedupe).
+
+#### Option O2: SQL insert on the caller's connection at call time, like ENQ-1
+
+- Pros: the same shape as `IJobQueue`; no unsaved state to guard.
+- Cons: needs the module's table name spliced into SQL at every publish (DAT-6), one round trip per event, and contradicts EVT-1's "same `SaveChanges`" wording for no gain.
+
+#### Option O3: No outbox; `Publish` enqueues one job per subscriber directly in the caller's transaction
+
+- Pros: no table, no dispatcher, no extra loop connection; delivery starts one step sooner.
+- Cons: the request pays one insert per subscriber; there is no event stream for EVT-4's readers (realtime, webhooks, replay); it reverses spec 0007's decision.
+
+### Options considered (what a subscriber's delivery job is)
+
+#### Option S1: One job kind per subscriber, the event copied into the job (chosen)
+
+- Pros: per subscriber lease, attempts, and timeout (`JobKindOptions`), per subscriber metrics and dead jobs for free; the dedupe key `<event id>:<subscriber>` under JDB-2's `(kind, project_id, dedupe_key)` scope is unique per event and subscriber; the job never reads the outbox row, so it survives the 7 day cleanup and a dead delivery can be retried later (feature 46).
+- Cons: the event is stored once per subscriber until cleanup; renaming a subscriber is a new subscriber.
+
+#### Option S2: One kind `outbox.deliver` with the subscriber in the payload
+
+- Pros: one registration.
+- Cons: one lease, attempt count, and timeout for every subscriber; metrics and dead jobs cannot tell subscribers apart.
+
+#### Option S3: The job holds only the event id and reads the outbox row
+
+- Pros: no copy.
+- Cons: a retry after the cleanup finds nothing; the handler reads another module's schema through Infrastructure, and the cleanup must wait for every delivery.
+
+### Options considered (the dispatcher's pool connection)
+
+#### Option P1: Count it, and lower JOP-2's limit by one (chosen)
+
+- Pros: the same plain arithmetic as JOP-4 (each loop holds one connection, serially); the two loops never wait on each other.
+- Cons: one fewer job slot per worker at the default pool (13, not 14), and a pool of 4 or 5 no longer starts; spec 0007 JOB-4 is amended a second time.
+
+#### Option P2: A shared gate so both loops together use one connection
+
+- Pros: JOP-2's numbers stay.
+- Cons: a dispatch batch (up to 10 s) delays a claim, and the claim's own bound then counts waiting time; a new coordination class for one connection.
+
+#### Option P3: Run the dispatch inside the runner's loop
+
+- Pros: no new loop, no new connection.
+- Cons: WAK-5 was built so this is a separate loop; a slow outbox would delay every claim, and the runner gains a second job.
+
+### Options considered (naming each outbox table in SQL)
+
+#### Option I1: One pattern checked identifier spliced through `FormattableStringFactory` (chosen)
+
+- Pros: every value stays a parameter; the schema comes only from `AddOutbox`, checked against `^[a-z][a-z0-9_]{1,30}$` and quoted; one helper, one deviation comment per call site.
+- Cons: a narrow deviation from DAT-6, amended there so reviewers find it.
+
+#### Option I2: A PL/pgSQL function in the `jobs` schema that builds the SQL with `format('%I')`
+
+- Pros: no splicing in C#.
+- Cons: a stored function in a migration, owned by `jobs` but reading every module's schema; harder to test and to change.
+
+#### Option I3: A per schema `DbContext` and LINQ
+
+- Pros: no SQL text.
+- Cons: EF has no `FOR UPDATE SKIP LOCKED`, so the claim still needs SQL with the table name.
+
+### Rationale
+
+O1 follows the settled wording (EVT-1, LAY-4) and needs the least new SQL; its one weakness, an event added but not saved, becomes a loud failed commit through a small, general hook (`AddBeforeCommit`). S1 is what makes the job queue's existing machinery (per kind options, dedupe scope, metrics, dead jobs, feature 46's retry) apply to subscribers unchanged, and copying the event keeps deliveries independent of the cleanup. P1 keeps the pool arithmetic honest at the cost of one slot. I1 is the smallest safe way to name a table Infrastructure does not own.
+
+### Calls made while writing (recommend items, milestone 3)
+
+The engineer was not in this run (another session started it), so each pick is the recommendation and is overridable.
+
+- **Publish signature**: `Guid Publish<TEvent>(DbContext, TEvent, Guid? projectId)`, synchronous, with a required project argument so every caller decides; the project becomes the delivery's project and scope. Runner up: an options record like `EnqueueOptions` (nothing else to put in it yet).
+- **Event type pattern**: `<schema>.<name segments>.v<n>`, first segment the publishing schema, checked at registration and at publish. Runner up: any JQ-1 name (loses the "own events only" check).
+- **Registration**: `AddOutbox(schema, builder => builder.Event<T>(jsonTypeInfo))` registers the schema and its events together; `IOutboxRegistry` is the read side. Spec 0007 EVT-1's "registers its schema with `IOutboxRegistry`" is reworded to match (DI cannot hand out a service during registration).
+- **Subscriber options**: `AddEventHandler` takes `JobKindOptions` like `AddJobHandler`, and refuses `RequiresProject` so an instance wide event cannot die unrun.
+- **Payload limit**: 64,000 bytes per event, so the delivery envelope fits ENQ-3's 65,536.
+- **Batch and bound**: 100 rows (EVT-3) and a 10 second bound per batch, the same number as `ClaimBound`; a cut batch rolls back whole, so the bound costs only time.
+- **Rounds**: one batch per outbox per round, more rounds while any batch was full, so one busy module cannot starve the others.
+- **Unknown types**: marked dispatched with a Warning instead of left pending, so a removed type cannot block its outbox's partial index forever. Runner up: leave them pending (they would be claimed and skipped on every pass).
+- **Wake signal**: reuse `job` (EVT-3) and accept one empty pass per dispatch. Runner up: a new `outbox` signal kind (changes BUS-1 and the listener).
+- **Cleanup by primary key**: `id < Floor(now − 7 days)` with `dispatched_at IS NOT NULL`, so no index on `dispatched_at`; retention is measured from `occurred_at`, which differs from "7 days after dispatch" only by the dispatch delay. Runner up: an index on `dispatched_at` (one more index write per dispatch).
+- **Cleanup schedule**: `37 3 * * *`, 20 minutes after `jobs.cleanup`, `MaxAttempts` 3, like SCH-7.
+- **`trace_parent` column**: added to EVT-1's list so a subscriber's trace links to the publishing request (JTL-3's pattern).
+- **Test outbox**: a `sample` schema context in `Orvano.Testing`, because no module owns an outbox yet.
+
+Spec 0007 EVT-1 to EVT-3 and JOB-4 (half the pool less two), its configuration lines, and spec 0002 DAT-6 (the identifier deviation) were updated in the same change.
