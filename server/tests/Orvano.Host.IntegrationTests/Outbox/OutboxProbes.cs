@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Data.Common;
 using System.Diagnostics;
 
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
