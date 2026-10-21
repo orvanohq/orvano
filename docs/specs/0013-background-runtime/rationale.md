@@ -341,3 +341,5 @@ A read only pass on another model checked commit 049d35e against spec 0007 EVT-1
 - **Notes (C)**: `\z` in the patterns; a rerun publish after an unknown commit makes a second event id (DLV-6); per outbox try and catch in the cleanup (OCL-1); database row order and the `SqlQuery` wrap (DSP-3, DSP-8); the source scan's false positives accepted (OGR-2); the future DAT-2a exemption (OTB-1); AC-31's contract test and AC-35's startup hook entries (steps 24, 25).
 
 Left open for the engineer (Follow-up): a batch that always fails or always outruns `BatchBound` holds its outbox's head. Options are halving the batch after a failure (lean), one multi row insert per batch, or accepting it.
+
+Settled the same day by the engineer, who approved milestone 3: option (a). Halving per outbox shrinks a failing batch until its one bad row stands alone, so the rows before it get dispatched and the fix costs no new statement shape; the sizes are in memory per worker, since a restart losing them only means starting at 100 again. A multi row insert stays an open performance follow up, independent of this.
