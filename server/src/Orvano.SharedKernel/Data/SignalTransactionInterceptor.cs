@@ -21,6 +21,10 @@ internal sealed class SignalTransactionInterceptor(PendingSignals batch, Lazy<IL
     // Set when a synchronous commit was refused, so the failure EF reports for it keeps the batch for CommitAsync.
     private bool _refusedCommit;
 
+    // Set while the checks and notifies run, before the COMMIT statement: a failure EF reports as the commit's while it
+    // is set left the transaction uncommitted, so the outcome is known and the after commit actions must not run.
+    private bool _beforeCommitStatement;
+
     public override DbTransaction TransactionStarted(DbConnection connection, TransactionEndEventData eventData, DbTransaction result)
     {
         Reset();
@@ -68,6 +72,8 @@ internal sealed class SignalTransactionInterceptor(PendingSignals batch, Lazy<IL
         DbConnection connection = transaction.Connection
             ?? throw new InvalidOperationException("The transaction has no connection to send its signals on.");
 
+        _beforeCommitStatement = true;
+
         // PUB-3: before any pg_notify, so a check that fails the commit sends nothing.
         batch.RunBeforeCommit();
 
@@ -84,6 +90,8 @@ internal sealed class SignalTransactionInterceptor(PendingSignals batch, Lazy<IL
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        // EF sends the COMMIT next; from here a failure's outcome is unknown.
+        _beforeCommitStatement = false;
         return result;
     }
 
@@ -128,8 +136,10 @@ internal sealed class SignalTransactionInterceptor(PendingSignals batch, Lazy<IL
         }
 
         // A failed commit has an unknown outcome, and a local removal is always safe; the on committed actions never run
-        // here (SND-3).
-        if (eventData.Action == "Commit")
+        // here (SND-3). A check or notify that failed before the COMMIT statement left nothing committed (SND-2, PUB-3).
+        bool beforeCommitStatement = _beforeCommitStatement;
+        _beforeCommitStatement = false;
+        if (eventData.Action == "Commit" && !beforeCommitStatement)
         {
             await batch.RunAfterCommitAsync(logger, CancellationToken.None);
         }
@@ -140,6 +150,7 @@ internal sealed class SignalTransactionInterceptor(PendingSignals batch, Lazy<IL
     private void Reset()
     {
         _refusedCommit = false;
+        _beforeCommitStatement = false;
         batch.Clear();
     }
 }

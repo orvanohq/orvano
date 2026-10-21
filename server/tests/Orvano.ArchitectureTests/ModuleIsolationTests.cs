@@ -107,12 +107,20 @@ public sealed partial class ModuleIsolationTests
             string underscored = Path.Combine(folder, "Underscored.cs");
             string usings = Path.Combine(folder, "Usings.cs");
             string publish = Path.Combine(folder, "Publish.cs");
+            string raw = Path.Combine(folder, "Raw.cs");
+            string verbatim = Path.Combine(folder, "Verbatim.cs");
+            string member = Path.Combine(folder, "Member.cs");
+            string comment = Path.Combine(folder, "Comment.cs");
             File.WriteAllText(table, """var sql = "DELETE FROM auth.outbox";""");
             File.WriteAllText(underscored, """var sql = "SELECT 1 FROM platform_admin.outbox WHERE true";""");
             File.WriteAllText(usings, "using Orvano.SharedKernel.Outbox;");
             File.WriteAllText(publish, "outbox.Publish(db, new UserCreatedV1(id), projectId: null);");
+            File.WriteAllText(raw, "var sql = $\"\"\"\"\n    UPDATE auth.outbox SET x = {\"\"\"a\"\"\"}\n    \"\"\"\";");
+            File.WriteAllText(verbatim, "var sql = @\"SELECT \"\"x\"\" FROM\n auth.outbox\";");
+            File.WriteAllText(member, "var name = '\"'; bool held = handler.outbox is not null; /* auth.outbox */ string s = \"\\\"\";");
+            File.WriteAllText(comment, "// Publishes into auth.outbox through IOutbox, never raw SQL.\nvar x = 1; // auth.outbox\n");
 
-            OutboxSqlIn([table, underscored, usings, publish]).ShouldBe([table, underscored]);
+            OutboxSqlIn([table, underscored, usings, publish, raw, verbatim, member, comment]).ShouldBe([table, underscored, raw, verbatim]);
         }
         finally
         {
@@ -176,11 +184,73 @@ public sealed partial class ModuleIsolationTests
         });
 
     /// <summary>
-    /// OGR-2: the files among <paramref name="files"/> that name a schema's outbox table in raw SQL, case sensitive, so
-    /// the namespace <c>Orvano.SharedKernel.Outbox</c> and calls such as <c>outbox.Publish(</c> do not match.
+    /// OGR-2: the files among <paramref name="files"/> that name a schema's outbox table in a string literal, case
+    /// sensitive, so the namespace <c>Orvano.SharedKernel.Outbox</c>, calls such as <c>outbox.Publish(</c>, a member
+    /// such as <c>handler.outbox</c>, and comments do not match.
     /// </summary>
     private static IEnumerable<string> OutboxSqlIn(IEnumerable<string> files) =>
-        files.Where(file => OutboxTable().IsMatch(File.ReadAllText(file)));
+        files.Where(file => StringLiterals(File.ReadAllText(file)).Any(literal => OutboxTable().IsMatch(literal)));
+
+    /// <summary>
+    /// The text of each string literal in C# <paramref name="source"/>: regular, verbatim, and raw (an interpolated
+    /// one with its holes), skipping comments and character literals. Enough for a scan, not a full lexer.
+    /// </summary>
+    private static IEnumerable<string> StringLiterals(string source)
+    {
+        int i = 0;
+        while (i < source.Length)
+        {
+            char c = source[i];
+            char next = i + 1 < source.Length ? source[i + 1] : '\0';
+            if (c == '/' && next == '/')
+            {
+                i = EndOrLength(source.IndexOf('\n', i));
+            }
+            else if (c == '/' && next == '*')
+            {
+                i = EndOrLength(source.IndexOf("*/", i + 2, StringComparison.Ordinal), 2);
+            }
+            else if (c == '\'')
+            {
+                // A character literal, which may be '"' or an escape such as '\''.
+                i = EndOrLength(source.IndexOf('\'', next == '\\' ? i + 3 : i + 2), 1);
+            }
+            else if (c == '"')
+            {
+                bool verbatim = i > 0 && (source[i - 1] == '@' || (source[i - 1] == '$' && i > 1 && source[i - 2] == '@'));
+                int quotes = 0;
+                while (!verbatim && i + quotes < source.Length && source[i + quotes] == '"')
+                {
+                    quotes++;
+                }
+
+                if (quotes >= 3)
+                {
+                    // A raw literal ends at the same run of quotes.
+                    int close = EndOrLength(source.IndexOf(new string('"', quotes), i + quotes, StringComparison.Ordinal));
+                    yield return source[(i + quotes)..close];
+                    i = Math.Min(close + quotes, source.Length);
+                    continue;
+                }
+
+                int first = ++i;
+                while (i < source.Length && !(source[i] == '"' && !(verbatim && i + 1 < source.Length && source[i + 1] == '"')))
+                {
+                    // A verbatim literal escapes a quote by doubling it, a regular one with a backslash.
+                    i += (verbatim && source[i] == '"') || (!verbatim && source[i] == '\\') ? 2 : 1;
+                }
+
+                yield return source[first..Math.Min(i, source.Length)];
+                i++;
+            }
+            else
+            {
+                i++;
+            }
+        }
+
+        int EndOrLength(int index, int past = 0) => index < 0 ? source.Length : index + past;
+    }
 
     [GeneratedRegex(@"\b[a-z][a-z0-9_]*\.outbox\b", RegexOptions.CultureInvariant)]
     private static partial Regex OutboxTable();

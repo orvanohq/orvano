@@ -96,7 +96,7 @@ internal static partial class InfrastructureLog
     public static partial void JobAttemptSucceeded(this ILogger logger, string kind, Guid id, int attempt);
 
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 104, Level = LogLevel.Warning,
-        Message = "Job {Kind} {Id} attempt {Attempt} of {MaxAttempts} failed; it runs again at {NextRunAt}")]
+        Message = "Job {Kind} {Id} attempt {Attempt} of {MaxAttempts} failed; it runs again at {NextRunAt:O}")]
     public static partial void JobAttemptFailed(
         this ILogger logger, string kind, Guid id, int attempt, int maxAttempts, DateTimeOffset nextRunAt, Exception? exception);
 
@@ -137,7 +137,7 @@ internal static partial class InfrastructureLog
     public static partial void JobScheduleSyncFailed(this ILogger logger, Exception exception);
 
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 114, Level = LogLevel.Debug,
-        Message = "Job schedule {Name} fired for {FireTime}")]
+        Message = "Job schedule {Name} fired for {FireTime:O}")]
     public static partial void JobScheduleFired(this ILogger logger, string name, DateTimeOffset fireTime);
 
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 115, Level = LogLevel.Error,
@@ -153,7 +153,7 @@ internal static partial class InfrastructureLog
     public static partial void JobScheduleNeverFires(this ILogger logger, string name);
 
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 118, Level = LogLevel.Debug,
-        Message = "Enqueued job {Kind} {Id} due at {RunAt} with dedupe key {DedupeKey}: {Payload}")]
+        Message = "Enqueued job {Kind} {Id} due at {RunAt:O} with dedupe key {DedupeKey}: {Payload}")]
     public static partial void JobEnqueued(this ILogger logger, string kind, Guid id, DateTimeOffset runAt, string? dedupeKey, string payload);
 
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 119, Level = LogLevel.Warning,
@@ -179,7 +179,7 @@ internal static partial class InfrastructureLog
 
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 202, Level = LogLevel.Error,
         Message = "Dispatching the {Outbox} outbox failed; nothing was enqueued or marked, and the next wake tries again")]
-    public static partial void OutboxBatchFailed(this ILogger logger, string outbox, Exception exception);
+    public static partial void OutboxBatchFailed(this ILogger logger, string outbox, Exception? exception);
 
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 203, Level = LogLevel.Warning,
         Message = "The {Outbox} outbox holds an event of type {Type}, which no outbox registers; it was marked dispatched with no deliveries")]

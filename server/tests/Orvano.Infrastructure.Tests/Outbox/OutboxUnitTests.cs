@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json.Serialization;
 
 using Microsoft.Extensions.Configuration;
@@ -170,6 +171,40 @@ public sealed class OutboxUnitTests
         context.OccurredAt.ShouldBe(row.OccurredAt);
         context.OccurredAt.Offset.ShouldBe(TimeSpan.FromHours(2));
         OutboxDispatch.DedupeKey(row.Id, new string('a', 100)).Length.ShouldBe(137); // within ENQ-3's 200
+    }
+
+    [Theory]
+    [Trait("Spec", "0013:DLV-2"), Trait("Spec", "0013:ENQ-3")]
+    [InlineData("""{"a": 1, "b": [1, 2, {}], "c": null}""", """{"a":1,"b":[1,2,{}],"c":null}""")]
+    [InlineData("""{"s": "x, y: \"z\" \\", "t": "\\"}""", """{"s":"x, y: \"z\" \\","t":"\\"}""")]
+    [InlineData("""{"é": "a b\u0001 ✓", "n": -1.5e3}""", """{"é":"a b\u0001 ✓","n":-1.5e3}""")]
+    [InlineData("\t[ 1 ,\r\n 2 ]\n", "[1,2]")]
+    public void Compact_removes_the_whitespace_outside_strings_and_keeps_every_string_byte_for_byte(string json, string expected)
+    {
+        byte[] bytes = Encoding.UTF8.GetBytes(json);
+
+        int length = OutboxDispatch.Compact(bytes);
+
+        Encoding.UTF8.GetString(bytes, 0, length).ShouldBe(expected);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:ENQ-3")]
+    public void Envelope_throws_naming_the_event_and_ENQ_3_when_it_would_be_over_the_job_payload_limit()
+    {
+        var row = new OutboxRow
+        {
+            Id = Guid.CreateVersion7(Moment),
+            Type = AlphaHappened.Type,
+            Payload = "[\"" + new string('x', 65_536) + "\"]",
+            OccurredAt = Moment,
+        };
+
+        InvalidOperationException error = Should.Throw<InvalidOperationException>(() => OutboxDispatch.Envelope(row));
+
+        error.Message.ShouldContain(row.Id.ToString("D"));
+        error.Message.ShouldContain("ENQ-3");
+        error.Message.ShouldNotContain("xxx"); // never the payload (spec 0006 LOG-2)
     }
 
     // PostgreSQL compares uuids byte by byte, in the order the big endian bytes are written.

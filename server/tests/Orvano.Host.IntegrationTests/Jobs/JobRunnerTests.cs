@@ -129,6 +129,8 @@ public sealed class JobRunnerTests(PostgresFixture postgres) : IAsyncLifetime
         meters.Sum("orvano.infrastructure.jobs.attempts", "outcome", "failed").ShouldBe(1);
         meters.Sum("orvano.infrastructure.jobs.attempts", "outcome", "dead").ShouldBe(1);
         _logs.Count(LogEventIds.Infrastructure + 104, LogLevel.Warning).ShouldBe(1);
+        _logs.Messages(LogEventIds.Infrastructure + 104).ShouldHaveSingleItem()
+            .ShouldMatch(@"runs again at \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{7}\+00:00$"); // round trip ISO 8601, in any culture
         _logs.Count(LogEventIds.Infrastructure + 105, LogLevel.Error).ShouldBe(1);
     }
 

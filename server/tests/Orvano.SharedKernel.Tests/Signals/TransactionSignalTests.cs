@@ -312,6 +312,61 @@ public sealed class TransactionSignalTests(SampleDatabase db) : IClassFixture<Sa
     }
 
     [Fact]
+    [Trait("Spec", "0013:SND-1"), Trait("Spec", "0013:SND-3"), Trait("Spec", "0013:PUB-3")]
+    public async Task After_commit_actions_never_run_when_a_before_commit_check_fails_the_commit_before_COMMIT_is_sent()
+    {
+        Guid projectId = await db.AddProjectAsync();
+        await using SignalListenerProbe probe = await SignalListenerProbe.StartAsync(db.DataSource, Token);
+        await using SampleContext context = db.CreateContext();
+        List<string> calls = [];
+
+        InvalidOperationException error = await Should.ThrowAsync<InvalidOperationException>(() => context.InTransactionAsync(
+            async token =>
+            {
+                await context.Database.ExecuteSqlAsync($"INSERT INTO sample.gadget (id, project_id, name) VALUES ({Guid.CreateVersion7()}, {projectId}, 'refused')", token);
+                TransactionSignals.Enlist(context, SignalKind.Cache, ["refused"]);
+                TransactionSignals.AddAfterCommit(context, _ => Record(calls, "after"));
+                TransactionSignals.AddOnCommitted(context, _ => Record(calls, "committed"));
+                TransactionSignals.AddBeforeCommit(context, typeof(TransactionSignalTests), _ => throw new InvalidOperationException("check refused"));
+            },
+            Token));
+
+        // The outcome is known: no COMMIT was sent, so the transaction rolled back (SND-3 runs them only for a commit).
+        error.Message.ShouldBe("check refused");
+        calls.ShouldBeEmpty();
+        (await probe.TakeAsync(Token)).ShouldBeEmpty();
+        (await context.Gadgets.AnyAsync(x => x.ProjectId == projectId, Token)).ShouldBeFalse();
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:SND-1"), Trait("Spec", "0013:SND-2"), Trait("Spec", "0013:SND-3")]
+    public async Task After_commit_actions_never_run_when_a_notify_fails_the_commit_on_an_aborted_transaction()
+    {
+        await using SampleContext context = db.CreateContext();
+        List<string> calls = [];
+
+        PostgresException error = await Should.ThrowAsync<PostgresException>(() => context.InTransactionAsync(
+            async token =>
+            {
+                try
+                {
+                    await context.Database.ExecuteSqlAsync($"SELECT 1 / 0", token);
+                }
+                catch (PostgresException)
+                {
+                    // The transaction is now aborted, so the pg_notify before the COMMIT fails with 25P02 (SND-2).
+                }
+
+                TransactionSignals.Enlist(context, SignalKind.Cache, ["aborted"]);
+                TransactionSignals.AddAfterCommit(context, _ => Record(calls, "after"));
+            },
+            Token));
+
+        error.SqlState.ShouldBe(PostgresErrorCodes.InFailedSqlTransaction);
+        calls.ShouldBeEmpty();
+    }
+
+    [Fact]
     [Trait("Spec", "0013:SND-5"), Trait("Spec", "0013:AC-3")]
     public async Task Enlist_throws_on_a_context_that_joined_the_transaction_and_the_context_that_began_it_still_sends()
     {

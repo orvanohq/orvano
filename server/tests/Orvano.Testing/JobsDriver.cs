@@ -5,13 +5,13 @@ using Orvano.Infrastructure.Outbox;
 
 namespace Orvano.Testing;
 
-/// <summary>One attempt <see cref="JobsDriver.RunDueAsync"/> ran: the job's kind, id, and outcome (spec 0013 JTL-1).</summary>
+/// <summary>One attempt <see cref="JobsDriver.RunDueAsync(IServiceProvider, CancellationToken)"/> ran: the job's kind, id, and outcome (spec 0013 JTL-1).</summary>
 public sealed record JobRun(string Kind, Guid Id, string Outcome);
 
 /// <summary>
 /// Runs due jobs and dispatches pending events inline, with no background loop and on any role (spec 0013 JTS-2, OTS-2).
 /// Module tests host with <c>ORVANO_ROLES=api</c>, advance their <see cref="ManualClock"/>, and call
-/// <see cref="RunDueAsync"/>.
+/// <see cref="RunDueAsync(IServiceProvider, CancellationToken)"/>.
 /// </summary>
 public static class JobsDriver
 {
@@ -25,7 +25,16 @@ public static class JobsDriver
     /// publishes an event another subscriber handles completes in one call. Returns each attempt in the order it ran.
     /// </summary>
     /// <exception cref="InvalidOperationException">More than <see cref="MaxAttempts"/> attempts ran; the message names their kinds.</exception>
-    public static async Task<IReadOnlyList<JobRun>> RunDueAsync(IServiceProvider services, CancellationToken cancellationToken)
+    /// <exception cref="AggregateException">A dispatch batch failed (DSP-5); each inner exception names its outbox. The
+    /// worker would log it and try again, but here it would look like nothing was left to run.</exception>
+    public static Task<IReadOnlyList<JobRun>> RunDueAsync(IServiceProvider services, CancellationToken cancellationToken) =>
+        RunDueAsync(services, allowDispatchFailures: false, cancellationToken);
+
+    /// <summary>
+    /// <see cref="RunDueAsync(IServiceProvider, CancellationToken)"/>, which with <paramref name="allowDispatchFailures"/>
+    /// goes on past a failed dispatch batch as the worker does, for a test that breaks an outbox on purpose.
+    /// </summary>
+    public static async Task<IReadOnlyList<JobRun>> RunDueAsync(IServiceProvider services, bool allowDispatchFailures, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(services);
         JobScheduler scheduler = services.GetRequiredService<JobScheduler>();
@@ -35,7 +44,7 @@ public static class JobsDriver
         await scheduler.SyncAsync(cancellationToken);
         await executor.MarkExpiredDeadAsync(cancellationToken);
         await scheduler.TickAsync(cancellationToken);
-        await dispatch.DispatchAsync(cancellationToken);
+        await DispatchOrThrowAsync(dispatch, allowDispatchFailures, cancellationToken);
 
         var runs = new List<JobRun>();
         do
@@ -62,18 +71,31 @@ public static class JobsDriver
                 }
             }
         }
-        while (await dispatch.DispatchAsync(cancellationToken) > 0);
+        while (await DispatchOrThrowAsync(dispatch, allowDispatchFailures, cancellationToken) > 0);
 
         return runs;
     }
 
     /// <summary>
     /// Runs one full dispatch pass alone (spec 0013 OTS-2), with the same per outbox batch sizes the worker's loop would
-    /// use, and returns the events it marked dispatched. Runs no handler.
+    /// use, and returns the events it marked dispatched. Runs no handler. A failed batch is logged and counts nothing, as
+    /// in the worker, so a test of a failing batch can check what it left.
     /// </summary>
     public static Task<int> DispatchAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(services);
         return services.GetRequiredService<OutboxDispatch>().DispatchAsync(cancellationToken);
+    }
+
+    private static async Task<int> DispatchOrThrowAsync(OutboxDispatch dispatch, bool allowFailures, CancellationToken cancellationToken)
+    {
+        var failures = new List<Exception>();
+        int marked = await dispatch.DispatchAsync(cancellationToken, failures);
+        if (failures.Count > 0 && !allowFailures)
+        {
+            throw new AggregateException("A dispatch batch failed, so JobsDriver.RunDueAsync stops (spec 0013 DSP-5).", failures);
+        }
+
+        return marked;
     }
 }
