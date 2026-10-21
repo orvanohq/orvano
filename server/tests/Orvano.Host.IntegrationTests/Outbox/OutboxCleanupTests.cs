@@ -105,11 +105,11 @@ public sealed class OutboxCleanupTests(PostgresFixture postgres) : IAsyncLifetim
     {
         _host = Host(services => services.AddOutbox("aside", _ => { })); // registered, but no table
         await SampleOutboxDbContext.CreateTablesAsync(_host.Services, Token);
-        (await JobsDriver.RunDueAsync(_host.Services, Token)).ShouldBeEmpty();
+        (await JobsDriver.RunDueAsync(_host.Services, allowDispatchFailures: true, Token)).ShouldBeEmpty(); // aside's dispatch fails too
         _clock.Advance(FireTime - _clock.GetUtcNow() + TimeSpan.FromSeconds(30));
         await InsertDispatchedAsync(3, _clock.GetUtcNow().AddDays(-8));
 
-        IReadOnlyList<JobRun> runs = await JobsDriver.RunDueAsync(_host.Services, Token);
+        IReadOnlyList<JobRun> runs = await JobsDriver.RunDueAsync(_host.Services, allowDispatchFailures: true, Token);
 
         runs.ShouldContain(run => run.Kind == "outbox.cleanup" && run.Outcome == "failed");
         (await _rows.CountAsync("true", Token)).ShouldBe(0);

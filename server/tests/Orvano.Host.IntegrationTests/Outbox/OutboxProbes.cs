@@ -265,6 +265,9 @@ internal sealed class DispatchInterceptor : DbCommandInterceptor
     /// <summary>Each outbox select's <c>LIMIT</c>, in the order the selects ran.</summary>
     public ConcurrentQueue<int> Sizes { get; } = new();
 
+    /// <summary>The UTF-8 size of each delivery job's payload as the dispatcher sent it, before <c>jsonb</c> stores it.</summary>
+    public ConcurrentQueue<int> DeliveryBytes { get; } = new();
+
     /// <summary>Set by the first outbox select while <see cref="Hold"/> is set, which then waits for <see cref="Release"/>.</summary>
     public TaskCompletionSource Holding { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -331,6 +334,17 @@ internal sealed class DispatchInterceptor : DbCommandInterceptor
     public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
         DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
     {
+        if (command.CommandText.Contains("INSERT INTO jobs.job", StringComparison.Ordinal))
+        {
+            foreach (DbParameter parameter in command.Parameters)
+            {
+                if (parameter.Value is string envelope && envelope.StartsWith("{\"eventId\":", StringComparison.Ordinal))
+                {
+                    DeliveryBytes.Enqueue(System.Text.Encoding.UTF8.GetByteCount(envelope));
+                }
+            }
+        }
+
         if (FailMark && command.CommandText.Contains("UPDATE \"sample\".outbox SET dispatched_at", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("the mark fails");

@@ -1,9 +1,12 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Text;
 using System.Text.Json.Serialization;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+
+using Npgsql;
 
 using Orvano.Host.IntegrationTests.Jobs;
 using Orvano.Host.IntegrationTests.Signals;
@@ -312,6 +315,109 @@ public sealed class OutboxDispatchTests(PostgresFixture postgres) : IAsyncLifeti
         jobs.Select(job => job.DedupeKey![..36]).Distinct().Order().ShouldBe(ids.Select(id => id.ToString("D")).Order());
     }
 
+    [Fact]
+    [Trait("Spec", "0013:PUB-2"), Trait("Spec", "0013:DLV-2"), Trait("Spec", "0013:ENQ-3")]
+    public async Task Delivery_stays_within_the_job_payload_limit_when_a_64000_byte_payload_of_small_members_grows_as_jsonb_text()
+    {
+        // As compact as Publish serializes it, at PUB-2's limit; jsonb prints it back with a space after every comma.
+        var payload = new StringBuilder($$"""{"noteId":"{{Guid.CreateVersion7():D}}","text":"","pad":[1""");
+        while (payload.Length < 64_000 - 4)
+        {
+            payload.Append(",1");
+        }
+
+        payload.Append("]}");
+        Encoding.UTF8.GetByteCount(payload.ToString()).ShouldBeInRange(63_990, 64_000);
+        await _rows.InsertAsync(SampleNoteAdded.Type, payload.ToString(), _clock.GetUtcNow(), Token);
+        (await _rows.WhereAsync("true", Token)).ShouldHaveSingleItem().Payload.Length.ShouldBeGreaterThan(90_000);
+
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(1);
+
+        _interceptor.DeliveryBytes.Count.ShouldBe(2);
+        _interceptor.DeliveryBytes.ShouldAllBe(bytes => bytes <= 64_000 + 300); // the payload as published, plus the envelope (DLV-2)
+        (await _jobs.CountAsync("true", Token)).ShouldBe(2);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:ENQ-3"), Trait("Spec", "0013:DSP-5")]
+    public async Task Batch_fails_and_inserts_nothing_when_an_events_numbers_print_past_the_job_payload_limit()
+    {
+        // 1E+300 prints as 301 digits from jsonb: 250 of them make 75,000 bytes that no compacting can shorten.
+        string pad = string.Join(',', Enumerable.Repeat("1E+300", 250));
+        Guid id = await _rows.InsertAsync(SampleNoteAdded.Type, $$"""{"noteId":"{{Guid.CreateVersion7():D}}","pad":[{{pad}}]}""", _clock.GetUtcNow(), Token);
+
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(0);
+
+        _interceptor.DeliveryBytes.ShouldBeEmpty();
+        (await _jobs.CountAsync("true", Token)).ShouldBe(0);
+        (await _rows.CountAsync("dispatched_at IS NULL", Token)).ShouldBe(1);
+        _logs.Count(LogEventIds.Infrastructure + 202, LogLevel.Error).ShouldBe(1);
+        string failure = _logs.TextAtOrAbove(LogLevel.Error).ShouldHaveSingleItem(); // not also an EF command failure
+        failure.ShouldContain(id.ToString("D"));
+        failure.ShouldContain("ENQ-3");
+        Dispatch.BatchSizeOf("sample").ShouldBe(50);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:DSP-2"), Trait("Spec", "0013:DSP-7")]
+    public async Task Batch_cut_short_by_another_dispatchers_locks_sends_a_job_signal_at_its_commit_when_its_events_have_no_subscriber()
+    {
+        for (int i = 0; i < 120; i++)
+        {
+            await PublishAsideAsync(Token);
+        }
+
+        // Another dispatcher holds the last 30 rows, so this one's batch selects 90 of 100 and its round ends (DSP-2).
+        await using NpgsqlConnection other = await _database.DataSource.OpenConnectionAsync(Token);
+        await using NpgsqlTransaction holding = await other.BeginTransactionAsync(Token);
+        await using (var lockRows = new NpgsqlCommand("SELECT id FROM aside.outbox ORDER BY id DESC LIMIT 30 FOR UPDATE", other, holding))
+        {
+            await lockRows.ExecuteNonQueryAsync(Token);
+        }
+
+        using var meters = new MeterRecorder(_host.Services.GetRequiredService<IMeterFactory>());
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(90);
+
+        // No delivery was enqueued, but the commit still wakes every dispatcher for the rows left, not only the poll.
+        (await _jobs.CountAsync("true", Token)).ShouldBe(0);
+        meters.Sum("orvano.infrastructure.signals.sent", "kind", "job").ShouldBe(1);
+
+        await holding.RollbackAsync(Token);
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(30);
+        (await AsideWaitingAsync(Token)).ShouldBe(0);
+        meters.Sum("orvano.infrastructure.signals.sent", "kind", "job").ShouldBe(2);
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(0);
+        meters.Sum("orvano.infrastructure.signals.sent", "kind", "job").ShouldBe(2); // a pass that marks nothing sends nothing
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:DSP-5"), Trait("Spec", "0013:OTL-2")]
+    public async Task Failed_batch_logs_the_database_error_once_when_EF_already_logged_its_command()
+    {
+        await PublishAsideAsync(Token);
+        await _database.ExecuteAsync("ALTER TABLE aside.outbox RENAME TO outbox_gone", Token);
+
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(0);
+
+        _logs.Count(LogEventIds.Infrastructure + 202, LogLevel.Error).ShouldBe(1);
+        _logs.Messages(LogEventIds.Infrastructure + 202).ShouldHaveSingleItem().ShouldContain(Aside);
+        _logs.TextAtOrAbove(LogLevel.Error).Count(text => text.Contains(PostgresErrorCodes.UndefinedTable, StringComparison.Ordinal)).ShouldBe(1);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:DSP-5"), Trait("Spec", "0013:OTS-2")]
+    public async Task RunDueAsync_throws_naming_the_outbox_when_a_dispatch_batch_fails()
+    {
+        await OutboxHosts.PublishAsync(_host.Services, new SampleNoteAdded(Guid.CreateVersion7()), null, Token);
+        _interceptor.FailMark = true;
+
+        AggregateException error = await Should.ThrowAsync<AggregateException>(() => JobsDriver.RunDueAsync(_host.Services, Token));
+
+        error.InnerExceptions.ShouldHaveSingleItem().Message.ShouldContain("sample outbox");
+        error.InnerExceptions[0].InnerException!.Message.ShouldBe("the mark fails");
+        (await _jobs.CountAsync("true", Token)).ShouldBe(0);
+    }
+
     private OrvanoApiFactory Host()
     {
         OrvanoApiFactory host = OutboxHosts.Create(_settings, new OutboxProbes(), _clock, roles: "api", services =>
@@ -339,7 +445,7 @@ public sealed class OutboxDispatchTests(PostgresFixture postgres) : IAsyncLifeti
 
     private async Task<long> AsideWaitingAsync(CancellationToken cancellationToken)
     {
-        await using Npgsql.NpgsqlCommand command = _database.DataSource.CreateCommand("SELECT count(*) FROM aside.outbox WHERE dispatched_at IS NULL");
+        await using NpgsqlCommand command = _database.DataSource.CreateCommand("SELECT count(*) FROM aside.outbox WHERE dispatched_at IS NULL");
         return (long)(await command.ExecuteScalarAsync(cancellationToken))!;
     }
 }
