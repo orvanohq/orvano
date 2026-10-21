@@ -36,9 +36,6 @@ internal sealed class OutboxDispatch
     /// </summary>
     public static readonly TimeSpan BatchBound = TimeSpan.FromSeconds(10);
 
-    /// <summary>The <c>type</c> tag of a row whose type no outbox registers, so the tag values stay those in code (OTL-1).</summary>
-    internal const string UnknownTypeTag = "unknown";
-
     private readonly IOutboxRegistry _registry;
     private readonly JobRegistry _jobs;
     private readonly JobQueue _queue;
@@ -68,7 +65,7 @@ internal sealed class OutboxDispatch
         _time = time;
         _telemetry = telemetry;
         _logger = logger;
-        _sql = registry.Outboxes.ToFrozenDictionary(outbox => outbox.Schema, outbox => new OutboxSql(outbox.Schema), StringComparer.Ordinal);
+        _sql = registry.Outboxes.ToFrozenDictionary(outbox => outbox.Schema, outbox => OutboxSql.For(outbox), StringComparer.Ordinal);
     }
 
     /// <summary>The size of <paramref name="schema"/>'s next batch: 100, or less after a failed or cut batch (DSP-5).</summary>
@@ -77,7 +74,7 @@ internal sealed class OutboxDispatch
     /// <summary>
     /// DSP-2: one pass. A batch per outbox per round, in schema order, then another round with only the outboxes whose
     /// batch was full, until none is. An outbox whose batch fails sits out the rest of the pass. Returns the events
-    /// marked dispatched. With no outbox registered it sends no query. Each failed batch, already logged, is also added
+    /// marked dispatched. An outbox that registers no event type, or no outbox at all, sends no query (DSP-4). Each failed batch, already logged, is also added
     /// to <paramref name="failures"/> when given, naming its outbox, so <c>JobsDriver</c> can surface it to a test.
     /// </summary>
     /// <exception cref="OperationCanceledException"><paramref name="stoppingToken"/> was cancelled; the batch in flight rolled back.</exception>
@@ -90,8 +87,14 @@ internal sealed class OutboxDispatch
             var full = new List<OutboxRegistration>();
             foreach (OutboxRegistration outbox in round)
             {
+                OutboxSql sql = _sql[outbox.Schema];
+                if (!sql.HasTypes)
+                {
+                    continue; // DSP-4: it registers no type, so nothing in it is this process's to dispatch
+                }
+
                 int size = BatchSizeOf(outbox.Schema);
-                if (await TryBatchAsync(_sql[outbox.Schema], size, failures, stoppingToken) is not { } selected)
+                if (await TryBatchAsync(sql, size, failures, stoppingToken) is not { } selected)
                 {
                     continue;
                 }
@@ -171,19 +174,15 @@ internal sealed class OutboxDispatch
 
                 DateTimeOffset now = _time.GetUtcNow();
                 var dispatched = new List<(string Type, DateTimeOffset OccurredAt)>(rows.Count);
-                var unknown = new List<string>();
                 int jobs = 0;
 
                 // In the order the database returned them: Guid.CompareTo does not order uuids as PostgreSQL does.
                 foreach (OutboxRow row in rows)
                 {
-                    if (_registry.FindEvent(row.Type) is not { } registration)
-                    {
-                        // DSP-4: marked like the rest, with no delivery.
-                        unknown.Add(row.Type);
-                        dispatched.Add((UnknownTypeTag, row.OccurredAt));
-                        continue;
-                    }
+                    // DSP-4: the select takes only registered types, so this holds; if it ever did not, the batch fails
+                    // and marks nothing rather than drop the event.
+                    OutboxEventRegistration registration = _registry.FindEvent(row.Type)
+                        ?? throw new InvalidOperationException($"The {sql.Schema} outbox selected the unregistered event type {row.Type} (spec 0013 DSP-4).");
 
                     dispatched.Add((registration.Type, row.OccurredAt));
                     IReadOnlyList<EventSubscription> subscribers = _registry.SubscribersOf(registration.Type);
@@ -229,11 +228,6 @@ internal sealed class OutboxDispatch
                     {
                         _telemetry.EventDispatched(type);
                         _telemetry.EventDispatchLag(sql.Schema, committed - occurredAt);
-                    }
-
-                    foreach (string type in unknown)
-                    {
-                        _logger.OutboxEventTypeUnknown(sql.Schema, type);
                     }
 
                     _logger.OutboxBatchDispatched(sql.Schema, rows.Count, jobs);

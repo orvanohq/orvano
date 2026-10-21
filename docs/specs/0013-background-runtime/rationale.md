@@ -317,7 +317,7 @@ The engineer was not in this run (another session started it), so each pick is t
 - **Payload limit**: 64,000 bytes per event, so the delivery envelope fits ENQ-3's 65,536.
 - **Batch and bound**: 100 rows (EVT-3) and a 10 second bound per batch, the same number as `ClaimBound`; a cut batch rolls back whole, so the bound costs only time.
 - **Rounds**: one batch per outbox per round, more rounds while any batch was full, so one busy module cannot starve the others.
-- **Unknown types**: marked dispatched with a Warning instead of left pending, so a removed type cannot block its outbox's partial index forever. Runner up: leave them pending (they would be claimed and skipped on every pass).
+- **Unknown types**: marked dispatched with a Warning instead of left pending, so a removed type cannot block its outbox's partial index forever. Runner up: leave them pending (they would be claimed and skipped on every pass). Reversed on 2026-10-21 (_Review settlement of milestone 3_): the mark loses events on a rolling upgrade, and filtering by type in the select avoids the claim and skip cost.
 - **Wake signal**: reuse `job` (EVT-3) and accept one empty pass per dispatch. Runner up: a new `outbox` signal kind (changes BUS-1 and the listener).
 - **Cleanup by primary key**: `id < Floor(now − 7 days)` with `dispatched_at IS NOT NULL`, so no index on `dispatched_at`; retention is measured from `occurred_at`, which differs from "7 days after dispatch" only by the dispatch delay. Runner up: an index on `dispatched_at` (one more index write per dispatch).
 - **Cleanup schedule**: `37 3 * * *`, 20 minutes after `jobs.cleanup`, `MaxAttempts` 3, like SCH-7.
@@ -343,3 +343,33 @@ A read only pass on another model checked commit 049d35e against spec 0007 EVT-1
 Left open for the engineer (Follow-up): a batch that always fails or always outruns `BatchBound` holds its outbox's head. Options are halving the batch after a failure (lean), one multi row insert per batch, or accepting it.
 
 Settled the same day by the engineer, who approved milestone 3: option (a). Halving per outbox shrinks a failing batch until its one bad row stands alone, so the rows before it get dispatched and the fix costs no new statement shape; the sizes are in memory per worker, since a restart losing them only means starting at 100 again. A multi row insert stays an open performance follow up, independent of this.
+
+## Review settlement of milestone 3 (2026-10-21)
+
+The fresh model review of the outbox ([report](../../reviews/2026-10-21-review-background-runtime-outbox.md)) found one gap that needed a rule change, and the verify report ([report](../../reviews/2026-10-21-verify-background-runtime-outbox.md), _Spec corrections for /architect_) four wording corrections.
+
+### Context (DSP-4 and rolling upgrades)
+
+DSP-4 marked a row of a type the running process did not register as dispatched, with a Warning. It was written for a rollback, but a rolling upgrade hits the same path in the ordinary deploy of a self hosted install: a new `api` instance publishes `auth.user.created.v2`, an old `worker` that is still running selects the row, does not know the type, and marks it. No newer worker ever sees it, so the event is lost with only a Warning.
+
+### Options considered (DSP-4)
+
+- **(a) Filter by type in the select (chosen).** Each dispatcher selects only `type = ANY(@types)`, the types its process registers for that outbox. A row of another type is never locked or marked, so it waits for a process that knows it. Pros: no new state, no coordination between workers, one parameter on the existing statement; skipped rows cannot sit at the head of a batch, fail it, or confuse DSP-5's halving or DSP-2's full batch count. Cons: a row no version will ever register waits forever unless something deletes it, and the select walks past waiting rows of other types in `ix_outbox_pending`.
+- **(b) Select everything and skip unknown rows in .NET.** Rows are locked and left unmarked. Cons: a batch full of unknown rows is selected again on every pass and every round (DSP-2 would loop on a "full" batch that marks nothing), and the lock blocks a newer worker on the same rows for the batch's length. Rejected.
+- **(c) Mark only once no running worker registers the type.** Needs a table of running workers and their registered types, heartbeats, and a rule for when a worker counts as gone. Correct, but it is new shared state and coordination for an edge of deploys. Rejected.
+- **(d) Hold unknown rows for a grace period, then mark them.** Close to (a) but still marks, so the dispatcher must still select them, with (b)'s cost. Rejected in favour of letting the cleanup delete them.
+
+### Rationale (DSP-4)
+
+(a) turns version skew from a loss into a delay, which is what at least once delivery (spec 0007 EVT-3) promises. The leftover risk is rows that no version will ever register: OCL-3 deletes them 30 days after they occurred, and only from a process that does not register the type, so a newer worker always dispatches a row long before an older worker could expire it. 30 days matches the dead job retention (SCH-7) and leaves room to roll forward again after a rollback. The expiry Warning carries the count but no types, because the type is row text (OTL-1's rule for tags, applied to this log too). The unknown `type` tag on `outbox.dispatched` and the unknown type Warning go away, since a dispatcher no longer sees such rows.
+
+Calls made while writing: the expiry is a constant, not an option (OCL-1's retention is one too); the filter uses the registering process's own list, not the union of every worker's (which would need (c)'s state); no new metric, since the open pending events gauge follow up covers visibility; publishers keep a retired type registered for one release, written as guidance in DSP-4 rather than enforced.
+
+Approved the same day by the engineer: option (a), with OCL-3's 30 day expiry.
+
+### Verify corrections (recorded as built)
+
+- **DLV-2**: the spec asked for `InternalsVisibleTo` from `Orvano.SharedKernel` to `Orvano.Infrastructure`, which spec 0012 RSV-1 forbids. The build writes the envelope in `OutboxDispatch.Envelope` with a `Utf8JsonWriter` and pins it with a unit test that the subscriber's kind reads it back; DLV-2 and step 24 now say so.
+- **AC-32**: the pending model changes check needs a migration, and no module owns an outbox yet; the milestone checks the shape on `SampleOutboxDbContext`, and the first module context that calls `HasOutbox()` brings the check.
+- **OBX-7**: two outboxes can share a type only when they share a schema (OBX-3), so the type check is a backstop that prints next to the schema registered twice problem.
+- **AC-37**: with the listener down, an event takes two poll ticks by design (dispatch on one, claim on the next); DSP-1 and AC-37 say so.

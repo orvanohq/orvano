@@ -71,6 +71,15 @@ public sealed record SampleNoteChained(Guid NoteId) : IOutboxEvent
     public static string Type => "sample.note.chained.v1";
 }
 
+/// <summary>
+/// A sample event that only a newer version registers (<see cref="SampleOutbox.AddNewerSampleOutbox"/>), for version
+/// skew: a process without it leaves its rows waiting (spec 0013 DSP-4).
+/// </summary>
+public sealed record SampleNoteArchived(Guid NoteId) : IOutboxEvent
+{
+    public static string Type => "sample.note.archived.v1";
+}
+
 /// <summary>An event of another module's schema, which the sample context must refuse to publish (PUB-2).</summary>
 public sealed record OtherModuleEvent(Guid Id) : IOutboxEvent
 {
@@ -85,6 +94,7 @@ public sealed record UnregisteredSampleEvent(Guid Id) : IOutboxEvent
 
 [JsonSerializable(typeof(SampleNoteAdded))]
 [JsonSerializable(typeof(SampleNoteChained))]
+[JsonSerializable(typeof(SampleNoteArchived))]
 [JsonSerializable(typeof(OtherModuleEvent))]
 [JsonSerializable(typeof(UnregisteredSampleEvent))]
 public sealed partial class SampleOutboxJsonContext : JsonSerializerContext;
@@ -96,4 +106,11 @@ public static class SampleOutbox
         services.AddOutbox(SampleOutboxDbContext.Schema, outbox => outbox
             .Event(SampleOutboxJsonContext.Default.SampleNoteAdded)
             .Event(SampleOutboxJsonContext.Default.SampleNoteChained));
+
+    /// <summary>The <c>sample</c> outbox as a newer version registers it: <see cref="AddSampleOutbox"/>'s types and <see cref="SampleNoteArchived"/>.</summary>
+    public static IServiceCollection AddNewerSampleOutbox(this IServiceCollection services) =>
+        services.AddOutbox(SampleOutboxDbContext.Schema, outbox => outbox
+            .Event(SampleOutboxJsonContext.Default.SampleNoteAdded)
+            .Event(SampleOutboxJsonContext.Default.SampleNoteChained)
+            .Event(SampleOutboxJsonContext.Default.SampleNoteArchived));
 }
