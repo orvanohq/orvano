@@ -160,7 +160,7 @@ spec [0013](../specs/0013-background-runtime/index.md) (builds spec [0007](../sp
 - [x] Verify it: `/check verify background runtime`
 - [x] Test it: `/test background runtime`
 - [x] Review it (fresh model): `/check review background runtime`
-- [ ] Document it: `/document background runtime`
+- [x] Document it: `/document background runtime`
 
 ### 11. Design system & console shell · needs a decision
 
