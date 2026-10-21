@@ -114,20 +114,23 @@ public sealed class OutboxUnitTests
     [InlineData("auth\"; DROP TABLE x; --")]
     [InlineData("a")]
     public void OutboxSql_refuses_a_schema_that_breaks_the_pattern(string schema) =>
-        Should.Throw<ArgumentException>(() => new OutboxSql(schema));
+        Should.Throw<ArgumentException>(() => new OutboxSql(schema, ["alpha.thing.happened.v1"]));
 
     [Fact]
-    [Trait("Spec", "0013:DSP-3"), Trait("Spec", "0013:DSP-8"), Trait("Spec", "0013:OCL-1")]
+    [Trait("Spec", "0013:DSP-3"), Trait("Spec", "0013:DSP-4"), Trait("Spec", "0013:DSP-8"), Trait("Spec", "0013:OCL-1"), Trait("Spec", "0013:OCL-3")]
     public void OutboxSql_quotes_the_schema_and_keeps_every_value_a_parameter()
     {
-        var sql = new OutboxSql("alpha");
+        string[] types = ["alpha.thing.happened.v1", "alpha.thing.moved.v2"];
+        var sql = new OutboxSql("alpha", types);
         var id = Guid.CreateVersion7();
 
+        sql.HasTypes.ShouldBeTrue();
+        new OutboxSql("alpha", []).HasTypes.ShouldBeFalse();
         FormattableString select = sql.Select(7);
         select.Format.ShouldBe(
             "SELECT id, type, payload::text AS payload, project_id, occurred_at, trace_parent FROM \"alpha\".outbox WHERE dispatched_at IS NULL "
-            + "ORDER BY id LIMIT {0} FOR UPDATE SKIP LOCKED");
-        select.GetArguments().ShouldBe([7]);
+            + "AND type = ANY({1}) ORDER BY id LIMIT {0} FOR UPDATE SKIP LOCKED");
+        select.GetArguments().ShouldBe([7, types]);
         FormattableString mark = sql.MarkDispatched(Moment, [id]);
         mark.Format.ShouldBe("UPDATE \"alpha\".outbox SET dispatched_at = {0} WHERE id = ANY({1})");
         mark.GetArguments().ShouldBe([Moment, new[] { id }]);
@@ -135,6 +138,11 @@ public sealed class OutboxUnitTests
         cleanup.Format.ShouldBe(
             "DELETE FROM \"alpha\".outbox WHERE id IN (SELECT id FROM \"alpha\".outbox WHERE id < {0} AND dispatched_at IS NOT NULL ORDER BY id LIMIT 5000)");
         cleanup.GetArguments().ShouldBe([id]);
+        FormattableString expire = sql.Expire(id);
+        expire.Format.ShouldBe(
+            "DELETE FROM \"alpha\".outbox WHERE id IN (SELECT id FROM \"alpha\".outbox WHERE id < {0} AND dispatched_at IS NULL "
+            + "AND NOT (type = ANY({1})) ORDER BY id LIMIT 5000)");
+        expire.GetArguments().ShouldBe([id, types]);
     }
 
     [Fact]

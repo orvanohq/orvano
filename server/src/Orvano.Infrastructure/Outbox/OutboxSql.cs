@@ -19,8 +19,12 @@ internal sealed class OutboxSql
     private readonly string _select;
     private readonly string _markDispatched;
     private readonly string _cleanup;
+    private readonly string _expire;
+    private readonly string[] _types;
 
-    public OutboxSql(string schema)
+    /// <param name="schema">The outbox's registered schema.</param>
+    /// <param name="types">The event types this process registers for the outbox, the only ones it dispatches (DSP-4).</param>
+    public OutboxSql(string schema, IEnumerable<string> types)
     {
         if (!OutboxServiceCollectionExtensions.IsValidSchema(schema))
         {
@@ -28,12 +32,14 @@ internal sealed class OutboxSql
         }
 
         Schema = schema;
+        _types = [.. types];
         string table = $"\"{schema}\".outbox"; // the table HasOutbox() maps (OTB-2)
 
-        // DSP-3 (1): the waiting rows through ix_outbox_pending, skipping rows another dispatcher holds and rows of
-        // transactions not yet committed. EF selects from it as a derived table, which PostgreSQL allows with the lock.
+        // DSP-3 (1): the waiting rows through ix_outbox_pending, skipping rows another dispatcher holds, rows of
+        // transactions not yet committed, and rows of types this process does not register, which wait for a process
+        // that does (DSP-4). EF selects from it as a derived table, which PostgreSQL allows with the lock.
         _select = "SELECT id, type, payload::text AS payload, project_id, occurred_at, trace_parent FROM " + table
-            + " WHERE dispatched_at IS NULL ORDER BY id LIMIT {0} FOR UPDATE SKIP LOCKED";
+            + " WHERE dispatched_at IS NULL AND type = ANY({1}) ORDER BY id LIMIT {0} FOR UPDATE SKIP LOCKED";
 
         // DSP-3 (3): every selected row, with or without subscribers.
         _markDispatched = "UPDATE " + table + " SET dispatched_at = {0} WHERE id = ANY({1})";
@@ -41,15 +47,27 @@ internal sealed class OutboxSql
         // OCL-1, OCL-2: through the primary key, only rows that were dispatched.
         _cleanup = "DELETE FROM " + table + " WHERE id IN (SELECT id FROM " + table
             + " WHERE id < {0} AND dispatched_at IS NOT NULL ORDER BY id LIMIT " + CleanupChunk.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")";
+
+        // OCL-3: through ix_outbox_pending, only waiting rows of types this process does not register.
+        _expire = "DELETE FROM " + table + " WHERE id IN (SELECT id FROM " + table
+            + " WHERE id < {0} AND dispatched_at IS NULL AND NOT (type = ANY({1})) ORDER BY id LIMIT " + CleanupChunk.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")";
     }
 
     public string Schema { get; }
 
-    public FormattableString Select(int size) => FormattableStringFactory.Create(_select, size);
+    /// <summary>The statements of a registered outbox, with the event types this process registers for it.</summary>
+    public static OutboxSql For(OutboxRegistration outbox) => new(outbox.Schema, outbox.Events.Select(e => e.Type));
+
+    /// <summary>Whether the outbox registers any event type; one that registers none has nothing to dispatch (DSP-4).</summary>
+    public bool HasTypes => _types.Length > 0;
+
+    public FormattableString Select(int size) => FormattableStringFactory.Create(_select, size, _types);
 
     public FormattableString MarkDispatched(DateTimeOffset now, Guid[] ids) => FormattableStringFactory.Create(_markDispatched, now, ids);
 
     public FormattableString Cleanup(Guid boundary) => FormattableStringFactory.Create(_cleanup, boundary);
+
+    public FormattableString Expire(Guid boundary) => FormattableStringFactory.Create(_expire, boundary, _types);
 }
 
 /// <summary>One waiting outbox row, as DSP-3's select reads it.</summary>

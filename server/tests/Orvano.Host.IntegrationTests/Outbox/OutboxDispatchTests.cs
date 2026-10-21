@@ -18,13 +18,17 @@ using Orvano.Testing;
 
 namespace Orvano.Host.IntegrationTests.Outbox;
 
-// Spec 0013 build plan steps 27 and 28: a dispatch pass moves committed events into one job per subscriber in batches,
-// marks every selected row, rolls a failed batch back whole, and halves that outbox's next batch. One api host (no
+// Spec 0013 build plan steps 27, 28, and 31: a dispatch pass moves committed events of the types it registers into one
+// job per subscriber in batches, marks every selected row, leaves rows of other types waiting for a newer worker, rolls a
+// failed batch back whole, and halves that outbox's next batch. One api host (no
 // dispatcher loop) with the sample outbox and a second one, "aside", whose only type has no subscriber; the tests drive
 // each pass with JobsDriver.DispatchAsync on a ManualClock.
 public sealed class OutboxDispatchTests(PostgresFixture postgres) : IAsyncLifetime
 {
     private const string Aside = "aside";
+
+    /// <summary>The newer version's subscriber of <see cref="SampleNoteArchived"/>.</summary>
+    private const string Archived = "sample.note_archived.record";
 
     private readonly ManualClock _clock = new();
     private readonly RecordingLogs _logs = new();
@@ -101,31 +105,72 @@ public sealed class OutboxDispatchTests(PostgresFixture postgres) : IAsyncLifeti
     }
 
     [Fact]
-    [Trait("Spec", "0013:AC-36"), Trait("Spec", "0013:DSP-4"), Trait("Spec", "0013:DLV-4"), Trait("Spec", "0013:AC-41")]
-    public async Task Rows_of_an_unknown_type_and_without_subscribers_are_marked_and_a_second_dispatch_inserts_no_job()
+    [Trait("Spec", "0013:AC-36"), Trait("Spec", "0013:DSP-3"), Trait("Spec", "0013:DLV-4"), Trait("Spec", "0013:AC-41")]
+    public async Task Rows_without_subscribers_are_marked_and_a_second_dispatch_inserts_no_job()
     {
         Guid note = await OutboxHosts.PublishAsync(_host.Services, new SampleNoteAdded(Guid.CreateVersion7()), null, Token);
-        Guid unknown = await _rows.InsertAsync("sample.gone.v1", "{}", _clock.GetUtcNow(), Token);
         await PublishAsideAsync(Token);
         using var meters = new MeterRecorder(_host.Services.GetRequiredService<IMeterFactory>());
 
-        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(3);
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(2);
 
         (await _rows.CountAsync("dispatched_at IS NULL", Token)).ShouldBe(0);
         (await AsideWaitingAsync(Token)).ShouldBe(0);
         (await _jobs.WhereAsync("true", Token)).Select(job => job.DedupeKey).ShouldBe(
             [$"{note:D}:{OutboxProbes.Recorder}", $"{note:D}:{OutboxProbes.Second}"], ignoreOrder: true);
-        meters.Sum("orvano.infrastructure.outbox.dispatched", "type", "unknown").ShouldBe(1);
         meters.Sum("orvano.infrastructure.outbox.dispatched", "type", AsideHappened.Type).ShouldBe(1);
-        _logs.Count(LogEventIds.Infrastructure + 203, LogLevel.Warning).ShouldBe(1);
-        _logs.Messages(LogEventIds.Infrastructure + 203).ShouldHaveSingleItem().ShouldContain("sample.gone.v1");
         _logs.Count(LogEventIds.Infrastructure + 201, LogLevel.Debug).ShouldBe(2);
 
         // A commit whose outcome was unknown is dispatched again: every delivery's dedupe key is taken (DLV-4).
         await _database.ExecuteAsync("UPDATE sample.outbox SET dispatched_at = NULL", Token);
-        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(2);
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(1);
         (await _jobs.CountAsync("true", Token)).ShouldBe(2);
-        (await _rows.CountAsync("id = ANY($1) AND dispatched_at IS NOT NULL", Token, new[] { note, unknown })).ShouldBe(2);
+        (await _rows.CountAsync("id = $1 AND dispatched_at IS NOT NULL", Token, note)).ShouldBe(1);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-36"), Trait("Spec", "0013:DSP-2"), Trait("Spec", "0013:DSP-4"), Trait("Spec", "0013:DSP-5"), Trait("Spec", "0013:AC-41"), Trait("Spec", "0013:OTL-1")]
+    public async Task Rows_of_a_type_this_process_does_not_register_wait_without_holding_back_the_rest_until_a_newer_worker_dispatches_them()
+    {
+        // Ids are uuid v7 from the clock, so a millisecond between the groups puts the waiting rows first, between, and last.
+        var waiting = new List<Guid> { await _rows.InsertAsync(SampleNoteArchived.Type, "{}", _clock.GetUtcNow(), Token) };
+        _clock.Advance(TimeSpan.FromMilliseconds(1));
+        await OutboxHosts.PublishManyAsync(_host.Services, 75, _ => new SampleNoteAdded(Guid.CreateVersion7()), null, Token);
+        _clock.Advance(TimeSpan.FromMilliseconds(1));
+        waiting.Add(await _rows.InsertAsync(SampleNoteArchived.Type, "{}", _clock.GetUtcNow(), Token));
+        _clock.Advance(TimeSpan.FromMilliseconds(1));
+        await OutboxHosts.PublishManyAsync(_host.Services, 75, _ => new SampleNoteAdded(Guid.CreateVersion7()), null, Token);
+        _clock.Advance(TimeSpan.FromMilliseconds(1));
+        waiting.Add(await _rows.InsertAsync(SampleNoteArchived.Type, "{}", _clock.GetUtcNow(), Token));
+        _clock.Advance(TimeSpan.FromSeconds(5));
+        using var meters = new MeterRecorder(_host.Services.GetRequiredService<IMeterFactory>());
+
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(150);
+
+        _interceptor.Sizes.ShouldBe([100, 100]); // the second batch takes 50 of 100: the waiting rows are not counted
+        Dispatch.BatchSizeOf(SampleOutboxDbContext.Schema).ShouldBe(OutboxDispatch.FullBatch);
+        (await _rows.CountAsync("dispatched_at IS NULL", Token)).ShouldBe(3);
+        (await _rows.CountAsync("id = ANY($1) AND dispatched_at IS NULL", Token, waiting.ToArray())).ShouldBe(3);
+        (await _jobs.CountAsync("true", Token)).ShouldBe(300);
+        meters.Sum("orvano.infrastructure.outbox.dispatched", "type", SampleNoteAdded.Type).ShouldBe(150);
+        meters.Sum("orvano.infrastructure.outbox.dispatched", "type", SampleNoteArchived.Type).ShouldBe(0);
+        meters.Sum("orvano.infrastructure.outbox.dispatched", "type", "unknown").ShouldBe(0);
+        meters.Values("orvano.infrastructure.outbox.lag", "outbox", SampleOutboxDbContext.Schema).Count.ShouldBe(150);
+        _logs.Count(LogEventIds.Infrastructure + 202, LogLevel.Error).ShouldBe(0);
+        _logs.Messages(LogEventIds.Infrastructure + 203).ShouldBeEmpty();
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(0); // nothing left that this process registers
+
+        // A newer worker registers the type and dispatches exactly the waiting rows, its lag counting the whole wait.
+        OrvanoApiFactory newer = NewerHost();
+        using var newerMeters = new MeterRecorder(newer.Services.GetRequiredService<IMeterFactory>());
+        (await JobsDriver.DispatchAsync(newer.Services, Token)).ShouldBe(3);
+
+        (await _rows.CountAsync("dispatched_at IS NULL", Token)).ShouldBe(0);
+        (await _jobs.WhereAsync("kind = $1", Token, Archived)).Select(job => job.DedupeKey).ShouldBe(
+            waiting.Select(id => $"{id:D}:{Archived}"), ignoreOrder: true);
+        (await _jobs.CountAsync("true", Token)).ShouldBe(303);
+        newerMeters.Sum("orvano.infrastructure.outbox.dispatched", "type", SampleNoteArchived.Type).ShouldBe(3);
+        newerMeters.Values("orvano.infrastructure.outbox.lag", "outbox", SampleOutboxDbContext.Schema).ShouldAllBe(lag => lag >= 5);
     }
 
     [Fact]
@@ -430,6 +475,24 @@ public sealed class OutboxDispatchTests(PostgresFixture postgres) : IAsyncLifeti
         return host;
     }
 
+    /// <summary>A host of a newer version: its sample outbox also registers <see cref="SampleNoteArchived"/>, with a subscriber.</summary>
+    private OrvanoApiFactory NewerHost()
+    {
+        OrvanoApiFactory host = JobHosts.Create(_settings, new JobProbes(), _clock, roles: "api", services =>
+        {
+            services.AddSingleton(new OutboxProbes());
+            services.AddNewerSampleOutbox();
+            services.AddEventHandler<SampleNoteAdded, NoteRecorder>(OutboxProbes.Recorder, OutboxHosts.RecorderOptions);
+            services.AddEventHandler<SampleNoteAdded, SecondNoteRecorder>(OutboxProbes.Second);
+            services.AddEventHandler<SampleNoteChained, ChainedRecorder>(OutboxProbes.Chained);
+            services.AddEventHandler<SampleNoteArchived, ArchivedRecorder>(Archived);
+            services.AddOutbox(Aside, outbox => outbox.Event(AsideJsonContext.Default.AsideHappened));
+            services.AddSingleton<ILoggerProvider>(_logs);
+        });
+        _hosts.Add(host);
+        return host;
+    }
+
     private async Task PublishAsideAsync(CancellationToken cancellationToken)
     {
         IOutbox outbox = _host.Services.GetRequiredService<IOutbox>();
@@ -458,6 +521,12 @@ internal sealed record AsideHappened(Guid Id) : IOutboxEvent
 
 [JsonSerializable(typeof(AsideHappened))]
 internal sealed partial class AsideJsonContext : JsonSerializerContext;
+
+/// <summary>The newer version's subscriber of <see cref="SampleNoteArchived"/>; the dispatch tests never run it.</summary>
+internal sealed class ArchivedRecorder : IEventHandler<SampleNoteArchived>
+{
+    public Task HandleAsync(SampleNoteArchived @event, EventContext context, CancellationToken cancellationToken) => Task.CompletedTask;
+}
 
 /// <summary>Collects the stopped activities of the <c>Orvano.Infrastructure</c> source.</summary>
 internal sealed class ActivityCapture : IDisposable

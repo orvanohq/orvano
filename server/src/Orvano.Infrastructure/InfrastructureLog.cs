@@ -181,9 +181,7 @@ internal static partial class InfrastructureLog
         Message = "Dispatching the {Outbox} outbox failed; nothing was enqueued or marked, and the next wake tries again")]
     public static partial void OutboxBatchFailed(this ILogger logger, string outbox, Exception? exception);
 
-    [LoggerMessage(EventId = LogEventIds.Infrastructure + 203, Level = LogLevel.Warning,
-        Message = "The {Outbox} outbox holds an event of type {Type}, which no outbox registers; it was marked dispatched with no deliveries")]
-    public static partial void OutboxEventTypeUnknown(this ILogger logger, string outbox, string type);
+    // + 203, the unknown type Warning, is retired with DSP-4's old mark and not reused (spec 0013 OTL-2).
 
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 204, Level = LogLevel.Debug,
         Message = "Published event {Type} {Id}: {Payload}")]
@@ -192,4 +190,8 @@ internal static partial class InfrastructureLog
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 205, Level = LogLevel.Information,
         Message = "Outbox cleanup deleted {Deleted} dispatched events from the {Outbox} outbox")]
     public static partial void OutboxCleanedUp(this ILogger logger, string outbox, int deleted);
+
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 206, Level = LogLevel.Warning,
+        Message = "Outbox cleanup deleted {Deleted} events from the {Outbox} outbox that waited more than 30 days for a version that registers their type")]
+    public static partial void OutboxEventsExpired(this ILogger logger, string outbox, int deleted);
 }
