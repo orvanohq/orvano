@@ -159,7 +159,7 @@ spec [0013](../specs/0013-background-runtime/index.md) (builds spec [0007](../sp
     - built: spec 0013 build plan steps 24 to 30 (the `Outbox/` contracts, `OutboxEvent` and `HasOutbox()`, `AddBeforeCommit`, `OutboxRegistry` in `StartupChecks`, `Outbox` publish, the `PoolSize` / 2 − 2 limit with `PoolSize` at least 6, `OutboxDispatch` with per outbox batch halving and `OutboxDispatcher` on `WorkerWake`, delivery kinds, `outbox.cleanup`, telemetry and guard rails, `JobsDriver.DispatchAsync`, and the test only `SampleOutboxDbContext`), 2026-10-20; no migration, since no module owns an outbox yet
 - [x] Verify it: `/check verify background runtime`
 - [x] Test it: `/test background runtime`
-- [ ] Review it (fresh model): `/check review background runtime`
+- [x] Review it (fresh model): `/check review background runtime`
 - [ ] Document it: `/document background runtime`
 
 ### 11. Design system & console shell · needs a decision
