@@ -31,6 +31,9 @@ internal sealed class InfrastructureTelemetry
     private readonly Histogram<double> _jobDuration;
     private readonly Histogram<double> _jobLag;
     private readonly Counter<long> _schedulesFired;
+    private readonly Counter<long> _eventsPublished;
+    private readonly Counter<long> _eventsDispatched;
+    private readonly Histogram<double> _outboxLag;
 
     public InfrastructureTelemetry(IMeterFactory meters)
     {
@@ -45,6 +48,11 @@ internal sealed class InfrastructureTelemetry
         _jobDuration = Meter.CreateHistogram("orvano.infrastructure.jobs.duration", "s", "From handler start to outcome.", advice: SecondsAdvice);
         _jobLag = Meter.CreateHistogram("orvano.infrastructure.jobs.lag", "s", "From a job's due time to its claim.", advice: SecondsAdvice);
         _schedulesFired = Meter.CreateCounter<long>("orvano.infrastructure.jobs.schedules.fired", "{fire}", "Schedule occurrences enqueued.");
+
+        // Spec 0013 OTL-1: types and schemas come from registrations, never from a row's text; no ids.
+        _eventsPublished = Meter.CreateCounter<long>("orvano.infrastructure.outbox.published", "{event}", "Events published by committed transactions.");
+        _eventsDispatched = Meter.CreateCounter<long>("orvano.infrastructure.outbox.dispatched", "{event}", "Events whose deliveries were enqueued.");
+        _outboxLag = Meter.CreateHistogram("orvano.infrastructure.outbox.lag", "s", "From an event's publish to its dispatch commit.", advice: SecondsAdvice);
     }
 
     public static ActivitySource ActivitySource { get; } = new(Name);
@@ -72,6 +80,13 @@ internal sealed class InfrastructureTelemetry
 
     public void JobClaimed(string kind, TimeSpan lag) =>
         _jobLag.Record(Math.Max(0, lag.TotalSeconds), new KeyValuePair<string, object?>("kind", kind));
+
+    public void EventPublished(string type) => _eventsPublished.Add(1, new KeyValuePair<string, object?>("type", type));
+
+    public void EventDispatched(string type) => _eventsDispatched.Add(1, new KeyValuePair<string, object?>("type", type));
+
+    public void EventDispatchLag(string outbox, TimeSpan lag) =>
+        _outboxLag.Record(Math.Max(0, lag.TotalSeconds), new KeyValuePair<string, object?>("outbox", outbox));
 
     public void ScheduleFired(string schedule) => _schedulesFired.Add(1, new KeyValuePair<string, object?>("schedule", schedule));
 }

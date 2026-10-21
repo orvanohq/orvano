@@ -34,7 +34,7 @@ internal sealed class JobQueue(
         ArgumentNullException.ThrowIfNull(context);
         (JobRegistration registration, string payload) = Check(job, options);
         TransactionSignals.EnsureEnlistable(context); // ENQ-2: the SND-5 refusals, before any I/O
-        return await InsertAsync(context, registration, payload, options, cancellationToken);
+        return await InsertAsync(context, registration, payload, options, CurrentTraceParent(), cancellationToken);
     }
 
     public async Task<Guid?> EnqueueAsync<TJob>(TJob job, EnqueueOptions? options, CancellationToken cancellationToken)
@@ -43,7 +43,8 @@ internal sealed class JobQueue(
         (JobRegistration registration, string payload) = Check(job, options);
         await using AsyncServiceScope scope = scopes.CreateAsyncScope();
         JobsDbContext db = scope.ServiceProvider.GetRequiredService<JobsDbContext>();
-        return await db.InTransactionAsync(token => InsertAsync(db, registration, payload, options, token), cancellationToken);
+        string? traceParent = CurrentTraceParent();
+        return await db.InTransactionAsync(token => InsertAsync(db, registration, payload, options, traceParent, token), cancellationToken);
     }
 
     public async Task<int> CancelProjectJobsAsync(Guid projectId, Guid? exceptJobId, CancellationToken cancellationToken)
@@ -68,10 +69,16 @@ internal sealed class JobQueue(
     /// <summary>
     /// ENQ-1, ENQ-4, ENQ-5: one insert on <paramref name="context"/>'s connection and transaction, which the caller has
     /// open. Returns the new id, or <see langword="null"/> on a dedupe hit. The schedule tick calls it with a payload
-    /// <c>JobRegistry</c> already checked.
+    /// <c>JobRegistry</c> already checked, and the outbox dispatcher with each event's delivery and the publishing
+    /// trace (DLV-3); the enqueue paths pass <see cref="CurrentTraceParent"/>.
     /// </summary>
     public async Task<Guid?> InsertAsync(
-        DbContext context, JobRegistration registration, string payload, EnqueueOptions? options, CancellationToken cancellationToken)
+        DbContext context,
+        JobRegistration registration,
+        string payload,
+        EnqueueOptions? options,
+        string? traceParent,
+        CancellationToken cancellationToken)
     {
         DateTimeOffset now = time.GetUtcNow();
         DateTimeOffset runAt = options?.RunAt?.ToUniversalTime() ?? now;
@@ -80,7 +87,6 @@ internal sealed class JobQueue(
         string? dedupeKey = options?.DedupeKey;
         Guid? projectId = options?.ProjectId;
         int maxAttempts = registration.Options.MaxAttempts;
-        string? traceParent = Activity.Current is { IdFormat: ActivityIdFormat.W3C } activity ? activity.Id : null;
 
         int inserted = await context.Database.ExecuteSqlAsync(
             $"""
@@ -111,6 +117,10 @@ internal sealed class JobQueue(
 
         return id;
     }
+
+    /// <summary>The W3C <c>traceparent</c> of the current activity, if any (JTL-3).</summary>
+    public static string? CurrentTraceParent() =>
+        Activity.Current is { IdFormat: ActivityIdFormat.W3C } activity ? activity.Id : null;
 
     /// <summary>ENQ-3: every argument check, before any I/O.</summary>
     private (JobRegistration Registration, string Payload) Check<TJob>(TJob job, EnqueueOptions? options)

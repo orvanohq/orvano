@@ -20,7 +20,8 @@ public sealed class JobOptions : IValidatableObject
 
     /// <summary>
     /// The most jobs one worker process runs at once, 1 to 256 and at most half of <c>ORVANO_DATABASE__POOLSIZE</c> less
-    /// one (the runner's own connection). Unset, it is the smallest of processor count × 2, 16, and that limit (at least 1).
+    /// two (the runner's and the outbox dispatcher's loop connections, spec 0013 OPL-1). Unset, it is the smallest of
+    /// processor count × 2, 16, and that limit (at least 1).
     /// </summary>
     public int? Concurrency { get; set; }
 

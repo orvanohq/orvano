@@ -118,7 +118,7 @@ internal sealed class JobScheduler(
 
                 string dedupeKey = name + ":" + fireTime.UtcDateTime.ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture);
                 Guid? job = await queue.InsertAsync(
-                    db, schedule.Registration, schedule.Payload, new EnqueueOptions { DedupeKey = dedupeKey, RunAt = fireTime }, token);
+                    db, schedule.Registration, schedule.Payload, new EnqueueOptions { DedupeKey = dedupeKey, RunAt = fireTime }, JobQueue.CurrentTraceParent(), token);
                 if (job is not null)
                 {
                     TransactionSignals.AddOnCommitted(db, _ =>

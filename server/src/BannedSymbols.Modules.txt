@@ -17,3 +17,4 @@ M:Npgsql.NpgsqlDataSource.CreateConnection; CAC-5: write the platform database t
 M:Npgsql.NpgsqlDataSource.CreateCommand(System.String); CAC-5: write the platform database through your DbContext, project databases through IProjectDbConnectionFactory (spec 0013 CAC-5, spec 0007 PG-3)
 M:Npgsql.NpgsqlDataSource.CreateBatch; CAC-5: write the platform database through your DbContext, project databases through IProjectDbConnectionFactory (spec 0013 CAC-5, spec 0007 PG-3)
 T:Orvano.SharedKernel.Jobs.JobAccessScope; JQ-6: only the job runner sets a job's caller and project; read them from ICallerContext and IProjectContext (spec 0013 JQ-6)
+T:Orvano.SharedKernel.Outbox.OutboxEvent; OGR-1: publish through IOutbox; never write, read, or delete an outbox row yourself (spec 0013 OGR-1, OGR-2)

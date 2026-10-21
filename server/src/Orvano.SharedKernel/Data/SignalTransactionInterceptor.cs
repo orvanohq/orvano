@@ -8,7 +8,8 @@ using Orvano.SharedKernel.Signals;
 namespace Orvano.SharedKernel.Data;
 
 /// <summary>
-/// Sends a context's pending signals inside its transaction, just before the commit (spec 0013 SND-2, SND-3, SND-5, SND-8).
+/// Runs a context's before commit checks and sends its pending signals inside its transaction, just before the commit
+/// (spec 0013 SND-2, SND-3, SND-5, SND-8, PUB-3).
 /// <c>UseOrvanoConventions</c> registers it, so every platform context has it. A listener sees a signal only once the
 /// change it announces is visible, and never for a rolled back change.
 /// </summary>
@@ -66,6 +67,9 @@ internal sealed class SignalTransactionInterceptor(PendingSignals batch, Lazy<IL
     {
         DbConnection connection = transaction.Connection
             ?? throw new InvalidOperationException("The transaction has no connection to send its signals on.");
+
+        // PUB-3: before any pg_notify, so a check that fails the commit sends nothing.
+        batch.RunBeforeCommit();
 
         // One notification per kind. A failure here fails the commit: the signal is part of the change.
         foreach ((SignalKind kind, IReadOnlyList<string> values) in batch.Batches)

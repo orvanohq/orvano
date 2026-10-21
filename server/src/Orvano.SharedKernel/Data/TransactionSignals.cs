@@ -51,6 +51,20 @@ public static class TransactionSignals
     }
 
     /// <summary>
+    /// Adds a check that runs just before the transaction commits, before any signal is sent, at most one per
+    /// <paramref name="key"/> per transaction (spec 0013 PUB-3). A check that throws fails the commit, so the
+    /// transaction rolls back and nothing is sent; the on committed actions then never run.
+    /// </summary>
+    public static void AddBeforeCommit(DbContext context, object key, Action<DbContext> check)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(check);
+
+        // The interceptor holds no context, so the check carries the one it was given.
+        BatchOf(context, requireTransaction: true).AddBeforeCommit(key, () => check(context));
+    }
+
+    /// <summary>
     /// Adds an action that runs only after a confirmed commit, after the after commit actions, before <c>CommitAsync</c>
     /// returns; never for a commit with an unknown outcome (SND-1, SND-3). Use it for what must not happen for a commit
     /// that may not have gone through, such as counting a signal as sent. It must catch its own exceptions.

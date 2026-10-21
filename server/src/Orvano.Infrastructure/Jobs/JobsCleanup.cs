@@ -61,4 +61,5 @@ internal sealed class JobsCleanupHandler(JobsDbContext db, TimeProvider time, IL
 
 /// <summary>Infrastructure's own job payloads (spec 0002 JSN-1).</summary>
 [JsonSerializable(typeof(JobsCleanup))]
+[JsonSerializable(typeof(Outbox.OutboxCleanup))]
 internal sealed partial class InfrastructureJsonContext : JsonSerializerContext;

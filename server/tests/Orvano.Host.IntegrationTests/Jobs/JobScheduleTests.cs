@@ -93,7 +93,7 @@ public sealed class JobScheduleTests(PostgresFixture postgres) : IAsyncLifetime
         OrvanoApiFactory first = Host(services => services.AddJobSchedule("test.sched", "0 * * * *", new ProbeJob(ProbeMode.Ok)));
         await Scheduler(first).SyncAsync(Token);
         (await ScheduleAsync("test.sched")).NextRunAt.ShouldBe(Start.AddHours(1));
-        _logs.Messages(LogEventIds.Infrastructure + 112)[^1].ShouldBe("Job schedules synced: 2 added, 0 updated, 0 removed");
+        _logs.Messages(LogEventIds.Infrastructure + 112)[^1].ShouldBe("Job schedules synced: 3 added, 0 updated, 0 removed"); // with jobs.cleanup and outbox.cleanup
 
         _clock.Advance(TimeSpan.FromMinutes(10));
         await Scheduler(first).SyncAsync(Token); // same cron: state kept
@@ -109,7 +109,7 @@ public sealed class JobScheduleTests(PostgresFixture postgres) : IAsyncLifetime
 
         OrvanoApiFactory removed = Host();
         await Scheduler(removed).SyncAsync(Token);
-        (await ScheduleNamesAsync()).ShouldBe(["jobs.cleanup"]);
+        (await ScheduleNamesAsync()).ShouldBe(["jobs.cleanup", "outbox.cleanup"]);
         _logs.Messages(LogEventIds.Infrastructure + 112)[^1].ShouldBe("Job schedules synced: 0 added, 0 updated, 1 removed");
     }
 
