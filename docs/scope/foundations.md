@@ -158,7 +158,7 @@ spec [0013](../specs/0013-background-runtime/index.md) (builds spec [0007](../sp
   - [x] Module outbox and dispatcher: `IOutbox`, `IOutboxRegistry`, `HasOutbox()`, publish in the caller's transaction, the dispatcher on `WorkerWake`, one delivery job per subscriber, `outbox.cleanup`, and the pool limit at half less two (EVT-1 to EVT-3; spec 0013 AC-31 to AC-43, build plan steps 24 to 30); EVT-4's readers are features 33 to 36
     - built: spec 0013 build plan steps 24 to 30 (the `Outbox/` contracts, `OutboxEvent` and `HasOutbox()`, `AddBeforeCommit`, `OutboxRegistry` in `StartupChecks`, `Outbox` publish, the `PoolSize` / 2 − 2 limit with `PoolSize` at least 6, `OutboxDispatch` with per outbox batch halving and `OutboxDispatcher` on `WorkerWake`, delivery kinds, `outbox.cleanup`, telemetry and guard rails, `JobsDriver.DispatchAsync`, and the test only `SampleOutboxDbContext`), 2026-10-20; no migration, since no module owns an outbox yet
 - [x] Verify it: `/check verify background runtime`
-- [ ] Test it: `/test background runtime`
+- [x] Test it: `/test background runtime`
 - [ ] Review it (fresh model): `/check review background runtime`
 - [ ] Document it: `/document background runtime`
 

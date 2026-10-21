@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Orvano.Host.IntegrationTests.Jobs;
 using Orvano.Host.IntegrationTests.Signals;
 using Orvano.SharedKernel.Access;
+using Orvano.SharedKernel.Outbox;
 using Orvano.Testing;
 
 namespace Orvano.Host.IntegrationTests.Outbox;
@@ -18,7 +19,9 @@ public sealed class OutboxDeliveryTests(PostgresFixture postgres) : IAsyncLifeti
     private readonly OutboxProbes _probes = new();
     private readonly ManualClock _clock = new();
     private readonly RecordingLogs _logs = new();
+    private Dictionary<string, string> _settings = null!;
     private OrvanoApiFactory _host = null!;
+    private OrvanoApiFactory? _late;
     private TestDatabase _database = null!;
     private JobRows _jobs = null!;
 
@@ -26,16 +29,21 @@ public sealed class OutboxDeliveryTests(PostgresFixture postgres) : IAsyncLifeti
 
     public async ValueTask InitializeAsync()
     {
-        Dictionary<string, string> settings = await SignalHosts.SettingsOnOwnDatabaseAsync(postgres, "delivery", Token);
-        settings["Logging:LogLevel:Default"] = "Debug";
-        _database = TestDatabase.For(postgres, settings);
+        _settings = await SignalHosts.SettingsOnOwnDatabaseAsync(postgres, "delivery", Token);
+        _settings["Logging:LogLevel:Default"] = "Debug";
+        _database = TestDatabase.For(postgres, _settings);
         _jobs = _database.Rows();
-        _host = OutboxHosts.Create(settings, _probes, _clock, roles: "api", services => services.AddSingleton<ILoggerProvider>(_logs));
+        _host = OutboxHosts.Create(_settings, _probes, _clock, roles: "api", services => services.AddSingleton<ILoggerProvider>(_logs));
         await SampleOutboxDbContext.CreateTablesAsync(_host.Services, Token);
     }
 
     public async ValueTask DisposeAsync()
     {
+        if (_late is not null)
+        {
+            await _late.DisposeAsync();
+        }
+
         await _host.DisposeAsync();
         await _database.DisposeAsync();
     }
@@ -170,5 +178,41 @@ public sealed class OutboxDeliveryTests(PostgresFixture postgres) : IAsyncLifeti
         (await _jobs.CountAsync("status = 'queued'", Token)).ShouldBe(4);
         (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(0);
         (await JobsDriver.RunDueAsync(_host.Services, Token)).Count.ShouldBe(4);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-36"), Trait("Spec", "0013:AC-38"), Trait("Spec", "0013:DSP-3"), Trait("Spec", "0013:DLV-1")]
+    public async Task A_subscriber_added_later_gets_only_events_dispatched_after_it_is_registered()
+    {
+        var old = Guid.CreateVersion7();
+        await OutboxHosts.PublishAsync(_host.Services, new SampleNoteAdded(old), null, Token);
+        (await JobsDriver.RunDueAsync(_host.Services, Token)).Count.ShouldBe(2);
+
+        // A new version of the host, as after a deploy, adds a third subscriber.
+        _late = OutboxHosts.Create(_settings, _probes, _clock, roles: "api", services =>
+            services.AddEventHandler<SampleNoteAdded, LateNoteRecorder>(LateNoteRecorder.Name));
+        (await JobsDriver.RunDueAsync(_late.Services, Token)).ShouldBeEmpty(); // the old event stays dispatched
+        var fresh = Guid.CreateVersion7();
+        await OutboxHosts.PublishAsync(_late.Services, new SampleNoteAdded(fresh), null, Token);
+
+        IReadOnlyList<JobRun> runs = await JobsDriver.RunDueAsync(_late.Services, Token);
+
+        runs.Select(run => run.Kind).ShouldBe([OutboxProbes.Recorder, OutboxProbes.Second, LateNoteRecorder.Name], ignoreOrder: true);
+        runs.ShouldAllBe(run => run.Outcome == "succeeded");
+        _probes.Of(LateNoteRecorder.Name).ShouldHaveSingleItem().NoteId.ShouldBe(fresh);
+        (await _jobs.CountAsync("kind = $1", Token, LateNoteRecorder.Name)).ShouldBe(1);
+        _probes.Of(OutboxProbes.Recorder).Select(delivery => delivery.NoteId).ShouldBe([old, fresh]);
+    }
+}
+
+/// <summary>A subscriber of <see cref="SampleNoteAdded"/> that only a later host registers.</summary>
+internal sealed class LateNoteRecorder(OutboxProbes probes, ICallerContext caller, IProjectContext project) : IEventHandler<SampleNoteAdded>
+{
+    public const string Name = "sample.note_added.late";
+
+    public Task HandleAsync(SampleNoteAdded @event, EventContext context, CancellationToken cancellationToken)
+    {
+        probes.Record(Name, @event.NoteId, context, caller, project);
+        return Task.CompletedTask;
     }
 }
