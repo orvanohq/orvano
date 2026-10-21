@@ -259,6 +259,7 @@ internal sealed class DispatchInterceptor : DbCommandInterceptor
 {
     private readonly Lock _lock = new();
     private volatile bool _failMark;
+    private volatile bool _failAsideMark;
     private Guid? _failEvent;
 
     /// <summary>Each outbox select's <c>LIMIT</c>, in the order the selects ran.</summary>
@@ -278,6 +279,13 @@ internal sealed class DispatchInterceptor : DbCommandInterceptor
     {
         get => _failMark;
         set => _failMark = value;
+    }
+
+    /// <summary>Throws on the <c>aside</c> outbox's mark, as <see cref="FailMark"/> does on the sample one's.</summary>
+    public bool FailAsideMark
+    {
+        get => _failAsideMark;
+        set => _failAsideMark = value;
     }
 
     /// <summary>The event whose delivery insert throws, or none.</summary>
@@ -326,6 +334,11 @@ internal sealed class DispatchInterceptor : DbCommandInterceptor
         if (FailMark && command.CommandText.Contains("UPDATE \"sample\".outbox SET dispatched_at", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("the mark fails");
+        }
+
+        if (FailAsideMark && command.CommandText.Contains("UPDATE \"aside\".outbox SET dispatched_at", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("the aside mark fails");
         }
 
         if (FailEvent is { } failing && command.CommandText.Contains("INSERT INTO jobs.job", StringComparison.Ordinal)

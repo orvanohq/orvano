@@ -180,6 +180,83 @@ public sealed class OutboxDispatchTests(PostgresFixture postgres) : IAsyncLifeti
     }
 
     [Fact]
+    [Trait("Spec", "0013:AC-36"), Trait("Spec", "0013:DSP-3"), Trait("Spec", "0013:DSP-5")]
+    public async Task A_batch_whose_delivery_insert_fails_partway_rolls_back_the_earlier_inserts_and_marks_nothing()
+    {
+        await OutboxHosts.PublishManyAsync(_host.Services, 3, _ => new SampleNoteAdded(Guid.CreateVersion7()), null, Token);
+        _interceptor.FailEvent = (await _rows.WhereAsync("true", Token))[2].Id; // the last in id order, after two events' inserts
+
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(0);
+
+        (await _jobs.CountAsync("true", Token)).ShouldBe(0);
+        (await _rows.CountAsync("dispatched_at IS NULL", Token)).ShouldBe(3);
+        _logs.Count(LogEventIds.Infrastructure + 202, LogLevel.Error).ShouldBe(1);
+        _logs.Count(LogEventIds.Infrastructure + 201, LogLevel.Debug).ShouldBe(0); // no committed batch to report
+        Dispatch.BatchSizeOf("sample").ShouldBe(50);
+
+        _interceptor.FailEvent = null;
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(3);
+        (await _jobs.CountAsync("true", Token)).ShouldBe(6);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-36"), Trait("Spec", "0013:DSP-5")]
+    public async Task Each_outbox_halves_down_to_1_and_returns_to_100_on_its_own_while_the_other_keeps_its_size()
+    {
+        await OutboxHosts.PublishAsync(_host.Services, new SampleNoteAdded(Guid.CreateVersion7()), null, Token);
+        _interceptor.FailMark = true;
+
+        // The sample outbox fails every pass while the aside one commits a new event at 100 each time.
+        for (int pass = 0; pass < 7; pass++)
+        {
+            await PublishAsideAsync(Token);
+            (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(1);
+            Dispatch.BatchSizeOf(Aside).ShouldBe(OutboxDispatch.FullBatch);
+        }
+
+        _interceptor.Sizes.ShouldBe([100, 50, 25, 12, 6, 3, 1]);
+        Dispatch.BatchSizeOf("sample").ShouldBe(1);
+
+        // Now the other way round: sample recovers at once, aside starts halving from 100.
+        _interceptor.FailMark = false;
+        _interceptor.FailAsideMark = true;
+        _interceptor.Sizes.Clear();
+        await PublishAsideAsync(Token);
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(1); // the sample event, at 1, then a full round
+        _interceptor.Sizes.ShouldBe([1, 100]);
+        Dispatch.BatchSizeOf("sample").ShouldBe(OutboxDispatch.FullBatch);
+        Dispatch.BatchSizeOf(Aside).ShouldBe(50);
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(0);
+        Dispatch.BatchSizeOf(Aside).ShouldBe(25);
+        Dispatch.BatchSizeOf("sample").ShouldBe(OutboxDispatch.FullBatch);
+
+        _interceptor.FailAsideMark = false;
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(1);
+        Dispatch.BatchSizeOf(Aside).ShouldBe(OutboxDispatch.FullBatch);
+        (await AsideWaitingAsync(Token)).ShouldBe(0);
+        (await _rows.CountAsync("dispatched_at IS NULL", Token)).ShouldBe(0);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-36"), Trait("Spec", "0013:DSP-3"), Trait("Spec", "0013:DLV-1")]
+    public async Task Events_of_different_projects_in_one_batch_each_get_jobs_in_their_own_project()
+    {
+        var first = Guid.CreateVersion7();
+        var second = Guid.CreateVersion7();
+        Guid a = await OutboxHosts.PublishAsync(_host.Services, new SampleNoteAdded(Guid.CreateVersion7()), first, Token);
+        Guid b = await OutboxHosts.PublishAsync(_host.Services, new SampleNoteAdded(Guid.CreateVersion7()), second, Token);
+        Guid wide = await OutboxHosts.PublishAsync(_host.Services, new SampleNoteAdded(Guid.CreateVersion7()), null, Token);
+
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(3);
+
+        _interceptor.Sizes.ShouldBe([100]); // one batch
+        IReadOnlyList<JobRows.Row> jobs = await _jobs.WhereAsync("true", Token);
+        jobs.Select(job => (job.DedupeKey![..36], job.ProjectId)).Distinct().ShouldBe(
+            [(a.ToString("D"), first), (b.ToString("D"), second), (wide.ToString("D"), (Guid?)null)], ignoreOrder: true);
+        jobs.Count.ShouldBe(6);
+    }
+
+    [Fact]
     [Trait("Spec", "0013:AC-36"), Trait("Spec", "0013:DSP-5"), Trait("Spec", "0013:DSP-6")]
     public async Task A_batch_cut_by_the_bound_halves_the_size_a_shutdown_leaves_it_and_a_new_dispatch_starts_full()
     {

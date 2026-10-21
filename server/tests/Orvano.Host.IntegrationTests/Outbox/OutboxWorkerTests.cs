@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using Npgsql;
 
@@ -93,6 +94,70 @@ public sealed class OutboxWorkerTests(PostgresFixture postgres) : IAsyncLifetime
         clock.Advance(TimeSpan.FromMinutes(1));
         await probes.DeliveredAsync(OutboxProbes.Recorder, polled, TimeSpan.FromSeconds(5), Token);
         await probes.DeliveredAsync(OutboxProbes.Second, polled, TimeSpan.FromSeconds(5), Token);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-36"), Trait("Spec", "0013:DSP-1"), Trait("Spec", "0013:DSP-6")]
+    public async Task A_worker_stopped_in_the_middle_of_a_dispatch_pass_rolls_the_batch_back_quietly_and_the_next_worker_delivers_it_once()
+    {
+        var probes = new OutboxProbes();
+        var logs = new RecordingLogs();
+        var interceptor = new DispatchInterceptor { Hold = true };
+        OrvanoApiFactory api = Host(probes, roles: "api");
+        await SampleOutboxDbContext.CreateTablesAsync(api.Services, Token);
+        var note = Guid.CreateVersion7();
+        Guid id = await OutboxHosts.PublishAsync(api.Services, new SampleNoteAdded(note), null, Token);
+
+        // The worker's first pass holds its select; the batch bound runs on a clock nobody advances.
+        OrvanoApiFactory stopping = Host(probes, roles: "worker", new ManualClock(), extra: services =>
+        {
+            DispatchInterceptor.AddTo(services, interceptor);
+            services.AddSingleton<ILoggerProvider>(logs);
+        });
+        _ = stopping.Services;
+        await interceptor.Holding.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
+        _hosts.Remove(stopping);
+        await stopping.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(20), Token);
+
+        (await _rows.CountAsync("id = $1 AND dispatched_at IS NULL", Token, id)).ShouldBe(1);
+        (await _database.Rows().CountAsync("true", Token)).ShouldBe(0);
+        logs.Count(LogEventIds.Infrastructure + 202, LogLevel.Error).ShouldBe(0); // a shutdown is not a failed batch
+        probes.Deliveries.ShouldBeEmpty();
+
+        OrvanoApiFactory next = Host(probes, roles: "worker");
+        _ = next.Services;
+        await probes.DeliveredAsync(OutboxProbes.Recorder, note, TimeSpan.FromSeconds(10), Token);
+        await probes.DeliveredAsync(OutboxProbes.Second, note, TimeSpan.FromSeconds(10), Token);
+        probes.Deliveries.Count.ShouldBe(2);
+        (await _rows.CountAsync("id = $1 AND dispatched_at IS NOT NULL", Token, id)).ShouldBe(1);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-40"), Trait("Spec", "0013:OPL-1"), Trait("Spec", "0013:JOP-2")]
+    public async Task A_worker_on_the_smallest_pool_of_6_runs_1_handler_and_still_dispatches_and_delivers()
+    {
+        _settings["Database:PoolSize"] = "6";
+        var probes = new OutboxProbes();
+        OrvanoApiFactory api = Host(probes, roles: "api");
+        await SampleOutboxDbContext.CreateTablesAsync(api.Services, Token);
+        OrvanoApiFactory worker = Host(probes, roles: "worker");
+        await api.WaitUntilConnectedAsync(Token);
+        await worker.WaitUntilConnectedAsync(Token);
+
+        worker.Services.GetRequiredService<IOptions<JobOptions>>().Value.Concurrency.ShouldBe(1);
+        Guid[] notes = [Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7()];
+        foreach (Guid note in notes)
+        {
+            await OutboxHosts.PublishAsync(api.Services, new SampleNoteAdded(note), null, Token);
+        }
+
+        foreach (Guid note in notes)
+        {
+            await probes.DeliveredAsync(OutboxProbes.Recorder, note, TimeSpan.FromSeconds(10), Token);
+            await probes.DeliveredAsync(OutboxProbes.Second, note, TimeSpan.FromSeconds(10), Token);
+        }
+
+        probes.Deliveries.Count.ShouldBe(6);
     }
 
     [Fact]
