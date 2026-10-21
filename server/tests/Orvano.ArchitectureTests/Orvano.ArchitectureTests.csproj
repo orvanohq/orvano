@@ -6,5 +6,7 @@
     <PackageReference Include="Shouldly" />
     <PackageReference Include="xunit.v3.mtp-v2" />
     <ProjectReference Include="..\..\src\Orvano.Host\Orvano.Host.csproj" />
+    <!-- Spec 0013 OTS-3: the spec 0011 rules run on the sample outbox context explicitly. -->
+    <ProjectReference Include="..\Orvano.Testing\Orvano.Testing.csproj" />
   </ItemGroup>
 </Project>

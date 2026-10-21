@@ -7,10 +7,20 @@ using Xunit;
 
 namespace Orvano.ArchitectureTests;
 
-// Spec 0013 JTS-1, AC-29: every time the queue and runner store or compare is a parameter from the injected clock, so
-// no SQL in Orvano.Infrastructure/Jobs/ asks the database for its own time.
+// Spec 0013 JTS-1, AC-29, OTS-1, AC-43: every time the queue, the runner, and the outbox store or compare is a parameter
+// from the injected clock, so no SQL in Orvano.Infrastructure/Jobs/ or Outbox/ asks the database for its own time.
 public sealed partial class JobTimeTests
 {
+    [Fact]
+    [Trait("Spec", "0013:OTS-1"), Trait("Spec", "0013:AC-43")]
+    public void No_outbox_source_file_reads_the_database_clock()
+    {
+        string[] files = [.. Directory.EnumerateFiles(Path.Combine(ServerDirectory(), "src", "Orvano.Infrastructure", "Outbox"), "*.cs", SearchOption.AllDirectories)];
+
+        files.Length.ShouldBeGreaterThan(5);
+        files.Where(file => DatabaseClock().IsMatch(File.ReadAllText(file))).ShouldBeEmpty();
+    }
+
     [Fact]
     [Trait("Spec", "0013:JTS-1"), Trait("Spec", "0013:AC-29")]
     public void No_jobs_source_file_reads_the_database_clock()

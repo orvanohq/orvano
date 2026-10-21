@@ -167,4 +167,29 @@ internal static partial class InfrastructureLog
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 121, Level = LogLevel.Error,
         Message = "Marking expired jobs dead failed; the runner tries again at the next poll")]
     public static partial void JobMarkDeadFailed(this ILogger logger, Exception exception);
+
+    // Spec 0013 OTL-2: the outbox block, + 200 to + 299. Payloads only at Debug (spec 0006 LOG-2).
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 200, Level = LogLevel.Information,
+        Message = "Outbox dispatcher started with {Outboxes} outboxes and {Subscribers} subscribers")]
+    public static partial void OutboxDispatcherStarted(this ILogger logger, int outboxes, int subscribers);
+
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 201, Level = LogLevel.Debug,
+        Message = "Dispatched {Events} events of the {Outbox} outbox into {Jobs} jobs")]
+    public static partial void OutboxBatchDispatched(this ILogger logger, string outbox, int events, int jobs);
+
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 202, Level = LogLevel.Error,
+        Message = "Dispatching the {Outbox} outbox failed; nothing was enqueued or marked, and the next wake tries again")]
+    public static partial void OutboxBatchFailed(this ILogger logger, string outbox, Exception exception);
+
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 203, Level = LogLevel.Warning,
+        Message = "The {Outbox} outbox holds an event of type {Type}, which no outbox registers; it was marked dispatched with no deliveries")]
+    public static partial void OutboxEventTypeUnknown(this ILogger logger, string outbox, string type);
+
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 204, Level = LogLevel.Debug,
+        Message = "Published event {Type} {Id}: {Payload}")]
+    public static partial void OutboxEventPublished(this ILogger logger, string type, Guid id, string payload);
+
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 205, Level = LogLevel.Information,
+        Message = "Outbox cleanup deleted {Deleted} dispatched events from the {Outbox} outbox")]
+    public static partial void OutboxCleanedUp(this ILogger logger, string outbox, int deleted);
 }

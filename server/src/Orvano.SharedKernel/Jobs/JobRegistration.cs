@@ -170,7 +170,8 @@ public static partial class JobServiceCollectionExtensions
     public static bool IsValidName(string? name) =>
         name is { Length: >= MinNameLength and <= MaxNameLength } && NamePattern().IsMatch(name);
 
-    private static void EnsureValidName(string? name, string what)
+    /// <summary>JQ-1's check, also run by <c>AddEventHandler</c> on a subscriber name (spec 0013 OBX-5).</summary>
+    internal static void EnsureValidName(string? name, string what)
     {
         if (!IsValidName(name))
         {
@@ -180,7 +181,8 @@ public static partial class JobServiceCollectionExtensions
         }
     }
 
-    private static void EnsureValidOptions(string kind, JobKindOptions options)
+    /// <summary>JQ-5's option ranges, also run by <c>AddEventHandler</c> (spec 0013 OBX-5).</summary>
+    internal static void EnsureValidOptions(string kind, JobKindOptions options)
     {
         if (options.Lease < JobKindOptions.MinLease || options.Lease > JobKindOptions.MaxLease)
         {

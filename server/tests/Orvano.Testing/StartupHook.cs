@@ -10,7 +10,8 @@ using Microsoft.Extensions.Hosting;
 /// Loaded into the real <c>orvano</c> process through <see cref="Orvano.Testing.OrvanoCli.UndeclaredEndpointHook"/>:
 /// maps <c>/test/undeclared</c>, an endpoint that declares no access, so a test can see what <c>serve</c> prints when
 /// the startup check (spec 0012 EPT-4) refuses it. With <see cref="Orvano.Testing.OrvanoCli.JobsHookVariable"/> set, it
-/// registers the bad job kind or schedule that variable names instead (spec 0013 SCH-1). The runtime finds the hook by
+/// registers the bad job kind or schedule that variable names instead (spec 0013 SCH-1), and with
+/// <see cref="Orvano.Testing.OrvanoCli.OutboxHookVariable"/> set, the bad outbox registration it names (OBX-7). The runtime finds the hook by
 /// this name, outside any namespace.
 /// </summary>
 #pragma warning disable CA1050 // DOTNET_STARTUP_HOOKS looks for a type named StartupHook in no namespace
@@ -50,6 +51,10 @@ internal static class StartupHook
                     if (Environment.GetEnvironmentVariable(Orvano.Testing.OrvanoCli.JobsHookVariable) is { Length: > 0 } jobs)
                     {
                         Orvano.Testing.BadJobRegistrations.Add(services, jobs);
+                    }
+                    else if (Environment.GetEnvironmentVariable(Orvano.Testing.OrvanoCli.OutboxHookVariable) is { Length: > 0 } outbox)
+                    {
+                        Orvano.Testing.BadOutboxRegistrations.Add(services, outbox);
                     }
                     else
                     {

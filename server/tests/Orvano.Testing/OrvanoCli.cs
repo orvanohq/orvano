@@ -21,6 +21,12 @@ public static class OrvanoCli
     /// </summary>
     public const string JobsHookVariable = "TESTHOOK_JOBS";
 
+    /// <summary>
+    /// With the startup hook loaded, the bad outbox registration to make instead of the undeclared endpoint: one of the
+    /// <see cref="BadOutboxRegistrations"/> names.
+    /// </summary>
+    public const string OutboxHookVariable = "TESTHOOK_OUTBOX";
+
     public static ProcessStartInfo StartInfo(IEnumerable<string> args, IReadOnlyDictionary<string, string>? environment = null,
         string? workingDirectory = null)
     {

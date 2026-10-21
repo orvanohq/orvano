@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 
 using Orvano.Host.Database;
+using Orvano.Host.IntegrationTests.Outbox;
 using Orvano.Host.IntegrationTests.Signals;
 using Orvano.Infrastructure;
 using Orvano.Infrastructure.Jobs;
@@ -260,24 +261,24 @@ public sealed class JobWorkerTests(PostgresFixture postgres) : IAsyncLifetime
 
     [Theory]
     [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2")]
-    [InlineData(32, 30, 14)]
+    [InlineData(32, 30, 13)]
     [InlineData(4, 30, 8)]
     [InlineData(2, 100, 4)]
     [InlineData(64, 100, 16)]
-    [InlineData(8, 4, 1)]
-    [InlineData(8, 7, 2)] // half of an odd pool rounds down
+    [InlineData(8, 6, 1)]
+    [InlineData(8, 9, 2)] // half of an odd pool rounds down
     public void Default_concurrency_is_the_smallest_of_twice_the_processors_16_and_the_pool_limit_and_at_least_1(int processors, int pool, int expected) =>
         JobConcurrency.Default(processors, pool).ShouldBe(expected);
 
     [Theory]
-    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2")]
-    [InlineData(30, 14, true)]
-    [InlineData(30, 15, false)]
-    [InlineData(31, 14, true)]
-    [InlineData(31, 15, false)] // half of an odd pool rounds down
-    [InlineData(4, 1, true)]
-    [InlineData(4, 2, false)]
-    public void The_pool_rule_allows_concurrency_up_to_half_the_pool_less_one_and_names_both_variables_past_it(int pool, int concurrency, bool allowed)
+    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2"), Trait("Spec", "0013:AC-40"), Trait("Spec", "0013:OPL-1")]
+    [InlineData(30, 13, true)]
+    [InlineData(30, 14, false)]
+    [InlineData(31, 13, true)]
+    [InlineData(31, 14, false)] // half of an odd pool rounds down
+    [InlineData(6, 1, true)]
+    [InlineData(6, 2, false)]
+    public void The_pool_rule_allows_concurrency_up_to_half_the_pool_less_two_and_names_both_variables_past_it(int pool, int concurrency, bool allowed)
     {
         var rule = new JobConcurrency(Options.Create(new DatabaseOptions { PoolSize = pool }));
 
@@ -286,19 +287,19 @@ public sealed class JobWorkerTests(PostgresFixture postgres) : IAsyncLifetime
         result.Succeeded.ShouldBe(allowed);
         if (!allowed)
         {
-            int limit = (pool / 2) - 1;
+            int limit = (pool / 2) - 2;
             result.FailureMessage.ShouldBe(
                 $"ORVANO_JOBS__CONCURRENCY ({concurrency}) must be at most {limit}: half of ORVANO_DATABASE__POOLSIZE ({pool}) "
-                + "less one connection for the job runner (spec 0007 JOB-4).");
+                + "less two connections for the job runner and the outbox dispatcher (spec 0007 JOB-4).");
         }
     }
 
     [Fact]
-    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2")]
+    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2"), Trait("Spec", "0013:AC-40")]
     public void The_default_concurrency_passes_the_pool_rule_for_every_pool_size_the_options_allow()
     {
         int[] processorCounts = [1, 2, 8, 64];
-        string[] refused = [.. Enumerable.Range(4, 997)
+        string[] refused = [.. Enumerable.Range(6, 995)
             .SelectMany(pool => processorCounts.Select(processors => (pool, processors)))
             .Where(pair => !new JobConcurrency(Options.Create(new DatabaseOptions { PoolSize = pair.pool }))
                 .Validate(null, new JobOptions { Concurrency = JobConcurrency.Default(pair.processors, pair.pool) }).Succeeded)
@@ -311,7 +312,7 @@ public sealed class JobWorkerTests(PostgresFixture postgres) : IAsyncLifetime
     [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2")]
     public void The_pool_rule_keeps_an_explicit_concurrency_and_fills_an_unset_one_with_a_default_that_passes()
     {
-        var rule = new JobConcurrency(Options.Create(new DatabaseOptions { PoolSize = 4 }));
+        var rule = new JobConcurrency(Options.Create(new DatabaseOptions { PoolSize = 6 }));
         var explicitOptions = new JobOptions { Concurrency = 3 };
         var unset = new JobOptions();
 
@@ -380,38 +381,55 @@ public sealed class JobWorkerTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
-    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2"), Trait("Spec", "0013:JOP-4")]
-    public async Task Handlers_holding_a_connection_each_while_every_renewal_fires_leave_a_request_a_pool_connection()
+    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-2"), Trait("Spec", "0013:JOP-4"), Trait("Spec", "0013:AC-40"), Trait("Spec", "0013:OPL-1")]
+    public async Task Handlers_holding_a_connection_each_while_every_renewal_fires_and_a_dispatch_batch_runs_leave_a_request_a_pool_connection()
     {
-        // Pool 8, so the limit is 3: 3 held, 3 renewals, and the request use 7, and none waits out the pool timeout.
-        _settings["Database:PoolSize"] = "8";
+        // Pool 10, so the limit is 3: 3 held, 3 renewals, the dispatcher's batch, and the request use 8, and none waits out
+        // the pool timeout.
+        _settings["Database:PoolSize"] = "10";
         _settings["Jobs:Concurrency"] = "3";
         _settings["Jobs:PollInterval"] = "00:01:00";
         var clock = new ManualClock();
         var probes = new JobProbes();
-        OrvanoApiFactory worker = Host(probes, roles: "worker", clock);
-        IJobQueue queue = worker.Services.GetRequiredService<IJobQueue>();
-        var ids = new Guid[3];
-        for (int i = 0; i < ids.Length; i++)
+        var dispatch = new DispatchInterceptor { Hold = true, IgnoreCancel = true };
+        OrvanoApiFactory worker = Host(probes, roles: "worker", clock, configure: services =>
         {
-            ids[i] = (await queue.EnqueueAsync(new LeaseJob(ProbeMode.HoldConnection), null, Token))!.Value;
+            services.AddSampleSubscribers(new OutboxProbes());
+            DispatchInterceptor.AddTo(services, dispatch);
+        });
+        try
+        {
+            await SampleOutboxDbContext.CreateTablesAsync(worker.Services, Token);
+            IJobQueue queue = worker.Services.GetRequiredService<IJobQueue>();
+            var ids = new Guid[3];
+            for (int i = 0; i < ids.Length; i++)
+            {
+                ids[i] = (await queue.EnqueueAsync(new LeaseJob(ProbeMode.HoldConnection), null, Token))!.Value;
+            }
+
+            await Eventually.TrueAsync(() => probes.Holding.Count == 3, TimeSpan.FromSeconds(10), "the handlers did not all hold a connection", Token);
+            await OutboxHosts.PublishAsync(worker.Services, new SampleNoteAdded(Guid.CreateVersion7()), null, Token);
+            await dispatch.Holding.Task.WaitAsync(TimeSpan.FromSeconds(10), Token); // a batch holds its connection, stalled
+            DateTimeOffset renewedUntil = clock.GetUtcNow().AddSeconds(80);
+            using HttpClient client = worker.CreateClient();
+
+            clock.Advance(TimeSpan.FromSeconds(20)); // every handler's renewal is due at once (lease 1 minute ÷ 3)
+            using HttpResponseMessage ready = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), Token)
+                .WaitAsync(TimeSpan.FromSeconds(5), Token);
+
+            ready.StatusCode.ShouldBe(System.Net.HttpStatusCode.OK);
+            await Eventually.TrueAsync(
+                async () => await _rows.CountAsync("status = 'running' AND locked_until = $1", Token, renewedUntil) == 3,
+                TimeSpan.FromSeconds(5), "not every renewal completed", Token);
+        }
+        finally
+        {
+            dispatch.Release.TrySetResult();
+            probes.Release.TrySetResult();
         }
 
-        await Eventually.TrueAsync(() => probes.Holding.Count == 3, TimeSpan.FromSeconds(10), "the handlers did not all hold a connection", Token);
-        DateTimeOffset renewedUntil = clock.GetUtcNow().AddSeconds(80);
-        using HttpClient client = worker.CreateClient();
-
-        clock.Advance(TimeSpan.FromSeconds(20)); // every handler's renewal is due at once (lease 1 minute ÷ 3)
-        using HttpResponseMessage ready = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), Token)
-            .WaitAsync(TimeSpan.FromSeconds(5), Token);
-
-        ready.StatusCode.ShouldBe(System.Net.HttpStatusCode.OK);
         await Eventually.TrueAsync(
-            async () => await _rows.CountAsync("status = 'running' AND locked_until = $1", Token, renewedUntil) == 3,
-            TimeSpan.FromSeconds(5), "not every renewal completed", Token);
-        probes.Release.SetResult();
-        await Eventually.TrueAsync(
-            async () => await _rows.CountAsync("status = 'succeeded'", Token) == 3, TimeSpan.FromSeconds(10), "the jobs did not succeed", Token);
+            async () => await _rows.CountAsync("status = 'succeeded' AND kind = 'test.lease'", Token) == 3, TimeSpan.FromSeconds(10), "the jobs did not succeed", Token);
     }
 
     [Fact]

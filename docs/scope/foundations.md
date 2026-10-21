@@ -146,7 +146,7 @@ The shared machinery spec 0007 designed but no feature built yet: cross replica 
 spec [0013](../specs/0013-background-runtime/index.md) (builds spec [0007](../specs/0007-stack-architecture/index.md) SIG, CCH, JOB, EVT) · code in `server/src/Orvano.Infrastructure/`
 
 - [x] Design it (spec): `/architect stack & architecture` (spec 0007 SIG, CCH, JOB, EVT); signal and cache contracts in spec 0013 (2026-10-19); job queue contracts, tables, runner, and schedules in spec 0013 _Job queue design_ (2026-10-19); job queue review settlement in spec 0013 steps 21 to 23 (2026-10-20); module outbox contracts, table, publish, dispatcher, delivery jobs, and cleanup in spec 0013 _Outbox design_ (2026-10-20)
-- [ ] Build it: `/develop background runtime`
+- [x] Build it: `/develop background runtime`
   - [x] Signals and cache invalidation: `ISignalBus`, `ICacheInvalidator`, the listener, heartbeat, disconnect bypass, and reconnect clear (SIG-1 to SIG-3, CCH-1, CCH-2; spec 0013 AC-1 to AC-13, build plan steps 1 to 7); unblocks feature 9's AC-10
     - built: spec 0013 build plan steps 1 to 7 (contracts and codec, transaction join, listener, cache, two host test, failure handling, telemetry), 2026-10-19
   - [x] Review settlement: handler limit and dispatch lag, reconnect floor, boot announce, confirmed commit count, joined context refusal, module isolation (spec 0013 AC-3, AC-8 to AC-13, build plan steps 8 to 12)
@@ -155,7 +155,8 @@ spec [0013](../specs/0013-background-runtime/index.md) (builds spec [0007](../sp
     - built: spec 0013 build plan steps 13 to 20 (job contracts, `JobsDbContext` and the `jobs` migration, `IJobQueue` in and out of a transaction, the runner with leases, renewal, backoff, timeouts, and shutdown release, `CancelProjectJobsAsync`, schedules on `Cronos` 0.13.0 with the `jobs.cleanup` schedule, telemetry, and `JobsDriver`), 2026-10-19
   - [x] Job queue review settlement: dedupe key scoped per kind and project, one pool connection kept for the runner, dead marking on the poll (spec 0013 AC-16, AC-20, AC-26, build plan steps 21 to 23)
     - built: spec 0013 build plan steps 21 to 23 (the `ScopeJobDedupeKey` migration on `(kind, project_id, dedupe_key)` with `NULLS NOT DISTINCT`, the `PoolSize` / 2 − 1 limit with `PoolSize` at least 4, `MarkExpiredDeadAsync` on the poll tick and once per `JobsDriver` pass), 2026-10-20
-  - [ ] Module outbox and dispatcher: `IOutbox`, `IOutboxRegistry`, `HasOutbox()`, publish in the caller's transaction, the dispatcher on `WorkerWake`, one delivery job per subscriber, `outbox.cleanup`, and the pool limit at half less two (EVT-1 to EVT-3; spec 0013 AC-31 to AC-43, build plan steps 24 to 30); EVT-4's readers are features 33 to 36
+  - [x] Module outbox and dispatcher: `IOutbox`, `IOutboxRegistry`, `HasOutbox()`, publish in the caller's transaction, the dispatcher on `WorkerWake`, one delivery job per subscriber, `outbox.cleanup`, and the pool limit at half less two (EVT-1 to EVT-3; spec 0013 AC-31 to AC-43, build plan steps 24 to 30); EVT-4's readers are features 33 to 36
+    - built: spec 0013 build plan steps 24 to 30 (the `Outbox/` contracts, `OutboxEvent` and `HasOutbox()`, `AddBeforeCommit`, `OutboxRegistry` in `StartupChecks`, `Outbox` publish, the `PoolSize` / 2 − 2 limit with `PoolSize` at least 6, `OutboxDispatch` with per outbox batch halving and `OutboxDispatcher` on `WorkerWake`, delivery kinds, `outbox.cleanup`, telemetry and guard rails, `JobsDriver.DispatchAsync`, and the test only `SampleOutboxDbContext`), 2026-10-20; no migration, since no module owns an outbox yet
 - [ ] Verify it: `/check verify background runtime`
 - [ ] Test it: `/test background runtime`
 - [ ] Review it (fresh model): `/check review background runtime`

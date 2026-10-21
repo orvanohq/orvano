@@ -6,8 +6,9 @@ namespace Orvano.SharedKernel.Data;
 
 /// <summary>
 /// The signals and actions one <c>DbContext</c>'s current transaction will send and run (spec 0013 SND-1, SND-4, SND-5):
-/// per kind, distinct values in first enlisted order, the after commit and on committed actions, and whether the
-/// transaction was joined rather than begun. A scoped EF internal service, so one per context instance.
+/// per kind, distinct values in first enlisted order, the before commit checks (PUB-3), the after commit and on
+/// committed actions, and whether the transaction was joined rather than begun. A scoped EF internal service, so one per
+/// context instance.
 /// </summary>
 internal sealed class PendingSignals
 {
@@ -15,9 +16,10 @@ internal sealed class PendingSignals
     private readonly Dictionary<SignalKind, (List<string> Values, HashSet<string> Seen)> _values = [];
     private readonly List<Func<CancellationToken, ValueTask>> _afterCommit = [];
     private readonly List<Func<CancellationToken, ValueTask>> _onCommitted = [];
+    private readonly List<(object Key, Action Check)> _beforeCommit = [];
 
-    /// <summary>True when there is nothing to send and nothing to run after the commit.</summary>
-    public bool IsEmpty => _kinds.Count == 0 && _afterCommit.Count == 0 && _onCommitted.Count == 0;
+    /// <summary>True when there is nothing to check before the commit, nothing to send, and nothing to run after it.</summary>
+    public bool IsEmpty => _kinds.Count == 0 && _beforeCommit.Count == 0 && _afterCommit.Count == 0 && _onCommitted.Count == 0;
 
     /// <summary>
     /// True while the context's current transaction was joined with <c>UseTransaction</c> rather than begun (SND-5).
@@ -65,6 +67,24 @@ internal sealed class PendingSignals
     public IReadOnlyList<string> ValuesOf(SignalKind kind) =>
         _values.TryGetValue(kind, out (List<string> Values, HashSet<string> Seen) entry) ? entry.Values : [];
 
+    /// <summary>Adds a check unless one with <paramref name="key"/> is already in this transaction (PUB-3).</summary>
+    public void AddBeforeCommit(object key, Action check)
+    {
+        if (!_beforeCommit.Exists(entry => Equals(entry.Key, key)))
+        {
+            _beforeCommit.Add((key, check));
+        }
+    }
+
+    /// <summary>Runs the before commit checks in add order; one that throws fails the commit (PUB-3).</summary>
+    public void RunBeforeCommit()
+    {
+        foreach ((object _, Action check) in _beforeCommit.ToArray())
+        {
+            check();
+        }
+    }
+
     public void AddAfterCommit(Func<CancellationToken, ValueTask> action) => _afterCommit.Add(action);
 
     public void AddOnCommitted(Func<CancellationToken, ValueTask> action) => _onCommitted.Add(action);
@@ -81,6 +101,7 @@ internal sealed class PendingSignals
     {
         _kinds.Clear();
         _values.Clear();
+        _beforeCommit.Clear();
         _afterCommit.Clear();
         _onCommitted.Clear();
         Joined = false;

@@ -19,18 +19,24 @@ namespace Orvano.Infrastructure.Tests.Jobs;
 public sealed class JobRegistryTests
 {
     [Fact]
-    [Trait("Spec", "0013:SCH-1"), Trait("Spec", "0013:SCH-7"), Trait("Spec", "0013:AC-25")]
-    public void Registry_has_no_problems_and_holds_the_built_in_cleanup_when_only_the_infrastructure_registers()
+    [Trait("Spec", "0013:SCH-1"), Trait("Spec", "0013:SCH-7"), Trait("Spec", "0013:AC-25"), Trait("Spec", "0013:OCL-1"), Trait("Spec", "0013:AC-39")]
+    public void Registry_has_no_problems_and_holds_the_built_in_cleanups_when_only_the_infrastructure_registers()
     {
         JobRegistry registry = Registry(_ => { });
 
         registry.Problems.ShouldBeEmpty();
-        ScheduledJob cleanup = registry.Schedules.ShouldHaveSingleItem();
-        cleanup.Name.ShouldBe("jobs.cleanup");
+        registry.Schedules.Select(schedule => schedule.Name).ShouldBe(["jobs.cleanup", "outbox.cleanup"]);
+        ScheduledJob cleanup = registry.FindSchedule("jobs.cleanup")!;
         cleanup.CronText.ShouldBe("17 3 * * *");
         cleanup.Payload.ShouldBe("{}");
         registry.Find("jobs.cleanup")!.Options.MaxAttempts.ShouldBe(3);
         registry.Find("jobs.cleanup")!.Options.Lease.ShouldBe(TimeSpan.FromMinutes(5));
+        ScheduledJob outbox = registry.FindSchedule("outbox.cleanup")!;
+        outbox.CronText.ShouldBe("37 3 * * *");
+        outbox.Payload.ShouldBe("{}");
+        outbox.Registration.Kind.ShouldBe("outbox.cleanup");
+        registry.Find("outbox.cleanup")!.Options.MaxAttempts.ShouldBe(3);
+        registry.Find("outbox.cleanup")!.Options.Lease.ShouldBe(TimeSpan.FromMinutes(5));
     }
 
     [Theory]
@@ -114,7 +120,7 @@ public sealed class JobRegistryTests
             services.AddJobSchedule("test.alpha", "* * * * *", new TestJob(""));
         });
 
-        registry.Schedules.Select(schedule => schedule.Name).ShouldBe(["jobs.cleanup", "test.alpha", "test.zulu"]);
+        registry.Schedules.Select(schedule => schedule.Name).ShouldBe(["jobs.cleanup", "outbox.cleanup", "test.alpha", "test.zulu"]);
     }
 
     [Theory]

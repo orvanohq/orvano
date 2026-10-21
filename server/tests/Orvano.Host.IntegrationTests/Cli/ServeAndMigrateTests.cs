@@ -250,14 +250,14 @@ public sealed class ServeAndMigrateTests(PostgresFixture postgres)
     }
 
     [Theory]
-    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-1"), Trait("Spec", "0013:JOP-2")]
+    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-1"), Trait("Spec", "0013:JOP-2"), Trait("Spec", "0013:AC-40")]
     [InlineData(
         "ORVANO_JOBS__CONCURRENCY",
-        "15",
-        "ORVANO_JOBS__CONCURRENCY (15) must be at most 14: half of ORVANO_DATABASE__POOLSIZE (30) less one connection for the job runner")]
+        "14",
+        "ORVANO_JOBS__CONCURRENCY (14) must be at most 13: half of ORVANO_DATABASE__POOLSIZE (30) less two connections for the job runner and the outbox dispatcher")]
     [InlineData("ORVANO_JOBS__CONCURRENCY", "0", "ORVANO_JOBS__CONCURRENCY")]
     [InlineData("ORVANO_JOBS__POLLINTERVAL", "00:00:00", "ORVANO_JOBS__POLLINTERVAL")]
-    [InlineData("ORVANO_DATABASE__POOLSIZE", "3", "ORVANO_DATABASE__POOLSIZE")] // at least 4, so the default concurrency passes JOP-2
+    [InlineData("ORVANO_DATABASE__POOLSIZE", "5", "ORVANO_DATABASE__POOLSIZE")] // at least 6, so the default concurrency passes JOP-2 (OPL-1)
     public async Task Serve_exits_1_naming_the_variable_when_a_job_option_is_out_of_range(string variable, string value, string message)
     {
         OrvanoCli.Result result = await OrvanoCli.RunAsync(["serve"], ServeEnvironment(new()
@@ -272,13 +272,40 @@ public sealed class ServeAndMigrateTests(PostgresFixture postgres)
     }
 
     [Fact]
-    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-3")]
-    public async Task Migrate_runs_no_job_runner()
+    [Trait("Spec", "0013:AC-26"), Trait("Spec", "0013:JOP-3"), Trait("Spec", "0013:AC-42"), Trait("Spec", "0013:DSP-1")]
+    public async Task Migrate_runs_no_job_runner_and_no_outbox_dispatcher()
     {
         OrvanoCli.Result result = await OrvanoCli.RunAsync(["migrate"], postgres.DatabaseEnvironment, TestContext.Current.CancellationToken);
 
         result.ExitCode.ShouldBe(0, result.Error);
         (result.Output + result.Error).ShouldNotContain("Job runner started");
+        (result.Output + result.Error).ShouldNotContain("Outbox dispatcher started");
+    }
+
+    [Theory]
+    [Trait("Spec", "0013:AC-35"), Trait("Spec", "0013:OBX-7")]
+    [InlineData(BadOutboxRegistrations.SchemaTwice, "The outbox of schema sample is registered more than once")]
+    [InlineData(BadOutboxRegistrations.TypeInTwoOutboxes, "The event type sample.note.added.v1 is registered by the sample and sample outboxes")]
+    [InlineData(
+        BadOutboxRegistrations.UnregisteredType,
+        "The event subscriber hook.subscriber subscribes to sample.note.added.v1, which no outbox registers")]
+    [InlineData(
+        BadOutboxRegistrations.OtherClrType,
+        "The event subscriber hook.subscriber reads sample.note.added.v1 as LookalikeNoteAdded, but its outbox registers it as SampleNoteAdded")]
+    [InlineData(BadOutboxRegistrations.NamedLikeAKind, "The job kind hook.job is registered more than once")]
+    public async Task Serve_exits_1_naming_the_registration_without_a_stack_trace_when_an_outbox_registration_is_bad(string registration, string message)
+    {
+        OrvanoCli.Result result = await OrvanoCli.RunAsync(["serve"], ServeEnvironment(new()
+        {
+            ["DOTNET_STARTUP_HOOKS"] = OrvanoCli.UndeclaredEndpointHook,
+            [OrvanoCli.OutboxHookVariable] = registration,
+            ["ORVANO_ROLES"] = "api", // the check runs in every role, not only where the dispatcher does
+            ["ASPNETCORE_HTTP_PORTS"] = Ports.Free().ToString(CultureInfo.InvariantCulture),
+        }), TestContext.Current.CancellationToken);
+
+        result.ExitCode.ShouldBe(1, result.Error);
+        result.Error.ShouldContain(message);
+        result.Error.ShouldNotContain(" at "); // no stack trace frames
     }
 
     private Dictionary<string, string> ServeEnvironment(Dictionary<string, string> extra)

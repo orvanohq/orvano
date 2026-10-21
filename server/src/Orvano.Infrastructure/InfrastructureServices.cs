@@ -6,10 +6,12 @@ using Microsoft.Extensions.Options;
 using Orvano.Infrastructure.Caching;
 using Orvano.Infrastructure.Jobs;
 using Orvano.Infrastructure.Jobs.Data;
+using Orvano.Infrastructure.Outbox;
 using Orvano.Infrastructure.Signals;
 using Orvano.Infrastructure.Tls;
 using Orvano.SharedKernel.Data;
 using Orvano.SharedKernel.Jobs;
+using Orvano.SharedKernel.Outbox;
 using Orvano.SharedKernel.Signals;
 
 namespace Orvano.Infrastructure;
@@ -25,7 +27,8 @@ public static class InfrastructureServices
 
     /// <summary>
     /// TLS options, the cache, the cache invalidator, the signal bus, a connection state that stays disconnected until
-    /// <see cref="AddSignalListener"/> replaces it (spec 0013 LSN-1), and the job queue (JOP-3). Every command calls this.
+    /// <see cref="AddSignalListener"/> replaces it (spec 0013 LSN-1), the job queue (JOP-3), and the outbox (PUB-1,
+    /// DSP-1). Every command calls this.
     /// </summary>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services)
     {
@@ -45,6 +48,7 @@ public static class InfrastructureServices
         services.TryAddSingleton<IHeartbeatSender, NotifyHeartbeatSender>();
 
         AddJobs(services);
+        AddOutboxes(services);
 
         AddCache(services);
         services.TryAddSingleton<ICacheInvalidator>(
@@ -64,12 +68,17 @@ public static class InfrastructureServices
     }
 
     /// <summary>
-    /// The job runner, its <c>job</c> signal handler and connection observer, and the wake they share (spec 0013 JOP-3).
-    /// Only <c>serve</c> with the <c>worker</c> role calls this; every command can enqueue without it.
+    /// The job runner and the outbox dispatcher, the runner's <c>job</c> signal handler and connection observer, and the
+    /// wake they share (spec 0013 JOP-3, DSP-1). Only <c>serve</c> with the <c>worker</c> role calls this; every command
+    /// can enqueue and publish without it.
     /// </summary>
     public static IServiceCollection AddJobRunner(this IServiceCollection services)
     {
         services.TryAddSingleton<WorkerWake>();
+
+        // DSP-1: before the runner, so the host (which stops hosted services in reverse order) stops the runner first
+        // and gives its shutdown releases the budget before the dispatcher stops.
+        services.AddHostedService<OutboxDispatcher>();
         services.AddHostedService<JobRunner>();
         services.AddSignalHandler<JobSignalHandler>();
         services.AddSignalConnectionObserver<JobConnectionObserver>();
@@ -82,6 +91,13 @@ public static class InfrastructureServices
     /// </summary>
     public static IReadOnlyList<string> JobRegistrationProblems(IServiceProvider services) =>
         services.GetRequiredService<JobRegistry>().Problems;
+
+    /// <summary>
+    /// OBX-7: what is wrong with the registered outboxes and subscribers, one line each; empty when they are sound.
+    /// <c>StartupChecks</c> fails startup on any, in every <c>serve</c> role, next to <see cref="JobRegistrationProblems"/>.
+    /// </summary>
+    public static IReadOnlyList<string> OutboxRegistrationProblems(IServiceProvider services) =>
+        services.GetRequiredService<OutboxRegistry>().Problems;
 
     /// <summary>
     /// JOP-3: the jobs schema, the queue, the executor and scheduler (which <c>JobsDriver</c> also drives), the options,
@@ -109,6 +125,28 @@ public static class InfrastructureServices
         services.AddJobHandler<JobsCleanup, JobsCleanupHandler>(
             InfrastructureJsonContext.Default.JobsCleanup, options => options.MaxAttempts = 3);
         services.AddJobSchedule(JobsCleanup.ScheduleName, JobsCleanup.Cron, new JobsCleanup());
+    }
+
+    /// <summary>
+    /// PUB-1, DSP-1, OCL-1: the registry, the publish path, the dispatch work (which <c>JobsDriver</c> also drives), and
+    /// the built in cleanup, for every command. The dispatcher's loop is <see cref="AddJobRunner"/>'s.
+    /// </summary>
+    private static void AddOutboxes(IServiceCollection services)
+    {
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(OutboxRegistry)))
+        {
+            return;
+        }
+
+        services.AddSingleton<OutboxRegistry>();
+        services.AddSingleton<IOutboxRegistry>(provider => provider.GetRequiredService<OutboxRegistry>());
+        services.AddSingleton<IOutbox, Outbox.Outbox>();
+        services.AddSingleton<OutboxDispatch>();
+
+        // OCL-1: default kind options except three attempts.
+        services.AddJobHandler<OutboxCleanup, OutboxCleanupHandler>(
+            InfrastructureJsonContext.Default.OutboxCleanup, options => options.MaxAttempts = 3);
+        services.AddJobSchedule(OutboxCleanup.ScheduleName, OutboxCleanup.Cron, new OutboxCleanup());
     }
 
     /// <summary>
