@@ -365,6 +365,8 @@ DSP-4 marked a row of a type the running process did not register as dispatched,
 
 Calls made while writing: the expiry is a constant, not an option (OCL-1's retention is one too); the filter uses the registering process's own list, not the union of every worker's (which would need (c)'s state); no new metric, since the open pending events gauge follow up covers visibility; publishers keep a retired type registered for one release, written as guidance in DSP-4 rather than enforced.
 
+Approved the same day by the engineer: option (a), with OCL-3's 30 day expiry.
+
 ### Verify corrections (recorded as built)
 
 - **DLV-2**: the spec asked for `InternalsVisibleTo` from `Orvano.SharedKernel` to `Orvano.Infrastructure`, which spec 0012 RSV-1 forbids. The build writes the envelope in `OutboxDispatch.Envelope` with a `Utf8JsonWriter` and pins it with a unit test that the subscriber's kind reads it back; DLV-2 and step 24 now say so.
