@@ -139,7 +139,7 @@ spec [0012](../specs/0012-access-control-model/index.md) · code in `server/src/
 - [x] Review it (fresh model): `/check review access control model`
 - [x] Document it: `/document access control model`
 
-### 61. Background runtime · in-progress
+### 61. Background runtime · done
 
 The shared machinery spec 0007 designed but no feature built yet: cross replica signals over `LISTEN/NOTIFY`, cache invalidation that reaches every replica, the PostgreSQL job queue with schedules, and the per module outbox. Features 9 (the label cache test), 13 (CORS cache), 14 (session revocation, signing key rotation), and every later feature that queues work or announces events build on it.
 **Done when:** a cache tag invalidated or a job enqueued on one server instance reaches a second instance through `orvano_signal`, a lost signal is recovered by SIG-2's bypass, poll, and clear, jobs run at least once with leases, backoff, and schedules firing once across workers, and an outbox event reaches its subscriber as a job.
@@ -160,7 +160,7 @@ spec [0013](../specs/0013-background-runtime/index.md) (builds spec [0007](../sp
 - [x] Verify it: `/check verify background runtime`
 - [x] Test it: `/test background runtime`
 - [x] Review it (fresh model): `/check review background runtime`
-- [ ] Document it: `/document background runtime`
+- [x] Document it: `/document background runtime`
 
 ### 11. Design system & console shell · needs a decision
 
