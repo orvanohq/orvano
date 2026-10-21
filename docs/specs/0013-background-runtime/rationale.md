@@ -325,3 +325,19 @@ The engineer was not in this run (another session started it), so each pick is t
 - **Test outbox**: a `sample` schema context in `Orvano.Testing`, because no module owns an outbox yet.
 
 Spec 0007 EVT-1 to EVT-3 and JOB-4 (half the pool less two), its configuration lines, and spec 0002 DAT-6 (the identifier deviation) were updated in the same change.
+
+### Cross check of milestone 3 (2026-10-20)
+
+A read only pass on another model checked commit 049d35e against spec 0007 EVT-1 to EVT-4, spec 0011, spec 0002 DAT-6, and the code built for milestones 1 and 2. It confirmed the pool arithmetic (one connection per dispatch batch, `Concurrency` + 2 ≤ `PoolSize` / 2 steady, 2 × `Concurrency` + 2 ≤ `PoolSize` − 2 worst case), the per subscriber dedupe key under JDB-2's index and the built `ON CONFLICT` clause, and that the only unbounded await is `InTransactionAsync`'s rollback. Changes folded in:
+
+- **Handler resolution (A)**: registering every subscriber as `IEventHandler<TEvent>` would make two subscribers of one type share the last registration; each handler is now registered and resolved by its own type (OBX-5, DLV-5).
+- **Driver reach (A)**: a hosted service cannot be resolved, so the dispatch work is an `OutboxDispatch` singleton in `AddInfrastructure`, and `OutboxDispatcher` is only the loop (DSP-1, OTS-2, step 27).
+- **Named mechanics (B)**: the delivery's `JobRegistration` comes from `JobRegistry.Find`; the internal envelope needs `InternalsVisibleTo` for Infrastructure (DSP-3, DLV-2, step 24).
+- **Bounds and shutdown (B)**: the rollback is bounded only by Npgsql's command timeout, stated and accepted; the dispatcher is registered before the runner so the runner stops first and keeps the shutdown budget for its releases (DSP-1, DSP-5); a cut inside the commit is an unknown outcome, not a rollback (DSP-5, AC-36).
+- **PUB-3 against the built code (B)**: `IsEmpty` counts the checks, the closure captures the context, a failing check runs the after commit actions but not the on committed ones, and retries re-add it.
+- **Sample context (B)**: created by `GenerateCreateScript()`, checked by the spec 0011 rules explicitly, kept off the OGR-3 host (OTS-3, step 25).
+- **Deleted projects (B)**: undispatched events of a deleted project still dispatch; handlers refuse a deleted project as AC-30 already requires (security model).
+- **Old limit tests (B)**: step 26 names the tests that encode `PoolSize` / 2 − 1.
+- **Notes (C)**: `\z` in the patterns; a rerun publish after an unknown commit makes a second event id (DLV-6); per outbox try and catch in the cleanup (OCL-1); database row order and the `SqlQuery` wrap (DSP-3, DSP-8); the source scan's false positives accepted (OGR-2); the future DAT-2a exemption (OTB-1); AC-31's contract test and AC-35's startup hook entries (steps 24, 25).
+
+Left open for the engineer (Follow-up): a batch that always fails or always outruns `BatchBound` holds its outbox's head. Options are halving the batch after a failure (lean), one multi row insert per batch, or accepting it.
