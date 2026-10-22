@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 
 using Npgsql;
 
+using Orvano.Host.IntegrationTests.Jobs;
 using Orvano.Host.IntegrationTests.Signals;
 using Orvano.Infrastructure.Outbox;
 using Orvano.SharedKernel;
@@ -21,6 +22,8 @@ public sealed class OutboxCleanupTests(PostgresFixture postgres) : IAsyncLifetim
 {
     // ManualClock starts at 2026-10-19 12:00 UTC; the first fire after it is the next day's 03:37.
     private static readonly DateTimeOffset FireTime = new(2026, 10, 20, 3, 37, 0, TimeSpan.Zero);
+
+    private const string Aside = "aside";
 
     private readonly ManualClock _clock = new();
     private readonly RecordingLogs _logs = new();
@@ -155,6 +158,94 @@ public sealed class OutboxCleanupTests(PostgresFixture postgres) : IAsyncLifetim
     }
 
     [Fact]
+    [Trait("Spec", "0013:AC-39"), Trait("Spec", "0013:OCL-2"), Trait("Spec", "0013:OCL-3"), Trait("Spec", "0013:OTL-2")]
+    public async Task Cleanup_expires_a_waiting_event_one_millisecond_past_30_days_and_keeps_one_at_exactly_30_days()
+    {
+        _host = Host();
+        await SampleOutboxDbContext.CreateTablesAsync(_host.Services, Token);
+        (await JobsDriver.RunDueAsync(_host.Services, Token)).ShouldBeEmpty(); // the sync sets the next fire
+        _clock.Advance(FireTime - _clock.GetUtcNow() + TimeSpan.FromSeconds(30));
+        DateTimeOffset boundary = _clock.GetUtcNow() - OutboxCleanupHandler.Expiry;
+        Guid past = await _rows.InsertAsync(SampleNoteArchived.Type, "{}", boundary.AddMilliseconds(-1), Token);
+        Guid at = await _rows.InsertAsync(SampleNoteArchived.Type, "{}", boundary, Token);
+
+        IReadOnlyList<JobRun> runs = await JobsDriver.RunDueAsync(_host.Services, Token);
+
+        runs.ShouldContain(run => run.Kind == "outbox.cleanup" && run.Outcome == "succeeded");
+        (await _rows.CountAsync("id = $1", Token, past)).ShouldBe(0);
+        (await _rows.CountAsync("id = $1 AND dispatched_at IS NULL", Token, at)).ShouldBe(1);
+        _logs.Messages(LogEventIds.Infrastructure + 206).ShouldBe(
+            ["Outbox cleanup deleted 1 events from the sample outbox that waited more than 30 days for a version that registers their type"]);
+        _logs.Count(LogEventIds.Infrastructure + 206, LogLevel.Warning).ShouldBe(1);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-39"), Trait("Spec", "0013:OCL-3"), Trait("Spec", "0013:OTL-2")]
+    public async Task Cleanup_keeps_a_waiting_event_older_than_30_days_and_logs_no_warning_when_the_cleaning_process_registers_its_type()
+    {
+        // The newer version registers sample.note.archived.v1, which an older process would expire after 30 days.
+        await using (OrvanoApiFactory older = Host())
+        {
+            await SampleOutboxDbContext.CreateTablesAsync(older.Services, Token);
+        }
+
+        _host = JobHosts.Create(_settings, new JobProbes(), _clock, roles: "api", services =>
+        {
+            services.AddNewerSampleOutbox();
+            services.AddSingleton<ILoggerProvider>(_logs);
+        });
+        (await JobsDriver.RunDueAsync(_host.Services, Token)).ShouldBeEmpty(); // the sync sets the next fire
+        _clock.Advance(FireTime - _clock.GetUtcNow() + TimeSpan.FromSeconds(30));
+        Guid old = await _rows.InsertAsync(SampleNoteArchived.Type, "{}", _clock.GetUtcNow().AddDays(-45), Token);
+
+        // A transaction holds the row, as an unfinished dispatch would, so the pass before the cleanup skips it.
+        IReadOnlyList<JobRun> runs;
+        await using (NpgsqlConnection holder = await _database.DataSource.OpenConnectionAsync(Token))
+        await using (NpgsqlTransaction transaction = await holder.BeginTransactionAsync(Token))
+        {
+            await using (var hold = new NpgsqlCommand("SELECT 1 FROM sample.outbox WHERE id = $1 FOR UPDATE", holder, transaction))
+            {
+                hold.Parameters.AddWithValue(old);
+                await hold.ExecuteNonQueryAsync(Token);
+            }
+
+            runs = await JobsDriver.RunDueAsync(_host.Services, Token);
+            await transaction.RollbackAsync(Token);
+        }
+
+        runs.ShouldContain(run => run.Kind == "outbox.cleanup" && run.Outcome == "succeeded");
+        (await _rows.CountAsync("id = $1 AND dispatched_at IS NULL", Token, old)).ShouldBe(1);
+        _logs.Messages(LogEventIds.Infrastructure + 206).ShouldBeEmpty();
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-39"), Trait("Spec", "0013:OCL-3"), Trait("Spec", "0013:DSP-4")]
+    public async Task Cleanup_expires_every_waiting_event_older_than_30_days_when_the_outbox_registers_no_type()
+    {
+        _host = Host(services => services.AddOutbox(Aside, _ => { }));
+        await SampleOutboxDbContext.CreateTablesAsync(_host.Services, Token);
+        await SampleOutboxDbContext.CreateTablesAsync(_host.Services, Aside, Token);
+        (await JobsDriver.RunDueAsync(_host.Services, Token)).ShouldBeEmpty(); // the sync sets the next fire
+        _clock.Advance(FireTime - _clock.GetUtcNow() + TimeSpan.FromSeconds(30));
+        DateTimeOffset now = _clock.GetUtcNow();
+        await _database.ExecuteAsync(
+            "INSERT INTO aside.outbox (id, type, payload, occurred_at) VALUES ($1, 'aside.thing.happened.v1', '{}', $2), ($3, 'aside.thing.moved.v2', '{}', $2), ($4, 'aside.thing.happened.v1', '{}', $5)",
+            Token,
+            Guid.CreateVersion7(now.AddDays(-31)),
+            now.AddDays(-31),
+            Guid.CreateVersion7(now.AddDays(-31)),
+            Guid.CreateVersion7(now.AddDays(-29)),
+            now.AddDays(-29));
+
+        IReadOnlyList<JobRun> runs = await JobsDriver.RunDueAsync(_host.Services, Token);
+
+        runs.ShouldContain(run => run.Kind == "outbox.cleanup" && run.Outcome == "succeeded");
+        (await AsideCountAsync()).ShouldBe(1); // the 29 day old event still waits
+        _logs.Messages(LogEventIds.Infrastructure + 206).ShouldBe(
+            ["Outbox cleanup deleted 2 events from the aside outbox that waited more than 30 days for a version that registers their type"]);
+    }
+
+    [Fact]
     [Trait("Spec", "0013:AC-39"), Trait("Spec", "0013:OCL-1"), Trait("Spec", "0013:DSP-4")]
     public async Task Cleanup_cleans_the_other_outboxes_when_one_fails_and_then_fails_the_attempt_so_it_retries()
     {
@@ -179,6 +270,12 @@ public sealed class OutboxCleanupTests(PostgresFixture postgres) : IAsyncLifetim
             services.AddSingleton<ILoggerProvider>(_logs);
             configure?.Invoke(services);
         });
+
+    private async Task<long> AsideCountAsync()
+    {
+        await using NpgsqlCommand command = _database.DataSource.CreateCommand("SELECT count(*) FROM aside.outbox");
+        return (long)(await command.ExecuteScalarAsync(Token))!;
+    }
 
     private async Task InsertDispatchedAsync(int count, DateTimeOffset occurredAt)
     {

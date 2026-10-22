@@ -60,7 +60,11 @@ public sealed class OutboxWorkerTests(PostgresFixture postgres) : IAsyncLifetime
     [Trait("Spec", "0013:AC-37"), Trait("Spec", "0013:DSP-1"), Trait("Spec", "0013:WAK-2"), Trait("Spec", "0013:AC-38")]
     public async Task An_event_published_on_an_api_host_reaches_its_subscriber_on_a_worker_by_signal_and_by_two_polls_after_a_drop()
     {
-        _settings["Jobs:PollInterval"] = "00:01:00";
+        // The smallest poll, so the two polls move the clock 2 s in all: less than every lease (1 min for the recorder)
+        // and every 10 s bound on it. A larger step could expire the lease of a delivery the first poll already
+        // claimed, cancelling it before it records, with no later poll to claim it again.
+        var poll = TimeSpan.FromSeconds(1);
+        _settings["Jobs:PollInterval"] = "00:00:01";
         var clock = new ManualClock();
         var probes = new OutboxProbes();
         OrvanoApiFactory api = Host(probes, roles: "api", clock);
@@ -73,27 +77,28 @@ public sealed class OutboxWorkerTests(PostgresFixture postgres) : IAsyncLifetime
         var project = Guid.CreateVersion7();
         var signalled = Guid.CreateVersion7();
         await OutboxHosts.PublishAsync(api.Services, new SampleNoteAdded(signalled), project, Token);
-        await probes.DeliveredAsync(OutboxProbes.Recorder, signalled, TimeSpan.FromSeconds(2), Token);
-        await probes.DeliveredAsync(OutboxProbes.Second, signalled, TimeSpan.FromSeconds(2), Token);
+        // Bounds on real signals and loops, which a loaded machine slows: generous, as nothing else can deliver.
+        await probes.DeliveredAsync(OutboxProbes.Recorder, signalled, TimeSpan.FromSeconds(15), Token);
+        await probes.DeliveredAsync(OutboxProbes.Second, signalled, TimeSpan.FromSeconds(15), Token);
         probes.Of(OutboxProbes.Recorder).ShouldHaveSingleItem().Project.ShouldBe(project);
 
         // The worker's listener is gone: one poll dispatches, and the next one runs the deliveries.
         await _database.ExecuteAsync($"ALTER ROLE {_role} NOLOGIN", Token);
         (await _database.TerminateAsync(worker.Services.GetRequiredService<OrvanoInstance>().ApplicationName, Token)).ShouldBe(1);
         await Eventually.TrueAsync(
-            () => !worker.Services.GetRequiredService<ISignalConnectionState>().IsConnected, TimeSpan.FromSeconds(5), "the worker stayed connected", Token);
+            () => !worker.Services.GetRequiredService<ISignalConnectionState>().IsConnected, TimeSpan.FromSeconds(15), "the worker stayed connected", Token);
         var polled = Guid.CreateVersion7();
         Guid polledEvent = await OutboxHosts.PublishAsync(api.Services, new SampleNoteAdded(polled), null, Token);
         await Task.Delay(1000, Token);
         (await _rows.CountAsync("id = $1 AND dispatched_at IS NULL", Token, polledEvent)).ShouldBe(1);
 
-        clock.Advance(TimeSpan.FromMinutes(1));
+        clock.Advance(poll);
         await Eventually.TrueAsync(
             async () => await _rows.CountAsync("id = $1 AND dispatched_at IS NOT NULL", Token, polledEvent) == 1,
-            TimeSpan.FromSeconds(5), "the first poll did not dispatch", Token);
-        clock.Advance(TimeSpan.FromMinutes(1));
-        await probes.DeliveredAsync(OutboxProbes.Recorder, polled, TimeSpan.FromSeconds(5), Token);
-        await probes.DeliveredAsync(OutboxProbes.Second, polled, TimeSpan.FromSeconds(5), Token);
+            TimeSpan.FromSeconds(15), "the first poll did not dispatch", Token);
+        clock.Advance(poll);
+        await probes.DeliveredAsync(OutboxProbes.Recorder, polled, TimeSpan.FromSeconds(15), Token);
+        await probes.DeliveredAsync(OutboxProbes.Second, polled, TimeSpan.FromSeconds(15), Token);
     }
 
     [Fact]
