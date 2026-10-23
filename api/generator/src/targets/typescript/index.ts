@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { Scenario } from "../../conformance.ts";
 import type { Audience, TargetModel } from "../../model.ts";
 import { byString } from "../../naming.ts";
-import type { OutputFile, Ownership, Provenance } from "../../output.ts";
+import { scenariosJson, type OutputFile, type Ownership, type Provenance } from "../../output.ts";
 import {
   checkNames,
   contractFile,
@@ -14,7 +14,7 @@ import {
   serviceFile,
   serviceFileName,
 } from "./files.ts";
-import { dispatchFile, scenariosFile } from "./conformance.ts";
+import { dispatchFile } from "./conformance.ts";
 import { fileHeader } from "./render.ts";
 
 const runtimeDirectory = fileURLToPath(new URL("../../../runtime/typescript/", import.meta.url));
@@ -47,7 +47,7 @@ export function renderTypescript(
     },
     {
       path: "conformance/scenarios.generated.json",
-      content: scenariosFile(conformance.scenarios, source),
+      content: scenariosJson(conformance.scenarios, source),
     },
   ];
   return files.toSorted((a, b) => byString(a.path, b.path));

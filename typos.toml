@@ -12,6 +12,8 @@ extend-exclude = [
   "api/generator/test/snapshots/ts-client/",
   "api/conformance/scenarios.json",
   "api/generator/test/snapshots/ts-server/",
+  "api/generator/test/snapshots/dart-client/",
+  "api/generator/test/snapshots/dart-server/",
   "console/src/locales/",
   "dist/",
   "bin/",

@@ -30,6 +30,13 @@ jobs:
       - run: pnpm test:tooling
       - name: SDK generator tests (spec 0014 GNR-10)
         run: pnpm test:generator
+      # The Dart snapshots must pass the Dart SDK repos' analyzer, on their SDK floor (spec 0004 DRT-1, DRT-4), and the
+      # shared Dart runtime its unit tests (DQA-5).
+      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
+        with:
+          sdk: 3.10.0
+      - name: Dart SDK generator output (spec 0014 AC-14)
+        run: pnpm test:generator:dart
       - id: playwright
         name: Find the Playwright version
         run: echo "version=$(pnpm --filter @orvano/console exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"

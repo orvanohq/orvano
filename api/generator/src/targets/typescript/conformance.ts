@@ -2,10 +2,9 @@
 // real SDK method and normalizes errors; the matcher and substitution are generated here too, so both TypeScript
 // repos match the same way. Fixture services render into this file alone, never into src/.
 import { GeneratorError } from "../../contract.ts";
-import type { Scenario } from "../../conformance.ts";
 import type { Operation, Service, TargetModel } from "../../model.ts";
 import { byString } from "../../naming.ts";
-import { headerLine, type Provenance } from "../../output.ts";
+import type { Provenance } from "../../output.ts";
 import {
   clientHelpers,
   hasInputs,
@@ -15,10 +14,6 @@ import {
   serviceClassName,
 } from "./files.ts";
 import { fileHeader } from "./render.ts";
-
-export function scenariosFile(scenarios: readonly Scenario[], source: Provenance): string {
-  return `${JSON.stringify({ generated: headerLine(source), scenarios }, null, 2)}\n`;
-}
 
 export function dispatchFile(model: TargetModel, fixture: TargetModel, source: Provenance): string {
   const imported = new Set([

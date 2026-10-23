@@ -1,0 +1,45 @@
+// The retry rules both Dart SDKs share, matching spec 0002 LIB-7 (spec 0004 NET-3).
+import 'dart:math';
+
+/// The statuses worth another attempt.
+const Set<int> retryStatuses = {408, 429, 502, 503, 504};
+
+/// The methods retried without an idempotency key.
+const Set<String> retryMethods = {'GET', 'HEAD', 'OPTIONS'};
+
+/// Exponential backoff with full jitter: a random wait up to
+/// `baseDelay * 2^attempt`.
+Duration backoff(int attempt, Duration baseDelay, Random random) =>
+    baseDelay * (random.nextDouble() * pow(2, attempt));
+
+/// `Retry-After` in seconds or as an HTTP date, as a wait from [now]; null
+/// when absent or unreadable.
+Duration? parseRetryAfter(String? value, DateTime now) {
+  final text = value?.trim() ?? '';
+  if (text.isEmpty) return null;
+  final seconds = int.tryParse(text);
+  if (seconds != null) return seconds < 0 ? null : Duration(seconds: seconds);
+  final date = parseHttpDate(text);
+  if (date == null) return null;
+  final wait = date.difference(now);
+  return wait.isNegative ? Duration.zero : wait;
+}
+
+final RegExp _httpDate = RegExp(
+  r'^[A-Za-z]{3}, (\d{2}) ([A-Za-z]{3}) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT$',
+);
+
+const List<String> _months = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+/// Reads an RFC 9110 IMF-fixdate, such as `Thu, 23 Oct 2026 10:00:00 GMT`.
+DateTime? parseHttpDate(String text) {
+  final match = _httpDate.firstMatch(text);
+  if (match == null) return null;
+  final month = _months.indexOf(match[2] ?? '') + 1;
+  if (month == 0) return null;
+  int part(int group) => int.parse(match[group] ?? '');
+  return DateTime.utc(part(3), month, part(1), part(4), part(5), part(6));
+}

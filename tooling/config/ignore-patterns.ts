@@ -16,6 +16,8 @@ export const ignorePatterns = [
   // the scenario bundle, written byte for byte by `pnpm api:scenarios` from the YAML (spec 0014 CNF-4)
   "api/conformance/scenarios.json",
   "api/generator/test/snapshots/ts-server/**",
+  "api/generator/test/snapshots/dart-client/**",
+  "api/generator/test/snapshots/dart-server/**",
   "console/src/locales/**",
   // build output
   "**/dist/**",

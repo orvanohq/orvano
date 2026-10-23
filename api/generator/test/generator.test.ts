@@ -71,10 +71,20 @@ describe("0014 AC-14: the generator renders the fixture contract", () => {
       const files = generate(loadContract(fixturePath), conformance(), target, commit);
       const root = join(snapshotRoot, target);
       if (writeSnapshots) {
-        rmSync(root, { recursive: true, force: true });
+        // writeOutput deletes what the target owns first, and keeps the Dart harness files around it.
+        mkdirSync(root, { recursive: true });
         writeOutput(root, findTarget(target).ownership, files);
       }
-      expect(files.map((file) => file.path)).toEqual(filesUnder(root));
+      // The Dart snapshots sit inside small packages (pubspec.yaml, lib/<package>.dart) so CI can analyze them;
+      // only what the target owns is compared.
+      const owned = findTarget(target).ownership;
+      expect(files.map((file) => file.path)).toEqual(
+        filesUnder(root).filter(
+          (path) =>
+            owned.files.includes(path) ||
+            owned.directories.some((directory) => path.startsWith(`${directory}/`)),
+        ),
+      );
       for (const file of files) {
         expect(file).toEqual({
           path: file.path,
@@ -97,7 +107,10 @@ describe("0014 AC-14: the generator renders the fixture contract", () => {
         const head = file.path.endsWith(".json")
           ? [(JSON.parse(file.content) as { generated: string }).generated]
           : file.content.split("\n").slice(0, 2);
-        const expected = file.path.endsWith(".json") ? [line] : ["// @generated", `// ${line}`];
+        const marker = file.path.endsWith(".dart")
+          ? "// GENERATED CODE - DO NOT MODIFY BY HAND"
+          : "// @generated";
+        const expected = file.path.endsWith(".json") ? [line] : [marker, `// ${line}`];
         expect({ path: file.path, head, carriageReturn: file.content.includes("\r") }).toEqual({
           path: file.path,
           head: expected,
@@ -135,6 +148,40 @@ describe("0014 AC-14: the generator renders the fixture contract", () => {
       '"widgetKeys.rotate"',
     );
     expect(contentOf(server, "conformance/dispatch.generated.ts")).toContain('"widgetKeys.rotate"');
+
+    const dartClient = generate(loadContract(fixturePath), conformance(), "dart-client", commit);
+    const dartServer = generate(loadContract(fixturePath), conformance(), "dart-server", commit);
+    expect(contentOf(dartClient, "lib/src/generated/widget_keys_service.dart")).toBeUndefined();
+    expect(contentOf(dartClient, "lib/src/generated/models.dart")).not.toContain(
+      "WidgetKeyResponse",
+    );
+    expect(contentOf(dartClient, "lib/src/generated/services.dart")).not.toContain("widgetKeys");
+    expect(contentOf(dartClient, "lib/src/generated/widgets_service.dart")).not.toContain(
+      "Fixture_DeleteWidget",
+    );
+    expect(contentOf(dartClient, "lib/src/generated/widgets_service.dart")).toContain(
+      "Fixture_GetWidget",
+    );
+    expect(contentOf(dartServer, "lib/src/generated/widget_keys_service.dart")).toContain(
+      "Fixture_RotateWidgetKey",
+    );
+    expect(contentOf(dartServer, "lib/src/generated/widgets_service.dart")).toContain(
+      "Fixture_DeleteWidget",
+    );
+    const dartScenarioIds = (files: OutputFile[]): string[] =>
+      (
+        JSON.parse(contentOf(files, "test/conformance/scenarios.g.json") ?? "{}") as {
+          scenarios: { id: string }[];
+        }
+      ).scenarios.map((scenario) => scenario.id);
+    expect(dartScenarioIds(dartClient)).not.toContain("widget_keys.rotate.ok");
+    expect(dartScenarioIds(dartServer)).toContain("widget_keys.rotate.ok");
+    expect(contentOf(dartClient, "test/conformance/dispatch.g.dart")).not.toContain(
+      "'widgetKeys.rotate'",
+    );
+    expect(contentOf(dartServer, "test/conformance/dispatch.g.dart")).toContain(
+      "'widgetKeys.rotate'",
+    );
   });
 
   it("0014 AC-14: the real contract renders every target", () => {
@@ -146,7 +193,7 @@ describe("0014 AC-14: the generator renders the fixture contract", () => {
           loadConformance(join(here, "..", "..", "conformance")),
           target,
           commit,
-        ).some((file) => file.content.includes(`"Host_Health"`)),
+        ).some((file) => /["']Host_Health["']/.test(file.content)),
     );
     expect(missingHealth).toEqual([]);
   });
@@ -227,6 +274,30 @@ describe("0014 GNR-10: bad input fails naming the operation", () => {
     );
   });
 
+  it("a Dart reserved word as a field name", () => {
+    const document = fixture();
+    const schema = document.components?.schemas?.["WidgetResponse"];
+    if (schema?.properties !== undefined)
+      schema.properties["class"] = { type: "string", description: "Clash." };
+    expect(() => render(document, "dart-server")).toThrow(
+      /^Schema WidgetResponse property class: class can't be a Dart member name/,
+    );
+  });
+
+  it("a oneOf of two types, which Dart can't hold", () => {
+    const document = fixture();
+    const schema = document.components?.schemas?.["WidgetResponse"];
+    if (schema?.properties !== undefined)
+      schema.properties["size"] = {
+        oneOf: [{ type: "string" }, { type: "integer" }],
+        description: "Either.",
+      };
+    expect(() => render(document, "dart-server")).toThrow(
+      /^Schema WidgetResponse property size: a oneOf with more than one type is not supported in Dart/,
+    );
+    expect(() => render(document, "ts-server")).not.toThrow();
+  });
+
   it("an unknown target", () => {
     expect(() => findTarget("ts-browser")).toThrow(/^Unknown target ts-browser\. Targets: /);
   });
@@ -256,6 +327,39 @@ describe("0014 GNR-9: the generator rewrites only what its target owns", () => {
       expect(written).not.toContain("src/generated/old-service.ts");
       expect(written).not.toContain("src/runtime/old.ts");
       expect(written).toContain("src/generated/widgets-service.ts");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("deletes and rewrites lib/src/generated and lib/src/core for Dart, and leaves the rest", () => {
+    const root = mkdtempSync(join(tmpdir(), "orvano-generator-"));
+    try {
+      for (const [path, content] of [
+        ["lib/orvano.dart", "hand written\n"],
+        ["lib/src/generated/old_service.dart", "stale\n"],
+        ["lib/src/core/old.dart", "stale\n"],
+        ["test/conformance/runner.dart", "hand written\n"],
+      ] as const) {
+        mkdirSync(dirname(join(root, path)), { recursive: true });
+        writeFileSync(join(root, path), content);
+      }
+      const target = findTarget("dart-client");
+      writeOutput(
+        root,
+        target.ownership,
+        generate(loadContract(fixturePath), conformance(), "dart-client", commit),
+      );
+      const written = filesUnder(root);
+      expect(readFileSync(join(root, "lib/orvano.dart"), "utf8")).toBe("hand written\n");
+      expect(readFileSync(join(root, "test/conformance/runner.dart"), "utf8")).toBe(
+        "hand written\n",
+      );
+      expect(written).not.toContain("lib/src/generated/old_service.dart");
+      expect(written).not.toContain("lib/src/core/old.dart");
+      expect(written).toContain("lib/src/generated/widgets_service.dart");
+      expect(written).toContain("lib/src/core/transport.dart");
+      expect(written).toContain("test/conformance/dispatch.g.dart");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

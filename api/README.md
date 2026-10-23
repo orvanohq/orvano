@@ -24,14 +24,16 @@ Every public operation (a `/v1` route outside `/v1/console`) calls `.WithSdk(ser
 
 ## The SDK generator
 
-`generator/` reads `openapi.json` and writes the code each SDK repo needs (spec 0014 GNR-3). It is TypeScript that Node 24 runs directly, with no runtime dependencies. Today it has the `ts-client` (`@orvano/client`) and `ts-server` (`@orvano/server`) targets; the Dart and C# targets come next.
+`generator/` reads `openapi.json` and writes the code each SDK repo needs (spec 0014 GNR-3). It is TypeScript that Node 24 runs directly, with no runtime dependencies. Today it has the `ts-client` (`@orvano/client`), `ts-server` (`@orvano/server`), `dart-client` (`orvano`, in `sdk-flutter`'s `packages/orvano`), and `dart-server` (`orvano_server`) targets; the C# target comes next.
 
 ```sh
-pnpm --filter @orvano/sdk-generator generate --target ts-client --contract api/openapi.json --out ../sdk-js
+pnpm --filter @orvano/sdk-generator generate --target ts-client --contract api/openapi.json --out ../sdk-js/packages/client
 ```
 
-It deletes and rewrites only what its target owns (`src/generated/` and `src/runtime/` for TypeScript), so you'll want to run the SDK repo's formatter after it. `--commit` names the orvano commit in each file header; without it the generator reads `git rev-parse HEAD`.
+It deletes and rewrites only what its target owns (`src/generated/` and `src/runtime/` for TypeScript, `lib/src/generated/` and `lib/src/core/` for Dart, plus each target's conformance dispatcher and scenarios), so you'll want to run the SDK repo's formatter after it. `--commit` names the orvano commit in each file header; without it the generator reads `git rev-parse HEAD`.
 
 - `generator/src/` builds one model from the contract (`model.ts`) and renders it per target (`targets/`).
-- `generator/runtime/typescript/` is the shared TypeScript runtime (transport, retry, errors, URL and signal helpers), copied into both TypeScript SDKs (spec 0005 CGN-2). Change it here, never in an SDK repo.
+- `generator/runtime/typescript/` is the shared TypeScript runtime (transport, retry, errors, URL and signal helpers), copied into both TypeScript SDKs (spec 0005 CGN-2). `generator/runtime/dart/` is the shared Dart runtime (transport, retry, cancel token, options, exceptions, JSON readers, codec), copied into both Dart SDKs (spec 0004 PKG-3). Change them here, never in an SDK repo.
+- `generator/templates/dart/` holds the part of the Dart conformance dispatcher that does not depend on the contract (options, error shape, matcher).
 - `generator/test/` renders `fixtures/contract.openapi.json` with every target and compares it with `snapshots/`, byte for byte. When you change a template on purpose, rewrite the snapshots with `ORVANO_SNAPSHOT_WRITE=1 pnpm test:generator` and review the diff. The TypeScript snapshots also type check under the SDK repos' strict options (`pnpm typecheck`).
+- The Dart snapshots sit in two small packages (`snapshots/dart-client`, `snapshots/dart-server`) with the Dart SDK repos' analyzer options. `pnpm test:generator:dart` (needs a Dart SDK) analyzes both with `--fatal-infos` and runs the Dart runtime's unit tests in `snapshots/dart-server/test/core/` (spec 0004 DQA-5). Those tests and the package files are hand written; the generator never touches them.

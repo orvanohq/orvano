@@ -17,6 +17,7 @@
     "fix": "vp check --fix && eslint --fix && cd server && dotnet format Orvano.slnx",
     "test": "pnpm run test:tooling && pnpm run test:generator && pnpm --filter @orvano/console test && cd server && dotnet test --solution Orvano.slnx",
     "test:generator": "pnpm --filter @orvano/sdk-generator test",
+    "test:generator:dart": "pnpm --filter @orvano/sdk-generator test:dart",
     "test:tooling": "node --test \"tooling/scripts/*.test.mjs\""
   },
   "devDependencies": {

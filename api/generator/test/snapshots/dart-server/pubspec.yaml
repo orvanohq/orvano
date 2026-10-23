@@ -1,0 +1,19 @@
+# A harness around the dart-server snapshot, so `dart analyze` checks the generated
+# code and its runtime the way the SDK repo does (spec 0014 AC-14, GNR-10).
+name: orvano_server
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+
+dependencies:
+  clock: ^1.1.0
+  collection: ^1.18.0
+  http: ^1.5.0
+  logging: ^1.2.0
+  meta: ^1.15.0
+
+dev_dependencies:
+  fake_async: ^1.3.0
+  lints: ^6.0.0
+  test: ^1.25.0
