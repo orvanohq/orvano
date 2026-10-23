@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Written by hand: the snapshot's library, with LIB-2's trim and AOT analyzers and every public member
+       documented (CS1591 as an error). -->
+  <PropertyGroup>
+    <IsAotCompatible>true</IsAotCompatible>
+    <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orvano.Server.ConformanceTests" />
+  </ItemGroup>
+</Project>

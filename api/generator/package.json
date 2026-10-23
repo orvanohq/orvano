@@ -8,6 +8,7 @@
   "scripts": {
     "generate": "node src/cli.ts",
     "test": "vitest run",
+    "test:csharp": "node test/check-csharp.ts",
     "test:dart": "node test/check-dart.ts",
     "typecheck": "tsc -p tsconfig.json && tsc -p test/snapshots/tsconfig.typescript.json"
   },

@@ -37,6 +37,13 @@ jobs:
           sdk: 3.10.0
       - name: Dart SDK generator output (spec 0014 AC-14)
         run: pnpm test:generator:dart
+      # The C# snapshot must build with sdk-dotnet's compiler settings and be clean under its dotnet format
+      # (spec 0002 LIB-11, spec 0014 GNR-9).
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: server/global.json
+      - name: C# SDK generator output (spec 0014 AC-14)
+        run: pnpm test:generator:csharp
       - id: playwright
         name: Find the Playwright version
         run: echo "version=$(pnpm --filter @orvano/console exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,6 @@
+<Project>
+  <!-- The harness has no packages; this file keeps MSBuild from looking further up. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>
