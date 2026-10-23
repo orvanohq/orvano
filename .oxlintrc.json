@@ -94,6 +94,7 @@
         "tooling/scripts/**",
         "console/scripts/**",
         "api/generator/src/cli.ts",
+        "api/generator/test/check-dart.ts",
         "api/conformance/stub/server.mjs"
       ],
       "rules": {

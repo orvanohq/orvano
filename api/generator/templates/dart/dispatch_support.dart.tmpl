@@ -1,0 +1,279 @@
+// The part of every Dart dispatcher that does not depend on the contract (spec 0014 CNF-3, CNF-4).
+/// A scenario step's options (CNF-2).
+final class ConformanceOptions {
+  /// Creates step options.
+  const ConformanceOptions({this.timeout, this.retry, this.headers = const {}});
+
+  /// Reads a step's `options`, plus the headers the runner adds.
+  factory ConformanceOptions.fromJson(
+    Map<String, Object?> json, {
+    Map<String, String> headers = const {},
+  }) {
+    if (json['idempotencyKey'] != null || json['ifMatch'] != null) {
+      throw UnsupportedError(
+        'This SDK does not offer idempotencyKey or ifMatch yet '
+        '(spec 0014 build plan steps 12 and 13).',
+      );
+    }
+    return ConformanceOptions(
+      timeout: readNullable(json['timeout'], r'$.timeout', readInt),
+      retry: readNullable(json['retry'], r'$.retry', readInt),
+      headers: {
+        ...readNullable(
+              json['headers'],
+              r'$.headers',
+              (v0, p0) => readMap(v0, p0, readString),
+            ) ??
+            const {},
+        ...headers,
+      },
+    );
+  }
+
+  /// The attempt timeout in milliseconds.
+  final int? timeout;
+
+  /// The most retries.
+  final int? retry;
+
+  /// Headers for the call.
+  final Map<String, String> headers;
+
+  /// The SDK's request options for these step options.
+  OrvanoRequestOptions toRequestOptions() => OrvanoRequestOptions(
+    timeout: switch (timeout) {
+      final int milliseconds? => Duration(milliseconds: milliseconds),
+      _ => null,
+    },
+    retry: switch (retry) {
+      final int maxRetries? => RetryOptions(maxRetries: maxRetries),
+      _ => null,
+    },
+    headers: headers,
+  );
+}
+
+/// What one call gave: its JSON result, or its normalized error.
+final class ConformanceOutcome {
+  /// A call that succeeded with [result].
+  const ConformanceOutcome.ok(this.result) : ok = true, error = null;
+
+  /// A call that failed with [error].
+  const ConformanceOutcome.failed(Map<String, Object?> this.error)
+    : ok = false,
+      result = null;
+
+  /// Whether the call succeeded.
+  final bool ok;
+
+  /// The result as JSON, when [ok].
+  final Object? result;
+
+  /// The normalized error, when not [ok].
+  final Map<String, Object?>? error;
+}
+
+/// An SDK error in the shape every SDK's dispatcher reports (CNF-4).
+Map<String, Object?> normalize(OrvanoException error) => {
+  'kind': error.kind.wireName,
+  'status': switch (error) {
+    OrvanoApiException(:final statusCode) => statusCode,
+    _ => null,
+  },
+  'code': switch (error) {
+    OrvanoApiException(:final code) => code,
+    _ => OrvanoErrorCodes.unknown,
+  },
+  'fieldErrors': switch (error) {
+    OrvanoApiException(:final fieldErrors) => [
+      for (final field in fieldErrors)
+        {
+          'field': field.field,
+          'location': field.location,
+          'code': field.code,
+          'message': field.message,
+        },
+    ],
+    _ => const <Object?>[],
+  },
+  'retryAfter': switch (error) {
+    OrvanoRateLimitedException(:final retryAfter?) => retryAfter.inSeconds,
+    _ => null,
+  },
+  'requestId': switch (error) {
+    OrvanoApiException(:final traceId) => traceId,
+    _ => null,
+  },
+};
+
+/// The last response an http.Client saw, for `expect.response`.
+final class SeenResponse {
+  /// Records a response.
+  const SeenResponse(this.status, this.headers, this.body);
+
+  /// The HTTP status.
+  final int status;
+
+  /// The headers, by lowercase name.
+  final Map<String, String> headers;
+
+  /// The body as JSON, or as text when it is not JSON.
+  final Object? body;
+
+  /// This response as JSON, for matching.
+  Map<String, Object?> toJson() => {
+    'status': status,
+    'headers': headers,
+    'body': body,
+  };
+}
+
+/// An http.Client that keeps the last response it passed on (CNF-4).
+final class RecordingClient extends http.BaseClient {
+  /// Wraps another client.
+  RecordingClient(this._inner);
+
+  final http.Client _inner;
+
+  /// The last response, if any.
+  SeenResponse? last;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final response = await _inner.send(request);
+    final bytes = await response.stream.toBytes();
+    final text = utf8.decode(bytes, allowMalformed: true);
+    Object? body;
+    try {
+      body = text.isEmpty ? null : jsonDecode(text);
+    } on FormatException {
+      body = text;
+    }
+    last = SeenResponse(response.statusCode, response.headers, body);
+    return http.StreamedResponse(
+      Stream.value(bytes),
+      response.statusCode,
+      contentLength: bytes.length,
+      request: response.request,
+      headers: response.headers,
+      isRedirect: response.isRedirect,
+      persistentConnection: response.persistentConnection,
+      reasonPhrase: response.reasonPhrase,
+    );
+  }
+
+  @override
+  void close() => _inner.close();
+}
+
+/// Replaces `${name}` in every string with its value; an unknown name
+/// throws (CNF-3).
+Object? substitute(Object? value, Map<String, String> variables) =>
+    switch (value) {
+      final String text => text.replaceAllMapped(_variable, (match) {
+        final name = match[1] ?? '';
+        return variables[name] ??
+            (throw StateError('The scenario names \${$name}, which is not set.'));
+      }),
+      final List<Object?> list => [
+        for (final item in list) substitute(item, variables),
+      ],
+      final Map<String, Object?> map => {
+        for (final MapEntry(:key, :value) in map.entries)
+          key: substitute(value, variables),
+      },
+      _ => value,
+    };
+
+final RegExp _variable = RegExp(r'\$\{([A-Za-z][A-Za-z0-9]*)\}');
+final RegExp _uuid = RegExp(
+  r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+);
+final RegExp _timestamp = RegExp(
+  r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$',
+);
+
+/// Matches a value against an expectation (CNF-3): objects by subset, arrays
+/// exactly unless `$contains`, and the matchers `$any`, `$uuid`,
+/// `$timestamp`, and `$regex`. Returns one message per mismatch; empty
+/// means a match.
+List<String> match(Object? expected, Object? actual, [String path = r'$']) {
+  if (expected is Map<String, Object?>) {
+    final keys = expected.keys.toList();
+    if (keys case [final key] when key.startsWith(r'$')) {
+      return _matchWith(key, expected[key], actual, path);
+    }
+    if (actual is! Map<String, Object?>) {
+      return ['$path: expected an object, got ${_describe(actual)}'];
+    }
+    return [
+      for (final key in keys)
+        ...(actual.containsKey(key)
+            ? match(expected[key], actual[key], '$path.$key')
+            : ['$path.$key: missing']),
+    ];
+  }
+  if (expected is List<Object?>) {
+    if (actual is! List<Object?>) {
+      return ['$path: expected an array, got ${_describe(actual)}'];
+    }
+    if (actual.length != expected.length) {
+      return [
+        '$path: expected ${expected.length} items, got ${actual.length}',
+      ];
+    }
+    return [
+      for (final (index, item) in expected.indexed)
+        ...match(item, actual[index], '$path[$index]'),
+    ];
+  }
+  return expected == actual
+      ? const []
+      : ['$path: expected ${_describe(expected)}, got ${_describe(actual)}'];
+}
+
+List<String> _matchWith(
+  String matcher,
+  Object? argument,
+  Object? actual,
+  String path,
+) {
+  switch (matcher) {
+    case r'$any':
+      return actual == null ? ['$path: missing'] : const [];
+    case r'$uuid':
+      return actual is String && _uuid.hasMatch(actual)
+          ? const []
+          : ['$path: expected a uuid, got ${_describe(actual)}'];
+    case r'$timestamp':
+      return actual is String &&
+              _timestamp.hasMatch(actual) &&
+              DateTime.tryParse(actual) != null
+          ? const []
+          : ['$path: expected an RFC 3339 timestamp, got ${_describe(actual)}'];
+    case r'$regex':
+      return actual is String && RegExp('$argument').hasMatch(actual)
+          ? const []
+          : ['$path: expected a match for /$argument/, got ${_describe(actual)}'];
+    case r'$contains':
+      if (actual is! List<Object?>) {
+        return ['$path: expected an array, got ${_describe(actual)}'];
+      }
+      final wanted = argument is List<Object?> ? argument : [argument];
+      return [
+        for (final (index, item) in wanted.indexed)
+          if (!actual.any((candidate) => match(item, candidate).isEmpty))
+            '$path: no item matches \$contains[$index] ${_describe(item)}',
+      ];
+    default:
+      return ['$path: unknown matcher $matcher'];
+  }
+}
+
+String _describe(Object? value) {
+  try {
+    return jsonEncode(value);
+  } on JsonUnsupportedObjectError {
+    return value.runtimeType.toString();
+  }
+}

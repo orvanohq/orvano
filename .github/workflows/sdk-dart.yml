@@ -97,7 +97,9 @@ jobs:
             fi
           done
           exit "$status"
+      # The conformance suite (spec 0004 DQA-3) needs Orvano and the stub running, so it runs in each repo's own
+      # conformance job with `--tags conformance`.
       - name: Tests
         env:
           FLUTTER: ${{ inputs.flutter }}
-        run: if [ "$FLUTTER" = "true" ]; then flutter test; else dart test; fi
+        run: if [ "$FLUTTER" = "true" ]; then flutter test --exclude-tags conformance; else dart test --exclude-tags conformance; fi

@@ -1,0 +1,259 @@
+import '../generated/error_codes.dart';
+import 'cancel_token.dart';
+
+/// What went wrong, the same set in every Orvano SDK (spec 0014 KND-2).
+enum OrvanoErrorKind {
+  /// No usable response: the connection failed, or the server redirected.
+  network('network'),
+
+  /// The last attempt ran out of time, or the server answered 408.
+  timeout('timeout'),
+
+  /// The call was cancelled by its token or by `close()`.
+  cancelled('cancelled'),
+
+  /// 401: the credential is missing, invalid, or expired.
+  unauthenticated('unauthenticated'),
+
+  /// 403: the caller is not allowed to do this.
+  forbidden('forbidden'),
+
+  /// 404: the resource or route was not found.
+  notFound('not_found'),
+
+  /// 409, 412, or 428: the request conflicts with the resource's state.
+  conflict('conflict'),
+
+  /// 400, 413, 415, or 422: the request is not valid.
+  validation('validation'),
+
+  /// 429: too many requests.
+  rateLimited('rate_limited'),
+
+  /// Any other 4xx or 5xx, or a reply the SDK could not read.
+  server('server');
+
+  const OrvanoErrorKind(this.wireName);
+
+  /// The kind's name in every SDK, such as `not_found`.
+  final String wireName;
+
+  /// The kind for an HTTP status, whatever the body (KND-2).
+  static OrvanoErrorKind fromStatus(int status) => switch (status) {
+    400 || 413 || 415 || 422 => validation,
+    401 => unauthenticated,
+    403 => forbidden,
+    404 => notFound,
+    408 => timeout,
+    409 || 412 || 428 => conflict,
+    429 => rateLimited,
+    _ => server,
+  };
+}
+
+/// One problem with one field of the request (spec 0014 PRB-3).
+final class OrvanoFieldError {
+  /// Creates a field error.
+  const OrvanoFieldError({
+    required this.field,
+    required this.location,
+    required this.code,
+    required this.message,
+  });
+
+  /// The field's wire name; in a body, a dotted path such as `address.city`.
+  final String field;
+
+  /// Where the field is: `body`, `query`, `path`, or `header`.
+  final String location;
+
+  /// What is wrong, such as `required` or `too_long`.
+  final String code;
+
+  /// An English sentence describing the problem, safe to show.
+  final String message;
+
+  @override
+  bool operator ==(Object other) =>
+      other is OrvanoFieldError &&
+      other.field == field &&
+      other.location == location &&
+      other.code == code &&
+      other.message == message;
+
+  @override
+  int get hashCode => Object.hash(field, location, code, message);
+
+  @override
+  String toString() => 'OrvanoFieldError($location $field: $code)';
+}
+
+/// Every runtime failure the Orvano SDK reports (spec 0004 EXC-1).
+///
+/// Switch over the subtypes; programming errors are Dart `Error`s instead.
+sealed class OrvanoException implements Exception {
+  const OrvanoException(this.message);
+
+  /// A short description, safe to log.
+  final String message;
+
+  /// What went wrong, the same in every Orvano SDK.
+  OrvanoErrorKind get kind;
+}
+
+/// The server answered with an error.
+final class OrvanoApiException extends OrvanoException {
+  /// Creates the error for a non 2xx response.
+  const OrvanoApiException({
+    required this.statusCode,
+    required this.code,
+    required this.title,
+    required this.rawBody,
+    this.detail,
+    this.traceId,
+    this.fieldErrors = const [],
+  }) : super(title);
+
+  /// The HTTP status.
+  final int statusCode;
+
+  /// The error code; compare it with [OrvanoErrorCodes].
+  final String code;
+
+  /// The HTTP reason phrase, such as `Not Found`.
+  final String title;
+
+  /// An English message safe to show, when the server sent one.
+  final String? detail;
+
+  /// The request's trace ID (`Orvano-Request-Id`), to quote when you report it.
+  final String? traceId;
+
+  /// When the body was not a problem: its first 4 KB, to help you debug a
+  /// proxy's answer (spec 0004 NET-10). Empty otherwise.
+  final String rawBody;
+
+  /// On `validation_failed`: each field that is not valid.
+  final List<OrvanoFieldError> fieldErrors;
+
+  @override
+  OrvanoErrorKind get kind => OrvanoErrorKind.fromStatus(statusCode);
+
+  @override
+  String toString() =>
+      'OrvanoApiException($statusCode $code, traceId: $traceId): $title';
+}
+
+/// The server answered 429 and asked the caller to slow down.
+final class OrvanoRateLimitedException extends OrvanoApiException {
+  /// Creates the error for a 429 response.
+  const OrvanoRateLimitedException({
+    required super.statusCode,
+    required super.code,
+    required super.title,
+    required super.rawBody,
+    super.detail,
+    super.traceId,
+    super.fieldErrors,
+    this.retryAfter,
+  });
+
+  /// How long the server asked the caller to wait, from `Retry-After`.
+  final Duration? retryAfter;
+
+  @override
+  String toString() =>
+      'OrvanoRateLimitedException($statusCode $code, traceId: $traceId, '
+      'retryAfter: $retryAfter): $title';
+}
+
+/// No usable response: connection refused, DNS or TLS failure, a dropped
+/// connection, or a redirect the SDK refused to follow.
+final class OrvanoNetworkException extends OrvanoException {
+  /// Creates the error with the failure that caused it.
+  const OrvanoNetworkException(this.cause)
+    : super('The request could not reach the server.');
+
+  /// The underlying failure.
+  final Object cause;
+
+  @override
+  OrvanoErrorKind get kind => OrvanoErrorKind.network;
+
+  @override
+  String toString() => 'OrvanoNetworkException: $message';
+}
+
+/// The last attempt ran out of time.
+final class OrvanoTimeoutException extends OrvanoException {
+  /// Creates the error with the timeout that ran out.
+  const OrvanoTimeoutException(this.timeout)
+    : super('The request timed out.');
+
+  /// The per attempt timeout that ran out.
+  final Duration timeout;
+
+  @override
+  OrvanoErrorKind get kind => OrvanoErrorKind.timeout;
+
+  @override
+  String toString() => 'OrvanoTimeoutException(${timeout.inMilliseconds} ms)';
+}
+
+/// The call was cancelled, by its token or by `close()`.
+final class OrvanoCancelledException extends OrvanoException {
+  /// Creates the error with the cancel reason.
+  const OrvanoCancelledException(this.reason)
+    : super('The request was cancelled.');
+
+  /// The token's reason, or [OrvanoCancelReason.clientClosed].
+  final Object? reason;
+
+  @override
+  OrvanoErrorKind get kind => OrvanoErrorKind.cancelled;
+
+  @override
+  String toString() => 'OrvanoCancelledException';
+}
+
+/// The server's reply could not be read: bad JSON, a missing required field,
+/// or an unexpected type. It names the JSON path, never the value (EXC-5).
+final class OrvanoProtocolException extends OrvanoException {
+  /// Creates the error for the value at [path].
+  const OrvanoProtocolException(this.path, String message, [this.cause])
+    : super(message);
+
+  /// Creates the error for a field at [path] that is not of the [expected]
+  /// type. Only the runtime type of [actual] is kept, never its value.
+  factory OrvanoProtocolException.field(
+    String path,
+    String expected,
+    Object? actual,
+  ) => OrvanoProtocolException(
+    path,
+    actual == null
+        ? 'Expected $expected at $path, but it is missing.'
+        : 'Expected $expected at $path, got ${_typeName(actual)}.',
+  );
+
+  /// The JSON path of the bad value, such as `$.items[3].id`.
+  final String path;
+
+  /// The underlying failure, such as a `FormatException`.
+  final Object? cause;
+
+  @override
+  OrvanoErrorKind get kind => OrvanoErrorKind.server;
+
+  @override
+  String toString() => 'OrvanoProtocolException: $message';
+}
+
+String _typeName(Object value) => switch (value) {
+  String() => 'a string',
+  bool() => 'a boolean',
+  num() => 'a number',
+  List<Object?>() => 'an array',
+  Map<Object?, Object?>() => 'an object',
+  _ => 'another type',
+};
