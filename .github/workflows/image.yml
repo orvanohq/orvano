@@ -1,0 +1,132 @@
+# Spec 0007 IMG-3: builds ghcr.io/orvanohq/orvano on every push to main, tagged `edge` and `sha-<commit>` (spec 0014
+# CNF-6), signed with cosign keyless and attested (spec 0006 SUP-8). When the push changed api/**, its last job sends
+# `contract-updated` to the six SDK repos through the orvano-sdk-bot App, only once the image is pushed and signed
+# (spec 0014 RGN-4, RGN-5). Release tags (`<version>`, `<major>.<minor>`) join with features 52 and 59.
+name: Image
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - docs/**
+
+permissions: {}
+
+# A newer push replaces a waiting run; a lost dispatch is caught by each SDK repo's daily catch up (RGN-9).
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/orvanohq/orvano
+
+jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      api: ${{ steps.changes.outputs.api }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      # With no usable base (a new branch, a force push), api/ counts as changed, like tooling/scripts/changes.mjs.
+      - id: changes
+        name: Did this push change api/
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          api=true
+          if [[ "$PUSH_BEFORE" =~ ^[0-9a-f]{40}$ && ! "$PUSH_BEFORE" =~ ^0+$ ]] \
+            && files="$(git diff --name-only "$PUSH_BEFORE" HEAD -- api/)"; then
+            [ -n "$files" ] || api=false
+          fi
+          echo "api=$api" >> "$GITHUB_OUTPUT"
+          echo "api/ changed: $api"
+
+  image:
+    name: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write # push to GHCR
+      id-token: write # cosign keyless signing and the provenance attestation
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # The build stages run on the runner's platform and cross publish (deploy/Dockerfile), so no QEMU is needed.
+      - id: build
+        name: Build and push (linux/amd64, linux/arm64)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: |
+            ${{ env.IMAGE }}:edge
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Sign the image (cosign keyless)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE@$DIGEST"
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  # RGN-5: the last job. A failed or unsigned image sends nothing, so a regenerate PR never waits on a missing image.
+  contract-updated:
+    name: contract-updated
+    needs: [changes, image]
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions: {}
+    steps:
+      # RGN-4: the token is narrowed to these six repos and to contents: write, which repository_dispatch needs.
+      - id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.SDK_BOT_APP_ID }}
+          private-key: ${{ secrets.SDK_BOT_PRIVATE_KEY }}
+          owner: orvanohq
+          repositories: sdk-flutter,sdk-dart,sdk-js,sdk-js-server,sdk-nextjs,sdk-dotnet
+          permission-contents: write
+      - name: Dispatch contract-updated
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          status=0
+          for repo in sdk-flutter sdk-dart sdk-js sdk-js-server sdk-nextjs sdk-dotnet; do
+            if gh api --method POST "repos/orvanohq/$repo/dispatches" \
+              -f event_type=contract-updated -f "client_payload[commit]=$COMMIT" --silent; then
+              echo "Sent contract-updated $COMMIT to $repo"
+            else
+              echo "::error::Could not dispatch to $repo"
+              status=1
+            fi
+          done
+          exit "$status"
