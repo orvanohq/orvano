@@ -46,8 +46,10 @@ export function createClientHandle(
   clientName: string,
   credentials: Readonly<Record<string, string>>,
 ): OrvanoClient {
-  if (typeof options !== "object" || options === null)
+  const given: unknown = options;
+  if (typeof given !== "object" || given === null) {
     throw new TypeError("createClient needs an options object.");
+  }
   const url = checkUrl(options.url, options.allowHttp === true);
   // Read as unknown: a JavaScript caller can pass anything, whatever the types say.
   const project: unknown = options.project;
@@ -78,7 +80,7 @@ export function createClientHandle(
  * plain to see; everything else sends through `config.fetch`.
  */
 function defaultFetch(request: Request): Promise<Response> {
-  return Reflect.apply(globalThis.fetch, globalThis, [request]) as Promise<Response>;
+  return Reflect.apply(globalThis.fetch, globalThis, [request]);
 }
 
 /** @internal */

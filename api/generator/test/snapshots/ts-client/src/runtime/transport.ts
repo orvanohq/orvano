@@ -23,8 +23,8 @@ export interface RequestSpec {
   readonly options?: RequestOptions | undefined;
 }
 
-type Result<T> =
-  | { readonly ok: true; readonly value: T }
+type Result =
+  | { readonly ok: true; readonly value: unknown }
   | { readonly ok: false; readonly error: OrvanoError };
 
 // Spec 0005 SHP-8, spec 0002 LIB-7.
@@ -44,20 +44,20 @@ export async function request<T>(client: OrvanoClient, spec: RequestSpec): Promi
   const callHeaders = checkHeaders(spec.options?.headers);
   for (let attempt = 0; ; attempt++) {
     // oxlint-disable-next-line no-await-in-loop -- attempts run one after another, each after the last failed (SHP-8)
-    const result = await sendOnce<T>(config, spec, timeout, callHeaders);
-    if (result.ok) return result.value;
+    const result = await sendOnce(config, spec, timeout, callHeaders);
+    if (result.ok) return result.value as T;
     if (!shouldRetry(spec, result.error, attempt, maxRetries)) throw result.error;
     // oxlint-disable-next-line no-await-in-loop -- the backoff wait sits between two attempts (SHP-8)
     await sleep(backoff(attempt, result.error.retryAfter), spec.options?.signal);
   }
 }
 
-async function sendOnce<T>(
+async function sendOnce(
   config: ClientConfig,
   spec: RequestSpec,
   timeout: number,
   callHeaders: Readonly<Record<string, string>>,
-): Promise<Result<T>> {
+): Promise<Result> {
   const callerSignal = spec.options?.signal;
   const linked = linkSignals(callerSignal, timeout);
   try {
@@ -82,7 +82,7 @@ async function sendOnce<T>(
       throw thrown; // a custom fetch's own error, unchanged (SHP-8)
     }
     if (!response.ok) return { ok: false, error: errorFromResponse(response, text) };
-    return { ok: true, value: readJson(response, text) as T };
+    return { ok: true, value: readJson(response, text) };
   } finally {
     linked.dispose();
   }
