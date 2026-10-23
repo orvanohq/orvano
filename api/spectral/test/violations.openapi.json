@@ -1,0 +1,74 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Orvano API",
+    "description": "A document that breaks every Orvano lint rule once, for tooling/scripts/spectral-rules.test.mjs.",
+    "license": { "name": "Apache 2.0", "identifier": "Apache-2.0" },
+    "version": "2026-10-22"
+  },
+  "paths": {
+    "/v1/Widgets": {
+      "get": {
+        "tags": ["widgets"],
+        "summary": "List widgets.",
+        "operationId": "listWidgets",
+        "parameters": [{ "name": "X-Trace", "in": "header", "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "X-Count": { "description": "A count.", "schema": { "type": "integer" } }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Widget" } }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Widget" } }
+            }
+          }
+        },
+        "x-orvano-sdk": { "service": "widgets", "method": "list" }
+      },
+      "post": {
+        "tags": ["widgets"],
+        "summary": "Create a widget.",
+        "description": "Creates a widget.",
+        "operationId": "Widgets_Create",
+        "requestBody": {
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Widget" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Widget" } }
+            }
+          }
+        },
+        "x-orvano-sdk": { "service": "widgets", "method": "list" },
+        "x-orvano-audience": ["server"],
+        "x-orvano-errors": ["widget_missing"]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Problem": { "type": "object", "description": "The error body." },
+      "Widget": {
+        "type": "object",
+        "properties": {
+          "Name": { "type": "string", "description": "The name." },
+          "size": { "type": "integer", "format": "int64", "description": "The size." },
+          "count": { "type": "integer", "format": "int64" }
+        }
+      }
+    }
+  },
+  "tags": [{ "name": "widgets", "description": "Widgets." }],
+  "x-orvano-error-codes": {
+    "not_found": { "status": 404, "description": "Not found." }
+  }
+}

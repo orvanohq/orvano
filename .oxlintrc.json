@@ -73,7 +73,12 @@
   },
   "overrides": [
     {
-      "files": ["**/*.config.ts", "**/*.config.mts", "**/*.config.mjs"],
+      "files": [
+        "**/*.config.ts",
+        "**/*.config.mts",
+        "**/*.config.mjs",
+        "api/spectral/functions/**"
+      ],
       "rules": {
         "import/no-default-export": "off"
       }

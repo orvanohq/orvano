@@ -1,11 +1,15 @@
+using System.Text.RegularExpressions;
+
 using Microsoft.AspNetCore.Builder;
 
 namespace Orvano.SharedKernel.Api;
 
 /// <summary>
 /// Endpoint metadata for the wire format and the contract (spec 0014 XTN-2), on a single endpoint or a <c>MapGroup</c>.
+/// Every public operation (a <c>/v1</c> route outside <c>/v1/console</c>) calls <see cref="WithSdk{TBuilder}"/> and
+/// <see cref="WithErrors{TBuilder}"/>, or the host does not start; console operations need neither.
 /// </summary>
-public static class ContractEndpointExtensions
+public static partial class ContractEndpointExtensions
 {
     /// <summary>
     /// Sends <paramref name="value"/> as <c>Cache-Control</c> instead of <c>no-store</c> (HDR-5). API responses are
@@ -18,4 +22,80 @@ public static class ContractEndpointExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
         return builder.WithMetadata(new CacheControlMetadata(value));
     }
+
+    /// <summary>
+    /// Names the operation in every SDK: <paramref name="service"/> is the service class, <paramref name="method"/>
+    /// the method on it, both camelCase (<c>.WithSdk("rows", "list")</c>). The pair is unique in the public contract.
+    /// </summary>
+    public static TBuilder WithSdk<TBuilder>(this TBuilder builder, string service, string method)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        RequireCamelCase(service, nameof(service));
+        RequireCamelCase(method, nameof(method));
+        return builder.WithMetadata(new SdkMetadata(service, method));
+    }
+
+    /// <summary>
+    /// Lists the catalogued error codes the operation can return beyond the implied ones (XTN-3); an empty call says
+    /// it returns none. A code missing from the catalogue fails startup.
+    /// </summary>
+    public static TBuilder WithErrors<TBuilder>(this TBuilder builder, params string[] codes)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(codes);
+        foreach (string code in codes)
+        {
+            if (!ErrorCodes.IsWellFormed(code))
+            {
+                throw new ArgumentException($"'{code}' is not a well formed error code (PRB-7).", nameof(codes));
+            }
+        }
+
+        return builder.WithMetadata(new ErrorsMetadata([.. codes.Distinct(StringComparer.Ordinal)]));
+    }
+
+    /// <summary>Marks a billable operation with the meter it counts under, such as <c>databases.rows.read</c> (XTN-4).</summary>
+    public static TBuilder WithMeter<TBuilder>(this TBuilder builder, string name)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        if (string.IsNullOrEmpty(name) || !MeterPattern().IsMatch(name))
+        {
+            throw new ArgumentException($"'{name}' is not a meter name: dotted lowercase segments, such as databases.rows.read.", nameof(name));
+        }
+
+        return builder.WithMetadata(new MeterMetadata(name));
+    }
+
+    /// <summary>Renders the operation with a hand written generator template, such as <c>typed-rows</c> (GNR-7).</summary>
+    public static TBuilder WithSdkTemplate<TBuilder>(this TBuilder builder, string name)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        if (string.IsNullOrEmpty(name) || !TemplatePattern().IsMatch(name))
+        {
+            throw new ArgumentException($"'{name}' is not a template name: lowercase words joined by hyphens.", nameof(name));
+        }
+
+        return builder.WithMetadata(new SdkTemplateMetadata(name));
+    }
+
+    private static void RequireCamelCase(string value, string parameter)
+    {
+        if (string.IsNullOrEmpty(value) || !CamelCasePattern().IsMatch(value))
+        {
+            throw new ArgumentException($"'{value}' is not a camelCase SDK name (XTN-1).", parameter);
+        }
+    }
+
+    [GeneratedRegex("^[a-z][a-zA-Z0-9]*$", RegexOptions.CultureInvariant)]
+    private static partial Regex CamelCasePattern();
+
+    [GeneratedRegex(@"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$", RegexOptions.CultureInvariant)]
+    private static partial Regex MeterPattern();
+
+    [GeneratedRegex("^[a-z][a-z0-9]*(-[a-z0-9]+)*$", RegexOptions.CultureInvariant)]
+    private static partial Regex TemplatePattern();
 }

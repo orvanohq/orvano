@@ -59,6 +59,13 @@ const labels = [
   { name: "triage", color: "fbca04", description: "Needs a first look from a maintainer" },
 ];
 
+/** Spec 0014 BRK-2: the API diff job marks a core PR whose public contract has breaking changes. */
+const breakingApiLabel = {
+  name: "breaking-api",
+  color: "b60205",
+  description: "Changes the public API contract in a breaking way",
+};
+
 /** RUL-4: a new CodeQL alert of high or critical security severity, or of error severity, blocks the merge. */
 const codeScanningRule = {
   type: "code_scanning",
@@ -142,7 +149,7 @@ export const profiles = {
       ["ci-gate", "analyze (csharp)", "analyze (javascript-typescript)", "dependency-review"],
       true,
     ),
-    labels,
+    labels: [...labels, breakingApiLabel],
     // ISS-4. GitHub's API can't read a category's format, only whether it takes answers.
     discussionCategories: [
       { name: "Announcements", isAnswerable: false },

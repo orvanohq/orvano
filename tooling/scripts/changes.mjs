@@ -26,8 +26,9 @@ const globalPaths = [
 
 /** Area → paths that change it. `repo` always runs, so it isn't listed. */
 const areaPaths = {
-  server: [/^server\//],
-  console: [/^console\//, /^tooling\/lint-fixtures\//],
+  // api/: the server job checks the committed contract for drift, the console job lints it and its API types.
+  server: [/^server\//, /^api\//],
+  console: [/^console\//, /^tooling\/lint-fixtures\//, /^api\//],
   deploy: [/^deploy\//, /^\.dockerignore$/, /^server\//, /^console\//],
   windows: [
     /^console\//,

@@ -1,0 +1,123 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Orvano Console API",
+    "description": "The control plane API that the Orvano console calls. It ships with the server and has no SDK.",
+    "license": {
+      "name": "Apache 2.0",
+      "identifier": "Apache-2.0"
+    },
+    "version": "2026-10-22"
+  },
+  "paths": {},
+  "components": {
+    "parameters": {
+      "Authorization": {
+        "name": "Authorization",
+        "in": "header",
+        "description": "`Bearer <access token>` for a signed in end user.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Idempotency-Key": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "description": "1 to 255 printable ASCII characters that make a retried request safe, on operations marked `x-orvano-idempotent`.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "If-Match": {
+        "name": "If-Match",
+        "in": "header",
+        "description": "The `ETag` of the version you read. A write to a changed resource answers `412 version_conflict`.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Orvano-Api-Version": {
+        "name": "Orvano-Api-Version",
+        "in": "header",
+        "description": "The API version the client was built for, `YYYY-MM-DD`. Without it the server uses its current version.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Orvano-Client": {
+        "name": "Orvano-Client",
+        "in": "header",
+        "description": "The SDK and its version, `<package>/<version>`. Used for telemetry only.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Orvano-Csrf": {
+        "name": "Orvano-Csrf",
+        "in": "header",
+        "description": "The console session's CSRF token, on requests that change state.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Orvano-Key": {
+        "name": "Orvano-Key",
+        "in": "header",
+        "description": "The project's publishable (`orv_pk_…`) or secret (`orv_sk_…`) key.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "traceparent": {
+        "name": "traceparent",
+        "in": "header",
+        "description": "W3C trace context, to join the request to your trace.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "tracestate": {
+        "name": "tracestate",
+        "in": "header",
+        "description": "W3C trace state, sent with `traceparent`.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "headers": {
+      "ETag": {
+        "description": "The strong ETag of the resource's version. Send it back as `If-Match` to write safely.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Orvano-Api-Version": {
+        "description": "The API version the server answered with.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Orvano-Idempotent-Replayed": {
+        "description": "`true` when the answer is a replay of an earlier request with the same `Idempotency-Key`.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Orvano-Request-Id": {
+        "description": "The request's 32 hex character trace ID. Equals the problem body's `traceId`; quote it when you report an issue.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Retry-After": {
+        "description": "Seconds to wait before trying again, on a 429 or a 503 that knows when to come back.",
+        "schema": {
+          "minimum": 0,
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    }
+  }
+}

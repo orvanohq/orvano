@@ -1,0 +1,711 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Orvano API",
+    "description": "The Orvano API that the client and server SDKs call. Send the version in `Orvano-Api-Version`; every error is a problem body with a `code`.",
+    "license": {
+      "name": "Apache 2.0",
+      "identifier": "Apache-2.0"
+    },
+    "version": "2026-10-22"
+  },
+  "paths": {
+    "/v1/projects/{projectId}/samples": {
+      "post": {
+        "tags": [
+          "samples"
+        ],
+        "summary": "Create a sample.",
+        "description": "Creates a sample and returns it.",
+        "operationId": "Sample_Create",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "The project's ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSampleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SampleResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-orvano-audience": [
+          "client"
+        ],
+        "x-orvano-errors": [
+          "conflict"
+        ],
+        "x-orvano-metered": "samples.create",
+        "x-orvano-sdk": {
+          "service": "samples",
+          "method": "create"
+        }
+      }
+    },
+    "/v1/projects/{projectId}/samples/{sampleId}": {
+      "get": {
+        "tags": [
+          "samples"
+        ],
+        "summary": "Get a sample.",
+        "description": "Returns one sample by its ID.",
+        "operationId": "Sample_Get",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "The project's ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sampleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SampleResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-orvano-audience": [
+          "server"
+        ],
+        "x-orvano-errors": [
+          "not_found"
+        ],
+        "x-orvano-sdk": {
+          "service": "samples",
+          "method": "get"
+        },
+        "x-orvano-sdk-template": "typed-rows"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateSampleRequest": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldError": {
+        "required": [
+          "code",
+          "field",
+          "location",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "The field's wire name; in a body, a dotted camelCase path with indexes, such as `address.city` or `tags[2]`."
+          },
+          "location": {
+            "enum": [
+              "body",
+              "query",
+              "path",
+              "header"
+            ],
+            "type": "string",
+            "description": "Where the field is."
+          },
+          "code": {
+            "type": "string",
+            "description": "What is wrong, such as `required` or `too_long`."
+          },
+          "message": {
+            "type": "string",
+            "description": "An English sentence describing the problem, safe to show."
+          }
+        },
+        "description": "One problem with one field of the request."
+      },
+      "Problem": {
+        "required": [
+          "code",
+          "detail",
+          "status",
+          "title",
+          "traceId",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Always `about:blank`: the code is the error's identity."
+          },
+          "title": {
+            "type": "string",
+            "description": "The HTTP reason phrase, such as `Not Found`."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status.",
+            "format": "int32"
+          },
+          "detail": {
+            "type": "string",
+            "description": "An English message safe to show to the user."
+          },
+          "code": {
+            "type": "string",
+            "description": "The snake_case error code; x-orvano-error-codes lists every code."
+          },
+          "traceId": {
+            "type": "string",
+            "description": "Equals the `Orvano-Request-Id` header."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "description": "On `validation_failed`: each field that is not valid."
+          },
+          "retryAfter": {
+            "type": "integer",
+            "description": "On a 429 or a 503 that knows when to come back: seconds to wait, equal to `Retry-After`.",
+            "format": "int32"
+          },
+          "requiredRole": {
+            "type": "string",
+            "description": "On a console 403: the console role that would allow the action."
+          },
+          "currentVersion": {
+            "type": "string",
+            "description": "On `version_conflict`: the resource's current version, as its `ETag` without quotes."
+          },
+          "supportedVersions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "On `unsupported_api_version`: the versions the server serves."
+          }
+        },
+        "description": "The error body of every non 2xx response (RFC 9457 problem details). `code` identifies the error."
+      },
+      "SampleAddress": {
+        "required": [
+          "city",
+          "zip"
+        ],
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "zip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "SampleResponse": {
+        "required": [
+          "address",
+          "count",
+          "createdAt",
+          "id",
+          "name",
+          "nickname",
+          "previous",
+          "shade",
+          "tags"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "shade": {
+            "$ref": "#/components/schemas/SampleShade"
+          },
+          "address": {
+            "$ref": "#/components/schemas/SampleAddress"
+          },
+          "previous": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SampleAddress"
+              }
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SampleShade": {
+        "enum": [
+          "light",
+          "deep_blue"
+        ],
+        "type": "string"
+      }
+    },
+    "parameters": {
+      "Authorization": {
+        "name": "Authorization",
+        "in": "header",
+        "description": "`Bearer <access token>` for a signed in end user.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Idempotency-Key": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "description": "1 to 255 printable ASCII characters that make a retried request safe, on operations marked `x-orvano-idempotent`.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "If-Match": {
+        "name": "If-Match",
+        "in": "header",
+        "description": "The `ETag` of the version you read. A write to a changed resource answers `412 version_conflict`.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Orvano-Api-Version": {
+        "name": "Orvano-Api-Version",
+        "in": "header",
+        "description": "The API version the client was built for, `YYYY-MM-DD`. Without it the server uses its current version.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Orvano-Client": {
+        "name": "Orvano-Client",
+        "in": "header",
+        "description": "The SDK and its version, `<package>/<version>`. Used for telemetry only.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Orvano-Csrf": {
+        "name": "Orvano-Csrf",
+        "in": "header",
+        "description": "The console session's CSRF token, on requests that change state.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Orvano-Key": {
+        "name": "Orvano-Key",
+        "in": "header",
+        "description": "The project's publishable (`orv_pk_…`) or secret (`orv_sk_…`) key.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "traceparent": {
+        "name": "traceparent",
+        "in": "header",
+        "description": "W3C trace context, to join the request to your trace.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "tracestate": {
+        "name": "tracestate",
+        "in": "header",
+        "description": "W3C trace state, sent with `traceparent`.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "headers": {
+      "ETag": {
+        "description": "The strong ETag of the resource's version. Send it back as `If-Match` to write safely.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Orvano-Api-Version": {
+        "description": "The API version the server answered with.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Orvano-Idempotent-Replayed": {
+        "description": "`true` when the answer is a replay of an earlier request with the same `Idempotency-Key`.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Orvano-Request-Id": {
+        "description": "The request's 32 hex character trace ID. Equals the problem body's `traceId`; quote it when you report an issue.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Retry-After": {
+        "description": "Seconds to wait before trying again, on a 429 or a 503 that knows when to come back.",
+        "schema": {
+          "minimum": 0,
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "samples"
+    }
+  ],
+  "x-orvano-error-codes": {
+    "conflict": {
+      "status": 409,
+      "description": "The request conflicts with the resource's current state."
+    },
+    "forbidden": {
+      "status": 403,
+      "description": "The caller is not allowed to do this; on a console route, requiredRole names the role that would allow it.",
+      "members": [
+        "requiredRole"
+      ]
+    },
+    "idempotency_in_progress": {
+      "status": 409,
+      "description": "A request with this idempotency key is still running (reserved)."
+    },
+    "idempotency_key_reused": {
+      "status": 422,
+      "description": "This idempotency key was used with a different request (reserved)."
+    },
+    "insufficient_scope": {
+      "status": 403,
+      "description": "The credential does not have the scope this needs."
+    },
+    "internal": {
+      "status": 500,
+      "description": "Something went wrong on the server."
+    },
+    "invalid_cursor": {
+      "status": 400,
+      "description": "The cursor does not parse, or was issued for another filter or sort."
+    },
+    "invalid_request": {
+      "status": 400,
+      "description": "The request could not be read: malformed JSON, a wrong body type, or a bad header."
+    },
+    "method_not_allowed": {
+      "status": 405,
+      "description": "The route does not accept this method."
+    },
+    "not_found": {
+      "status": 404,
+      "description": "The resource or route was not found."
+    },
+    "payload_too_large": {
+      "status": 413,
+      "description": "The request body is too large."
+    },
+    "rate_limited": {
+      "status": 429,
+      "description": "Too many requests; wait retryAfter seconds.",
+      "members": [
+        "retryAfter"
+      ]
+    },
+    "session_expired": {
+      "status": 401,
+      "description": "The access token expired; refresh the session once and retry."
+    },
+    "timeout": {
+      "status": 503,
+      "description": "The server took too long to answer."
+    },
+    "unauthorized": {
+      "status": 401,
+      "description": "The credential is missing, invalid, expired, or not for this project."
+    },
+    "unavailable": {
+      "status": 503,
+      "description": "The server cannot answer right now; retryAfter says when to come back, when known.",
+      "members": [
+        "retryAfter"
+      ]
+    },
+    "unsupported_api_version": {
+      "status": 400,
+      "description": "The Orvano-Api-Version header is malformed or not supported; supportedVersions lists the ones that are.",
+      "members": [
+        "supportedVersions"
+      ]
+    },
+    "unsupported_media_type": {
+      "status": 415,
+      "description": "The request body's content type is not accepted here."
+    },
+    "validation_failed": {
+      "status": 400,
+      "description": "A field in the request is not valid; errors lists each one.",
+      "members": [
+        "errors"
+      ]
+    },
+    "version_conflict": {
+      "status": 412,
+      "description": "If-Match does not match the resource's current version; currentVersion holds it.",
+      "members": [
+        "currentVersion"
+      ]
+    }
+  }
+}

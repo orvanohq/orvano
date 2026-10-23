@@ -90,22 +90,23 @@ internal sealed class WireEndpoints : IStartupFilter
         var api = ApiRoutes.Create(routes);
 
         // A module maps its own group under the one it is given (spec 0014 PTH-2).
-        RouteGroupBuilder module = api.Project.MapGroup("/test");
-        module.MapGet("/ping", (Guid projectId) => TypedResults.Ok(new { projectId })).AllowPublicAccess();
-        module.MapGet("/secured", () => "ran").RequireScope(Scopes.StorageRead);
+        // Public /v1 endpoints carry their contract metadata, or the host does not start (spec 0014 XTN-2).
+        RouteGroupBuilder module = api.Project.MapGroup("/test").WithErrors();
+        module.MapGet("/ping", (Guid projectId) => TypedResults.Ok(new { projectId })).AllowPublicAccess().WithSdk("test", "projectPing");
+        module.MapGet("/secured", () => "ran").RequireScope(Scopes.StorageRead).WithSdk("test", "projectSecured");
 
-        RouteGroupBuilder test = api.Instance.MapGroup("/test").AllowPublicAccess();
-        test.MapGet("/conflict", () => Error.Conflict("name_taken", "That name is taken.").ToProblem());
-        test.MapGet("/limited", () => Error.RateLimited(ErrorCodes.RateLimited, "Slow down.", TimeSpan.FromSeconds(7)).ToProblem());
-        test.MapGet("/throw", (RequestDelegate)(_ => throw new InvalidOperationException("Password=hunter2")));
-        test.MapGet("/timeout", (RequestDelegate)(_ => throw new OperationCanceledException("query timed out")));
-        test.MapPost("/too-large", (RequestDelegate)(_ => throw new BadHttpRequestException("too big", StatusCodes.Status413PayloadTooLarge)));
-        test.MapGet("/cached", () => "same for all").WithCacheControl("public, max-age=60");
-        test.MapGet("/version", (IApiVersionContext version) => TypedResults.Ok(new { version = version.Version }));
+        RouteGroupBuilder test = api.Instance.MapGroup("/test").AllowPublicAccess().WithErrors();
+        test.MapGet("/conflict", () => Error.Conflict("name_taken", "That name is taken.").ToProblem()).WithSdk("test", "conflict");
+        test.MapGet("/limited", () => Error.RateLimited(ErrorCodes.RateLimited, "Slow down.", TimeSpan.FromSeconds(7)).ToProblem()).WithSdk("test", "limited");
+        test.MapGet("/throw", (RequestDelegate)(_ => throw new InvalidOperationException("Password=hunter2"))).WithSdk("test", "throw");
+        test.MapGet("/timeout", (RequestDelegate)(_ => throw new OperationCanceledException("query timed out"))).WithSdk("test", "timeout");
+        test.MapPost("/too-large", (RequestDelegate)(_ => throw new BadHttpRequestException("too big", StatusCodes.Status413PayloadTooLarge))).WithSdk("test", "tooLarge");
+        test.MapGet("/cached", () => "same for all").WithCacheControl("public, max-age=60").WithSdk("test", "cached");
+        test.MapGet("/version", (IApiVersionContext version) => TypedResults.Ok(new { version = version.Version })).WithSdk("test", "version");
         test.MapPost("/bodies", (WireRequest request) =>
-            TypedResults.Ok(new WireResponse(request.Name, request.Nickname, request.Shade, request.At, Guid.Parse("0199F0A2-0000-7000-8000-00000000ABCD"))));
-        test.MapGet("/query", ([Range(1, 100, ErrorMessage = FieldCodes.OutOfRange)] int limit) => TypedResults.Ok(new { limit }));
+            TypedResults.Ok(new WireResponse(request.Name, request.Nickname, request.Shade, request.At, Guid.Parse("0199F0A2-0000-7000-8000-00000000ABCD")))).WithSdk("test", "bodies");
+        test.MapGet("/query", ([Range(1, 100, ErrorMessage = FieldCodes.OutOfRange)] int limit) => TypedResults.Ok(new { limit })).WithSdk("test", "query");
         test.MapGet("/header", ([FromHeader(Name = "Orvano-Client")][MaxLength(3, ErrorMessage = FieldCodes.TooLong)] string? client) =>
-            TypedResults.Ok(new { client }));
+            TypedResults.Ok(new { client })).WithSdk("test", "header");
     };
 }

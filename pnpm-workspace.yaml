@@ -6,6 +6,9 @@ packages:
 
 # Spec 0003 SEC-5, spec 0006 SUP-6:
 # Dependency install scripts stay blocked (pnpm's default); allow one only by name here, with a reason.
+allowBuilds:
+  # Denied: @scarf/scarf (through @stoplight/spectral-cli, spec 0014 CLT-1) only sends install analytics.
+  "@scarf/scarf": false
 # A just published version waits 3 days before it can be installed.
 minimumReleaseAge: 4320
 

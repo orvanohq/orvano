@@ -5,6 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Options;
 
 using Orvano.Host.Api;
+using Orvano.Host.Api.OpenApi;
 using Orvano.Host.Configuration;
 using Orvano.Host.Database;
 using Orvano.Host.Startup;
@@ -68,6 +69,12 @@ internal static class ServeCommand
                 app.Logger.StartupFailed(ex.Message);
                 await Console.Error.WriteLineAsync(ex.Message);
             }
+            catch (ContractDeclarationException ex)
+            {
+                // Spec 0014 XTN-2: the message names each public endpoint missing its contract metadata.
+                app.Logger.StartupFailed(ex.Message);
+                await Console.Error.WriteLineAsync(ex.Message);
+            }
 
             return 1;
         }
@@ -99,6 +106,7 @@ internal static class ServeCommand
         builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(25));
         builder.Services.AddValidation(); // spec 0002 VAL-1: once here, plus once in each module that maps endpoints
         builder.Services.AddApiWireFormat(); // spec 0014: JSON rules, problem bodies, the version, and CORS (COR-1)
+        builder.Services.AddApiContract(); // spec 0014 CTR-1, XTN-2: both OpenAPI documents and their startup check
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
         builder.Services.AddAccessContext(); // spec 0012 PRJ-3: the per request caller and project
         builder.Services.AddHealthChecks().AddCheck<PlatformDatabaseHealthCheck>("platform-database", tags: ["ready"]);
