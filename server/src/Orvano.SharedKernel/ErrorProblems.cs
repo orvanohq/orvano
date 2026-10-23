@@ -4,15 +4,19 @@ using System.Globalization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
+
 
 namespace Orvano.SharedKernel;
 
 /// <summary>
-/// Spec 0002 ERR-4: the one place an <see cref="Error"/> becomes ProblemDetails (RFC 9457), with <c>code</c>,
-/// <c>traceId</c>, field errors, and the error's extensions. Feature 10 fixes the final body shape.
+/// Spec 0002 ERR-4 and spec 0014 PRB-1: the one place an <see cref="Error"/> becomes RFC 9457 problem details, with
+/// <c>code</c>, <c>traceId</c>, field <c>errors</c>, <c>retryAfter</c>, and the error's own extensions. The host's
+/// problem writer gives every problem the final member order and the request's trace ID.
 /// </summary>
 public static class ErrorProblems
 {
+    /// <summary>KND-1: the status each kind answers with.</summary>
     public static int StatusFor(ErrorKind kind) => kind switch
     {
         ErrorKind.Validation => StatusCodes.Status400BadRequest,
@@ -20,25 +24,29 @@ public static class ErrorProblems
         ErrorKind.Forbidden => StatusCodes.Status403Forbidden,
         ErrorKind.NotFound => StatusCodes.Status404NotFound,
         ErrorKind.Conflict => StatusCodes.Status409Conflict,
+        ErrorKind.PreconditionFailed => StatusCodes.Status412PreconditionFailed,
         ErrorKind.RateLimited => StatusCodes.Status429TooManyRequests,
         ErrorKind.Unavailable => StatusCodes.Status503ServiceUnavailable,
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 
-    /// <summary>The extension a <see cref="ErrorKind.RateLimited"/> error carries its wait in.</summary>
-    public const string RetryAfterSecondsExtension = "retryAfterSeconds";
+    /// <summary>PRB-1: the problem <c>type</c>; the code is the identity.</summary>
+    public const string ProblemType = "about:blank";
 
-    private static readonly HashSet<string> ReservedExtensions = new(StringComparer.Ordinal) { "code", "traceId", "errors" };
+    /// <summary>The members only the error itself supplies, never its extensions.</summary>
+    public static IReadOnlySet<string> ReservedMembers { get; } = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "type", "title", "status", "detail", "instance", "code", "traceId", "errors", "retryAfter",
+    };
 
     public static ErrorProblemResult ToProblem(this Error error)
     {
         ArgumentNullException.ThrowIfNull(error);
 
-        // The error's own extensions never supply code, traceId, or errors: those come only from the error itself.
         var extensions = new Dictionary<string, object?>(StringComparer.Ordinal);
         foreach ((string key, object? value) in error.Extensions ?? new Dictionary<string, object?>())
         {
-            if (!ReservedExtensions.Contains(key))
+            if (!ReservedMembers.Contains(key))
             {
                 extensions[key] = value;
             }
@@ -55,19 +63,26 @@ public static class ErrorProblems
             extensions["errors"] = fields;
         }
 
-        int? retryAfterSeconds = error.Kind == ErrorKind.RateLimited
-            && error.Extensions?.GetValueOrDefault(RetryAfterSecondsExtension) is int seconds and >= 0
-                ? seconds
-                : null;
+        // PRB-6: only a 429, or a 503 that knows when to come back, carries a wait; whole seconds, rounded up.
+        int? retryAfterSeconds = error is { Kind: ErrorKind.RateLimited or ErrorKind.Unavailable, RetryAfter: { } wait } && wait >= TimeSpan.Zero
+            ? (int)Math.Ceiling(wait.TotalSeconds)
+            : null;
+        if (retryAfterSeconds is { } seconds)
+        {
+            extensions["retryAfter"] = seconds;
+        }
+
+        int status = StatusFor(error.Kind);
         return new ErrorProblemResult(
-            TypedResults.Problem(detail: error.Message, statusCode: StatusFor(error.Kind), extensions: extensions),
+            TypedResults.Problem(
+                detail: error.Message, statusCode: status, title: ReasonPhrases.GetReasonPhrase(status), type: ProblemType, extensions: extensions),
             retryAfterSeconds);
     }
 }
 
 /// <summary>
-/// The problem an <see cref="Error"/> answers with. A rate limited error also sets <c>Retry-After</c> from its
-/// <c>retryAfterSeconds</c> extension (ERR-4); without one, there is no header.
+/// The problem an <see cref="Error"/> answers with. A wait also sets <c>Retry-After</c> to the body's <c>retryAfter</c>
+/// (PRB-2); without one, there is no header.
 /// </summary>
 public sealed class ErrorProblemResult : IResult, IStatusCodeHttpResult, IValueHttpResult, IValueHttpResult<ProblemDetails>, IContentTypeHttpResult
 {

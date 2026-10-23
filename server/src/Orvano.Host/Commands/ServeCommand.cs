@@ -4,6 +4,7 @@ using System.Security.Cryptography.X509Certificates;
 
 using Microsoft.Extensions.Options;
 
+using Orvano.Host.Api;
 using Orvano.Host.Configuration;
 using Orvano.Host.Database;
 using Orvano.Host.Startup;
@@ -14,6 +15,7 @@ using Orvano.Infrastructure.RootKeys;
 using Orvano.Infrastructure.Tls;
 using Orvano.Modules.Auth;
 using Orvano.SharedKernel.Access;
+using Orvano.SharedKernel.Api;
 using Orvano.SharedKernel.Configuration;
 
 namespace Orvano.Host.Commands;
@@ -96,10 +98,9 @@ internal static class ServeCommand
         // Spec 0013 OUT-6: running jobs get 25 seconds to stop and be released; compose waits 35 before killing.
         builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(25));
         builder.Services.AddValidation(); // spec 0002 VAL-1: once here, plus once in each module that maps endpoints
-        builder.Services.AddProblemDetails();
+        builder.Services.AddApiWireFormat(); // spec 0014: JSON rules, problem bodies, the version, and CORS (COR-1)
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
         builder.Services.AddAccessContext(); // spec 0012 PRJ-3: the per request caller and project
-        builder.Services.AddCors(); // spec 0007 COR-1: no policy yet, so no CORS headers; the project policy comes later
         builder.Services.AddHealthChecks().AddCheck<PlatformDatabaseHealthCheck>("platform-database", tags: ["ready"]);
 
         string? trustedProxies = builder.Configuration[TrustedProxies.ConfigurationKey];
@@ -117,6 +118,9 @@ internal static class ServeCommand
             app.UseForwardedHeaders();
         }
 
+        // Spec 0014 VRS-4: on /v1, the request ID and the version check come first, and their response headers
+        // reach every answer, the exception handler's included.
+        app.UseApiWireFormat();
         app.UseExceptionHandler();
         app.UseSecurityHeaders();
         if (roles.Api)
@@ -141,6 +145,10 @@ internal static class ServeCommand
             .WithMetadata(new HttpMethodMetadata([HttpMethods.Get])).AllowPublicAccess();
         app.MapHealthChecks("/health/ready", new() { Predicate = check => check.Tags.Contains("ready") })
             .WithMetadata(new HttpMethodMetadata([HttpMethods.Get])).AllowPublicAccess();
+
+        // Spec 0014 PTH-2: the /v1 groups. GET /v1/health answers in every role (HLT-1); each module maps its own
+        // endpoints under the groups it is handed, in its Map<Module>Endpoints (none yet).
+        ApiRoutes.Create(app).MapHealth();
 
         if (roles.Api)
         {

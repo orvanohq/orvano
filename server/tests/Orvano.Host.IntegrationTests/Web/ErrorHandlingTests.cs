@@ -34,7 +34,7 @@ public sealed class ErrorHandlingTests(PostgresFixture postgres) : IDisposable
         body.ShouldNotContain("hunter2");
         body.ShouldNotContain("InvalidOperationException");
         using var problem = JsonDocument.Parse(body);
-        problem.RootElement.GetProperty("code").GetString().ShouldBe("internal_error");
+        problem.RootElement.GetProperty("code").GetString().ShouldBe("internal");
         problem.RootElement.GetProperty("traceId").GetString().ShouldNotBeNullOrWhiteSpace();
     }
 

@@ -1,4 +1,5 @@
 using Orvano.SharedKernel.Access;
+using Orvano.SharedKernel.Api;
 
 using Shouldly;
 
@@ -31,7 +32,7 @@ public sealed class ScopeAndPermissionTests
         Error error = Scopes.Validate(KeyType.Publishable, ["client.storage", "databases.write"]).Error!;
 
         error.Code.ShouldBe("validation_failed");
-        error.Fields!["scopes"].ShouldHaveSingleItem().ShouldContain("'databases.write'");
+        error.FieldMessages("scopes").ShouldHaveSingleItem().ShouldContain("'databases.write'");
     }
 
     [Fact]
@@ -42,7 +43,7 @@ public sealed class ScopeAndPermissionTests
     [Fact]
     [Trait("Spec", "0012:AC-8")]
     public void Validate_refuses_users_impersonate_as_reserved_when_creating_a_secret_key() =>
-        Scopes.Validate(KeyType.Secret, ["users.impersonate"]).Error!.Fields!["scopes"].ShouldHaveSingleItem().ShouldContain("reserved");
+        Scopes.Validate(KeyType.Secret, ["users.impersonate"]).Error!.FieldMessages("scopes").ShouldHaveSingleItem().ShouldContain("reserved");
 
     [Fact]
     [Trait("Spec", "0012:AC-8")]
@@ -96,7 +97,7 @@ public sealed class ScopeAndPermissionTests
     [Trait("Spec", "0012:AC-8")]
     public void Validate_names_every_bad_scope_when_several_are_outside_the_ceiling()
     {
-        string[] problems = Scopes.Validate(KeyType.Secret, ["client.auth", "storage.read", "nope"]).Error!.Fields!["scopes"];
+        string[] problems = Scopes.Validate(KeyType.Secret, ["client.auth", "storage.read", "nope"]).Error!.FieldMessages("scopes");
 
         problems.Length.ShouldBe(2);
         problems.ShouldContain(problem => problem.Contains("'client.auth'"));
@@ -134,14 +135,15 @@ public sealed class ScopeAndPermissionTests
 
         error.Kind.ShouldBe(ErrorKind.Validation);
         error.Code.ShouldBe("validation_failed");
-        error.Fields!["permissions"].ShouldBe(["one", "two"]);
+        error.FieldMessages("permissions").ShouldBe(["one", "two"]);
+        error.Fields!.ShouldAllBe(e => e.Location == FieldLocation.Body && e.Code == FieldCodes.InvalidValue); // spec 0014 PRB-3
     }
 
     [Fact]
     [Trait("Spec", "0012:SCP-3")]
     public void Validate_quotes_a_bad_scope_short_and_escaped_when_reporting_it()
     {
-        string problem = Scopes.Validate(KeyType.Secret, ["x\r\n" + new string('y', 500)]).Error!.Fields!["scopes"].ShouldHaveSingleItem();
+        string problem = Scopes.Validate(KeyType.Secret, ["x\r\n" + new string('y', 500)]).Error!.FieldMessages("scopes").ShouldHaveSingleItem();
 
         problem.ShouldStartWith(@"'x\u000D\u000A");
         problem.ShouldContain("…'");
@@ -152,8 +154,8 @@ public sealed class ScopeAndPermissionTests
     [Trait("Spec", "0012:SCP-3")]
     public void Validate_lists_at_most_20_problems_and_stops_past_500_entries_when_the_input_is_large()
     {
-        Scopes.Validate(KeyType.Secret, [.. Enumerable.Range(0, 300).Select(i => $"bad.{i}")]).Error!.Fields!["scopes"].Length.ShouldBe(20);
-        Scopes.Validate(KeyType.Secret, Enumerable.Repeat(Scopes.StorageRead, int.MaxValue)).Error!.Fields!["scopes"]
+        Scopes.Validate(KeyType.Secret, [.. Enumerable.Range(0, 300).Select(i => $"bad.{i}")]).Error!.FieldMessages("scopes").Length.ShouldBe(20);
+        Scopes.Validate(KeyType.Secret, Enumerable.Repeat(Scopes.StorageRead, int.MaxValue)).Error!.FieldMessages("scopes")
             .ShouldHaveSingleItem().ShouldContain("at most 500");
     }
 }
