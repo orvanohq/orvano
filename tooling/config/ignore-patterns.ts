@@ -6,6 +6,10 @@ export const ignorePatterns = [
   // generated files
   "console/src/routeTree.gen.ts",
   "**/schema.gen.ts",
+  // the API contract and its snapshots, written byte for byte by `pnpm api:emit` (spec 0014 CTR-4)
+  "api/openapi.json",
+  "api/console.openapi.json",
+  "server/tests/Orvano.Host.IntegrationTests/Contract/Snapshots/**",
   "console/src/locales/**",
   // build output
   "**/dist/**",

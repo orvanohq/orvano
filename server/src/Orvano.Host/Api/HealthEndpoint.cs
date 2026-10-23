@@ -7,7 +7,11 @@ using Orvano.SharedKernel.Api;
 
 namespace Orvano.Host.Api;
 
-/// <summary>The body of a ready <c>GET /v1/health</c> (spec 0014 HLT-2). It never names the server build.</summary>
+// Spec 0014 HLT-2: it never names the server build. The XML docs below are the contract's descriptions (CLT-3).
+
+/// <summary>The server is up and ready to serve requests.</summary>
+/// <param name="Status">Always <c>ok</c>.</param>
+/// <param name="ApiVersions">The API versions the server serves, <c>YYYY-MM-DD</c>; send one in <c>Orvano-Api-Version</c>.</param>
 internal sealed record HealthResponse(string Status, IReadOnlyList<string> ApiVersions);
 
 /// <summary><c>GET /v1/health</c> (spec 0014 HLT-1 to HLT-5), mapped in every role.</summary>
@@ -19,7 +23,17 @@ internal static class HealthEndpoint
     {
         // Public (spec 0012 EPT-5, spec 0014 HLT-4): the same answer for every caller and project, so any credential
         // sent is ignored and an SDK with a bad key still learns it reaches the server. Not metered.
-        routes.Instance.MapGet("/health", GetAsync).AllowPublicAccess().RequireCors(OrvanoCorsPolicyProvider.HealthPolicyName);
+        routes.Instance.MapGet("/health", GetAsync)
+            .AllowPublicAccess()
+            .RequireCors(OrvanoCorsPolicyProvider.HealthPolicyName)
+            .WithName("Host_Health")
+            .WithSummary("Check that the server is reachable and ready.")
+            .WithDescription(
+                "Answers 200 with the API versions the server serves, or 503 `unavailable` while it is not ready. "
+                + "It needs no key and ignores any credential sent, so it works from a browser on any origin.")
+            .WithSdk("health", "get")
+            .WithErrors() // unavailable, its only error, is a transport code every operation implies (XTN-3)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
         return routes;
     }
 

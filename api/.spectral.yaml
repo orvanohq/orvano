@@ -1,0 +1,156 @@
+# Spec 0014 CLT-1 to CLT-3: contract lint for api/openapi.json, api/console.openapi.json, and (from build step 6)
+# api/conformance/fixture.openapi.json. `pnpm check` runs it with --fail-severity warn, so a warning fails too.
+# Each Orvano rule names the spec rule it enforces. tooling/scripts/spectral-rules.test.mjs proves each one fires.
+extends: ["spectral:oas"]
+functionsDir: ./spectral/functions
+functions:
+  - orvano-catalogued-errors
+  - orvano-int64
+  - orvano-problem-response
+  - orvano-public-operation
+  - orvano-schema-direction
+  - orvano-sdk-unique
+
+aliases:
+  Operation:
+    - "$.paths[*][get,put,post,delete,options,head,patch,trace]"
+
+rules:
+  # CTR-4: servers are omitted on purpose, since each install has its own URL.
+  oas3-api-servers: off
+  # The contract names no contact; issues go to the repo.
+  info-contact: off
+  # HDR-4: every Orvano header is declared once as a component for the generator, whether or not an operation
+  # references it. Unreferenced schemas are already dropped by the server's UnusedSchemaTransformer.
+  oas3-unused-component: off
+
+  orvano-operation-description:
+    description: Every operation has a description for app developers (CLT-2, CLT-3).
+    severity: error
+    given: "#Operation"
+    then:
+      field: description
+      function: truthy
+
+  orvano-schema-description:
+    description: Every component schema has a description (CLT-2).
+    severity: error
+    given: "$.components.schemas[*]"
+    then:
+      field: description
+      function: truthy
+
+  orvano-property-description:
+    description: Every schema property has a description (CLT-2).
+    severity: error
+    given: "$..properties[*]"
+    then:
+      field: description
+      function: truthy
+
+  orvano-parameter-description:
+    description: Every parameter has a description (CLT-2).
+    severity: error
+    given:
+      - "#Operation.parameters[*]"
+      - "$.paths[*].parameters[*]"
+      - "$.components.parameters[*]"
+    then:
+      field: description
+      function: truthy
+
+  orvano-operation-id:
+    description: Operation IDs are <Module>_<Feature>, such as Auth_SignUp or Host_Health (CLT-2, spec 0002 API-2).
+    severity: error
+    given: "#Operation"
+    then:
+      field: operationId
+      function: pattern
+      functionOptions:
+        match: "^[A-Z][A-Za-z0-9]*_[A-Z][A-Za-z0-9]*$"
+
+  orvano-public-operation:
+    description: Public operations carry x-orvano-sdk, x-orvano-audience, and x-orvano-errors (CLT-2, XTN-1).
+    severity: error
+    given: "#Operation"
+    then:
+      function: orvano-public-operation
+
+  orvano-sdk-unique:
+    description: Each x-orvano-sdk (service, method) pair names one operation (CLT-2).
+    severity: error
+    given: "$.paths"
+    then:
+      function: orvano-sdk-unique
+
+  orvano-catalogued-errors:
+    description: x-orvano-errors lists only codes in x-orvano-error-codes (XTN-3).
+    severity: error
+    given: "#Operation.x-orvano-errors"
+    then:
+      function: orvano-catalogued-errors
+
+  orvano-camel-case-properties:
+    description: Property names are camelCase (JSW-1).
+    severity: error
+    given: "$..properties"
+    then:
+      field: "@key"
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-zA-Z0-9]*$"
+
+  orvano-no-x-header-parameters:
+    description: No request header starts with X- (HDR-1).
+    severity: error
+    given: "$..parameters[?(@.in == 'header')]"
+    then:
+      field: name
+      function: pattern
+      functionOptions:
+        notMatch: "^[Xx]-"
+
+  orvano-no-x-response-headers:
+    description: No response header starts with X- (HDR-1).
+    severity: error
+    given:
+      - "$.components.headers"
+      - "$..responses[*].headers"
+    then:
+      field: "@key"
+      function: pattern
+      functionOptions:
+        notMatch: "^[Xx]-"
+
+  orvano-lowercase-paths:
+    description: Path segments are lowercase words joined by hyphens, and parameters are camelCase (PTH-3).
+    severity: error
+    given: "$.paths"
+    then:
+      field: "@key"
+      function: pattern
+      functionOptions:
+        match: "^(/([a-z0-9]+(-[a-z0-9]+)*|\\{[a-z][a-zA-Z0-9]*\\}))+$"
+
+  orvano-int64:
+    description: An int64 is a number with maximum at or below 2^53 - 1, or a string with a pattern (JSW-5).
+    severity: error
+    given: "$..[?(@.format == 'int64')]"
+    then:
+      function: orvano-int64
+
+  orvano-schema-direction:
+    description: No schema is used both as a request body and in a response (JSW-11).
+    severity: error
+    resolved: false
+    given: "$"
+    then:
+      function: orvano-schema-direction
+
+  orvano-problem-response:
+    description: Every error response is application/problem+json with the shared Problem schema (PRB-1).
+    severity: error
+    resolved: false
+    given: "#Operation.responses[*]"
+    then:
+      function: orvano-problem-response

@@ -27,4 +27,7 @@ public sealed class ErrorCodeAttribute : Attribute
     public int Status { get; }
 
     public string Description { get; }
+
+    /// <summary>The problem members this code adds beyond PRB-1's always present ones, such as <c>currentVersion</c>.</summary>
+    public string[] Members { get; init; } = [];
 }

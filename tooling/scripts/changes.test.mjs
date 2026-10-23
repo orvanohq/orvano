@@ -91,6 +91,15 @@ describe("changedAreas", () => {
     });
   });
 
+  test("a contract change marks server and console (spec 0014 CTR-5, CLT-1)", () => {
+    assert.deepEqual(changedAreas(["api/openapi.json"]), { ...none, server: true, console: true });
+    assert.deepEqual(changedAreas(["api/.spectral.yaml"]), {
+      ...none,
+      server: true,
+      console: true,
+    });
+  });
+
   test("deploy files and .dockerignore mark deploy only", () => {
     assert.deepEqual(changedAreas(["deploy/Dockerfile"]), { ...none, deploy: true });
     assert.deepEqual(changedAreas([".dockerignore"]), { ...none, deploy: true });

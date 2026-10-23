@@ -1,0 +1,79 @@
+# Spec 0014 BRK-1 to BRK-3: on a PR that changes the contract, oasdiff compares each document with the base branch's
+# file and the result goes into one PR comment, updated in place, with the breaking-api label when the public
+# document has ERR findings. Before beta it reports only and never fails (BRK-2), so ci-gate does not wait on it.
+# Fork PRs get a read only token, so there the report lands only in the job summary.
+name: API diff
+
+on:
+  pull_request:
+    paths:
+      - api/openapi.json
+      - api/console.openapi.json
+
+permissions: {}
+
+concurrency:
+  group: api-diff-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  api-diff:
+    name: api-diff
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write # the one report comment and the breaking-api label
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .base
+          persist-credentials: false
+          sparse-checkout: api
+      # A base without the file (the PR that adds it) compares against an empty document.
+      - name: Fill in missing base documents
+        run: |
+          for file in openapi.json console.openapi.json; do
+            if [ ! -f ".base/api/$file" ]; then
+              mkdir -p .base/api
+              printf '{"openapi":"3.1.1","info":{"title":"none","version":"0"},"paths":{}}\n' > ".base/api/$file"
+            fi
+          done
+      # fail-on ERR only sets the step outcome the report reads; continue-on-error keeps the job green (BRK-2).
+      # review and github-token off: no spec leaves CI, and the action posts no comment of its own.
+      - id: public
+        uses: oasdiff/oasdiff-action/breaking@514e22ec2f1d1654fb78ac3bb7dc00d8f3c6c4d9 # v0.1.19
+        continue-on-error: true
+        with:
+          base: .base/api/openapi.json
+          revision: api/openapi.json
+          fail-on: ERR
+          output-to-file: oasdiff-public.txt
+          review: "false"
+          github-token: ""
+      - id: console
+        uses: oasdiff/oasdiff-action/breaking@514e22ec2f1d1654fb78ac3bb7dc00d8f3c6c4d9 # v0.1.19
+        continue-on-error: true
+        with:
+          base: .base/api/console.openapi.json
+          revision: api/console.openapi.json
+          fail-on: ERR
+          output-to-file: oasdiff-console.txt
+          review: "false"
+          github-token: ""
+      - uses: voidzero-dev/setup-vp@68f39c78aaf39be468cabd2afb09c162574c84af # v1.21.2
+        with:
+          node-version-file: .node-version
+      - name: Report
+        env:
+          PUBLIC_OUTCOME: ${{ steps.public.outcome }}
+          CONSOLE_OUTCOME: ${{ steps.console.outcome }}
+          POST: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node tooling/scripts/api-diff-report.mjs oasdiff-public.txt oasdiff-console.txt

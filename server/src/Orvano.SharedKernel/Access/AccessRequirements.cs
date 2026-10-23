@@ -67,6 +67,29 @@ public static class AccessDeclaration
         return endpoint.Metadata.GetMetadata<PublicAccess>() is not null;
     }
 
+    /// <summary>
+    /// The SDK audience the declaration implies (spec 0014 XTN-1): <c>RequireClientApi</c> is <c>client</c>,
+    /// <c>RequireScope</c> is <c>server</c>, <c>AllowPublicAccess</c> is both. Console routes and endpoints that
+    /// declare their access wrongly have none (null).
+    /// </summary>
+    public static IReadOnlyList<string>? Audience(Endpoint endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        if (Problem(endpoint) is not null)
+        {
+            return null;
+        }
+
+        return IsPublic(endpoint)
+            ? [Audiences.Client, Audiences.Server]
+            : endpoint.Metadata.GetMetadata<AccessRequirement>() switch
+            {
+                ClientApiRequirement => [Audiences.Client],
+                ScopeRequirement => [Audiences.Server],
+                _ => null,
+            };
+    }
+
     /// <summary>The endpoint's route pattern, else its display name, for error messages.</summary>
     public static string Name(Endpoint endpoint)
     {
