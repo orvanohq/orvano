@@ -45,4 +45,4 @@ You'll want to run these from the repo root:
 ORVANO_IMAGE_TAG=sha-<orvano commit> docker compose -f api/conformance/compose.yaml up -d --wait
 ```
 
-For a local build, use `docker buildx build --load -f deploy/Dockerfile -t orvano:ci .` and then `ORVANO_IMAGE=orvano ORVANO_IMAGE_TAG=ci`. Each run gets a fresh database (in memory) and a fresh root key. The stub keeps each run's script apart by the token in `Orvano-Stub-Run`, so several runtimes can share it at once (STB-2).
+`.github/workflows/image.yml` publishes a signed `sha-<commit>` image for every push to `main`, so each SDK's pinned commit has one to pull (CNF-6, RGN-5). For a local build, use `docker buildx build --load -f deploy/Dockerfile -t orvano:ci .` and then `ORVANO_IMAGE=orvano ORVANO_IMAGE_TAG=ci`. Each run gets a fresh database (in memory) and a fresh root key. The stub keeps each run's script apart by the token in `Orvano-Stub-Run`, so several runtimes can share it at once (STB-2).
