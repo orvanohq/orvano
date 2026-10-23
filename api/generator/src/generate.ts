@@ -1,0 +1,15 @@
+// Spec 0014 GNR-2, GNR-8: contract in, files out, the same bytes on every run.
+import type { LoadedContract } from "./contract.ts";
+import { buildModel } from "./model.ts";
+import { provenance, type OutputFile } from "./output.ts";
+import { findTarget } from "./targets/index.ts";
+
+export function generate(
+  contract: LoadedContract,
+  targetName: string,
+  commit: string,
+): OutputFile[] {
+  const target = findTarget(targetName);
+  const model = buildModel(contract);
+  return target.render(model, provenance(model, commit));
+}

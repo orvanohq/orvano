@@ -1,0 +1,269 @@
+import type { OrvanoErrorCode } from "../generated/error-codes.js";
+import { OrvanoHeaders } from "../generated/contract.js";
+
+/**
+ * What went wrong, the same set in every Orvano SDK (spec 0005 ERR-T1, spec 0014 KND-2).
+ * @public
+ */
+export type ErrorKind =
+  | "network"
+  | "timeout"
+  | "unauthenticated"
+  | "forbidden"
+  | "not_found"
+  | "conflict"
+  | "validation"
+  | "rate_limited"
+  | "server";
+
+/**
+ * One problem with one field of the request (spec 0014 PRB-3).
+ * @public
+ */
+export interface FieldError {
+  /** The field's wire name; in a body, a dotted camelCase path such as `address.city` or `tags[2]`. */
+  readonly field: string;
+  /** Where the field is. */
+  readonly location: "body" | "query" | "path" | "header" | (string & {});
+  /** What is wrong, such as `required` or `too_long`. */
+  readonly code: string;
+  /** An English sentence describing the problem, safe to show. */
+  readonly message: string;
+}
+
+/**
+ * The plain form of an `OrvanoError`, safe to return from a server action (spec 0005 ERR-T4).
+ * @public
+ */
+export interface OrvanoErrorJson {
+  readonly kind: ErrorKind;
+  readonly code: OrvanoErrorCode;
+  readonly message: string;
+  readonly requestId: string | undefined;
+  readonly fieldErrors: readonly FieldError[];
+  readonly requiredRole: string | undefined;
+  readonly retryAfter: number | undefined;
+}
+
+/** @internal */
+export interface OrvanoErrorInit {
+  readonly kind: ErrorKind;
+  readonly status?: number | undefined;
+  readonly code: OrvanoErrorCode;
+  readonly message: string;
+  readonly requestId?: string | undefined;
+  readonly fieldErrors?: readonly FieldError[] | undefined;
+  readonly requiredRole?: string | undefined;
+  readonly retryAfter?: number | undefined;
+  readonly rawBody?: string | undefined;
+  readonly cause?: unknown;
+}
+
+const brand = Symbol.for("orvano.error");
+
+/**
+ * Every failure an Orvano SDK reports. Switch on `kind` and `code`, never on `status` or the message.
+ * @public
+ */
+export class OrvanoError extends Error {
+  override readonly name: string = "OrvanoError";
+  /** What went wrong. */
+  readonly kind: ErrorKind;
+  /** The HTTP status; absent for `network` and a client side `timeout`. */
+  readonly status: number | undefined;
+  /** The contract's error code, or `unknown` when the body was not a problem. */
+  readonly code: OrvanoErrorCode;
+  /** The `Orvano-Request-Id` of the failed response, to quote when you report it. */
+  readonly requestId: string | undefined;
+  /** On `validation_failed`: each field that is not valid. */
+  readonly fieldErrors: readonly FieldError[];
+  /** On a console 403: the role that would allow the action. */
+  readonly requiredRole: string | undefined;
+  /** Seconds to wait before trying again, from `Retry-After`. */
+  readonly retryAfter: number | undefined;
+  /** When the body was not a problem: its first 4 KB, to help you debug a proxy's answer (spec 0014 KND-3). */
+  readonly rawBody: string | undefined;
+
+  constructor(init: OrvanoErrorInit) {
+    super(init.message, init.cause === undefined ? undefined : { cause: init.cause });
+    this.kind = init.kind;
+    this.status = init.status;
+    this.code = init.code;
+    this.requestId = init.requestId;
+    this.fieldErrors = init.fieldErrors ?? [];
+    this.requiredRole = init.requiredRole;
+    this.retryAfter = init.retryAfter;
+    this.rawBody = init.rawBody;
+    Object.defineProperty(this, brand, { value: true });
+  }
+
+  /** True for an `OrvanoError` from any copy of any Orvano package (ERR-T3). */
+  static is(value: unknown): value is OrvanoError {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      (value as Record<symbol, unknown>)[brand] === true
+    );
+  }
+
+  /** The plain, serializable form (ERR-T4). */
+  toJSON(): OrvanoErrorJson {
+    return {
+      kind: this.kind,
+      code: this.code,
+      message: this.message,
+      requestId: this.requestId,
+      fieldErrors: this.fieldErrors,
+      requiredRole: this.requiredRole,
+      retryAfter: this.retryAfter,
+    };
+  }
+}
+
+/**
+ * The error kind from the HTTP status alone, whatever the body (spec 0014 KND-2).
+ * @internal
+ */
+export function kindFromStatus(status: number): ErrorKind {
+  switch (status) {
+    case 400:
+    case 413:
+    case 415:
+    case 422:
+      return "validation";
+    case 401:
+      return "unauthenticated";
+    case 403:
+      return "forbidden";
+    case 404:
+      return "not_found";
+    case 408:
+      return "timeout";
+    case 409:
+    case 412:
+    case 428:
+      return "conflict";
+    case 429:
+      return "rate_limited";
+    default:
+      return "server";
+  }
+}
+
+const rawBodyLimit = 4096;
+
+/**
+ * Builds the error for a non 2xx response from its already read body (spec 0014 PRB-1, KND-3).
+ * @internal
+ */
+export function errorFromResponse(response: Response, text: string): OrvanoError {
+  const status = response.status;
+  const problem = parseProblem(text);
+  const headerRequestId = response.headers.get(OrvanoHeaders.orvanoRequestId) ?? undefined;
+  const retryAfter =
+    parseRetryAfter(response.headers.get(OrvanoHeaders.retryAfter)) ?? problem?.retryAfter;
+  if (problem === undefined) {
+    return new OrvanoError({
+      kind: kindFromStatus(status),
+      status,
+      code: "unknown",
+      message: response.statusText === "" ? `HTTP ${String(status)}` : response.statusText,
+      requestId: headerRequestId,
+      retryAfter,
+      rawBody: text === "" ? undefined : text.slice(0, rawBodyLimit),
+    });
+  }
+  return new OrvanoError({
+    kind: kindFromStatus(status),
+    status,
+    code: problem.code,
+    message: problem.detail ?? problem.title ?? response.statusText,
+    requestId: headerRequestId ?? problem.traceId,
+    fieldErrors: problem.errors,
+    requiredRole: problem.requiredRole,
+    retryAfter,
+  });
+}
+
+interface ParsedProblem {
+  code: string;
+  title: string | undefined;
+  detail: string | undefined;
+  traceId: string | undefined;
+  errors: FieldError[];
+  requiredRole: string | undefined;
+  retryAfter: number | undefined;
+}
+
+function parseProblem(text: string): ParsedProblem | undefined {
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (typeof body !== "object" || body === null) return undefined;
+  const record = body as Record<string, unknown>;
+  if (typeof record["code"] !== "string" || typeof record["status"] !== "number") return undefined;
+  return {
+    code: record["code"],
+    title: stringOf(record["title"]),
+    detail: stringOf(record["detail"]),
+    traceId: stringOf(record["traceId"]),
+    errors: Array.isArray(record["errors"]) ? record["errors"].flatMap(fieldErrorOf) : [],
+    requiredRole: stringOf(record["requiredRole"]),
+    retryAfter: typeof record["retryAfter"] === "number" ? record["retryAfter"] : undefined,
+  };
+}
+
+function fieldErrorOf(value: unknown): FieldError[] {
+  if (typeof value !== "object" || value === null) return [];
+  const record = value as Record<string, unknown>;
+  const field = stringOf(record["field"]);
+  const code = stringOf(record["code"]);
+  if (field === undefined || code === undefined) return [];
+  return [
+    {
+      field,
+      location: stringOf(record["location"]) ?? "body",
+      code,
+      message: stringOf(record["message"]) ?? "",
+    },
+  ];
+}
+
+function stringOf(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * `Retry-After` in seconds or as an HTTP date, as whole seconds from now (spec 0005 ERR-T1).
+ * @internal
+ */
+export function parseRetryAfter(value: string | null): number | undefined {
+  if (value === null || value.trim() === "") return undefined;
+  if (/^\d+$/.test(value.trim())) return Number(value.trim());
+  const date = Date.parse(value);
+  if (Number.isNaN(date)) return undefined;
+  return Math.max(0, Math.ceil((date - Date.now()) / 1000));
+}
+
+/** @internal */
+export function timeoutError(cause?: unknown): OrvanoError {
+  return new OrvanoError({
+    kind: "timeout",
+    code: "unknown",
+    message: "The request timed out.",
+    cause,
+  });
+}
+
+/** @internal */
+export function networkError(cause: unknown): OrvanoError {
+  return new OrvanoError({
+    kind: "network",
+    code: "unknown",
+    message: "The request could not reach the server.",
+    cause,
+  });
+}

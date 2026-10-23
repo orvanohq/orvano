@@ -11,9 +11,10 @@
     "check:dotnet": "cd server && dotnet format Orvano.slnx --verify-no-changes && dotnet build Orvano.slnx -p:CI=true --no-incremental",
     "check:api": "spectral lint api/openapi.json api/console.openapi.json --ruleset api/.spectral.yaml --fail-severity warn",
     "check:lint-fixtures": "node tooling/scripts/check-lint-fixtures.mjs",
-    "typecheck": "tsc -p tsconfig.json && pnpm --filter @orvano/console typecheck",
+    "typecheck": "tsc -p tsconfig.json && pnpm --filter @orvano/console typecheck && pnpm --filter @orvano/sdk-generator typecheck",
     "fix": "vp check --fix && eslint --fix && cd server && dotnet format Orvano.slnx",
-    "test": "pnpm run test:tooling && pnpm --filter @orvano/console test && cd server && dotnet test --solution Orvano.slnx",
+    "test": "pnpm run test:tooling && pnpm run test:generator && pnpm --filter @orvano/console test && cd server && dotnet test --solution Orvano.slnx",
+    "test:generator": "pnpm --filter @orvano/sdk-generator test",
     "test:tooling": "node --test \"tooling/scripts/*.test.mjs\""
   },
   "devDependencies": {

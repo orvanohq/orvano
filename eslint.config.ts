@@ -14,6 +14,13 @@ const consoleTests = ["console/src/**/*.test.{ts,tsx}", "console/src/test/**/*.{
 // The console's tool configs live in tsconfig.node.json, which the project service can't find by name.
 const consoleToolConfigs = ["console/*.config.ts"];
 const rootFiles = ["*.config.ts", "tooling/config/*.ts", "tooling/scripts/*.mjs"];
+// The SDK generator (spec 0014 GNR-1); its runtime templates import generated modules, so they are checked
+// through the rendered snapshots instead.
+const generatorFiles = [
+  "api/generator/src/**/*.ts",
+  "api/generator/test/*.ts",
+  "api/generator/*.config.ts",
+];
 
 export default defineConfig(
   // Lint fixtures break the rules on purpose; check:lint-fixtures lints them on its own (LNT-3).
@@ -22,7 +29,7 @@ export default defineConfig(
 
   // typescript-eslint strict type checked (WEB-4, TYP-2) for every TypeScript and script file.
   {
-    files: [...consoleSrc, ...consoleToolConfigs, ...rootFiles],
+    files: [...consoleSrc, ...consoleToolConfigs, ...rootFiles, ...generatorFiles],
     extends: [tseslint.configs.strictTypeChecked],
     languageOptions: {
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },

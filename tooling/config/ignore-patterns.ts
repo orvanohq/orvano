@@ -10,6 +10,10 @@ export const ignorePatterns = [
   "api/openapi.json",
   "api/console.openapi.json",
   "server/tests/Orvano.Host.IntegrationTests/Contract/Snapshots/**",
+  // the generator's raw output for the fixture contract, compared byte for byte (spec 0014 GNR-10); each SDK repo
+  // formats its own copy after generating (GNR-9)
+  "api/generator/test/snapshots/ts-client/**",
+  "api/generator/test/snapshots/ts-server/**",
   "console/src/locales/**",
   // build output
   "**/dist/**",

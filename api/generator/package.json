@@ -1,0 +1,21 @@
+{
+  "name": "@orvano/sdk-generator",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Turns api/openapi.json into the code each Orvano SDK needs (spec 0014 GNR-1 to GNR-10).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "generate": "node src/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json && tsc -p test/snapshots/tsconfig.typescript.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=24.11.0 <25"
+  }
+}

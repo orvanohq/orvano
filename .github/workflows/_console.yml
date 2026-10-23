@@ -28,6 +28,8 @@ jobs:
       - run: pnpm check:lint-fixtures
       # The tooling scripts' own tests (changes, fixtures, format-cs, size entries, coverage summary).
       - run: pnpm test:tooling
+      - name: SDK generator tests (spec 0014 GNR-10)
+        run: pnpm test:generator
       - id: playwright
         name: Find the Playwright version
         run: echo "version=$(pnpm --filter @orvano/console exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"

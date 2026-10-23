@@ -1,0 +1,62 @@
+/**
+ * A signal that aborts when the caller's signal does or when the attempt times out (spec 0005 RTM-3).
+ * @internal
+ */
+export interface LinkedSignal {
+  readonly signal: AbortSignal;
+  /** True when the timeout, not the caller, aborted it. */
+  timedOut(): boolean;
+  /** Clears the timer and the listener; call it when the request settles. */
+  dispose(): void;
+}
+
+/**
+ * Links a caller's signal and a timeout without `AbortSignal.any` or `AbortSignal.timeout` (RTM-2).
+ * @internal
+ */
+export function linkSignals(
+  callerSignal: AbortSignal | undefined,
+  timeoutMs: number,
+): LinkedSignal {
+  const controller = new AbortController();
+  let timedOut = false;
+  const onAbort = (): void => {
+    controller.abort(callerSignal?.reason);
+  };
+  if (callerSignal?.aborted === true) controller.abort(callerSignal.reason);
+  else callerSignal?.addEventListener("abort", onAbort, { once: true });
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  return {
+    signal: controller.signal,
+    timedOut: () => timedOut,
+    dispose: () => {
+      clearTimeout(timer);
+      callerSignal?.removeEventListener("abort", onAbort);
+    },
+  };
+}
+
+/**
+ * Waits, or rejects with the signal's reason as soon as it aborts.
+ * @internal
+ */
+export function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted === true) {
+      reject(signal.reason as Error);
+      return;
+    }
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      reject(signal?.reason as Error);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}

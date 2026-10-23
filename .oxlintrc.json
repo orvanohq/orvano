@@ -90,7 +90,7 @@
       }
     },
     {
-      "files": ["tooling/scripts/**", "console/scripts/**"],
+      "files": ["tooling/scripts/**", "console/scripts/**", "api/generator/src/cli.ts"],
       "rules": {
         "no-console": "off"
       }
