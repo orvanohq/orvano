@@ -1,0 +1,666 @@
+# Spec 0014 CNF-10 and STB-4: the health call, live against the real server and scripted against the stub.
+# Substituted before matching: ${apiVersion}, ${clientName}, ${key}, ${projectId}, and saved names (CNF-3).
+scenarios:
+  - id: health.get.ok
+    title: The server answers ok with the SDK's API version, a request ID, and the version used
+    mode: live
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        expect:
+          result:
+            status: ok
+            apiVersions: { $contains: ["${apiVersion}"] }
+          response:
+            status: 200
+            headers:
+              orvano-request-id: { $regex: "^[0-9a-f]{32}$" }
+              orvano-api-version: ${apiVersion}
+
+  - id: health.get.ignores_bad_key
+    title: A key the server does not know still gets ok, since health ignores credentials (HLT-4)
+    mode: live
+    audience: [client, server]
+    requires: []
+    client: { key: not-a-real-key }
+    steps:
+      - call: health.get
+        expect:
+          result: { status: ok }
+
+  - id: health.get.unsupported_version
+    title: An unsupported Orvano-Api-Version gives validation and unsupported_api_version (VRS-4)
+    mode: live
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options:
+          retry: 0
+          headers: { Orvano-Api-Version: "1999-01-01" }
+        expect:
+          error: { kind: validation, status: 400, code: unsupported_api_version }
+          response:
+            status: 400
+            body:
+              code: unsupported_api_version
+              supportedVersions: { $contains: ["${apiVersion}"] }
+
+  - id: health.get.request_headers
+    title: Every request sends the API version, the SDK identity, and the key (VRS-3, HDR-1)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        expect:
+          result: { status: ok }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond: { status: 200, body: { status: ok, apiVersions: ["${apiVersion}"] } }
+    expectRequests:
+      - method: GET
+        path: /v1/health
+        headers:
+          orvano-api-version: ${apiVersion}
+          orvano-client: ${clientName}
+          orvano-key: ${key}
+
+  - id: health.get.retry_after_503
+    title: A GET is retried after a 503, and the second answer is the result (LIB-7, SHP-8)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        expect:
+          result: { status: ok }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 503
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Service Unavailable,
+              status: 503,
+              detail: Not ready.,
+              code: unavailable,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+      - request: { method: GET, path: /v1/health }
+        respond: { status: 200, body: { status: ok, apiVersions: ["${apiVersion}"] } }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+      - { method: GET, path: /v1/health }
+
+  - id: health.get.retry_after_seconds
+    title: Retry-After in seconds is honored before the retry (PRB-6)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        expect:
+          result: { status: ok }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 429
+          headers: { Content-Type: application/problem+json, Retry-After: "1" }
+          body:
+            {
+              type: "about:blank",
+              title: Too Many Requests,
+              status: 429,
+              detail: Slow down.,
+              code: rate_limited,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+              retryAfter: 1,
+            }
+      - request: { method: GET, path: /v1/health }
+        respond: { status: 200, body: { status: ok, apiVersions: ["${apiVersion}"] } }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+      - { method: GET, path: /v1/health }
+
+  - id: health.get.retry_after_http_date
+    title: Retry-After as an HTTP date is honored before the retry (spec 0005 ERR-T1)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        expect:
+          result: { status: ok }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 503
+          headers: { Retry-After: { $httpDateIn: 1 } }
+      - request: { method: GET, path: /v1/health }
+        respond: { status: 200, body: { status: ok, apiVersions: ["${apiVersion}"] } }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+      - { method: GET, path: /v1/health }
+
+  - id: health.get.attempt_timeout
+    title: An attempt that runs past its timeout gives kind timeout (ERR-T2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { timeout: 300, retry: 0 }
+        expect:
+          error: { kind: timeout }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          { status: 200, delayMs: 1500, body: { status: ok, apiVersions: ["${apiVersion}"] } }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+
+  - id: health.get.html_502
+    title: A proxy's HTML 502 gives kind server and code unknown (KND-3)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: server, status: 502, code: unknown }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 502
+          headers: { Content-Type: text/html }
+          rawBody: "<html><body><h1>502 Bad Gateway</h1></body></html>"
+    expectRequests:
+      - { method: GET, path: /v1/health }
+
+  - id: health.get.empty_503
+    title: An empty 503 gives kind server and code unknown (KND-3)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: server, status: 503, code: unknown }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond: { status: 503 }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+
+  - id: health.get.json_not_problem
+    title: JSON that is not a problem body gives code unknown (KND-3)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: server, status: 500, code: unknown }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond: { status: 500, body: { error: boom } }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+
+  - id: health.get.redirect_not_followed
+    title: A 3xx is never followed, so a credential never reaches another origin (PTH-4, RTM-6)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: network }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond: { status: 302, headers: { Location: /v1/elsewhere } }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+
+  - id: health.get.unknown_fields
+    title: Unknown response fields are ignored (JSW-8)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        expect:
+          result: { status: ok, apiVersions: ["${apiVersion}"] }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 200
+          body:
+            { status: ok, apiVersions: ["${apiVersion}"], addedLater: { nested: true }, region: eu }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+
+  - id: health.get.status_400
+    title: A 400 problem gives kind validation (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: validation, status: 400, code: invalid_request }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 400
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 400,
+              status: 400,
+              detail: A scripted 400.,
+              code: invalid_request,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_401
+    title: A 401 problem gives kind unauthenticated (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: unauthenticated, status: 401, code: unauthorized }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 401
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 401,
+              status: 401,
+              detail: A scripted 401.,
+              code: unauthorized,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_403
+    title: A 403 problem gives kind forbidden (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: forbidden, status: 403, code: forbidden }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 403
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 403,
+              status: 403,
+              detail: A scripted 403.,
+              code: forbidden,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_404
+    title: A 404 problem gives kind not_found (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: not_found, status: 404, code: not_found }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 404
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 404,
+              status: 404,
+              detail: A scripted 404.,
+              code: not_found,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_408
+    title: A 408 problem gives kind timeout (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: timeout, status: 408, code: fixture_status_408 }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 408
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 408,
+              status: 408,
+              detail: A scripted 408.,
+              code: fixture_status_408,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_409
+    title: A 409 problem gives kind conflict (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: conflict, status: 409, code: conflict }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 409
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 409,
+              status: 409,
+              detail: A scripted 409.,
+              code: conflict,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_412
+    title: A 412 problem gives kind conflict (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: conflict, status: 412, code: version_conflict }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 412
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 412,
+              status: 412,
+              detail: A scripted 412.,
+              code: version_conflict,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_413
+    title: A 413 problem gives kind validation (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: validation, status: 413, code: payload_too_large }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 413
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 413,
+              status: 413,
+              detail: A scripted 413.,
+              code: payload_too_large,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_415
+    title: A 415 problem gives kind validation (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: validation, status: 415, code: unsupported_media_type }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 415
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 415,
+              status: 415,
+              detail: A scripted 415.,
+              code: unsupported_media_type,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_418
+    title: A 418 problem gives kind server (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: server, status: 418, code: fixture_status_418 }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 418
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 418,
+              status: 418,
+              detail: A scripted 418.,
+              code: fixture_status_418,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_422
+    title: A 422 problem gives kind validation (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: validation, status: 422, code: idempotency_key_reused }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 422
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 422,
+              status: 422,
+              detail: A scripted 422.,
+              code: idempotency_key_reused,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_428
+    title: A 428 problem gives kind conflict (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: conflict, status: 428, code: fixture_status_428 }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 428
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 428,
+              status: 428,
+              detail: A scripted 428.,
+              code: fixture_status_428,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_429
+    title: A 429 problem gives kind rate_limited (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: rate_limited, status: 429, code: rate_limited }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 429
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 429,
+              status: 429,
+              detail: A scripted 429.,
+              code: rate_limited,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_500
+    title: A 500 problem gives kind server (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: server, status: 500, code: internal }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 500
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 500,
+              status: 500,
+              detail: A scripted 500.,
+              code: internal,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_502
+    title: A 502 problem gives kind server (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: server, status: 502, code: fixture_status_502 }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 502
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 502,
+              status: 502,
+              detail: A scripted 502.,
+              code: fixture_status_502,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }
+  - id: health.get.status_503
+    title: A 503 problem gives kind server (KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: health.get
+        options: { retry: 0 }
+        expect:
+          error: { kind: server, status: 503, code: unavailable }
+    stub:
+      - request: { method: GET, path: /v1/health }
+        respond:
+          status: 503
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Status 503,
+              status: 503,
+              detail: A scripted 503.,
+              code: unavailable,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - { method: GET, path: /v1/health }

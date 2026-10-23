@@ -1,6 +1,7 @@
 // The TypeScript runtime templates, run through the rendered fixture snapshots with a stub fetch (spec 0005 SQA-2).
 // The SDK repos run the full SQA-7 suite; this proves the templates behave before they are copied there.
 import { describe, expect, it } from "vitest";
+import { match, substitute } from "./snapshots/ts-client/conformance/dispatch.generated.ts";
 import { createClientHandle } from "./snapshots/ts-client/src/runtime/options.ts";
 import {
   Health,
@@ -252,5 +253,34 @@ describe("helpers", () => {
     expect(
       buildUrl("https://a/", ["v1", "x/y"], { b: undefined, a: true, n: 2, list: ["p", "q"] }),
     ).toBe("https://a/v1/x%2Fy?a=true&n=2&list=p&list=q");
+  });
+});
+
+describe("0014 CNF-3: the generated matcher", () => {
+  it("matches objects by subset and arrays exactly", () => {
+    expect(match({ a: 1 }, { a: 1, b: 2 })).toEqual([]);
+    expect(match({ a: 1 }, { b: 2 })).toEqual(["$.a: missing"]);
+    expect(match([1, 2], [1, 2, 3])).toEqual(["$: expected 2 items, got 3"]);
+    expect(match({ a: [{ x: 1 }] }, { a: [{ x: 2 }] })).toEqual(["$.a[0].x: expected 1, got 2"]);
+    expect(match(null, null)).toEqual([]);
+    expect(match(1, "1")).toEqual(['$: expected 1, got "1"']);
+  });
+
+  it("knows $any, $uuid, $timestamp, $regex, and $contains", () => {
+    expect(match({ $any: true }, null)).toEqual([]);
+    expect(match({ a: { $any: true } }, {})).toEqual(["$.a: missing"]);
+    expect(match({ $uuid: true }, "0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10")).toEqual([]);
+    expect(match({ $uuid: true }, "0192F0C1-7B9E-7C43-9A51-3F0E8D2B6A10")).toHaveLength(1);
+    expect(match({ $timestamp: true }, "2026-10-22T09:14:03.120558Z")).toEqual([]);
+    expect(match({ $timestamp: true }, "yesterday")).toHaveLength(1);
+    expect(match({ $regex: "^[0-9a-f]{32}$" }, "a".repeat(32))).toEqual([]);
+    expect(match({ $regex: "^x" }, "y")).toHaveLength(1);
+    expect(match({ $contains: ["b"] }, ["a", "b"])).toEqual([]);
+    expect(match({ $contains: ["c"] }, ["a", "b"])).toHaveLength(1);
+  });
+
+  it("substitutes ${name} and refuses an unknown name", () => {
+    expect(substitute({ a: ["${v}", "x-${v}"] }, { v: "1" })).toEqual({ a: ["1", "x-1"] });
+    expect(() => substitute("${missing}", {})).toThrow(/missing/);
   });
 });

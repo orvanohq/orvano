@@ -95,10 +95,14 @@ export function checkNames(model: TargetModel): void {
 }
 
 export function modelsFile(model: TargetModel, source: Provenance): string {
-  const blocks = model.schemas.map((schema) =>
-    modelBlock(schema, model.schemaUse.get(schema.name)?.input === true),
-  );
-  return `${fileHeader(source)}\n${blocks.join("\n")}`;
+  return `${fileHeader(source)}\n${modelBlocks(model)}`;
+}
+
+/** Every schema the model reaches, as interfaces and type aliases. */
+export function modelBlocks(model: TargetModel): string {
+  return model.schemas
+    .map((schema) => modelBlock(schema, model.schemaUse.get(schema.name)?.input === true))
+    .join("\n");
 }
 
 function modelBlock(schema: NamedSchema, input: boolean): string {
@@ -123,27 +127,44 @@ function propertyMember(property: Property, input: boolean, where: string): stri
 }
 
 export function serviceFile(service: Service, source: Provenance, model: TargetModel): string {
-  const className = serviceClassName(service);
-  const operations = service.operations;
-  const uses = (kind: "project" | "param"): boolean =>
-    operations.some((operation) => operation.segments.some((segment) => segment.kind === kind));
+  const modelImports = referencedModels([service]);
+  let text = fileHeader(source);
+  text += `import { ${clientHelpers([service]).join(", ")}, type OrvanoClient, type RequestOptions } from "../runtime/client.js";\n`;
+  text += `import { request } from "../runtime/transport.js";\n`;
+  if (modelImports.length > 0) {
+    text += `import type { ${modelImports.join(", ")} } from "./models.js";\n`;
+  }
+  return text + serviceBody(service, model);
+}
 
-  const clientImports = [
+/** Uses of runtime helpers in a set of services, for the import line. */
+export function clientHelpers(services: readonly Service[]): string[] {
+  const uses = (kind: "project" | "param"): boolean =>
+    services.some((service) =>
+      service.operations.some((operation) =>
+        operation.segments.some((segment) => segment.kind === kind),
+      ),
+    );
+  return [
     "assertClient",
     ...(uses("param") ? ["pathParam"] : []),
     ...(uses("project") ? ["projectId"] : []),
   ];
-  const modelImports = new Set<string>();
-  for (const operation of operations) {
-    collectRefs(operation, modelImports);
-  }
+}
 
-  let text = fileHeader(source);
-  text += `import { ${clientImports.join(", ")}, type OrvanoClient, type RequestOptions } from "../runtime/client.js";\n`;
-  text += `import { request } from "../runtime/transport.js";\n`;
-  if (modelImports.size > 0) {
-    text += `import type { ${[...modelImports].toSorted(byString).join(", ")} } from "./models.js";\n`;
-  }
+/** Every model a set of services names in its inputs and results. */
+export function referencedModels(services: readonly Service[]): string[] {
+  const names = new Set<string>();
+  for (const operation of services.flatMap((service) => service.operations))
+    collectRefs(operation, names);
+  return [...names].toSorted(byString);
+}
+
+/** A service's params interfaces and its class, without imports. */
+export function serviceBody(service: Service, model: TargetModel): string {
+  const className = serviceClassName(service);
+  const operations = service.operations;
+  let text = "";
   for (const operation of operations) {
     if (hasInputs(operation)) text += `\n${paramsInterface(operation, model)}`;
   }

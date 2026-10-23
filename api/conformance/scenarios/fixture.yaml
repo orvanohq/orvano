@@ -1,0 +1,109 @@
+# Spec 0014 STB-4: behavior proven on the stub only fixture service (fixture.openapi.json) until real endpoints exist.
+scenarios:
+  - id: fixture.create_widget.no_retry_without_key
+    title: A POST is not retried after a 503 without an idempotency key (IDM-3)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: fixture.createWidget
+        params: { name: first }
+        expect:
+          error: { kind: server, status: 503, code: unavailable }
+    stub:
+      - request: { method: POST, path: "/v1/projects/${projectId}/fixture/widgets" }
+        respond:
+          status: 503
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Service Unavailable,
+              status: 503,
+              detail: Not ready.,
+              code: unavailable,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+            }
+    expectRequests:
+      - method: POST
+        path: "/v1/projects/${projectId}/fixture/widgets"
+        headers: { content-type: { $regex: "^application/json" } }
+        body: { name: first }
+
+  - id: fixture.create_widget.field_errors
+    title: Field errors are read from a validation problem body (PRB-3)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: fixture.createWidget
+        params: { name: "", color: red }
+        expect:
+          error:
+            kind: validation
+            status: 400
+            code: validation_failed
+            fieldErrors:
+              - {
+                  field: name,
+                  location: body,
+                  code: too_short,
+                  message: Name must have at least 1 character.,
+                }
+    stub:
+      - request: { method: POST, path: "/v1/projects/${projectId}/fixture/widgets" }
+        respond:
+          status: 400
+          headers: { Content-Type: application/problem+json }
+          body:
+            type: "about:blank"
+            title: Bad Request
+            status: 400
+            detail: The request is not valid.
+            code: validation_failed
+            traceId: 0af7651916cd43dd8448eb211c80319c
+            errors:
+              - {
+                  field: name,
+                  location: body,
+                  code: too_short,
+                  message: Name must have at least 1 character.,
+                }
+    expectRequests:
+      - method: POST
+        path: "/v1/projects/${projectId}/fixture/widgets"
+        body: { name: "", color: red }
+
+  - id: fixture.get_widget.unknown_enum
+    title: An enum value the SDK does not know is kept, not refused (JSW-2, TYP-4)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: fixture.getWidget
+        params: { widgetId: 0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10 }
+        expect:
+          result:
+            id: 0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10
+            color: purple
+            createdAt: { $timestamp: true }
+    stub:
+      - request:
+          {
+            method: GET,
+            path: "/v1/projects/${projectId}/fixture/widgets/0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10",
+          }
+        respond:
+          status: 200
+          body:
+            {
+              id: 0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10,
+              name: first,
+              color: purple,
+              createdAt: "2026-10-22T09:14:03.120558Z",
+            }
+    expectRequests:
+      - {
+          method: GET,
+          path: "/v1/projects/${projectId}/fixture/widgets/0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10",
+        }

@@ -1,6 +1,7 @@
 // Spec 0014 GNR-3: ts-client (sdk-js, @orvano/client) and ts-server (sdk-js-server, @orvano/server).
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import type { Scenario } from "../../conformance.ts";
 import type { Audience, TargetModel } from "../../model.ts";
 import { byString } from "../../naming.ts";
 import type { OutputFile, Ownership, Provenance } from "../../output.ts";
@@ -13,19 +14,21 @@ import {
   serviceFile,
   serviceFileName,
 } from "./files.ts";
+import { dispatchFile, scenariosFile } from "./conformance.ts";
 import { fileHeader } from "./render.ts";
 
 const runtimeDirectory = fileURLToPath(new URL("../../../runtime/typescript/", import.meta.url));
 
 export const typescriptOwnership: Ownership = {
   directories: ["src/generated", "src/runtime"],
-  files: [],
+  files: ["conformance/dispatch.generated.ts", "conformance/scenarios.generated.json"],
 };
 
 export function renderTypescript(
   model: TargetModel,
   source: Provenance,
   sdkPackage: string,
+  conformance: { fixture: TargetModel; scenarios: readonly Scenario[] },
 ): OutputFile[] {
   checkNames(model);
   const files: OutputFile[] = [
@@ -38,6 +41,14 @@ export function renderTypescript(
       content: serviceFile(service, source, model),
     })),
     ...runtimeFiles(source),
+    {
+      path: "conformance/dispatch.generated.ts",
+      content: dispatchFile(model, conformance.fixture, source),
+    },
+    {
+      path: "conformance/scenarios.generated.json",
+      content: scenariosFile(conformance.scenarios, source),
+    },
   ];
   return files.toSorted((a, b) => byString(a.path, b.path));
 }

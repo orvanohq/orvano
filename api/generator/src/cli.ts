@@ -2,15 +2,16 @@
 // Relative paths resolve from where pnpm was run (INIT_CWD), not from this package.
 import { execFileSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
+import { loadConformance } from "./conformance.ts";
 import { GeneratorError, loadContract } from "./contract.ts";
 import { generate } from "./generate.ts";
 import { writeOutput } from "./output.ts";
 import { findTarget, targetNames } from "./targets/index.ts";
 
-const usage = `Usage: generate --target <${targetNames.join("|")}> --contract <openapi.json> --out <repo root> [--commit <sha>]`;
+const usage = `Usage: generate --target <${targetNames.join("|")}> --contract <openapi.json> --out <repo root> [--commit <sha>] [--conformance <dir>]`;
 
 function main(): void {
   const { values } = parseArgs({
@@ -19,6 +20,7 @@ function main(): void {
       contract: { type: "string" },
       out: { type: "string" },
       commit: { type: "string" },
+      conformance: { type: "string" },
     },
     strict: true,
   });
@@ -34,7 +36,14 @@ function main(): void {
     throw new GeneratorError(`--commit must be 40 lowercase hex, got ${commit}.`);
 
   const target = findTarget(values.target);
-  const files = generate(loadContract(resolve(base, values.contract)), target.name, commit);
+  const contractPath = resolve(base, values.contract);
+  // CNF-4: the scenarios and fixture sit beside the contract (api/conformance/) unless --conformance says otherwise.
+  const conformance = loadConformance(
+    values.conformance === undefined
+      ? join(dirname(contractPath), "conformance")
+      : resolve(base, values.conformance),
+  );
+  const files = generate(loadContract(contractPath), conformance, target.name, commit);
   writeOutput(out, target.ownership, files);
   console.log(`sdk-generator: wrote ${String(files.length)} files for ${target.name} into ${out}.`);
 }
