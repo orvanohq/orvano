@@ -13,7 +13,12 @@ const consoleSrc = ["console/src/**/*.{ts,tsx}"];
 const consoleTests = ["console/src/**/*.test.{ts,tsx}", "console/src/test/**/*.{ts,tsx}"];
 // The console's tool configs live in tsconfig.node.json, which the project service can't find by name.
 const consoleToolConfigs = ["console/*.config.ts"];
-const rootFiles = ["*.config.ts", "tooling/config/*.ts", "tooling/scripts/*.mjs"];
+const rootFiles = [
+  "*.config.ts",
+  "tooling/config/*.ts",
+  "tooling/scripts/*.mjs",
+  "api/conformance/stub/*.mjs",
+];
 // The SDK generator (spec 0014 GNR-1); its runtime templates import generated modules, so they are checked
 // through the rendered snapshots instead.
 const generatorFiles = [

@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/orvanohq/orvano/api/conformance/scenario.schema.json",
+  "title": "Orvano conformance scenario file",
+  "description": "One file under scenarios/ holds one or more scenarios (spec 0014 CNF-1, CNF-2).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scenarios"],
+  "properties": {
+    "scenarios": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/scenario" } }
+  },
+  "$defs": {
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "mode", "audience", "requires", "steps"],
+      "properties": {
+        "id": {
+          "description": "Dotted and unique, `<service>.<method>.<case>`, such as `health.get.ok`.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,}$"
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "mode": { "enum": ["live", "stub"] },
+        "audience": {
+          "description": "Which SDKs run it.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["client", "server"] }
+        },
+        "requires": {
+          "description": "Capabilities the runner must set up first (CNF-7). Empty until feature 13 adds `project`.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["project"] }
+        },
+        "client": {
+          "description": "How the runner opens the client for this scenario, beyond its defaults.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "key": { "description": "The key the client sends in `Orvano-Key`.", "type": "string" }
+          }
+        },
+        "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } },
+        "stub": {
+          "description": "Stub mode: the scripted answers, used in order (STB-2).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/stubEntry" }
+        },
+        "expectRequests": {
+          "description": "Stub mode: the requests the SDK must have sent, all of them, in order (CNF-3 matching).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/recordedRequest" }
+        }
+      },
+      "if": { "properties": { "mode": { "const": "stub" } } },
+      "then": { "required": ["stub", "expectRequests"] },
+      "else": { "not": { "anyOf": [{ "required": ["stub"] }, { "required": ["expectRequests"] }] } }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["call", "expect"],
+      "properties": {
+        "call": {
+          "description": "`<service>.<method>` from x-orvano-sdk.",
+          "type": "string",
+          "pattern": "^[a-z][A-Za-z0-9]*\\.[a-z][A-Za-z0-9]*$"
+        },
+        "params": { "description": "JSON matching the operation's inputs.", "type": "object" },
+        "options": { "$ref": "#/$defs/options" },
+        "expect": { "$ref": "#/$defs/expect" },
+        "save": {
+          "description": "Values to reuse as `${name}` in later steps: name to a dotted path in the result.",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout": {
+          "description": "Per attempt timeout, milliseconds.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "retry": {
+          "description": "Max retries for this call.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+        "idempotencyKey": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "ifMatch": { "type": "string", "minLength": 1 }
+      }
+    },
+    "expect": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "result": { "description": "The call's result (CNF-3 matching). `null` for no body." },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "kind": {
+              "enum": [
+                "network",
+                "timeout",
+                "unauthenticated",
+                "forbidden",
+                "not_found",
+                "conflict",
+                "validation",
+                "rate_limited",
+                "server"
+              ]
+            },
+            "status": {},
+            "code": {},
+            "fieldErrors": {},
+            "retryAfter": {}
+          }
+        },
+        "response": {
+          "description": "The last HTTP response the runner saw, for what the SDK result does not carry.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": { "type": "integer" },
+            "headers": { "description": "Header names in lowercase.", "type": "object" },
+            "body": {}
+          }
+        }
+      },
+      "oneOf": [{ "required": ["result"] }, { "required": ["error"] }]
+    },
+    "stubEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request", "respond"],
+      "properties": {
+        "request": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "path"],
+          "properties": {
+            "method": { "enum": ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"] },
+            "path": {
+              "description": "The path without the query; `${projectId}` is substituted.",
+              "type": "string",
+              "pattern": "^/"
+            }
+          }
+        },
+        "respond": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {
+            "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+            "headers": {
+              "description": "A value is a string, or `{ \"$httpDateIn\": <seconds> }` for an HTTP date that many seconds from now.",
+              "type": "object",
+              "additionalProperties": {
+                "oneOf": [
+                  { "type": "string" },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["$httpDateIn"],
+                    "properties": { "$httpDateIn": { "type": "integer" } }
+                  }
+                ]
+              }
+            },
+            "body": {
+              "description": "Sent as JSON, with `Content-Type: application/json` unless headers name another."
+            },
+            "rawBody": { "description": "Sent as is.", "type": "string" },
+            "delayMs": {
+              "description": "Waits before answering; under 2000 (STB-5).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1999
+            }
+          },
+          "not": { "required": ["body", "rawBody"] }
+        }
+      }
+    },
+    "recordedRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "path"],
+      "properties": {
+        "method": { "type": "string" },
+        "path": { "type": "string" },
+        "query": { "description": "Query values by name, each an array.", "type": "object" },
+        "headers": { "description": "Header names in lowercase.", "type": "object" },
+        "body": {}
+      }
+    }
+  }
+}

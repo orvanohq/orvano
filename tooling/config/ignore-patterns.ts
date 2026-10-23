@@ -13,6 +13,8 @@ export const ignorePatterns = [
   // the generator's raw output for the fixture contract, compared byte for byte (spec 0014 GNR-10); each SDK repo
   // formats its own copy after generating (GNR-9)
   "api/generator/test/snapshots/ts-client/**",
+  // the scenario bundle, written byte for byte by `pnpm api:scenarios` from the YAML (spec 0014 CNF-4)
+  "api/conformance/scenarios.json",
   "api/generator/test/snapshots/ts-server/**",
   "console/src/locales/**",
   // build output

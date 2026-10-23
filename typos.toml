@@ -10,6 +10,7 @@ extend-exclude = [
   "api/console.openapi.json",
   "server/tests/Orvano.Host.IntegrationTests/Contract/Snapshots/",
   "api/generator/test/snapshots/ts-client/",
+  "api/conformance/scenarios.json",
   "api/generator/test/snapshots/ts-server/",
   "console/src/locales/",
   "dist/",

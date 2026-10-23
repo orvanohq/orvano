@@ -90,7 +90,12 @@
       }
     },
     {
-      "files": ["tooling/scripts/**", "console/scripts/**", "api/generator/src/cli.ts"],
+      "files": [
+        "tooling/scripts/**",
+        "console/scripts/**",
+        "api/generator/src/cli.ts",
+        "api/conformance/stub/server.mjs"
+      ],
       "rules": {
         "no-console": "off"
       }

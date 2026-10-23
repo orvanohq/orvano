@@ -16,5 +16,11 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "eslint.config.ts", "tooling/config/*.ts", "tooling/scripts/*.mjs"]
+  "include": [
+    "vite.config.ts",
+    "eslint.config.ts",
+    "tooling/config/*.ts",
+    "tooling/scripts/*.mjs",
+    "api/conformance/stub/*.mjs"
+  ]
 }
