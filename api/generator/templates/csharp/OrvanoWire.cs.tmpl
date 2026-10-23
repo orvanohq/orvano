@@ -1,0 +1,110 @@
+// The generated side of the seam between the generated services and the hand written transport (spec 0014 GNR-5).
+
+using System.Collections;
+using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
+
+namespace Orvano.Server;
+
+/// <summary>One API call as a generated service hands it to <c>OrvanoTransport</c>.</summary>
+internal sealed class OrvanoCall
+{
+    public OrvanoCall(string operationId, HttpMethod method, IReadOnlyList<string> path)
+    {
+        OperationId = operationId;
+        Method = method;
+        Path = path;
+    }
+
+    /// <summary>The contract's operation ID, for logs.</summary>
+    public string OperationId { get; }
+
+    public HttpMethod Method { get; }
+
+    /// <summary>The path segments, not yet escaped; the transport escapes each one.</summary>
+    public IReadOnlyList<string> Path { get; }
+
+    /// <summary>The query parameters in order; a list repeats its name.</summary>
+    public IReadOnlyList<KeyValuePair<string, string>> Query { get; init; } = [];
+
+    /// <summary>The JSON body, written once so every attempt sends the same bytes (spec 0002 LIB-7).</summary>
+    public byte[]? Body { get; init; }
+}
+
+/// <summary>Query parameters as wire text; a null value is left out.</summary>
+internal sealed class OrvanoQuery : IReadOnlyList<KeyValuePair<string, string>>
+{
+    private readonly List<KeyValuePair<string, string>> _items = [];
+
+    public int Count => _items.Count;
+
+    public KeyValuePair<string, string> this[int index] => _items[index];
+
+    public void Add(string name, string? value)
+    {
+        if (value is not null)
+        {
+            _items.Add(new(name, value));
+        }
+    }
+
+    public void Add(string name, int? value) => Add(name, value is { } number ? OrvanoWire.Text(number) : null);
+
+    public void Add(string name, long? value) => Add(name, value is { } number ? OrvanoWire.Text(number) : null);
+
+    public void Add(string name, double? value) => Add(name, value is { } number ? OrvanoWire.Text(number) : null);
+
+    public void Add(string name, bool? value) => Add(name, value is { } flag ? OrvanoWire.Text(flag) : null);
+
+    public void Add(string name, Guid? value) => Add(name, value is { } id ? OrvanoWire.Text(id) : null);
+
+    public void Add(string name, DateTimeOffset? value) => Add(name, value is { } time ? OrvanoWire.Text(time) : null);
+
+    public void Add(string name, IEnumerable<string>? values)
+    {
+        foreach (var value in values ?? [])
+        {
+            Add(name, value);
+        }
+    }
+
+    public void Add(string name, IEnumerable<int>? values) => Add(name, values?.Select(OrvanoWire.Text));
+
+    public void Add(string name, IEnumerable<long>? values) => Add(name, values?.Select(OrvanoWire.Text));
+
+    public void Add(string name, IEnumerable<double>? values) => Add(name, values?.Select(OrvanoWire.Text));
+
+    public void Add(string name, IEnumerable<bool>? values) => Add(name, values?.Select(OrvanoWire.Text));
+
+    public void Add(string name, IEnumerable<Guid>? values) => Add(name, values?.Select(OrvanoWire.Text));
+
+    public void Add(string name, IEnumerable<DateTimeOffset>? values) => Add(name, values?.Select(OrvanoWire.Text));
+
+    public IEnumerator<KeyValuePair<string, string>> GetEnumerator() => _items.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
+
+/// <summary>Values as the wire writes them (spec 0014 JSW-3, JSW-4, spec 0002 GEN-10: invariant culture).</summary>
+internal static class OrvanoWire
+{
+    /// <summary>The body of an optional request body the caller left out.</summary>
+    public static byte[] EmptyObject => "{}"u8.ToArray();
+
+    public static byte[] Body<T>(T value, JsonTypeInfo<T> type) => JsonSerializer.SerializeToUtf8Bytes(value, type);
+
+    public static string Text(int value) => value.ToString(CultureInfo.InvariantCulture);
+
+    public static string Text(long value) => value.ToString(CultureInfo.InvariantCulture);
+
+    public static string Text(double value) => value.ToString("R", CultureInfo.InvariantCulture);
+
+    public static string Text(bool value) => value ? "true" : "false";
+
+    public static string Text(Guid value) => value.ToString("D", CultureInfo.InvariantCulture);
+
+    /// <summary>UTC with a <c>Z</c> and up to six fraction digits (JSW-3).</summary>
+    public static string Text(DateTimeOffset value) =>
+        value.UtcDateTime.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss.FFFFFF'Z'", CultureInfo.InvariantCulture);
+}

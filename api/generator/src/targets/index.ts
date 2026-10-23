@@ -4,6 +4,7 @@ import { scenariosFor, type ConformanceInputs } from "../conformance.ts";
 import { buildModel, forAudience, type Audience, type Model } from "../model.ts";
 import { byString } from "../naming.ts";
 import type { OutputFile, Ownership, Provenance } from "../output.ts";
+import { csharpOwnership, csharpTargets, renderCsharp } from "./csharp/index.ts";
 import { dartOwnership, dartTargets, renderDart } from "./dart/index.ts";
 import { renderTypescript, typescriptOwnership, typescriptTargets } from "./typescript/index.ts";
 
@@ -62,6 +63,16 @@ const targets: Target[] = [
         settings.dartPackage,
         conformanceFor(model, settings.audience, conformance),
       );
+    },
+  })),
+  ...Object.entries(csharpTargets).map(([name, settings]): Target => ({
+    name,
+    audience: settings.audience,
+    ownership: csharpOwnership,
+    render: (model, source, conformance) => {
+      const view = forAudience(model, settings.audience);
+      checkTemplates(view, name);
+      return renderCsharp(view, source, conformanceFor(model, settings.audience, conformance));
     },
   })),
 ].toSorted((a, b) => byString(a.name, b.name));

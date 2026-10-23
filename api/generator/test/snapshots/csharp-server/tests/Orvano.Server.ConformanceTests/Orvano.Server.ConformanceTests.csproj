@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Written by hand: builds the snapshot's conformance dispatcher against the library. The runner and the tests
+       are sdk-dotnet's (spec 0002 LIB-12). -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Orvano.Server/Orvano.Server.csproj" />
+  </ItemGroup>
+</Project>

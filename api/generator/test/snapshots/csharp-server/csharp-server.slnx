@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/Orvano.Server/Orvano.Server.csproj" />
+  <Project Path="tests/Orvano.Server.ConformanceTests/Orvano.Server.ConformanceTests.csproj" />
+</Solution>

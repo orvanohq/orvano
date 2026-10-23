@@ -1,0 +1,329 @@
+// The part of the C# conformance dispatcher that does not depend on the contract (spec 0014 CNF-3, CNF-4).
+
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization.Metadata;
+using System.Text.RegularExpressions;
+
+namespace Orvano.Server.ConformanceTests;
+
+/// <summary>A scenario step's options (CNF-2).</summary>
+internal sealed class ConformanceOptions
+{
+    /// <summary>The attempt timeout in milliseconds.</summary>
+    public int? Timeout { get; init; }
+
+    /// <summary>The most retries.</summary>
+    public int? Retry { get; init; }
+
+    /// <summary>Headers for the call.</summary>
+    public IReadOnlyDictionary<string, string> Headers { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>Reads a step's <c>options</c>, plus the headers the runner adds (such as <c>Orvano-Stub-Run</c>).</summary>
+    public static ConformanceOptions FromJson(JsonObject? json, IReadOnlyDictionary<string, string> headers)
+    {
+        if (json?["idempotencyKey"] is not null || json?["ifMatch"] is not null)
+        {
+            throw new NotSupportedException(
+                "This SDK does not offer idempotencyKey or ifMatch yet (spec 0014 build plan steps 12 and 13).");
+        }
+        var merged = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (json?["headers"] is JsonObject stepHeaders)
+        {
+            foreach (var (name, value) in stepHeaders)
+            {
+                merged[name] = value?.GetValue<string>() ?? string.Empty;
+            }
+        }
+        foreach (var (name, value) in headers)
+        {
+            merged[name] = value;
+        }
+        return new ConformanceOptions
+        {
+            Timeout = json?["timeout"]?.GetValue<int>(),
+            Retry = json?["retry"]?.GetValue<int>(),
+            Headers = merged,
+        };
+    }
+
+    /// <summary>The SDK's request options for these step options.</summary>
+    public OrvanoRequestOptions ToRequestOptions() => new()
+    {
+        Timeout = Timeout is { } milliseconds ? TimeSpan.FromMilliseconds(milliseconds) : null,
+        Retry = Retry is { } maxRetries ? new OrvanoRetryOptions { MaxRetries = maxRetries } : null,
+        Headers = Headers,
+    };
+}
+
+/// <summary>What one call gave: its JSON result, or its normalized error.</summary>
+internal sealed record ConformanceOutcome(bool IsOk, JsonNode? Result, JsonObject? Error)
+{
+    public static ConformanceOutcome Ok(JsonNode? result) => new(true, result, null);
+
+    public static ConformanceOutcome Failed(JsonObject error) => new(false, null, error);
+}
+
+/// <summary>SDK errors in the shape every SDK's dispatcher reports (CNF-4).</summary>
+internal static class ConformanceErrors
+{
+    /// <summary>The normalized error, or null for an exception the SDK does not throw for a failed call.</summary>
+    public static JsonObject? Normalize(Exception error) => error switch
+    {
+        OrvanoException api => new JsonObject
+        {
+            ["kind"] = KindName(api.Kind),
+            ["status"] = api.StatusCode,
+            ["code"] = api.Code,
+            ["fieldErrors"] = new JsonArray(
+                [
+                    .. api.FieldErrors.Select(static field => (JsonNode)new JsonObject
+                    {
+                        ["field"] = field.Field,
+                        ["location"] = field.Location,
+                        ["code"] = field.Code,
+                        ["message"] = field.Message,
+                    }),
+                ]),
+            ["retryAfter"] = api is OrvanoRateLimitedException { RetryAfter: { } wait } ? (int?)wait.TotalSeconds : null,
+            ["requestId"] = api.TraceId,
+        },
+        // LIB-6: the last attempt's timeout is a TimeoutException, a failed connection an HttpRequestException.
+        TimeoutException => WithoutResponse("timeout"),
+        HttpRequestException => WithoutResponse("network"),
+        _ => null,
+    };
+
+    private static JsonObject WithoutResponse(string kind) => new()
+    {
+        ["kind"] = kind,
+        ["status"] = null,
+        ["code"] = OrvanoErrorCodes.Unknown,
+        ["fieldErrors"] = new JsonArray(),
+        ["retryAfter"] = null,
+        ["requestId"] = null,
+    };
+
+    /// <summary>The kind's wire name (spec 0014 KND-2).</summary>
+    public static string KindName(OrvanoErrorKind kind) => kind switch
+    {
+        OrvanoErrorKind.Validation => "validation",
+        OrvanoErrorKind.Unauthenticated => "unauthenticated",
+        OrvanoErrorKind.Forbidden => "forbidden",
+        OrvanoErrorKind.NotFound => "not_found",
+        OrvanoErrorKind.Timeout => "timeout",
+        OrvanoErrorKind.Conflict => "conflict",
+        OrvanoErrorKind.RateLimited => "rate_limited",
+        _ => "server",
+    };
+}
+
+/// <summary>Reads a scenario's params into the SDK's types and writes results back as JSON.</summary>
+internal static class ConformanceJson
+{
+    /// <summary>The SDK's and the fixture's contexts, then reflection for the scalars a scenario passes.</summary>
+    public static JsonSerializerOptions Options { get; } = new(JsonSerializerDefaults.Web)
+    {
+        RespectNullableAnnotations = true,
+        RespectRequiredConstructorParameters = true,
+        TypeInfoResolver = JsonTypeInfoResolver.Combine(
+            ConformanceJsonContext.Default,
+            OrvanoJsonContext.Default,
+            new DefaultJsonTypeInfoResolver()),
+    };
+
+    public static T Required<T>(JsonObject parameters, string name)
+        where T : notnull =>
+        (parameters[name] ?? throw new ArgumentException($"The scenario's params have no {name}.", nameof(parameters)))
+            .Deserialize<T>(Options)
+        ?? throw new ArgumentException($"The scenario's {name} is null.", nameof(parameters));
+
+    public static T? Optional<T>(JsonObject parameters, string name) =>
+        parameters[name] is { } node ? node.Deserialize<T>(Options) : default;
+
+    /// <summary>The request body: the params that are not path or query parameters (unknown members are ignored).</summary>
+    public static T Body<T>(JsonObject parameters)
+        where T : class =>
+        parameters.Deserialize<T>(Options) ?? throw new ArgumentException("The scenario's params are null.", nameof(parameters));
+
+    public static JsonNode? ToNode<T>(T value) => JsonSerializer.SerializeToNode(value, Options);
+}
+
+/// <summary>The last response an <c>HttpClient</c> saw, for <c>expect.response</c>.</summary>
+internal sealed record SeenResponse(int Status, IReadOnlyDictionary<string, string> Headers, JsonNode? Body)
+{
+    /// <summary>This response as JSON, for matching.</summary>
+    public JsonObject ToJson()
+    {
+        var headers = new JsonObject();
+        foreach (var (name, value) in Headers)
+        {
+            headers[name] = value;
+        }
+        return new JsonObject { ["status"] = Status, ["headers"] = headers, ["body"] = Body?.DeepClone() };
+    }
+}
+
+/// <summary>A handler that keeps the last response it passed on (CNF-4).</summary>
+internal sealed class RecordingHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
+{
+    /// <summary>The last response, if any.</summary>
+    public SeenResponse? Last { get; private set; }
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        var headers = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (name, values) in response.Headers.Concat(response.Content.Headers))
+        {
+            headers[name.ToLowerInvariant()] = string.Join(", ", values);
+        }
+        var text = Encoding.UTF8.GetString(bytes);
+        JsonNode? body;
+        try
+        {
+            body = text.Length == 0 ? null : JsonNode.Parse(text);
+        }
+        catch (JsonException)
+        {
+            body = JsonValue.Create(text);
+        }
+        Last = new SeenResponse((int)response.StatusCode, headers, body);
+
+        var content = new ByteArrayContent(bytes);
+        foreach (var (name, values) in response.Content.Headers)
+        {
+            content.Headers.TryAddWithoutValidation(name, values);
+        }
+        response.Content.Dispose();
+        response.Content = content;
+        return response;
+    }
+}
+
+/// <summary>Substitution and matching (CNF-3).</summary>
+internal static partial class ConformanceMatch
+{
+    /// <summary>Replaces <c>${name}</c> in every string with its value; an unknown name throws.</summary>
+    public static JsonNode? Substitute(JsonNode? value, IReadOnlyDictionary<string, string> variables) => value switch
+    {
+        JsonObject map => new JsonObject(
+            map.Select(entry => KeyValuePair.Create(entry.Key, Substitute(entry.Value, variables)))),
+        JsonArray list => new JsonArray([.. list.Select(item => Substitute(item, variables))]),
+        JsonValue scalar when scalar.GetValueKind() == JsonValueKind.String => JsonValue.Create(
+            Variable().Replace(
+                scalar.GetValue<string>(),
+                match => variables.TryGetValue(match.Groups[1].Value, out var text)
+                    ? text
+                    : throw new InvalidOperationException($"The scenario names ${{{match.Groups[1].Value}}}, which is not set."))),
+        _ => value?.DeepClone(),
+    };
+
+    /// <summary>
+    /// Matches a value against an expectation: objects by subset, arrays exactly unless <c>$contains</c>, and the
+    /// matchers <c>$any</c>, <c>$uuid</c>, <c>$timestamp</c>, and <c>$regex</c>. Returns one message per mismatch;
+    /// empty means a match.
+    /// </summary>
+    public static IReadOnlyList<string> Match(JsonNode? expected, JsonNode? actual, string path = "$")
+    {
+        switch (expected)
+        {
+            case JsonObject map when map.Count == 1 && map.First().Key.StartsWith('$'):
+                return MatchWith(map.First().Key, map.First().Value, actual, path);
+            case JsonObject map:
+                if (actual is not JsonObject actualMap)
+                {
+                    return [$"{path}: expected an object, got {Describe(actual)}"];
+                }
+                return
+                [
+                    .. map.SelectMany(entry => actualMap.ContainsKey(entry.Key)
+                        ? Match(entry.Value, actualMap[entry.Key], $"{path}.{entry.Key}")
+                        : [$"{path}.{entry.Key}: missing"]),
+                ];
+            case JsonArray list:
+                if (actual is not JsonArray actualList)
+                {
+                    return [$"{path}: expected an array, got {Describe(actual)}"];
+                }
+                if (actualList.Count != list.Count)
+                {
+                    return [$"{path}: expected {list.Count} items, got {actualList.Count}"];
+                }
+                return [.. list.SelectMany((item, index) => Match(item, actualList[index], $"{path}[{index}]"))];
+            default:
+                return SameScalar(expected, actual) ? [] : [$"{path}: expected {Describe(expected)}, got {Describe(actual)}"];
+        }
+    }
+
+    private static IReadOnlyList<string> MatchWith(string matcher, JsonNode? argument, JsonNode? actual, string path)
+    {
+        var text = actual is JsonValue value && value.GetValueKind() == JsonValueKind.String ? value.GetValue<string>() : null;
+        switch (matcher)
+        {
+            case "$any":
+                return actual is null ? [$"{path}: missing"] : [];
+            case "$uuid":
+                return text is not null && Uuid().IsMatch(text) ? [] : [$"{path}: expected a uuid, got {Describe(actual)}"];
+            case "$timestamp":
+                return text is not null && Timestamp().IsMatch(text)
+                    && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out _)
+                    ? []
+                    : [$"{path}: expected an RFC 3339 timestamp, got {Describe(actual)}"];
+            case "$regex":
+                var pattern = argument?.GetValue<string>() ?? string.Empty;
+                return text is not null && Regex.IsMatch(text, pattern)
+                    ? []
+                    : [$"{path}: expected a match for /{pattern}/, got {Describe(actual)}"];
+            case "$contains":
+                if (actual is not JsonArray actualList)
+                {
+                    return [$"{path}: expected an array, got {Describe(actual)}"];
+                }
+                JsonNode?[] wanted = argument is JsonArray list ? [.. list] : [argument];
+                return
+                [
+                    .. wanted
+                        .Select((item, index) => (item, index))
+                        .Where(entry => !actualList.Any(candidate => Match(entry.item, candidate).Count == 0))
+                        .Select(entry => $"{path}: no item matches $contains[{entry.index}] {Describe(entry.item)}"),
+                ];
+            default:
+                return [$"{path}: unknown matcher {matcher}"];
+        }
+    }
+
+    /// <summary>Scalars compare by JSON value: numbers by value, the rest by their JSON text.</summary>
+    private static bool SameScalar(JsonNode? expected, JsonNode? actual)
+    {
+        if (expected is null || actual is null)
+        {
+            return expected is null && actual is null;
+        }
+        if (expected.GetValueKind() == JsonValueKind.Number && actual.GetValueKind() == JsonValueKind.Number)
+        {
+            return decimal.Parse(expected.ToJsonString(), NumberStyles.Float, CultureInfo.InvariantCulture)
+                == decimal.Parse(actual.ToJsonString(), NumberStyles.Float, CultureInfo.InvariantCulture);
+        }
+        if (expected.GetValueKind() == JsonValueKind.String && actual.GetValueKind() == JsonValueKind.String)
+        {
+            return string.Equals(expected.GetValue<string>(), actual.GetValue<string>(), StringComparison.Ordinal);
+        }
+        return expected.GetValueKind() == actual.GetValueKind()
+            && string.Equals(expected.ToJsonString(), actual.ToJsonString(), StringComparison.Ordinal);
+    }
+
+    private static string Describe(JsonNode? value) => value?.ToJsonString() ?? "null";
+
+    [GeneratedRegex(@"\$\{([A-Za-z][A-Za-z0-9]*)\}")]
+    private static partial Regex Variable();
+
+    [GeneratedRegex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")]
+    private static partial Regex Uuid();
+
+    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$")]
+    private static partial Regex Timestamp();
+}

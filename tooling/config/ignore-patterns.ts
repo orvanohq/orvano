@@ -18,6 +18,7 @@ export const ignorePatterns = [
   "api/generator/test/snapshots/ts-server/**",
   "api/generator/test/snapshots/dart-client/**",
   "api/generator/test/snapshots/dart-server/**",
+  "api/generator/test/snapshots/csharp-server/**",
   "console/src/locales/**",
   // build output
   "**/dist/**",
