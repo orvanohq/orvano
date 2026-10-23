@@ -20,8 +20,8 @@ export interface RequestSpec {
   readonly options?: RequestOptions | undefined;
 }
 
-type Result<T> =
-  | { readonly ok: true; readonly value: T }
+type Result =
+  | { readonly ok: true; readonly value: unknown }
   | { readonly ok: false; readonly error: OrvanoError };
 
 // Spec 0005 SHP-8, spec 0002 LIB-7.
@@ -41,20 +41,20 @@ export async function request<T>(client: OrvanoClient, spec: RequestSpec): Promi
   const callHeaders = checkHeaders(spec.options?.headers);
   for (let attempt = 0; ; attempt++) {
     // oxlint-disable-next-line no-await-in-loop -- attempts run one after another, each after the last failed (SHP-8)
-    const result = await sendOnce<T>(config, spec, timeout, callHeaders);
-    if (result.ok) return result.value;
+    const result = await sendOnce(config, spec, timeout, callHeaders);
+    if (result.ok) return result.value as T;
     if (!shouldRetry(spec, result.error, attempt, maxRetries)) throw result.error;
     // oxlint-disable-next-line no-await-in-loop -- the backoff wait sits between two attempts (SHP-8)
     await sleep(backoff(attempt, result.error.retryAfter), spec.options?.signal);
   }
 }
 
-async function sendOnce<T>(
+async function sendOnce(
   config: ClientConfig,
   spec: RequestSpec,
   timeout: number,
   callHeaders: Readonly<Record<string, string>>,
-): Promise<Result<T>> {
+): Promise<Result> {
   const callerSignal = spec.options?.signal;
   const linked = linkSignals(callerSignal, timeout);
   try {
@@ -62,6 +62,15 @@ async function sendOnce<T>(
     let text: string;
     try {
       response = await config.fetch(buildRequest(config, spec, callHeaders, linked.signal));
+      if (isRedirect(response)) {
+        await response.body?.cancel();
+        return {
+          ok: false,
+          error: networkError(
+            new TypeError("The server answered with a redirect, which the SDK never follows."),
+          ),
+        };
+      }
       text = await response.text();
     } catch (thrown) {
       if (callerSignal?.aborted === true) throw callerSignal.reason; // the caller's own abort (ERR-T2)
@@ -70,7 +79,7 @@ async function sendOnce<T>(
       throw thrown; // a custom fetch's own error, unchanged (SHP-8)
     }
     if (!response.ok) return { ok: false, error: errorFromResponse(response, text) };
-    return { ok: true, value: readJson<T>(response, text) };
+    return { ok: true, value: readJson(response, text) };
   } finally {
     linked.dispose();
   }
@@ -100,14 +109,22 @@ function buildRequest(
     headers,
     body,
     signal,
-    redirect: "error", // RTM-6: a credential header is never replayed to another origin
+    // Deviation RTM-6: workerd refuses "error" (it only has "follow" and "manual"), so every runtime sends "manual"
+    // and isRedirect turns the answer into a network error. A redirect is still never followed, so a credential
+    // header is never replayed to another origin.
+    redirect: "manual",
   });
 }
 
-function readJson<T>(response: Response, text: string): T {
-  if (response.status === 204 || text === "") return undefined as T;
+/** A 3xx, or the opaque answer a browser gives for one under `redirect: "manual"`. */
+function isRedirect(response: Response): boolean {
+  return response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400);
+}
+
+function readJson(response: Response, text: string): unknown {
+  if (response.status === 204 || text === "") return undefined;
   try {
-    return JSON.parse(text) as T;
+    return JSON.parse(text) as unknown;
   } catch (thrown) {
     // SHP-8: a body that isn't JSON is a server error, never retried as a network failure.
     throw new OrvanoError({

@@ -19,6 +19,12 @@ internal static class HealthEndpoint
 {
     internal static Error NotReady { get; } = Error.Unavailable(ErrorCodes.Unavailable, "The server is not ready.");
 
+    private static readonly PathString HealthPath = new(ApiPaths.Prefix + "/health");
+
+    /// <summary>Whether a request is for <c>/v1/health</c>, with or without a trailing slash (PTH-4).</summary>
+    internal static bool IsHealthPath(PathString path) =>
+        path.StartsWithSegments(HealthPath, StringComparison.OrdinalIgnoreCase, out PathString rest) && rest.Value is null or "" or "/";
+
     public static ApiRoutes MapHealth(this ApiRoutes routes)
     {
         // Public (spec 0012 EPT-5, spec 0014 HLT-4): the same answer for every caller and project, so any credential

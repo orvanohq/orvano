@@ -65,6 +65,7 @@ describe("0014 STB-2: the stub server", () => {
       body: JSON.stringify({ name: "a" }),
     });
     assert.equal(second.status, 201);
+    assert.equal(second.headers.get("connection"), "close");
     assert.deepEqual(await second.json(), { ok: true });
 
     const seen = await requests("run-aaaaaaaa");

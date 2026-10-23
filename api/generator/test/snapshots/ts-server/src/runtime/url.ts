@@ -26,7 +26,7 @@ export function checkUrl(url: unknown, allowHttp: boolean): string {
       "url must be an https: URL with no query or fragment (http: is allowed for localhost, or with allowHttp: true).",
     );
   }
-  return url.replace(/\/+$/, "");
+  return trimTrailingSlashes(url);
 }
 
 /**
@@ -39,7 +39,7 @@ export function buildUrl(
   segments: readonly string[],
   query?: Readonly<Record<string, QueryValue | undefined>>,
 ): string {
-  let url = base.replace(/\/+$/, "");
+  let url = trimTrailingSlashes(base);
   for (const segment of segments) url += `/${encodeURIComponent(segment)}`;
   const pairs: string[] = [];
   for (const [key, value] of Object.entries(query ?? {})) {
@@ -51,4 +51,11 @@ export function buildUrl(
       pairs.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(item))}`);
   }
   return pairs.length === 0 ? url : `${url}?${pairs.join("&")}`;
+}
+
+/** Removes trailing `/` characters in one pass, with no regular expression to backtrack on a long run of them. */
+function trimTrailingSlashes(text: string): string {
+  let end = text.length;
+  while (end > 0 && text.charCodeAt(end - 1) === 47) end -= 1; // 47 is "/"
+  return text.slice(0, end);
 }

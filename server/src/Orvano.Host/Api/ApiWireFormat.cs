@@ -1,5 +1,6 @@
 using System.Diagnostics;
 
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
 
@@ -49,6 +50,14 @@ internal static class ApiWireFormat
                 if (!ApiVersions.IsSupported(value))
                 {
                     activity?.SetTag("orvano.api_version", ClientTag(requested.ToString()));
+                    // This answers before routing, so the endpoint's CORS never runs. Health's policy is fixed and
+                    // needs no project (HLT-3), so a browser can read why it was refused.
+                    if (HealthEndpoint.IsHealthPath(http.Request.Path))
+                    {
+                        ICorsService cors = http.RequestServices.GetRequiredService<ICorsService>();
+                        cors.ApplyResult(cors.EvaluatePolicy(http, OrvanoCorsPolicyProvider.Health), http.Response);
+                    }
+
                     await UnsupportedVersion.ToProblem().ExecuteAsync(http);
                     return;
                 }
