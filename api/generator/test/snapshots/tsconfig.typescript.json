@@ -1,0 +1,21 @@
+{
+  // Spec 0014 AC-14: the TypeScript snapshots type check under the SDK repos' options (spec 0005 TYP-1, BLD-2).
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedDeclarations": true,
+    "declaration": true,
+    "noEmit": true,
+    "types": []
+  },
+  "include": ["ts-client/**/*.ts", "ts-server/**/*.ts"]
+}

@@ -1,0 +1,51 @@
+/**
+ * A query string value (spec 0005 RTM-3).
+ * @internal
+ */
+export type QueryValue = string | number | boolean | readonly (string | number | boolean)[];
+
+// RTM-6: checked with patterns, not URL (Hermes lacks a complete URL).
+const secure = /^https:\/\/[^\s/?#]+(?:\/[^\s?#]*)?$/i;
+const loopback = /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/[^\s?#]*)?$/i;
+const anyHttp = /^http:\/\/[^\s/?#]+(?:\/[^\s?#]*)?$/i;
+
+/**
+ * Checks the client `url` and removes any trailing `/`. Throws `TypeError` for anything but `https:`, a loopback
+ * `http:` host, or any `http:` host when `allowHttp` is true (RTM-6).
+ * @internal
+ */
+export function checkUrl(url: unknown, allowHttp: boolean): string {
+  if (
+    typeof url !== "string" ||
+    !(secure.test(url) || loopback.test(url) || (allowHttp && anyHttp.test(url)))
+  ) {
+    throw new TypeError(
+      "url must be an https: URL with no query or fragment (http: is allowed for localhost, or with allowHttp: true).",
+    );
+  }
+  return url.replace(/\/+$/, "");
+}
+
+/**
+ * Builds a request URL: each segment encoded and joined with `/`, `undefined` query values skipped, arrays
+ * repeated once per item, keys in insertion order (RTM-3).
+ * @internal
+ */
+export function buildUrl(
+  base: string,
+  segments: readonly string[],
+  query?: Readonly<Record<string, QueryValue | undefined>>,
+): string {
+  let url = base.replace(/\/+$/, "");
+  for (const segment of segments) url += `/${encodeURIComponent(segment)}`;
+  const pairs: string[] = [];
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value === undefined) continue;
+    const values: readonly (string | number | boolean)[] = Array.isArray(value)
+      ? value
+      : [value as string | number | boolean];
+    for (const item of values)
+      pairs.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(item))}`);
+  }
+  return pairs.length === 0 ? url : `${url}?${pairs.join("&")}`;
+}

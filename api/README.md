@@ -7,6 +7,7 @@ The server's API, as OpenAPI 3.1, emitted from the real host ([spec 0014](../doc
 | `openapi.json`         | The public API (client and server operations), with the `x-orvano-*` extensions (XTN-1)       |
 | `console.openapi.json` | The control plane under `/v1/console`, read by the console's `pnpm api:gen` (spec 0003 QRY-1) |
 | `.spectral.yaml`       | Contract lint (CLT-1, CLT-2); its custom functions are in `spectral/functions/`               |
+| `generator/`           | `@orvano/sdk-generator`, which turns `openapi.json` into each SDK's code (GNR-1 to GNR-10)    |
 
 ## When you change an endpoint
 
@@ -19,3 +20,17 @@ You'll want to run these from the repo root (Docker or Podman must be running, a
 Commit the regenerated files with the endpoint change. CI fails when they differ from what the server emits (CTR-5), and on a PR that changes them, the API diff workflow posts the oasdiff report as a comment (BRK-1, BRK-2; report only until beta).
 
 Every public operation (a `/v1` route outside `/v1/console`) calls `.WithSdk(service, method)` and `.WithErrors(...)` from `ContractEndpointExtensions`, or the server does not start (XTN-2). Descriptions come from `WithSummary`, `WithDescription`, and the XML docs on request and response records; write them for app developers (CLT-3).
+
+## The SDK generator
+
+`generator/` reads `openapi.json` and writes the code each SDK repo needs (spec 0014 GNR-3). It is TypeScript that Node 24 runs directly, with no runtime dependencies. Today it has the `ts-client` (`@orvano/client`) and `ts-server` (`@orvano/server`) targets; the Dart and C# targets come next.
+
+```sh
+pnpm --filter @orvano/sdk-generator generate --target ts-client --contract api/openapi.json --out ../sdk-js
+```
+
+It deletes and rewrites only what its target owns (`src/generated/` and `src/runtime/` for TypeScript), so you'll want to run the SDK repo's formatter after it. `--commit` names the orvano commit in each file header; without it the generator reads `git rev-parse HEAD`.
+
+- `generator/src/` builds one model from the contract (`model.ts`) and renders it per target (`targets/`).
+- `generator/runtime/typescript/` is the shared TypeScript runtime (transport, retry, errors, URL and signal helpers), copied into both TypeScript SDKs (spec 0005 CGN-2). Change it here, never in an SDK repo.
+- `generator/test/` renders `fixtures/contract.openapi.json` with every target and compares it with `snapshots/`, byte for byte. When you change a template on purpose, rewrite the snapshots with `ORVANO_SNAPSHOT_WRITE=1 pnpm test:generator` and review the diff. The TypeScript snapshots also type check under the SDK repos' strict options (`pnpm typecheck`).

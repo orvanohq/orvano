@@ -2,6 +2,7 @@
 # tooling/starters/** holds template files for SDK repos and is never a workspace package (KIT-2).
 packages:
   - console
+  - api/generator
   - "!tooling/starters/**"
 
 # Spec 0003 SEC-5, spec 0006 SUP-6:
