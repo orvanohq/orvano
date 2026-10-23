@@ -28,6 +28,7 @@ describe("classify", () => {
 
   test("no changes, or no report, is none", () => {
     assert.equal(classify("No changes detected\n", "success").state, "none");
+    assert.equal(classify("No breaking changes\n", "success").state, "none"); // the action's output file
     assert.equal(classify("", "success").state, "none");
   });
 

@@ -21,7 +21,9 @@ export function classify(report, outcome) {
   const errors = Number(/(\d+) errors?\b/.exec(text)?.[1] ?? 0);
   if (outcome === "failure")
     return errors > 0 ? { state: "breaking", report: text } : { state: "failed", report: text };
-  if (text === "" || /^No changes detected/m.test(text)) return { state: "none", report: text };
+  // The CLI says "No changes detected"; the action's output file says "No breaking changes".
+  if (text === "" || /^No (breaking )?changes\b/m.test(text))
+    return { state: "none", report: text };
   return { state: errors > 0 ? "breaking" : "changes", report: text };
 }
 
