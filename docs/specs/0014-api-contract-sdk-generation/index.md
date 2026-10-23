@@ -409,7 +409,7 @@ Contract surfaces this feature adds:
 - Regenerate: a no op commit under `api/` on `main` yields six PRs (or updates), each signed off, each green; a hand edit in `src/generated/` fails the drift check; verifies **AC-15**, **AC-16**.
 - Conformance: deleting a scenario from a runner's run list fails the job; adding a public operation without a live scenario fails `pnpm api:check`; `health.get.ok` passes in every runtime of every SDK; verifies **AC-17**, **AC-18**.
 - Breaking report: removing a response field produces a comment and the `breaking-api` label, and CI stays green; verifies **AC-19**.
-- Events and catalogue: a sample public event appears under `webhooks` with its schema and as a model in each target; an operation listing an uncatalogued code fails lint; a `.WithMeter` endpoint shows `x-orvano-metered`; verifies **AC-20**, **AC-21**.
+- Events and catalogue: a sample public event appears under `webhooks` with its schema and as a model in each target; an operation listing a code missing from the catalogue fails lint; a `.WithMeter` endpoint shows `x-orvano-metered`; verifies **AC-20**, **AC-21**.
 
 ## Build plan
 
