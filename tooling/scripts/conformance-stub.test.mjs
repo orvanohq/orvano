@@ -190,6 +190,15 @@ describe("0014 STB-2: the stub server", () => {
     assert.equal(Object.getPrototypeOf(seen?.headers), Object.prototype);
   });
 
+  it("answers an oversized body with 413 and no exception text", async () => {
+    const response = await fetch(`${base}/__stub/runs/run-iiiiiiii/scenarios/a.b.i`, {
+      method: "POST",
+      body: "x".repeat(1024 * 1024 + 1),
+    });
+    assert.equal(response.status, 413);
+    assert.deepEqual(await response.json(), { error: "The request body is over 1 MB." });
+  });
+
   it("refuses a bad token", async () => {
     const response = await fetch(`${base}/__stub/runs/short/scenarios/a.b.c`, {
       method: "POST",

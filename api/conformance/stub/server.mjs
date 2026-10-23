@@ -35,8 +35,14 @@ export function createStubServer(options = {}) {
 
   return createServer((request, response) => {
     void handle(request, response).catch((/** @type {unknown} */ error) => {
-      if (!response.headersSent) send(request, response, 500, { error: String(error) });
-      else response.destroy();
+      // The answer names no exception text; the stub's log keeps it for whoever runs the suite.
+      console.error("conformance stub:", error);
+      const tooLarge = error instanceof BodyTooLargeError;
+      if (!response.headersSent) {
+        send(request, response, tooLarge ? 413 : 500, {
+          error: tooLarge ? "The request body is over 1 MB." : "The stub failed; see its log.",
+        });
+      } else response.destroy();
     });
   });
 
@@ -237,6 +243,9 @@ function record(request, method, url, body) {
   return entry;
 }
 
+/** A request body over the stub's limit. */
+class BodyTooLargeError extends Error {}
+
 /**
  * @param {unknown} value
  * @returns {value is StubEntry[]}
@@ -264,7 +273,7 @@ async function readBody(request) {
   let size = 0;
   for await (const buffer of /** @type {AsyncIterable<Buffer>} */ (request)) {
     size += buffer.length;
-    if (size > maxBodyBytes) throw new Error("The request body is over 1 MB.");
+    if (size > maxBodyBytes) throw new BodyTooLargeError();
     chunks.push(buffer);
   }
   return Buffer.concat(chunks).toString("utf8");
