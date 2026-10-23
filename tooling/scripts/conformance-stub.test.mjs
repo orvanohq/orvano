@@ -172,6 +172,24 @@ describe("0014 STB-2: the stub server", () => {
     assert.equal(gone.status, 404);
   });
 
+  it("records a header or query named __proto__ as data, not as a prototype", async () => {
+    await load("run-hhhhhhhh", "a.b.h", [
+      { request: { method: "GET", path: "/v1/health" }, respond: { status: 200 } },
+    ]);
+    await fetch(`${base}/v1/health?__proto__=x&constructor=y`, {
+      headers: [
+        ["Orvano-Stub-Run", "run-hhhhhhhh"],
+        ["__proto__", "polluted"],
+      ],
+    });
+    const [seen] = (await requests("run-hhhhhhhh")).requests;
+    assert.deepEqual(Object.getOwnPropertyDescriptor(seen?.query ?? {}, "__proto__")?.value, ["x"]);
+    assert.equal(Object.getPrototypeOf(seen?.query), Object.prototype);
+    // Node drops a header named __proto__ before the stub sees it; nothing may reach the prototype either way.
+    assert.equal(/** @type {Record<string, unknown>} */ (Object.prototype)["polluted"], undefined);
+    assert.equal(Object.getPrototypeOf(seen?.headers), Object.prototype);
+  });
+
   it("refuses a bad token", async () => {
     const response = await fetch(`${base}/__stub/runs/short/scenarios/a.b.c`, {
       method: "POST",

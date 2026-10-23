@@ -216,14 +216,18 @@ function header(request, name) {
  * @returns {RecordedRequest}
  */
 function record(request, method, url, body) {
-  /** @type {Record<string, string[]>} */
-  const query = {};
-  for (const [name, value] of url.searchParams) (query[name] ??= []).push(value);
-  /** @type {Record<string, string>} */
-  const headers = {};
-  for (const [name, value] of Object.entries(request.headers)) {
-    if (value !== undefined) headers[name] = Array.isArray(value) ? value.join(", ") : value;
-  }
+  // Names come from the request, so they become entries of a Map and then own properties through
+  // Object.fromEntries, never assignments that a `__proto__` name could turn into a prototype write.
+  /** @type {Map<string, string[]>} */
+  const values = new Map();
+  for (const [name, value] of url.searchParams)
+    values.set(name, [...(values.get(name) ?? []), value]);
+  const query = Object.fromEntries(values);
+  const headers = Object.fromEntries(
+    Object.entries(request.headers).flatMap(([name, value]) =>
+      value === undefined ? [] : [[name, Array.isArray(value) ? value.join(", ") : value]],
+    ),
+  );
   /** @type {RecordedRequest} */
   const entry = { method, path: url.pathname, query, headers };
   if (body !== "")
