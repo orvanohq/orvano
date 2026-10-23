@@ -6,12 +6,23 @@ Six SDKs: Flutter, JavaScript, and Next.js for client apps; Dart, JavaScript, an
 
 ## Foundation
 
-### 10. API contract & SDK generation · needs a decision
+### 10. API contract & SDK generation · in-progress
 
 One machine readable API contract is the single source of truth. All six SDKs are generated from it, with hand written layers only where a platform needs them. It also fixes the shared error format, pagination, the API version header, and one conformance test suite that every SDK runs.
 **Done when:** changing the contract regenerates all six SDKs, each passes the shared conformance tests against a running server, and a health call works from every SDK.
+spec [0014](../specs/0014-api-contract-sdk-generation/index.md) · code in `server/src/` (`Orvano.SharedKernel/Api/`, `Orvano.Host/Api/`), `api/`, and the six SDK repos
 
-- [ ] Design it (spec): `/architect API contract & SDK generation`
+- [x] Design it (spec): `/architect API contract & SDK generation` (spec 0014, 2026-10-22)
+- [ ] Build it: `/develop API contract & SDK generation`
+  - [ ] Server wire format and health: `/v1` groups, version header, Orvano headers, JSON rules, problem bodies and codes, `GET /v1/health` (spec 0014 AC-3 to AC-8, AC-13; build plan steps 1 to 2)
+  - [ ] Contract emit and checks: both OpenAPI documents, `x-orvano-*` metadata, drift check, Spectral, oasdiff report (spec 0014 AC-1, AC-2, AC-19, AC-21; build plan steps 3 to 4)
+  - [ ] Generator, conformance suite, and the six SDK repos: TypeScript, Dart, and C# targets, scenarios and stub server, health passing in every SDK (spec 0014 AC-14, AC-15, AC-17, AC-18; build plan steps 5 to 9)
+  - [ ] Cross repo regeneration: `sdk-nextjs`, the `orvano-sdk-bot` App (you create it), dispatch after the image, regenerate PRs, daily catch up (spec 0014 AC-15, AC-16, AC-18; build plan step 10)
+  - [ ] Shared primitives: paging, partial updates, row versions, idempotency wire contract, events in the contract (spec 0014 AC-9 to AC-12, AC-20; build plan steps 11 to 14)
+- [ ] Verify it: `/check verify API contract & SDK generation`
+- [ ] Test it: `/test API contract & SDK generation`
+- [ ] Review it (fresh model): `/check review API contract & SDK generation`
+- [ ] Document it: `/document API contract & SDK generation`
 
 ## Slice 2: Auth breadth
 
