@@ -62,6 +62,15 @@ async function sendOnce<T>(
     let text: string;
     try {
       response = await config.fetch(buildRequest(config, spec, callHeaders, linked.signal));
+      if (isRedirect(response)) {
+        await response.body?.cancel();
+        return {
+          ok: false,
+          error: networkError(
+            new TypeError("The server answered with a redirect, which the SDK never follows."),
+          ),
+        };
+      }
       text = await response.text();
     } catch (thrown) {
       if (callerSignal?.aborted === true) throw callerSignal.reason; // the caller's own abort (ERR-T2)
@@ -100,8 +109,16 @@ function buildRequest(
     headers,
     body,
     signal,
-    redirect: "error", // RTM-6: a credential header is never replayed to another origin
+    // Deviation RTM-6: workerd refuses "error" (it only has "follow" and "manual"), so every runtime sends "manual"
+    // and isRedirect turns the answer into a network error. A redirect is still never followed, so a credential
+    // header is never replayed to another origin.
+    redirect: "manual",
   });
+}
+
+/** A 3xx, or the opaque answer a browser gives for one under `redirect: "manual"`. */
+function isRedirect(response: Response): boolean {
+  return response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400);
 }
 
 function readJson<T>(response: Response, text: string): T {

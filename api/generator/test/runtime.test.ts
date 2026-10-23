@@ -84,13 +84,13 @@ function client(
 }
 
 describe("transport", () => {
-  it("sends the version, identity, and key headers with redirect: error", async () => {
+  it("sends the version, identity, and key headers, and never follows a redirect", async () => {
     const http = stub(json(200, health));
     await expect(new Health(client(http.fetch)).get()).resolves.toEqual(health);
     const sent = http.requests[0];
     expect(sent?.url).toBe("https://orvano.example.com/base/v1/health");
     expect(sent?.method).toBe("GET");
-    expect(sent?.redirect).toBe("error");
+    expect(sent?.redirect).toBe("manual");
     expect(sent?.headers.get("Orvano-Api-Version")).toBe(apiVersion);
     expect(sent?.headers.get("Orvano-Client")).toBe("client/0.0.0-test");
     expect(sent?.headers.get("Orvano-Key")).toBe("pk_test_fixture");
@@ -162,6 +162,17 @@ describe("transport", () => {
       "Bad Gateway",
       "<html>bad gateway</html>",
     ]);
+  });
+
+  it("turns a redirect into a network error without following it (RTM-6)", async () => {
+    const http = stub(
+      new Response(null, { status: 302, headers: { Location: "https://elsewhere.example/" } }),
+    );
+    const error: unknown = await new Health(client(http.fetch, { retry: { maxRetries: 0 } }))
+      .get()
+      .catch((thrown: unknown) => thrown);
+    expect(OrvanoError.is(error) && [error.kind, error.status]).toEqual(["network", undefined]);
+    expect(http.requests).toHaveLength(1);
   });
 
   it("maps a fetch TypeError to network and leaves another error unchanged", async () => {
