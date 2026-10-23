@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
+using Orvano.SharedKernel.Api;
+
 namespace Orvano.SharedKernel.Access;
 
 /// <summary>A requirement an endpoint declared with one of the <see cref="AccessEndpointFilters"/> methods, kept as endpoint metadata.</summary>
@@ -89,6 +91,10 @@ public static class AccessRequirementsMiddleware
     // Failed reasons come from resolver code and may hold request data; the log keeps at most this many characters.
     internal const int MaxReasonLength = 100;
 
+    // The display names of routing's own 405 and 415 endpoints (HttpMethodMatcherPolicy, AcceptsMatcherPolicy),
+    // which carry no metadata.
+    internal static readonly string[] RoutingRejectionNames = ["405 HTTP Method Not Supported", "415 HTTP Unsupported Media Type"];
+
     /// <summary>
     /// Place after <c>UseRouting</c> and <c>UseCors</c> (which answers a preflight without a credential, spec 0007
     /// COR-1), before anything that runs an endpoint. Only endpoints may answer after it.
@@ -105,6 +111,15 @@ public static class AccessRequirementsMiddleware
                 // Routing's own 404, answered here rather than by passing on, so a later branch, Map, or Run delegate
                 // cannot answer without an endpoint and skip default deny (EPT-3).
                 http.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            if (endpoint is not RouteEndpoint && RoutingRejectionNames.Contains(endpoint.DisplayName) && ApiPaths.IsApi(http.Request.Path))
+            {
+                // Spec 0014 PRB-4: an API route answers a wrong method with 405 method_not_allowed and a wrong body type
+                // with 415 unsupported_media_type. Routing's endpoint sets only the status (and Allow); the host's wire
+                // format middleware writes the problem body.
+                await next(http);
                 return;
             }
 

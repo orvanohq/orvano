@@ -3,13 +3,15 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
+using Orvano.SharedKernel.Api;
+
 using Shouldly;
 
 using Xunit;
 
 namespace Orvano.SharedKernel.Tests;
 
-// Spec 0002 ERR-4: the one place an Error becomes ProblemDetails (interim shape until feature 10).
+// Spec 0002 ERR-4 and spec 0014 PRB-1, PRB-2, PRB-6, KND-1: the one place an Error becomes a problem.
 public sealed class ErrorProblemsTests
 {
     public static TheoryData<ErrorKind, int> Statuses => new()
@@ -19,14 +21,15 @@ public sealed class ErrorProblemsTests
         { ErrorKind.Forbidden, StatusCodes.Status403Forbidden },
         { ErrorKind.NotFound, StatusCodes.Status404NotFound },
         { ErrorKind.Conflict, StatusCodes.Status409Conflict },
+        { ErrorKind.PreconditionFailed, StatusCodes.Status412PreconditionFailed },
         { ErrorKind.RateLimited, StatusCodes.Status429TooManyRequests },
         { ErrorKind.Unavailable, StatusCodes.Status503ServiceUnavailable },
     };
 
     [Theory]
-    [Trait("Spec", "0002:ERR-4")]
+    [Trait("Spec", "0014:KND-1")]
     [MemberData(nameof(Statuses))]
-    public void Status_follows_the_interim_kind_map_when_an_error_becomes_a_problem(ErrorKind kind, int status)
+    public void Status_follows_the_kind_table_when_an_error_becomes_a_problem(ErrorKind kind, int status)
     {
         ErrorProblems.StatusFor(kind).ShouldBe(status);
 
@@ -37,7 +40,7 @@ public sealed class ErrorProblemsTests
     }
 
     [Fact]
-    [Trait("Spec", "0002:ERR-4")]
+    [Trait("Spec", "0014:KND-1")]
     public void Every_error_kind_has_a_status_when_mapped() =>
         Enum.GetValues<ErrorKind>().ShouldAllBe(kind => ErrorProblems.StatusFor(kind) >= 400);
 
@@ -47,17 +50,19 @@ public sealed class ErrorProblemsTests
         Should.Throw<ArgumentOutOfRangeException>(() => ErrorProblems.StatusFor((ErrorKind)99));
 
     [Fact]
-    [Trait("Spec", "0002:ERR-4")]
-    public void Problem_carries_the_code_and_the_message_as_detail_when_made()
+    [Trait("Spec", "0014:PRB-1")]
+    public void Problem_has_type_about_blank_the_reason_phrase_as_title_and_the_message_as_detail_when_made()
     {
         ErrorProblemResult problem = Error.Conflict("name_taken", "That name is taken.").ToProblem();
 
+        problem.ProblemDetails.Type.ShouldBe("about:blank");
+        problem.ProblemDetails.Title.ShouldBe("Conflict");
         problem.ProblemDetails.Detail.ShouldBe("That name is taken.");
         problem.ProblemDetails.Extensions["code"].ShouldBe("name_taken");
     }
 
     [Fact]
-    [Trait("Spec", "0002:ERR-4")]
+    [Trait("Spec", "0014:PRB-1")]
     public void Problem_carries_the_current_trace_id_when_an_activity_is_running()
     {
         using Activity activity = new Activity("request").SetIdFormat(ActivityIdFormat.W3C).Start();
@@ -68,7 +73,7 @@ public sealed class ErrorProblemsTests
     }
 
     [Fact]
-    [Trait("Spec", "0002:ERR-4")]
+    [Trait("Spec", "0014:PRB-1")]
     public void Problem_has_no_trace_id_when_no_activity_is_running()
     {
         Activity? previous = Activity.Current;
@@ -84,10 +89,10 @@ public sealed class ErrorProblemsTests
     }
 
     [Fact]
-    [Trait("Spec", "0002:ERR-4")]
+    [Trait("Spec", "0014:PRB-3")]
     public void Problem_lists_field_errors_under_errors_when_the_error_has_fields()
     {
-        var fields = new Dictionary<string, string[]> { ["permissions"] = ["'read:x': not a valid grant."] };
+        FieldError[] fields = [new("permissions", FieldLocation.Body, FieldCodes.InvalidValue, "'read:x': not a valid grant.")];
 
         ErrorProblemResult problem = Error.Validation("validation_failed", "Some entries are not valid.", fields).ToProblem();
 
@@ -95,76 +100,103 @@ public sealed class ErrorProblemsTests
     }
 
     [Fact]
-    [Trait("Spec", "0002:ERR-4")]
+    [Trait("Spec", "0014:PRB-3")]
     public void Problem_has_no_errors_entry_when_the_fields_are_missing_or_empty()
     {
         Error.Validation("validation_failed", "Bad.").ToProblem().ProblemDetails.Extensions.ShouldNotContainKey("errors");
-        Error.Validation("validation_failed", "Bad.", new Dictionary<string, string[]>())
-            .ToProblem().ProblemDetails.Extensions.ShouldNotContainKey("errors");
+        Error.Validation("validation_failed", "Bad.", []).ToProblem().ProblemDetails.Extensions.ShouldNotContainKey("errors");
     }
 
     [Fact]
-    [Trait("Spec", "0002:ERR-4")]
+    [Trait("Spec", "0014:PRB-1")]
     public void Problem_copies_the_errors_extensions_when_made()
     {
-        ErrorProblemResult problem = Error.RateLimited("rate_limited", "Slow down.", retryAfterSeconds: 12).ToProblem();
+        var extensions = new Dictionary<string, object?> { ["currentVersion"] = "AAAAAAAAAAE" };
 
-        problem.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
-        problem.ProblemDetails.Extensions["retryAfterSeconds"].ShouldBe(12);
+        ErrorProblemResult problem = Error.PreconditionFailed("version_conflict", "Stale.", extensions).ToProblem();
+
+        problem.StatusCode.ShouldBe(StatusCodes.Status412PreconditionFailed);
+        problem.ProblemDetails.Extensions["currentVersion"].ShouldBe("AAAAAAAAAAE");
     }
 
-    [Fact]
-    [Trait("Spec", "0002:ERR-4")]
-    public async Task Rate_limited_problem_sets_the_retry_after_header_when_written()
+    [Theory]
+    [Trait("Spec", "0014:PRB-2"), Trait("Spec", "0014:PRB-6")]
+    [InlineData(12.0, 12)]
+    [InlineData(0.2, 1)]
+    [InlineData(0.0, 0)]
+    public async Task Rate_limited_problem_sets_retry_after_in_the_body_and_the_header_in_whole_seconds(double wait, int seconds)
     {
-        DefaultHttpContext http = await WriteAsync(Error.RateLimited("rate_limited", "Slow down.", retryAfterSeconds: 12));
+        var error = Error.RateLimited("rate_limited", "Slow down.", TimeSpan.FromSeconds(wait));
 
-        http.Response.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
-        http.Response.Headers.RetryAfter.ToString().ShouldBe("12");
-    }
-
-    [Fact]
-    [Trait("Spec", "0002:ERR-4")]
-    public async Task Rate_limited_problem_has_no_retry_after_header_when_the_error_has_no_wait()
-    {
-        var error = new Error("rate_limited", "Slow down.", ErrorKind.RateLimited);
-
-        error.ToProblem().RetryAfterSeconds.ShouldBeNull();
+        error.ToProblem().ProblemDetails.Extensions["retryAfter"].ShouldBe(seconds);
         DefaultHttpContext http = await WriteAsync(error);
 
         http.Response.StatusCode.ShouldBe(StatusCodes.Status429TooManyRequests);
-        http.Response.Headers.ShouldNotContainKey("Retry-After");
+        http.Response.Headers.RetryAfter.ToString().ShouldBe(seconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
     [Fact]
-    [Trait("Spec", "0002:ERR-4")]
-    public async Task Problem_has_no_retry_after_header_when_the_error_is_not_rate_limited()
+    [Trait("Spec", "0014:PRB-6")]
+    public async Task Unavailable_problem_sets_retry_after_when_it_knows_when_to_come_back()
     {
-        var extensions = new Dictionary<string, object?> { [ErrorProblems.RetryAfterSecondsExtension] = 5 };
-
-        DefaultHttpContext http = await WriteAsync(new Error("busy", "Busy.", ErrorKind.Unavailable, Extensions: extensions));
+        DefaultHttpContext http = await WriteAsync(Error.Unavailable("unavailable", "Busy.", TimeSpan.FromSeconds(5)));
 
         http.Response.StatusCode.ShouldBe(StatusCodes.Status503ServiceUnavailable);
+        http.Response.Headers.RetryAfter.ToString().ShouldBe("5");
+    }
+
+    [Fact]
+    [Trait("Spec", "0014:PRB-6")]
+    public async Task Problem_has_no_retry_after_when_the_error_has_no_wait()
+    {
+        var error = Error.Unavailable("unavailable", "Busy.");
+
+        error.ToProblem().ProblemDetails.Extensions.ShouldNotContainKey("retryAfter");
+        DefaultHttpContext http = await WriteAsync(error);
+
         http.Response.Headers.ShouldNotContainKey("Retry-After");
     }
 
     [Fact]
-    [Trait("Spec", "0002:ERR-4")]
-    public void Problem_keeps_its_own_code_trace_id_and_errors_when_the_extensions_name_them()
+    [Trait("Spec", "0014:PRB-6")]
+    public async Task Problem_has_no_retry_after_when_the_error_is_neither_rate_limited_nor_unavailable()
     {
-        var fields = new Dictionary<string, string[]> { ["name"] = ["Enter a name."] };
-        var extensions = new Dictionary<string, object?> { ["code"] = "forged", ["traceId"] = "forged", ["errors"] = "forged", ["other"] = 1 };
+        var error = new Error("conflict", "Busy.", ErrorKind.Conflict, RetryAfter: TimeSpan.FromSeconds(5));
+
+        error.ToProblem().ProblemDetails.Extensions.ShouldNotContainKey("retryAfter");
+        DefaultHttpContext http = await WriteAsync(error);
+
+        http.Response.Headers.ShouldNotContainKey("Retry-After");
+    }
+
+    [Fact]
+    [Trait("Spec", "0014:PRB-1")]
+    public void Problem_keeps_its_own_members_when_the_extensions_name_them()
+    {
+        FieldError[] fields = [new("name", FieldLocation.Body, FieldCodes.Required, "Enter a name.")];
+        var extensions = new Dictionary<string, object?>
+        {
+            ["code"] = "forged",
+            ["traceId"] = "forged",
+            ["errors"] = "forged",
+            ["retryAfter"] = 9,
+            ["type"] = "forged",
+            ["other"] = 1,
+        };
         Activity? previous = Activity.Current;
         Activity.Current = null;
         try
         {
-            IDictionary<string, object?> body = new Error("real_code", "Bad.", ErrorKind.Validation, fields, extensions)
-                .ToProblem().ProblemDetails.Extensions;
+            ErrorProblemResult problem = new Error("real_code", "Bad.", ErrorKind.Validation, fields, extensions).ToProblem();
+            IDictionary<string, object?> body = problem.ProblemDetails.Extensions;
 
             body["code"].ShouldBe("real_code");
             body["errors"].ShouldBe(fields);
             body.ShouldNotContainKey("traceId");
+            body.ShouldNotContainKey("retryAfter");
+            body.ShouldNotContainKey("type");
             body["other"].ShouldBe(1);
+            problem.ProblemDetails.Type.ShouldBe("about:blank");
         }
         finally
         {

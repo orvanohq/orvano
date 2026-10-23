@@ -1,7 +1,7 @@
 # 0014. API contract and SDK generation: a code first OpenAPI contract, one Orvano generator, one conformance suite
 
 **Date**: 2026-10-22
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 

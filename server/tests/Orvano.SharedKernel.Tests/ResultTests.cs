@@ -1,3 +1,5 @@
+using Orvano.SharedKernel.Api;
+
 using Shouldly;
 
 using Xunit;
@@ -77,24 +79,26 @@ public sealed class ResultTests
     [Trait("Spec", "0002:ERR-1")]
     public void Error_factories_set_the_kind_code_and_message_when_called()
     {
-        var fields = new Dictionary<string, string[]> { ["email"] = ["Enter an email address."] };
+        FieldError[] fields = [new("email", FieldLocation.Body, FieldCodes.InvalidEmail, "Enter an email address.")];
 
         Error.Validation("validation_failed", "Bad input.", fields).ShouldBe(new Error("validation_failed", "Bad input.", ErrorKind.Validation, fields));
         Error.Unauthorized("unauthorized", "No.").Kind.ShouldBe(ErrorKind.Unauthorized);
         Error.Forbidden("forbidden", "No.").Kind.ShouldBe(ErrorKind.Forbidden);
         Error.NotFound("not_found", "No.").Kind.ShouldBe(ErrorKind.NotFound);
         Error.Conflict("conflict", "No.").Kind.ShouldBe(ErrorKind.Conflict);
+        Error.PreconditionFailed("version_conflict", "No.").Kind.ShouldBe(ErrorKind.PreconditionFailed);
         Error.Unavailable("timeout", "No.").Kind.ShouldBe(ErrorKind.Unavailable);
     }
 
     [Fact]
-    [Trait("Spec", "0002:ERR-4")]
-    public void Rate_limited_error_carries_retry_after_seconds_when_made()
+    [Trait("Spec", "0014:PRB-2")]
+    public void Rate_limited_error_carries_its_wait_as_retry_after_when_made()
     {
-        var error = Error.RateLimited("rate_limited", "Slow down.", retryAfterSeconds: 30);
+        var error = Error.RateLimited("rate_limited", "Slow down.", TimeSpan.FromSeconds(30));
 
         error.Kind.ShouldBe(ErrorKind.RateLimited);
-        error.Extensions.ShouldNotBeNull()["retryAfterSeconds"].ShouldBe(30);
+        error.RetryAfter.ShouldBe(TimeSpan.FromSeconds(30));
+        error.Extensions.ShouldBeNull();
     }
 
     [Fact]

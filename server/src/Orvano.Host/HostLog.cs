@@ -28,4 +28,7 @@ internal static partial class HostLog
 
     [LoggerMessage(EventId = LogEventIds.Host + 22, Level = LogLevel.Debug, Message = "Request cancelled by the caller")]
     public static partial void RequestAborted(this ILogger logger);
+
+    [LoggerMessage(EventId = LogEventIds.Host + 23, Level = LogLevel.Debug, Message = "Request could not be bound: {Status}")]
+    public static partial void BadRequest(this ILogger logger, int status);
 }

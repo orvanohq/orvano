@@ -46,7 +46,7 @@ public sealed class GrantSetTests
         Error error = GrantSet.Normalize(["read:any", token], Secret, GrantTarget.Table).Error!;
 
         error.Code.ShouldBe("validation_failed");
-        string problem = error.Fields!["permissions"].ShouldHaveSingleItem();
+        string problem = error.FieldMessages("permissions").ShouldHaveSingleItem();
         problem.ShouldContain($"'{token}'");
         problem.ShouldContain(reason);
     }
@@ -59,7 +59,7 @@ public sealed class GrantSetTests
     [InlineData("execute:users", GrantTarget.Table)]
     [InlineData("read:users", GrantTarget.Function)]
     public void Normalize_fails_when_the_action_is_not_valid_for_the_target(string token, GrantTarget target) =>
-        GrantSet.Normalize([token], Secret, target).Error!.Fields!["permissions"].ShouldHaveSingleItem().ShouldContain($"'{token}'");
+        GrantSet.Normalize([token], Secret, target).Error!.FieldMessages("permissions").ShouldHaveSingleItem().ShouldContain($"'{token}'");
 
     [Fact]
     [Trait("Spec", "0012:AC-6")]
@@ -88,8 +88,8 @@ public sealed class GrantSetTests
 
         Error error = GrantSet.Normalize([other, "update:label:admin", "read:any"], A, GrantTarget.Row).Error!;
 
-        error.Fields!["permissions"].Length.ShouldBe(2);
-        error.Fields["permissions"].ShouldAllBe(problem => problem.Contains("roles you hold"));
+        error.FieldMessages("permissions").Length.ShouldBe(2);
+        error.FieldMessages("permissions").ShouldAllBe(problem => problem.Contains("roles you hold"));
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public sealed class GrantSetTests
     {
         Error error = GrantSet.Normalize(["READ:any", "read:label:a.b", "read:any"], Secret, GrantTarget.Table).Error!;
 
-        string[] problems = error.Fields!["permissions"];
+        string[] problems = error.FieldMessages("permissions");
         problems.Length.ShouldBe(2);
         problems.ShouldContain(problem => problem.Contains("'READ:any'"));
         problems.ShouldContain(problem => problem.Contains("'read:label:a.b'"));
@@ -272,7 +272,7 @@ public sealed class GrantSetTests
     [InlineData("write:")]
     public void Write_with_a_bad_role_is_reported_once_when_expanded(string token)
     {
-        string problem = GrantSet.Normalize([token], Secret, GrantTarget.Table).Error!.Fields!["permissions"].ShouldHaveSingleItem();
+        string problem = GrantSet.Normalize([token], Secret, GrantTarget.Table).Error!.FieldMessages("permissions").ShouldHaveSingleItem();
 
         problem.ShouldContain($"'{token}'");
     }
@@ -280,7 +280,7 @@ public sealed class GrantSetTests
     [Fact]
     [Trait("Spec", "0012:GRM-4")]
     public void Write_naming_a_role_the_client_lacks_is_reported_once_when_expanded() =>
-        GrantSet.Normalize(["write:label:admin"], A, GrantTarget.Row).Error!.Fields!["permissions"]
+        GrantSet.Normalize(["write:label:admin"], A, GrantTarget.Row).Error!.FieldMessages("permissions")
             .ShouldHaveSingleItem().ShouldContain("roles you hold");
 
     [Fact]
@@ -289,7 +289,7 @@ public sealed class GrantSetTests
     {
         string token = "read:label:" + new string('x', 1000);
 
-        string problem = GrantSet.Normalize([token], Secret, GrantTarget.Row).Error!.Fields!["permissions"].ShouldHaveSingleItem();
+        string problem = GrantSet.Normalize([token], Secret, GrantTarget.Row).Error!.FieldMessages("permissions").ShouldHaveSingleItem();
 
         problem.ShouldStartWith($"'{token[..64]}…'");
         problem.Length.ShouldBeLessThan(200);
@@ -299,7 +299,7 @@ public sealed class GrantSetTests
     [Trait("Spec", "0012:GRM-2")]
     public void Problem_shows_control_characters_escaped_when_the_token_holds_them()
     {
-        string problem = GrantSet.Normalize(["read:label:x\nINFO forged\u202e"], Secret, GrantTarget.Row).Error!.Fields!["permissions"]
+        string problem = GrantSet.Normalize(["read:label:x\nINFO forged\u202e"], Secret, GrantTarget.Row).Error!.FieldMessages("permissions")
             .ShouldHaveSingleItem();
 
         problem.ShouldStartWith(@"'read:label:x\u000AINFO forged\u202E'");
@@ -313,7 +313,7 @@ public sealed class GrantSetTests
     {
         string[] bad = [.. Enumerable.Range(0, 300).Select(i => $"bad{i}")];
 
-        GrantSet.Normalize(bad, Secret, GrantTarget.Row).Error!.Fields!["permissions"].Length.ShouldBe(20);
+        GrantSet.Normalize(bad, Secret, GrantTarget.Row).Error!.FieldMessages("permissions").Length.ShouldBe(20);
     }
 
     [Fact]
@@ -322,7 +322,7 @@ public sealed class GrantSetTests
     {
         IEnumerable<string> endless = Enumerable.Repeat("read:any", int.MaxValue);
 
-        string problem = GrantSet.Normalize(endless, Secret, GrantTarget.Row).Error!.Fields!["permissions"].ShouldHaveSingleItem();
+        string problem = GrantSet.Normalize(endless, Secret, GrantTarget.Row).Error!.FieldMessages("permissions").ShouldHaveSingleItem();
 
         problem.ShouldContain("at most 500");
         GrantSet.Normalize(Enumerable.Repeat("read:any", 500), Secret, GrantTarget.Row).Value.ShouldBe(["read:any"]);
