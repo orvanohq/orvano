@@ -260,6 +260,14 @@ describe("helpers", () => {
     }
   });
 
+  it("trims a long run of trailing slashes in linear time", () => {
+    const slashes = "/".repeat(200_000);
+    const started = performance.now();
+    expect(checkUrl(`https://a.example${slashes}`, false)).toBe("https://a.example");
+    expect(buildUrl(`https://a.example/x${slashes}`, ["v1"])).toBe("https://a.example/x/v1");
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
   it("builds URLs by the RTM-3 rules", () => {
     expect(
       buildUrl("https://a/", ["v1", "x/y"], { b: undefined, a: true, n: 2, list: ["p", "q"] }),
