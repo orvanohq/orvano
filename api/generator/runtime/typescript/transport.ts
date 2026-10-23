@@ -79,7 +79,7 @@ async function sendOnce<T>(
       throw thrown; // a custom fetch's own error, unchanged (SHP-8)
     }
     if (!response.ok) return { ok: false, error: errorFromResponse(response, text) };
-    return { ok: true, value: readJson<T>(response, text) };
+    return { ok: true, value: readJson(response, text) as T };
   } finally {
     linked.dispose();
   }
@@ -121,10 +121,10 @@ function isRedirect(response: Response): boolean {
   return response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400);
 }
 
-function readJson<T>(response: Response, text: string): T {
-  if (response.status === 204 || text === "") return undefined as T;
+function readJson(response: Response, text: string): unknown {
+  if (response.status === 204 || text === "") return undefined;
   try {
-    return JSON.parse(text) as T;
+    return JSON.parse(text) as unknown;
   } catch (thrown) {
     // SHP-8: a body that isn't JSON is a server error, never retried as a network failure.
     throw new OrvanoError({

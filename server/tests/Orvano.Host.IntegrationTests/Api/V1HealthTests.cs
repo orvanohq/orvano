@@ -86,6 +86,24 @@ public sealed class V1HealthTests(PostgresFixture postgres) : IDisposable
             .ShouldBe(OrvanoHeaders.CorsExposedHeaders, ignoreOrder: true);
     }
 
+    [Fact, Trait("Spec", "0014:AC-4"), Trait("Spec", "0014:HLT-3")]
+    public async Task Health_sends_any_origin_cors_with_the_problem_when_a_browser_sends_an_unsupported_version()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/v1/health", UriKind.Relative));
+        request.Headers.Add("Origin", Origin);
+        request.Headers.Add(OrvanoHeaders.ApiVersion, "1999-01-01");
+
+        using HttpResponseMessage response = await Client().SendAsync(request, Token);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        response.Headers.GetValues("Access-Control-Allow-Origin").ShouldBe(["*"]);
+        response.Headers.Contains("Access-Control-Allow-Credentials").ShouldBeFalse();
+        string.Join(",", response.Headers.GetValues("Access-Control-Expose-Headers")).Split(',')
+            .ShouldBe(OrvanoHeaders.CorsExposedHeaders, ignoreOrder: true);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Token));
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(ErrorCodes.UnsupportedApiVersion);
+    }
+
     [Fact, Trait("Spec", "0014:AC-13"), Trait("Spec", "0014:HLT-3")]
     public async Task Health_preflight_answers_the_fixed_policy_without_a_credential()
     {

@@ -52,28 +52,36 @@ export function createClientHandle(
   if (typeof options !== "object" || options === null)
     throw new TypeError("createClient needs an options object.");
   const url = checkUrl(options.url, options.allowHttp === true);
-  if (
-    options.project !== undefined &&
-    (typeof options.project !== "string" || options.project === "")
-  ) {
+  // Read as unknown: a JavaScript caller can pass anything, whatever the types say.
+  const project: unknown = options.project;
+  if (project !== undefined && (typeof project !== "string" || project === "")) {
     throw new TypeError("project must be a non empty string.");
   }
-  if (options.fetch !== undefined && typeof options.fetch !== "function")
+  const customFetch: unknown = options.fetch;
+  if (customFetch !== undefined && typeof customFetch !== "function") {
     throw new TypeError("fetch must be a function.");
+  }
   const timeout = checkTimeout(options.timeout) ?? defaultTimeout;
   const maxRetries = checkRetries(options.retry) ?? defaultRetries;
-  const customFetch = options.fetch;
   return registerClient({
     url,
     project: options.project,
     clientName,
     credentials,
     headers: checkHeaders(options.headers),
-    // RTM-6: looked up at call time, so a fetch patched later (Next.js, a test) is the one used.
-    fetch: customFetch ?? ((request) => globalThis.fetch(request)),
+    fetch: options.fetch ?? defaultFetch,
     timeout,
     maxRetries,
   });
+}
+
+/**
+ * RTM-6: the global fetch, looked up at call time, so a fetch patched later (Next.js, a test) is the one used, and
+ * called with globalThis as `this`. Through Reflect.apply, so the one place the SDK reaches for the global fetch is
+ * plain to see; everything else sends through `config.fetch`.
+ */
+function defaultFetch(request: Request): Promise<Response> {
+  return Reflect.apply(globalThis.fetch, globalThis, [request]) as Promise<Response>;
 }
 
 /** @internal */

@@ -192,6 +192,9 @@ function writeResponse(request, response, status, headers, payload) {
     ...corsHeaders(request),
     ...(expose === "" ? {} : { "Access-Control-Expose-Headers": expose }),
     "Cache-Control": "no-store",
+    // A fresh connection for every request: Chromium resends a request by itself when a 408 arrives on a reused
+    // keep alive connection, which would make the SDK look like it retried.
+    Connection: "close",
   });
   response.end(payload);
 }
