@@ -174,6 +174,62 @@ public sealed class OutboxDispatchTests(PostgresFixture postgres) : IAsyncLifeti
     }
 
     [Fact]
+    [Trait("Spec", "0013:AC-36"), Trait("Spec", "0013:DSP-2"), Trait("Spec", "0013:DSP-3"), Trait("Spec", "0013:DSP-4")]
+    public async Task Dispatch_takes_every_registered_row_in_one_batch_when_1000_rows_of_an_unregistered_type_come_first_in_id_order()
+    {
+        // A newer api host published 1000 events before the older worker's own: all of them sort before it by id.
+        Guid[] newer = [.. Enumerable.Range(0, 1000).Select(_ => Guid.CreateVersion7(_clock.GetUtcNow()))];
+        await _database.ExecuteAsync(
+            "INSERT INTO sample.outbox (id, type, payload, occurred_at) SELECT id, $2, '{}', $3 FROM unnest($1::uuid[]) AS id",
+            Token,
+            newer,
+            SampleNoteArchived.Type,
+            _clock.GetUtcNow());
+        _clock.Advance(TimeSpan.FromMilliseconds(1));
+        Guid[] own = await OutboxHosts.PublishManyAsync(_host.Services, 10, _ => new SampleNoteAdded(Guid.CreateVersion7()), null, Token);
+        await _database.ExecuteAsync("ANALYZE sample.outbox", Token);
+
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(10);
+
+        _interceptor.Sizes.ShouldBe([100]); // one select reaches past the 1000 waiting rows, and 10 of 100 ends the pass
+        (await _rows.CountAsync("id = ANY($1) AND dispatched_at IS NOT NULL", Token, own)).ShouldBe(10);
+        (await _rows.CountAsync("type = $1 AND dispatched_at IS NULL", Token, SampleNoteArchived.Type)).ShouldBe(1000);
+        (await _jobs.CountAsync("true", Token)).ShouldBe(20);
+        Dispatch.BatchSizeOf(SampleOutboxDbContext.Schema).ShouldBe(OutboxDispatch.FullBatch);
+    }
+
+    [Fact]
+    [Trait("Spec", "0013:AC-36"), Trait("Spec", "0013:DSP-3"), Trait("Spec", "0013:DSP-4"), Trait("Spec", "0013:DLV-3")]
+    public async Task Each_event_is_dispatched_once_by_a_version_that_registers_it_when_older_and_newer_workers_alternate_passes()
+    {
+        // A rolling upgrade, a rollback, and a roll forward: the registered types change from one pass to the next.
+        OrvanoApiFactory newer = NewerHost();
+        var archived = new List<Guid> { await _rows.InsertAsync(SampleNoteArchived.Type, "{}", _clock.GetUtcNow(), Token) };
+        await OutboxHosts.PublishAsync(_host.Services, new SampleNoteAdded(Guid.CreateVersion7()), null, Token);
+
+        (await JobsDriver.DispatchAsync(newer.Services, Token)).ShouldBe(2);
+
+        // Rolled back: the older worker takes the new added event and leaves the new archived one waiting.
+        _clock.Advance(TimeSpan.FromMilliseconds(1));
+        archived.Add(await _rows.InsertAsync(SampleNoteArchived.Type, "{}", _clock.GetUtcNow(), Token));
+        Guid added = await OutboxHosts.PublishAsync(_host.Services, new SampleNoteAdded(Guid.CreateVersion7()), null, Token);
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(1);
+        (await _rows.CountAsync("id = $1 AND dispatched_at IS NOT NULL", Token, added)).ShouldBe(1);
+        (await _rows.CountAsync("id = $1 AND dispatched_at IS NULL", Token, archived[1])).ShouldBe(1);
+
+        // Rolled forward: the newer worker takes only what is left, and neither finds anything after that.
+        (await JobsDriver.DispatchAsync(newer.Services, Token)).ShouldBe(1);
+        (await JobsDriver.DispatchAsync(_host.Services, Token)).ShouldBe(0);
+        (await JobsDriver.DispatchAsync(newer.Services, Token)).ShouldBe(0);
+
+        (await _rows.CountAsync("dispatched_at IS NULL", Token)).ShouldBe(0);
+        (await _jobs.WhereAsync("kind = $1", Token, Archived)).Select(job => job.DedupeKey).ShouldBe(
+            archived.Select(id => $"{id:D}:{Archived}"), ignoreOrder: true);
+        (await _jobs.CountAsync("true", Token)).ShouldBe(6); // 2 added events × 2 subscribers, 2 archived × 1
+        (await _jobs.WhereAsync("true", Token)).Select(job => job.DedupeKey).Distinct().Count().ShouldBe(6);
+    }
+
+    [Fact]
     [Trait("Spec", "0013:AC-36"), Trait("Spec", "0013:DSP-5"), Trait("Spec", "0013:OTL-2")]
     public async Task A_batch_that_fails_after_its_inserts_leaves_no_job_and_no_mark_and_the_other_outbox_still_dispatches()
     {
