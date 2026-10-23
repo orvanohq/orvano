@@ -16,7 +16,8 @@ spec [0014](../specs/0014-api-contract-sdk-generation/index.md) · code in `serv
 - [ ] Build it: `/develop API contract & SDK generation`
   - [x] Server wire format and health: `/v1` groups, version header, Orvano headers, JSON rules, problem bodies and codes, `GET /v1/health` (spec 0014 AC-3 to AC-8, AC-13; build plan steps 1 to 2)
   - [x] Contract emit and checks: both OpenAPI documents, `x-orvano-*` metadata, drift check, Spectral, oasdiff report (spec 0014 AC-1, AC-2, AC-19, AC-21; build plan steps 3 to 4)
-  - [ ] Generator, conformance suite, and the six SDK repos: TypeScript, Dart, and C# targets, scenarios and stub server, health passing in every SDK (spec 0014 AC-14, AC-15, AC-17, AC-18; build plan steps 5 to 9)
+  - [x] Generator, conformance suite, and the six SDK repos: TypeScript, Dart, and C# targets, scenarios and stub server, health passing in every SDK (spec 0014 AC-14, AC-15, AC-17, AC-18; build plan steps 5 to 9)
+    - built: spec 0014 build plan steps 5 to 9 (`@orvano/sdk-generator` with the `ts-client`, `ts-server`, `dart-client`, `dart-server`, and `csharp-server` targets, the conformance scenarios and stub server, and `sdk-js`, `sdk-js-server`, `sdk-dart`, `sdk-flutter`, `sdk-dotnet` with their pins, regenerate entry points, drift checks, and conformance runners; orvano#73, #74, #76, #77, #78, sdk-js#5, sdk-js-server#5, sdk-dart#1, sdk-flutter#1, sdk-dotnet#2; `sdk-nextjs` lands with step 10), 2026-10-23
   - [ ] Cross repo regeneration: `sdk-nextjs`, the `orvano-sdk-bot` App (you create it), dispatch after the image, regenerate PRs, daily catch up (spec 0014 AC-15, AC-16, AC-18; build plan step 10)
   - [ ] Shared primitives: paging, partial updates, row versions, idempotency wire contract, events in the contract (spec 0014 AC-9 to AC-12, AC-20; build plan steps 11 to 14)
 - [ ] Verify it: `/check verify API contract & SDK generation`
