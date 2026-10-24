@@ -33,7 +33,7 @@ public sealed class IdempotencyKeyTests(WireServerFixture server) : IClassFixtur
     }
 
     [Theory, Trait("Spec", "0014:AC-12"), Trait("Spec", "0014:IDM-1")]
-    [InlineData("caf\u00e9")]
+    [InlineData("n\u00e4me")]
     [InlineData("tab\there")]
     public async Task Marked_operation_fails_invalid_request_when_the_key_is_malformed(string key)
     {
@@ -61,7 +61,7 @@ public sealed class IdempotencyKeyTests(WireServerFixture server) : IClassFixtur
     [Fact, Trait("Spec", "0014:AC-12"), Trait("Spec", "0014:IDM-2")]
     public async Task Unmarked_operation_ignores_the_key_when_it_is_malformed()
     {
-        using HttpResponseMessage response = await PostAsync("/v1/test/bodies", """{ "name": "a" }""", "caf\u00e9");
+        using HttpResponseMessage response = await PostAsync("/v1/test/bodies", """{ "name": "a" }""", "n\u00e4me");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(Token));
     }

@@ -96,7 +96,7 @@ public sealed class VersioningTypesTests
     [InlineData("order 2026-10-24 #7~", true)]
     [InlineData("", false)]
     [InlineData(null, false)]
-    [InlineData("caf\u00e9", false)]
+    [InlineData("n\u00e4me", false)]
     [InlineData("new\nline", false)]
     public void Idempotency_key_is_1_to_255_printable_ascii_characters(string? key, bool wellFormed) =>
         IdempotencyKey.IsWellFormed(key).ShouldBe(wellFormed);

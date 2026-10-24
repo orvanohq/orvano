@@ -223,7 +223,7 @@ void main() {
           operationId: 'T',
           method: 'POST',
           path: ['v1'],
-          idempotencyKey: 'caf\u00e9',
+          idempotencyKey: 'n\u00e4me',
         ),
         () => transport.request(
           operationId: 'T',
