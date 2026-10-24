@@ -53,12 +53,23 @@ internal sealed partial class ContractOperationTransformer : IOpenApiOperationTr
             WritePagingParameters(operation);
         }
 
+        bool concurrency = metadata.OfType<ConcurrencyMetadata>().Any();
+        if (concurrency)
+        {
+            operation.Extensions[ContractExtensions.Concurrency] = Node(JsonValue.Create(true));
+        }
+
         if (metadata.OfType<SdkTemplateMetadata>().LastOrDefault() is { } template)
         {
             operation.Extensions[ContractExtensions.SdkTemplate] = Node(JsonValue.Create(template.Name));
         }
 
         WritePathParameters(operation, context.Description.RelativePath);
+        if (concurrency)
+        {
+            WriteConcurrency(operation, context.Document!);
+        }
+
         WriteResponses(operation, context.Document!);
         return Task.CompletedTask;
     }
@@ -134,6 +145,15 @@ internal sealed partial class ContractOperationTransformer : IOpenApiOperationTr
     [GeneratedRegex(@"\{(?<name>[A-Za-z0-9_]+)[^}]*\}", RegexOptions.CultureInvariant)]
     private static partial Regex RouteParameter();
 
+    // CNC-3, CNC-4: the write takes If-Match and can answer 412 version_conflict; its answer carries the ETag (CNC-1).
+    private static void WriteConcurrency(OpenApiOperation operation, OpenApiDocument document)
+    {
+        operation.Parameters ??= [];
+        operation.Parameters.Add(new OpenApiParameterReference(OrvanoHeaders.IfMatch, document));
+        operation.Responses ??= [];
+        operation.Responses[StatusCodes.Status412PreconditionFailed.ToString(System.Globalization.CultureInfo.InvariantCulture)] = new OpenApiResponse();
+    }
+
     // PRB-1: every error answer is the shared Problem body, whatever type the endpoint declared it with.
     private static void WriteResponses(OpenApiOperation operation, OpenApiDocument document)
     {
@@ -147,6 +167,10 @@ internal sealed partial class ContractOperationTransformer : IOpenApiOperationTr
             else if (response is OpenApiResponse concrete)
             {
                 concrete.Headers = ResponseHeaders(document, status: 200);
+                if (status is >= 200 and < 300 and not 204 && operation.Extensions?.ContainsKey(ContractExtensions.Concurrency) == true)
+                {
+                    concrete.Headers[OrvanoHeaders.ETag] = new OpenApiHeaderReference(OrvanoHeaders.ETag, document);
+                }
             }
         }
 
@@ -198,6 +222,8 @@ internal static class ContractExtensions
     public const string Metered = "x-orvano-metered";
 
     public const string Paging = "x-orvano-paging";
+
+    public const string Concurrency = "x-orvano-concurrency";
 
     public const string SdkTemplate = "x-orvano-sdk-template";
 

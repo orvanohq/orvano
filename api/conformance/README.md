@@ -29,7 +29,7 @@ One set of language neutral scenarios that every Orvano SDK runs, so all six beh
         response: { status: 200, headers: { orvano-api-version: $, { apiVersion } } } # what the runner saw last
 ```
 
-Matching (CNF-3): objects match by subset, arrays exactly, and `$any`, `$uuid`, `$timestamp`, `$regex`, and `$contains` match by rule. The runner substitutes `${apiVersion}`, `${clientName}`, `${key}`, `${projectId}`, and saved names first. In a stub scenario, a `respond.headers` value of `{ $httpDateIn: 2 }` is an HTTP date two seconds from now.
+Matching (CNF-3): objects match by subset, arrays exactly, and `$any`, `$uuid`, `$timestamp`, `$regex`, and `$contains` match by rule. `{ $absent: true }` as an object member says the object must not have it, which is how a scenario proves a partial update leaves an unset field out (JSW-10). The runner substitutes `${apiVersion}`, `${clientName}`, `${key}`, `${projectId}`, and saved names first. In a stub scenario, a `respond.headers` value of `{ $httpDateIn: 2 }` is an HTTP date two seconds from now.
 
 ## When you change a scenario
 

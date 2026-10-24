@@ -67,6 +67,8 @@ export interface RequestBody {
   description: string;
   required: boolean;
   properties: Property[];
+  /** A PATCH body (JSW-9, JSW-10): an optional property left unset is omitted, and `null` clears a nullable one. */
+  partial: boolean;
 }
 
 export interface Operation {
@@ -280,7 +282,7 @@ function buildOperation(
     segments.some((segment) => segment.kind === "param" && segment.name === parameter.name),
   );
 
-  const body = requestBody(document, raw, operationId);
+  const body = requestBody(document, raw, operationId, httpMethod === "PATCH");
   const names = new Set<string>();
   for (const name of [...usedPathParams, ...queryParams, ...(body?.properties ?? [])].map(
     (entry) => entry.name,
@@ -381,6 +383,7 @@ function requestBody(
   document: OpenApiDocument,
   raw: OperationObject,
   operationId: string,
+  partial: boolean,
 ): RequestBody | undefined {
   const content = raw.requestBody?.content;
   if (content === undefined) return undefined;
@@ -402,6 +405,7 @@ function requestBody(
     description: raw.requestBody?.description ?? resolved.description ?? "",
     required: raw.requestBody?.required === true,
     properties: type.properties,
+    partial,
   };
 }
 

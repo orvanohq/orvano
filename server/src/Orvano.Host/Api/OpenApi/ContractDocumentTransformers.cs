@@ -98,7 +98,8 @@ internal sealed class ContractTagsTransformer : IOpenApiDocumentTransformer
 /// <c>required</c>, since a nullable one is sent as <c>null</c>, never omitted (JSW-6), and drop
 /// <c>additionalProperties: false</c>, which comes from the request rule (JSW-7): fields are added to responses, and
 /// clients ignore the ones they do not know. Request schemas require only their non nullable properties, since an
-/// optional one may be omitted (JSW-6), and keep refusing unknown ones.
+/// optional one may be omitted (JSW-6), and not a partial update's <c>Optional&lt;T&gt;</c> fields (JSW-9), and keep
+/// refusing unknown ones.
 /// </summary>
 internal sealed class BodySchemaTransformer : IOpenApiDocumentTransformer
 {
@@ -139,7 +140,11 @@ internal sealed class BodySchemaTransformer : IOpenApiDocumentTransformer
 
     private static void Request(OpenApiSchema schema) =>
         schema.Required = new HashSet<string>(
-            schema.Properties!.Where(property => !IsNullable(property.Value)).Select(property => property.Key), StringComparer.Ordinal);
+            schema.Properties!.Where(property => !IsNullable(property.Value) && !IsOptional(property.Value)).Select(property => property.Key), StringComparer.Ordinal);
+
+    // JSW-9: a partial update's Optional<T> field may be omitted, nullable or not.
+    private static bool IsOptional(IOpenApiSchema schema) =>
+        schema is OpenApiSchema { Metadata: { } metadata } && metadata.ContainsKey(OptionalSchemaTransformer.OptionalMetadata);
 
     private static bool IsNullable(IOpenApiSchema schema) =>
         schema.Type?.HasFlag(JsonSchemaType.Null) == true

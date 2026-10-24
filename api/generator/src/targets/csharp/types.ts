@@ -31,6 +31,8 @@ export type CSharpDeclaration =
       properties: Property[];
       /** Sent in a request: an optional property left null is not written (spec 0014 JSW-6). */
       input: boolean;
+      /** A PATCH body (JSW-10): its optional properties are `Optional<T>`, not written while absent. */
+      partial: boolean;
     };
 
 /** Resolves contract types to C# types and collects every declaration the target emits. */
@@ -62,6 +64,7 @@ export class CSharpTypes {
           schema.type.properties,
           use?.input === true,
           where,
+          false,
         );
       }
     }
@@ -74,6 +77,7 @@ export class CSharpTypes {
           body.properties,
           true,
           `${operation.operationId} request body`,
+          body.partial,
         );
       }
     }
@@ -139,6 +143,7 @@ export class CSharpTypes {
           type.properties,
           input,
           where,
+          false, // an inline object in a PATCH body is replaced whole (JSW-9)
         );
         return { kind: "class", name: owner };
       case "union":
@@ -178,8 +183,9 @@ export class CSharpTypes {
     properties: Property[],
     input: boolean,
     where: string,
+    partial: boolean,
   ): void {
-    this.#declare({ kind: "class", name, description, properties, input }, where);
+    this.#declare({ kind: "class", name, description, properties, input, partial }, where);
     for (const property of properties) {
       this.property(property, name, input, `${where} property ${property.name}`);
     }
@@ -206,14 +212,21 @@ export class CSharpTypes {
       declaration.input
     ) {
       existing.declaration.input = true;
+      existing.declaration.partial ||= declaration.partial;
     }
   }
 }
 
 /** An operation's request body as its own record: the named schema, else `<Method><Service>Request`. */
-export function requestBodyOf(
-  operation: Operation,
-): { name: string; description: string; required: boolean; properties: Property[] } | undefined {
+export function requestBodyOf(operation: Operation):
+  | {
+      name: string;
+      description: string;
+      required: boolean;
+      properties: Property[];
+      partial: boolean;
+    }
+  | undefined {
   const body = operation.body;
   if (body === undefined) return undefined;
   return {
@@ -223,5 +236,6 @@ export function requestBodyOf(
     required: body.required,
     // A read only property is the server's to set (OpenAPI readOnly), so the request leaves it out.
     properties: body.properties.filter((property) => !property.readOnly),
+    partial: body.partial,
   };
 }

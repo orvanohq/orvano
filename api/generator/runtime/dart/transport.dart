@@ -149,6 +149,7 @@ final class OrvanoTransport {
     Map<String, Object?> query = const {},
     Map<String, Object?>? body,
     OrvanoRequestOptions? options,
+    String? ifMatch,
   }) async {
     if (_closed) throw StateError('This Orvano client is closed.');
     final timeout = options?.timeout ?? _options.timeout;
@@ -156,7 +157,11 @@ final class OrvanoTransport {
     _checkTimeout(timeout);
     _checkRetry(retry);
     final cancelToken = options?.cancelToken;
-    final callHeaders = _checkHeaders(options?.headers ?? const {}, perCall: true);
+    final callHeaders = {
+      ..._checkHeaders(options?.headers ?? const {}, perCall: true),
+      // CNC-3, CNC-4: the version the caller read, as a strong ETag.
+      if (ifMatch != null) OrvanoHeaders.ifMatch: _ifMatch(ifMatch),
+    };
     final uri = _endpoint.resolveUri(
       Uri(pathSegments: path, queryParameters: _queryOf(query)),
     );
@@ -420,12 +425,26 @@ final class OrvanoTransport {
   }
 }
 
+/// The `If-Match` value for a resource's `version`: the strong ETag
+/// `"<version>"` (spec 0014 CNC-1, CNC-3).
+String _ifMatch(String version) {
+  if (version.isEmpty || version.contains(RegExp(r'["\s,]'))) {
+    throw ArgumentError.value(
+      version,
+      'ifMatch',
+      "must be a resource's version, as its version field holds it",
+    );
+  }
+  return '"$version"';
+}
+
 final Set<String> _reservedHeaders = {
   for (final name in [
     OrvanoHeaders.authorization,
     OrvanoHeaders.orvanoKey,
     OrvanoHeaders.orvanoClient,
     OrvanoHeaders.idempotencyKey,
+    OrvanoHeaders.ifMatch,
     'User-Agent',
   ])
     name.toLowerCase(),

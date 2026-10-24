@@ -18,3 +18,6 @@ public sealed record SdkTemplateMetadata(string Name);
 
 /// <summary><c>x-orvano-paging</c> (spec 0014 PAG-3, PAG-6): a paged list, and whether it fills <c>total</c>.</summary>
 public sealed record PagingMetadata(bool Total);
+
+/// <summary><c>x-orvano-concurrency</c> (spec 0014 CNC-4): the write takes <c>If-Match</c>.</summary>
+public sealed record ConcurrencyMetadata;

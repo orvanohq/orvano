@@ -50,6 +50,18 @@ export interface RequestOptions {
 }
 
 /**
+ * Options of a write to a versioned resource (spec 0014 CNC-4), on operations that take `If-Match`.
+ * @public
+ */
+export interface IfMatchOptions extends RequestOptions {
+  /**
+   * The resource's `version` as you read it, sent as `If-Match`. The write answers `412 version_conflict` (an
+   * `OrvanoError` with `kind` `conflict`) when the resource changed since. Leave it out to write anyway.
+   */
+  readonly ifMatch?: string | undefined;
+}
+
+/**
  * One page of a list (spec 0014 PAG-2). Pass `nextCursor` as `cursor` for the next page, or use the method's
  * `All` sibling to walk every page.
  * @public

@@ -33,6 +33,7 @@ export const corePublicNames: Readonly<Record<string, readonly string[]>> = {
     "OrvanoRateLimitedException",
     "OrvanoTimeoutException",
   ],
+  "optional.dart": ["Optional"],
   "options.dart": ["OrvanoClientOptions", "OrvanoRequestOptions", "RetryOptions"],
   "paging.dart": ["ResultPage"],
 };
@@ -62,6 +63,7 @@ const takenNames: readonly string[] = [
 const runtimeHeaders: readonly string[] = [
   "Authorization",
   "Idempotency-Key",
+  "If-Match",
   "Orvano-Api-Version",
   "Orvano-Client",
   "Orvano-Key",
@@ -308,6 +310,8 @@ interface Input {
   deprecated: boolean;
   type: DartType;
   location: "path" | "query" | "body";
+  /** A partial update's field (JSW-10): an `Optional<type>`, absent by default and then not sent. */
+  optional: boolean;
 }
 
 /** A type a path or query parameter can hold. */
@@ -350,6 +354,7 @@ export function inputsOf(operation: Operation, types: DartTypes): Input[] {
       deprecated: entry.deprecated,
       type,
       location: entry.location,
+      optional: false,
     };
   };
   const bodyOwner = operation.body?.schema ?? `${owner}Request`;
@@ -358,19 +363,37 @@ export function inputsOf(operation: Operation, types: DartTypes): Input[] {
     ...operation.queryParams.map(parameter),
     ...(operation.body?.properties ?? [])
       .filter((property) => !property.readOnly)
-      .map((property): Input => ({
-        name: checkMemberName(property.name, `${where} body property ${property.name}`),
-        wireName: property.name,
-        description: property.description,
-        required: property.required,
-        deprecated: property.deprecated,
-        type: types.property(property, bodyOwner, false, `${where} body property ${property.name}`),
-        location: "body",
-      })),
+      .map((property): Input => {
+        const at = `${where} body property ${property.name}`;
+        // JSW-10: in a PATCH, an optional field is Optional<T>, nullable only when the contract's type is.
+        const optional = operation.body?.partial === true && !property.required;
+        return {
+          name: checkMemberName(property.name, at),
+          wireName: property.name,
+          description: property.description,
+          required: property.required,
+          deprecated: property.deprecated,
+          type: optional
+            ? types.resolve(
+                property.type,
+                `${bodyOwner}${pascalCase(property.name)}`,
+                false,
+                at,
+                property.description,
+              )
+            : types.property(property, bodyOwner, false, at),
+          location: "body",
+          optional,
+        };
+      }),
   ];
-  if (inputs.some((input) => input.name === "options")) {
+  if (
+    inputs.some(
+      (input) => input.name === "options" || (operation.concurrency && input.name === "ifMatch"),
+    )
+  ) {
     throw new GeneratorError(
-      `${where}: an input named options clashes with the request options parameter.`,
+      `${where}: an input named options or ifMatch clashes with a request option parameter.`,
     );
   }
   return inputs;
@@ -434,14 +457,22 @@ function method(operation: Operation, types: DartTypes): string {
   for (const input of inputs) {
     if (input.description !== "") paragraphs.push(`[${input.name}]: ${input.description}`);
   }
+  if (operation.concurrency) {
+    paragraphs.push(
+      "[ifMatch]: the resource's `version` as you read it. The write fails with `version_conflict` when it changed since; leave it out to write anyway.",
+    );
+  }
   paragraphs.push("Throws an [OrvanoException] when the call fails.");
   let text = dartDoc(paragraphs, "  ");
   if (operation.deprecated)
     text += "  @Deprecated('The contract marks this operation deprecated.')\n";
   const params = [
-    ...inputs.map(
-      (input) => `${input.required ? "required " : ""}${dartTypeName(input.type)} ${input.name}`,
+    ...inputs.map((input) =>
+      input.optional
+        ? `Optional<${dartTypeName(input.type)}> ${input.name} = const Optional.absent()`
+        : `${input.required ? "required " : ""}${dartTypeName(input.type)} ${input.name}`,
     ),
+    ...(operation.concurrency ? ["String? ifMatch"] : []),
     "OrvanoRequestOptions? options",
   ];
   text += `  Future<${returnType}> ${name}({\n${params.map((param) => `    ${param},\n`).join("")}  }) async {\n`;
@@ -476,14 +507,23 @@ function method(operation: Operation, types: DartTypes): string {
   if (operation.body !== undefined) {
     const members = inputs
       .filter((input) => input.location === "body")
-      .map((input) =>
-        input.required
+      .map((input) => {
+        if (input.optional) {
+          const value = `${input.name}.value`;
+          const written =
+            input.type.kind === "nullable"
+              ? writeNullable(input.type, value)
+              : writeExpression(input.type, value);
+          return `if (${input.name}.isPresent) ${dartString(input.wireName)}: ${written}`;
+        }
+        return input.required
           ? `${dartString(input.wireName)}: ${valueExpression(input)}`
-          : `${dartString(input.wireName)}: ?${writeNullable(input.type, input.name)}`,
-      );
+          : `${dartString(input.wireName)}: ?${writeNullable(input.type, input.name)}`;
+      });
     fields.push(`body: {${members.join(", ")}}`);
   }
   fields.push("options: options");
+  if (operation.concurrency) fields.push("ifMatch: ifMatch");
   const call = `_transport.request(\n${fields.map((field) => `      ${field},\n`).join("")}    )`;
   if (item !== undefined) {
     text += `    final json = await ${call};\n`;
@@ -560,6 +600,7 @@ export function serviceFile(service: Service, types: DartTypes, source: Provenan
   text += "\nimport 'package:meta/meta.dart';\n\n";
   text += "import '../core/exceptions.dart';\n";
   if (/\bread[A-Z][A-Za-z]*\(|writeDateTime\(/.test(body)) text += "import '../core/json.dart';\n";
+  if (/\bOptional\b/.test(body)) text += "import '../core/optional.dart';\n";
   text += "import '../core/options.dart';\n";
   if (service.operations.some((operation) => operation.paging !== undefined))
     text += "import '../core/paging.dart';\n";

@@ -27,13 +27,16 @@ internal sealed class ConformanceOptions
     /// <summary>With <see cref="All"/>: cancel the walk once this many items arrived.</summary>
     public int? CancelAfter { get; init; }
 
+    /// <summary>The version to send as <c>If-Match</c>, on calls that take it (CNC-4).</summary>
+    public string? IfMatch { get; init; }
+
     /// <summary>Reads a step's <c>options</c>, plus the headers the runner adds (such as <c>Orvano-Stub-Run</c>).</summary>
     public static ConformanceOptions FromJson(JsonObject? json, IReadOnlyDictionary<string, string> headers)
     {
-        if (json?["idempotencyKey"] is not null || json?["ifMatch"] is not null)
+        if (json?["idempotencyKey"] is not null)
         {
             throw new NotSupportedException(
-                "This SDK does not offer idempotencyKey or ifMatch yet (spec 0014 build plan steps 12 and 13).");
+                "This SDK does not offer idempotencyKey yet (spec 0014 build plan step 13).");
         }
         var merged = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (json?["headers"] is JsonObject stepHeaders)
@@ -54,6 +57,7 @@ internal sealed class ConformanceOptions
             Headers = merged,
             All = json?["all"]?.GetValue<bool>() ?? false,
             CancelAfter = json?["cancelAfter"]?.GetValue<int>(),
+            IfMatch = json?["ifMatch"]?.GetValue<string>(),
         };
     }
 
@@ -264,8 +268,9 @@ internal static partial class ConformanceMatch
 
     /// <summary>
     /// Matches a value against an expectation: objects by subset, arrays exactly unless <c>$contains</c>, and the
-    /// matchers <c>$any</c>, <c>$uuid</c>, <c>$timestamp</c>, and <c>$regex</c>. Returns one message per mismatch;
-    /// empty means a match.
+    /// matchers <c>$any</c>, <c>$uuid</c>, <c>$timestamp</c>, and <c>$regex</c>. <c>{ "$absent": true }</c> as an
+    /// object's member says the object must not have it (a partial update's unset field, JSW-10). Returns one message
+    /// per mismatch; empty means a match.
     /// </summary>
     public static IReadOnlyList<string> Match(JsonNode? expected, JsonNode? actual, string path = "$")
     {
@@ -280,9 +285,11 @@ internal static partial class ConformanceMatch
                 }
                 return
                 [
-                    .. map.SelectMany(entry => actualMap.ContainsKey(entry.Key)
-                        ? Match(entry.Value, actualMap[entry.Key], $"{path}.{entry.Key}")
-                        : [$"{path}.{entry.Key}: missing"]),
+                    .. map.SelectMany(entry => entry.Value is JsonObject { Count: 1 } wanted && wanted.ContainsKey("$absent")
+                        ? (actualMap.ContainsKey(entry.Key) ? [$"{path}.{entry.Key}: expected no field, got {Describe(actualMap[entry.Key])}"] : [])
+                        : actualMap.ContainsKey(entry.Key)
+                            ? Match(entry.Value, actualMap[entry.Key], $"{path}.{entry.Key}")
+                            : [$"{path}.{entry.Key}: missing"]),
                 ];
             case JsonArray list:
                 if (actual is not JsonArray actualList)
@@ -306,6 +313,8 @@ internal static partial class ConformanceMatch
         {
             case "$any":
                 return actual is null ? [$"{path}: missing"] : [];
+            case "$absent":
+                return actual is null ? [] : [$"{path}: expected nothing, got {Describe(actual)}"];
             case "$uuid":
                 return text is not null && Uuid().IsMatch(text) ? [] : [$"{path}: expected a uuid, got {Describe(actual)}"];
             case "$timestamp":

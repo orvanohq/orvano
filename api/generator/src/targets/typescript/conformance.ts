@@ -51,6 +51,7 @@ export function dispatchFile(model: TargetModel, fixture: TargetModel, source: P
   const publicImports = [
     "OrvanoError",
     ...(paged ? ["type Page"] : []),
+    "type IfMatchOptions",
     ...model.services.map(serviceClassName),
     ...model.services.flatMap((service) =>
       service.operations.filter(hasInputs).map((operation) => `type ${paramsTypeName(operation)}`),
@@ -79,11 +80,18 @@ export function dispatchFile(model: TargetModel, fixture: TargetModel, source: P
     .map(({ operation }) => JSON.stringify(callName(operation)));
   text += `\n/** The calls that are paged lists, which take the \`all\` option (PAG-6). */\n`;
   text += `const pagedCalls: ReadonlySet<string> = new Set([${pagedCalls.join(", ")}]);\n`;
+  const concurrencyCalls = entries
+    .filter(({ operation }) => operation.concurrency)
+    .map(({ operation }) => JSON.stringify(callName(operation)));
+  text += "\n/** The calls that take `ifMatch` (CNC-4). */\n";
+  text += `const concurrencyCalls: ReadonlySet<string> = new Set([${concurrencyCalls.join(", ")}]);\n`;
   text +=
     "\n/** Runs one scenario step's call and returns its result as JSON, or the normalized error (CNF-4). */\n";
   text +=
     "export async function dispatch(\n  client: OrvanoClient,\n  call: string,\n  params: Readonly<Record<string, unknown>>,\n  options: ConformanceOptions = {},\n): Promise<ConformanceOutcome> {\n";
   text += "  const requestOptions = toRequestOptions(options);\n";
+  text += "  if (options.ifMatch !== undefined && !concurrencyCalls.has(call))\n";
+  text += `    throw new Error(\`\${call} does not take ifMatch.\`);\n`;
   text += "  if (options.all === true && !pagedCalls.has(call))\n";
   text += `    throw new Error(\`\${call} is not a paged list, so it has no walk all method.\`);\n`;
   text += "  try {\n    switch (call) {\n";
@@ -153,14 +161,15 @@ export type ConformanceOutcome =
   | { readonly ok: true; readonly result: unknown }
   | { readonly ok: false; readonly error: ConformanceError };
 
-function toRequestOptions(options: ConformanceOptions): RequestOptions {
-  if (options.idempotencyKey !== undefined || options.ifMatch !== undefined) {
-    throw new Error("This SDK does not offer idempotencyKey or ifMatch yet (spec 0014 build plan steps 12 and 13).");
+function toRequestOptions(options: ConformanceOptions): IfMatchOptions {
+  if (options.idempotencyKey !== undefined) {
+    throw new Error("This SDK does not offer idempotencyKey yet (spec 0014 build plan step 13).");
   }
   return {
     timeout: options.timeout,
     retry: options.retry === undefined ? undefined : { maxRetries: options.retry },
     headers: options.headers,
+    ifMatch: options.ifMatch,
   };
 }
 
@@ -226,7 +235,8 @@ const timestampPattern = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z
 
 /**
  * Matches a value against an expectation (CNF-3): objects by subset, arrays exactly unless \`$contains\`, and the
- * matchers \`$any\`, \`$uuid\`, \`$timestamp\`, and \`$regex\`. Returns one message per mismatch; empty means a match.
+ * matchers \`$any\`, \`$uuid\`, \`$timestamp\`, and \`$regex\`. \`{ $absent: true }\` as an object's member says the
+ * object must not have it (a partial update's unset field, JSW-10). Returns one message per mismatch; empty is a match.
  */
 export function match(expected: unknown, actual: unknown, path = "$"): string[] {
   if (isRecord(expected)) {
@@ -234,9 +244,13 @@ export function match(expected: unknown, actual: unknown, path = "$"): string[] 
     const matcher = keys.length === 1 && keys[0]?.startsWith("$") === true ? keys[0] : undefined;
     if (matcher !== undefined) return matchWith(matcher, expected[matcher], actual, path);
     if (!isRecord(actual)) return [\`\${path}: expected an object, got \${describe(actual)}\`];
-    return keys.flatMap((key) =>
-      key in actual ? match(expected[key], actual[key], \`\${path}.\${key}\`) : [\`\${path}.\${key}: missing\`],
-    );
+    return keys.flatMap((key) => {
+      const wanted = expected[key];
+      if (isRecord(wanted) && Object.keys(wanted).length === 1 && "$absent" in wanted) {
+        return key in actual ? [\`\${path}.\${key}: expected no field, got \${describe(actual[key])}\`] : [];
+      }
+      return key in actual ? match(wanted, actual[key], \`\${path}.\${key}\`) : [\`\${path}.\${key}: missing\`];
+    });
   }
   if (Array.isArray(expected)) {
     if (!Array.isArray(actual)) return [\`\${path}: expected an array, got \${describe(actual)}\`];
@@ -252,6 +266,8 @@ function matchWith(matcher: string, argument: unknown, actual: unknown, path: st
   switch (matcher) {
     case "$any":
       return actual === undefined ? [\`\${path}: missing\`] : [];
+    case "$absent":
+      return actual === undefined ? [] : [\`\${path}: expected nothing, got \${describe(actual)}\`];
     case "$uuid":
       return typeof actual === "string" && uuidPattern.test(actual) ? [] : [\`\${path}: expected a uuid, got \${describe(actual)}\`];
     case "$timestamp":

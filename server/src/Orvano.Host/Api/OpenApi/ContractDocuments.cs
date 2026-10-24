@@ -41,6 +41,7 @@ internal static class ContractDocuments
             {
                 options.ShouldInclude = description => For(description.RelativePath) == name;
                 options.AddSchemaTransformer<WireSchemaTransformer>();
+                options.AddSchemaTransformer<OptionalSchemaTransformer>();
                 options.AddOperationTransformer<ContractOperationTransformer>();
                 options.AddDocumentTransformer<ContractInfoTransformer>();
                 options.AddDocumentTransformer<ContractComponentsTransformer>();

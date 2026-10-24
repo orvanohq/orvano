@@ -32,6 +32,7 @@ const reserved: ReadonlySet<string> = new Set(
     OrvanoHeaders.authorization,
     OrvanoHeaders.orvanoKey,
     OrvanoHeaders.idempotencyKey,
+    OrvanoHeaders.ifMatch,
     OrvanoHeaders.orvanoClient,
   ].map((name) => name.toLowerCase()),
 );

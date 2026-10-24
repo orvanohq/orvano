@@ -8,6 +8,7 @@ final class ConformanceOptions {
     this.headers = const {},
     this.all = false,
     this.cancelAfter,
+    this.ifMatch,
   });
 
   /// Reads a step's `options`, plus the headers the runner adds.
@@ -15,10 +16,10 @@ final class ConformanceOptions {
     Map<String, Object?> json, {
     Map<String, String> headers = const {},
   }) {
-    if (json['idempotencyKey'] != null || json['ifMatch'] != null) {
+    if (json['idempotencyKey'] != null) {
       throw UnsupportedError(
-        'This SDK does not offer idempotencyKey or ifMatch yet '
-        '(spec 0014 build plan steps 12 and 13).',
+        'This SDK does not offer idempotencyKey yet '
+        '(spec 0014 build plan step 13).',
       );
     }
     return ConformanceOptions(
@@ -35,6 +36,7 @@ final class ConformanceOptions {
       },
       all: readNullable(json['all'], r'$.all', readBool) ?? false,
       cancelAfter: readNullable(json['cancelAfter'], r'$.cancelAfter', readInt),
+      ifMatch: readNullable(json['ifMatch'], r'$.ifMatch', readString),
     );
   }
 
@@ -52,6 +54,9 @@ final class ConformanceOptions {
 
   /// With [all]: stop the walk once this many items arrived.
   final int? cancelAfter;
+
+  /// The version to send as `If-Match`, on calls that take it (CNC-4).
+  final String? ifMatch;
 
   /// The SDK's request options for these step options.
   OrvanoRequestOptions toRequestOptions() => OrvanoRequestOptions(
@@ -209,8 +214,9 @@ final RegExp _timestamp = RegExp(
 
 /// Matches a value against an expectation (CNF-3): objects by subset, arrays
 /// exactly unless `$contains`, and the matchers `$any`, `$uuid`,
-/// `$timestamp`, and `$regex`. Returns one message per mismatch; empty
-/// means a match.
+/// `$timestamp`, and `$regex`. `{$absent: true}` as an object's member says
+/// the object must not have it (a partial update's unset field, JSW-10).
+/// Returns one message per mismatch; empty means a match.
 List<String> match(Object? expected, Object? actual, [String path = r'$']) {
   if (expected is Map<String, Object?>) {
     final keys = expected.keys.toList();
@@ -222,9 +228,15 @@ List<String> match(Object? expected, Object? actual, [String path = r'$']) {
     }
     return [
       for (final key in keys)
-        ...(actual.containsKey(key)
-            ? match(expected[key], actual[key], '$path.$key')
-            : ['$path.$key: missing']),
+        ...switch (expected[key]) {
+          {r'$absent': _} when expected[key] is Map && (expected[key]! as Map).length == 1 =>
+            actual.containsKey(key)
+                ? ['$path.$key: expected no field, got ${_describe(actual[key])}']
+                : const <String>[],
+          final wanted => actual.containsKey(key)
+              ? match(wanted, actual[key], '$path.$key')
+              : ['$path.$key: missing'],
+        },
     ];
   }
   if (expected is List<Object?>) {
@@ -255,6 +267,10 @@ List<String> _matchWith(
   switch (matcher) {
     case r'$any':
       return actual == null ? ['$path: missing'] : const [];
+    case r'$absent':
+      return actual == null
+          ? const []
+          : ['$path: expected nothing, got ${_describe(actual)}'];
     case r'$uuid':
       return actual is String && _uuid.hasMatch(actual)
           ? const []

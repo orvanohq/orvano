@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 
 namespace Orvano.SharedKernel.Api;
 
@@ -66,6 +67,23 @@ public static partial class ContractEndpointExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         return builder.WithMetadata(new PagingMetadata(total));
+    }
+
+    /// <summary>
+    /// Marks a write to a versioned resource (spec 0014 CNC-3, CNC-4): it accepts <c>If-Match</c>, which the handler
+    /// binds as <see cref="IfMatch"/> and checks with <see cref="IfMatch.Check"/> in its write's transaction, and every
+    /// SDK offers an <c>ifMatch</c> option. A malformed <c>If-Match</c> answers <c>400 invalid_request</c> before the
+    /// handler runs.
+    /// </summary>
+    public static TBuilder WithConcurrency<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.WithMetadata(new ConcurrencyMetadata());
+        return builder.AddEndpointFilter(static (context, next) =>
+            IfMatch.Read(context.HttpContext.Request).Malformed
+                ? ValueTask.FromResult<object?>(IfMatch.MalformedError.ToProblem())
+                : next(context));
     }
 
     /// <summary>Marks a billable operation with the meter it counts under, such as <c>databases.rows.read</c> (XTN-4).</summary>

@@ -23,6 +23,7 @@ public sealed class ContractMetadataTests
             .WithMeter("databases.rows.read")
             .WithSdkTemplate("typed-rows")
             .WithPaging(total: true)
+            .WithConcurrency()
             .AllowPublicAccess());
 
         endpoint.Metadata.GetMetadata<SdkMetadata>().ShouldBe(new SdkMetadata("rows", "list"));
@@ -30,6 +31,7 @@ public sealed class ContractMetadataTests
         endpoint.Metadata.GetMetadata<MeterMetadata>().ShouldBe(new MeterMetadata("databases.rows.read"));
         endpoint.Metadata.GetMetadata<SdkTemplateMetadata>().ShouldBe(new SdkTemplateMetadata("typed-rows"));
         endpoint.Metadata.GetMetadata<PagingMetadata>().ShouldBe(new PagingMetadata(Total: true));
+        endpoint.Metadata.GetMetadata<ConcurrencyMetadata>().ShouldNotBeNull();
     }
 
     [Theory, Trait("Spec", "0014:XTN-1")]
