@@ -155,6 +155,7 @@ export class Widgets {
     let cursor: string | undefined;
     for (;;) {
       if (options?.signal?.aborted === true) throw options.signal.reason;
+      // oxlint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before (SHP-5)
       const page = await this.list({ ...params, cursor }, options);
       yield* page.items;
       if (page.nextCursor === null) return;

@@ -319,6 +319,8 @@ function walkAllMethod(operation: Operation): string {
   text += "    let cursor: string | undefined;\n";
   text += "    for (;;) {\n";
   text += "      if (options?.signal?.aborted === true) throw options.signal.reason;\n";
+  text +=
+    "      // oxlint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before (SHP-5)\n";
   text += `      const page = await this.${operation.method}({ ...params, cursor }, options);\n`;
   text += "      yield* page.items;\n";
   text += "      if (page.nextCursor === null) return;\n";
