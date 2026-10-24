@@ -282,6 +282,23 @@ describe("0014 GNR-10: bad input fails naming the operation", () => {
     );
   });
 
+  it("a webhook whose payload schema is not named from its event type", () => {
+    const document = fixture();
+    const content = document.webhooks?.["widgets.widget.created.v1"]?.post?.requestBody?.content;
+    if (content !== undefined)
+      content["application/json"] = { schema: { $ref: "#/components/schemas/WidgetResponse" } };
+    expect(rendering(document)).toThrow(
+      /^Webhook widgets\.widget\.created\.v1: its payload schema must be named WidgetsWidgetCreatedV1Event, got WidgetResponse/,
+    );
+  });
+
+  it("a webhook key that is not an event type", () => {
+    const document = fixture();
+    const webhooks = document.webhooks ?? {};
+    webhooks["WidgetCreated"] = webhooks["widgets.widget.created.v1"] ?? {};
+    expect(rendering(document)).toThrow(/^Webhook WidgetCreated: the key must be an event type/);
+  });
+
   it("an input name used twice", () => {
     const document = fixture();
     const schema = document.components?.schemas?.["CreateWidgetRequest"];

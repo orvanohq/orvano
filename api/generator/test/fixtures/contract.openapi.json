@@ -443,6 +443,31 @@
       }
     }
   },
+  "webhooks": {
+    "widgets.widget.created.v1": {
+      "post": {
+        "operationId": "Events_WidgetsWidgetCreatedV1Event",
+        "summary": "The widgets.widget.created.v1 event.",
+        "description": "A widget was created.",
+        "requestBody": {
+          "required": true,
+          "description": "The widgets.widget.created.v1 payload.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WidgetsWidgetCreatedV1Event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The event was received."
+          }
+        }
+      }
+    }
+  },
   "components": {
     "schemas": {
       "CreateWidgetRequest": {
@@ -726,6 +751,21 @@
             "type": "string",
             "readOnly": true,
             "description": "The widget's version, equal to its ETag without quotes."
+          }
+        }
+      },
+      "WidgetsWidgetCreatedV1Event": {
+        "type": "object",
+        "description": "A widget was created.",
+        "required": ["widgetId", "color"],
+        "properties": {
+          "widgetId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The new widget's ID."
+          },
+          "color": {
+            "$ref": "#/components/schemas/WidgetColor"
           }
         }
       }
