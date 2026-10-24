@@ -130,7 +130,6 @@
       },
       "HealthResponse": {
         "required": [
-          "apiVersions",
           "status"
         ],
         "type": "object",
@@ -138,13 +137,6 @@
           "status": {
             "type": "string",
             "description": "Always `ok`."
-          },
-          "apiVersions": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "The API versions the server serves, `YYYY-MM-DD`; send one in `Orvano-Api-Version`."
           }
         },
         "description": "The server is up and ready to serve requests."
