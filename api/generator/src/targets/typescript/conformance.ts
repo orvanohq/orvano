@@ -78,13 +78,13 @@ export function dispatchFile(model: TargetModel, fixture: TargetModel, source: P
     .filter(({ operation }) => operation.paging !== undefined)
     .map(({ operation }) => JSON.stringify(callName(operation)));
   text += `\n/** The calls that are paged lists, which take the \`all\` option (PAG-6). */\n`;
-  text += `const pagedCalls: readonly string[] = [${pagedCalls.join(", ")}];\n`;
+  text += `const pagedCalls: ReadonlySet<string> = new Set([${pagedCalls.join(", ")}]);\n`;
   text +=
     "\n/** Runs one scenario step's call and returns its result as JSON, or the normalized error (CNF-4). */\n";
   text +=
     "export async function dispatch(\n  client: OrvanoClient,\n  call: string,\n  params: Readonly<Record<string, unknown>>,\n  options: ConformanceOptions = {},\n): Promise<ConformanceOutcome> {\n";
   text += "  const requestOptions = toRequestOptions(options);\n";
-  text += "  if (options.all === true && !pagedCalls.includes(call))\n";
+  text += "  if (options.all === true && !pagedCalls.has(call))\n";
   text += `    throw new Error(\`\${call} is not a paged list, so it has no walk all method.\`);\n`;
   text += "  try {\n    switch (call) {\n";
   for (const { service, operation } of entries) text += dispatchCase(service, operation);

@@ -48,6 +48,7 @@ const takenNames: readonly string[] = [
   "OrvanoRetryOptions",
   "OrvanoServiceCollectionExtensions",
   "OrvanoTransport",
+  "ResultPage",
   // generated here
   "OrvanoCall",
   "OrvanoContract",
@@ -57,7 +58,6 @@ const takenNames: readonly string[] = [
   "OrvanoQuery",
   "OrvanoServices",
   "OrvanoWire",
-  "ResultPage",
   // a type named like its namespace's last part hides it
   "Orvano",
   "Server",
@@ -549,6 +549,9 @@ function method(operation: Operation, types: CSharpTypes, typeInfo: TypeInfo): s
   const where = operation.operationId;
   const inputs = inputsOf(operation, types);
   const response = responseOf(operation, types);
+  const item = pageItemOf(operation, types);
+  // A page's JSON metadata is the context's ResultPageOf<item> entry.
+  const responseInfo = item === undefined ? response : pageInfoName(item);
   const indent = "    ";
 
   let text = docComment(
@@ -647,7 +650,7 @@ function method(operation: Operation, types: CSharpTypes, typeInfo: TypeInfo): s
   body.push(
     response === undefined
       ? "return _transport.SendAsync(call, options, cancellationToken);"
-      : `return _transport.SendAsync(call, ${typeInfo(response.startsWith("ResultPage<") ? pageInfoName(response.slice(11, -1)) : response)}, options, cancellationToken);`,
+      : `return _transport.SendAsync(call, ${typeInfo(responseInfo ?? "")}, options, cancellationToken);`,
   );
   text += body
     .map((statement) =>

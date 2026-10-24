@@ -274,7 +274,7 @@ export const calls: readonly string[] = [
 ];
 
 /** The calls that are paged lists, which take the `all` option (PAG-6). */
-const pagedCalls: readonly string[] = ["widgets.list"];
+const pagedCalls: ReadonlySet<string> = new Set(["widgets.list"]);
 
 /** Runs one scenario step's call and returns its result as JSON, or the normalized error (CNF-4). */
 export async function dispatch(
@@ -284,7 +284,7 @@ export async function dispatch(
   options: ConformanceOptions = {},
 ): Promise<ConformanceOutcome> {
   const requestOptions = toRequestOptions(options);
-  if (options.all === true && !pagedCalls.includes(call))
+  if (options.all === true && !pagedCalls.has(call))
     throw new Error(`${call} is not a paged list, so it has no walk all method.`);
   try {
     switch (call) {
