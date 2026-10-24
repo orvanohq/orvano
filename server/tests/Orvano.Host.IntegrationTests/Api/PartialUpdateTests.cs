@@ -141,6 +141,59 @@ public sealed class PartialUpdateTests(WireServerFixture server) : IClassFixture
         await ProblemAsync(stale, HttpStatusCode.PreconditionFailed, ErrorCodes.VersionConflict);
     }
 
+    [Fact, Trait("Spec", "0014:AC-9"), Trait("Spec", "0014:JSW-7"), Trait("Spec", "0014:JSW-9")]
+    public async Task Patch_fails_unknown_field_when_the_body_names_a_field_the_request_does_not_have()
+    {
+        NoteResponse note = Notes.Add("first");
+
+        using HttpResponseMessage response = await PatchAsync(note.Id, """{ "name": "second", "colour": "red" }""");
+
+        JsonElement problem = await ProblemAsync(response, HttpStatusCode.BadRequest, ErrorCodes.ValidationFailed);
+        JsonElement error = problem.GetProperty("errors").EnumerateArray().Single();
+        error.GetProperty("field").GetString().ShouldBe("colour");
+        error.GetProperty("code").GetString().ShouldBe(FieldCodes.UnknownField);
+        (await OkAsync(await GetAsync(note.Id))).GetProperty("name").GetString().ShouldBe("first");
+    }
+
+    [Theory, Trait("Spec", "0014:AC-9"), Trait("Spec", "0014:JSW-9")]
+    [InlineData("""{ "nickname": 5 }""")]
+    [InlineData("""{ "rank": "high" }""")]
+    [InlineData("""{ "tags": "a" }""")]
+    public async Task Patch_fails_invalid_request_when_a_field_has_the_wrong_type(string json)
+    {
+        NoteResponse note = Notes.Add("first", "nick", ["a"]);
+
+        using HttpResponseMessage response = await PatchAsync(note.Id, json);
+
+        await ProblemAsync(response, HttpStatusCode.BadRequest, ErrorCodes.InvalidRequest);
+        JsonElement body = await OkAsync(await GetAsync(note.Id));
+        body.GetProperty("nickname").GetString().ShouldBe("nick");
+        body.GetProperty("version").GetString().ShouldBe(note.Version);
+    }
+
+    [Fact, Trait("Spec", "0014:AC-9"), Trait("Spec", "0014:JSW-9")]
+    public async Task Patch_clears_a_nullable_nested_object_when_it_is_sent_as_null()
+    {
+        NoteResponse note = Notes.Add("first", address: new NoteAddress("Oslo", "0150"));
+
+        JsonElement body = await OkAsync(await PatchAsync(note.Id, """{ "address": null }"""));
+
+        body.GetProperty("address").ValueKind.ShouldBe(JsonValueKind.Null);
+        body.GetProperty("name").GetString().ShouldBe("first");
+    }
+
+    [Fact, Trait("Spec", "0014:AC-11"), Trait("Spec", "0014:CNC-2"), Trait("Spec", "0014:CNC-3")]
+    public async Task Write_fails_version_conflict_when_if_match_is_a_strong_etag_the_server_never_made()
+    {
+        NoteResponse note = Notes.Add("first");
+
+        using HttpResponseMessage response = await PatchAsync(note.Id, """{ "name": "second" }""", "\"not-a-version\"");
+
+        JsonElement problem = await ProblemAsync(response, HttpStatusCode.PreconditionFailed, ErrorCodes.VersionConflict);
+        problem.GetProperty("currentVersion").GetString().ShouldBe(note.Version);
+        (await OkAsync(await GetAsync(note.Id))).GetProperty("name").GetString().ShouldBe("first");
+    }
+
     private Task<HttpResponseMessage> GetAsync(Guid id) => SendAsync(HttpMethod.Get, $"/v1/test/notes/{id}", null, null);
 
     private Task<HttpResponseMessage> PatchAsync(Guid id, string json, string? ifMatch = null) =>

@@ -200,6 +200,85 @@ describe("0014 STB-2: the stub server", () => {
     assert.deepEqual(await response.json(), { error: "The request body is over 1 MB." });
   });
 
+  it("refuses a bad scenario ID, a body that is not JSON, and a stub that is not a list", async () => {
+    const refused = [
+      ["Health.Get", JSON.stringify({ stub: [] })],
+      ["a.b.j", "{ not json"],
+      ["a.b.j", JSON.stringify({ stub: { request: {} } })],
+      ["a.b.j", JSON.stringify([])],
+    ];
+    const statuses = await Promise.all(
+      refused.map(async ([id = "", body = ""]) => {
+        const response = await fetch(`${base}/__stub/runs/run-jjjjjjjj/scenarios/${id}`, {
+          method: "POST",
+          body,
+        });
+        return response.status;
+      }),
+    );
+    assert.deepEqual(statuses, [400, 400, 400, 400]);
+    const none = await fetch(`${base}/__stub/runs/run-jjjjjjjj/requests`);
+    assert.equal(none.status, 404);
+  });
+
+  it("answers 599 once the script is used up, and for the right path with the wrong method", async () => {
+    await load("run-kkkkkkkk", "a.b.k", [
+      { request: { method: "GET", path: "/v1/health" }, respond: { status: 200 } },
+      { request: { method: "POST", path: "/v1/thing" }, respond: { status: 201 } },
+    ]);
+    const headers = { "Orvano-Stub-Run": "run-kkkkkkkk" };
+    assert.equal((await fetch(`${base}/v1/health`, { headers })).status, 200);
+    const wrongMethod = await fetch(`${base}/v1/thing`, { method: "PUT", headers });
+    assert.equal(wrongMethod.status, 599);
+    assert.match(
+      String(/** @type {{ error: string }} */ (await wrongMethod.json()).error),
+      /expected POST \/v1\/thing, but got PUT \/v1\/thing \(request 2\)/,
+    );
+    // The mismatch did not use up the entry, so the script still answers in order.
+    assert.equal((await fetch(`${base}/v1/thing`, { method: "POST", headers })).status, 201);
+    const extra = await fetch(`${base}/v1/health`, { headers });
+    assert.equal(extra.status, 599);
+    assert.match(
+      String(/** @type {{ error: string }} */ (await extra.json()).error),
+      /expected no more requests/,
+    );
+    assert.equal((await requests("run-kkkkkkkk")).requests.length, 4);
+  });
+
+  it("replaces a run's script and clears its recording when the token is loaded again", async () => {
+    await load("run-llllllll", "a.b.l", [
+      { request: { method: "GET", path: "/v1/a" }, respond: { status: 200 } },
+    ]);
+    await fetch(`${base}/v1/a`, { headers: { "Orvano-Stub-Run": "run-llllllll" } });
+    await load("run-llllllll", "a.b.m", [
+      { request: { method: "GET", path: "/v1/b" }, respond: { status: 204 } },
+    ]);
+    assert.deepEqual(await requests("run-llllllll"), { scenario: "a.b.m", requests: [] });
+    const answer = await fetch(`${base}/v1/b`, { headers: { "Orvano-Stub-Run": "run-llllllll" } });
+    assert.equal(answer.status, 204);
+  });
+
+  it("records a body that is not JSON, and JSON that does not parse, as its text", async () => {
+    await load("run-mmmmmmmm", "a.b.n", [
+      { request: { method: "POST", path: "/v1/a" }, respond: { status: 200 } },
+      { request: { method: "POST", path: "/v1/a" }, respond: { status: 200 } },
+    ]);
+    await fetch(`${base}/v1/a`, {
+      method: "POST",
+      headers: { "Orvano-Stub-Run": "run-mmmmmmmm", "Content-Type": "text/plain" },
+      body: '{"looks":"like json"}',
+    });
+    await fetch(`${base}/v1/a`, {
+      method: "POST",
+      headers: { "Orvano-Stub-Run": "run-mmmmmmmm", "Content-Type": "application/json" },
+      body: "{ broken",
+    });
+    assert.deepEqual(
+      (await requests("run-mmmmmmmm")).requests.map((entry) => entry.body),
+      ['{"looks":"like json"}', "{ broken"],
+    );
+  });
+
   it("refuses a bad token", async () => {
     const response = await fetch(`${base}/__stub/runs/short/scenarios/a.b.c`, {
       method: "POST",

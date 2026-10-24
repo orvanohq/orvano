@@ -39,7 +39,12 @@ const json = (status: number, body: unknown, headers: Record<string, string> = {
     headers: { "Content-Type": "application/json", ...headers },
   });
 
-const problem = (status: number, code: string, extra: Record<string, unknown> = {}): Response =>
+const problem = (
+  status: number,
+  code: string,
+  extra: Record<string, unknown> = {},
+  headers: Record<string, string> = {},
+): Response =>
   new Response(
     JSON.stringify({
       type: "about:blank",
@@ -52,7 +57,7 @@ const problem = (status: number, code: string, extra: Record<string, unknown> = 
     }),
     {
       status,
-      headers: { "Content-Type": "application/problem+json" },
+      headers: { "Content-Type": "application/problem+json", ...headers },
     },
   );
 
@@ -121,6 +126,58 @@ describe("transport", () => {
       .catch((thrown: unknown) => thrown);
     expect(OrvanoError.is(error) && error.kind).toBe("server");
     expect(http.requests).toHaveLength(1);
+  });
+
+  it("0014 IDM-3: gives up after the default two retries and throws the last error", async () => {
+    const http = stub(
+      problem(503, "unavailable", { retryAfter: 0 }),
+      problem(503, "unavailable", { retryAfter: 0 }),
+      problem(502, "unavailable", { retryAfter: 0 }),
+      json(200, health),
+    );
+    const error: unknown = await new Health(client(http.fetch))
+      .get()
+      .catch((thrown: unknown) => thrown);
+    expect(OrvanoError.is(error) && error.status).toBe(502);
+    expect(http.requests).toHaveLength(3);
+  });
+
+  it("takes a per call retry count, and refuses one outside 0 to 2 before sending", async () => {
+    const once = stub(problem(503, "unavailable", { retryAfter: 0 }), json(200, health));
+    await expect(new Health(client(once.fetch)).get({ retry: { maxRetries: 0 } })).rejects.toThrow(
+      OrvanoError,
+    );
+    expect(once.requests).toHaveLength(1);
+
+    const never = stub(json(200, health));
+    await expect(new Health(client(never.fetch)).get({ retry: { maxRetries: 3 } })).rejects.toThrow(
+      TypeError,
+    );
+    expect(never.requests).toHaveLength(0);
+  });
+
+  it("does not retry a GET after a status outside the retry list", async () => {
+    const http = stub(problem(500, "internal"), json(200, health));
+    const error: unknown = await new Health(client(http.fetch))
+      .get()
+      .catch((thrown: unknown) => thrown);
+    expect(OrvanoError.is(error) && error.kind).toBe("server");
+    expect(http.requests).toHaveLength(1);
+  });
+
+  it("does not wait out a Retry-After over 30 seconds, and hands it to the caller", async () => {
+    const http = stub(problem(429, "rate_limited", {}, { "Retry-After": "31" }), json(200, health));
+    const error: unknown = await new Health(client(http.fetch))
+      .get()
+      .catch((thrown: unknown) => thrown);
+    expect(OrvanoError.is(error) && [error.kind, error.retryAfter]).toEqual(["rate_limited", 31]);
+    expect(http.requests).toHaveLength(1);
+  });
+
+  it("retries a 429 after the Retry-After header's seconds", async () => {
+    const http = stub(problem(429, "rate_limited", {}, { "Retry-After": "0" }), json(200, health));
+    await expect(new Health(client(http.fetch)).get()).resolves.toEqual(health);
+    expect(http.requests).toHaveLength(2);
   });
 
   it("turns a problem body into an OrvanoError with field errors", async () => {

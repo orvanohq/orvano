@@ -23,7 +23,7 @@ spec [0014](../specs/0014-api-contract-sdk-generation/index.md) · code in `serv
   - [x] Shared primitives: paging, partial updates, row versions, idempotency wire contract, events in the contract (spec 0014 AC-9 to AC-12, AC-20; build plan steps 11 to 14)
     - built: spec 0014 build plan steps 11 to 14 (`Page<T>`, `PageQuery`, `CursorCodec`, `.WithPaging`, and the `orvano-paging` lint rule; `Optional<T>` with its null check and schema, `ResourceVersion`, `IfMatch`, `.WithConcurrency`; `.WithIdempotency` and the `Idempotency-Key` retry rule, without the replay store, which IDM-4 leaves to feature 14 or 16; `IPublicEventCatalog`, `AddPublicEvent`, and the `webhooks` transformer, proved with a test only sample event, since feature 33 registers the real ones; in every target `listAll`, `Optional` PATCH inputs, `ifMatch`, `idempotencyKey`, and event payload models, with stub scenarios for each; orvano#83, #84, #85, #86, sdk-dotnet#6, #8, #10 for the hand written .NET runtime), 2026-10-24
 - [ ] Verify it: `/check verify API contract & SDK generation`
-- [ ] Test it: `/test API contract & SDK generation`
+- [x] Test it: `/test API contract & SDK generation`
 - [ ] Review it (fresh model): `/check review API contract & SDK generation`
 - [ ] Document it: `/document API contract & SDK generation`
 
