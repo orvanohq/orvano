@@ -89,6 +89,7 @@ public sealed class PagingTests(WireServerFixture server) : IClassFixture<WireSe
     }
 
     [Theory, Trait("Spec", "0014:AC-10"), Trait("Spec", "0014:PAG-1")]
+    [InlineData(-1)]
     [InlineData(0)]
     [InlineData(101)]
     public async Task Limit_fails_out_of_range_when_outside_1_to_100(int limit)
@@ -108,6 +109,60 @@ public sealed class PagingTests(WireServerFixture server) : IClassFixture<WireSe
         JsonElement page = await PageAsync($"/v1/test/rows?limit={PageQuery.MaxLimit}");
 
         page.GetProperty("items").GetArrayLength().ShouldBe(PageQuery.MaxLimit);
+    }
+
+    [Fact, Trait("Spec", "0014:AC-10"), Trait("Spec", "0014:PAG-2")]
+    public async Task List_ends_without_an_empty_page_when_the_rows_fill_the_last_page_exactly()
+    {
+        int rows = server.Factory.Services.GetRequiredService<FixtureRows>().Snapshot().Length;
+        int limit = Enumerable.Range(1, PageQuery.MaxLimit).Last(size => rows % size == 0 && rows / size >= 2);
+
+        var sizes = new List<int>();
+        string? cursor = null;
+        do
+        {
+            JsonElement page = await PageAsync($"/v1/test/rows?limit={limit}{(cursor is null ? "" : $"&cursor={cursor}")}");
+            sizes.Add(page.GetProperty("items").GetArrayLength());
+            cursor = page.GetProperty("nextCursor").GetString();
+        }
+        while (cursor is not null && sizes.Count <= rows);
+
+        sizes.ShouldAllBe(size => size == limit);
+        sizes.Count.ShouldBe(rows / limit);
+    }
+
+    [Fact, Trait("Spec", "0014:AC-10"), Trait("Spec", "0014:PAG-5")]
+    public async Task Cursor_keeps_working_when_the_limit_changes_between_pages()
+    {
+        JsonElement first = await PageAsync("/v1/test/rows?sort=created&limit=10");
+        JsonElement wide = await PageAsync("/v1/test/rows?sort=created&limit=30");
+
+        JsonElement second = await PageAsync($"/v1/test/rows?sort=created&limit=20&cursor={first.GetProperty("nextCursor").GetString()}");
+
+        second.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetString())
+            .ShouldBe(wide.GetProperty("items").EnumerateArray().Skip(10).Select(item => item.GetProperty("id").GetString()));
+    }
+
+    [Theory, Trait("Spec", "0014:AC-10"), Trait("Spec", "0014:PAG-1")]
+    [InlineData("abc")]
+    [InlineData("1.5")]
+    public async Task Limit_fails_invalid_request_when_it_is_not_an_integer(string limit)
+    {
+        using HttpResponseMessage response = await GetAsync($"/v1/test/rows?limit={limit}");
+
+        await ShouldBeProblemAsync(response, ErrorCodes.InvalidRequest);
+    }
+
+    [Fact, Trait("Spec", "0014:AC-10"), Trait("Spec", "0014:PAG-1")]
+    public async Task Cursor_fails_too_long_when_it_is_longer_than_2048_characters()
+    {
+        using HttpResponseMessage response = await GetAsync($"/v1/test/rows?cursor={new string('A', PageQuery.MaxCursorLength + 1)}");
+
+        JsonElement problem = await ShouldBeProblemAsync(response, ErrorCodes.ValidationFailed);
+        JsonElement error = problem.GetProperty("errors").EnumerateArray().Single();
+        error.GetProperty("field").GetString().ShouldBe("cursor");
+        error.GetProperty("location").GetString().ShouldBe("query");
+        error.GetProperty("code").GetString().ShouldBe(FieldCodes.TooLong);
     }
 
     private async Task<JsonElement> PageAsync(string path)

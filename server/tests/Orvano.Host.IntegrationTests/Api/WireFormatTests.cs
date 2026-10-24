@@ -76,6 +76,15 @@ public sealed class WireFormatTests(WireServerFixture server) : IClassFixture<Wi
     }
 
     [Fact, Trait("Spec", "0014:AC-4"), Trait("Spec", "0014:VRS-4")]
+    public async Task Version_sent_twice_answers_400_even_when_both_values_are_supported()
+    {
+        using HttpResponseMessage response = await GetAsync(
+            "/v1/test/version", (OrvanoHeaders.ApiVersion, ApiVersions.Current), (OrvanoHeaders.ApiVersion, ApiVersions.Current));
+
+        await ShouldBeProblemAsync(response, HttpStatusCode.BadRequest, ErrorCodes.UnsupportedApiVersion);
+    }
+
+    [Fact, Trait("Spec", "0014:AC-4"), Trait("Spec", "0014:VRS-4")]
     public async Task Unsupported_version_answers_400_even_when_the_path_matches_no_endpoint()
     {
         using HttpResponseMessage response = await GetAsync("/v1/nothing-here", (OrvanoHeaders.ApiVersion, "banana"));
