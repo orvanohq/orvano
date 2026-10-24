@@ -81,7 +81,8 @@ export function createStubServer(options = {}) {
       const entries = /** @type {{ stub?: unknown }} */ (script ?? {}).stub;
       if (!tokenPattern.test(token) || !idPattern.test(id) || !isEntryList(entries)) {
         send(request, response, 400, {
-          error: "Send a token of 8 to 64 URL safe characters, a scenario ID, and { stub: [...] }.",
+          error:
+            "Send a token of 8 to 64 URL safe characters, a scenario ID, and { stub: [...] } whose entries each have request.method, request.path, and respond.status (100 to 599).",
         });
         return;
       }
@@ -254,7 +255,26 @@ class BodyTooLargeError extends Error {}
  * @returns {value is StubEntry[]}
  */
 function isEntryList(value) {
-  return Array.isArray(value);
+  return Array.isArray(value) && value.every(isEntry);
+}
+
+/**
+ * Checks the fields the stub reads when it answers, so a bad entry is refused at load and not a 500 later.
+ * @param {unknown} value
+ */
+function isEntry(value) {
+  const entry =
+    /** @type {{ request?: { method?: unknown, path?: unknown }, respond?: { status?: unknown } }} */ (
+      typeof value === "object" && value !== null ? value : {}
+    );
+  const status = entry.respond?.status;
+  return (
+    typeof entry.request?.method === "string" &&
+    typeof entry.request.path === "string" &&
+    Number.isInteger(status) &&
+    /** @type {number} */ (status) >= 100 &&
+    /** @type {number} */ (status) <= 599
+  );
 }
 
 /** @param {string} text */

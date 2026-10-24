@@ -200,12 +200,23 @@ describe("0014 STB-2: the stub server", () => {
     assert.deepEqual(await response.json(), { error: "The request body is over 1 MB." });
   });
 
-  it("refuses a bad scenario ID, a body that is not JSON, and a stub that is not a list", async () => {
+  it("refuses a bad scenario ID, a body that is not JSON, a stub that is not a list, and a bad entry", async () => {
+    const entry = { request: { method: "GET", path: "/v1/health" }, respond: { status: 200 } };
     const refused = [
       ["Health.Get", JSON.stringify({ stub: [] })],
       ["a.b.j", "{ not json"],
       ["a.b.j", JSON.stringify({ stub: { request: {} } })],
       ["a.b.j", JSON.stringify([])],
+      // Each entry is checked at load, so a bad one is a 400 now and not a 500 on the next call.
+      ["a.b.j", JSON.stringify({ stub: [{}] })],
+      ["a.b.j", JSON.stringify({ stub: [null] })],
+      ["a.b.j", JSON.stringify({ stub: [entry, { ...entry, request: { path: "/v1/health" } }] })],
+      ["a.b.j", JSON.stringify({ stub: [{ ...entry, request: { method: "GET", path: 7 } }] })],
+      ["a.b.j", JSON.stringify({ stub: [{ ...entry, respond: {} }] })],
+      ["a.b.j", JSON.stringify({ stub: [{ ...entry, respond: { status: "200" } }] })],
+      ["a.b.j", JSON.stringify({ stub: [{ ...entry, respond: { status: 200.5 } }] })],
+      ["a.b.j", JSON.stringify({ stub: [{ ...entry, respond: { status: 99 } }] })],
+      ["a.b.j", JSON.stringify({ stub: [{ ...entry, respond: { status: 600 } }] })],
     ];
     const statuses = await Promise.all(
       refused.map(async ([id = "", body = ""]) => {
@@ -216,7 +227,10 @@ describe("0014 STB-2: the stub server", () => {
         return response.status;
       }),
     );
-    assert.deepEqual(statuses, [400, 400, 400, 400]);
+    assert.deepEqual(
+      statuses,
+      refused.map(() => 400),
+    );
     const none = await fetch(`${base}/__stub/runs/run-jjjjjjjj/requests`);
     assert.equal(none.status, 404);
   });
