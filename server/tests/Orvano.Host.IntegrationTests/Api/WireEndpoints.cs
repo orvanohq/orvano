@@ -229,6 +229,10 @@ internal sealed class WireEndpoints : IStartupFilter
             }, response)).WithConcurrency().WithSdk("test", "updateNote");
         test.MapDelete("/notes/{noteId:guid}", (Guid noteId, IfMatch ifMatch, FixtureNotes notes, HttpResponse response) =>
             notes.Write(noteId, ifMatch, _ => null, response)).WithConcurrency().WithSdk("test", "deleteNote");
+        // IDM-2: a marked operation; the replay store is not built yet (IDM-4), so this only checks the key.
+        test.MapPost("/charges", (HttpRequest request) =>
+            TypedResults.Created("/v1/test/charges/1", new { key = request.Headers[OrvanoHeaders.IdempotencyKey].ToString() }))
+            .WithIdempotency().WithSdk("test", "charge");
         test.MapGet("/rows", ListRows).WithPaging(total: true).WithSdk("test", "rows");
         test.MapGet("/header", ([FromHeader(Name = "Orvano-Client")][MaxLength(3, ErrorMessage = FieldCodes.TooLong)] string? client) =>
             TypedResults.Ok(new { client })).WithSdk("test", "header");

@@ -51,6 +51,7 @@ export function dispatchFile(model: TargetModel, fixture: TargetModel, source: P
   const publicImports = [
     "OrvanoError",
     ...(paged ? ["type Page"] : []),
+    "type IdempotencyOptions",
     "type IfMatchOptions",
     ...model.services.map(serviceClassName),
     ...model.services.flatMap((service) =>
@@ -85,11 +86,18 @@ export function dispatchFile(model: TargetModel, fixture: TargetModel, source: P
     .map(({ operation }) => JSON.stringify(callName(operation)));
   text += "\n/** The calls that take `ifMatch` (CNC-4). */\n";
   text += `const concurrencyCalls: ReadonlySet<string> = new Set([${concurrencyCalls.join(", ")}]);\n`;
+  const idempotentCalls = entries
+    .filter(({ operation }) => operation.idempotent)
+    .map(({ operation }) => JSON.stringify(callName(operation)));
+  text += "\n/** The calls that take `idempotencyKey` (IDM-3). */\n";
+  text += `const idempotentCalls: ReadonlySet<string> = new Set([${idempotentCalls.join(", ")}]);\n`;
   text +=
     "\n/** Runs one scenario step's call and returns its result as JSON, or the normalized error (CNF-4). */\n";
   text +=
     "export async function dispatch(\n  client: OrvanoClient,\n  call: string,\n  params: Readonly<Record<string, unknown>>,\n  options: ConformanceOptions = {},\n): Promise<ConformanceOutcome> {\n";
   text += "  const requestOptions = toRequestOptions(options);\n";
+  text += "  if (options.idempotencyKey !== undefined && !idempotentCalls.has(call))\n";
+  text += `    throw new Error(\`\${call} does not take idempotencyKey.\`);\n`;
   text += "  if (options.ifMatch !== undefined && !concurrencyCalls.has(call))\n";
   text += `    throw new Error(\`\${call} does not take ifMatch.\`);\n`;
   text += "  if (options.all === true && !pagedCalls.has(call))\n";
@@ -161,15 +169,13 @@ export type ConformanceOutcome =
   | { readonly ok: true; readonly result: unknown }
   | { readonly ok: false; readonly error: ConformanceError };
 
-function toRequestOptions(options: ConformanceOptions): IfMatchOptions {
-  if (options.idempotencyKey !== undefined) {
-    throw new Error("This SDK does not offer idempotencyKey yet (spec 0014 build plan step 13).");
-  }
+function toRequestOptions(options: ConformanceOptions): IfMatchOptions & IdempotencyOptions {
   return {
     timeout: options.timeout,
     retry: options.retry === undefined ? undefined : { maxRetries: options.retry },
     headers: options.headers,
     ifMatch: options.ifMatch,
+    idempotencyKey: options.idempotencyKey,
   };
 }
 

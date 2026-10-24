@@ -62,6 +62,18 @@ export interface IfMatchOptions extends RequestOptions {
 }
 
 /**
+ * Options of a call that replays safely with an idempotency key (spec 0014 IDM-2, IDM-3), on operations marked for it.
+ * @public
+ */
+export interface IdempotencyOptions extends RequestOptions {
+  /**
+   * A key you choose, 1 to 255 printable ASCII characters, sent as `Idempotency-Key`. With it, a failed call is
+   * retried like a GET; reuse the key only for the same request. The SDK never makes one up.
+   */
+  readonly idempotencyKey?: string | undefined;
+}
+
+/**
  * One page of a list (spec 0014 PAG-2). Pass `nextCursor` as `cursor` for the next page, or use the method's
  * `All` sibling to walk every page.
  * @public

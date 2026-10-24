@@ -9,6 +9,7 @@ final class ConformanceOptions {
     this.all = false,
     this.cancelAfter,
     this.ifMatch,
+    this.idempotencyKey,
   });
 
   /// Reads a step's `options`, plus the headers the runner adds.
@@ -16,12 +17,6 @@ final class ConformanceOptions {
     Map<String, Object?> json, {
     Map<String, String> headers = const {},
   }) {
-    if (json['idempotencyKey'] != null) {
-      throw UnsupportedError(
-        'This SDK does not offer idempotencyKey yet '
-        '(spec 0014 build plan step 13).',
-      );
-    }
     return ConformanceOptions(
       timeout: readNullable(json['timeout'], r'$.timeout', readInt),
       retry: readNullable(json['retry'], r'$.retry', readInt),
@@ -37,6 +32,11 @@ final class ConformanceOptions {
       all: readNullable(json['all'], r'$.all', readBool) ?? false,
       cancelAfter: readNullable(json['cancelAfter'], r'$.cancelAfter', readInt),
       ifMatch: readNullable(json['ifMatch'], r'$.ifMatch', readString),
+      idempotencyKey: readNullable(
+        json['idempotencyKey'],
+        r'$.idempotencyKey',
+        readString,
+      ),
     );
   }
 
@@ -57,6 +57,9 @@ final class ConformanceOptions {
 
   /// The version to send as `If-Match`, on calls that take it (CNC-4).
   final String? ifMatch;
+
+  /// The key to send as `Idempotency-Key`, on calls that take it (IDM-3).
+  final String? idempotencyKey;
 
   /// The SDK's request options for these step options.
   OrvanoRequestOptions toRequestOptions() => OrvanoRequestOptions(

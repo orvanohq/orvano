@@ -86,6 +86,23 @@ public static partial class ContractEndpointExtensions
                 : next(context));
     }
 
+    /// <summary>
+    /// Marks an operation that replays safely when a caller repeats its <c>Idempotency-Key</c> (spec 0014 IDM-2), so
+    /// every SDK offers <c>idempotencyKey</c> on it and retries it when one is passed (IDM-3). A malformed key answers
+    /// <c>400 invalid_request</c> before the handler runs. Mark nothing until the replay store exists (IDM-4: feature
+    /// 14 or 16): without it a retried request runs twice.
+    /// </summary>
+    public static TBuilder WithIdempotency<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.WithMetadata(new IdempotencyMetadata());
+        return builder.AddEndpointFilter(static (context, next) =>
+            IdempotencyKey.TryRead(context.HttpContext.Request, out _)
+                ? next(context)
+                : ValueTask.FromResult<object?>(IdempotencyKey.MalformedError.ToProblem()));
+    }
+
     /// <summary>Marks a billable operation with the meter it counts under, such as <c>databases.rows.read</c> (XTN-4).</summary>
     public static TBuilder WithMeter<TBuilder>(this TBuilder builder, string name)
         where TBuilder : IEndpointConventionBuilder

@@ -389,11 +389,14 @@ export function inputsOf(operation: Operation, types: DartTypes): Input[] {
   ];
   if (
     inputs.some(
-      (input) => input.name === "options" || (operation.concurrency && input.name === "ifMatch"),
+      (input) =>
+        input.name === "options" ||
+        (operation.concurrency && input.name === "ifMatch") ||
+        (operation.idempotent && input.name === "idempotencyKey"),
     )
   ) {
     throw new GeneratorError(
-      `${where}: an input named options or ifMatch clashes with a request option parameter.`,
+      `${where}: an input named options, ifMatch, or idempotencyKey clashes with a request option parameter.`,
     );
   }
   return inputs;
@@ -462,6 +465,11 @@ function method(operation: Operation, types: DartTypes): string {
       "[ifMatch]: the resource's `version` as you read it. The write fails with `version_conflict` when it changed since; leave it out to write anyway.",
     );
   }
+  if (operation.idempotent) {
+    paragraphs.push(
+      "[idempotencyKey]: a key you choose, 1 to 255 printable ASCII characters, sent as `Idempotency-Key`. With it, a failed call is retried; reuse it only for the same request.",
+    );
+  }
   paragraphs.push("Throws an [OrvanoException] when the call fails.");
   let text = dartDoc(paragraphs, "  ");
   if (operation.deprecated)
@@ -473,6 +481,7 @@ function method(operation: Operation, types: DartTypes): string {
         : `${input.required ? "required " : ""}${dartTypeName(input.type)} ${input.name}`,
     ),
     ...(operation.concurrency ? ["String? ifMatch"] : []),
+    ...(operation.idempotent ? ["String? idempotencyKey"] : []),
     "OrvanoRequestOptions? options",
   ];
   text += `  Future<${returnType}> ${name}({\n${params.map((param) => `    ${param},\n`).join("")}  }) async {\n`;
@@ -524,6 +533,7 @@ function method(operation: Operation, types: DartTypes): string {
   }
   fields.push("options: options");
   if (operation.concurrency) fields.push("ifMatch: ifMatch");
+  if (operation.idempotent) fields.push("idempotencyKey: idempotencyKey");
   const call = `_transport.request(\n${fields.map((field) => `      ${field},\n`).join("")}    )`;
   if (item !== undefined) {
     text += `    final json = await ${call};\n`;

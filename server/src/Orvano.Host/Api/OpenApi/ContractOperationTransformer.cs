@@ -59,6 +59,12 @@ internal sealed partial class ContractOperationTransformer : IOpenApiOperationTr
             operation.Extensions[ContractExtensions.Concurrency] = Node(JsonValue.Create(true));
         }
 
+        bool idempotent = metadata.OfType<IdempotencyMetadata>().Any();
+        if (idempotent)
+        {
+            operation.Extensions[ContractExtensions.Idempotent] = Node(JsonValue.Create(true));
+        }
+
         if (metadata.OfType<SdkTemplateMetadata>().LastOrDefault() is { } template)
         {
             operation.Extensions[ContractExtensions.SdkTemplate] = Node(JsonValue.Create(template.Name));
@@ -68,6 +74,13 @@ internal sealed partial class ContractOperationTransformer : IOpenApiOperationTr
         if (concurrency)
         {
             WriteConcurrency(operation, context.Document!);
+        }
+
+        if (idempotent)
+        {
+            // IDM-1: the marked operation documents the header it takes.
+            operation.Parameters ??= [];
+            operation.Parameters.Add(new OpenApiParameterReference(OrvanoHeaders.IdempotencyKey, context.Document!));
         }
 
         WriteResponses(operation, context.Document!);
@@ -224,6 +237,8 @@ internal static class ContractExtensions
     public const string Paging = "x-orvano-paging";
 
     public const string Concurrency = "x-orvano-concurrency";
+
+    public const string Idempotent = "x-orvano-idempotent";
 
     public const string SdkTemplate = "x-orvano-sdk-template";
 

@@ -97,6 +97,10 @@ export function conformanceFiles(
   const concurrencyCalls = entries
     .filter(({ operation }) => operation.concurrency)
     .map(({ operation }) => csString(callName(operation)));
+  const idempotentCalls = entries
+    .filter(({ operation }) => operation.idempotent)
+    .map(({ operation }) => csString(callName(operation)));
+  dispatch += `        if (options.IdempotencyKey is not null && ${idempotentCalls.length === 0 ? "true" : `call is not (${idempotentCalls.join(" or ")})`})\n        {\n            throw new ArgumentException($"{call} does not take idempotencyKey.", nameof(call));\n        }\n\n`;
   dispatch += `        if (options.IfMatch is not null && ${concurrencyCalls.length === 0 ? "true" : `call is not (${concurrencyCalls.join(" or ")})`})\n        {\n            throw new ArgumentException($"{call} does not take ifMatch.", nameof(call));\n        }\n\n`;
   dispatch += "        try\n        {\n            switch (call)\n            {\n";
   dispatch += entries
@@ -156,6 +160,7 @@ function dispatchCase(
         : `ConformanceJson.Optional<${csTypeName(input.type)}>(parameters, ${csString(input.wireName)})`;
     }),
     ...(operation.concurrency ? ["options.IfMatch"] : []),
+    ...(operation.idempotent ? ["options.IdempotencyKey"] : []),
     "requestOptions",
     "cancellationToken",
   ];

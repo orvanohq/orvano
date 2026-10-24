@@ -99,6 +99,7 @@ public sealed class ContractTransformerTests
             .WithSdk("samples", "create")
             .WithErrors(ErrorCodes.Conflict)
             .WithMeter("samples.create")
+            .WithIdempotency()
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         samples.MapGet("/{sampleId:guid}", Results<Ok<SampleResponse>, ErrorProblemResult> (Guid sampleId) =>
