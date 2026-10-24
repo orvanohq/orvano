@@ -295,7 +295,7 @@ export async function dispatch(
       case "health.get":
         return { ok: true, result: toJson(await new Health(client).get(requestOptions)) };
       case "widgetKeys.rotate":
-        return { ok: true, result: toJson(await new WidgetKeys(client).rotate(params as unknown as RotateWidgetKeysParams, requestOptions)) };
+        return { ok: true, result: toJson(await new WidgetKeys(client).rotate(params, requestOptions)) };
       case "widgets.create":
         return { ok: true, result: toJson(await new Widgets(client).create(params as unknown as CreateWidgetsParams, requestOptions)) };
       case "widgets.delete":
@@ -308,13 +308,13 @@ export async function dispatch(
           return await walkAll(
             (walkOptions) =>
             new Widgets(client).listAll(
-              params as unknown as Omit<ListWidgetsParams, "cursor">,
+              params,
               walkOptions,
             ),
             requestOptions,
             options.cancelAfter,
           );
-        return { ok: true, result: toJson(await new Widgets(client).list(params as unknown as ListWidgetsParams, requestOptions)) };
+        return { ok: true, result: toJson(await new Widgets(client).list(params, requestOptions)) };
       default:
         throw new Error(`This SDK has no call ${call}.`);
     }

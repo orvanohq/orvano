@@ -99,14 +99,21 @@ function callName(operation: Operation): string {
 }
 
 function dispatchCase(service: Service, operation: Operation): string {
+  // A params type whose inputs are all optional already accepts the step's params as they are.
+  const allOptional = [
+    ...operation.pathParams,
+    ...operation.queryParams,
+    ...(operation.body?.properties ?? []),
+  ].every((entry) => !entry.required);
+  const cast = (type: string): string => (allOptional ? "params" : `params as unknown as ${type}`);
   const args = hasInputs(operation)
-    ? `params as unknown as ${paramsTypeName(operation)}, requestOptions`
+    ? `${cast(paramsTypeName(operation))}, requestOptions`
     : "requestOptions";
   const target = `new ${serviceClassName(service)}(client).${operation.method}(${args})`;
   const name = JSON.stringify(callName(operation));
   if (operation.paging !== undefined) {
     // CNF-2 `all`: the walk all sibling, its items collected (PAG-6).
-    const walk = `(walkOptions) =>\n            new ${serviceClassName(service)}(client).${operation.method}All(\n              params as unknown as Omit<${paramsTypeName(operation)}, "cursor">,\n              walkOptions,\n            )`;
+    const walk = `(walkOptions) =>\n            new ${serviceClassName(service)}(client).${operation.method}All(\n              ${cast(`Omit<${paramsTypeName(operation)}, "cursor">`)},\n              walkOptions,\n            )`;
     return `      case ${name}:\n        if (options.all === true)\n          return await walkAll(\n            ${walk},\n            requestOptions,\n            options.cancelAfter,\n          );\n        return { ok: true, result: toJson(await ${target}) };\n`;
   }
 

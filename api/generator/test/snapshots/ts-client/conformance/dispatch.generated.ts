@@ -301,13 +301,13 @@ export async function dispatch(
           return await walkAll(
             (walkOptions) =>
             new Widgets(client).listAll(
-              params as unknown as Omit<ListWidgetsParams, "cursor">,
+              params,
               walkOptions,
             ),
             requestOptions,
             options.cancelAfter,
           );
-        return { ok: true, result: toJson(await new Widgets(client).list(params as unknown as ListWidgetsParams, requestOptions)) };
+        return { ok: true, result: toJson(await new Widgets(client).list(params, requestOptions)) };
       default:
         throw new Error(`This SDK has no call ${call}.`);
     }
