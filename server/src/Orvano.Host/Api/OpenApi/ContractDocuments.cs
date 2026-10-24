@@ -35,6 +35,7 @@ internal static class ContractDocuments
     public static IServiceCollection AddApiContract(this IServiceCollection services)
     {
         services.AddErrorCatalogue();
+        services.AddPublicEventCatalog();
         foreach (string name in new[] { Public, Console })
         {
             services.AddOpenApi(name, options =>
@@ -47,6 +48,7 @@ internal static class ContractDocuments
                 options.AddDocumentTransformer<ContractComponentsTransformer>();
                 options.AddDocumentTransformer<ErrorCatalogueTransformer>();
                 options.AddDocumentTransformer<ContractTagsTransformer>();
+                options.AddDocumentTransformer<WebhooksTransformer>();
                 options.AddDocumentTransformer<BodySchemaTransformer>();
                 options.AddDocumentTransformer<UnusedSchemaTransformer>();
             });

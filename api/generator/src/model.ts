@@ -123,6 +123,13 @@ export interface HeaderName {
   description: string;
 }
 
+/** A public event (EVS-1): its type and the schema of its payload. */
+export interface PublicEvent {
+  type: string;
+  description: string;
+  schema: string;
+}
+
 export interface Model {
   title: string;
   version: string;
@@ -131,6 +138,8 @@ export interface Model {
   schemas: NamedSchema[];
   errorCodes: ErrorCode[];
   headers: HeaderName[];
+  /** EVS-3: every target emits these payload models, so realtime, webhooks, and functions share them. */
+  events: PublicEvent[];
 }
 
 const sdkName = /^[a-z][A-Za-z0-9]*$/;
@@ -225,7 +234,44 @@ export function buildModel(contract: LoadedContract): Model {
         };
       }),
     headers: headerNames(document),
+    events: publicEvents(document),
   };
+}
+
+const eventType = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+\.v[1-9][0-9]*$/;
+
+/** EVS-1: each webhook is keyed by its event type and posts the `<PascalCased segments>Event` schema. */
+function publicEvents(document: OpenApiDocument): PublicEvent[] {
+  return Object.keys(document.webhooks ?? {})
+    .toSorted(byString)
+    .map((type) => {
+      if (!eventType.test(type))
+        throw new GeneratorError(
+          `Webhook ${type}: the key must be an event type such as auth.user.created.v1.`,
+        );
+      const post = document.webhooks?.[type]?.post;
+      const ref = post?.requestBody?.content?.["application/json"]?.schema?.$ref;
+      if (ref === undefined)
+        throw new GeneratorError(
+          `Webhook ${type}: it needs a post whose application/json body is a schema reference.`,
+        );
+      const schema = schemaRefName(document, ref, `Webhook ${type}`);
+      const expected = `${type
+        .split(".")
+        .map((segment) =>
+          segment
+            .split("_")
+            .filter((word) => word !== "")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(""),
+        )
+        .join("")}Event`;
+      if (schema !== expected)
+        throw new GeneratorError(
+          `Webhook ${type}: its payload schema must be named ${expected}, got ${schema}.`,
+        );
+      return { type, description: post?.description ?? "", schema };
+    });
 }
 
 function buildOperation(
@@ -622,6 +668,8 @@ export function forAudience(model: Model, audience: Audience): TargetModel {
     if (operation.paging !== undefined) visit(operation.paging.item, "output");
     else if (operation.response !== undefined) visit(operation.response, "output");
   }
+  // EVS-3: event payloads reach every target, client and server.
+  for (const event of model.events) visit({ kind: "ref", name: event.schema }, "output");
 
   return {
     ...model,

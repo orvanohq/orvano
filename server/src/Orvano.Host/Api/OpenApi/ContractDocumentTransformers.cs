@@ -106,11 +106,18 @@ internal sealed class BodySchemaTransformer : IOpenApiDocumentTransformer
     public Task TransformAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
     {
         OpenApiOperation[] operations = [.. document.Paths.Values.SelectMany(item => item.Operations?.Values ?? Enumerable.Empty<OpenApiOperation>())];
+        // EVS-1: an event payload is sent by the server, so it follows the response rule.
+        IEnumerable<IOpenApiSchema> events = (document.Webhooks?.Values ?? Enumerable.Empty<IOpenApiPathItem>())
+            .SelectMany(item => item.Operations?.Values ?? Enumerable.Empty<OpenApiOperation>())
+            .SelectMany(operation => operation.RequestBody?.Content?.Values ?? [])
+            .Select(media => media.Schema)
+            .OfType<IOpenApiSchema>();
         IEnumerable<IOpenApiSchema> responses = operations
             .SelectMany(operation => operation.Responses?.Values ?? Enumerable.Empty<IOpenApiResponse>())
             .SelectMany(response => response.Content?.Values ?? [])
             .Select(media => media.Schema)
-            .OfType<IOpenApiSchema>();
+            .OfType<IOpenApiSchema>()
+            .Concat(events);
         IEnumerable<IOpenApiSchema> requests = operations
             .SelectMany(operation => operation.RequestBody?.Content?.Values ?? [])
             .Select(media => media.Schema)

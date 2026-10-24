@@ -92,6 +92,8 @@ export interface OpenApiDocument {
   info: { title: string; version: string; description?: string };
   tags?: { name: string; description?: string }[];
   paths?: Record<string, PathItem>;
+  /** EVS-1: public events, keyed by type, each a `post` whose body is the payload. */
+  webhooks?: Record<string, PathItem>;
   components?: {
     schemas?: Record<string, SchemaObject>;
     parameters?: Record<string, ParameterObject>;
