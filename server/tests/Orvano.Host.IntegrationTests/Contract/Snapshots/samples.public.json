@@ -146,6 +146,137 @@
           "service": "samples",
           "method": "create"
         }
+      },
+      "get": {
+        "tags": [
+          "samples"
+        ],
+        "summary": "List samples.",
+        "description": "Returns the samples, a page at a time.",
+        "operationId": "Sample_List",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "The project's ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many items to return, 1 to 100; 50 when not sent.",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The nextCursor of the previous page; omit it for the first page.",
+            "schema": {
+              "maxLength": 2048,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfSampleResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-orvano-audience": [
+          "server"
+        ],
+        "x-orvano-errors": [
+          "invalid_cursor"
+        ],
+        "x-orvano-paging": {
+          "total": false
+        },
+        "x-orvano-sdk": {
+          "service": "samples",
+          "method": "list"
+        }
       }
     },
     "/v1/projects/{projectId}/samples/{sampleId}": {
@@ -339,6 +470,39 @@
           }
         },
         "description": "One problem with one field of the request."
+      },
+      "PageOfSampleResponse": {
+        "required": [
+          "items",
+          "nextCursor",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SampleResponse"
+            },
+            "description": "The items on this page, in the list's order."
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The cursor for the next page, or null on the last page."
+          },
+          "total": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "How many items the whole list has, or null when the operation does not count them.",
+            "format": "int32"
+          }
+        },
+        "description": "One page of a list."
       },
       "Problem": {
         "required": [

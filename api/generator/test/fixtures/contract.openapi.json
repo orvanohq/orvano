@@ -97,6 +97,15 @@
                 "type": "string"
               }
             }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The nextCursor of the previous page; omit it for the first page.",
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
           }
         ],
         "responses": {
@@ -126,6 +135,9 @@
         "x-orvano-sdk": {
           "service": "widgets",
           "method": "list"
+        },
+        "x-orvano-paging": {
+          "total": true
         }
       },
       "post": {
@@ -583,7 +595,7 @@
         }
       },
       "WidgetListResponse": {
-        "required": ["items"],
+        "required": ["items", "nextCursor", "total"],
         "type": "object",
         "description": "Widgets.",
         "properties": {
@@ -593,6 +605,15 @@
               "$ref": "#/components/schemas/WidgetResponse"
             },
             "description": "The widgets."
+          },
+          "nextCursor": {
+            "type": ["string", "null"],
+            "description": "The cursor for the next page, or null on the last page."
+          },
+          "total": {
+            "type": ["integer", "null"],
+            "format": "int32",
+            "description": "How many widgets there are, or null when not counted."
           }
         }
       },

@@ -45,8 +45,12 @@ export function dispatchFile(model: TargetModel, fixture: TargetModel, source: P
     ),
   ].toSorted((a, b) => byString(callName(a.operation), callName(b.operation)));
 
+  const paged = [...model.services, ...fixture.services].some((service) =>
+    service.operations.some((operation) => operation.paging !== undefined),
+  );
   const publicImports = [
     "OrvanoError",
+    ...(paged ? ["type Page"] : []),
     ...model.services.map(serviceClassName),
     ...model.services.flatMap((service) =>
       service.operations.filter(hasInputs).map((operation) => `type ${paramsTypeName(operation)}`),
@@ -70,11 +74,19 @@ export function dispatchFile(model: TargetModel, fixture: TargetModel, source: P
   text += staticPart;
   text += `\n/** Every call this SDK's scenarios may make, as \`<service>.<method>\`. */\n`;
   text += `export const calls: readonly string[] = [\n${entries.map(({ operation }) => `  ${JSON.stringify(callName(operation))},\n`).join("")}];\n`;
+  const pagedCalls = entries
+    .filter(({ operation }) => operation.paging !== undefined)
+    .map(({ operation }) => JSON.stringify(callName(operation)));
+  text += `\n/** The calls that are paged lists, which take the \`all\` option (PAG-6). */\n`;
+  text += `const pagedCalls: ReadonlySet<string> = new Set([${pagedCalls.join(", ")}]);\n`;
   text +=
     "\n/** Runs one scenario step's call and returns its result as JSON, or the normalized error (CNF-4). */\n";
   text +=
     "export async function dispatch(\n  client: OrvanoClient,\n  call: string,\n  params: Readonly<Record<string, unknown>>,\n  options: ConformanceOptions = {},\n): Promise<ConformanceOutcome> {\n";
-  text += "  const requestOptions = toRequestOptions(options);\n  try {\n    switch (call) {\n";
+  text += "  const requestOptions = toRequestOptions(options);\n";
+  text += "  if (options.all === true && !pagedCalls.has(call))\n";
+  text += `    throw new Error(\`\${call} is not a paged list, so it has no walk all method.\`);\n`;
+  text += "  try {\n    switch (call) {\n";
   for (const { service, operation } of entries) text += dispatchCase(service, operation);
   text += "      default:\n        throw new Error(`This SDK has no call ${call}.`);\n    }\n";
   text +=
@@ -87,11 +99,24 @@ function callName(operation: Operation): string {
 }
 
 function dispatchCase(service: Service, operation: Operation): string {
+  // A params type whose inputs are all optional already accepts the step's params as they are.
+  const allOptional = [
+    ...operation.pathParams,
+    ...operation.queryParams,
+    ...(operation.body?.properties ?? []),
+  ].every((entry) => !entry.required);
+  const cast = (type: string): string => (allOptional ? "params" : `params as unknown as ${type}`);
   const args = hasInputs(operation)
-    ? `params as unknown as ${paramsTypeName(operation)}, requestOptions`
+    ? `${cast(paramsTypeName(operation))}, requestOptions`
     : "requestOptions";
   const target = `new ${serviceClassName(service)}(client).${operation.method}(${args})`;
   const name = JSON.stringify(callName(operation));
+  if (operation.paging !== undefined) {
+    // CNF-2 `all`: the walk all sibling, its items collected (PAG-6).
+    const walk = `(walkOptions) =>\n            new ${serviceClassName(service)}(client).${operation.method}All(\n              ${cast(`Omit<${paramsTypeName(operation)}, "cursor">`)},\n              walkOptions,\n            )`;
+    return `      case ${name}:\n        if (options.all === true)\n          return await walkAll(\n            ${walk},\n            requestOptions,\n            options.cancelAfter,\n          );\n        return { ok: true, result: toJson(await ${target}) };\n`;
+  }
+
   if (operation.response === undefined) {
     return `      case ${name}:\n        await ${target};\n        return { ok: true, result: null };\n`;
   }
@@ -107,6 +132,10 @@ export interface ConformanceOptions {
   readonly headers?: Readonly<Record<string, string>> | undefined;
   readonly idempotencyKey?: string | undefined;
   readonly ifMatch?: string | undefined;
+  /** Calls the operation's walk all sibling and answers every item it yields (PAG-6). */
+  readonly all?: boolean | undefined;
+  /** With \`all\`: aborts the walk's signal once this many items arrived; the answer is the items so far. */
+  readonly cancelAfter?: number | undefined;
 }
 
 /** An SDK error in the shape every SDK's dispatcher reports (CNF-4). */
@@ -133,6 +162,27 @@ function toRequestOptions(options: ConformanceOptions): RequestOptions {
     retry: options.retry === undefined ? undefined : { maxRetries: options.retry },
     headers: options.headers,
   };
+}
+
+const walkCancelled = new Error("The scenario cancelled the walk (cancelAfter).");
+
+/** Collects a walk's items; \`cancelAfter\` aborts its signal, which the SDK checks before each page (SHP-5). */
+async function walkAll(
+  start: (options: RequestOptions) => AsyncIterable<unknown>,
+  options: RequestOptions,
+  cancelAfter: number | undefined,
+): Promise<ConformanceOutcome> {
+  const controller = new AbortController();
+  const items: unknown[] = [];
+  try {
+    for await (const item of start({ ...options, signal: controller.signal })) {
+      items.push(item);
+      if (items.length === cancelAfter) controller.abort(walkCancelled);
+    }
+  } catch (error) {
+    if (error !== walkCancelled) throw error;
+  }
+  return { ok: true, result: toJson(items) };
 }
 
 function normalize(error: OrvanoError): ConformanceError {

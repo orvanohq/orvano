@@ -47,6 +47,12 @@ internal sealed partial class ContractOperationTransformer : IOpenApiOperationTr
             operation.Extensions[ContractExtensions.Metered] = Node(JsonValue.Create(meter.Name));
         }
 
+        if (metadata.OfType<PagingMetadata>().LastOrDefault() is { } paging)
+        {
+            operation.Extensions[ContractExtensions.Paging] = Node(new JsonObject { ["total"] = paging.Total });
+            WritePagingParameters(operation);
+        }
+
         if (metadata.OfType<SdkTemplateMetadata>().LastOrDefault() is { } template)
         {
             operation.Extensions[ContractExtensions.SdkTemplate] = Node(JsonValue.Create(template.Name));
@@ -87,6 +93,34 @@ internal sealed partial class ContractOperationTransformer : IOpenApiOperationTr
             if (existing is OpenApiParameter { Description: null } concrete && GroupParameters.TryGetValue(name, out string? description))
             {
                 concrete.Description = description;
+            }
+        }
+    }
+
+    // PAG-1: the limits PageQuery validates, so the SDKs and docs show them.
+    private static void WritePagingParameters(OpenApiOperation operation)
+    {
+        foreach (IOpenApiParameter parameter in operation.Parameters ?? [])
+        {
+            if (parameter is not OpenApiParameter { In: ParameterLocation.Query, Schema: OpenApiSchema schema } concrete)
+            {
+                continue;
+            }
+
+            switch (concrete.Name)
+            {
+                case "limit":
+                    concrete.Description ??= "How many items to return, 1 to 100; 50 when not sent.";
+                    schema.Minimum = "1";
+                    schema.Maximum = PageQuery.MaxLimit.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    schema.Default = PageQuery.DefaultLimit;
+                    break;
+                case "cursor":
+                    concrete.Description ??= "The nextCursor of the previous page; omit it for the first page.";
+                    schema.MaxLength = PageQuery.MaxCursorLength;
+                    break;
+                default:
+                    break;
             }
         }
     }
@@ -162,6 +196,8 @@ internal static class ContractExtensions
     public const string Errors = "x-orvano-errors";
 
     public const string Metered = "x-orvano-metered";
+
+    public const string Paging = "x-orvano-paging";
 
     public const string SdkTemplate = "x-orvano-sdk-template";
 

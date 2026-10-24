@@ -100,6 +100,15 @@ public sealed class ContractTransformerTests
             .WithSdkTemplate("typed-rows")
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        samples.MapGet("/", ([AsParameters] PageQuery page) => TypedResults.Ok(new Page<SampleResponse>([Sample], null, null)))
+            .RequireScope(Scopes.DatabasesRead)
+            .WithName("Sample_List")
+            .WithSummary("List samples.")
+            .WithDescription("Returns the samples, a page at a time.")
+            .WithSdk("samples", "list")
+            .WithErrors(ErrorCodes.InvalidCursor)
+            .WithPaging();
+
         api.Console.MapGet("/organizations/{organizationId:guid}/samples", () => TypedResults.Ok(Sample))
             .RequireConsolePermission(ConsolePermission.OrgRead)
             .WithName("Sample_ConsoleGet")

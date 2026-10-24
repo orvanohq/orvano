@@ -50,25 +50,45 @@ internal static class ValidationErrors
     }
 
     // A key whose first segment names a parameter bound from the query, route, or a header is that parameter;
-    // anything else is a body member path, written with the JSON naming policy per segment.
+    // anything else is a body member path, written with the JSON naming policy per segment. A member of an
+    // [AsParameters] type (PageQuery, spec 0014 PAG-1) is found by its own name, with or without the parameter's.
     private static (FieldLocation Location, string Field) Locate(
         string key, ParameterInfo[] parameters, RoutePattern? route, JsonNamingPolicy? naming)
     {
         int end = key.IndexOfAny(['.', '[']);
         string head = end < 0 ? key : key[..end];
         ParameterInfo? parameter = parameters.FirstOrDefault(p => string.Equals(p.Name, head, StringComparison.OrdinalIgnoreCase));
-        if (parameter is not null && Source(parameter, route) is { } source)
+        if (parameter?.GetCustomAttribute<AsParametersAttribute>() is not null && end > 0)
+        {
+            string member = key[(end + 1)..];
+            if (Member(parameter.ParameterType, member) is { } property && Source(property, property.Name, property.PropertyType, route) is { } inner)
+            {
+                return inner;
+            }
+        }
+
+        if (parameter is not null && Source(parameter, parameter.Name!, parameter.ParameterType, route) is { } source)
         {
             return source;
+        }
+
+        foreach (ParameterInfo grouped in parameters.Where(p => p.GetCustomAttribute<AsParametersAttribute>() is not null))
+        {
+            if (Member(grouped.ParameterType, key) is { } property && Source(property, property.Name, property.PropertyType, route) is { } inner)
+            {
+                return inner;
+            }
         }
 
         return (FieldLocation.Body, BodyPath(parameter is null ? key : key[head.Length..].TrimStart('.'), naming));
     }
 
-    private static (FieldLocation, string)? Source(ParameterInfo parameter, RoutePattern? route)
+    private static PropertyInfo? Member(Type type, string name) =>
+        type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+
+    private static (FieldLocation, string)? Source(ICustomAttributeProvider member, string name, Type memberType, RoutePattern? route)
     {
-        object[] attributes = parameter.GetCustomAttributes(inherit: true);
-        string name = parameter.Name!;
+        object[] attributes = member.GetCustomAttributes(inherit: true);
         if (attributes.OfType<IFromHeaderMetadata>().FirstOrDefault() is { } header)
         {
             return (FieldLocation.Header, header.Name ?? name);
@@ -94,7 +114,7 @@ internal static class ValidationErrors
             return (FieldLocation.Path, name);
         }
 
-        Type type = Nullable.GetUnderlyingType(parameter.ParameterType) ?? parameter.ParameterType;
+        Type type = Nullable.GetUnderlyingType(memberType) ?? memberType;
         bool simple = type.IsPrimitive || type.IsEnum || type == typeof(string) || type == typeof(Guid) || type == typeof(decimal)
             || type == typeof(DateTimeOffset) || type == typeof(DateTime) || type == typeof(DateOnly) || type == typeof(TimeSpan);
         return simple ? (FieldLocation.Query, name) : null;

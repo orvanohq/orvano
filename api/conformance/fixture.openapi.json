@@ -17,6 +17,116 @@
   ],
   "paths": {
     "/v1/projects/{projectId}/fixture/widgets": {
+      "get": {
+        "tags": ["fixture"],
+        "x-orvano-audience": ["client", "server"],
+        "x-orvano-errors": ["invalid_cursor"],
+        "summary": "List fixture widgets.",
+        "description": "Answers a page of widgets, so stub scenarios can script paging and the walk all method (PAG-6).",
+        "operationId": "Fixture_ListWidgets",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "description": "The project's ID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many items to return, 1 to 100; 50 when not sent.",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The nextCursor of the previous page; omit it for the first page.",
+            "schema": {
+              "maxLength": 2048,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfFixtureWidgetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-orvano-sdk": {
+          "service": "fixture",
+          "method": "listWidgets"
+        },
+        "x-orvano-paging": {
+          "total": false
+        }
+      },
       "post": {
         "tags": ["fixture"],
         "x-orvano-audience": ["client", "server"],
@@ -344,6 +454,29 @@
           }
         },
         "description": "The server is up and ready to serve requests."
+      },
+      "PageOfFixtureWidgetResponse": {
+        "required": ["items", "nextCursor", "total"],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FixtureWidgetResponse"
+            },
+            "description": "The items on this page, in the list's order."
+          },
+          "nextCursor": {
+            "type": ["string", "null"],
+            "description": "The cursor for the next page, or null on the last page."
+          },
+          "total": {
+            "type": ["integer", "null"],
+            "description": "How many items the whole list has, or null when the operation does not count them.",
+            "format": "int32"
+          }
+        },
+        "description": "One page of a list."
       },
       "Problem": {
         "required": ["code", "detail", "status", "title", "traceId", "type"],

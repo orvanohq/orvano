@@ -12,6 +12,7 @@ import {
   isCollection,
   nonNull,
   readExpression,
+  readerFunction,
   writeExpression,
   writeNullable,
 } from "./render.ts";
@@ -33,6 +34,7 @@ export const corePublicNames: Readonly<Record<string, readonly string[]>> = {
     "OrvanoTimeoutException",
   ],
   "options.dart": ["OrvanoClientOptions", "OrvanoRequestOptions", "RetryOptions"],
+  "paging.dart": ["ResultPage"],
 };
 
 /** Names the runtime and the hand written layers already use, so no schema or service may take them. */
@@ -49,7 +51,6 @@ const takenNames: readonly string[] = [
   "OrvanoFlutter",
   "OrvanoServer",
   "OrvanoRow",
-  "ResultPage",
   "TableHandle",
   "SessionStore",
   // Flutter widgets an app imports beside the SDK (spec 0004 CLN-4)
@@ -396,11 +397,24 @@ export function serviceClass(service: Service, types: DartTypes): string {
   return `${text}}\n`;
 }
 
+/** A paged list's item type (PAG-6). */
+export function pageItemOf(operation: Operation, types: DartTypes): DartType | undefined {
+  return operation.paging === undefined
+    ? undefined
+    : types.resolve(
+        operation.paging.item,
+        `${pascalCase(operation.method)}${pascalCase(operation.service)}Item`,
+        true,
+        `${operation.operationId} item`,
+      );
+}
+
 function method(operation: Operation, types: DartTypes): string {
   const where = operation.operationId;
   const inputs = inputsOf(operation, types);
+  const item = pageItemOf(operation, types);
   const response =
-    operation.response === undefined
+    operation.response === undefined || item !== undefined
       ? undefined
       : types.resolve(
           operation.response,
@@ -408,7 +422,12 @@ function method(operation: Operation, types: DartTypes): string {
           true,
           `${where} response`,
         );
-  const returnType = response === undefined ? "void" : dartTypeName(response);
+  const returnType =
+    item !== undefined
+      ? `ResultPage<${dartTypeName(item)}>`
+      : response === undefined
+        ? "void"
+        : dartTypeName(response);
   const name = methodName(operation);
 
   const paragraphs = [operation.summary, operation.description];
@@ -466,12 +485,50 @@ function method(operation: Operation, types: DartTypes): string {
   }
   fields.push("options: options");
   const call = `_transport.request(\n${fields.map((field) => `      ${field},\n`).join("")}    )`;
+  if (item !== undefined) {
+    text += `    final json = await ${call};\n`;
+    text += `    return ResultPage.fromJson(readObject(json, r'$'), ${readerFunction(item)});\n  }\n`;
+    return text + walkAllMethod(operation, inputs, item);
+  }
   if (response === undefined) {
     text += `    await ${call};\n  }\n`;
   } else {
     text += `    final json = await ${call};\n`;
     text += `    return ${readExpression(response, "json", "r'$'")};\n  }\n`;
   }
+  return text;
+}
+
+/**
+ * The walk all sibling of a paged list (spec 0004 CLN-4, spec 0014 PAG-6): a lazy `Stream` of items that fetches the
+ * next page only when the listener reaches it and stops when the subscription is cancelled.
+ */
+function walkAllMethod(operation: Operation, inputs: Input[], item: DartType): string {
+  const name = methodName(operation);
+  const walkInputs = inputs.filter(
+    (input) => !(input.location === "query" && input.wireName === "cursor"),
+  );
+  let text = `\n${dartDoc(
+    [
+      `Walks every page of [${name}], yielding items. A page is fetched when the listener reaches it; cancelling the subscription stops fetching. [options] apply to each page's request.`,
+      "Emits an [OrvanoException] when a page's call fails.",
+    ],
+    "  ",
+  )}`;
+  if (operation.deprecated)
+    text += "  @Deprecated('The contract marks this operation deprecated.')\n";
+  const params = [
+    ...walkInputs.map(
+      (input) => `${input.required ? "required " : ""}${dartTypeName(input.type)} ${input.name}`,
+    ),
+    "OrvanoRequestOptions? options",
+  ];
+  const args = [
+    ...walkInputs.map((input) => `${input.name}: ${input.name}`),
+    "cursor: cursor",
+    "options: options",
+  ];
+  text += `  Stream<${dartTypeName(item)}> ${name}All({\n${params.map((param) => `    ${param},\n`).join("")}  }) => walkPages(\n    (cursor) => ${name}(${args.join(", ")}),\n  );\n`;
   return text;
 }
 
@@ -503,7 +560,10 @@ export function serviceFile(service: Service, types: DartTypes, source: Provenan
   text += "\nimport 'package:meta/meta.dart';\n\n";
   text += "import '../core/exceptions.dart';\n";
   if (/\bread[A-Z][A-Za-z]*\(|writeDateTime\(/.test(body)) text += "import '../core/json.dart';\n";
-  text += "import '../core/options.dart';\nimport '../core/transport.dart';\n";
+  text += "import '../core/options.dart';\n";
+  if (service.operations.some((operation) => operation.paging !== undefined))
+    text += "import '../core/paging.dart';\n";
+  text += "import '../core/transport.dart';\n";
   if (types.declarations().length > 0 && usesModels(body, types)) text += "import 'models.dart';\n";
   return `${text}\n${body}`;
 }

@@ -2,7 +2,13 @@
 /// A scenario step's options (CNF-2).
 final class ConformanceOptions {
   /// Creates step options.
-  const ConformanceOptions({this.timeout, this.retry, this.headers = const {}});
+  const ConformanceOptions({
+    this.timeout,
+    this.retry,
+    this.headers = const {},
+    this.all = false,
+    this.cancelAfter,
+  });
 
   /// Reads a step's `options`, plus the headers the runner adds.
   factory ConformanceOptions.fromJson(
@@ -27,6 +33,8 @@ final class ConformanceOptions {
             const {},
         ...headers,
       },
+      all: readNullable(json['all'], r'$.all', readBool) ?? false,
+      cancelAfter: readNullable(json['cancelAfter'], r'$.cancelAfter', readInt),
     );
   }
 
@@ -38,6 +46,12 @@ final class ConformanceOptions {
 
   /// Headers for the call.
   final Map<String, String> headers;
+
+  /// Whether to call the paged list's walk all sibling and answer every item (PAG-6).
+  final bool all;
+
+  /// With [all]: stop the walk once this many items arrived.
+  final int? cancelAfter;
 
   /// The SDK's request options for these step options.
   OrvanoRequestOptions toRequestOptions() => OrvanoRequestOptions(

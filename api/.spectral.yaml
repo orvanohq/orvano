@@ -6,6 +6,7 @@ functionsDir: ./spectral/functions
 functions:
   - orvano-catalogued-errors
   - orvano-int64
+  - orvano-paging
   - orvano-problem-response
   - orvano-public-operation
   - orvano-schema-direction
@@ -131,6 +132,13 @@ rules:
       function: pattern
       functionOptions:
         match: "^(/([a-z0-9]+(-[a-z0-9]+)*|\\{[a-z][a-zA-Z0-9]*\\}))+$"
+
+  orvano-paging:
+    description: Every list is paged, with limit, cursor, and { items, nextCursor, total } (PAG-1, PAG-2, PAG-7).
+    severity: error
+    given: "#Operation"
+    then:
+      function: orvano-paging
 
   orvano-int64:
     description: An int64 is a number with maximum at or below 2^53 - 1, or a string with a pattern (JSW-5).
