@@ -150,6 +150,7 @@ final class OrvanoTransport {
     Map<String, Object?>? body,
     OrvanoRequestOptions? options,
     String? ifMatch,
+    String? idempotencyKey,
   }) async {
     if (_closed) throw StateError('This Orvano client is closed.');
     final timeout = options?.timeout ?? _options.timeout;
@@ -161,12 +162,17 @@ final class OrvanoTransport {
       ..._checkHeaders(options?.headers ?? const {}, perCall: true),
       // CNC-3, CNC-4: the version the caller read, as a strong ETag.
       if (ifMatch != null) OrvanoHeaders.ifMatch: _ifMatch(ifMatch),
+      // IDM-1: the caller's key, on operations marked for it.
+      if (idempotencyKey != null)
+        OrvanoHeaders.idempotencyKey: _idempotencyKey(idempotencyKey),
     };
     final uri = _endpoint.resolveUri(
       Uri(pathSegments: path, queryParameters: _queryOf(query)),
     );
     final bytes = body == null ? null : utf8.encode(jsonEncode(body));
-    final retriable = retryMethods.contains(method);
+    // IDM-3: a non GET call is retried only with an idempotency key, which
+    // only marked operations take.
+    final retriable = retryMethods.contains(method) || idempotencyKey != null;
     var retries = 0;
     var refreshed = false;
 
@@ -423,6 +429,19 @@ final class OrvanoTransport {
     }
     return Map.unmodifiable(headers);
   }
+}
+
+/// An `Idempotency-Key`: 1 to 255 printable ASCII characters, chosen by the
+/// caller (spec 0014 IDM-1).
+String _idempotencyKey(String key) {
+  if (!RegExp(r'^[\x20-\x7e]{1,255}$').hasMatch(key)) {
+    throw ArgumentError.value(
+      key,
+      'idempotencyKey',
+      'must be 1 to 255 printable ASCII characters',
+    );
+  }
+  return key;
 }
 
 /// The `If-Match` value for a resource's `version`: the strong ETag

@@ -18,6 +18,7 @@ export const runtimePublicNames: readonly string[] = [
   "CommonClientOptions",
   "ErrorKind",
   "FieldError",
+  "IdempotencyOptions",
   "IfMatchOptions",
   "OrvanoClient",
   "OrvanoError",
@@ -163,8 +164,12 @@ export function clientImports(services: readonly Service[]): string[] {
   const concurrency = services.some((service) =>
     service.operations.some((operation) => operation.concurrency),
   );
+  const idempotent = services.some((service) =>
+    service.operations.some((operation) => operation.idempotent),
+  );
   return [
     ...clientHelpers(services),
+    ...(idempotent ? ["type IdempotencyOptions"] : []),
     ...(concurrency ? ["type IfMatchOptions"] : []),
     "type OrvanoClient",
     ...(paged ? ["type Page"] : []),
@@ -286,6 +291,15 @@ function queryable(type: TypeRef, model: TargetModel): boolean {
   return scalar(outer) || (outer.kind === "array" && scalar(outer.items));
 }
 
+/** The options type of an operation: `RequestOptions`, plus `ifMatch` (CNC-4) or `idempotencyKey` (IDM-3) when marked. */
+function optionsTypeOf(operation: Operation): string {
+  const types = [
+    ...(operation.concurrency ? ["IfMatchOptions"] : []),
+    ...(operation.idempotent ? ["IdempotencyOptions"] : []),
+  ];
+  return types.length === 0 ? "RequestOptions" : types.join(" & ");
+}
+
 /** The TypeScript result of an operation: its response, or `Page<item>` for a paged list (PAG-6). */
 function responseTypeOf(operation: Operation): string {
   if (operation.paging !== undefined)
@@ -345,12 +359,16 @@ function method(operation: Operation): string {
       ...operation.queryParams,
       ...(operation.body?.properties ?? []),
     ].every((entry) => !entry.required);
-  const optionsType = operation.concurrency ? "IfMatchOptions" : "RequestOptions";
+  const optionsType = optionsTypeOf(operation);
+  const extras = [
+    ...(operation.concurrency ? ["`ifMatch`, the `version` you read"] : []),
+    ...(operation.idempotent ? ["`idempotencyKey`, which makes a failed call retryable"] : []),
+  ];
   const tags = [
     ...(inputs ? ["@param params - The call's inputs."] : []),
-    operation.concurrency
-      ? "@param options - Per call options: signal, timeout, headers, retry, and `ifMatch`, the `version` you read."
-      : "@param options - Per call options: signal, timeout, headers, and retry.",
+    extras.length === 0
+      ? "@param options - Per call options: signal, timeout, headers, and retry."
+      : `@param options - Per call options: signal, timeout, headers, retry, ${extras.join(", and ")}.`,
     `@throws {@link OrvanoError} when the call fails.`,
     ...(operation.deprecated ? ["@deprecated"] : []),
   ];
@@ -386,6 +404,7 @@ function method(operation: Operation): string {
   }
   fields.push("options");
   if (operation.concurrency) fields.push("ifMatch: options?.ifMatch");
+  if (operation.idempotent) fields.push("idempotencyKey: options?.idempotencyKey");
 
   let text = tsDoc([operation.summary, operation.description], tags, "  ");
   text += `  async ${operation.method}(${signature}): Promise<${responseType}> {\n`;
@@ -452,7 +471,7 @@ export function indexFile(model: TargetModel, source: Provenance): string {
     text += `export { ${names} } from "./${serviceFileName(service).replace(/\.ts$/, ".js")}";\n`;
   }
   text +=
-    'export type { IfMatchOptions, OrvanoClient, Page, RequestOptions } from "../runtime/client.js";\n';
+    'export type { IdempotencyOptions, IfMatchOptions, OrvanoClient, Page, RequestOptions } from "../runtime/client.js";\n';
   text +=
     'export { OrvanoError, type ErrorKind, type FieldError, type OrvanoErrorJson } from "../runtime/errors.js";\n';
   text += 'export type { CommonClientOptions } from "../runtime/options.js";\n';

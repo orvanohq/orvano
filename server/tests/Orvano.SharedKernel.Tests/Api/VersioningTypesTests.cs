@@ -10,7 +10,8 @@ using Xunit;
 
 namespace Orvano.SharedKernel.Tests.Api;
 
-// Spec 0014 JSW-9, CNC-1 to CNC-3: Optional<T> on the wire, the version format, and reading If-Match.
+// Spec 0014 JSW-9, CNC-1 to CNC-3, IDM-1: Optional<T> on the wire, the version format, reading If-Match, and the
+// Idempotency-Key format.
 public sealed class VersioningTypesTests
 {
     private sealed record Patch(Optional<string> Name, Optional<string?> Nickname, Optional<int> Rank);
@@ -88,5 +89,22 @@ public sealed class VersioningTypesTests
         conflict.Extensions!["currentVersion"].ShouldBe(ResourceVersion.Format(5));
         context.Request.Headers.IfMatch = ResourceVersion.ETag(5);
         IfMatch.Read(context.Request).Check(5).Error.ShouldBeNull();
+    }
+
+    [Theory, Trait("Spec", "0014:IDM-1")]
+    [InlineData("k", true)]
+    [InlineData("order 2026-10-24 #7~", true)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    [InlineData("n\u00e4me", false)]
+    [InlineData("new\nline", false)]
+    public void Idempotency_key_is_1_to_255_printable_ascii_characters(string? key, bool wellFormed) =>
+        IdempotencyKey.IsWellFormed(key).ShouldBe(wellFormed);
+
+    [Fact, Trait("Spec", "0014:IDM-1")]
+    public void Idempotency_key_is_at_most_255_characters()
+    {
+        IdempotencyKey.IsWellFormed(new string('k', 255)).ShouldBeTrue();
+        IdempotencyKey.IsWellFormed(new string('k', 256)).ShouldBeFalse();
     }
 }

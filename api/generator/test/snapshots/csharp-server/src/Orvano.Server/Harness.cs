@@ -88,6 +88,9 @@ public sealed class OrvanoRequestOptions
 
     /// <summary>A copy of <paramref name="options"/> that sends <paramref name="version"/> as <c>If-Match</c>.</summary>
     internal static OrvanoRequestOptions? WithIfMatch(OrvanoRequestOptions? options, string? version) => options;
+
+    /// <summary>A copy of <paramref name="options"/> that sends <paramref name="key"/> as <c>Idempotency-Key</c>.</summary>
+    internal static OrvanoRequestOptions? WithIdempotencyKey(OrvanoRequestOptions? options, string? key) => options;
 }
 
 /// <summary>The client.</summary>

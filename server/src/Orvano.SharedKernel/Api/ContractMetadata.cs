@@ -21,3 +21,6 @@ public sealed record PagingMetadata(bool Total);
 
 /// <summary><c>x-orvano-concurrency</c> (spec 0014 CNC-4): the write takes <c>If-Match</c>.</summary>
 public sealed record ConcurrencyMetadata;
+
+/// <summary><c>x-orvano-idempotent</c> (spec 0014 IDM-2): the operation replays safely for a repeated <c>Idempotency-Key</c>.</summary>
+public sealed record IdempotencyMetadata;

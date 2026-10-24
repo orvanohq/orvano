@@ -163,6 +163,80 @@ void main() {
       expect(calls, 1);
     });
 
+    test('retries a POST after a 503 when it carries an idempotency key', () {
+      final keys = <String?>[];
+      final transport = _transport(
+        MockClient((request) async {
+          keys.add(request.headers['Idempotency-Key']);
+          return keys.length == 1
+              ? _problem(503, 'unavailable')
+              : _json({'ok': true}, 201);
+        }),
+      );
+      final result = _run(
+        () => transport.request(
+          operationId: 'T',
+          method: 'POST',
+          path: ['v1'],
+          idempotencyKey: 'order-7',
+        ),
+      );
+      expect(result.value, {'ok': true});
+      expect(keys, ['order-7', 'order-7']);
+    });
+
+    test('sends ifMatch as a strong If-Match', () {
+      String? ifMatch;
+      final transport = _transport(
+        MockClient((request) async {
+          ifMatch = request.headers['If-Match'];
+          return _json({'ok': true}, 200);
+        }),
+      );
+      _run(
+        () => transport.request(
+          operationId: 'T',
+          method: 'PATCH',
+          path: ['v1'],
+          ifMatch: 'AAAAAAAAAAE',
+        ),
+      );
+      expect(ifMatch, '"AAAAAAAAAAE"');
+    });
+
+    test('refuses a malformed idempotency key or ifMatch before sending', () {
+      var calls = 0;
+      final transport = _transport(
+        MockClient((request) async {
+          calls++;
+          return _json({'ok': true}, 200);
+        }),
+      );
+      for (final call in [
+        () => transport.request(
+          operationId: 'T',
+          method: 'POST',
+          path: ['v1'],
+          idempotencyKey: '',
+        ),
+        () => transport.request(
+          operationId: 'T',
+          method: 'POST',
+          path: ['v1'],
+          idempotencyKey: 'n\u00e4me',
+        ),
+        () => transport.request(
+          operationId: 'T',
+          method: 'PATCH',
+          path: ['v1'],
+          ifMatch: '"quoted"',
+        ),
+      ]) {
+        expect(_run(call).error, isA<ArgumentError>());
+      }
+      expect(calls, 0);
+    });
+
     test('stops after maxRetries', () {
       var calls = 0;
       final transport = _transport(

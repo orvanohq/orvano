@@ -125,11 +125,18 @@ export function dispatchFile(
     .map(({ operation }) => `  ${dartString(callName(operation))},\n`);
   text += "\n/// The calls that take `ifMatch` (CNC-4).\n";
   text += `const List<String> concurrencyCalls = [\n${concurrencyCalls.join("")}];\n`;
+  const idempotentCalls = entries
+    .filter(({ operation }) => operation.idempotent)
+    .map(({ operation }) => `  ${dartString(callName(operation))},\n`);
+  text += "\n/// The calls that take `idempotencyKey` (IDM-3).\n";
+  text += `const List<String> idempotentCalls = [\n${idempotentCalls.join("")}];\n`;
   text +=
     "\n/// Runs one scenario step's call and returns its result as JSON, or the normalized error (CNF-4).\n";
   text +=
     "Future<ConformanceOutcome> dispatch(\n  OrvanoServices client,\n  String call,\n  Map<String, Object?> params,\n  ConformanceOptions options,\n) async {\n";
   text += "  final requestOptions = options.toRequestOptions();\n";
+  text +=
+    "  if (options.idempotencyKey != null && !idempotentCalls.contains(call)) {\n    throw ArgumentError.value(call, 'call', 'does not take idempotencyKey');\n  }\n";
   text +=
     "  if (options.ifMatch != null && !concurrencyCalls.contains(call)) {\n    throw ArgumentError.value(call, 'call', 'does not take ifMatch');\n  }\n";
   text +=
@@ -167,6 +174,7 @@ function dispatchCase(
         : `${input.name}: ${read}`;
     }),
     ...(operation.concurrency ? ["ifMatch: options.ifMatch"] : []),
+    ...(operation.idempotent ? ["idempotencyKey: options.idempotencyKey"] : []),
     "options: requestOptions",
   ];
   const target = fixture

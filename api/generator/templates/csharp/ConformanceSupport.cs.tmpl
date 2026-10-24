@@ -30,14 +30,12 @@ internal sealed class ConformanceOptions
     /// <summary>The version to send as <c>If-Match</c>, on calls that take it (CNC-4).</summary>
     public string? IfMatch { get; init; }
 
+    /// <summary>The key to send as <c>Idempotency-Key</c>, on calls that take it (IDM-3).</summary>
+    public string? IdempotencyKey { get; init; }
+
     /// <summary>Reads a step's <c>options</c>, plus the headers the runner adds (such as <c>Orvano-Stub-Run</c>).</summary>
     public static ConformanceOptions FromJson(JsonObject? json, IReadOnlyDictionary<string, string> headers)
     {
-        if (json?["idempotencyKey"] is not null)
-        {
-            throw new NotSupportedException(
-                "This SDK does not offer idempotencyKey yet (spec 0014 build plan step 13).");
-        }
         var merged = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (json?["headers"] is JsonObject stepHeaders)
         {
@@ -58,6 +56,7 @@ internal sealed class ConformanceOptions
             All = json?["all"]?.GetValue<bool>() ?? false,
             CancelAfter = json?["cancelAfter"]?.GetValue<int>(),
             IfMatch = json?["ifMatch"]?.GetValue<string>(),
+            IdempotencyKey = json?["idempotencyKey"]?.GetValue<string>(),
         };
     }
 

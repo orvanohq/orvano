@@ -9,6 +9,7 @@ final class ConformanceOptions {
     this.all = false,
     this.cancelAfter,
     this.ifMatch,
+    this.idempotencyKey,
   });
 
   /// Reads a step's `options`, plus the headers the runner adds.
@@ -16,12 +17,6 @@ final class ConformanceOptions {
     Map<String, Object?> json, {
     Map<String, String> headers = const {},
   }) {
-    if (json['idempotencyKey'] != null) {
-      throw UnsupportedError(
-        'This SDK does not offer idempotencyKey yet '
-        '(spec 0014 build plan step 13).',
-      );
-    }
     return ConformanceOptions(
       timeout: readNullable(json['timeout'], r'$.timeout', readInt),
       retry: readNullable(json['retry'], r'$.retry', readInt),
@@ -37,6 +32,11 @@ final class ConformanceOptions {
       all: readNullable(json['all'], r'$.all', readBool) ?? false,
       cancelAfter: readNullable(json['cancelAfter'], r'$.cancelAfter', readInt),
       ifMatch: readNullable(json['ifMatch'], r'$.ifMatch', readString),
+      idempotencyKey: readNullable(
+        json['idempotencyKey'],
+        r'$.idempotencyKey',
+        readString,
+      ),
     );
   }
 
@@ -57,6 +57,9 @@ final class ConformanceOptions {
 
   /// The version to send as `If-Match`, on calls that take it (CNC-4).
   final String? ifMatch;
+
+  /// The key to send as `Idempotency-Key`, on calls that take it (IDM-3).
+  final String? idempotencyKey;
 
   /// The SDK's request options for these step options.
   OrvanoRequestOptions toRequestOptions() => OrvanoRequestOptions(
@@ -226,18 +229,21 @@ List<String> match(Object? expected, Object? actual, [String path = r'$']) {
     if (actual is! Map<String, Object?>) {
       return ['$path: expected an object, got ${_describe(actual)}'];
     }
-    return [
-      for (final key in keys)
-        ...switch (expected[key]) {
-          {r'$absent': _} when expected[key] is Map && (expected[key]! as Map).length == 1 =>
-            actual.containsKey(key)
-                ? ['$path.$key: expected no field, got ${_describe(actual[key])}']
-                : const <String>[],
-          final wanted => actual.containsKey(key)
-              ? match(wanted, actual[key], '$path.$key')
-              : ['$path.$key: missing'],
-        },
-    ];
+    final problems = <String>[];
+    for (final key in keys) {
+      final wanted = expected[key];
+      if (_isAbsent(wanted)) {
+        if (actual.containsKey(key)) {
+          final got = _describe(actual[key]);
+          problems.add('$path.$key: expected no field, got $got');
+        }
+      } else if (actual.containsKey(key)) {
+        problems.addAll(match(wanted, actual[key], '$path.$key'));
+      } else {
+        problems.add('$path.$key: missing');
+      }
+    }
+    return problems;
   }
   if (expected is List<Object?>) {
     if (actual is! List<Object?>) {
@@ -257,6 +263,10 @@ List<String> match(Object? expected, Object? actual, [String path = r'$']) {
       ? const []
       : ['$path: expected ${_describe(expected)}, got ${_describe(actual)}'];
 }
+
+/// Whether [wanted] is `{$absent: true}`: the object must not have the field.
+bool _isAbsent(Object? wanted) =>
+    wanted is Map && wanted.length == 1 && wanted.containsKey(r'$absent');
 
 List<String> _matchWith(
   String matcher,

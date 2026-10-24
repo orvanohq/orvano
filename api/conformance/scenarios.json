@@ -76,7 +76,7 @@
     },
     {
       "id": "fixture.create_widget.no_retry_without_key",
-      "title": "A POST is not retried after a 503 without an idempotency key (IDM-3)",
+      "title": "A marked POST is not retried after a 503 without an idempotency key (IDM-3)",
       "mode": "stub",
       "audience": [
         "client",
@@ -127,7 +127,97 @@
           "headers": {
             "content-type": {
               "$regex": "^application/json"
+            },
+            "idempotency-key": {
+              "$absent": true
             }
+          },
+          "body": {
+            "name": "first"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fixture.create_widget.retry_with_key",
+      "title": "A marked POST with an idempotency key is retried after a 503, sending the same key (IDM-1, IDM-3)",
+      "mode": "stub",
+      "audience": [
+        "client",
+        "server"
+      ],
+      "requires": [],
+      "steps": [
+        {
+          "call": "fixture.createWidget",
+          "params": {
+            "name": "first"
+          },
+          "options": {
+            "idempotencyKey": "order-7"
+          },
+          "expect": {
+            "result": {
+              "id": "0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10",
+              "name": "first"
+            }
+          }
+        }
+      ],
+      "stub": [
+        {
+          "request": {
+            "method": "POST",
+            "path": "/v1/projects/${projectId}/fixture/widgets"
+          },
+          "respond": {
+            "status": 503,
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Retry-After": "0"
+            },
+            "body": {
+              "type": "about:blank",
+              "title": "Service Unavailable",
+              "status": 503,
+              "detail": "Not ready.",
+              "code": "unavailable",
+              "traceId": "0af7651916cd43dd8448eb211c80319c"
+            }
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "path": "/v1/projects/${projectId}/fixture/widgets"
+          },
+          "respond": {
+            "status": 201,
+            "body": {
+              "id": "0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10",
+              "name": "first",
+              "color": "red",
+              "createdAt": "2026-10-22T09:14:03Z"
+            }
+          }
+        }
+      ],
+      "expectRequests": [
+        {
+          "method": "POST",
+          "path": "/v1/projects/${projectId}/fixture/widgets",
+          "headers": {
+            "idempotency-key": "order-7"
+          },
+          "body": {
+            "name": "first"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/projects/${projectId}/fixture/widgets",
+          "headers": {
+            "idempotency-key": "order-7"
           },
           "body": {
             "name": "first"

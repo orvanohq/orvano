@@ -617,6 +617,14 @@ function method(operation: Operation, types: CSharpTypes, typeInfo: TypeInfo): s
       ' name="ifMatch"',
     );
   }
+  if (operation.idempotent) {
+    text += docElement(
+      "param",
+      "A key you choose, 1 to 255 printable ASCII characters, sent as `Idempotency-Key`. With it, a failed call is retried; reuse it only for the same request.",
+      indent,
+      ' name="idempotencyKey"',
+    );
+  }
   text += docElement(
     "param",
     "Per call options: the timeout, retries, and extra headers.",
@@ -645,12 +653,17 @@ function method(operation: Operation, types: CSharpTypes, typeInfo: TypeInfo): s
       (input) => `${csTypeName(input.type)} ${input.name}${input.required ? "" : " = null"}`,
     ),
     ...(operation.concurrency ? ["string? ifMatch = null"] : []),
+    ...(operation.idempotent ? ["string? idempotencyKey = null"] : []),
     "OrvanoRequestOptions? options = null",
     "CancellationToken cancellationToken = default",
   ];
   if (operation.concurrency && inputs.some((input) => input.name === "ifMatch"))
     throw new GeneratorError(
       `${where}: an input named ifMatch clashes with the ifMatch parameter.`,
+    );
+  if (operation.idempotent && inputs.some((input) => input.name === "idempotencyKey"))
+    throw new GeneratorError(
+      `${where}: an input named idempotencyKey clashes with the idempotencyKey parameter.`,
     );
   const returnType = response === undefined ? "Task" : `Task<${response}>`;
   text += `${indent}public ${returnType} ${methodName(operation)}(${params.join(", ")})\n${indent}{\n`;
@@ -705,6 +718,9 @@ function method(operation: Operation, types: CSharpTypes, typeInfo: TypeInfo): s
   // CNC-4: the hand written runtime sends the version as a strong If-Match.
   if (operation.concurrency)
     body.push("options = OrvanoRequestOptions.WithIfMatch(options, ifMatch);");
+  // IDM-1, IDM-3: the runtime sends the key and retries the call when there is one.
+  if (operation.idempotent)
+    body.push("options = OrvanoRequestOptions.WithIdempotencyKey(options, idempotencyKey);");
   body.push(
     response === undefined
       ? "return _transport.SendAsync(call, options, cancellationToken);"
