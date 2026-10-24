@@ -94,6 +94,10 @@ export function conformanceFiles(
     .filter(({ operation }) => operation.paging !== undefined)
     .map(({ operation }) => csString(callName(operation)));
   dispatch += `        if (options.All && ${pagedCalls.length === 0 ? "true" : `call is not (${pagedCalls.join(" or ")})`})\n        {\n            throw new ArgumentException($"{call} is not a paged list, so it has no walk all method.", nameof(call));\n        }\n\n`;
+  const concurrencyCalls = entries
+    .filter(({ operation }) => operation.concurrency)
+    .map(({ operation }) => csString(callName(operation)));
+  dispatch += `        if (options.IfMatch is not null && ${concurrencyCalls.length === 0 ? "true" : `call is not (${concurrencyCalls.join(" or ")})`})\n        {\n            throw new ArgumentException($"{call} does not take ifMatch.", nameof(call));\n        }\n\n`;
   dispatch += "        try\n        {\n            switch (call)\n            {\n";
   dispatch += entries
     .map((entry) => dispatchCase(entry.service, entry.operation, entry.fixture, entry.types))
@@ -151,6 +155,7 @@ function dispatchCase(
         ? `ConformanceJson.Required<${csTypeName(input.type)}>(parameters, ${csString(input.wireName)})`
         : `ConformanceJson.Optional<${csTypeName(input.type)}>(parameters, ${csString(input.wireName)})`;
     }),
+    ...(operation.concurrency ? ["options.IfMatch"] : []),
     "requestOptions",
     "cancellationToken",
   ];

@@ -303,6 +303,76 @@
           "service": "widgets",
           "method": "delete"
         }
+      },
+      "patch": {
+        "tags": ["widgets"],
+        "summary": "Update a widget.",
+        "description": "Changes the fields sent and leaves the rest.",
+        "operationId": "Fixture_UpdateWidget",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "description": "The project.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "widgetId",
+            "in": "path",
+            "required": true,
+            "description": "The widget.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/If-Match"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-orvano-audience": ["client"],
+        "x-orvano-errors": ["version_conflict"],
+        "x-orvano-sdk": {
+          "service": "widgets",
+          "method": "update"
+        },
+        "x-orvano-concurrency": true,
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWidgetRequest"
+              }
+            }
+          },
+          "required": true
+        }
       }
     },
     "/v1/projects/{projectId}/widget-keys/rotate": {
@@ -371,6 +441,73 @@
   },
   "components": {
     "schemas": {
+      "CreateWidgetRequest": {
+        "required": ["name"],
+        "type": "object",
+        "description": "A new widget.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The widget's name, unique in the project."
+          },
+          "color": {
+            "$ref": "#/components/schemas/WidgetColor"
+          },
+          "nickname": {
+            "type": ["string", "null"],
+            "description": "A short name, or null for none."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Labels to filter by."
+          }
+        }
+      },
+      "FieldError": {
+        "required": ["code", "field", "location", "message"],
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "The field's wire name; in a body, a dotted camelCase path with indexes, such as `address.city` or `tags[2]`."
+          },
+          "location": {
+            "enum": ["body", "query", "path", "header"],
+            "type": "string",
+            "description": "Where the field is."
+          },
+          "code": {
+            "type": "string",
+            "description": "What is wrong, such as `required` or `too_long`."
+          },
+          "message": {
+            "type": "string",
+            "description": "An English sentence describing the problem, safe to show."
+          }
+        },
+        "description": "One problem with one field of the request."
+      },
+      "HealthResponse": {
+        "required": ["apiVersions", "status"],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Always `ok`."
+          },
+          "apiVersions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The API versions the server serves, `YYYY-MM-DD`; send one in `Orvano-Api-Version`."
+          }
+        },
+        "description": "The server is up and ready to serve requests."
+      },
       "Problem": {
         "required": ["code", "detail", "status", "title", "traceId", "type"],
         "type": "object",
@@ -430,75 +567,86 @@
         },
         "description": "The error body of every non 2xx response (RFC 9457 problem details). `code` identifies the error."
       },
-      "FieldError": {
-        "required": ["code", "field", "location", "message"],
+      "UpdateWidgetRequest": {
         "type": "object",
+        "description": "A partial update of a widget.",
         "properties": {
-          "field": {
+          "name": {
             "type": "string",
-            "description": "The field's wire name; in a body, a dotted camelCase path with indexes, such as `address.city` or `tags[2]`."
+            "description": "The new name; it can't be cleared."
           },
-          "location": {
-            "enum": ["body", "query", "path", "header"],
-            "type": "string",
-            "description": "Where the field is."
+          "nickname": {
+            "type": ["string", "null"],
+            "description": "The new nickname, or null to clear it."
           },
-          "code": {
-            "type": "string",
-            "description": "What is wrong, such as `required` or `too_long`."
-          },
-          "message": {
-            "type": "string",
-            "description": "An English sentence describing the problem, safe to show."
-          }
-        },
-        "description": "One problem with one field of the request."
-      },
-      "HealthResponse": {
-        "required": ["apiVersions", "status"],
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "Always `ok`."
-          },
-          "apiVersions": {
-            "type": "array",
+          "tags": {
+            "type": ["array", "null"],
             "items": {
               "type": "string"
             },
-            "description": "The API versions the server serves, `YYYY-MM-DD`; send one in `Orvano-Api-Version`."
+            "description": "The new tags, replacing the old ones, or null to clear them."
           }
-        },
-        "description": "The server is up and ready to serve requests."
+        }
       },
       "WidgetColor": {
         "enum": ["blue", "dark_green", "red"],
         "type": "string",
         "description": "A widget's color."
       },
-      "CreateWidgetRequest": {
-        "required": ["name"],
+      "WidgetKeyResponse": {
+        "required": ["counter", "keyId"],
         "type": "object",
-        "description": "A new widget.",
+        "description": "A rotated key.",
         "properties": {
-          "name": {
+          "keyId": {
             "type": "string",
-            "description": "The widget's name, unique in the project."
+            "description": "The new key's ID."
           },
-          "color": {
-            "$ref": "#/components/schemas/WidgetColor"
-          },
-          "nickname": {
-            "type": ["string", "null"],
-            "description": "A short name, or null for none."
-          },
-          "tags": {
+          "counter": {
+            "type": "string",
+            "format": "int64",
+            "pattern": "^-?[0-9]+$",
+            "description": "How many times the key was rotated, as a string (JSW-5)."
+          }
+        }
+      },
+      "WidgetListResponse": {
+        "required": ["items", "nextCursor", "total"],
+        "type": "object",
+        "description": "Widgets.",
+        "properties": {
+          "items": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/WidgetResponse"
             },
-            "description": "Labels to filter by."
+            "description": "The widgets."
+          },
+          "nextCursor": {
+            "type": ["string", "null"],
+            "description": "The cursor for the next page, or null on the last page."
+          },
+          "total": {
+            "type": ["integer", "null"],
+            "format": "int32",
+            "description": "How many widgets there are, or null when not counted."
+          }
+        }
+      },
+      "WidgetOwnerResponse": {
+        "required": ["kind", "userId"],
+        "type": "object",
+        "description": "Who owns a widget.",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The owner's user ID."
+          },
+          "kind": {
+            "enum": ["team", "user"],
+            "type": "string",
+            "description": "What kind of owner."
           }
         }
       },
@@ -574,63 +722,6 @@
             "type": "string",
             "readOnly": true,
             "description": "The widget's version, equal to its ETag without quotes."
-          }
-        }
-      },
-      "WidgetOwnerResponse": {
-        "required": ["kind", "userId"],
-        "type": "object",
-        "description": "Who owns a widget.",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "The owner's user ID."
-          },
-          "kind": {
-            "enum": ["team", "user"],
-            "type": "string",
-            "description": "What kind of owner."
-          }
-        }
-      },
-      "WidgetListResponse": {
-        "required": ["items", "nextCursor", "total"],
-        "type": "object",
-        "description": "Widgets.",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/WidgetResponse"
-            },
-            "description": "The widgets."
-          },
-          "nextCursor": {
-            "type": ["string", "null"],
-            "description": "The cursor for the next page, or null on the last page."
-          },
-          "total": {
-            "type": ["integer", "null"],
-            "format": "int32",
-            "description": "How many widgets there are, or null when not counted."
-          }
-        }
-      },
-      "WidgetKeyResponse": {
-        "required": ["counter", "keyId"],
-        "type": "object",
-        "description": "A rotated key.",
-        "properties": {
-          "keyId": {
-            "type": "string",
-            "description": "The new key's ID."
-          },
-          "counter": {
-            "type": "string",
-            "format": "int64",
-            "pattern": "^-?[0-9]+$",
-            "description": "How many times the key was rotated, as a string (JSW-5)."
           }
         }
       }

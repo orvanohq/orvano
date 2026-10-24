@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
 namespace Orvano.SharedKernel.Api;
@@ -16,6 +17,10 @@ public sealed record ApiRoutes(RouteGroupBuilder Instance, RouteGroupBuilder Pro
     public static ApiRoutes Create(IEndpointRouteBuilder routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        return new ApiRoutes(routes.MapGroup(ApiPaths.Prefix), routes.MapGroup(ApiPaths.Project), routes.MapGroup(ApiPaths.Console));
+        // JSW-9: null on a non nullable Optional<T> body field answers validation_failed with required.
+        return new ApiRoutes(
+            routes.MapGroup(ApiPaths.Prefix).AddEndpointFilterFactory(OptionalNullCheck.Factory),
+            routes.MapGroup(ApiPaths.Project).AddEndpointFilterFactory(OptionalNullCheck.Factory),
+            routes.MapGroup(ApiPaths.Console).AddEndpointFilterFactory(OptionalNullCheck.Factory));
     }
 }

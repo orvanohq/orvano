@@ -43,6 +43,18 @@ public sealed record SampleResponse(
     IReadOnlyList<string> Tags,
     DateTimeOffset CreatedAt);
 
+/// <summary>A partial update of a sample.</summary>
+/// <param name="Name">The new name; it can't be cleared.</param>
+/// <param name="Nickname">The new nickname, or null to clear it.</param>
+/// <param name="Count">The new count, or null to clear it.</param>
+public sealed record UpdateSampleRequest(Optional<string> Name, Optional<string?> Nickname, Optional<int?> Count);
+
+/// <summary>A versioned sample.</summary>
+/// <param name="Id">The sample's ID.</param>
+/// <param name="Name">The name.</param>
+/// <param name="Version">The sample's version, the same as its ETag without quotes.</param>
+public sealed record VersionedSampleResponse(Guid Id, string Name, [property: System.ComponentModel.ReadOnly(true)] string Version);
+
 /// <summary>What a caller sends to create a sample.</summary>
 /// <param name="Name">The name, 1 to 40 characters.</param>
 /// <param name="Nickname">An optional nickname.</param>
@@ -99,6 +111,16 @@ public sealed class ContractTransformerTests
             .WithErrors(ErrorCodes.NotFound)
             .WithSdkTemplate("typed-rows")
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        samples.MapPatch("/{sampleId:guid}", (Guid sampleId, UpdateSampleRequest request, IfMatch ifMatch) =>
+                TypedResults.Ok(new VersionedSampleResponse(sampleId, request.Name.Or("a"), ResourceVersion.Format(2))))
+            .RequireScope(Scopes.DatabasesRead)
+            .WithName("Sample_Update")
+            .WithSummary("Update a sample.")
+            .WithDescription("Changes the fields sent and leaves the rest.")
+            .WithSdk("samples", "update")
+            .WithErrors(ErrorCodes.VersionConflict)
+            .WithConcurrency();
 
         samples.MapGet("/", ([AsParameters] PageQuery page) => TypedResults.Ok(new Page<SampleResponse>([Sample], null, null)))
             .RequireScope(Scopes.DatabasesRead)

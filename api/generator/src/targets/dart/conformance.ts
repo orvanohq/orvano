@@ -79,6 +79,9 @@ export function dispatchFile(
     )
   )
     imports.add(`${library}/core/paging.dart`);
+  // The fixture's services, and the cases that build their Optional inputs (JSW-10).
+  if (`${fixtureServices}${cases}`.includes("Optional"))
+    imports.add(`${library}/core/optional.dart`);
   if (fixtureModels.includes("_equality")) imports.add("package:collection/collection.dart");
   const usesContractModels = types
     .declarations()
@@ -117,11 +120,18 @@ export function dispatchFile(
     .map(({ operation }) => `  ${dartString(callName(operation))},\n`);
   text += "\n/// The calls that are paged lists, which take the `all` option (PAG-6).\n";
   text += `const List<String> pagedCalls = [\n${pagedCalls.join("")}];\n`;
+  const concurrencyCalls = entries
+    .filter(({ operation }) => operation.concurrency)
+    .map(({ operation }) => `  ${dartString(callName(operation))},\n`);
+  text += "\n/// The calls that take `ifMatch` (CNC-4).\n";
+  text += `const List<String> concurrencyCalls = [\n${concurrencyCalls.join("")}];\n`;
   text +=
     "\n/// Runs one scenario step's call and returns its result as JSON, or the normalized error (CNF-4).\n";
   text +=
     "Future<ConformanceOutcome> dispatch(\n  OrvanoServices client,\n  String call,\n  Map<String, Object?> params,\n  ConformanceOptions options,\n) async {\n";
   text += "  final requestOptions = options.toRequestOptions();\n";
+  text +=
+    "  if (options.ifMatch != null && !concurrencyCalls.contains(call)) {\n    throw ArgumentError.value(call, 'call', 'does not take ifMatch');\n  }\n";
   text +=
     "  if (options.all && !pagedCalls.contains(call)) {\n    throw ArgumentError.value(call, 'call', 'is not a paged list, so it has no walk all method');\n  }\n";
   text += "  try {\n    switch (call) {\n";
@@ -145,10 +155,18 @@ function dispatchCase(
 ): string {
   const inputs = inputsOf(operation, types);
   const args = [
-    ...inputs.map(
-      (input) =>
-        `${input.name}: ${readExpression(input.type, `params[${dartString(input.wireName)}]`, dartString(`$.${input.wireName}`))}`,
-    ),
+    ...inputs.map((input) => {
+      const read = readExpression(
+        input.type,
+        `params[${dartString(input.wireName)}]`,
+        dartString(`$.${input.wireName}`),
+      );
+      // JSW-10: a key the step leaves out stays absent, so the SDK does not send it.
+      return input.optional
+        ? `${input.name}: params.containsKey(${dartString(input.wireName)}) ? Optional.of(${read}) : const Optional.absent()`
+        : `${input.name}: ${read}`;
+    }),
+    ...(operation.concurrency ? ["ifMatch: options.ifMatch"] : []),
     "options: requestOptions",
   ];
   const target = fixture

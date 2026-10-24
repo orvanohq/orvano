@@ -245,3 +245,104 @@ scenarios:
     stub: *three_pages
     expectRequests:
       - { method: GET, path: "/v1/projects/${projectId}/fixture/widgets", query: { limit: ["2"] } }
+
+  - id: fixture.update_widget.clears_with_null
+    title: A partial update sends null for a cleared field and omits the unset ones (JSW-9, JSW-10)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: fixture.updateWidget
+        params: { widgetId: 0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10, nickname: null }
+        expect:
+          result: { id: 0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10, name: first }
+    stub: &updated_widget
+      - request:
+          {
+            method: PATCH,
+            path: "/v1/projects/${projectId}/fixture/widgets/0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10",
+          }
+        respond:
+          status: 200
+          headers: { ETag: '"AAAAAAAAAAI"' }
+          body:
+            {
+              id: 0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10,
+              name: first,
+              color: red,
+              createdAt: "2026-10-22T09:14:03Z",
+            }
+    expectRequests:
+      - method: PATCH
+        path: "/v1/projects/${projectId}/fixture/widgets/0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10"
+        headers: { content-type: { $regex: "^application/json" }, if-match: { $absent: true } }
+        body: { nickname: null, name: { $absent: true }, tags: { $absent: true } }
+
+  - id: fixture.update_widget.sets_fields
+    title: A partial update sends the fields set, arrays whole, and leaves the rest out (JSW-9, JSW-10)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: fixture.updateWidget
+        params: { widgetId: 0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10, name: second, tags: [a, b] }
+        expect:
+          result: { id: 0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10 }
+    stub: *updated_widget
+    expectRequests:
+      - method: PATCH
+        path: "/v1/projects/${projectId}/fixture/widgets/0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10"
+        body: { name: second, tags: [a, b], nickname: { $absent: true } }
+
+  - id: fixture.update_widget.if_match
+    title: The ifMatch option is sent as a strong If-Match (CNC-4)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: fixture.updateWidget
+        params: { widgetId: 0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10, name: second }
+        options: { ifMatch: AAAAAAAAAAE }
+        expect:
+          result: { id: 0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10 }
+    stub: *updated_widget
+    expectRequests:
+      - method: PATCH
+        path: "/v1/projects/${projectId}/fixture/widgets/0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10"
+        headers: { if-match: '"AAAAAAAAAAE"' }
+        body: { name: second }
+
+  - id: fixture.update_widget.version_conflict
+    title: A 412 version_conflict reads as kind conflict, and the write is not retried (CNC-3, KND-2)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: fixture.updateWidget
+        params: { widgetId: 0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10, name: second }
+        options: { ifMatch: AAAAAAAAAAE }
+        expect:
+          error: { kind: conflict, status: 412, code: version_conflict }
+    stub:
+      - request:
+          {
+            method: PATCH,
+            path: "/v1/projects/${projectId}/fixture/widgets/0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10",
+          }
+        respond:
+          status: 412
+          headers: { Content-Type: application/problem+json }
+          body:
+            {
+              type: "about:blank",
+              title: Precondition Failed,
+              status: 412,
+              detail: The resource changed since you read it.,
+              code: version_conflict,
+              traceId: 0af7651916cd43dd8448eb211c80319c,
+              currentVersion: AAAAAAAAAAI,
+            }
+    expectRequests:
+      - method: PATCH
+        path: "/v1/projects/${projectId}/fixture/widgets/0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10"
+        headers: { if-match: '"AAAAAAAAAAE"' }

@@ -27,6 +27,25 @@ import {
 export const sdkNamespace = "Orvano.Server";
 export const generatedDirectory = "src/Orvano.Server/Generated";
 
+/**
+ * The `T` of every `Optional<T>` field (JSW-10), as `typeof` can name it: a reference type without its `?`, which
+ * `typeof` refuses and the runtime type does not carry. Records already in the context are left out.
+ */
+function optionalValueTypes(types: CSharpTypes): string[] {
+  const records = new Set(types.declarations().map((declaration) => declaration.name));
+  const names = new Set<string>();
+  for (const declaration of types.declarations()) {
+    if (declaration.kind !== "class" || !declaration.partial) continue;
+    for (const field of fieldsOf(declaration, types)) {
+      if (!field.optional) continue;
+      const type = isReference(field.type) ? nonNull(field.type) : field.type;
+      if (type.kind === "class" && records.has(type.name)) continue;
+      names.add(csTypeName(type));
+    }
+  }
+  return [...names].toSorted(byString);
+}
+
 /** The item records of every paged list in a model, for the JSON context (PAG-6). */
 export function pageItems(model: TargetModel, types: CSharpTypes): string[] {
   return model.services.flatMap((service) =>
@@ -48,6 +67,8 @@ const takenNames: readonly string[] = [
   "OrvanoRetryOptions",
   "OrvanoServiceCollectionExtensions",
   "OrvanoTransport",
+  "Optional",
+  "OptionalJsonConverter",
   "ResultPage",
   // generated here
   "OrvanoCall",
@@ -66,6 +87,7 @@ const takenNames: readonly string[] = [
 /** Header constants the runtime reads, so the contract must declare them (HDR-4). */
 const runtimeHeaders: readonly string[] = [
   "Idempotency-Key",
+  "If-Match",
   "Orvano-Api-Version",
   "Orvano-Client",
   "Orvano-Key",
@@ -246,6 +268,8 @@ interface Field {
   description: string;
   deprecated: boolean;
   required: boolean;
+  /** A partial update's field (JSW-10): `Optional<type>`. */
+  optional: boolean;
   type: CSharpType;
 }
 
@@ -261,6 +285,8 @@ function fieldsOf(
     if (seen.has(member))
       throw new GeneratorError(`${at}: two properties give the C# name ${member}.`);
     seen.add(member);
+    // JSW-10: a PATCH body's optional field is Optional<T>, nullable only when the contract's type is.
+    const optional = declaration.partial && !property.required;
     return {
       member,
       wireName: property.name,
@@ -268,7 +294,16 @@ function fieldsOf(
         property.description === "" ? `The \`${property.name}\` field.` : property.description,
       deprecated: property.deprecated,
       required: property.required,
-      type: types.property(property, declaration.name, declaration.input, at),
+      optional,
+      type: optional
+        ? types.resolve(
+            property.type,
+            `${declaration.name}${pascalCase(property.name)}`,
+            true,
+            at,
+            property.description,
+          )
+        : types.property(property, declaration.name, declaration.input, at),
     };
   });
 }
@@ -290,6 +325,13 @@ function recordBlock(
       if (field.deprecated)
         block += '    [Obsolete("The contract marks this field deprecated.")]\n';
       block += `    [JsonPropertyName(${csString(field.wireName)})]\n`;
+      if (field.optional) {
+        // Absent is the default, and is not written; a set null is (JSW-10).
+        block += `    [JsonConverter(typeof(OptionalJsonConverter<${csTypeName(field.type)}>))]\n`;
+        block += "    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]\n";
+        block += `    public Optional<${csTypeName(field.type)}> ${field.member} { get; init; }\n`;
+        return block;
+      }
       if (declaration.input && !field.required)
         block += "    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]\n";
       block += `    public ${field.required ? "required " : ""}${csTypeName(field.type)} ${field.member} { get; init; }\n`;
@@ -567,6 +609,14 @@ function method(operation: Operation, types: CSharpTypes, typeInfo: TypeInfo): s
       ` name="${input.name.replace(/^@/, "")}"`,
     );
   }
+  if (operation.concurrency) {
+    text += docElement(
+      "param",
+      "The resource's `version` as you read it, sent as `If-Match`. The write fails with `version_conflict` when it changed since; leave it null to write anyway.",
+      indent,
+      ' name="ifMatch"',
+    );
+  }
   text += docElement(
     "param",
     "Per call options: the timeout, retries, and extra headers.",
@@ -594,9 +644,14 @@ function method(operation: Operation, types: CSharpTypes, typeInfo: TypeInfo): s
     ...inputs.map(
       (input) => `${csTypeName(input.type)} ${input.name}${input.required ? "" : " = null"}`,
     ),
+    ...(operation.concurrency ? ["string? ifMatch = null"] : []),
     "OrvanoRequestOptions? options = null",
     "CancellationToken cancellationToken = default",
   ];
+  if (operation.concurrency && inputs.some((input) => input.name === "ifMatch"))
+    throw new GeneratorError(
+      `${where}: an input named ifMatch clashes with the ifMatch parameter.`,
+    );
   const returnType = response === undefined ? "Task" : `Task<${response}>`;
   text += `${indent}public ${returnType} ${methodName(operation)}(${params.join(", ")})\n${indent}{\n`;
 
@@ -647,6 +702,9 @@ function method(operation: Operation, types: CSharpTypes, typeInfo: TypeInfo): s
       ? `var call = ${call};`
       : `var call = ${call}\n{\n${initializers.map((line) => `    ${line}`).join("\n")}\n};`,
   );
+  // CNC-4: the hand written runtime sends the version as a strong If-Match.
+  if (operation.concurrency)
+    body.push("options = OrvanoRequestOptions.WithIfMatch(options, ifMatch);");
   body.push(
     response === undefined
       ? "return _transport.SendAsync(call, options, cancellationToken);"
@@ -781,6 +839,10 @@ export function jsonContextBlock(
     "[JsonSourceGenerationOptions(JsonSerializerDefaults.Web, RespectNullableAnnotations = true, RespectRequiredConstructorParameters = true)]\n";
   text += records
     .map((declaration) => `[JsonSerializable(typeof(${declaration.name}))]\n`)
+    .join("");
+  // JSW-10: OptionalJsonConverter<T> writes T through this context, so it needs T's metadata.
+  text += optionalValueTypes(types)
+    .map((type) => `[JsonSerializable(typeof(${type}))]\n`)
     .join("");
   text += [...new Set(pagedItems)]
     .toSorted(byString)

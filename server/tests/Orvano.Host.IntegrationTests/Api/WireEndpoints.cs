@@ -44,6 +44,7 @@ public sealed class WireServerFixture : IDisposable
             {
                 services.AddSingleton<IStartupFilter, WireEndpoints>();
                 services.AddSingleton<FixtureRows>();
+                services.AddSingleton<FixtureNotes>();
                 services.AddValidation(); // spec 0002 VAL-1: generates the validators for this project's request types
             });
         }
@@ -112,6 +113,77 @@ public sealed class FixtureRows
     }
 }
 
+/// <summary>Where a test note's author is; replaced whole by a PATCH (spec 0014 JSW-9).</summary>
+public sealed record NoteAddress(string City, string? Zip);
+
+/// <summary>A test only versioned resource (spec 0014 CNC-1).</summary>
+public sealed record NoteResponse(Guid Id, string Name, string? Nickname, IReadOnlyList<string> Tags, NoteAddress? Address, [property: System.ComponentModel.ReadOnly(true)] string Version);
+
+/// <summary>A partial update of a test note (spec 0014 JSW-9).</summary>
+public sealed record UpdateNoteRequest(Optional<string> Name, Optional<string?> Nickname, Optional<IReadOnlyList<string>> Tags, Optional<NoteAddress?> Address, Optional<int> Rank);
+
+/// <summary>The notes behind <c>/v1/test/notes</c>, each with a version that every write moves on.</summary>
+public sealed class FixtureNotes
+{
+    private readonly Lock _lock = new();
+    private readonly Dictionary<Guid, (NoteResponse Note, ulong Version)> _notes = [];
+
+    public NoteResponse Add(string name, string? nickname = null, IReadOnlyList<string>? tags = null, NoteAddress? address = null)
+    {
+        lock (_lock)
+        {
+            var id = Guid.CreateVersion7();
+            var note = new NoteResponse(id, name, nickname, tags ?? [], address, ResourceVersion.Format(1));
+            _notes[id] = (note, 1);
+            return note;
+        }
+    }
+
+    /// <summary>Runs <paramref name="write"/> on the note under the lock, so the If-Match check and the write are one step (CNC-3).</summary>
+    public IResult Write(Guid id, IfMatch ifMatch, Func<NoteResponse, NoteResponse?> write, HttpResponse response)
+    {
+        lock (_lock)
+        {
+            if (!_notes.TryGetValue(id, out (NoteResponse Note, ulong Version) entry))
+            {
+                return Error.NotFound(ErrorCodes.NotFound, "No such note.").ToProblem();
+            }
+
+            if (ifMatch.Check(entry.Version).Error is { } conflict)
+            {
+                return conflict.ToProblem();
+            }
+
+            NoteResponse? changed = write(entry.Note);
+            if (changed is null)
+            {
+                _notes.Remove(id);
+                return TypedResults.NoContent();
+            }
+
+            ulong version = entry.Version + 1;
+            changed = changed with { Version = ResourceVersion.Format(version) };
+            _notes[id] = (changed, version);
+            ResourceVersion.SetETag(response, version);
+            return TypedResults.Ok(changed);
+        }
+    }
+
+    public IResult Read(Guid id, HttpResponse response)
+    {
+        lock (_lock)
+        {
+            if (!_notes.TryGetValue(id, out (NoteResponse Note, ulong Version) entry))
+            {
+                return Error.NotFound(ErrorCodes.NotFound, "No such note.").ToProblem();
+            }
+
+            ResourceVersion.SetETag(response, entry.Version);
+            return TypedResults.Ok(entry.Note);
+        }
+    }
+}
+
 public sealed record WireResponse(string? Name, string? Nickname, Shade? Shade, DateTimeOffset? At, Guid Id);
 
 /// <summary>
@@ -145,6 +217,18 @@ internal sealed class WireEndpoints : IStartupFilter
         test.MapPost("/bodies", (WireRequest request) =>
             TypedResults.Ok(new WireResponse(request.Name, request.Nickname, request.Shade, request.At, Guid.Parse("0199F0A2-0000-7000-8000-00000000ABCD")))).WithSdk("test", "bodies");
         test.MapGet("/query", ([Range(1, 100, ErrorMessage = FieldCodes.OutOfRange)] int limit) => TypedResults.Ok(new { limit })).WithSdk("test", "query");
+        test.MapGet("/notes/{noteId:guid}", (Guid noteId, FixtureNotes notes, HttpResponse response) => notes.Read(noteId, response))
+            .WithSdk("test", "getNote");
+        test.MapPatch("/notes/{noteId:guid}", (Guid noteId, UpdateNoteRequest request, IfMatch ifMatch, FixtureNotes notes, HttpResponse response) =>
+            notes.Write(noteId, ifMatch, note => note with
+            {
+                Name = request.Name.Or(note.Name),
+                Nickname = request.Nickname.Or(note.Nickname),
+                Tags = request.Tags.Or(note.Tags),
+                Address = request.Address.Or(note.Address),
+            }, response)).WithConcurrency().WithSdk("test", "updateNote");
+        test.MapDelete("/notes/{noteId:guid}", (Guid noteId, IfMatch ifMatch, FixtureNotes notes, HttpResponse response) =>
+            notes.Write(noteId, ifMatch, _ => null, response)).WithConcurrency().WithSdk("test", "deleteNote");
         test.MapGet("/rows", ListRows).WithPaging(total: true).WithSdk("test", "rows");
         test.MapGet("/header", ([FromHeader(Name = "Orvano-Client")][MaxLength(3, ErrorMessage = FieldCodes.TooLong)] string? client) =>
             TypedResults.Ok(new { client })).WithSdk("test", "header");
