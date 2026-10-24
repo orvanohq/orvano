@@ -56,6 +56,18 @@ public static partial class ContractEndpointExtensions
         return builder.WithMetadata(new ErrorsMetadata([.. codes.Distinct(StringComparer.Ordinal)]));
     }
 
+    /// <summary>
+    /// Marks a paged list (spec 0014 PAG-1 to PAG-3): it binds <see cref="PageQuery"/> with <c>[AsParameters]</c> and
+    /// returns a <see cref="Page{T}"/>, and every SDK gets a walk all method beside it (PAG-6). Pass
+    /// <paramref name="total"/> only when counting the whole list is cheap; otherwise <c>total</c> is always null.
+    /// </summary>
+    public static TBuilder WithPaging<TBuilder>(this TBuilder builder, bool total = false)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.WithMetadata(new PagingMetadata(total));
+    }
+
     /// <summary>Marks a billable operation with the meter it counts under, such as <c>databases.rows.read</c> (XTN-4).</summary>
     public static TBuilder WithMeter<TBuilder>(this TBuilder builder, string name)
         where TBuilder : IEndpointConventionBuilder

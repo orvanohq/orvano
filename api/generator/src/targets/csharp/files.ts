@@ -27,6 +27,13 @@ import {
 export const sdkNamespace = "Orvano.Server";
 export const generatedDirectory = "src/Orvano.Server/Generated";
 
+/** The item records of every paged list in a model, for the JSON context (PAG-6). */
+export function pageItems(model: TargetModel, types: CSharpTypes): string[] {
+  return model.services.flatMap((service) =>
+    service.operations.flatMap((operation) => pageItemOf(operation, types) ?? []),
+  );
+}
+
 /** Names the hand written runtime and the generated helpers already use, so no schema or service may take them. */
 const takenNames: readonly string[] = [
   // the hand written runtime in sdk-dotnet (spec 0002 LIB-4 to LIB-8)
@@ -50,6 +57,7 @@ const takenNames: readonly string[] = [
   "OrvanoQuery",
   "OrvanoServices",
   "OrvanoWire",
+  "ResultPage",
   // a type named like its namespace's last part hides it
   "Orvano",
   "Server",
@@ -143,6 +151,7 @@ function usingsFor(body: string): string[] {
     usings.push("System.Text.Json.Serialization");
   if (/\bJsonTypeInfo\b/.test(body)) usings.push("System.Text.Json.Serialization.Metadata");
   if (/\bStringBuilder\b/.test(body)) usings.push("System.Text");
+  if (/\[EnumeratorCancellation\]/.test(body)) usings.push("System.Runtime.CompilerServices");
   return usings;
 }
 
@@ -400,8 +409,29 @@ export function methodName(operation: Operation): string {
   return `${pascalCase(operation.method)}Async`;
 }
 
+/** A paged list's item record (PAG-6); its page is `ResultPage<item>`. */
+export function pageItemOf(operation: Operation, types: CSharpTypes): string | undefined {
+  if (operation.paging === undefined) return undefined;
+  const type = types.resolve(
+    operation.paging.item,
+    `${pascalCase(operation.method)}${pascalCase(operation.service)}Item`,
+    false,
+    `${operation.operationId} item`,
+  );
+  if (type.kind !== "class")
+    throw new GeneratorError(`${operation.operationId}: a list's items must be JSON objects.`);
+  return type.name;
+}
+
+/** The JSON metadata property of `ResultPage<item>` in a JSON context. */
+export function pageInfoName(item: string): string {
+  return `ResultPageOf${item}`;
+}
+
 /** The response record of an operation, or undefined for 204. JSW-8: a body is always an object. */
 export function responseOf(operation: Operation, types: CSharpTypes): string | undefined {
+  const item = pageItemOf(operation, types);
+  if (item !== undefined) return `ResultPage<${item}>`;
   if (operation.response === undefined) return undefined;
   const type = types.resolve(
     operation.response,
@@ -428,8 +458,81 @@ export function serviceClass(service: Service, types: CSharpTypes, typeInfo: Typ
   text += `public sealed class ${className}\n{\n`;
   text += "    private readonly OrvanoTransport _transport;\n\n";
   text += `    internal ${className}(OrvanoTransport transport)\n    {\n        _transport = transport;\n    }\n`;
-  for (const operation of service.operations) text += `\n${method(operation, types, typeInfo)}`;
+  for (const operation of service.operations) {
+    text += `\n${method(operation, types, typeInfo)}`;
+    if (operation.paging !== undefined) text += `\n${walkAllMethod(operation, types)}`;
+  }
   return `${text}}\n`;
+}
+
+/**
+ * The walk all sibling of a paged list (spec 0002 LIB-5, spec 0014 PAG-6): an <c>IAsyncEnumerable</c> of items that
+ * fetches each page as the caller reaches it and checks the token before every page.
+ */
+function walkAllMethod(operation: Operation, types: CSharpTypes): string {
+  const item = pageItemOf(operation, types) ?? "";
+  const inputs = inputsOf(operation, types).filter(
+    (input) => !(input.location === "query" && input.wireName === "cursor"),
+  );
+  const indent = "    ";
+  let text = docComment(
+    `Walks every page of \`${methodName(operation)}\`, yielding items.`,
+    "Each page is fetched when the caller reaches it, so stopping the loop stops fetching; the options apply to each page's request.",
+    indent,
+  );
+  for (const input of inputs) {
+    text += docElement(
+      "param",
+      input.description,
+      indent,
+      ` name="${input.name.replace(/^@/, "")}"`,
+    );
+  }
+  text += docElement(
+    "param",
+    "Per call options: the timeout, retries, and extra headers.",
+    indent,
+    ' name="options"',
+  );
+  text += docElement(
+    "param",
+    "Stops the walk before the next page.",
+    indent,
+    ' name="cancellationToken"',
+  );
+  text += docElement("returns", `Every \`${item}\` in the list, in its order.`, indent);
+  text += docElement(
+    "exception",
+    "The server answered a page with an error.",
+    indent,
+    ' cref="OrvanoException"',
+  );
+  if (operation.deprecated)
+    text += `${indent}[Obsolete("The contract marks this operation deprecated.")]\n`;
+  const params = [
+    ...inputs.map(
+      (input) => `${csTypeName(input.type)} ${input.name}${input.required ? "" : " = null"}`,
+    ),
+    "OrvanoRequestOptions? options = null",
+    "[EnumeratorCancellation] CancellationToken cancellationToken = default",
+  ];
+  const args = [
+    ...inputs.map((input) => `${input.name}: ${input.name}`),
+    "cursor: cursor",
+    "options: options",
+    "cancellationToken: cancellationToken",
+  ];
+  const name = methodName(operation).replace(/Async$/, "AllAsync");
+  text += `${indent}public async IAsyncEnumerable<${item}> ${name}(${params.join(", ")})\n${indent}{\n`;
+  text += `${indent}${indent}string? cursor = null;\n`;
+  text += `${indent}${indent}do\n${indent}${indent}{\n`;
+  text += `${indent}${indent}${indent}cancellationToken.ThrowIfCancellationRequested();\n`;
+  text += `${indent}${indent}${indent}var page = await ${methodName(operation)}(${args.join(", ")}).ConfigureAwait(false);\n`;
+  text += `${indent}${indent}${indent}foreach (var entry in page.Items)\n${indent}${indent}${indent}{\n`;
+  text += `${indent}${indent}${indent}${indent}yield return entry;\n${indent}${indent}${indent}}\n\n`;
+  text += `${indent}${indent}${indent}cursor = page.NextCursor;\n`;
+  text += `${indent}${indent}}\n${indent}${indent}while (cursor is not null);\n`;
+  return `${text}${indent}}\n`;
 }
 
 const httpMethods: Readonly<Record<Operation["httpMethod"], string>> = {
@@ -544,7 +647,7 @@ function method(operation: Operation, types: CSharpTypes, typeInfo: TypeInfo): s
   body.push(
     response === undefined
       ? "return _transport.SendAsync(call, options, cancellationToken);"
-      : `return _transport.SendAsync(call, ${typeInfo(response)}, options, cancellationToken);`,
+      : `return _transport.SendAsync(call, ${typeInfo(response.startsWith("ResultPage<") ? pageInfoName(response.slice(11, -1)) : response)}, options, cancellationToken);`,
   );
   text += body
     .map((statement) =>
@@ -663,13 +766,25 @@ export function servicesBlock(model: TargetModel): string {
 }
 
 /** A source generated JSON context for every record (spec 0002 JSN-1, LIB-9): trim and AOT safe. */
-export function jsonContextBlock(types: CSharpTypes, name: string, description: string): string {
+export function jsonContextBlock(
+  types: CSharpTypes,
+  name: string,
+  description: string,
+  pagedItems: readonly string[] = [],
+): string {
   const records = types.declarations().filter((declaration) => declaration.kind === "class");
   let text = docElement("summary", description, "");
   text +=
     "[JsonSourceGenerationOptions(JsonSerializerDefaults.Web, RespectNullableAnnotations = true, RespectRequiredConstructorParameters = true)]\n";
   text += records
     .map((declaration) => `[JsonSerializable(typeof(${declaration.name}))]\n`)
+    .join("");
+  text += [...new Set(pagedItems)]
+    .toSorted(byString)
+    .map(
+      (item) =>
+        `[JsonSerializable(typeof(ResultPage<${item}>), TypeInfoPropertyName = "${pageInfoName(item)}")]\n`,
+    )
     .join("");
   return `${text}internal sealed partial class ${name} : JsonSerializerContext;\n`;
 }

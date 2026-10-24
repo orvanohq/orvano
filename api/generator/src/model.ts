@@ -88,11 +88,19 @@ export interface Operation {
   /** The success body's type; undefined when it has none (204). */
   response: TypeRef | undefined;
   errors: string[];
-  paging: { total: boolean } | undefined;
+  /** A paged list (PAG-6): `response` is the page schema, `item` the type of one of its items. */
+  paging: Paging | undefined;
   concurrency: boolean;
   idempotent: boolean;
   metered: string | undefined;
   template: string | undefined;
+}
+
+export interface Paging {
+  total: boolean;
+  /** The page schema's name, such as `PageOfRowResponse`. */
+  page: string;
+  item: TypeRef;
 }
 
 export interface Service {
@@ -159,6 +167,18 @@ export function buildModel(contract: LoadedContract): Model {
       }
       seen.set(pair, operation.operationId);
       operations.push(operation);
+    }
+  }
+
+  // PAG-6: a paged list's walk all sibling takes the name `<method>All`, so no other operation may.
+  for (const operation of operations) {
+    if (operation.paging === undefined) continue;
+    const pair = `${operation.service}.${operation.method}All`;
+    const other = seen.get(pair);
+    if (other !== undefined) {
+      throw new GeneratorError(
+        `${other}: ${pair} is the walk all method of ${operation.operationId}; name the operation something else.`,
+      );
     }
   }
 
@@ -271,6 +291,10 @@ function buildOperation(
   }
 
   const { status, type } = successResponse(document, raw, operationId);
+  const paging =
+    raw["x-orvano-paging"] === undefined
+      ? undefined
+      : pagingOf(document, operationId, raw["x-orvano-paging"].total === true, type, queryParams);
   return {
     operationId,
     service: sdk.service,
@@ -288,15 +312,48 @@ function buildOperation(
     successStatus: status,
     response: type,
     errors: [...(raw["x-orvano-errors"] ?? [])].toSorted(byString),
-    paging:
-      raw["x-orvano-paging"] === undefined
-        ? undefined
-        : { total: raw["x-orvano-paging"].total === true },
+    paging,
     concurrency: raw["x-orvano-concurrency"] === true,
     idempotent: raw["x-orvano-idempotent"] === true,
     metered: raw["x-orvano-metered"],
     template: raw["x-orvano-sdk-template"],
   };
+}
+
+/** PAG-1, PAG-2: a paged list takes `limit` and `cursor` and answers a `{ items, nextCursor, total }` schema. */
+function pagingOf(
+  document: OpenApiDocument,
+  operationId: string,
+  total: boolean,
+  response: TypeRef | undefined,
+  queryParams: Parameter[],
+): Paging {
+  for (const name of ["limit", "cursor"]) {
+    if (!queryParams.some((parameter) => parameter.name === name && !parameter.required)) {
+      throw new GeneratorError(
+        `${operationId}: a paged operation takes the optional query parameter ${name} (PAG-1).`,
+      );
+    }
+  }
+  const page = response?.kind === "ref" ? response.name : undefined;
+  const schema = page === undefined ? undefined : document.components?.schemas?.[page];
+  const type = schema === undefined ? undefined : toType(document, schema, `Schema ${page ?? ""}`);
+  const property = (name: string): Property | undefined =>
+    type?.kind === "object" ? type.properties.find((entry) => entry.name === name) : undefined;
+  const items = property("items")?.type;
+  const nextCursor = property("nextCursor")?.type;
+  if (
+    page === undefined ||
+    items?.kind !== "array" ||
+    nextCursor?.kind !== "nullable" ||
+    nextCursor.inner.kind !== "string" ||
+    property("total")?.type.kind !== "nullable"
+  ) {
+    throw new GeneratorError(
+      `${operationId}: a paged operation answers a named { items, nextCursor, total } schema (PAG-2).`,
+    );
+  }
+  return { total, page, item: items.items };
 }
 
 /** `/v1/projects/{projectId}/...`: the project comes from the client, never from the call (PTH-5). */
@@ -557,7 +614,9 @@ export function forAudience(model: Model, audience: Audience): TargetModel {
     operation.body?.properties.forEach((property) => {
       visit(property.type, "input");
     });
-    if (operation.response !== undefined) visit(operation.response, "output");
+    // A page is rendered as the target's own page type (PAG-6), so only its item type is reached.
+    if (operation.paging !== undefined) visit(operation.paging.item, "output");
+    else if (operation.response !== undefined) visit(operation.response, "output");
   }
 
   return {

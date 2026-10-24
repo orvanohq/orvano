@@ -1,0 +1,65 @@
+// One page of a list, and the walk over every page (spec 0014 PAG-2, PAG-6,
+// spec 0004 CLN-4).
+import 'package:meta/meta.dart';
+
+import 'json.dart';
+
+/// One page of a list. Pass [nextCursor] as `cursor` for the next page, or
+/// use the method's `All` sibling to walk every page.
+final class ResultPage<T> {
+  /// Creates a page.
+  const ResultPage({
+    required this.items,
+    required this.nextCursor,
+    required this.total,
+  });
+
+  /// Reads a page from JSON, each item with [item].
+  factory ResultPage.fromJson(
+    Map<String, Object?> json,
+    T Function(Object? value, String path) item, [
+    String path = r'$',
+  ]) => ResultPage(
+    items: readList(json['items'], '$path.items', item),
+    nextCursor: readNullable(json['nextCursor'], '$path.nextCursor', readString),
+    total: readNullable(json['total'], '$path.total', readInt),
+  );
+
+  /// The items on this page, in the list's order.
+  final List<T> items;
+
+  /// The cursor for the next page, or null on the last page.
+  final String? nextCursor;
+
+  /// How many items the whole list has, or null when the operation does not
+  /// count them.
+  final int? total;
+
+  /// This page as JSON, each item written with [item].
+  Map<String, Object?> toJson(Object? Function(T item) item) => {
+    'items': [for (final entry in items) item(entry)],
+    'nextCursor': nextCursor,
+    'total': total,
+  };
+
+  @override
+  String toString() =>
+      'ResultPage(items: ${items.length}, nextCursor: $nextCursor, total: $total)';
+}
+
+/// Walks every page: [page] fetches the one after a cursor (null for the
+/// first). A page is fetched only when the listener has taken the items
+/// before it, and none after the subscription is cancelled (CLN-4).
+@internal
+Stream<T> walkPages<T>(
+  Future<ResultPage<T>> Function(String? cursor) page,
+) async* {
+  String? cursor;
+  do {
+    final current = await page(cursor);
+    for (final item in current.items) {
+      yield item;
+    }
+    cursor = current.nextCursor;
+  } while (cursor != null);
+}

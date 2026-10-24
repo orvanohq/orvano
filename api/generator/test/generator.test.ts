@@ -250,6 +250,38 @@ describe("0014 GNR-10: bad input fails naming the operation", () => {
     );
   });
 
+  it("a paged list without a cursor parameter", () => {
+    const document = fixture();
+    const operation = document.paths?.["/v1/projects/{projectId}/widgets"]?.get;
+    if (operation?.parameters !== undefined)
+      operation.parameters = operation.parameters.filter(
+        (parameter) => !("name" in parameter) || parameter.name !== "cursor",
+      );
+    expect(rendering(document)).toThrow(
+      /^Fixture_ListWidgets: a paged operation takes the optional query parameter cursor \(PAG-1\)/,
+    );
+  });
+
+  it("a paged list that does not answer a page", () => {
+    const document = fixture();
+    const operation = document.paths?.["/v1/projects/{projectId}/widgets"]?.get;
+    const response = operation?.responses?.["200"]?.content?.["application/json"];
+    if (response !== undefined) response.schema = { $ref: "#/components/schemas/WidgetResponse" };
+    expect(rendering(document)).toThrow(
+      /^Fixture_ListWidgets: a paged operation answers a named \{ items, nextCursor, total \} schema \(PAG-2\)/,
+    );
+  });
+
+  it("an operation named like a paged list's walk all method", () => {
+    const document = fixture();
+    const operation = document.paths?.["/v1/projects/{projectId}/widgets/{widgetId}"]?.delete;
+    if (operation !== undefined)
+      operation["x-orvano-sdk"] = { service: "widgets", method: "listAll" };
+    expect(rendering(document)).toThrow(
+      /^Fixture_DeleteWidget: widgets\.listAll is the walk all method of Fixture_ListWidgets/,
+    );
+  });
+
   it("an input name used twice", () => {
     const document = fixture();
     const schema = document.components?.schemas?.["CreateWidgetRequest"];

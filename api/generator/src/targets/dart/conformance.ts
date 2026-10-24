@@ -11,6 +11,7 @@ import {
   declarationBlocks,
   inputsOf,
   methodName,
+  pageItemOf,
   serviceClass,
   serviceClassName,
 } from "./files.ts";
@@ -72,6 +73,12 @@ export function dispatchFile(
     imports.add("package:meta/meta.dart");
     imports.add(`${library}/core/transport.dart`);
   }
+  if (
+    fixture.services.some((service) =>
+      service.operations.some((operation) => operation.paging !== undefined),
+    )
+  )
+    imports.add(`${library}/core/paging.dart`);
   if (fixtureModels.includes("_equality")) imports.add("package:collection/collection.dart");
   const usesContractModels = types
     .declarations()
@@ -105,11 +112,19 @@ export function dispatchFile(
   text += staticPart;
   text += "\n/// Every call this SDK's scenarios may make, as `<service>.<method>`.\n";
   text += `const List<String> calls = [\n${entries.map(({ operation }) => `  ${dartString(callName(operation))},\n`).join("")}];\n`;
+  const pagedCalls = entries
+    .filter(({ operation }) => operation.paging !== undefined)
+    .map(({ operation }) => `  ${dartString(callName(operation))},\n`);
+  text += "\n/// The calls that are paged lists, which take the `all` option (PAG-6).\n";
+  text += `const List<String> pagedCalls = [\n${pagedCalls.join("")}];\n`;
   text +=
     "\n/// Runs one scenario step's call and returns its result as JSON, or the normalized error (CNF-4).\n";
   text +=
     "Future<ConformanceOutcome> dispatch(\n  OrvanoServices client,\n  String call,\n  Map<String, Object?> params,\n  ConformanceOptions options,\n) async {\n";
-  text += "  final requestOptions = options.toRequestOptions();\n  try {\n    switch (call) {\n";
+  text += "  final requestOptions = options.toRequestOptions();\n";
+  text +=
+    "  if (options.all && !pagedCalls.contains(call)) {\n    throw ArgumentError.value(call, 'call', 'is not a paged list, so it has no walk all method');\n  }\n";
+  text += "  try {\n    switch (call) {\n";
   text += cases;
   text +=
     "      default:\n        throw ArgumentError.value(call, 'call', 'is not a call this SDK has');\n    }\n";
@@ -141,6 +156,20 @@ function dispatchCase(
     : `client.${service.name}`;
   const invocation = `${target}.${methodName(operation)}(\n${args.map((arg) => `          ${arg},\n`).join("")}        )`;
   const name = dartString(callName(operation));
+  const item = pageItemOf(operation, types);
+  if (item !== undefined) {
+    // CNF-2 `all`: the walk all sibling, its items collected; breaking out cancels the subscription (PAG-6).
+    const walkArgs = args.filter((arg) => !arg.startsWith("cursor: "));
+    const walk = `${target}.${methodName(operation)}All(\n${walkArgs.map((arg) => `          ${arg},\n`).join("")}        )`;
+    let text = `      case ${name}:\n        if (options.all) {\n          final items = <Object?>[];\n`;
+    text += `          await for (final item in ${walk}) {\n`;
+    text += `            items.add(${writeExpression(item, "item")});\n`;
+    text += "            if (items.length == options.cancelAfter) break;\n          }\n";
+    text += "          return ConformanceOutcome.ok(items);\n        }\n";
+    text += `        final result = await ${invocation};\n`;
+    text += `        return ConformanceOutcome.ok(result.toJson((item) => ${writeExpression(item, "item")}));\n`;
+    return text;
+  }
   if (operation.response === undefined) {
     return `      case ${name}:\n        await ${invocation};\n        return const ConformanceOutcome.ok(null);\n`;
   }

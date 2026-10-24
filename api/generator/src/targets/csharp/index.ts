@@ -16,6 +16,7 @@ import {
   generatedDirectory,
   headersBlock,
   jsonContextBlock,
+  pageItems,
   sdkNamespace,
   sdkTypeInfo,
   serviceClass,
@@ -62,6 +63,7 @@ export function renderCsharp(
         types,
         "OrvanoJsonContext",
         "JSON metadata for every record (spec 0002 JSN-1, LIB-9): trim and AOT safe.",
+        pageItems(model, types),
       ),
       source,
       sdkNamespace,
@@ -70,6 +72,10 @@ export function renderCsharp(
     {
       path: `${generatedDirectory}/OrvanoWire.cs`,
       content: `${fileHeader(source)}${wireTemplate}`,
+    },
+    {
+      path: `${generatedDirectory}/ResultPage.cs`,
+      content: `${fileHeader(source)}${resultPageTemplate}`,
     },
     ...declarationFiles(types, `${generatedDirectory}/Models`, source, sdkNamespace),
     ...services,
@@ -85,6 +91,14 @@ export function renderCsharp(
 // Written once and copied as is: OrvanoCall, OrvanoQuery, and OrvanoWire.
 const wireTemplate = readFileSync(
   fileURLToPath(new URL("../../../templates/csharp/OrvanoWire.cs.tmpl", import.meta.url)),
+  "utf8",
+)
+  .replace(/\r\n/g, "\n")
+  .replace(/^\/\/.*\n/, "");
+
+// Written once and copied as is: the page type every paged list answers (PAG-2).
+const resultPageTemplate = readFileSync(
+  fileURLToPath(new URL("../../../templates/csharp/ResultPage.cs.tmpl", import.meta.url)),
   "utf8",
 )
   .replace(/\r\n/g, "\n")

@@ -49,6 +49,20 @@ export interface RequestOptions {
   readonly retry?: { readonly maxRetries: number } | undefined;
 }
 
+/**
+ * One page of a list (spec 0014 PAG-2). Pass `nextCursor` as `cursor` for the next page, or use the method's
+ * `All` sibling to walk every page.
+ * @public
+ */
+export interface Page<T> {
+  /** The items on this page, in the list's order. */
+  readonly items: T[];
+  /** The cursor for the next page, or null on the last page. */
+  readonly nextCursor: string | null;
+  /** How many items the whole list has, or null when the operation does not count them. */
+  readonly total: number | null;
+}
+
 // The one module level state (SDK-6): each handle maps to its own configuration and nothing else.
 const configs = new WeakMap<OrvanoClient, ClientConfig>();
 

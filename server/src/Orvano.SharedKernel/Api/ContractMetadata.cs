@@ -15,3 +15,6 @@ public sealed record MeterMetadata(string Name);
 
 /// <summary><c>x-orvano-sdk-template</c> (spec 0014 XTN-1, GNR-7): the hand written template that renders the operation.</summary>
 public sealed record SdkTemplateMetadata(string Name);
+
+/// <summary><c>x-orvano-paging</c> (spec 0014 PAG-3, PAG-6): a paged list, and whether it fills <c>total</c>.</summary>
+public sealed record PagingMetadata(bool Total);

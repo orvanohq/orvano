@@ -21,6 +21,7 @@ export const runtimePublicNames: readonly string[] = [
   "OrvanoClient",
   "OrvanoError",
   "OrvanoErrorJson",
+  "Page",
   "RequestOptions",
 ];
 
@@ -129,7 +130,7 @@ function propertyMember(property: Property, input: boolean, where: string): stri
 export function serviceFile(service: Service, source: Provenance, model: TargetModel): string {
   const modelImports = referencedModels([service]);
   let text = fileHeader(source);
-  text += `import { ${clientHelpers([service]).join(", ")}, type OrvanoClient, type RequestOptions } from "../runtime/client.js";\n`;
+  text += `import { ${clientImports([service]).join(", ")} } from "../runtime/client.js";\n`;
   text += `import { request } from "../runtime/transport.js";\n`;
   if (modelImports.length > 0) {
     text += `import type { ${modelImports.join(", ")} } from "./models.js";\n`;
@@ -149,6 +150,19 @@ export function clientHelpers(services: readonly Service[]): string[] {
     "assertClient",
     ...(uses("param") ? ["pathParam"] : []),
     ...(uses("project") ? ["projectId"] : []),
+  ];
+}
+
+/** What a set of services imports from runtime/client.js. */
+export function clientImports(services: readonly Service[]): string[] {
+  const paged = services.some((service) =>
+    service.operations.some((operation) => operation.paging !== undefined),
+  );
+  return [
+    ...clientHelpers(services),
+    "type OrvanoClient",
+    ...(paged ? ["type Page"] : []),
+    "type RequestOptions",
   ];
 }
 
@@ -179,7 +193,10 @@ export function serviceBody(service: Service, model: TargetModel): string {
     "  ",
   );
   text += `  constructor(client: OrvanoClient) {\n    assertClient(client, ${JSON.stringify(className)});\n    this.client = client;\n  }\n`;
-  for (const operation of operations) text += `\n${method(operation)}`;
+  for (const operation of operations) {
+    text += `\n${method(operation)}`;
+    if (operation.paging !== undefined) text += `\n${walkAllMethod(operation)}`;
+  }
   text += "}\n";
   return text;
 }
@@ -219,7 +236,8 @@ function collectRefs(operation: Operation, names: Set<string>): void {
   for (const parameter of [...operation.pathParams, ...operation.queryParams])
     visit(parameter.type);
   for (const property of operation.body?.properties ?? []) visit(property.type);
-  if (operation.response !== undefined) visit(operation.response);
+  if (operation.paging !== undefined) visit(operation.paging.item);
+  else if (operation.response !== undefined) visit(operation.response);
 }
 
 function paramsInterface(operation: Operation, model: TargetModel): string {
@@ -262,9 +280,55 @@ function queryable(type: TypeRef, model: TargetModel): boolean {
   return scalar(outer) || (outer.kind === "array" && scalar(outer.items));
 }
 
+/** The TypeScript result of an operation: its response, or `Page<item>` for a paged list (PAG-6). */
+function responseTypeOf(operation: Operation): string {
+  if (operation.paging !== undefined)
+    return `Page<${tsType(operation.paging.item, `${operation.operationId} item`)}>`;
+  return operation.response === undefined
+    ? "void"
+    : tsType(operation.response, operation.operationId);
+}
+
+/**
+ * The walk all sibling of a paged list (spec 0005 SHP-5, spec 0014 PAG-6): an async iterable of items, not pages,
+ * that fetches each page as the caller reaches it and checks `signal` before every page.
+ */
+function walkAllMethod(operation: Operation): string {
+  const paging = operation.paging;
+  if (paging === undefined) throw new GeneratorError(`${operation.operationId}: not a paged list.`);
+  const item = tsType(paging.item, `${operation.operationId} item`);
+  const params = paramsTypeName(operation);
+  const allOptional = [
+    ...operation.pathParams,
+    ...operation.queryParams.filter((parameter) => parameter.name !== "cursor"),
+  ].every((entry) => !entry.required);
+  const tags = [
+    "@param params - The call's inputs; `limit` sets the page size.",
+    "@param options - Per call options: signal, timeout, headers, and retry. They apply to each page's request.",
+    `@throws {@link OrvanoError} when a page's call fails; an aborted \`signal\` throws its reason.`,
+    ...(operation.deprecated ? ["@deprecated"] : []),
+  ];
+  let text = tsDoc(
+    [
+      `Walks every page of \`${operation.method}\`, yielding items. Each page is fetched when the loop reaches it, so breaking out stops fetching.`,
+    ],
+    tags,
+    "  ",
+  );
+  text += `  async *${operation.method}All(\n    params: Omit<${params}, "cursor">${allOptional ? " = {}" : ""},\n    options?: RequestOptions,\n  ): AsyncGenerator<${item}, void, undefined> {\n`;
+  text += "    let cursor: string | undefined;\n";
+  text += "    for (;;) {\n";
+  text += "      if (options?.signal?.aborted === true) throw options.signal.reason;\n";
+  text += `      const page = await this.${operation.method}({ ...params, cursor }, options);\n`;
+  text += "      yield* page.items;\n";
+  text += "      if (page.nextCursor === null) return;\n";
+  text += "      cursor = page.nextCursor;\n";
+  text += "    }\n  }\n";
+  return text;
+}
+
 function method(operation: Operation): string {
-  const responseType =
-    operation.response === undefined ? "void" : tsType(operation.response, operation.operationId);
+  const responseType = responseTypeOf(operation);
   const inputs = hasInputs(operation);
   const allOptional =
     inputs &&
@@ -375,7 +439,7 @@ export function indexFile(model: TargetModel, source: Provenance): string {
     const names = [serviceClassName(service), ...params.toSorted(byString)].join(", ");
     text += `export { ${names} } from "./${serviceFileName(service).replace(/\.ts$/, ".js")}";\n`;
   }
-  text += 'export type { OrvanoClient, RequestOptions } from "../runtime/client.js";\n';
+  text += 'export type { OrvanoClient, Page, RequestOptions } from "../runtime/client.js";\n';
   text +=
     'export { OrvanoError, type ErrorKind, type FieldError, type OrvanoErrorJson } from "../runtime/errors.js";\n';
   text += 'export type { CommonClientOptions } from "../runtime/options.js";\n';

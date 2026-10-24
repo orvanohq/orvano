@@ -96,8 +96,18 @@
         },
         "headers": { "type": "object", "additionalProperties": { "type": "string" } },
         "idempotencyKey": { "type": "string", "minLength": 1, "maxLength": 255 },
-        "ifMatch": { "type": "string", "minLength": 1 }
-      }
+        "ifMatch": { "type": "string", "minLength": 1 },
+        "all": {
+          "description": "Calls the paged list's walk all sibling (listAll, PAG-6); the result is every item it yields, as an array.",
+          "type": "boolean"
+        },
+        "cancelAfter": {
+          "description": "With `all`: cancels the walk once this many items arrived; the result is the items so far. SDKs check cancellation between pages, so put it on a page boundary.",
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "dependentRequired": { "cancelAfter": ["all"] }
     },
     "expect": {
       "type": "object",

@@ -22,12 +22,14 @@ public sealed class ContractMetadataTests
             .WithErrors(ErrorCodes.NotFound, ErrorCodes.Conflict, ErrorCodes.NotFound)
             .WithMeter("databases.rows.read")
             .WithSdkTemplate("typed-rows")
+            .WithPaging(total: true)
             .AllowPublicAccess());
 
         endpoint.Metadata.GetMetadata<SdkMetadata>().ShouldBe(new SdkMetadata("rows", "list"));
         endpoint.Metadata.GetMetadata<ErrorsMetadata>()!.Codes.ShouldBe([ErrorCodes.NotFound, ErrorCodes.Conflict]);
         endpoint.Metadata.GetMetadata<MeterMetadata>().ShouldBe(new MeterMetadata("databases.rows.read"));
         endpoint.Metadata.GetMetadata<SdkTemplateMetadata>().ShouldBe(new SdkTemplateMetadata("typed-rows"));
+        endpoint.Metadata.GetMetadata<PagingMetadata>().ShouldBe(new PagingMetadata(Total: true));
     }
 
     [Theory, Trait("Spec", "0014:XTN-1")]

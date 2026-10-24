@@ -14,6 +14,7 @@ import {
   inputsOf,
   jsonContextBlock,
   methodName,
+  pageItems,
   responseOf,
   sdkNamespace,
   serviceClass,
@@ -88,8 +89,12 @@ export function conformanceFiles(
     "    /// <summary>Runs one scenario step's call and returns its result as JSON, or the normalized error.</summary>\n";
   dispatch +=
     "    public static async Task<ConformanceOutcome> DispatchAsync(OrvanoServices client, string call, JsonObject parameters, ConformanceOptions options, CancellationToken cancellationToken)\n    {\n";
-  dispatch +=
-    "        var requestOptions = options.ToRequestOptions();\n        try\n        {\n            switch (call)\n            {\n";
+  dispatch += "        var requestOptions = options.ToRequestOptions();\n";
+  const pagedCalls = entries
+    .filter(({ operation }) => operation.paging !== undefined)
+    .map(({ operation }) => csString(callName(operation)));
+  dispatch += `        if (options.All && ${pagedCalls.length === 0 ? "true" : `call is not (${pagedCalls.join(" or ")})`})\n        {\n            throw new ArgumentException($"{call} is not a paged list, so it has no walk all method.", nameof(call));\n        }\n\n`;
+  dispatch += "        try\n        {\n            switch (call)\n            {\n";
   dispatch += entries
     .map((entry) => dispatchCase(entry.service, entry.operation, entry.fixture, entry.types))
     .join("");
@@ -111,6 +116,7 @@ export function conformanceFiles(
         fixtureTypes,
         "ConformanceJsonContext",
         "JSON metadata for the fixture's records (spec 0014 STB-4).",
+        pageItems(fixture, fixtureTypes),
       ),
       source,
       conformanceNamespace,
@@ -154,6 +160,19 @@ function dispatchCase(
   const invocation = `${target}.${methodName(operation)}(${args.join(", ")}).ConfigureAwait(false)`;
   const name = csString(callName(operation));
   const indent = "                ";
+  if (operation.paging !== undefined) {
+    // CNF-2 `all`: the walk all sibling, its items collected (PAG-6).
+    const cursor = inputs.findIndex(
+      (input) => input.location === "query" && input.wireName === "cursor",
+    );
+    // The walk takes the same inputs without the cursor, and the walk's own token in place of the step's.
+    const walkArgs = [...args.slice(0, -1).filter((_, index) => index !== cursor), "token"];
+    const walkMethod = methodName(operation).replace(/Async$/, "AllAsync");
+    let text = `${indent}case ${name}:\n${indent}    if (options.All)\n${indent}    {\n`;
+    text += `${indent}        return await ConformanceWalk.AllAsync(token => ${target}.${walkMethod}(${walkArgs.join(", ")}), options.CancelAfter, cancellationToken).ConfigureAwait(false);\n${indent}    }\n\n`;
+    text += `${indent}    {\n${indent}        var result = await ${invocation};\n${indent}        return ConformanceOutcome.Ok(ConformanceJson.ToNode(result));\n${indent}    }\n`;
+    return text;
+  }
   if (responseOf(operation, types) === undefined) {
     return `${indent}case ${name}:\n${indent}    await ${invocation};\n${indent}    return ConformanceOutcome.Ok(null);\n`;
   }

@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 
+using System.Text.Json.Nodes;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -41,6 +43,7 @@ public sealed class WireServerFixture : IDisposable
             builder.ConfigureServices(services =>
             {
                 services.AddSingleton<IStartupFilter, WireEndpoints>();
+                services.AddSingleton<FixtureRows>();
                 services.AddValidation(); // spec 0002 VAL-1: generates the validators for this project's request types
             });
         }
@@ -69,6 +72,42 @@ public sealed record WireRequest(
         if (Tags is { Count: > 0 } && Tags.Contains("forbidden"))
         {
             yield return new FieldValidationResult("tag_reserved", "That tag is reserved.", [nameof(Tags)]);
+        }
+    }
+}
+
+/// <summary>A row of the test only paged list (spec 0014 PAG-4).</summary>
+public sealed record FixtureRow(Guid Id, string Name, DateTimeOffset CreatedAt);
+
+/// <summary>The rows behind <c>GET /v1/test/rows</c>: 120 to start with, and tests may add more while they page.</summary>
+public sealed class FixtureRows
+{
+    private readonly Lock _lock = new();
+    private readonly List<FixtureRow> _rows = [];
+
+    public FixtureRows()
+    {
+        DateTimeOffset start = new(2026, 10, 22, 9, 0, 0, TimeSpan.Zero);
+        for (int index = 0; index < 120; index++)
+        {
+            // Names repeat every 10 rows, so the row ID decides the order among equal names (PAG-4).
+            Add(new FixtureRow(Guid.CreateVersion7(start.AddSeconds(index)), $"row {index % 10:D2}", start.AddSeconds(index)));
+        }
+    }
+
+    public void Add(FixtureRow row)
+    {
+        lock (_lock)
+        {
+            _rows.Add(row);
+        }
+    }
+
+    public FixtureRow[] Snapshot()
+    {
+        lock (_lock)
+        {
+            return [.. _rows];
         }
     }
 }
@@ -106,7 +145,43 @@ internal sealed class WireEndpoints : IStartupFilter
         test.MapPost("/bodies", (WireRequest request) =>
             TypedResults.Ok(new WireResponse(request.Name, request.Nickname, request.Shade, request.At, Guid.Parse("0199F0A2-0000-7000-8000-00000000ABCD")))).WithSdk("test", "bodies");
         test.MapGet("/query", ([Range(1, 100, ErrorMessage = FieldCodes.OutOfRange)] int limit) => TypedResults.Ok(new { limit })).WithSdk("test", "query");
+        test.MapGet("/rows", ListRows).WithPaging(total: true).WithSdk("test", "rows");
         test.MapGet("/header", ([FromHeader(Name = "Orvano-Client")][MaxLength(3, ErrorMessage = FieldCodes.TooLong)] string? client) =>
             TypedResults.Ok(new { client })).WithSdk("test", "header");
     };
+
+    // A keyset list over FixtureRows (spec 0014 PAG-1 to PAG-5): ordered by `sort` (name, or else created),
+    // then by ID; the cursor holds the last row's sort keys.
+    private static IResult ListRows(HttpRequest request, FixtureRows rows, [AsParameters] PageQuery page, string? sort = null)
+    {
+        bool byName = sort == "name";
+        string query = CursorCodec.Query(request);
+        IEnumerable<FixtureRow> ordered = byName
+            ? rows.Snapshot().OrderBy(row => row.Name, StringComparer.Ordinal).ThenBy(row => row.Id)
+            : rows.Snapshot().OrderBy(row => row.CreatedAt).ThenBy(row => row.Id);
+        FixtureRow[] all = rows.Snapshot();
+        if (page.Cursor is not null)
+        {
+            Result<JsonArray> keys = CursorCodec.Decode(page.Cursor, query);
+            if (keys.Error is { } error)
+            {
+                return error.ToProblem();
+            }
+
+            var lastId = Guid.Parse(keys.Value![^1]!.GetValue<string>());
+            ordered = byName
+                ? ordered.Where(row => string.CompareOrdinal(row.Name, keys.Value![0]!.GetValue<string>()) is var order && (order > 0 || (order == 0 && row.Id.CompareTo(lastId) > 0)))
+                : ordered.Where(row => row.CreatedAt.CompareTo(DateTimeOffset.Parse(keys.Value![0]!.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture)) is var order && (order > 0 || (order == 0 && row.Id.CompareTo(lastId) > 0)));
+        }
+
+        FixtureRow[] fetched = [.. ordered.Take(page.Size + 1)];
+        var result = Page.From(
+            fetched,
+            page.Size,
+            query,
+            row => [byName ? row.Name : row.CreatedAt.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture), row.Id.ToString()],
+            row => row,
+            total: all.Length);
+        return TypedResults.Ok(result);
+    }
 }
