@@ -35,6 +35,22 @@ public sealed class FixtureService
         return _transport.SendAsync(call, ConformanceJsonContext.Default.FixtureWidgetResponse, options, cancellationToken);
     }
 
+    /// <summary>Delete a fixture label.</summary>
+    /// <remarks>
+    /// Answers 204. Its path parameter is free text, so stub scenarios can prove an SDK refuses an empty or dot segment
+    /// value before sending (spec 0014 PTH-4).
+    /// </remarks>
+    /// <param name="labelName">The label's name.</param>
+    /// <param name="options">Per call options: the timeout, retries, and extra headers.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>A task that completes when the server has answered.</returns>
+    /// <exception cref="OrvanoException">The server answered with an error.</exception>
+    public Task DeleteLabelAsync(string labelName, OrvanoRequestOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        var call = new OrvanoCall("Fixture_DeleteLabel", HttpMethod.Delete, ["v1", "projects", _transport.ProjectId, "fixture", "labels", OrvanoWire.PathSegment(labelName, nameof(labelName))]);
+        return _transport.SendAsync(call, options, cancellationToken);
+    }
+
     /// <summary>Read a fixture widget.</summary>
     /// <remarks>Answers the widget, so stub scenarios can script any response to a GET.</remarks>
     /// <param name="widgetId">The widget's ID.</param>

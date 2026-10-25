@@ -90,6 +90,20 @@ Uri checkEndpoint(Uri endpoint, {required bool allowInsecure}) {
   return endpoint.replace(path: path);
 }
 
+/// A path parameter's value, refused before any request when it is empty or
+/// a dot segment (spec 0004 EXC-4, spec 0014 PTH-4): `Uri` removes `.` and
+/// `..` (also as `%2e`), which would send the call to another route. Throws
+/// `ArgumentError`.
+@internal
+String pathSegment(String name, String value) {
+  if (value.isEmpty) throw ArgumentError.value(value, name, 'must not be empty');
+  final decoded = value.replaceAll(RegExp('%2e', caseSensitive: false), '.');
+  if (decoded == '.' || decoded == '..') {
+    throw ArgumentError.value(value, name, 'must not be "." or ".."');
+  }
+  return value;
+}
+
 final Logger _log = Logger('orvano.http');
 
 const int _rawBodyLimit = 4096;
@@ -118,9 +132,7 @@ final class OrvanoTransport {
        _client = httpClient ?? http.Client(),
        _ownsClient = httpClient == null,
        _random = random ?? Random() {
-    if (projectId.isEmpty) {
-      throw ArgumentError.value('', 'projectId', 'must not be empty');
-    }
+    pathSegment('projectId', projectId);
     _checkTimeout(options.timeout);
     _checkRetry(options.retry);
     _defaultHeaders = _checkHeaders(options.defaultHeaders, perCall: false);

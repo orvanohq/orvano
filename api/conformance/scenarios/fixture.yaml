@@ -392,3 +392,28 @@ scenarios:
       - method: PATCH
         path: "/v1/projects/${projectId}/fixture/widgets/0192f0c1-7b9e-7c43-9a51-3f0e8d2b6a10"
         headers: { if-match: '"AAAAAAAAAAE"' }
+
+  - id: fixture.delete_label.refuses_dot_segments
+    title: An empty or dot segment path value is refused before any request (ERR-T5, EXC-4, LIB-6, PTH-4)
+    mode: stub
+    audience: [client, server]
+    requires: []
+    steps:
+      - call: fixture.deleteLabel
+        params: { labelName: "" }
+        expect:
+          error: { kind: argument }
+      - call: fixture.deleteLabel
+        params: { labelName: "." }
+        expect:
+          error: { kind: argument }
+      - call: fixture.deleteLabel
+        params: { labelName: ".." }
+        expect:
+          error: { kind: argument }
+      - call: fixture.deleteLabel
+        params: { labelName: "%2E%2e" }
+        expect:
+          error: { kind: argument }
+    stub: []
+    expectRequests: []

@@ -95,6 +95,17 @@ final class ConformanceOutcome {
   final Map<String, Object?>? error;
 }
 
+/// A bad argument the SDK refused before sending, as kind `argument` (it has
+/// no response).
+const Map<String, Object?> refused = {
+  'kind': 'argument',
+  'status': null,
+  'code': OrvanoErrorCodes.unknown,
+  'fieldErrors': <Object?>[],
+  'retryAfter': null,
+  'requestId': null,
+};
+
 /// An SDK error in the shape every SDK's dispatcher reports (CNF-4).
 Map<String, Object?> normalize(OrvanoException error) => {
   'kind': error.kind.wireName,

@@ -670,11 +670,9 @@ function method(operation: Operation, types: CSharpTypes, typeInfo: TypeInfo): s
 
   const body: string[] = [];
   for (const input of inputs) {
-    if (!input.required) continue;
-    if (nonNull(input.type).kind === "string" && input.location === "path")
-      body.push(`ArgumentException.ThrowIfNullOrEmpty(${input.name});`);
-    else if (isReference(input.type))
-      body.push(`ArgumentNullException.ThrowIfNull(${input.name});`);
+    // A text path value is checked where the path is built, by OrvanoWire.PathSegment.
+    if (!input.required || (input.location === "path" && isTextSegment(input.type))) continue;
+    if (isReference(input.type)) body.push(`ArgumentNullException.ThrowIfNull(${input.name});`);
   }
 
   const path = operation.segments.map((segment) => {
@@ -689,7 +687,10 @@ function method(operation: Operation, types: CSharpTypes, typeInfo: TypeInfo): s
         );
         if (input === undefined)
           throw new GeneratorError(`${where}: the path parameter ${segment.name} is not declared.`);
-        return wireText(input.name, input.type);
+        const value = wireText(input.name, input.type);
+        return isTextSegment(input.type)
+          ? `OrvanoWire.PathSegment(${value}, nameof(${input.name}))`
+          : value;
       }
     }
   });
@@ -735,6 +736,15 @@ function method(operation: Operation, types: CSharpTypes, typeInfo: TypeInfo): s
     )
     .join("\n");
   return `${text}\n${indent}}\n`;
+}
+
+/**
+ * Whether a path value is free text, which can be empty or a dot segment (spec 0002 LIB-6, spec 0014 PTH-4); the
+ * other types' wire text never is.
+ */
+function isTextSegment(type: CSharpType): boolean {
+  const plain = nonNull(type);
+  return plain.kind === "string" || plain.kind === "enum";
 }
 
 /** A path value as its wire text. */

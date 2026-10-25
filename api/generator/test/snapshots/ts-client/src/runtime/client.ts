@@ -136,15 +136,18 @@ export function projectId(client: OrvanoClient): string {
   if (project === undefined || project === "") {
     throw new TypeError("This call needs a project. Pass project to createClient.");
   }
-  return project;
+  return pathParam("project", project);
 }
 
 /**
- * A path parameter's value, refused when empty before any request (spec 0005 ERR-T5).
+ * A path parameter's value, refused before any request when it is empty or a dot segment (spec 0005 ERR-T5).
+ * `.` and `..` (also as `%2e`) would be removed by URL parsing and send the call to another route (spec 0014 PTH-4).
  * @internal
  */
 export function pathParam(name: string, value: string | number): string {
   const text = String(value);
   if (text === "") throw new TypeError(`${name} must not be empty.`);
+  const decoded = text.replace(/%2e/giu, ".");
+  if (decoded === "." || decoded === "..") throw new TypeError(`${name} must not be "." or "..".`);
   return text;
 }

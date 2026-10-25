@@ -207,6 +207,27 @@ final class FixtureService {
     return FixtureWidgetResponse.fromJson(readObject(json, r'$'), r'$');
   }
 
+  /// Delete a fixture label.
+  ///
+  /// Answers 204. Its path parameter is free text, so stub scenarios can prove
+  /// an SDK refuses an empty or dot segment value before sending (spec 0014
+  /// PTH-4).
+  ///
+  /// [labelName]: The label's name.
+  ///
+  /// Throws an [OrvanoException] when the call fails.
+  Future<void> deleteLabel({
+    required String labelName,
+    OrvanoRequestOptions? options,
+  }) async {
+    await _transport.request(
+      operationId: 'Fixture_DeleteLabel',
+      method: 'DELETE',
+      path: ['v1', 'projects', _transport.projectId, 'fixture', 'labels', pathSegment('labelName', labelName)],
+      options: options,
+    );
+  }
+
   /// Read a fixture widget.
   ///
   /// Answers the widget, so stub scenarios can script any response to a GET.
@@ -221,7 +242,7 @@ final class FixtureService {
     final json = await _transport.request(
       operationId: 'Fixture_GetWidget',
       method: 'GET',
-      path: ['v1', 'projects', _transport.projectId, 'fixture', 'widgets', widgetId],
+      path: ['v1', 'projects', _transport.projectId, 'fixture', 'widgets', pathSegment('widgetId', widgetId)],
       options: options,
     );
     return FixtureWidgetResponse.fromJson(readObject(json, r'$'), r'$');
@@ -323,6 +344,17 @@ final class ConformanceOutcome {
   /// The normalized error, when not [ok].
   final Map<String, Object?>? error;
 }
+
+/// A bad argument the SDK refused before sending, as kind `argument` (it has
+/// no response).
+const Map<String, Object?> refused = {
+  'kind': 'argument',
+  'status': null,
+  'code': OrvanoErrorCodes.unknown,
+  'fieldErrors': <Object?>[],
+  'retryAfter': null,
+  'requestId': null,
+};
 
 /// An SDK error in the shape every SDK's dispatcher reports (CNF-4).
 Map<String, Object?> normalize(OrvanoException error) => {
@@ -550,6 +582,7 @@ String _describe(Object? value) {
 /// Every call this SDK's scenarios may make, as `<service>.<method>`.
 const List<String> calls = [
   'fixture.createWidget',
+  'fixture.deleteLabel',
   'fixture.getWidget',
   'health.get',
   'widgets.create',
@@ -599,6 +632,12 @@ Future<ConformanceOutcome> dispatch(
           options: requestOptions,
         );
         return ConformanceOutcome.ok(result.toJson());
+      case 'fixture.deleteLabel':
+        await FixtureService(client.transport).deleteLabel(
+          labelName: readString(params['labelName'], r'$.labelName'),
+          options: requestOptions,
+        );
+        return const ConformanceOutcome.ok(null);
       case 'fixture.getWidget':
         final result = await FixtureService(client.transport).getWidget(
           widgetId: readString(params['widgetId'], r'$.widgetId'),
@@ -663,5 +702,9 @@ Future<ConformanceOutcome> dispatch(
     }
   } on OrvanoException catch (error) {
     return ConformanceOutcome.failed(normalize(error));
+  } on ArgumentError catch (error) {
+    // EXC-4: a bad argument the SDK refused before any request.
+    if (error.name == 'call') rethrow;
+    return const ConformanceOutcome.failed(refused);
   }
 }
