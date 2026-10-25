@@ -25,7 +25,7 @@ spec [0014](../specs/0014-api-contract-sdk-generation/index.md) · code in `serv
 - [x] Verify it: `/check verify API contract & SDK generation`
 - [x] Test it: `/test API contract & SDK generation`
 - [x] Review it (fresh model): `/check review API contract & SDK generation`
-- [ ] Document it: `/document API contract & SDK generation`
+- [x] Document it: `/document API contract & SDK generation`
 
 ## Slice 2: Auth breadth
 
