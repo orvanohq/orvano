@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-22
 **Status**: Accepted
-**Updated**: 2026-10-23, open points from verify: RGN-3 and AC-15 scope the drift check to the pin and the generated paths; RGN-6, RGN-9, and AC-16 say `sdk-nextjs` takes new SDK pins in the catch up; CNF-3 adds `$absent`; CNF-8 says which CI layer owns the run list; spec 0007 IMG-3 names the `sha-<commit>` tag.
+**Updated**: 2026-10-23, open points from verify: RGN-3 and AC-15 scope the drift check to the pin and the generated paths; RGN-6, RGN-9, and AC-16 say `sdk-nextjs` takes new SDK pins in the catch up; CNF-3 adds `$absent`; CNF-8 says which CI layer owns the run list; spec 0007 IMG-3 names the `sha-<commit>` tag. 2026-10-25, the Follow-up items for specs 0002, 0003, 0004, 0005, 0006, 0007, and 0012 are applied to those specs.
 
 ## Summary
 
@@ -457,13 +457,13 @@ Tracer Bullet: the first strand is the health call, end to end from the server t
 
 ## Follow-up
 
-- [ ] Spec 0002: API-1 route prefixes now PTH-1 and PTH-2; API-6 settled as code first (CTR-1); ERR-4's map is final in KND-1 (add `PreconditionFailed` 412) and the body is PRB-1, with `retryAfterSeconds` replaced by `Error.RetryAfter` (PRB-2); LOG-6 health paths stay; LIB-6 and LIB-7 now name `Idempotency-Key` and the KND-2 table; close the feature 10 follow up.
-- [ ] Spec 0003: FLT-1 maps PRB-1 (`requestId` from `traceId`, `fieldErrors` from `errors`); QRY-1 reads `api/console.openapi.json`; RTE-10 boot calls are CPX-3; row versions are CNC; allowed actions and dependents are CPX-1 and CPX-2.
-- [ ] Spec 0004: NET-6 header names (`Orvano-Api-Version`, `Orvano-Client`); NET-8 session expired code `session_expired`; NET-10 `unknown` reserved (PRB-8); MDL-4 is JSW-5; partial updates are JSW-9 and JSW-10; PKG-3 templates live in `api/generator/runtime/dart/`; DSC-1 audience tags are XTN-1; close its feature 10 follow up.
-- [ ] Spec 0005: ERR-T1 table refined by KND-2 (413, 415 `validation`; 428 `conflict`); NPM-6 header is `Orvano-Client`; SHP-3 `idempotencyKey` header is `Idempotency-Key` and offered only on marked operations; SHP-5 page fields are `items`, `nextCursor`, `total`; CGN-1 to CGN-3 generator named; close its feature 10 follow up.
-- [ ] Spec 0006: CON-2 header is `Orvano-Csrf`; KEY-6 header is `Orvano-Key`; NET-3 is covered by HDR-5; close its feature 10 follow up.
-- [ ] Spec 0007 (IMG-3 done 2026-10-23): RUN-4 prefix is `/v1` (PTH-1); COR-3 lists are HDR-2; COR-1, COR-2, and COR-4 gain the `/v1/health` exception (HLT-3: a fixed named policy, no project lookup); IMG-3 adds the `sha-<commit>` tag and the contract dispatch job (CNF-6, RGN-5); close the feature 10 follow up.
-- [ ] Spec 0012: DEN-4 codes sit in the PRB-8 catalogue; EPT-5's public list gains `/v1/health` (and `/v1/console/config` with feature 13); close its feature 10 follow up.
+- [x] Spec 0002: API-1 route prefixes now PTH-1 and PTH-2; API-6 settled as code first (CTR-1); ERR-4's map is final in KND-1 (add `PreconditionFailed` 412) and the body is PRB-1, with `retryAfterSeconds` replaced by `Error.RetryAfter` (PRB-2); LOG-6 health paths stay; LIB-6 and LIB-7 now name `Idempotency-Key` and the KND-2 table; close the feature 10 follow up.
+- [x] Spec 0003: FLT-1 maps PRB-1 (`requestId` from `traceId`, `fieldErrors` from `errors`); QRY-1 reads `api/console.openapi.json`; RTE-10 boot calls are CPX-3; row versions are CNC; allowed actions and dependents are CPX-1 and CPX-2.
+- [x] Spec 0004: NET-6 header names (`Orvano-Api-Version`, `Orvano-Client`); NET-8 session expired code `session_expired`; NET-10 `unknown` reserved (PRB-8); MDL-4 is JSW-5; partial updates are JSW-9 and JSW-10; PKG-3 templates live in `api/generator/runtime/dart/`; DSC-1 audience tags are XTN-1; close its feature 10 follow up.
+- [x] Spec 0005: ERR-T1 table refined by KND-2 (413, 415 `validation`; 428 `conflict`); NPM-6 header is `Orvano-Client`; SHP-3 `idempotencyKey` header is `Idempotency-Key` and offered only on marked operations; SHP-5 page fields are `items`, `nextCursor`, `total`; CGN-1 to CGN-3 generator named; close its feature 10 follow up.
+- [x] Spec 0006: CON-2 header is `Orvano-Csrf`; KEY-6 header is `Orvano-Key`; NET-3 is covered by HDR-5; close its feature 10 follow up.
+- [x] Spec 0007 (IMG-3 done 2026-10-23): RUN-4 prefix is `/v1` (PTH-1); COR-3 lists are HDR-2; COR-1, COR-2, and COR-4 gain the `/v1/health` exception (HLT-3: a fixed named policy, no project lookup); IMG-3 adds the `sha-<commit>` tag and the contract dispatch job (CNF-6, RGN-5); close the feature 10 follow up.
+- [x] Spec 0012: DEN-4 codes sit in the PRB-8 catalogue; EPT-5's public list gains `/v1/health` (and `/v1/console/config` with feature 13); close its feature 10 follow up.
 - [ ] Feature 13: the `orvano admin` project bootstrap command the conformance suite calls (CNF-7), and the CPX-3 console boot endpoints.
 - [ ] Feature 14 or 16, whichever first needs a safe retried create: build the idempotency replay store per IDM-4, through a spec update.
 - [ ] Feature 33: define the event envelope and register public events in `IPublicEventCatalog` (EVS).
