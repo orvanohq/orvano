@@ -1,7 +1,8 @@
 # Spec 0007 IMG-3: builds ghcr.io/orvanohq/orvano on every push to main, tagged `edge` and `sha-<commit>` (spec 0014
-# CNF-6), signed with cosign keyless and attested (spec 0006 SUP-8). When the push changed api/**, its last job sends
-# `contract-updated` to the six SDK repos through the orvano-sdk-bot App, only once the image is pushed and signed
-# (spec 0014 RGN-4, RGN-5). Release tags (`<version>`, `<major>.<minor>`) join with features 52 and 59.
+# CNF-6), signed with cosign keyless and attested (spec 0006 SUP-8). When api/** changed since the last successful
+# run, its last job sends `contract-updated` to the six SDK repos through the orvano-sdk-bot App, only once the image
+# is pushed and signed (spec 0014 RGN-4, RGN-5).
+# Release tags (`<version>`, `<major>.<minor>`) join with features 52 and 59.
 name: Image
 
 on:
@@ -12,7 +13,8 @@ on:
 
 permissions: {}
 
-# A newer push replaces a waiting run; a lost dispatch is caught by each SDK repo's daily catch up (RGN-9).
+# A newer push replaces a waiting run, so that push never gets its own image. The `changes` job therefore compares api/
+# with the last successful run, not with the previous push, and the next run sends the replaced push's contract change.
 concurrency:
   group: image-${{ github.ref }}
   cancel-in-progress: false
@@ -27,6 +29,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      actions: read # find the last successful run of this workflow
     outputs:
       api: ${{ steps.changes.outputs.api }}
     steps:
@@ -35,15 +38,20 @@ jobs:
           fetch-depth: 0
           filter: blob:none
           persist-credentials: false
-      # With no usable base (a new branch, a force push), api/ counts as changed, like tooling/scripts/changes.mjs.
+      # RGN-5: the base is the commit of the last successful run, whose image is signed and whose dispatch (if any) went
+      # out. A replaced, failed, or cancelled run is never the base, so its api/ change is sent by the next run that
+      # succeeds. With no usable base (the first run, a commit missing from main), api/ counts as changed.
       - id: changes
-        name: Did this push change api/
+        name: Did api/ change since the last successful run
         env:
-          PUSH_BEFORE: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           api=true
-          if [[ "$PUSH_BEFORE" =~ ^[0-9a-f]{40}$ && ! "$PUSH_BEFORE" =~ ^0+$ ]] \
-            && files="$(git diff --name-only "$PUSH_BEFORE" HEAD -- api/)"; then
+          runs="repos/$REPO/actions/workflows/image.yml/runs?branch=main&event=push&status=success&per_page=1"
+          base="$(gh api "$runs" --jq '.workflow_runs[0].head_sha // empty')"
+          echo "Last successful run: ${base:-none}"
+          if [[ "$base" =~ ^[0-9a-f]{40}$ ]] && files="$(git diff --name-only "$base" HEAD -- api/)"; then
             [ -n "$files" ] || api=false
           fi
           echo "api=$api" >> "$GITHUB_OUTPUT"
