@@ -27,9 +27,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          global-json-file: ${{ inputs.working-directory }}/global.json
+      # Outage workaround for setup-dotnet, the same steps as .github/actions/install-dotnet (read its comment). A
+      # reusable workflow can't use this repo's local actions, so they sit inline. Remove once aka.ms works again.
+      - name: Install .NET from builds.dotnet.microsoft.com (aka.ms outage workaround)
+        working-directory: .
+        env:
+          GLOBAL_JSON: ${{ inputs.working-directory }}/global.json
+        run: |
+          set -euo pipefail
+          script="$RUNNER_TEMP/dotnet-install.sh"
+          curl -fsSL --retry 3 -o "$script" \
+            https://raw.githubusercontent.com/dotnet/install-scripts/da3ce11ba63f3dbb0fb835d41bda2665d5c48e84/src/dotnet-install.sh
+          echo "082f7685e156738a1b2e2ed8381a621870d4ce8e8c59278034556f05c186eb2e  $script" | sha256sum --check --strict
+          dir="$RUNNER_TEMP/dotnet"
+          bash "$script" --jsonfile "$GLOBAL_JSON" --azure-feed https://builds.dotnet.microsoft.com/dotnet --install-dir "$dir"
+          echo "DOTNET_ROOT=$dir" >> "$GITHUB_ENV"
+          echo "$dir" >> "$GITHUB_PATH"
       - name: Cache NuGet packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
