@@ -1,0 +1,47 @@
+# Temporary stand in for actions/setup-dotnet (spec 0008 CI-5). Outage of 2026-10-25: the aka.ms links that
+# setup-dotnet v6.0.0 resolves redirect to dotnetorigin.blob.core.windows.net, which answers HTTP 409 for every file.
+# This installs the exact SDK version in global.json from builds.dotnet.microsoft.com, which skips aka.ms entirely.
+# Remove it, and go back to setup-dotnet with `global-json-file`, once the aka.ms redirect works again.
+# sdk-dotnet.yml carries the same steps inline, because a reusable workflow can't use this repo's local actions.
+name: Install .NET (aka.ms outage workaround)
+description: Installs the .NET SDK version in a global.json from builds.dotnet.microsoft.com.
+
+inputs:
+  global-json-file:
+    description: Path to the global.json, relative to the workspace.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # dotnet/install-scripts v2026.07.21 (da3ce11), checked against its SHA-256 before it runs (CI-4).
+    - if: runner.os != 'Windows'
+      shell: bash
+      env:
+        GLOBAL_JSON: ${{ inputs.global-json-file }}
+      run: | # zizmor: ignore[github-env] writes only a fixed RUNNER_TEMP path, no outside input
+        set -euo pipefail
+        script="$RUNNER_TEMP/dotnet-install.sh"
+        curl -fsSL --retry 3 -o "$script" \
+          https://raw.githubusercontent.com/dotnet/install-scripts/da3ce11ba63f3dbb0fb835d41bda2665d5c48e84/src/dotnet-install.sh
+        echo "082f7685e156738a1b2e2ed8381a621870d4ce8e8c59278034556f05c186eb2e  $script" | sha256sum --check --strict
+        dir="$RUNNER_TEMP/dotnet"
+        bash "$script" --jsonfile "$GLOBAL_JSON" --azure-feed https://builds.dotnet.microsoft.com/dotnet --install-dir "$dir"
+        echo "DOTNET_ROOT=$dir" >> "$GITHUB_ENV"
+        echo "$dir" >> "$GITHUB_PATH"
+    - if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        GLOBAL_JSON: ${{ inputs.global-json-file }}
+      run: | # zizmor: ignore[github-env] writes only a fixed RUNNER_TEMP path, no outside input
+        $ErrorActionPreference = 'Stop'
+        $script = Join-Path $env:RUNNER_TEMP 'dotnet-install.ps1'
+        Invoke-WebRequest -OutFile $script `
+          -Uri https://raw.githubusercontent.com/dotnet/install-scripts/da3ce11ba63f3dbb0fb835d41bda2665d5c48e84/src/dotnet-install.ps1
+        if ((Get-FileHash $script -Algorithm SHA256).Hash -ne '3bb07bc8025211836c1e4f9d3f6a044e55b1fb6eec518a6c78851d04e210442b') {
+          throw 'dotnet-install.ps1 does not match its pinned SHA-256.'
+        }
+        $dir = Join-Path $env:RUNNER_TEMP 'dotnet'
+        & $script -JSonFile $env:GLOBAL_JSON -AzureFeed https://builds.dotnet.microsoft.com/dotnet -InstallDir $dir
+        "DOTNET_ROOT=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        $dir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
