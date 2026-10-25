@@ -67,7 +67,7 @@ final class WidgetsService {
     final json = await _transport.request(
       operationId: 'Fixture_GetWidget',
       method: 'GET',
-      path: ['v1', 'projects', _transport.projectId, 'widgets', widgetId],
+      path: ['v1', 'projects', _transport.projectId, 'widgets', pathSegment('widgetId', widgetId)],
       options: options,
     );
     return WidgetResponse.fromJson(readObject(json, r'$'), r'$');
@@ -144,7 +144,7 @@ final class WidgetsService {
     final json = await _transport.request(
       operationId: 'Fixture_UpdateWidget',
       method: 'PATCH',
-      path: ['v1', 'projects', _transport.projectId, 'widgets', widgetId],
+      path: ['v1', 'projects', _transport.projectId, 'widgets', pathSegment('widgetId', widgetId)],
       body: {if (name.isPresent) 'name': name.value, if (nickname.isPresent) 'nickname': nickname.value, if (tags.isPresent) 'tags': tags.value},
       options: options,
       ifMatch: ifMatch,

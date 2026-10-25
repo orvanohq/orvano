@@ -120,6 +120,7 @@
           "minProperties": 1,
           "properties": {
             "kind": {
+              "description": "A KND-2 kind, or `argument` when the SDK refused the call before sending (spec 0005 ERR-T5).",
               "enum": [
                 "network",
                 "timeout",
@@ -129,7 +130,8 @@
                 "conflict",
                 "validation",
                 "rate_limited",
-                "server"
+                "server",
+                "argument"
               ]
             },
             "status": {},

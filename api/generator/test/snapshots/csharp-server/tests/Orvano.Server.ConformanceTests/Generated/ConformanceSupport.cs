@@ -138,6 +138,8 @@ internal static class ConformanceErrors
         // LIB-6: the last attempt's timeout is a TimeoutException, a failed connection an HttpRequestException.
         TimeoutException => WithoutResponse("timeout"),
         HttpRequestException => WithoutResponse("network"),
+        // LIB-6: a bad argument the SDK refused before any request; the dispatcher's own checks name call or parameters.
+        ArgumentException { ParamName: not ("call" or "parameters") } => WithoutResponse("argument"),
         _ => null,
     };
 

@@ -146,7 +146,7 @@ export function dispatchFile(
   text +=
     "      default:\n        throw ArgumentError.value(call, 'call', 'is not a call this SDK has');\n    }\n";
   text +=
-    "  } on OrvanoException catch (error) {\n    return ConformanceOutcome.failed(normalize(error));\n  }\n}\n";
+    "  } on OrvanoException catch (error) {\n    return ConformanceOutcome.failed(normalize(error));\n  } on ArgumentError catch (error) {\n    // EXC-4: a bad argument the SDK refused before any request.\n    if (error.name == 'call') rethrow;\n    return const ConformanceOutcome.failed(refused);\n  }\n}\n";
   return text;
 }
 

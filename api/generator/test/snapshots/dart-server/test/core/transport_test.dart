@@ -655,6 +655,17 @@ void main() {
     );
   });
 
+  group('pathSegment', () {
+    test('refuses an empty or dot segment value, which Uri would remove', () {
+      for (final bad in ['', '.', '..', '%2e', '%2E%2e', '.%2E']) {
+        expect(() => pathSegment('id', bad), throwsArgumentError);
+      }
+      for (final good in ['...', 'a.b', '.x', '%2e%2e%2e']) {
+        expect(pathSegment('id', good), good);
+      }
+    });
+  });
+
   group('checkEndpoint', () {
     test('adds a trailing slash to the base path', () {
       expect(

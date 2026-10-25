@@ -498,7 +498,7 @@ function method(operation: Operation, types: DartTypes): string {
         );
         if (input === undefined)
           throw new GeneratorError(`${where}: the path parameter ${segment.name} is not declared.`);
-        return pathValue(input);
+        return `pathSegment(${dartString(input.name)}, ${pathValue(input)})`;
       }
     }
   });

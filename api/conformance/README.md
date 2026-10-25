@@ -25,7 +25,7 @@ One set of language neutral scenarios that every Orvano SDK runs, so all six beh
       params: {} # the operation's inputs
       options: { retry: 0, timeout: 300, headers: {} }
       expect:
-        result: { status: ok } # or error: { kind, status, code, fieldErrors, retryAfter }
+        result: { status: ok } # or error: { kind, status, code, fieldErrors, retryAfter }; kind argument: refused before sending
         response: { status: 200, headers: { orvano-api-version: $, { apiVersion } } } # what the runner saw last
 ```
 

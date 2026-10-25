@@ -226,6 +226,64 @@
       ]
     },
     {
+      "id": "fixture.delete_label.refuses_dot_segments",
+      "title": "An empty or dot segment path value is refused before any request (ERR-T5, EXC-4, LIB-6, PTH-4)",
+      "mode": "stub",
+      "audience": [
+        "client",
+        "server"
+      ],
+      "requires": [],
+      "steps": [
+        {
+          "call": "fixture.deleteLabel",
+          "params": {
+            "labelName": ""
+          },
+          "expect": {
+            "error": {
+              "kind": "argument"
+            }
+          }
+        },
+        {
+          "call": "fixture.deleteLabel",
+          "params": {
+            "labelName": "."
+          },
+          "expect": {
+            "error": {
+              "kind": "argument"
+            }
+          }
+        },
+        {
+          "call": "fixture.deleteLabel",
+          "params": {
+            "labelName": ".."
+          },
+          "expect": {
+            "error": {
+              "kind": "argument"
+            }
+          }
+        },
+        {
+          "call": "fixture.deleteLabel",
+          "params": {
+            "labelName": "%2E%2e"
+          },
+          "expect": {
+            "error": {
+              "kind": "argument"
+            }
+          }
+        }
+      ],
+      "stub": [],
+      "expectRequests": []
+    },
+    {
       "id": "fixture.get_widget.unknown_enum",
       "title": "An enum value the SDK does not know is kept, not refused (JSW-2, TYP-4)",
       "mode": "stub",

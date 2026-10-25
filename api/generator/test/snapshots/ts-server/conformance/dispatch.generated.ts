@@ -41,6 +41,16 @@ export interface CreateWidgetFixtureParams {
 }
 
 /**
+ * The inputs of `fixture.deleteLabel`.
+ *
+ * @public
+ */
+export interface DeleteLabelFixtureParams {
+  /** The label's name. */
+  labelName: string;
+}
+
+/**
  * The inputs of `fixture.getWidget`.
  *
  * @public
@@ -79,6 +89,24 @@ export class Fixture {
       method: "POST",
       path: ["v1", "projects", projectId(this.client), "fixture", "widgets"],
       body: { name: params.name, color: params.color },
+      options,
+    });
+  }
+
+  /**
+   * Delete a fixture label.
+   *
+   * Answers 204. Its path parameter is free text, so stub scenarios can prove an SDK refuses an empty or dot segment value before sending (spec 0014 PTH-4).
+   *
+   * @param params - The call's inputs.
+   * @param options - Per call options: signal, timeout, headers, and retry.
+   * @throws {@link OrvanoError} when the call fails.
+   */
+  async deleteLabel(params: DeleteLabelFixtureParams, options?: RequestOptions): Promise<void> {
+    return request<void>(this.client, {
+      operationId: "Fixture_DeleteLabel",
+      method: "DELETE",
+      path: ["v1", "projects", projectId(this.client), "fixture", "labels", pathParam("labelName", params.labelName)],
       options,
     });
   }
@@ -160,6 +188,16 @@ async function walkAll(
   }
   return { ok: true, result: toJson(items) };
 }
+
+/** A bad argument the SDK refused before sending, as kind `argument` (it has no response). */
+const refused: ConformanceError = {
+  kind: "argument",
+  status: null,
+  code: "unknown",
+  fieldErrors: [],
+  retryAfter: null,
+  requestId: null,
+};
 
 function normalize(error: OrvanoError): ConformanceError {
   return {
@@ -270,6 +308,7 @@ function describe(value: unknown): string {
 /** Every call this SDK's scenarios may make, as `<service>.<method>`. */
 export const calls: readonly string[] = [
   "fixture.createWidget",
+  "fixture.deleteLabel",
   "fixture.getWidget",
   "health.get",
   "widgetKeys.rotate",
@@ -307,6 +346,9 @@ export async function dispatch(
     switch (call) {
       case "fixture.createWidget":
         return { ok: true, result: toJson(await new Fixture(client).createWidget(params as unknown as CreateWidgetFixtureParams, requestOptions)) };
+      case "fixture.deleteLabel":
+        await new Fixture(client).deleteLabel(params as unknown as DeleteLabelFixtureParams, requestOptions);
+        return { ok: true, result: null };
       case "fixture.getWidget":
         return { ok: true, result: toJson(await new Fixture(client).getWidget(params as unknown as GetWidgetFixtureParams, requestOptions)) };
       case "health.get":
@@ -339,6 +381,8 @@ export async function dispatch(
     }
   } catch (error) {
     if (OrvanoError.is(error)) return { ok: false, error: normalize(error) };
+    // ERR-T5: a bad argument the SDK refused before any request.
+    if (error instanceof TypeError) return { ok: false, error: refused };
     throw error;
   }
 }

@@ -9,6 +9,7 @@ import {
   Widgets,
   apiVersion,
 } from "./snapshots/ts-client/src/generated/index.ts";
+import { pathParam } from "./snapshots/ts-client/src/runtime/client.ts";
 import { kindFromStatus } from "./snapshots/ts-client/src/runtime/errors.ts";
 import { buildUrl, checkUrl } from "./snapshots/ts-client/src/runtime/url.ts";
 import { createClientHandle as createServerHandle } from "./snapshots/ts-server/src/runtime/options.ts";
@@ -323,6 +324,15 @@ describe("helpers", () => {
     expect(checkUrl(`https://a.example${slashes}`, false)).toBe("https://a.example");
     expect(buildUrl(`https://a.example/x${slashes}`, ["v1"])).toBe("https://a.example/x/v1");
     expect(performance.now() - started).toBeLessThan(500);
+  });
+
+  it("0005 ERR-T5: refuses an empty or dot segment path value, which URL parsing would remove (PTH-4)", () => {
+    for (const bad of ["", ".", "..", "%2e", "%2E%2e", ".%2E"]) {
+      expect(() => pathParam("id", bad)).toThrow(TypeError);
+    }
+    for (const good of ["...", "a.b", ".x", "%2e%2e%2e", 0]) {
+      expect(pathParam("id", good)).toBe(String(good));
+    }
   });
 
   it("builds URLs by the RTM-3 rules", () => {

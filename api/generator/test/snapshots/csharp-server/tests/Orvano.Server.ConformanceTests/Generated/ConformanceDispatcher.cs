@@ -15,6 +15,7 @@ internal static class ConformanceDispatcher
     public static IReadOnlyList<string> Calls { get; } =
     [
         "fixture.createWidget",
+        "fixture.deleteLabel",
         "fixture.getWidget",
         "health.get",
         "widgetKeys.rotate",
@@ -53,6 +54,9 @@ internal static class ConformanceDispatcher
                         var result = await new FixtureService(client.Transport).CreateWidgetAsync(ConformanceJson.Body<FixtureCreateWidgetRequest>(parameters), requestOptions, cancellationToken).ConfigureAwait(false);
                         return ConformanceOutcome.Ok(ConformanceJson.ToNode(result));
                     }
+                case "fixture.deleteLabel":
+                    await new FixtureService(client.Transport).DeleteLabelAsync(ConformanceJson.Required<string>(parameters, "labelName"), requestOptions, cancellationToken).ConfigureAwait(false);
+                    return ConformanceOutcome.Ok(null);
                 case "fixture.getWidget":
                     {
                         var result = await new FixtureService(client.Transport).GetWidgetAsync(ConformanceJson.Required<Guid>(parameters, "widgetId"), requestOptions, cancellationToken).ConfigureAwait(false);

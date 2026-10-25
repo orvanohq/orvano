@@ -523,6 +523,117 @@
           "required": true
         }
       }
+    },
+    "/v1/projects/{projectId}/fixture/labels/{labelName}": {
+      "delete": {
+        "tags": ["fixture"],
+        "x-orvano-audience": ["client", "server"],
+        "x-orvano-errors": [],
+        "summary": "Delete a fixture label.",
+        "description": "Answers 204. Its path parameter is free text, so stub scenarios can prove an SDK refuses an empty or dot segment value before sending (spec 0014 PTH-4).",
+        "operationId": "Fixture_DeleteLabel",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "description": "The project's ID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "labelName",
+            "in": "path",
+            "required": true,
+            "description": "The label's name.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-orvano-sdk": {
+          "service": "fixture",
+          "method": "deleteLabel"
+        }
+      }
     }
   },
   "components": {

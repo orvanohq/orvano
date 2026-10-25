@@ -94,6 +94,23 @@ internal static class OrvanoWire
 
     public static byte[] Body<T>(T value, JsonTypeInfo<T> type) => JsonSerializer.SerializeToUtf8Bytes(value, type);
 
+    /// <summary>
+    /// A path parameter's value, refused before any request when it is empty or a dot segment (spec 0002 LIB-6,
+    /// spec 0014 PTH-4): <c>Uri</c> removes <c>.</c> and <c>..</c> (also as <c>%2e</c>), which would send the call to
+    /// another route.
+    /// </summary>
+    public static string PathSegment(string value, string name)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(value, name);
+        string decoded = value.Replace("%2e", ".", StringComparison.OrdinalIgnoreCase);
+        if (decoded is "." or "..")
+        {
+            throw new ArgumentException($"{name} must not be \".\" or \"..\".", name);
+        }
+
+        return value;
+    }
+
     public static string Text(int value) => value.ToString(CultureInfo.InvariantCulture);
 
     public static string Text(long value) => value.ToString(CultureInfo.InvariantCulture);

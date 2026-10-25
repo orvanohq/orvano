@@ -106,7 +106,7 @@ export function dispatchFile(model: TargetModel, fixture: TargetModel, source: P
   for (const { service, operation } of entries) text += dispatchCase(service, operation);
   text += "      default:\n        throw new Error(`This SDK has no call ${call}.`);\n    }\n";
   text +=
-    "  } catch (error) {\n    if (OrvanoError.is(error)) return { ok: false, error: normalize(error) };\n    throw error;\n  }\n}\n";
+    "  } catch (error) {\n    if (OrvanoError.is(error)) return { ok: false, error: normalize(error) };\n    // ERR-T5: a bad argument the SDK refused before any request.\n    if (error instanceof TypeError) return { ok: false, error: refused };\n    throw error;\n  }\n}\n";
   return text;
 }
 
@@ -199,6 +199,16 @@ async function walkAll(
   }
   return { ok: true, result: toJson(items) };
 }
+
+/** A bad argument the SDK refused before sending, as kind \`argument\` (it has no response). */
+const refused: ConformanceError = {
+  kind: "argument",
+  status: null,
+  code: "unknown",
+  fieldErrors: [],
+  retryAfter: null,
+  requestId: null,
+};
 
 function normalize(error: OrvanoError): ConformanceError {
   return {
