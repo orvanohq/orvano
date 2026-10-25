@@ -13,7 +13,7 @@ namespace Orvano.SharedKernel.Api;
 /// <typeparam name="T">The field's type; annotate it nullable (<c>string?</c>) when the field can be cleared.</typeparam>
 [JsonConverter(typeof(OptionalJsonConverterFactory))]
 #pragma warning disable CA1716 // JSW-9: spec 0014 names this type Optional; the server has no VB consumers.
-public readonly struct Optional<T> : IEquatable<Optional<T>>
+public readonly struct Optional<T> : IEquatable<Optional<T>>, IOptional
 {
     private readonly T _value;
 
@@ -47,6 +47,10 @@ public readonly struct Optional<T> : IEquatable<Optional<T>>
     /// </summary>
     public T Value => _value;
 
+    bool IOptional.SentNull => SentNull;
+
+    object? IOptional.Value => _value;
+
     /// <summary>The value sent, or <paramref name="current"/> when the field was absent (unchanged).</summary>
     public T Or(T current) => HasValue ? _value : current;
 
@@ -66,6 +70,16 @@ public readonly struct Optional<T> : IEquatable<Optional<T>>
     public override string ToString() => HasValue ? $"{_value}" : "(absent)";
 }
 #pragma warning restore CA1716
+
+/// <summary>An <see cref="Optional{T}"/> of any <c>T</c>, for code that reads one without knowing <c>T</c>.</summary>
+internal interface IOptional
+{
+    bool HasValue { get; }
+
+    bool SentNull { get; }
+
+    object? Value { get; }
+}
 
 /// <summary>
 /// Reads and writes <see cref="Optional{T}"/> as its value. An absent property never reaches the converter, so the
