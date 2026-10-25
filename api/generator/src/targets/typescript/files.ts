@@ -408,7 +408,11 @@ function method(operation: Operation): string {
 
   let text = tsDoc([operation.summary, operation.description], tags, "  ");
   text += `  async ${operation.method}(${signature}): Promise<${responseType}> {\n`;
-  text += `    return request<${responseType}>(this.client, {\n`;
+  // A call with no response awaits the request, since \`void\` is no type argument (no-invalid-void-type).
+  text +=
+    responseType === "void"
+      ? "    await request<unknown>(this.client, {\n"
+      : `    return request<${responseType}>(this.client, {\n`;
   text += fields.map((field) => `      ${field},\n`).join("");
   text += "    });\n  }\n";
   return text;
