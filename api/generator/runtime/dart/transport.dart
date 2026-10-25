@@ -93,7 +93,9 @@ Uri checkEndpoint(Uri endpoint, {required bool allowInsecure}) {
 /// `ArgumentError`.
 @internal
 String pathSegment(String name, String value) {
-  if (value.isEmpty) throw ArgumentError.value(value, name, 'must not be empty');
+  if (value.isEmpty) {
+    throw ArgumentError.value(value, name, 'must not be empty');
+  }
   final decoded = value.replaceAll(RegExp('%2e', caseSensitive: false), '.');
   if (decoded == '.' || decoded == '..') {
     throw ArgumentError.value(value, name, 'must not be "." or ".."');

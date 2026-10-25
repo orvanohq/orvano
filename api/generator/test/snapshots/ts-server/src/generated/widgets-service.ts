@@ -115,7 +115,7 @@ export class Widgets {
    * @throws {@link OrvanoError} when the call fails.
    */
   async delete(params: DeleteWidgetsParams, options?: RequestOptions): Promise<void> {
-    return request<void>(this.client, {
+    await request<unknown>(this.client, {
       operationId: "Fixture_DeleteWidget",
       method: "DELETE",
       path: ["v1", "projects", projectId(this.client), "widgets", pathParam("widgetId", params.widgetId)],

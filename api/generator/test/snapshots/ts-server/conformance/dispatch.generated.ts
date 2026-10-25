@@ -103,7 +103,7 @@ export class Fixture {
    * @throws {@link OrvanoError} when the call fails.
    */
   async deleteLabel(params: DeleteLabelFixtureParams, options?: RequestOptions): Promise<void> {
-    return request<void>(this.client, {
+    await request<unknown>(this.client, {
       operationId: "Fixture_DeleteLabel",
       method: "DELETE",
       path: ["v1", "projects", projectId(this.client), "fixture", "labels", pathParam("labelName", params.labelName)],
