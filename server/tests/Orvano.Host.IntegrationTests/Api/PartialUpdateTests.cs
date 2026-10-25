@@ -72,6 +72,54 @@ public sealed class PartialUpdateTests(WireServerFixture server) : IClassFixture
         (await OkAsync(await GetAsync(note.Id))).GetProperty("name").GetString().ShouldBe("first");
     }
 
+    // [OptionalValue<T>] on an Optional<T> field checks the value sent, not the Optional wrapper; an absent field and a null
+    // on a nullable field skip them (JSW-9, PRB-5).
+    [Theory, Trait("Spec", "0014:AC-9"), Trait("Spec", "0014:JSW-9"), Trait("Spec", "0014:PRB-5")]
+    [InlineData("""{ "name": "a much too long name" }""", "name", FieldCodes.TooLong)]
+    [InlineData("""{ "nickname": "x" }""", "nickname", FieldCodes.TooShort)]
+    [InlineData("""{ "tags": ["a", "b", "c", "d"] }""", "tags", FieldCodes.TooLong)]
+    [InlineData("""{ "rank": 0 }""", "rank", FieldCodes.OutOfRange)]
+    [InlineData("""{ "rank": 101 }""", "rank", FieldCodes.OutOfRange)]
+    [InlineData("""{ "email": "not an email" }""", "email", FieldCodes.InvalidEmail)]
+    public async Task Patch_fails_the_attribute_code_when_an_optional_field_breaks_its_constraint(string json, string field, string code)
+    {
+        NoteResponse note = Notes.Add("first");
+
+        using HttpResponseMessage response = await PatchAsync(note.Id, json);
+
+        JsonElement problem = await ProblemAsync(response, HttpStatusCode.BadRequest, ErrorCodes.ValidationFailed);
+        JsonElement error = problem.GetProperty("errors").EnumerateArray().Single();
+        error.GetProperty("field").GetString().ShouldBe(field);
+        error.GetProperty("location").GetString().ShouldBe("body");
+        error.GetProperty("code").GetString().ShouldBe(code);
+        (await OkAsync(await GetAsync(note.Id))).GetProperty("name").GetString().ShouldBe("first");
+    }
+
+    [Theory, Trait("Spec", "0014:AC-9"), Trait("Spec", "0014:JSW-9"), Trait("Spec", "0014:PRB-5")]
+    [InlineData("""{ "name": "second", "nickname": "nick", "tags": ["a", "b", "c"], "rank": 100, "email": "ada@example.com" }""")]
+    [InlineData("""{ "nickname": null, "email": null }""")]
+    [InlineData("""{ "address": { "city": "Bergen", "zip": null } }""")]
+    [InlineData("{}")]
+    public async Task Patch_accepts_constrained_optional_fields_when_valid_absent_or_cleared(string json)
+    {
+        NoteResponse note = Notes.Add("first", "nick");
+
+        await OkAsync(await PatchAsync(note.Id, json));
+    }
+
+    [Fact, Trait("Spec", "0014:AC-9"), Trait("Spec", "0014:JSW-9"), Trait("Spec", "0014:PRB-5")]
+    public async Task Patch_reports_every_failing_optional_field_when_several_break_their_constraints()
+    {
+        NoteResponse note = Notes.Add("first");
+
+        using HttpResponseMessage response = await PatchAsync(note.Id, """{ "name": "a much too long name", "rank": 0, "email": "nope" }""");
+
+        JsonElement problem = await ProblemAsync(response, HttpStatusCode.BadRequest, ErrorCodes.ValidationFailed);
+        problem.GetProperty("errors").EnumerateArray()
+            .Select(error => $"{error.GetProperty("field").GetString()}:{error.GetProperty("code").GetString()}")
+            .ShouldBe(["name:too_long", "rank:out_of_range", "email:invalid_email"], ignoreOrder: true);
+    }
+
     // --- AC-11: row versions and If-Match ----------------------------------------------------------------------------
 
     [Fact, Trait("Spec", "0014:AC-11"), Trait("Spec", "0014:CNC-1"), Trait("Spec", "0014:CNC-2")]

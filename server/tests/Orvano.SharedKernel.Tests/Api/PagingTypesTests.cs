@@ -1,6 +1,6 @@
 using System.Buffers.Text;
+using System.Globalization;
 using System.Text;
-using System.Text.Json.Nodes;
 
 using Microsoft.AspNetCore.Http;
 
@@ -22,10 +22,12 @@ public sealed class PagingTypesTests
     {
         string cursor = CursorCodec.Encode(["2026-10-22T09:00:00Z", "0199f0a2-0000-7000-8000-00000000abcd"], Query);
 
-        Result<JsonArray> keys = CursorCodec.Decode(cursor, Query);
+        Result<CursorKeys> keys = CursorCodec.Decode(cursor, Query, CursorKey.Timestamp, CursorKey.Uuid);
 
         keys.Error.ShouldBeNull();
-        keys.Value!.ToJsonString().ShouldBe("""["2026-10-22T09:00:00Z","0199f0a2-0000-7000-8000-00000000abcd"]""");
+        keys.Value!.Count.ShouldBe(2);
+        keys.Value.GetTimestamp(0).ShouldBe(new DateTimeOffset(2026, 10, 22, 9, 0, 0, TimeSpan.Zero));
+        keys.Value.GetUuid(1).ShouldBe(Guid.Parse("0199f0a2-0000-7000-8000-00000000abcd"));
     }
 
     [Fact, Trait("Spec", "0014:PAG-5")]
@@ -38,8 +40,8 @@ public sealed class PagingTypesTests
     }
 
     [Theory, Trait("Spec", "0014:PAG-5")]
-    [InlineData("""{"v":1,"k":[7],"q":"fedcba9876543210"}""")] // another filter or sort
-    [InlineData("""{"v":2,"k":[7],"q":"0123456789abcdef"}""")] // another version
+    [InlineData("""{"v":1,"k":["7"],"q":"fedcba9876543210"}""")] // another filter or sort
+    [InlineData("""{"v":2,"k":["7"],"q":"0123456789abcdef"}""")] // another version
     [InlineData("""{"v":1,"k":[],"q":"0123456789abcdef"}""")] // no keys
     [InlineData("""{"v":1,"q":"0123456789abcdef"}""")]
     [InlineData("""[1]""")]
@@ -48,18 +50,67 @@ public sealed class PagingTypesTests
     {
         string cursor = Base64Url.EncodeToString(Encoding.UTF8.GetBytes(json));
 
-        CursorCodec.Decode(cursor, Query).Error!.Code.ShouldBe(ErrorCodes.InvalidCursor);
+        CursorCodec.Decode(cursor, Query, CursorKey.Int64Text).Error!.Code.ShouldBe(ErrorCodes.InvalidCursor);
+    }
+
+    // The hash is not secret, so a forged cursor can carry the right one with keys of another count or kind (PAG-5).
+    [Theory, Trait("Spec", "0014:PAG-5")]
+    [InlineData("""[5]""")] // too few keys, and a number
+    [InlineData("""["x"]""")] // too few keys
+    [InlineData("""["2026-10-22T09:00:00Z","x"]""")] // not a uuid
+    [InlineData("""["2026-10-22T09:00:00Z","{0199f0a2-0000-7000-8000-00000000abcd}"]""")] // a uuid, but not as JSW writes one
+    [InlineData("""["2026-10-22","0199f0a2-0000-7000-8000-00000000abcd"]""")] // not RFC 3339
+    [InlineData("""[1761123600,"0199f0a2-0000-7000-8000-00000000abcd"]""")] // a number, not a timestamp string
+    [InlineData("""["2026-10-22T09:00:00Z",null]""")]
+    [InlineData("""["2026-10-22T09:00:00Z",["0199f0a2-0000-7000-8000-00000000abcd"]]""")]
+    [InlineData("""["2026-10-22T09:00:00Z","0199f0a2-0000-7000-8000-00000000abcd","extra"]""")] // too many keys
+    public void Cursor_fails_invalid_cursor_when_its_keys_do_not_have_the_shape(string keys)
+    {
+        string cursor = Base64Url.EncodeToString(Encoding.UTF8.GetBytes($$"""{"v":1,"k":{{keys}},"q":"{{Query}}"}"""));
+
+        CursorCodec.Decode(cursor, Query, CursorKey.Timestamp, CursorKey.Uuid).Error!.Code.ShouldBe(ErrorCodes.InvalidCursor);
+    }
+
+    [Theory, Trait("Spec", "0014:PAG-5")]
+    [InlineData("""[7]""")] // JSW-5: an int64 is a string
+    [InlineData("""["7.5"]""")]
+    [InlineData("""["99999999999999999999"]""")]
+    public void Cursor_fails_invalid_cursor_when_an_int64_key_is_not_an_int64_string(string keys)
+    {
+        string cursor = Base64Url.EncodeToString(Encoding.UTF8.GetBytes($$"""{"v":1,"k":{{keys}},"q":"{{Query}}"}"""));
+
+        CursorCodec.Decode(cursor, Query, CursorKey.Int64Text).Error!.Code.ShouldBe(ErrorCodes.InvalidCursor);
+    }
+
+    [Fact, Trait("Spec", "0014:PAG-5"), Trait("Spec", "0014:JSW-3")]
+    public void Cursor_reads_a_timestamp_with_an_offset_as_utc_when_decoded()
+    {
+        string cursor = CursorCodec.Encode(["2026-10-22T11:00:00+02:00", "-42"], Query);
+
+        CursorKeys keys = CursorCodec.Decode(cursor, Query, CursorKey.Timestamp, CursorKey.Int64Text).Value!;
+
+        keys.GetTimestamp(0).ShouldBe(new DateTimeOffset(2026, 10, 22, 9, 0, 0, TimeSpan.Zero));
+        keys.GetTimestamp(0).Offset.ShouldBe(TimeSpan.Zero);
+        keys.GetInt64(1).ShouldBe(-42);
+    }
+
+    [Fact, Trait("Spec", "0014:PAG-5")]
+    public void Cursor_key_throws_when_read_as_another_kind_than_its_shape()
+    {
+        CursorKeys keys = CursorCodec.Decode(CursorCodec.Encode(["x"], Query), Query, CursorKey.Text).Value!;
+
+        Should.Throw<InvalidOperationException>(() => keys.GetUuid(0));
     }
 
     [Theory, Trait("Spec", "0014:PAG-5")]
     [InlineData("")]
     [InlineData("not base64!")]
     public void Cursor_fails_invalid_cursor_when_it_is_not_base64url(string cursor) =>
-        CursorCodec.Decode(cursor, Query).Error!.Code.ShouldBe(ErrorCodes.InvalidCursor);
+        CursorCodec.Decode(cursor, Query, CursorKey.Int64Text).Error!.Code.ShouldBe(ErrorCodes.InvalidCursor);
 
     [Fact, Trait("Spec", "0014:PAG-5")]
     public void Cursor_fails_invalid_cursor_when_longer_than_the_limit() =>
-        CursorCodec.Decode(new string('a', PageQuery.MaxCursorLength + 1), Query).Error!.Code.ShouldBe(ErrorCodes.InvalidCursor);
+        CursorCodec.Decode(new string('a', PageQuery.MaxCursorLength + 1), Query, CursorKey.Int64Text).Error!.Code.ShouldBe(ErrorCodes.InvalidCursor);
 
     [Fact, Trait("Spec", "0014:PAG-5")]
     public void Query_hash_ignores_limit_cursor_and_parameter_order()
@@ -86,10 +137,10 @@ public sealed class PagingTypesTests
     [Fact, Trait("Spec", "0014:PAG-2"), Trait("Spec", "0014:PAG-4")]
     public void Page_has_a_next_cursor_from_the_last_row_when_the_query_fetched_an_extra_row()
     {
-        var page = Page.From([1, 2, 3], limit: 2, Query, row => [row], row => $"row {row}");
+        var page = Page.From([1L, 2L, 3L], limit: 2, Query, row => [row.ToString(CultureInfo.InvariantCulture)], row => $"row {row}");
 
         page.Items.ShouldBe(["row 1", "row 2"]);
-        CursorCodec.Decode(page.NextCursor!, Query).Value!.ToJsonString().ShouldBe("[2]");
+        CursorCodec.Decode(page.NextCursor!, Query, CursorKey.Int64Text).Value!.GetInt64(0).ShouldBe(2);
         page.Total.ShouldBeNull();
     }
 

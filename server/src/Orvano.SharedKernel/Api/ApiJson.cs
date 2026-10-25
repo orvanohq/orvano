@@ -32,14 +32,20 @@ public sealed class UtcDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
 {
     public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        string? text = reader.GetString();
-        if (text is null || !DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTimeOffset value)
-            || !IsRfc3339(text))
+        return TryParse(reader.GetString(), out DateTimeOffset value) ? value : throw new JsonException("Expected an RFC 3339 timestamp.");
+    }
+
+    /// <summary>Reads <paramref name="text"/> as an RFC 3339 timestamp with any offset, converted to UTC.</summary>
+    internal static bool TryParse(string? text, out DateTimeOffset value)
+    {
+        if (text is null || !DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out value) || !IsRfc3339(text))
         {
-            throw new JsonException("Expected an RFC 3339 timestamp.");
+            value = default;
+            return false;
         }
 
-        return value.ToUniversalTime();
+        value = value.ToUniversalTime();
+        return true;
     }
 
     public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options)

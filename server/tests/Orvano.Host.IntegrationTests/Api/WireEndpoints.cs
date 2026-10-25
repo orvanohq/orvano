@@ -1,7 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 
-using System.Text.Json.Nodes;
-
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -120,7 +118,13 @@ public sealed record NoteAddress(string City, string? Zip);
 public sealed record NoteResponse(Guid Id, string Name, string? Nickname, IReadOnlyList<string> Tags, NoteAddress? Address, [property: System.ComponentModel.ReadOnly(true)] string Version);
 
 /// <summary>A partial update of a test note (spec 0014 JSW-9).</summary>
-public sealed record UpdateNoteRequest(Optional<string> Name, Optional<string?> Nickname, Optional<IReadOnlyList<string>> Tags, Optional<NoteAddress?> Address, Optional<int> Rank);
+public sealed record UpdateNoteRequest(
+    [property: OptionalValue<MaxLengthAttribute>(10, ErrorMessage = FieldCodes.TooLong)] Optional<string> Name,
+    [property: OptionalValue<MinLengthAttribute>(2, ErrorMessage = FieldCodes.TooShort)] Optional<string?> Nickname,
+    [property: OptionalValue<MaxLengthAttribute>(3, ErrorMessage = FieldCodes.TooLong)] Optional<IReadOnlyList<string>> Tags,
+    Optional<NoteAddress?> Address,
+    [property: OptionalValue<RangeAttribute>(1, 100, ErrorMessage = FieldCodes.OutOfRange)] Optional<int> Rank,
+    [property: OptionalValue<EmailAddressAttribute>(ErrorMessage = FieldCodes.InvalidEmail)] Optional<string?> Email);
 
 /// <summary>The notes behind <c>/v1/test/notes</c>, each with a version that every write moves on.</summary>
 public sealed class FixtureNotes
@@ -250,16 +254,25 @@ internal sealed class WireEndpoints : IStartupFilter
         FixtureRow[] all = rows.Snapshot();
         if (page.Cursor is not null)
         {
-            Result<JsonArray> keys = CursorCodec.Decode(page.Cursor, query);
+            Result<CursorKeys> keys = byName
+                ? CursorCodec.Decode(page.Cursor, query, CursorKey.Text, CursorKey.Uuid)
+                : CursorCodec.Decode(page.Cursor, query, CursorKey.Timestamp, CursorKey.Uuid);
             if (keys.Error is { } error)
             {
                 return error.ToProblem();
             }
 
-            var lastId = Guid.Parse(keys.Value![^1]!.GetValue<string>());
-            ordered = byName
-                ? ordered.Where(row => string.CompareOrdinal(row.Name, keys.Value![0]!.GetValue<string>()) is var order && (order > 0 || (order == 0 && row.Id.CompareTo(lastId) > 0)))
-                : ordered.Where(row => row.CreatedAt.CompareTo(DateTimeOffset.Parse(keys.Value![0]!.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture)) is var order && (order > 0 || (order == 0 && row.Id.CompareTo(lastId) > 0)));
+            Guid lastId = keys.Value!.GetUuid(1);
+            if (byName)
+            {
+                string lastName = keys.Value.GetText(0);
+                ordered = ordered.Where(row => string.CompareOrdinal(row.Name, lastName) is var order && (order > 0 || (order == 0 && row.Id.CompareTo(lastId) > 0)));
+            }
+            else
+            {
+                DateTimeOffset lastCreated = keys.Value.GetTimestamp(0);
+                ordered = ordered.Where(row => row.CreatedAt.CompareTo(lastCreated) is var order && (order > 0 || (order == 0 && row.Id.CompareTo(lastId) > 0)));
+            }
         }
 
         FixtureRow[] fetched = [.. ordered.Take(page.Size + 1)];

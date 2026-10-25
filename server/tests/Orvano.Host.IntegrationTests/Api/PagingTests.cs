@@ -1,5 +1,8 @@
+using System.Buffers.Text;
 using System.Net;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -84,6 +87,30 @@ public sealed class PagingTests(WireServerFixture server) : IClassFixture<WireSe
     public async Task Cursor_fails_invalid_cursor_when_it_does_not_parse(string cursor)
     {
         using HttpResponseMessage response = await GetAsync($"/v1/test/rows?cursor={cursor}");
+
+        await ShouldBeProblemAsync(response, ErrorCodes.InvalidCursor);
+    }
+
+    // A cursor is not signed and its hash is computable, so a forged one with the right hash but keys of the wrong
+    // count or kind must still answer invalid_cursor, not 500 (PAG-5, PRB-8).
+    [Theory, Trait("Spec", "0014:AC-10"), Trait("Spec", "0014:PAG-5"), Trait("Spec", "0014:PRB-8")]
+    [InlineData("", "[5]")]
+    [InlineData("", "[\"x\"]")]
+    [InlineData("", "[\"2026-10-22T09:00:00Z\",\"x\"]")]
+    [InlineData("", "[\"not a time\",\"0199f0a2-0000-7000-8000-00000000abcd\"]")]
+    [InlineData("", "[\"2026-10-22T09:00:00Z\",5]")]
+    [InlineData("", "[\"2026-10-22T09:00:00Z\",\"0199f0a2-0000-7000-8000-00000000abcd\",\"extra\"]")]
+    [InlineData("", "[\"2026-10-22T09:00:00Z\",null]")]
+    [InlineData("&sort=name", "[5,\"0199f0a2-0000-7000-8000-00000000abcd\"]")]
+    [InlineData("&sort=name", "[[\"row 01\"],\"0199f0a2-0000-7000-8000-00000000abcd\"]")]
+    public async Task Cursor_fails_invalid_cursor_when_its_hash_matches_but_its_keys_have_the_wrong_shape(string sort, string keys)
+    {
+        JsonElement first = await PageAsync($"/v1/test/rows?limit=5{sort}");
+        JsonObject body = JsonNode.Parse(Base64Url.DecodeFromChars(first.GetProperty("nextCursor").GetString()))!.AsObject();
+        body["k"] = JsonNode.Parse(keys);
+        string forged = Base64Url.EncodeToString(Encoding.UTF8.GetBytes(body.ToJsonString()));
+
+        using HttpResponseMessage response = await GetAsync($"/v1/test/rows?limit=5{sort}&cursor={forged}");
 
         await ShouldBeProblemAsync(response, ErrorCodes.InvalidCursor);
     }
