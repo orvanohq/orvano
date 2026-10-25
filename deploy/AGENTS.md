@@ -21,6 +21,7 @@ The image and the compose files. Every rule here comes from [spec 0007](../docs/
 - `ORVANO_TRUSTED_PROXIES` must equal Caddy's fixed IP on the compose network (`172.30.80.10`). Only the `orvano` service gets the root key secret; `migrate` needs none (INS-2).
 - `init` runs as the operator, and the install folder is 0700 with `root.key` at 0644 (INS-3, INS-5). Run compose as the same user.
 - The `orvano` service keeps `stop_grace_period: 35s`, longer than `serve`'s 25 s shutdown timeout, so running jobs are released before Docker kills the container (spec 0013 OUT-6).
+- `.github/workflows/image.yml` publishes the image on each push to `main`, tagged `edge` and `sha-<commit>` (the full commit, which each SDK's conformance pins), signed with cosign keyless and attested (spec 0007 IMG-3, spec 0006 SUP-8). Its last job sends `contract-updated` to the six SDK repos when `api/` changed, only after the image succeeds, so keep that job last (spec 0014 CNF-6, RGN-5).
 - For throwaway test stacks, use `docker compose -p <test-name>` so they never reuse a real install's named volumes.
 
 ## Agent skills

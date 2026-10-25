@@ -37,6 +37,7 @@ Read the matching practice spec first. Each rule has an ID (for example `API-1`,
 | A new dependency, package metadata, or a LICENSE or NOTICE file | [0009 Open source license](docs/specs/0009-open-source-license/index.md)                                                                                      |
 | A platform table, entity, or module `DbContext`                 | [0011 Platform data model](docs/specs/0011-platform-data-model/index.md)                                                                                      |
 | An endpoint's access check, a permission, or a grant filter     | [0012 Access control model](docs/specs/0012-access-control-model/index.md)                                                                                    |
+| API wire format, errors, the contract, or the SDK generator     | [0014 API contract and SDK generation](docs/specs/0014-api-contract-sdk-generation/index.md)                                                                  |
 
 Each spec has a `rationale.md` beside it; read it only when you need the why. Each spec also lists its implementation skills under `.claude/skills/`; load only the ones the task needs.
 
@@ -71,6 +72,10 @@ Load only what the task needs. Spec 0008 wins where a skill disagrees (TL-0).
 - [dependabot](.claude/skills/dependabot/): `github/awesome-copilot`, Dependabot config (DPB rules)
 - [msbuild](.claude/skills/msbuild/): `dotnet/skills`, MSBuild props and analyzer wiring
 - Declined (2026-10-16): a CodeQL skill; no MCP server fits these tools
+- [aspnet-minimal-api-openapi](.claude/skills/aspnet-minimal-api-openapi/): `github/awesome-copilot`, Minimal API endpoints with OpenAPI metadata (spec 0014 wins: `WithSdk` and `WithErrors`, XTN-2)
+- [openapi-spec-generation](.claude/skills/openapi-spec-generation/): `wshobson/agents`, OpenAPI 3.1 documents (code first only, CTR-1; never edit `api/*.json` by hand)
+- [openapi-contract-diff](.claude/skills/openapi-contract-diff/): `testland/qa`, oasdiff breaking change reports (report only until beta, BRK-2)
+- Declined (2026-10-22): the Swagger (SmartBear) MCP server
 
 ## Context files
 
@@ -79,5 +84,6 @@ Load only what the task needs. Spec 0008 wins where a skill disagrees (TL-0).
 - [server/AGENTS.md](server/AGENTS.md): the .NET solution, its commands, config and test conventions
 - [console/AGENTS.md](console/AGENTS.md): the React console, its pnpm commands, Lingui and test conventions
 - [deploy/AGENTS.md](deploy/AGENTS.md): the image, the reference and dev compose files, install rules
+- [api/README.md](api/README.md): the API contract, the SDK generator, the conformance suite, and their commands (`pnpm api:emit`, `pnpm check:api`, `pnpm api:check`)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

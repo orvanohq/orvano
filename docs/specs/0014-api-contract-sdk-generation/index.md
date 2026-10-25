@@ -1,7 +1,7 @@
 # 0014. API contract and SDK generation: a code first OpenAPI contract, one Orvano generator, one conformance suite
 
 **Date**: 2026-10-22
-**Status**: In Progress
+**Status**: Accepted
 **Updated**: 2026-10-23, open points from verify: RGN-3 and AC-15 scope the drift check to the pin and the generated paths; RGN-6, RGN-9, and AC-16 say `sdk-nextjs` takes new SDK pins in the catch up; CNF-3 adds `$absent`; CNF-8 says which CI layer owns the run list; spec 0007 IMG-3 names the `sha-<commit>` tag.
 
 ## Summary
@@ -470,5 +470,5 @@ Tracer Bullet: the first strand is the health call, end to end from the server t
 - [ ] Feature 52: release versions, changelogs, and registry publishing for the six SDKs; until then `sdk-nextjs` tests against pinned tarballs.
 - [ ] At the first beta: switch BRK-2 to failing CI and keep the previous version in `ApiVersions.Supported` (spec update).
 - [ ] You: create the `orvano-sdk-bot` GitHub App and the two org secrets before build step 10, and create the six SDK repos from the templates (REP-3 names).
-- [ ] Root `AGENTS.md` `## Agent skills`: add `aspnet-minimal-api-openapi`, `openapi-spec-generation`, and `openapi-contract-diff` (installed 2026-10-22, all in `.agents/skills/` with `.claude/skills/` links); record the Swagger (SmartBear) MCP server as declined. `/sync` owns that edit.
+- [x] Root `AGENTS.md` `## Agent skills`: add `aspnet-minimal-api-openapi`, `openapi-spec-generation`, and `openapi-contract-diff` (installed 2026-10-22, all in `.agents/skills/` with `.claude/skills/` links); record the Swagger (SmartBear) MCP server as declined. `/sync` owns that edit.
 - [x] Verify at scaffold: the .NET 10 OpenAPI document provider type for CTR-3, and whether .NET 10 validation exposes the failing attribute for PRB-5. Record the outcome in this spec. Outcome (2026-10-22): CTR-3 uses the public `Microsoft.AspNetCore.OpenApi.IOpenApiDocumentProvider` (package `Microsoft.AspNetCore.OpenApi` 10.0.13), resolved as a keyed service by document name, with `GetOpenApiDocumentAsync`; the `MapOpenApi` and `Api:ServeContract` fallback is not needed and not built. PRB-5: .NET 10 validation (`ValidationErrorContext`) exposes only the member name, path, and messages, not the failing attribute, so the `FieldCodes` `ErrorMessage` convention applies, enforced by `ArchitectureTests/Api/WireRulesTests`.

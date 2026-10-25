@@ -6,7 +6,7 @@ Six SDKs: Flutter, JavaScript, and Next.js for client apps; Dart, JavaScript, an
 
 ## Foundation
 
-### 10. API contract & SDK generation · in-progress
+### 10. API contract & SDK generation · done
 
 One machine readable API contract is the single source of truth. All six SDKs are generated from it, with hand written layers only where a platform needs them. It also fixes the shared error format, pagination, the API version header, and one conformance test suite that every SDK runs.
 **Done when:** changing the contract regenerates all six SDKs, each passes the shared conformance tests against a running server, and a health call works from every SDK.
