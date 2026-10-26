@@ -222,7 +222,9 @@ describe("resource layout", () => {
     const handle = separator(screen);
     await expect.element(handle).toHaveAttribute("aria-valuenow", "280");
 
-    await tabTo(handle.element());
+    // Focused directly: the test is about the keys, and WebKit's Tab order past many links varies by settings.
+    (handle.element() as HTMLElement).focus();
+    await expect.element(handle).toHaveFocus();
     await userEvent.keyboard("{ArrowRight}");
     await expect.element(handle).toHaveAttribute("aria-valuenow", "296");
     expect(resourceListLayout.read(ids).width).toBe(296);
@@ -244,7 +246,9 @@ describe("resource layout", () => {
     const handle = separator(screen);
 
     await expect.element(handle).toHaveAttribute("aria-valuemax", "380");
-    await tabTo(handle.element());
+    // Focused directly: the test is about the keys, and WebKit's Tab order past many links varies by settings.
+    (handle.element() as HTMLElement).focus();
+    await expect.element(handle).toHaveFocus();
     await userEvent.keyboard("{End}");
     await expect.element(handle).toHaveAttribute("aria-valuenow", "380");
     expect(screen.getByRole("main").element().getBoundingClientRect().width).toBeGreaterThanOrEqual(
