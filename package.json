@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@stoplight/spectral-cli": "6.17.0",
-    "@tanstack/eslint-plugin-query": "5.104.3",
+    "@tanstack/eslint-plugin-query": "5.104.5",
     "@tanstack/eslint-plugin-router": "1.162.0",
     "@types/node": "^24.19.2",
     "ajv": "8.20.0",
