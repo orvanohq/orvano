@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "size": "node scripts/size-entries.mjs && size-limit",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage --browser.name=chromium",
+    "test:engines": "vitest run --project \"ui (firefox)\" --project \"ui (webkit)\""
   },
   "dependencies": {
     "@lingui/core": "^6.10.0",

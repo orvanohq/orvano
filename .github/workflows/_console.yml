@@ -55,8 +55,11 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-3-engines
       # Spec 0003 QA-1: src/ui primitives run in Chromium, Firefox, and WebKit.
       - run: pnpm --filter @orvano/console exec playwright install --with-deps chromium firefox webkit
-      - name: Tests (Vitest browser mode) with coverage
+      # V8 coverage works only in Chromium, so Firefox and WebKit run the src/ui tests in a second step.
+      - name: Tests (Vitest browser mode, Chromium) with coverage
         run: pnpm --filter @orvano/console test:coverage
+      - name: src/ui tests in Firefox and WebKit (spec 0003 QA-1)
+        run: pnpm --filter @orvano/console test:engines
       # The steps below use the build that check-drift.mjs made in pnpm check:js.
       - name: Bundle and CSS size (spec 0003 BDL-1, spec 0015 STY-4)
         run: pnpm --filter @orvano/console size
