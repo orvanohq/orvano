@@ -30,10 +30,10 @@ All colors are OKLCH (lightness, chroma, hue). Neutrals are a cool zinc (hue 286
 | `--color-tooltip`          | `oklch(0.21 0.006 286)`       | `oklch(0.967 0.003 286)` | Tooltip surface (inverted)                                          |
 | `--color-tooltip-fg`       | `oklch(1 0 0)`                | `oklch(0.16 0.005 286)`  | Tooltip text                                                        |
 | `--color-border`           | `oklch(0.92 0.004 286)`       | `oklch(0.3 0.008 286)`   | Decorative dividers and card edges                                  |
-| `--color-border-strong`    | `oklch(0.6 0.015 286)`        | `oklch(0.53 0.015 286)`  | Input, checkbox, switch, and secondary button edges                 |
+| `--color-border-strong`    | `oklch(0.6 0.015 286)`        | `oklch(0.57 0.015 286)`  | Input, checkbox, switch, and secondary button edges                 |
 | `--color-fg`               | `oklch(0.21 0.006 286)`       | `oklch(0.967 0.003 286)` | Body text, headings, icons                                          |
 | `--color-fg-muted`         | `oklch(0.46 0.016 286)`       | `oklch(0.72 0.015 286)`  | Help text, meta, placeholders, inactive nav, disabled text          |
-| `--color-accent`           | `oklch(0.511 0.262 277)`      | `oklch(0.55 0.24 277)`   | Primary button, checked controls, progress                          |
+| `--color-accent`           | `oklch(0.511 0.262 277)`      | `oklch(0.59 0.24 277)`   | Primary button, checked controls, progress                          |
 | `--color-accent-hover`     | `oklch(0.457 0.24 277)`       | `oklch(0.511 0.262 277)` | Primary button hover and pressed                                    |
 | `--color-accent-fg`        | `oklch(1 0 0)`                | `oklch(1 0 0)`           | Text and icons on `accent`                                          |
 | `--color-accent-text`      | `oklch(0.511 0.262 277)`      | `oklch(0.785 0.115 275)` | Links, accent text on surfaces                                      |
@@ -62,7 +62,7 @@ All colors are OKLCH (lightness, chroma, hue). Neutrals are a cool zinc (hue 286
 - `accent-fg` on `accent` and `accent-hover`, `danger-fg` on `danger` and `danger-hover`, `accent-subtle-fg` on `accent-subtle`, and `tooltip-fg` on `tooltip` at 4.5:1;
 - `border-strong`, `focus`, and `accent` on every surface at 3:1.
 
-The tightest pairs today: white on the danger button 4.76:1, the dark focus ring on `accent-subtle` 4.47:1 (needs 3), and the dark strong border on `bg-muted` 3.15:1 (needs 3). A new surface or text token joins these sets automatically.
+The tightest pairs today, all in the dark theme: `accent` on `accent-subtle` 3.05:1 (needs 3), the strong border on `accent-subtle` 3.11:1 (needs 3), and white on `accent` 4.57:1 (needs 4.5). Raising the dark `accent` further breaks the last one. A new surface or text token joins these sets automatically.
 
 ### Using color
 
