@@ -1,8 +1,8 @@
 {
-  // Spec 0003 WEB-4: the tool configs.
+  // Spec 0003 WEB-4: the tool configs and the Playwright tests (DOM, for the code they run in the page).
   "compilerOptions": {
     "target": "ES2023",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
@@ -12,5 +12,11 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "lingui.config.ts"]
+  "include": [
+    "vite.config.ts",
+    "vitest.config.ts",
+    "lingui.config.ts",
+    "playwright.config.ts",
+    "e2e"
+  ]
 }

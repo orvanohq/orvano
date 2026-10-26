@@ -110,6 +110,9 @@ export default defineConfig(
             "URL",
             "URLSearchParams",
             "Intl.*",
+            // Spec 0015 STY-3: class lists go through cx, so its arguments are code, not copy.
+            "cx",
+            "*.matchMedia",
           ],
           useTsTypes: true,
           ignoreMethodsOnTypes: [
@@ -126,6 +129,12 @@ export default defineConfig(
 
   // LNT-3: restrictions, one rule set per region; an allowed home leaves out only its own restriction.
   ...regionRules(),
+
+  // Spec 0015 GAL-3: the gallery's placeholder text stays out of the catalog, so I18N-8 doesn't apply there.
+  {
+    files: ["console/src/gallery/**/*.{ts,tsx}"],
+    rules: { "lingui/no-unlocalized-strings": "off" },
+  },
 
   // Spec 0003 Exceptions: tests may use literal strings and `!`.
   {

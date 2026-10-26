@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="same-origin" />
+    <!-- Spec 0015 GAL-1: the development gallery. `pnpm build` never ships it (GAL-3). -->
+    <script src="/theme-boot.js"></script>
+    <!-- Spec 0015 STY-2: React Aria injects a <style> for pressable elements unless an element with this id exists.
+         theme.css carries that rule instead, so the CSP's style-src 'self' holds. -->
+    <template id="react-aria-pressable-style"></template>
+    <title>Orvano gallery</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/gallery/main.tsx"></script>
+  </body>
+</html>

@@ -1,7 +1,7 @@
 # 0015. Design system and console shell
 
 **Date**: 2026-10-26
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 

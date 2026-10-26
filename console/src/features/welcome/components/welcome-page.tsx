@@ -1,15 +1,16 @@
 import { Trans } from "@lingui/react/macro";
+import { AuthLayout } from "@/ui";
 
-// A placeholder until the console shell (feature 11) and sign in (feature 13) replace it.
+// A placeholder until sign in (feature 13) replaces it. It sits in AuthLayout, like the pages without the shell.
 export function WelcomePage() {
   return (
-    <main>
-      <h1>
+    <AuthLayout>
+      <h1 className="text-xl font-semibold">
         <Trans>Orvano console</Trans>
       </h1>
-      <p>
+      <p className="text-fg-muted">
         <Trans>The server and console are running. Screens arrive with the next features.</Trans>
       </p>
-    </main>
+    </AuthLayout>
   );
 }

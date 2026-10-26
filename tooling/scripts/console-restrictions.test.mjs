@@ -137,6 +137,29 @@ describe("regionRules", () => {
       importMessagesFor("routes/**/*.{ts,tsx}").some((message) => message.startsWith(reactAria)),
     );
   });
+
+  test("spec 0015: STY-5 and GAL-3 apply outside src/ui and the gallery, RTL-2 everywhere", () => {
+    for (const file of ["**/*.{ts,tsx}", "features/**/*.{ts,tsx}", "shared/**/*.{ts,tsx}"]) {
+      assert.ok(idsFor(file).has("STY-5"), file);
+      assert.ok(idsFor(file).has("GAL-3"), file);
+    }
+    assert.ok(!idsFor("ui/**/*.{ts,tsx}").has("STY-5"));
+    assert.ok(idsFor("ui/**/*.{ts,tsx}").has("GAL-3"));
+    assert.ok(idsFor("gallery/**/*.{ts,tsx}").has("STY-5"));
+    assert.ok(!idsFor("gallery/**/*.{ts,tsx}").has("GAL-3"));
+    for (const region of regions) {
+      const file = region.files[0]?.replace("console/src/", "") ?? "";
+      assert.ok(idsFor(file).has("RTL-2"), file);
+    }
+  });
+
+  test("spec 0015: only ui may import Lucide and the grid (ICN-1, PRM-5)", () => {
+    const dir3 = importRegex("DIR-3: compose the primitives in src/ui instead");
+    assert.ok(dir3.test("lucide-react"));
+    assert.ok(dir3.test("react-data-grid"));
+    assert.ok(!dir3.test("lucide"));
+    assert.ok(idsFor("gallery/**/*.{ts,tsx}").has("DIR-3"));
+  });
 });
 
 describe("package regexes", () => {
@@ -161,20 +184,23 @@ describe("package regexes", () => {
 });
 
 describe("restrictionMessages", () => {
-  test("groups the 16 rule IDs that check:lint-fixtures expects to fire", () => {
+  test("groups the 19 rule IDs that check:lint-fixtures expects to fire", () => {
     assert.deepEqual([...restrictionMessages().keys()].toSorted(), [
       "DIR-2",
       "DIR-3",
       "FRM-1",
+      "GAL-3",
       "I18N-1",
       "I18N-5",
       "QA-1",
       "QRY-1",
       "QRY-2",
       "RTE-1",
+      "RTL-2",
       "SEC-2",
       "STA-1",
       "STO-1",
+      "STY-5",
       "URL-3",
       "WEB-4",
       "WEB-6",

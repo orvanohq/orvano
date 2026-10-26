@@ -40,7 +40,8 @@ jobs:
           path: ~\AppData\Local\ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - run: pnpm --filter @orvano/console exec playwright install chromium
-      - run: pnpm --filter @orvano/console test
+      # Chromium only: this job decides Vite+ on Windows; the Linux console job runs all three engines.
+      - run: pnpm --filter @orvano/console test --browser.name=chromium
       - name: Hook proof (HOK-1, HOK-2, GIT-4)
         run: |
           git config user.name ci

@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Spec 0003 SEC-6: also sent as a header by the server. -->
     <meta name="referrer" content="same-origin" />
+    <!-- Spec 0015 THM-2: a classic script, before the stylesheet, so the first paint has the right theme. -->
+    <script src="/theme-boot.js"></script>
+    <!-- Spec 0015 STY-2: React Aria injects a <style> for pressable elements unless an element with this id exists.
+         theme.css carries that rule instead, so the CSP's style-src 'self' holds. -->
+    <template id="react-aria-pressable-style"></template>
     <title>Orvano</title>
   </head>
   <body>

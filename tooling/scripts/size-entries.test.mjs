@@ -82,7 +82,7 @@ describe("size-entries.mjs", () => {
       ...manifest,
       "src/other.ts": { file: "assets/vendor-b2.js" },
     };
-    const perFile = run(manifestWithDuplicate).entries.slice(1);
+    const perFile = run(manifestWithDuplicate).entries.slice(1, -1);
     assert.deepEqual(
       perFile.map((entry) => entry.path),
       [
@@ -106,6 +106,16 @@ describe("size-entries.mjs", () => {
     }
   });
 
+  test("0015 AC-3: the stylesheet gets one 30 KB entry, last", () => {
+    const css = run(manifest).entries.at(-1);
+    assert.deepEqual(css, {
+      name: "CSS (STY-4)",
+      path: ["dist/assets/style-j0.css"],
+      limit: "30 KB",
+      gzip: true,
+    });
+  });
+
   test("import cycles don't loop", () => {
     const { entries } = run({
       "index.html": { file: "assets/a.js", isEntry: true, imports: ["_b.js"] },
@@ -115,6 +125,6 @@ describe("size-entries.mjs", () => {
   });
 
   test("reports how many entries and first load files it wrote", () => {
-    assert.match(run(manifest).stdout, /size-entries: 12 entries \(9 first load files\)/);
+    assert.match(run(manifest).stdout, /size-entries: 13 entries \(9 first load files\)/);
   });
 });

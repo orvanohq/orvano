@@ -15,6 +15,10 @@ deploy/root.key
 # Vitest browser mode failure screenshots
 .vitest/
 
+# Playwright reports and traces
+console/playwright-report/
+console/test-results/
+
 # Written by console/scripts/size-entries.mjs from the build manifest (spec 0008 CI-2)
 console/.size-limit.json
 

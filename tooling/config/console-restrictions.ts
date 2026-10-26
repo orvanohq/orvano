@@ -1,11 +1,11 @@
 // Spec 0008 LNT-3: the console's restriction rules, from the spec 0003 Enforcement table and Replaces list, and the
-// spec 0001 import boundary. Each entry's message starts with its rule ID and says where to go instead.
+// spec 0001 import boundary, and spec 0015's styling, direction, and gallery rules. Each entry's message starts with its rule ID and says where to go instead.
 //
 // Flat config replaces a rule's options rather than merging them, so eslint.config.ts builds one rule set per
 // region below. A region that is a restriction's allowed home simply leaves that one restriction out: no inline
 // disables, and the other restrictions still apply there.
 
-type Area = "app" | "routes" | "features" | "shared" | "ui";
+type Area = "app" | "routes" | "features" | "shared" | "ui" | "gallery";
 type Home = "api" | "config" | "storage" | "url" | "view-hook" | "queries";
 
 interface Region {
@@ -50,7 +50,25 @@ export const regions: Region[] = [
   { files: [`${src}/shared/storage/**/*.{ts,tsx}`], area: "shared", home: "storage" },
   { files: [`${src}/shared/url/**/*.{ts,tsx}`], area: "shared", home: "url" },
   { files: [`${src}/ui/**/*.{ts,tsx}`], area: "ui" },
+  { files: [`${src}/gallery/**/*.{ts,tsx}`], area: "gallery" },
 ];
+
+/**
+ * Spec 0015 RTL-2: a physical direction utility, matched per class token after its variant prefixes. A regex
+ * literal inside an ESLint selector can't hold a slash, and this one needs none.
+ */
+const physicalDirection = String.raw`(^|\s)(\S*:)?!?(-?(m|p|scroll-m|scroll-p)[lr]-|-?(left|right)-|(text|float|clear)-(left|right)(\s|$)|rounded-([lr]|tl|tr|bl|br)(-|\s|$)|border-[lr](-|\s|$)|origin-(left|right|top-left|top-right|bottom-left|bottom-right)(\s|$)|bg-linear-to-[lr](\s|$)|bg-gradient-to-[lr](\s|$))`;
+
+/** Spec 0015 STY-5: an arbitrary value (`w-[13px]`) or property (`[mask-type:luminance]`) in a class string. */
+const arbitraryValue = String.raw`(-\[|(^|\s)\[[a-z-]+:)`;
+
+/** Selectors for class strings: className literals and templates, and `cx(...)` arguments. */
+const classStrings = (pattern: string) =>
+  [
+    `JSXAttribute[name.name='className'] Literal[value=/${pattern}/]`,
+    `JSXAttribute[name.name='className'] TemplateElement[value.raw=/${pattern}/]`,
+    `CallExpression[callee.name='cx'] Literal[value=/${pattern}/]`,
+  ].join(", ");
 
 const banned = (names: string[], message: string): Restriction => ({
   imports: { regex: packages(names), message },
@@ -87,9 +105,10 @@ export const restrictions: Restriction[] = [
         "DIR-2: import another area only through its index (@/features/<area>); inside your own area use relative paths.",
     },
   },
-  // DIR-3 and the spec 0001 import boundary: React Aria only inside src/ui.
+  // DIR-3 and the spec 0001 import boundary: React Aria only inside src/ui, widened by spec 0015 ICN-1 (Lucide) and
+  // PRM-5 (the grid).
   {
-    areas: ["app", "routes", "features", "shared"],
+    areas: ["app", "routes", "features", "shared", "gallery"],
     imports: {
       regex: packages([
         "react-aria-components",
@@ -97,8 +116,46 @@ export const restrictions: Restriction[] = [
         "react-stately",
         "@react-aria/*",
         "@react-stately/*",
+        "lucide-react",
+        "react-data-grid",
       ]),
-      message: "DIR-3: compose the primitives in src/ui instead of importing React Aria.",
+      message:
+        "DIR-3: compose the primitives in src/ui instead of importing React Aria, Lucide (use src/ui/icons.ts), or the grid.",
+    },
+  },
+  // Spec 0015 STY-5: only src/ui sets inline styles or arbitrary values; everything else uses tokens and props.
+  {
+    areas: ["app", "routes", "features", "shared", "gallery"],
+    syntax: [
+      {
+        selector: "JSXAttribute[name.name='style']",
+        message:
+          "STY-5: no style prop outside src/ui; use layout utilities or a primitive's props.",
+      },
+      {
+        selector: classStrings(arbitraryValue),
+        message:
+          "STY-5: no arbitrary values (w-[13px]) outside src/ui; use a token utility, or add a token through design.md.",
+      },
+    ],
+  },
+  // Spec 0015 RTL-2: logical direction utilities only, everywhere (ms-, pe-, start-, text-start, border-s, ...).
+  // Every string literal is checked, since primitives keep class lists in objects.
+  {
+    syntax: [
+      {
+        selector: `Literal[value=/${physicalDirection}/], JSXAttribute[name.name='className'] TemplateElement[value.raw=/${physicalDirection}/]`,
+        message:
+          "RTL-2: use a logical utility (ms-, me-, ps-, pe-, start-, end-, text-start, rounded-s, border-s) so right to left works.",
+      },
+    ],
+  },
+  // Spec 0015 GAL-3: the gallery is a development entry that never ships, so nothing imports it.
+  {
+    areas: ["app", "routes", "features", "shared", "ui"],
+    imports: {
+      group: ["@/gallery", "@/gallery/**", "**/gallery", "**/gallery/**"],
+      message: "GAL-3: nothing imports src/gallery; it is a development entry that never ships.",
     },
   },
   // QRY-1: all HTTP goes through the one client in src/shared/api.
