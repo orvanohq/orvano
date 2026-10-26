@@ -34,3 +34,8 @@ TestResults/
 .claude/skills/testcontainers/
 .claude/skills/dotnet-system-commandline
 .agents/skills/dotnet-system-commandline/
+
+# The tailwind-4-docs skill syncs the Tailwind docs here locally; that repo is source available, not open source, so the
+# snapshot is never committed (spec 0015 Follow-up).
+.claude/skills/tailwind-4-docs/references/docs/
+.claude/skills/tailwind-4-docs/references/docs-index.tsx

@@ -38,6 +38,8 @@ extend-ignore-identifiers-re = ["^[0-9a-f]{7,40}$"]
 [default.extend-words]
 # Rule ID prefix from spec 0005 (SIZ-1, SIZ-2).
 SIZ = "SIZ"
+# Rule ID prefix from spec 0015 (THM-1 to THM-6, the theme rules).
+THM = "THM"
 # The wrk HTTP benchmark tool.
 wrk = "wrk"
 # A valid spelling, used in spec 0004.

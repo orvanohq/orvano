@@ -259,6 +259,13 @@
       "skillPath": "plugins/database-design/skills/postgresql-table-design/SKILL.md",
       "computedHash": "d9832627098bddf570aef2219092625faf6b2a14aeeb0f6fb96ed691a020100a"
     },
+    "react-aria": {
+      "source": "react-aria.adobe.com",
+      "sourceUrl": "https://react-aria.adobe.com",
+      "sourceType": "well-known",
+      "computedHash": "d94f6d3316f26d0c803394185d54b3812665170dabfaa4763aa824a9ae898ed4",
+      "wellKnownDigest": "sha256:304d7e4dc4d550ad58b01101a0c2204adfd5d990e659104681b7e79c5a8d6926"
+    },
     "react-native-best-practices": {
       "source": "callstackincubator/agent-skills",
       "sourceType": "github",
@@ -269,6 +276,12 @@
       "source": "./console/node_modules/@tanstack/router-plugin/skills",
       "sourceType": "local",
       "computedHash": "9954f6c52398cb2a84cd67cf79eac683e6e72848a3eb10c5bf79e14ac056e3a5"
+    },
+    "tailwind-4-docs": {
+      "source": "lombiq/tailwind-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tailwind-4-docs/SKILL.md",
+      "computedHash": "de756f5f03cc20a029983875b00b9dfef9d0ba8567d242c5cbb0262037d0a134"
     },
     "tanstack-router-best-practices": {
       "source": "deckardger/tanstack-agent-skills",
