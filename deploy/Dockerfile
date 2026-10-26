@@ -3,7 +3,7 @@
 #   docker buildx build --platform linux/amd64,linux/arm64 -f deploy/Dockerfile -t ghcr.io/orvanohq/orvano:edge .
 # Build stages run on the build machine and cross compile, so no stage needs emulation.
 
-FROM --platform=$BUILDPLATFORM node:24.22.0-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS console
+FROM --platform=$BUILDPLATFORM node:24.22.1-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS console
 # Spec 0008 TL-7: the console builds from the root pnpm workspace. pnpm comes from corepack, which reads the one pin
 # in the root package.json (packageManager). The node tag matches .node-version.
 WORKDIR /src
@@ -18,7 +18,7 @@ RUN pnpm install --frozen-lockfile --filter @orvano/console...
 COPY console/ console/
 RUN pnpm --filter @orvano/console build
 
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.402-noble@sha256:0d99ebf1ccad15037b5c98c9fe8979d6b8dbac23812feae2277a0b277b5c5ffa AS server
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.403-noble@sha256:de4fe90a98845d75910b9769662465c84de1a934665c431279d1382b2bddc02b AS server
 ARG TARGETARCH
 WORKDIR /src/server
 COPY server/global.json server/Directory.Build.props server/Directory.Packages.props server/BannedSymbols.txt server/.editorconfig ./
@@ -36,7 +36,7 @@ COPY --from=console /src/console/dist /out/wwwroot/console
 # The final image has no shell, so the storage folder is made here (spec 0007 IMG-2).
 RUN mkdir -p /rootfs/var/lib/orvano/storage
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.13-noble-chiseled@sha256:84def277556c2843a44fdeefbd3145d0a2e32d8f736d0c1a7b0a96b2880b0187
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.14-noble-chiseled@sha256:c89a6a61f494f20a5ae302990e814627a8d91b332fd4a8e7c1707c2d4da9555d
 # Spec 0009 LIC-6: the license travels with the image.
 LABEL org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.source="https://github.com/orvanohq/orvano"
