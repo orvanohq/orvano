@@ -17,13 +17,19 @@ describe("Tooltip", () => {
       </Tooltip>,
     );
 
-    await userEvent.tab();
+    // The first Tab in a fresh Firefox frame can land on the frame itself, so Tab until the button has focus.
+    const button = screen.getByRole("button", { name: "Save" });
+    for (let presses = 0; presses < 3 && document.activeElement !== button.element(); presses++) {
+      // oxlint-disable-next-line no-await-in-loop -- each Tab depends on where the last one put focus
+      await userEvent.tab();
+    }
+    await expect.element(button).toHaveFocus();
     await expect.element(screen.getByRole("tooltip")).toHaveTextContent("Saves the row");
     await expectNoAxeViolations();
     await userEvent.keyboard("{Escape}");
 
     await expect.element(screen.getByRole("tooltip")).not.toBeInTheDocument();
-    await expect.element(screen.getByRole("button", { name: "Save" })).toHaveFocus();
+    await expect.element(button).toHaveFocus();
   });
 });
 
