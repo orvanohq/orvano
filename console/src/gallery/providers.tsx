@@ -5,16 +5,11 @@ import { LocaleProvider } from "@/ui";
 import { useSettings } from "./settings";
 
 /**
- * Applies the toolbar's settings: density on <html> (SHL-11: the gallery sets it until feature 13's boot step),
- * the Lingui catalog, and the direction. Right to left gives React Aria the `ar-XB` locale while Lingui keeps its
+ * Applies the toolbar's settings: the Lingui catalog, and the direction. Right to left gives React Aria the `ar-XB` locale while Lingui keeps its
  * catalog (RTL-1).
  */
 export function GalleryProviders({ children }: { children: ReactNode }) {
-  const { density, locale, direction } = useSettings();
-
-  useEffect(() => {
-    document.documentElement.dataset.density = density;
-  }, [density]);
+  const { locale, direction } = useSettings();
 
   useEffect(() => {
     const apply = async () => {

@@ -6,9 +6,10 @@ import { cx, focusRing, focusRingInset } from "./cx";
 interface AriaRouterLinkProps extends Omit<AriaLinkProps, "className" | "style"> {
   /**
    * `inline` links in running text are underlined; `nav` links (menus, crumbs, lists) rely on position. `sidebar`
-   * is the primary sidebar's item (SHL-5), current on `accent-subtle`.
+   * is the primary sidebar's item (SHL-5), current on `accent-subtle`; `rail` is the same item in the icon rail.
+   * `resource` is a resource list row (UX-2, a density row), and `tab` a `RouteTabs` link (UX-5).
    */
-  variant?: "inline" | "nav" | "sidebar";
+  variant?: "inline" | "nav" | "sidebar" | "rail" | "resource" | "tab";
   ref?: Ref<HTMLAnchorElement>;
 }
 
@@ -17,11 +18,30 @@ const variants = {
     "rounded-sm text-accent-text underline underline-offset-2 data-hovered:decoration-2",
     focusRing,
   ),
-  nav: cx("rounded-sm text-inherit no-underline", focusRing),
+  // UX-32: at least 24 px high, so a crumb or the brand link is a big enough target.
+  nav: cx("inline-flex min-h-6 items-center rounded-sm text-inherit no-underline", focusRing),
   sidebar: cx(
     "flex h-control items-center gap-2 rounded-md px-2 font-medium text-fg-muted no-underline",
     "data-hovered:bg-bg-muted data-hovered:text-fg",
     "aria-[current=page]:bg-accent-subtle aria-[current=page]:text-accent-subtle-fg",
+    focusRingInset,
+  ),
+  rail: cx(
+    "flex size-control-lg items-center justify-center rounded-md text-fg-muted no-underline",
+    "data-hovered:bg-bg-muted data-hovered:text-fg",
+    "aria-[current=page]:bg-accent-subtle aria-[current=page]:text-accent-subtle-fg",
+    focusRingInset,
+  ),
+  resource: cx(
+    "flex h-(--row-height) min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-fg no-underline",
+    "data-hovered:bg-bg-muted",
+    "aria-[current=page]:bg-accent-subtle aria-[current=page]:font-medium aria-[current=page]:text-accent-subtle-fg",
+    focusRingInset,
+  ),
+  tab: cx(
+    "-mb-px flex h-control-lg shrink-0 items-center border-b-2 border-transparent px-3 font-medium whitespace-nowrap text-fg-muted no-underline",
+    "data-hovered:text-fg",
+    "aria-[current=page]:border-accent aria-[current=page]:text-fg",
     focusRingInset,
   ),
 } as const;

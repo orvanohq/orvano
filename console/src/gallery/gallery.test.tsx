@@ -1,32 +1,14 @@
-import { I18nProvider } from "@lingui/react";
-import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
-import { render } from "vitest-browser-react";
-import { activateLocale, i18n } from "@/shared/i18n";
 import { expectNoAxeViolations } from "@/test/axe";
-import { createGalleryRouter } from "./router";
+import { NARROW, renderScene, tabTo, resetShellState, setViewport, WIDE } from "./render-scene";
 
 // Spec 0015 AC-5, AC-7, AC-21: the gallery's scenes, rendered as the gallery renders them (without its toolbar),
 // checked in Chromium, Firefox, and WebKit.
 
-async function renderScene(path: string) {
-  if (!i18n.locale) await activateLocale("en");
-  const router = createGalleryRouter({
-    history: createMemoryHistory({ initialEntries: [path] }),
-    toolbar: false,
-  });
-  await router.load();
-  const screen = await render(
-    <I18nProvider i18n={i18n}>
-      <RouterProvider router={router} />
-    </I18nProvider>,
-  );
-  return { router, screen };
-}
-
 const scenes = [
   "/acme/storefront/databases",
+  "/acme/storefront/databases/users",
   "/acme/storefront",
   "/acme",
   "/account/profile",
@@ -34,12 +16,13 @@ const scenes = [
   "/auth-layout",
 ];
 
-describe("gallery scenes", () => {
-  afterEach(() => {
-    delete document.documentElement.dataset.theme;
-    delete document.documentElement.dataset.density;
-  });
+beforeEach(async () => {
+  await setViewport(WIDE);
+});
 
+afterEach(resetShellState);
+
+describe("gallery scenes", () => {
   for (const path of scenes) {
     it(`0015 AC-5: ${path} passes axe in both themes and both densities`, async () => {
       const { screen } = await renderScene(path);
@@ -52,6 +35,18 @@ describe("gallery scenes", () => {
           await expectNoAxeViolations();
         }
       }
+    });
+  }
+});
+
+describe("gallery scenes, narrow", () => {
+  for (const path of scenes.slice(0, 2)) {
+    it(`0015 AC-5: ${path} passes axe below 64rem`, async () => {
+      await setViewport(NARROW);
+      const { screen } = await renderScene(path);
+      await expect.element(screen.getByRole("main")).toBeInTheDocument();
+
+      await expectNoAxeViolations();
     });
   }
 });
@@ -101,11 +96,8 @@ describe("AppShell", () => {
       .element(sidebar.getByRole("link", { name: "Overview" }))
       .toHaveAttribute("aria-current", "page");
 
-    // Skip link, brand link, Overview, Auth.
-    await userEvent.tab();
-    await userEvent.tab();
-    await userEvent.tab();
-    await userEvent.tab();
+    // By keyboard: past the skip link, the top bar, and Overview.
+    await tabTo(sidebar.getByRole("link", { name: "Auth" }).element());
     await expect.element(sidebar.getByRole("link", { name: "Auth" })).toHaveFocus();
     await userEvent.keyboard("{Enter}");
 

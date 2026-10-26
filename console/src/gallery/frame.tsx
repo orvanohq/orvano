@@ -5,6 +5,8 @@ import {
   useThemePreference,
   type ThemePreference,
 } from "@/shared/stores/theme";
+import { setDensity, useLayout, type Density } from "@/shared/stores/layout";
+import { user } from "./fixtures";
 import { frameUrl, settingsStore, useSettings, type GallerySettings } from "./settings";
 
 const update = (key: keyof GallerySettings) => (event: ChangeEvent<HTMLSelectElement>) => {
@@ -16,6 +18,7 @@ export function GalleryFrame() {
   const settings = useSettings();
   const theme = useThemePreference();
   const location = useLocation();
+  const density = useLayout(user.id, (layout) => layout.density);
 
   return (
     <div className="flex h-full flex-col">
@@ -38,7 +41,13 @@ export function GalleryFrame() {
           <option value="light">Light</option>
           <option value="dark">Dark</option>
         </Select>
-        <Select label="Density" value={settings.density} onChange={update("density")}>
+        <Select
+          label="Density"
+          value={density}
+          onChange={(event) => {
+            setDensity(user.id, event.target.value as Density);
+          }}
+        >
           <option value="comfortable">Comfortable</option>
           <option value="compact">Compact</option>
         </Select>
