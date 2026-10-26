@@ -1,8 +1,17 @@
 import { I18nProvider } from "@lingui/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
+import type { ReactNode } from "react";
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from "@tanstack/react-router";
 import { render } from "vitest-browser-react";
 import { createAppRouter } from "@/router";
+import { UiRouterProvider } from "@/ui/router-provider";
 import { activateLocale, i18n } from "@/shared/i18n";
 
 /**
@@ -28,4 +37,45 @@ export async function renderWithProviders(url: string) {
       </QueryClientProvider>
     </I18nProvider>,
   );
+}
+
+/**
+ * Renders a primitive inside a minimal router at `/` (links need one), with the `en` catalog. `routes` adds sibling
+ * routes, for tests that navigate or preload.
+ */
+export async function renderInRouter(
+  element: ReactNode,
+  routes: { path: string; loader?: () => unknown }[] = [],
+) {
+  if (!i18n.locale) await activateLocale("en");
+  const rootRoute = createRootRoute({
+    component: () => (
+      <UiRouterProvider>
+        <Outlet />
+      </UiRouterProvider>
+    ),
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([
+      createRoute({ getParentRoute: () => rootRoute, path: "/", component: () => element }),
+      ...routes.map((route) =>
+        createRoute({
+          getParentRoute: () => rootRoute,
+          path: route.path,
+          loader: route.loader,
+          component: () => null,
+        }),
+      ),
+    ]),
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+  });
+  await router.load();
+  return {
+    router,
+    screen: await render(
+      <I18nProvider i18n={i18n}>
+        <RouterProvider router={router} />
+      </I18nProvider>,
+    ),
+  };
 }

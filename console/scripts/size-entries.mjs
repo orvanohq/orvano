@@ -1,9 +1,10 @@
-// Spec 0003 BDL-1, spec 0008 CI-2: turns the Vite manifest from the last build into size-limit entries, so the
-// budgets follow hashed file names. Run after `vite build`; size-limit reads the .size-limit.json it writes.
+// Spec 0003 BDL-1, spec 0015 STY-4, spec 0008 CI-2: turns the Vite manifest from the last build into size-limit
+// entries, so the budgets follow hashed file names. Run after `vite build`; size-limit reads the .size-limit.json it writes.
 import { readFileSync, writeFileSync } from "node:fs";
 
 const firstLoadLimit = "200 KB";
 const perFileLimit = "80 KB";
+const cssLimit = "30 KB";
 
 // The first load (BDL-1): the root, shell, org, project, and project overview route files, plus the `en` catalog
 // main.tsx loads before the first render. Routes that don't exist yet match nothing.
@@ -51,6 +52,15 @@ const entries = [
     limit: perFileLimit,
     gzip: true,
   })),
+  // STY-4: the one stylesheet (build.cssCodeSplit is off).
+  {
+    name: "CSS (STY-4)",
+    path: [...new Set(Object.values(manifest).map((chunk) => chunk.file))]
+      .filter((file) => file.endsWith(".css"))
+      .map((file) => `dist/${file}`),
+    limit: cssLimit,
+    gzip: true,
+  },
 ];
 
 writeFileSync(".size-limit.json", `${JSON.stringify(entries, null, 2)}\n`);

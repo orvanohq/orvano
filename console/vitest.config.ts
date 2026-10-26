@@ -3,7 +3,8 @@ import { playwright } from "@vitest/browser-playwright";
 import viteConfig from "./vite.config";
 
 // Spec 0003 QA-1: browser mode only, on the app's own Vite config, so tests run the same router plugin, Lingui
-// macros, and React Compiler as the app. The src/ui project (Chromium, Firefox, WebKit) joins with feature 11.
+// macros, and React Compiler as the app: features and shared code in Chromium, src/ui primitives in Chromium,
+// Firefox, and WebKit.
 // The dev proxy (spec 0007 CSL-3) is left out: it would send Vitest's own browser requests to the server.
 export default mergeConfig(
   { ...viteConfig, server: { ...viteConfig.server, proxy: undefined } },
@@ -18,6 +19,7 @@ export default mergeConfig(
           "src/test/**",
           "src/routeTree.gen.ts",
           "src/locales/**",
+          "src/gallery/**",
         ],
         reporter: ["text", "json-summary"],
       },
@@ -27,12 +29,28 @@ export default mergeConfig(
           test: {
             name: "app",
             include: ["src/**/*.test.{ts,tsx}"],
-            exclude: ["src/ui/**"],
+            exclude: ["src/ui/**", "src/gallery/**"],
+            setupFiles: ["src/test/setup.ts"],
             browser: {
               enabled: true,
               headless: true,
               provider: playwright(),
               instances: [{ browser: "chromium" }],
+            },
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: "ui",
+            // The gallery's scene tests check the shell as a whole, so they run in all three engines too.
+            include: ["src/ui/**/*.test.{ts,tsx}", "src/gallery/**/*.test.{ts,tsx}"],
+            setupFiles: ["src/test/setup.ts"],
+            browser: {
+              enabled: true,
+              headless: true,
+              provider: playwright(),
+              instances: [{ browser: "chromium" }, { browser: "firefox" }, { browser: "webkit" }],
             },
           },
         },

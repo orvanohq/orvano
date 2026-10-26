@@ -1,0 +1,327 @@
+/*
+ * The console's one stylesheet and the only source of token values (spec 0015 STY-1, TKN-1 to TKN-6).
+ * console/design.md's token tables are generated from this file: change a value or its `use:` comment here, then
+ * run `pnpm fix`. Values are OKLCH (TKN-2) and rem, so zoom and the user's font size scale everything.
+ */
+
+/* STY-1: scan only console/src, so design.md, specs, and other text never generate classes. */
+@import "tailwindcss" source(none);
+@source "../";
+
+/* THM-3: the `dark:` variant follows data-theme, set by public/theme-boot.js and the theme store. src/ui only. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  /* STY-1: reset Tailwind's scales, so only Orvano's tokens exist as utilities (`bg-red-500` compiles to nothing). */
+  --color-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+
+  /* Colors, light theme (TKN-2). The dark values are in the [data-theme="dark"] block below. */
+  /* use: Content area, inputs */
+  --color-bg: oklch(1 0 0);
+  /* use: Sidebar, top bar, resource list, auth page backdrop */
+  --color-bg-subtle: oklch(0.985 0.002 286);
+  /* use: Hover rows, code blocks, skeletons, table header, disabled controls */
+  --color-bg-muted: oklch(0.967 0.003 286);
+  /* use: Popovers, menus, dialogs, sheets, toasts */
+  --color-bg-raised: oklch(1 0 0);
+  /* use: Behind modal dialogs, sheets, drawers */
+  --color-scrim: oklch(0.21 0.006 286 / 0.4);
+  /* use: Tooltip surface (inverted) */
+  --color-tooltip: oklch(0.21 0.006 286);
+  /* use: Tooltip text */
+  --color-tooltip-fg: oklch(1 0 0);
+  /* use: Decorative dividers and card edges */
+  --color-border: oklch(0.92 0.004 286);
+  /* use: Input, checkbox, switch, and secondary button edges */
+  --color-border-strong: oklch(0.6 0.015 286);
+  /* use: Body text, headings, icons */
+  --color-fg: oklch(0.21 0.006 286);
+  /* use: Help text, meta, placeholders, inactive nav, disabled text */
+  --color-fg-muted: oklch(0.46 0.016 286);
+  /* use: Primary button, checked controls, progress */
+  --color-accent: oklch(0.511 0.262 277);
+  /* use: Primary button hover and pressed */
+  --color-accent-hover: oklch(0.457 0.24 277);
+  /* use: Text and icons on `accent` */
+  --color-accent-fg: oklch(1 0 0);
+  /* use: Links, accent text on surfaces */
+  --color-accent-text: oklch(0.511 0.262 277);
+  /* use: Current sidebar item, selected rows, avatar */
+  --color-accent-subtle: oklch(0.962 0.018 272);
+  /* use: Text on `accent-subtle` */
+  --color-accent-subtle-fg: oklch(0.457 0.24 277);
+  /* use: The focus ring */
+  --color-focus: oklch(0.511 0.262 277);
+  /* use: Danger button */
+  --color-danger: oklch(0.577 0.245 27);
+  /* use: Danger button hover and pressed */
+  --color-danger-hover: oklch(0.505 0.213 27);
+  /* use: Text on `danger` */
+  --color-danger-fg: oklch(1 0 0);
+  /* use: Error text, inline errors, failed status */
+  --color-danger-text: oklch(0.505 0.213 27);
+  /* use: Error banner, danger zone, failed chip */
+  --color-danger-subtle: oklch(0.971 0.013 17);
+  /* use: Success text, ready status */
+  --color-success-text: oklch(0.48 0.13 150);
+  /* use: Success banner, ready chip */
+  --color-success-subtle: oklch(0.982 0.018 155);
+  /* use: Warning text, limits near */
+  --color-warning-text: oklch(0.5 0.13 50);
+  /* use: Warning banner and chip */
+  --color-warning-subtle: oklch(0.987 0.022 95);
+  /* use: Info text, running status */
+  --color-info-text: oklch(0.48 0.12 240);
+  /* use: Info banner, running chip */
+  --color-info-subtle: oklch(0.977 0.013 236);
+
+  /* Type (TKN-3): system stacks, three weights, six sizes. No web font. */
+  --font-sans:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  /* use: Chips, badges, keyboard hints, table meta (the floor: nothing smaller) */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  /* use: Compact rows, help text, code and IDs (with `font-mono`) */
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.125rem;
+  /* use: Body, controls, nav, table cells */
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.25rem;
+  /* use: Section headings (h3), sheet and dialog titles */
+  --text-md: 1rem;
+  --text-md--line-height: 1.5rem;
+  /* use: Card group headings (h2) */
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.75rem;
+  /* use: Page title (h1, one per page) */
+  --text-xl: 1.5rem;
+  --text-xl--line-height: 2rem;
+
+  /* Layout sizes (TKN-5). Tailwind's spacing step stays 4 px, so `p-1` is 4 px. */
+  /* use: Top bar height (48 px) */
+  --spacing-topbar: 3rem;
+  /* use: Primary sidebar width (240 px) */
+  --spacing-sidebar: 15rem;
+  /* use: Collapsed icon rail width (56 px) */
+  --spacing-rail: 3.5rem;
+  /* use: Resource list default width (280 px; 200 to 480) */
+  --spacing-resource-list: 17.5rem;
+  /* use: Collapsed resource list strip (40 px) */
+  --spacing-list-strip: 2.5rem;
+  /* use: Docs pane width (400 px) */
+  --spacing-docs-pane: 25rem;
+  /* use: Small dialog width (400 px) */
+  --spacing-dialog-sm: 25rem;
+  /* use: Medium dialog width (560 px) */
+  --spacing-dialog-md: 35rem;
+  /* use: Side sheet width (480 px) */
+  --spacing-sheet: 30rem;
+  /* use: Command palette width (640 px) */
+  --spacing-palette: 40rem;
+  /* use: Toast width (360 px) */
+  --spacing-toast: 22.5rem;
+  /* use: Auth card width (400 px) */
+  --spacing-auth: 25rem;
+  /* use: Control height (32 px) */
+  --spacing-control: 2rem;
+  /* use: Small control height (28 px) */
+  --spacing-control-sm: 1.75rem;
+  /* use: Large control height (40 px, auth pages) */
+  --spacing-control-lg: 2.5rem;
+  /* use: Maximum width of forms and settings pages (768 px) */
+  --spacing-content: 48rem;
+
+  /* Shape (TKN-4). */
+  /* use: Chips, badges, checkboxes, `Kbd`, tooltips */
+  --radius-sm: 0.25rem;
+  /* use: Buttons, inputs, cards, menus, popovers, toasts */
+  --radius-md: 0.375rem;
+  /* use: Dialogs, sheets (inline start corners only), the command palette */
+  --radius-lg: 0.5rem;
+  /* use: Avatars, switch tracks, status dots */
+  --radius-full: 9999px;
+  /* use: Popovers, menus, tooltips, toasts */
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.08), 0 2px 8px oklch(0 0 0 / 0.08);
+  /* use: Dialogs, sheets, drawers, the command palette */
+  --shadow-lg: 0 8px 24px oklch(0 0 0 / 0.16), 0 2px 6px oklch(0 0 0 / 0.08);
+
+  /* Motion (MOT-1): the one easing curve. Durations are plain variables below (TKN-1). */
+  /* use: Every transition */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* THM-3: the dark tokens, set by data-theme, and by the OS when no script set it. Keep both blocks the same. */
+[data-theme="dark"] {
+  --color-bg: oklch(0.16 0.005 286);
+  --color-bg-subtle: oklch(0.19 0.006 286);
+  --color-bg-muted: oklch(0.235 0.006 286);
+  --color-bg-raised: oklch(0.21 0.006 286);
+  --color-scrim: oklch(0 0 0 / 0.6);
+  --color-tooltip: oklch(0.967 0.003 286);
+  --color-tooltip-fg: oklch(0.16 0.005 286);
+  --color-border: oklch(0.3 0.008 286);
+  --color-border-strong: oklch(0.53 0.015 286);
+  --color-fg: oklch(0.967 0.003 286);
+  --color-fg-muted: oklch(0.72 0.015 286);
+  --color-accent: oklch(0.55 0.24 277);
+  --color-accent-hover: oklch(0.511 0.262 277);
+  --color-accent-fg: oklch(1 0 0);
+  --color-accent-text: oklch(0.785 0.115 275);
+  --color-accent-subtle: oklch(0.3 0.09 277);
+  --color-accent-subtle-fg: oklch(0.87 0.065 274);
+  --color-focus: oklch(0.673 0.182 277);
+  --color-danger: oklch(0.577 0.245 27);
+  --color-danger-hover: oklch(0.505 0.213 27);
+  --color-danger-fg: oklch(1 0 0);
+  --color-danger-text: oklch(0.75 0.15 22);
+  --color-danger-subtle: oklch(0.26 0.07 25);
+  --color-success-text: oklch(0.79 0.17 152);
+  --color-success-subtle: oklch(0.25 0.05 155);
+  --color-warning-text: oklch(0.83 0.16 84);
+  --color-warning-subtle: oklch(0.26 0.05 70);
+  --color-info-text: oklch(0.78 0.12 233);
+  --color-info-subtle: oklch(0.25 0.04 240);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --color-bg: oklch(0.16 0.005 286);
+    --color-bg-subtle: oklch(0.19 0.006 286);
+    --color-bg-muted: oklch(0.235 0.006 286);
+    --color-bg-raised: oklch(0.21 0.006 286);
+    --color-scrim: oklch(0 0 0 / 0.6);
+    --color-tooltip: oklch(0.967 0.003 286);
+    --color-tooltip-fg: oklch(0.16 0.005 286);
+    --color-border: oklch(0.3 0.008 286);
+    --color-border-strong: oklch(0.53 0.015 286);
+    --color-fg: oklch(0.967 0.003 286);
+    --color-fg-muted: oklch(0.72 0.015 286);
+    --color-accent: oklch(0.55 0.24 277);
+    --color-accent-hover: oklch(0.511 0.262 277);
+    --color-accent-fg: oklch(1 0 0);
+    --color-accent-text: oklch(0.785 0.115 275);
+    --color-accent-subtle: oklch(0.3 0.09 277);
+    --color-accent-subtle-fg: oklch(0.87 0.065 274);
+    --color-focus: oklch(0.673 0.182 277);
+    --color-danger: oklch(0.577 0.245 27);
+    --color-danger-hover: oklch(0.505 0.213 27);
+    --color-danger-fg: oklch(1 0 0);
+    --color-danger-text: oklch(0.75 0.15 22);
+    --color-danger-subtle: oklch(0.26 0.07 25);
+    --color-success-text: oklch(0.79 0.17 152);
+    --color-success-subtle: oklch(0.25 0.05 155);
+    --color-warning-text: oklch(0.83 0.16 84);
+    --color-warning-subtle: oklch(0.26 0.05 70);
+    --color-info-text: oklch(0.78 0.12 233);
+    --color-info-subtle: oklch(0.25 0.04 240);
+  }
+}
+
+/* THM-6: more contrast makes decorative borders strong and muted text the main text color. */
+@media (prefers-contrast: more) {
+  :root {
+    --color-border: var(--color-border-strong);
+    --color-fg-muted: var(--color-fg);
+  }
+}
+
+/* THM-6: in forced colors the focus ring is an outline (kept by the browser), and current and selected items gain
+   a 2 px inline start border in Highlight. Icons use currentColor (Icon sets it). */
+@media (forced-colors: active) {
+  [aria-current="page"],
+  [aria-selected="true"],
+  [data-selected] {
+    border-inline-start: 2px solid Highlight;
+  }
+}
+
+/* UX-32: rows follow the density; forms, the sidebar, and the top bar don't. */
+:root {
+  /* use: Grid, table, and list rows (UX-32) */
+  --row-height: 2.5rem;
+}
+[data-density="compact"] {
+  --row-height: 1.75rem;
+}
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-fg-muted);
+  }
+  :root {
+    color-scheme: light dark;
+  }
+  [data-theme="light"] {
+    color-scheme: light;
+  }
+  [data-theme="dark"] {
+    color-scheme: dark;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  html {
+    /* SHL-8: sticky bars never hide the focused element. The shell adds the bottom padding for toasts. */
+    scroll-padding-top: var(--spacing-topbar);
+  }
+  /* STY-2: the rule React Aria would inject at runtime (usePress); index.html's placeholder element stops it. */
+  [data-react-aria-pressable] {
+    touch-action: pan-x pan-y pinch-zoom;
+  }
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+  }
+}
+
+/* TKN-1: values that aren't Tailwind theme namespaces, used only inside src/ui (`z-(--z-modal)`). */
+:root {
+  /* use: Sticky table headers, the paging bar */
+  --z-sticky: 10;
+  /* use: Sidebar, resource list, and narrow docs drawers */
+  --z-drawer: 30;
+  /* use: Dialogs, sheets, the command palette */
+  --z-modal: 50;
+  /* use: Menus, popovers, combobox lists (above modals they open from) */
+  --z-popover: 60;
+  /* use: The toast region */
+  --z-toast: 70;
+  /* use: Tooltips */
+  --z-tooltip: 80;
+  /* use: Hover, press, focus ring, fades */
+  --duration-fast: 120ms;
+  /* use: Popovers, menus, toasts, tooltips */
+  --duration-base: 200ms;
+  /* use: Sheets, drawers, the command palette */
+  --duration-slow: 280ms;
+}
+
+/* MOT-1: under reduced motion, slides and scales are instant and nothing spins or shimmers. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+}

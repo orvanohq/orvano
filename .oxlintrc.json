@@ -68,6 +68,11 @@
     "jsx-a11y/scope": "error",
     "jsx-a11y/tabindex-no-positive": "error",
     "import/no-cycle": "error",
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
+    "vitest/expect-expect": [
+      "error",
+      { "assertFunctionNames": ["expect", "expectNoAxeViolations"] }
+    ],
     "no-empty": "error",
     "react/react-in-jsx-scope": "off"
   },

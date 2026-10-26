@@ -7,11 +7,107 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: en\n"
 
-#: src/features/welcome/components/welcome-page.tsx:8
+#: src/ui/shell/primary-sidebar.tsx:22
+msgid "Account"
+msgstr "Account"
+
+#: src/ui/shell/nav-registry.ts:35
+msgid "Auth"
+msgstr "Auth"
+
+#: src/ui/shell/app-shell.tsx:19
+msgid "Breadcrumb"
+msgstr "Breadcrumb"
+
+#: src/ui/shell/nav-registry.ts:36
+msgid "Databases"
+msgstr "Databases"
+
+#: src/ui/shell/nav-registry.ts:39
+msgid "Functions"
+msgstr "Functions"
+
+#: src/ui/shell/nav-registry.ts:43
+msgid "Logs"
+msgstr "Logs"
+
+#: src/ui/shell/nav-registry.ts:47
+msgid "Members"
+msgstr "Members"
+
+#: src/ui/shell/nav-registry.ts:41
+msgid "Messaging"
+msgstr "Messaging"
+
+#: src/ui/shell/primary-sidebar.tsx:21
+msgid "Organization"
+msgstr "Organization"
+
+#: src/ui/shell/nav-registry.ts:48
+msgid "Organization settings"
+msgstr "Organization settings"
+
+#: src/features/welcome/components/welcome-page.tsx:9
 #: src/shared/i18n/index.test.ts:23
 msgid "Orvano console"
 msgstr "Orvano console"
 
-#: src/features/welcome/components/welcome-page.tsx:11
+#: src/ui/shell/brand-mark.tsx:23
+msgid "Orvano home"
+msgstr "Orvano home"
+
+#: src/ui/shell/nav-registry.ts:34
+msgid "Overview"
+msgstr "Overview"
+
+#: src/ui/shell/nav-registry.ts:52
+msgid "Preferences"
+msgstr "Preferences"
+
+#: src/ui/shell/nav-registry.ts:50
+msgid "Profile"
+msgstr "Profile"
+
+#: src/ui/shell/primary-sidebar.tsx:20
+msgid "Project"
+msgstr "Project"
+
+#: src/ui/shell/nav-registry.ts:46
+msgid "Projects"
+msgstr "Projects"
+
+#: src/ui/shell/nav-registry.ts:38
+msgid "Realtime"
+msgstr "Realtime"
+
+#: src/ui/shell/nav-registry.ts:51
+msgid "Security"
+msgstr "Security"
+
+#: src/ui/shell/nav-registry.ts:44
+msgid "Settings"
+msgstr "Settings"
+
+#: src/ui/shell/nav-registry.ts:40
+msgid "Sites"
+msgstr "Sites"
+
+#: src/ui/shell/skip-link.tsx:19
+msgid "Skip to content"
+msgstr "Skip to content"
+
+#: src/ui/shell/nav-registry.ts:37
+msgid "Storage"
+msgstr "Storage"
+
+#: src/features/welcome/components/welcome-page.tsx:12
 msgid "The server and console are running. Screens arrive with the next features."
 msgstr "The server and console are running. Screens arrive with the next features."
+
+#: src/ui/shell/nav-registry.ts:42
+msgid "Usage"
+msgstr "Usage"
+
+#: src/ui/button.test.tsx:9
+msgid "You need the Admin role to delete tables."
+msgstr "You need the Admin role to delete tables."

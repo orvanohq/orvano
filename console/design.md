@@ -2,7 +2,7 @@
 
 The visual language of the Orvano console: what it looks like, the values behind it, and how each component behaves. The decision and the rules (STY, TKN, THM, MOT, SHL, PRM, ICN, RTL, GAL) are in [spec 0015](../docs/specs/0015-design-system-console-shell/index.md). Behavior is [spec 0001](../docs/specs/0001-console-ux-patterns/index.md) (UX rules) and code is [spec 0003](../docs/specs/0003-react-console-practices/index.md).
 
-`src/ui/theme.css` is the only source of token values. The tables between `<!-- tokens:… -->` markers are generated from it by `pnpm fix`, and `pnpm check` fails when they are stale (TKN-6). To change a token, edit `theme.css` (value and its `/* use: … */` comment) and run `pnpm fix`; never edit a generated table by hand. Until the generator lands (spec 0015 build step 3), these tables are the target values `theme.css` is written from.
+`src/ui/theme.css` is the only source of token values. The tables between `<!-- tokens:… -->` markers are generated from it by `pnpm fix`, and `pnpm check` fails when they are stale (TKN-6). To change a token, edit `theme.css` (the value, and the `/* use: … */` comment on the line above it) and run `pnpm fix`; never edit a generated table by hand.
 
 To see everything live, run `pnpm dev` in `console/` and open `http://localhost:5173/console/gallery.html`.
 
