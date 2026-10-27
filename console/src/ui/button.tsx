@@ -4,7 +4,7 @@ import { useLingui } from "@lingui/react";
 import { Button as AriaButton, type PressEvent } from "react-aria-components";
 import { cx, focusRing } from "./cx";
 import { Icon } from "./icon";
-import type { IconComponent } from "./icons";
+import { PendingIcon, type IconComponent } from "./icons";
 import { Tooltip } from "./tooltip";
 import { VisuallyHidden } from "./visually-hidden";
 
@@ -14,6 +14,8 @@ export type ButtonSize = "sm" | "md" | "lg";
 interface BaseProps {
   onPress?: (event: PressEvent) => void;
   type?: "button" | "submit" | "reset";
+  /** The id of the `<form>` a submit button submits, when it sits outside it (a sheet's footer). */
+  form?: string;
   /** For controls that truly can't act (a submit while pending). Removes focus; prefer `unavailableReason`. */
   isDisabled?: boolean;
   /**
@@ -21,12 +23,20 @@ interface BaseProps {
    * Enter, and exposes the reason through `aria-describedby` and a tooltip.
    */
   unavailableReason?: MessageDescriptor;
+  /** Takes focus when it mounts: the safe choice in a dialog (Cancel in a tier 2 delete, UX-23). */
+  initialFocus?: boolean;
+  /** `close` closes the `Dialog` or `SideSheet` it sits in (a sheet asks first when it has unsaved changes). */
+  slot?: "close";
 }
 
 export interface ButtonProps extends BaseProps {
   children: ReactNode;
   variant?: ButtonVariant;
   size?: ButtonSize;
+  /**
+   * Busy (FRM-4, UX-8): shows a spinner, stays focusable, ignores presses, and React Aria announces the busy state.
+   */
+  isPending?: boolean;
 }
 
 export interface IconButtonProps extends BaseProps {
@@ -102,9 +112,13 @@ function PressableButton({
   children,
   onPress,
   type = "button",
+  form,
   isDisabled,
+  isPending,
+  initialFocus,
+  slot,
   unavailableReason,
-}: BaseProps & { className: string; label?: string; children: ReactNode }) {
+}: BaseProps & { className: string; label?: string; isPending?: boolean; children: ReactNode }) {
   const { i18n } = useLingui();
   const reasonId = useId();
   const reason = unavailableReason ? i18n._(unavailableReason) : undefined;
@@ -115,7 +129,12 @@ function PressableButton({
       aria-label={label}
       // A submit button that is unavailable must not submit its form either.
       type={reason ? "button" : type}
+      form={form}
       isDisabled={isDisabled}
+      isPending={isPending}
+      // oxlint-disable-next-line jsx-a11y/no-autofocus -- UX-23 and the APG alert dialog: focus starts on the safe action
+      autoFocus={initialFocus}
+      slot={slot}
       aria-disabled={reason ? true : undefined}
       aria-describedby={reason ? reasonId : undefined}
       onPress={reason ? undefined : onPress}
@@ -137,10 +156,17 @@ function PressableButton({
 }
 
 /** design.md _Button recipes_. One `primary` per surface, at the inline end (UX-36). */
-export function Button({ children, variant = "secondary", size = "md", ...props }: ButtonProps) {
+export function Button({
+  children,
+  variant = "secondary",
+  size = "md",
+  isPending,
+  ...props
+}: ButtonProps) {
   return (
     <PressableButton
       {...props}
+      isPending={isPending}
       className={cx(
         base,
         focusRing,
@@ -148,8 +174,14 @@ export function Button({ children, variant = "secondary", size = "md", ...props 
         variants[variant],
         unavailable[variant],
         disabled[variant],
+        "data-pending:cursor-wait",
       )}
     >
+      {isPending ? (
+        <span className="animate-spin motion-reduce:animate-none">
+          <Icon icon={PendingIcon} />
+        </span>
+      ) : null}
       {children}
     </PressableButton>
   );

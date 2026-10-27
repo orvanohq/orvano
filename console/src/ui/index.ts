@@ -9,6 +9,7 @@ export {
   type ButtonVariant,
   type IconButtonProps,
 } from "./button";
+export { Dialog, DialogTrigger, type DialogProps, type DialogTriggerProps } from "./dialog";
 export { Icon, type IconProps } from "./icon";
 export * from "./icons";
 export { Link } from "./link";

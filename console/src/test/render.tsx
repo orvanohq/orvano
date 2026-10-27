@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-router";
 import { render } from "vitest-browser-react";
 import { createAppRouter } from "@/router";
+import { UnsavedChangesGuard } from "@/ui/form/unsaved-changes-guard";
 import { UiRouterProvider } from "@/ui/router-provider";
 import { activateLocale, i18n } from "@/shared/i18n";
 
@@ -52,6 +53,7 @@ export async function renderInRouter(
     component: () => (
       <UiRouterProvider>
         <Outlet />
+        <UnsavedChangesGuard />
       </UiRouterProvider>
     ),
   });

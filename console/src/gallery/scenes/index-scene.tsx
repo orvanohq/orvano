@@ -2,6 +2,8 @@ import { Link } from "@tanstack/react-router";
 
 const scenes = [
   { to: "/primitives", label: "Primitives" },
+  { to: "/forms", label: "Forms" },
+  { to: "/overlays", label: "Overlays (dialog, side sheet, confirm delete)" },
   { to: "/acme/storefront/databases", label: "Shell, project scope (with a resource list)" },
   { to: "/acme/storefront/databases/users", label: "Shell, a table open (page header, tabs)" },
   { to: "/acme/storefront", label: "Shell, project scope (Overview)" },

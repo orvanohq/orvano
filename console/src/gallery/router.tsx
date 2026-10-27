@@ -6,10 +6,13 @@ import {
   useRouter,
   type RouterHistory,
 } from "@tanstack/react-router";
+import { UnsavedChangesGuard } from "@/ui/form/unsaved-changes-guard";
 import { UiRouterProvider } from "@/ui/router-provider";
 import { GalleryFrame } from "./frame";
 import { AuthScene } from "./scenes/auth-scene";
+import { FormsScene } from "./scenes/forms-scene";
 import { IndexScene } from "./scenes/index-scene";
+import { OverlaysScene } from "./scenes/overlays-scene";
 import { PrimitivesScene } from "./scenes/primitives-scene";
 import { ShellScene } from "./scenes/shell-scene";
 
@@ -25,7 +28,12 @@ const rootRoute = createRootRouteWithContext<GalleryContext>()({
   component: function GalleryRoot() {
     // The app's router is the registered one, so the gallery reads its own context untyped.
     const { toolbar } = useRouter().options.context as unknown as GalleryContext;
-    return <UiRouterProvider>{toolbar ? <GalleryFrame /> : <Outlet />}</UiRouterProvider>;
+    return (
+      <UiRouterProvider>
+        {toolbar ? <GalleryFrame /> : <Outlet />}
+        <UnsavedChangesGuard />
+      </UiRouterProvider>
+    );
   },
 });
 
@@ -39,6 +47,18 @@ const primitivesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/primitives",
   component: PrimitivesScene,
+});
+
+const formsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/forms",
+  component: FormsScene,
+});
+
+const overlaysRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/overlays",
+  component: OverlaysScene,
 });
 
 const authRoute = createRoute({
@@ -118,6 +138,8 @@ const tableColumnsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   primitivesRoute,
+  formsRoute,
+  overlaysRoute,
   authRoute,
   accountRoute,
   orgRoute,

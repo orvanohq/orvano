@@ -36,4 +36,9 @@ export {
   Search as SearchIcon,
   Keyboard as ShortcutsIcon,
   LogOut as SignOutIcon,
+  Eye as ShowIcon,
+  EyeOff as HideIcon,
+  Minus as IndeterminateIcon,
+  LoaderCircle as PendingIcon,
+  CircleAlert as ErrorIcon,
 } from "lucide-react";

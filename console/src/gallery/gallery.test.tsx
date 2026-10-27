@@ -13,6 +13,8 @@ const scenes = [
   "/acme",
   "/account/profile",
   "/primitives",
+  "/forms",
+  "/overlays",
   "/auth-layout",
 ];
 
