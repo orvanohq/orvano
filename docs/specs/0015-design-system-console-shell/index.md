@@ -426,3 +426,5 @@ Tracer Bullet inside this feature: milestone 1 runs one thin thread through ever
 - [ ] The rows feature (16): verify react-data-grid against UX-11 to UX-19, bring its CSS into `theme.css`, and build `DataGrid` and the non modal row sheet (PRM-5).
 - [ ] Feature 45: chart palette tokens (categorical and sequential), checked against both themes like TKN-7.
 - [ ] Later: a real logo to replace the geometric mark (one file, SHL-7).
+- [ ] AC-22 (owed after milestone 5): run the screen reader script SRT-1 to SRT-12 with VoiceOver and Safari on macOS and with NVDA and Firefox on Windows, and record each result in [`verify.md`](verify.md) before the feature is `done`.
+- [ ] AC-3 (by `/architect`, before feature 13 routes the shell): with `AppShell` in the first load, the console measures about 209.5 KB gzip against BDL-1's 200 KB (210.6 KB already at milestone 4; measured by rendering `AppShell` from the welcome route). Decide between loading more of the shell lazily (the account menu, switcher, and breadcrumb menu popovers, which pull React Aria's collection, selection, and menu code into the first load) and raising the budget.

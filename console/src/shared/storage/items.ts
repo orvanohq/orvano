@@ -42,3 +42,11 @@ export const resourceListLayout = defineStored({
   fallback: { collapsed: false, width: 280 },
 });
 export type ResourceListLayout = ReturnType<typeof resourceListLayout.read>;
+
+/** Spec 0015 SHL-10, UX-25: the command palette's recent action IDs, newest first, at most 10. */
+export const PALETTE_RECENTS_LIMIT = 10;
+export const paletteRecents = defineStored({
+  key: (ids: { userId: string }) => `orvano:v1:${ids.userId}:palette`,
+  schema: z.array(z.string()).max(PALETTE_RECENTS_LIMIT),
+  fallback: [],
+});

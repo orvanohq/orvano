@@ -45,16 +45,15 @@ export default defineConfig({
     cssCodeSplit: false, // spec 0015 STY-2: one CSS file for the whole console
     rolldownOptions: {
       output: {
-        // Spec 0003 BDL-1: no emitted file over 80 KB gzip, so the framework libraries get their own chunks.
+        // Spec 0003 BDL-1: no emitted file over 80 KB gzip, so the framework libraries get their own chunks. React Aria
+        // has no group: a group gathers every module it matches into one chunk, so the parts only the lazy panels use
+        // (the palette's Autocomplete and Menu, PRM-10) would load first. Split by importer, its first load parts stay
+        // well under 80 KB.
         codeSplitting: {
           groups: [
             { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
             { name: "tanstack", test: /node_modules[\\/]@tanstack[\\/]/ },
             { name: "lingui", test: /node_modules[\\/]@lingui[\\/]/ },
-            {
-              name: "react-aria",
-              test: /node_modules[\\/](react-aria-components|react-aria|react-stately|@react-aria|@react-stately|@internationalized|@react-types)[\\/]/,
-            },
           ],
         },
       },

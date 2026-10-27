@@ -45,6 +45,7 @@ export function Drawer({
 }: DrawerProps) {
   return (
     <ModalOverlay
+      data-modal // SHL-10: shell shortcuts do nothing while a modal is open
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       isDismissable

@@ -27,6 +27,8 @@ interface BaseProps {
   initialFocus?: boolean;
   /** `close` closes the `Dialog` or `SideSheet` it sits in (a sheet asks first when it has unsaved changes). */
   slot?: "close";
+  /** For a button that shows and hides a region beside it (the help button and the docs pane). */
+  "aria-expanded"?: boolean;
 }
 
 export interface ButtonProps extends BaseProps {
@@ -118,6 +120,7 @@ function PressableButton({
   initialFocus,
   slot,
   unavailableReason,
+  "aria-expanded": expanded,
 }: BaseProps & { className: string; label?: string; isPending?: boolean; children: ReactNode }) {
   const { i18n } = useLingui();
   const reasonId = useId();
@@ -135,6 +138,7 @@ function PressableButton({
       // oxlint-disable-next-line jsx-a11y/no-autofocus -- UX-23 and the APG alert dialog: focus starts on the safe action
       autoFocus={initialFocus}
       slot={slot}
+      aria-expanded={expanded}
       aria-disabled={reason ? true : undefined}
       aria-describedby={reason ? reasonId : undefined}
       onPress={reason ? undefined : onPress}

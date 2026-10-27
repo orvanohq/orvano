@@ -12,7 +12,9 @@ export {
 export { Dialog, DialogTrigger, type DialogProps, type DialogTriggerProps } from "./dialog";
 export { Icon, type IconProps } from "./icon";
 export * from "./icons";
-export { Link } from "./link";
+export { ExternalLink, Link, type ExternalLinkProps } from "./link";
+export { Kbd, type KbdProps } from "./kbd";
+export { useShortcut, type UseShortcutOptions } from "./use-shortcut";
 export { Menu, MenuItem, MenuSection, MenuSeparator, MenuTrigger } from "./menu";
 export type { MenuItemProps, MenuProps, MenuSectionProps, MenuTriggerProps } from "./menu";
 export { PageHeader, type PageHeaderProps } from "./page-header";
@@ -60,6 +62,10 @@ export {
 export { Badge, StatusChip, type BadgeProps, type JobStatus } from "./status-chip";
 export { notify, ToastRegion, type NotifyOptions, type ToastTone } from "./toast";
 export { AccountMenu, type AccountMenuProps } from "./shell/account-menu";
+export { ActivityIndicator } from "./shell/activity-indicator";
+export { HelpButton, type HelpButtonProps } from "./shell/help-button";
+export { PaletteButton, type PaletteButtonProps } from "./shell/palette-button";
+export { paletteActions, type PaletteAction } from "./shell/palette-actions";
 export { AppShell } from "./shell/app-shell";
 export { Breadcrumbs, type BreadcrumbsProps } from "./shell/breadcrumbs";
 export { Drawer, type DrawerProps } from "./shell/drawer";

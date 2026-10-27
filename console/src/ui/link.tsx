@@ -1,7 +1,11 @@
 import type { Ref } from "react";
 import { createLink, type LinkComponent, type NavigateOptions } from "@tanstack/react-router";
 import { Link as AriaLink, type LinkProps as AriaLinkProps } from "react-aria-components";
+import { useLingui } from "@lingui/react/macro";
 import { cx, focusRing, focusRingInset } from "./cx";
+import { Icon } from "./icon";
+import { ExternalLinkIcon } from "./icons";
+import { VisuallyHidden } from "./visually-hidden";
 
 interface AriaRouterLinkProps extends Omit<AriaLinkProps, "className" | "style"> {
   /**
@@ -77,3 +81,29 @@ export const Link: LinkComponent<typeof AriaRouterLink> = (props) => {
   const linkProps = { ...props, routerOptions } as typeof props;
   return <RouterLink preload="intent" {...linkProps} />;
 };
+
+export interface ExternalLinkProps {
+  href: string;
+  children: string;
+}
+
+/**
+ * A link out of the console (spec 0015 SHL-9: today only the docs fallback). It opens in a new tab with
+ * `rel="noopener noreferrer"`, shows the external icon, and says so to screen readers.
+ */
+export function ExternalLink({ href, children }: ExternalLinkProps) {
+  const { t } = useLingui();
+  return (
+    <AriaLink
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cx(variants.inline, "inline-flex items-center gap-1")}
+    >
+      {children}
+      <Icon icon={ExternalLinkIcon} />
+      {/* The space keeps the name and the text axe sees as visible the same (WCAG 2.5.3). */}{" "}
+      <VisuallyHidden>{t`(opens in a new tab)`}</VisuallyHidden>
+    </AriaLink>
+  );
+}

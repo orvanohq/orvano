@@ -43,10 +43,12 @@ export interface MenuProps {
   "aria-label": string;
   children: ReactNode;
   onAction?: (key: Key) => void;
+  /** Shown instead of the items when there are none (the command palette's "No matching actions"). */
+  emptyMessage?: string;
 }
 
 /** APG menu: arrows, Enter, Escape, and type ahead (React Aria). */
-export function Menu({ children, ...props }: MenuProps) {
+export function Menu({ children, emptyMessage, ...props }: MenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   // PRM-4: React Aria's MenuItem doesn't pass `aria-disabled` through, and its `isDisabled` would remove focus, so
   // unavailable items (marked `data-unavailable`) get it here. The items render after the menu (React Aria builds
@@ -70,6 +72,9 @@ export function Menu({ children, ...props }: MenuProps) {
     <AriaMenu
       {...props}
       ref={ref}
+      renderEmptyState={
+        emptyMessage ? () => <p className="px-2 py-3 text-fg-muted">{emptyMessage}</p> : undefined
+      }
       className="max-h-[inherit] min-w-48 overflow-y-auto p-1 outline-none"
     >
       {children}
