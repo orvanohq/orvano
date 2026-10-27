@@ -52,6 +52,16 @@ export {
   Lock as NotAllowedIcon,
   ArrowUp as SortAscendingIcon,
   ArrowDown as SortDescendingIcon,
+  // Power features (design.md _Shell_): help, activity, the palette's actions
+  CircleHelp as HelpIcon,
+  Activity as ActivityIcon,
+  ExternalLink as ExternalLinkIcon,
+  History as RecentIcon,
+  Monitor as ThemeSystemIcon,
+  Sun as ThemeLightIcon,
+  Moon as ThemeDarkIcon,
+  Rows3 as DensityComfortableIcon,
+  Rows4 as DensityCompactIcon,
   // StatusChip (design.md _StatusChip statuses_)
   Clock as StatusQueuedIcon,
   LoaderCircle as StatusRunningIcon,

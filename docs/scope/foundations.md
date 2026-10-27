@@ -171,12 +171,12 @@ Visual language, base components, layout, navigation, and light and dark themes 
 spec [0015](../specs/0015-design-system-console-shell/index.md) · design [console/design.md](../../console/design.md) · code in `console/src/ui/`
 
 - [x] Design it (spec): `/architect design system & console shell`
-- [ ] Build it: `/develop design system & console shell`
+- [x] Build it: `/develop design system & console shell`
   - [x] Milestone 1, the thread: Tailwind v4 and `theme.css` tokens, theme boot, generated `design.md` tables, contrast and CSS size checks, lint rules, the dev gallery, the first primitives, the `AppShell` frame, `AuthLayout`, and the CSP test (spec 0015 build plan steps 1 to 7; AC-1 to AC-7, AC-15, AC-18 to AC-21, AC-23)
   - [x] Milestone 2, the shell: scope nav and icon rail, drawers, breadcrumbs and switchers, resource layout and resize, page header, tabs, account menu, right to left test (steps 8 to 13; AC-7 to AC-11, AC-15, AC-18)
   - [x] Milestone 3, forms and overlays: `src/ui/form`, `Dialog`, `SideSheet`, `UnsavedChangesGuard`, `ConfirmDelete` (steps 14 to 16; AC-15 to AC-17)
   - [x] Milestone 4, feedback and data display: `notify` and toasts, banners, states and skeletons, status chips, table, copy and secret fields, relative time, error pages (steps 17 to 20; AC-12, AC-15, AC-17, AC-21, AC-24)
-  - [ ] Milestone 5, power features and sign off: shortcuts, command palette, activity indicator, docs pane, finished `design.md`, budgets, and the screen reader script in both pairs (steps 21 to 24; AC-1, AC-3, AC-12 to AC-14, AC-22)
+  - [x] Milestone 5, power features and sign off: shortcuts, command palette, activity indicator, docs pane, finished `design.md`, budgets, and the screen reader script in both pairs (steps 21 to 24; AC-1, AC-3, AC-12 to AC-14, AC-22)
 - [ ] Verify it: `/check verify design system & console shell`
 - [ ] Test it: `/test design system & console shell`
 - [ ] Review it (fresh model): `/check review design system & console shell`

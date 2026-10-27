@@ -6,8 +6,10 @@ import {
   ChevronEndIcon,
   ChevronStartIcon,
   CloseIcon,
+  ExternalLink,
   Icon,
   IconButton,
+  Kbd,
   Link,
   Menu,
   MenuItem,
@@ -142,6 +144,23 @@ export function PrimitivesScene() {
           <Avatar name="" email="grace@example.com" />
           <Avatar name="Émile" email="emile@example.com" />
         </Row>
+      </Section>
+
+      <Section title="Kbd">
+        <Row label="Mod+K">
+          <Kbd keys="Mod+K" />
+        </Row>
+        <Row label="?">
+          <Kbd keys="?" />
+        </Row>
+      </Section>
+
+      <Section title="ExternalLink">
+        <p>
+          <ExternalLink href="https://github.com/orvanohq/orvano#readme">
+            Open the Orvano docs
+          </ExternalLink>
+        </p>
       </Section>
 
       <Section title="VisuallyHidden">

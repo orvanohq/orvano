@@ -1,14 +1,20 @@
-import { useState } from "react";
+import { lazy, Suspense, useRef, useState } from "react";
+import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { useRouterState } from "@tanstack/react-router";
 import { updateLayout, useLayout } from "@/shared/stores/layout";
 import { Button, IconButton } from "../button";
 import { cx } from "../cx";
 import { SidebarOpenIcon } from "../icons";
+import { useShortcut } from "../use-shortcut";
 import { AccountMenu } from "./account-menu";
+import { ActivityIndicator } from "./activity-indicator";
 import { BrandLink } from "./brand-mark";
 import { Breadcrumbs } from "./breadcrumbs";
 import { Drawer } from "./drawer";
+import { HelpButton } from "./help-button";
+import { paletteActions } from "./palette-actions";
+import { PALETTE_KEYS, PaletteButton } from "./palette-button";
 import { PrimarySidebar, useScopeLabel } from "./primary-sidebar";
 import { ShellContext } from "./shell-context";
 import { SkipLink } from "./skip-link";
@@ -16,11 +22,27 @@ import type { AppShellProps } from "./types";
 import { useDocumentTitle } from "./use-document-title";
 import { useIsWide } from "./use-is-wide";
 
+// PRM-10: the panels load on first use; their triggers (the palette button, `?`, the help button) are in the shell.
+const CommandPalette = lazy(() =>
+  import("../command-palette").then((module) => ({ default: module.CommandPalette })),
+);
+const ShortcutHelp = lazy(() =>
+  import("../shortcut-help").then((module) => ({ default: module.ShortcutHelp })),
+);
+const DocsPane = lazy(() =>
+  import("../docs-pane").then((module) => ({ default: module.DocsPane })),
+);
+
+const paletteShortcut = msg`Open the command palette`;
+const shortcutHelpShortcut = msg`Show keyboard shortcuts`;
+
 /**
  * Spec 0015 SHL-3: the frame every signed in screen sits in. Landmarks in order: the skip link, the `header` top bar
  * with the "Breadcrumb" `nav`, the scope's primary `nav`, an optional resource list (a `ResourceLayout`), and one
  * `main`. From 64rem the sidebar sits beside the content and collapses to the icon rail; below, the sidebar and the
- * resource list are drawers, which close on navigation and when the window widens (SHL-6).
+ * resource list are drawers, which close on navigation and when the window widens (SHL-6). The top bar's inline end
+ * holds the activity indicator, help (the docs pane, SHL-9), the command palette (Mod+K, SHL-10), and the account
+ * menu (SHL-4); `?` opens the shortcut list (A11Y-7).
  */
 export function AppShell({ model, crumbs, resourceList, banner, children }: AppShellProps) {
   const { t } = useLingui();
@@ -45,6 +67,37 @@ export function AppShell({ model, crumbs, resourceList, banner, children }: AppS
   const navOpen = !isWide && navOpenAt === href;
   const listOpen = !isWide && listOpenAt === href;
 
+  // The power panels. Each mounts on first use and then stays, so it can animate out.
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [docsOpen, setDocsOpen] = useState(false);
+  const [used, setUsed] = useState({ palette: false, shortcuts: false, docs: false });
+  const helpButton = useRef<HTMLSpanElement>(null);
+  const openPalette = () => {
+    setUsed((previous) => ({ ...previous, palette: true }));
+    setPaletteOpen(true);
+  };
+  const openShortcuts = () => {
+    setUsed((previous) => ({ ...previous, shortcuts: true }));
+    setShortcutsOpen(true);
+  };
+  const toggleDocs = (open: boolean) => {
+    setUsed((previous) => ({ ...previous, docs: true }));
+    setDocsOpen(open);
+  };
+  const paletteKeys = useShortcut({
+    id: "command-palette",
+    keys: PALETTE_KEYS,
+    label: paletteShortcut,
+    onTrigger: openPalette,
+  });
+  useShortcut({
+    id: "shortcut-help",
+    keys: "?",
+    label: shortcutHelpShortcut,
+    onTrigger: openShortcuts,
+  });
+
   return (
     <div
       className={cx(
@@ -66,7 +119,20 @@ export function AppShell({ model, crumbs, resourceList, banner, children }: AppS
         <BrandLink markOnly={!isWide || collapsed} />
         <Breadcrumbs model={model} crumbs={crumbs} collapsed={!isWide} />
         <div className="ms-auto flex shrink-0 items-center gap-1">
-          <AccountMenu user={model.user} onSignOut={model.onSignOut} />
+          <ActivityIndicator />
+          <HelpButton
+            ref={helpButton}
+            isExpanded={docsOpen}
+            onPress={() => {
+              toggleDocs(!docsOpen);
+            }}
+          />
+          <PaletteButton onPress={openPalette} {...paletteKeys} />
+          <AccountMenu
+            user={model.user}
+            onSignOut={model.onSignOut}
+            onShowShortcuts={openShortcuts}
+          />
         </div>
       </header>
       {banner}
@@ -128,7 +194,40 @@ export function AppShell({ model, crumbs, resourceList, banner, children }: AppS
             {children}
           </main>
         </div>
+        {used.docs && (
+          <Suspense fallback={null}>
+            <DocsPane
+              isOpen={docsOpen}
+              isWide={isWide}
+              onOpenChange={toggleDocs}
+              onClosed={() => {
+                // SHL-9: focus returns to the help button, once the pane (or its drawer) is gone.
+                helpButton.current?.querySelector("button")?.focus();
+              }}
+            />
+          </Suspense>
+        )}
       </div>
+      {used.palette && (
+        <Suspense fallback={null}>
+          <CommandPalette
+            isOpen={paletteOpen}
+            onOpenChange={setPaletteOpen}
+            userId={model.user.id}
+            actions={paletteActions(model, {
+              showShortcuts: openShortcuts,
+              openHelp: () => {
+                toggleDocs(true);
+              },
+            })}
+          />
+        </Suspense>
+      )}
+      {used.shortcuts && (
+        <Suspense fallback={null}>
+          <ShortcutHelp isOpen={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+        </Suspense>
+      )}
     </div>
   );
 }

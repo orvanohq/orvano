@@ -53,7 +53,7 @@ export function resetShellState() {
 }
 
 /** Presses Tab until `element` has focus, at most `limit` times (a fresh Firefox frame can take one Tab first). */
-export async function tabTo(element: Element, limit = 30) {
+export async function tabTo(element: Element, limit = 40) {
   const { userEvent } = await import("vitest/browser");
   for (let index = 0; index < limit && document.activeElement !== element; index++) {
     await userEvent.tab();

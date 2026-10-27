@@ -7,8 +7,17 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: pseudo-LOCALE\n"
 
+#: src/ui/link.tsx:106
+msgid "(opens in a new tab)"
+msgstr ""
+
 #: src/ui/form/field.tsx:177
 msgid "(optional)"
+msgstr ""
+
+#. placeholder {0}: messages.length
+#: src/ui/shell/activity-indicator.tsx:65
+msgid "{0, plural, one {# message} other {# messages}}"
 msgstr ""
 
 #. placeholder {0}: Math.ceil(details.retryAfter)
@@ -128,6 +137,19 @@ msgstr ""
 msgid "Account"
 msgstr ""
 
+#: src/ui/command-palette/index.tsx:136
+msgid "Actions"
+msgstr ""
+
+#: src/ui/shell/activity-indicator.tsx:37
+#: src/ui/shell/activity-indicator.tsx:54
+msgid "Activity"
+msgstr ""
+
+#: src/ui/shell/activity-indicator.tsx:37
+msgid "Activity, new messages"
+msgstr ""
+
 #: src/ui/shell/switcher.tsx:62
 msgid "All organizations"
 msgstr ""
@@ -138,6 +160,11 @@ msgstr ""
 
 #: src/ui/confirm-delete/index.tsx:206
 msgid "Also deleted:"
+msgstr ""
+
+#: src/ui/kbd.tsx:56
+msgctxt "keyboard key"
+msgid "Alt"
 msgstr ""
 
 #: src/ui/error-copy.tsx:54
@@ -164,8 +191,13 @@ msgstr ""
 msgid "Check your connection and try again."
 msgstr ""
 
-#: src/ui/side-sheet/index.tsx:65
+#: src/ui/shortcut-help/index.tsx:29
+#: src/ui/side-sheet/index.tsx:66
 msgid "Close"
+msgstr ""
+
+#: src/ui/docs-pane/index.tsx:124
+msgid "Close help"
 msgstr ""
 
 #: src/ui/shell/resource-layout.tsx:110
@@ -178,6 +210,14 @@ msgstr ""
 
 #: src/ui/shell/account-menu.tsx:74
 msgid "Comfortable"
+msgstr ""
+
+#: src/ui/command-palette/index.tsx:54
+msgid "Command palette"
+msgstr ""
+
+#: src/ui/shell/palette-button.tsx:38
+msgid "Commands"
 msgstr ""
 
 #: src/ui/shell/account-menu.tsx:75
@@ -219,6 +259,11 @@ msgstr ""
 
 #: src/ui/confirm-delete/index.tsx:188
 msgid "Counting what will be deleted with it…"
+msgstr ""
+
+#: src/ui/kbd.tsx:54
+msgctxt "keyboard key"
+msgid "Ctrl"
 msgstr ""
 
 #: src/ui/settings-card.tsx:56
@@ -318,6 +363,7 @@ msgid "Delete webhook"
 msgstr ""
 
 #: src/ui/shell/account-menu.tsx:68
+#: src/ui/shell/palette-actions.ts:47
 msgid "Density"
 msgstr ""
 
@@ -353,6 +399,25 @@ msgstr ""
 msgid "Functions"
 msgstr ""
 
+#: src/ui/shell/palette-actions.ts:45
+msgid "Go to"
+msgstr ""
+
+#: src/ui/shell/palette-actions.ts:60
+msgid "Go to {name}"
+msgstr ""
+
+#: src/ui/docs-pane/index.tsx:128
+msgid "Guides for each service will appear here. Until then, the Orvano documentation is on GitHub."
+msgstr ""
+
+#: src/ui/docs-pane/index.tsx:46
+#: src/ui/docs-pane/index.tsx:122
+#: src/ui/shell/help-button.tsx:24
+#: src/ui/shell/palette-actions.ts:48
+msgid "Help"
+msgstr ""
+
 #: src/ui/form/text-fields.tsx:86
 msgid "Hide password"
 msgstr ""
@@ -370,6 +435,7 @@ msgid "Keep editing"
 msgstr ""
 
 #: src/ui/shell/account-menu.tsx:79
+#: src/ui/shortcut-help/index.tsx:23
 msgid "Keyboard shortcuts"
 msgstr ""
 
@@ -403,6 +469,11 @@ msgstr ""
 msgid "Members"
 msgstr ""
 
+#: src/ui/shell/activity-indicator.tsx:60
+#: src/ui/shell/activity-indicator.tsx:62
+msgid "Messages"
+msgstr ""
+
 #: src/ui/shell/nav-registry.ts:41
 msgid "Messaging"
 msgstr ""
@@ -419,12 +490,24 @@ msgstr ""
 msgid "No matches"
 msgstr ""
 
+#: src/ui/command-palette/index.tsx:137
+msgid "No matching actions"
+msgstr ""
+
+#: src/ui/shell/activity-indicator.tsx:70
+msgid "No messages yet"
+msgstr ""
+
 #: src/ui/shell/switcher.tsx:60
 msgid "No organizations match"
 msgstr ""
 
 #: src/ui/shell/switcher.tsx:72
 msgid "No projects match"
+msgstr ""
+
+#: src/ui/shell/activity-indicator.tsx:58
+msgid "No running jobs"
 msgstr ""
 
 #: src/ui/error-copy.tsx:45
@@ -439,8 +522,20 @@ msgstr ""
 msgid "Notifications"
 msgstr ""
 
-#: src/ui/shell/app-shell.tsx:60
+#: src/ui/shell/palette-actions.ts:135
+msgid "Open help"
+msgstr ""
+
+#: src/ui/shell/app-shell.tsx:113
 msgid "Open navigation"
+msgstr ""
+
+#: src/ui/shell/app-shell.tsx:36
+msgid "Open the command palette"
+msgstr ""
+
+#: src/ui/docs-pane/index.tsx:134
+msgid "Open the Orvano docs"
 msgstr ""
 
 #: src/ui/shell/primary-sidebar.tsx:30
@@ -513,6 +608,10 @@ msgstr ""
 msgid "Realtime"
 msgstr ""
 
+#: src/ui/command-palette/index.tsx:143
+msgid "Recent"
+msgstr ""
+
 #: src/ui/error-page.tsx:57
 msgid "Reload"
 msgstr ""
@@ -540,6 +639,16 @@ msgstr ""
 msgid "Running"
 msgstr ""
 
+#: src/ui/shell/activity-indicator.tsx:56
+#: src/ui/shell/activity-indicator.tsx:57
+msgid "Running jobs"
+msgstr ""
+
+#: src/ui/command-palette/index.tsx:118
+#: src/ui/command-palette/index.tsx:130
+msgid "Search actions"
+msgstr ""
+
 #: src/ui/shell/switcher.tsx:57
 msgid "Search organizations"
 msgstr ""
@@ -560,7 +669,17 @@ msgstr ""
 msgid "Settings"
 msgstr ""
 
-#: src/ui/shell/app-shell.tsx:124
+#: src/ui/kbd.tsx:55
+msgctxt "keyboard key"
+msgid "Shift"
+msgstr ""
+
+#: src/ui/shell/app-shell.tsx:37
+#: src/ui/shell/palette-actions.ts:128
+msgid "Show keyboard shortcuts"
+msgstr ""
+
+#: src/ui/shell/app-shell.tsx:190
 msgid "Show list"
 msgstr ""
 
@@ -614,6 +733,7 @@ msgid "The server and console are running. Screens arrive with the next features
 msgstr ""
 
 #: src/ui/shell/account-menu.tsx:57
+#: src/ui/shell/palette-actions.ts:46
 msgid "Theme"
 msgstr ""
 
@@ -659,6 +779,26 @@ msgstr ""
 
 #: src/ui/shell/nav-registry.ts:42
 msgid "Usage"
+msgstr ""
+
+#: src/ui/shell/palette-actions.ts:104
+msgid "Use comfortable density"
+msgstr ""
+
+#: src/ui/shell/palette-actions.ts:116
+msgid "Use compact density"
+msgstr ""
+
+#: src/ui/shell/palette-actions.ts:92
+msgid "Use the dark theme"
+msgstr ""
+
+#: src/ui/shell/palette-actions.ts:80
+msgid "Use the light theme"
+msgstr ""
+
+#: src/ui/shell/palette-actions.ts:68
+msgid "Use the system theme"
 msgstr ""
 
 #: src/ui/error-copy.tsx:62
