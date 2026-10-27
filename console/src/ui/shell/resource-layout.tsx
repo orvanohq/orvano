@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useLingui } from "@lingui/react/macro";
-import { useLocale, useMove } from "react-aria";
+import { useMove } from "react-aria";
 import { resourceListLayout } from "@/shared/storage/items";
 import { IconButton } from "../button";
 import { cx } from "../cx";
@@ -26,6 +26,14 @@ export interface ResourceLayoutProps {
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+/**
+ * +1 when moving right points toward the content, -1 in right to left. Read from the layout when the user acts, not
+ * from React Aria's locale: engines differ on a locale's direction (CI WebKit gives ar-XB as left to right), while
+ * the layout always follows `dir`.
+ */
+const towardContent = (element: Element) =>
+  getComputedStyle(element).direction === "rtl" ? -1 : 1;
 
 /**
  * Spec 0015 SHL-13, UX-2: the resource list's pane, passed as AppShell's `resourceList` so it sits between the
@@ -160,8 +168,7 @@ function ResizeSeparator({
   onDrag: (width: number) => void;
   onCommit: (width: number) => void;
 }) {
-  const { direction } = useLocale();
-  const towardContent = direction === "rtl" ? -1 : 1;
+  const separator = useRef<HTMLDivElement>(null);
   // The width during a drag, unclamped, so a drag past a limit and back tracks the pointer.
   const drag = useRef(0);
   const { moveProps } = useMove({
@@ -170,7 +177,7 @@ function ResizeSeparator({
     },
     onMove: (event) => {
       if (event.pointerType === "keyboard") return;
-      drag.current += event.deltaX * towardContent;
+      drag.current += event.deltaX * (separator.current ? towardContent(separator.current) : 1);
       onDrag(clamp(drag.current, LIST_MIN, max));
     },
     onMoveEnd: (event) => {
@@ -179,9 +186,10 @@ function ResizeSeparator({
   });
 
   const onKeyDown = (event: KeyboardEvent) => {
+    const step = LIST_STEP * towardContent(event.currentTarget);
     const keys: Record<string, number> = {
-      ArrowRight: clamp(width + LIST_STEP * towardContent, LIST_MIN, max),
-      ArrowLeft: clamp(width - LIST_STEP * towardContent, LIST_MIN, max),
+      ArrowRight: clamp(width + step, LIST_MIN, max),
+      ArrowLeft: clamp(width - step, LIST_MIN, max),
       Home: LIST_MIN,
       End: max,
     };
@@ -194,6 +202,7 @@ function ResizeSeparator({
   return (
     <div
       {...moveProps}
+      ref={separator}
       onKeyDown={onKeyDown}
       // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- SHL-13: the APG window splitter is a focusable separator with a value, which an hr can't hold
       role="separator"
