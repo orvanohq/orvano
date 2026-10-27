@@ -338,7 +338,7 @@ Sizes: `sm` 28 px, `md` 32 px, `lg` 40 px high, `text-base` (`text-sm` for `sm`)
 
 ### Forms
 
-All fields render through `useAppForm` (spec 0003 FRM-1). Label above, help text under the label, "(optional)" on optional fields, error under the control (UX-7, UX-8). Inputs are `bg`, `border-strong`, `radius-md`, 32 px high; invalid adds a `danger-text` border and message.
+All fields render through `useAppForm` (spec 0003 FRM-1). Label above, help text under the label, "(optional)" on optional fields, error under the control (UX-7, UX-8). Inputs are `bg`, `border-strong`, `radius-md`, 32 px high; invalid adds a `danger-text` border and message. Screens pass `useAppForm` a schema and `onSubmitAsync`, never validator timing (FRM-2). When a pointer press moves focus out of a field, its error appears once the press ends, so the shift can't pull a button out from under the pointer.
 
 | Component                                | Built on                         | Variants and states                          | Keys                  | Notes                                                            |
 | ---------------------------------------- | -------------------------------- | -------------------------------------------- | --------------------- | ---------------------------------------------------------------- |

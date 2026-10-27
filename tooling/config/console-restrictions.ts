@@ -6,7 +6,7 @@
 // disables, and the other restrictions still apply there.
 
 type Area = "app" | "routes" | "features" | "shared" | "ui" | "gallery";
-type Home = "api" | "config" | "storage" | "url" | "view-hook" | "queries";
+type Home = "api" | "config" | "storage" | "url" | "view-hook" | "queries" | "guard";
 
 interface Region {
   files: string[];
@@ -50,6 +50,7 @@ export const regions: Region[] = [
   { files: [`${src}/shared/storage/**/*.{ts,tsx}`], area: "shared", home: "storage" },
   { files: [`${src}/shared/url/**/*.{ts,tsx}`], area: "shared", home: "url" },
   { files: [`${src}/ui/**/*.{ts,tsx}`], area: "ui" },
+  { files: [`${src}/ui/form/unsaved-changes-guard.tsx`], area: "ui", home: "guard" },
   { files: [`${src}/gallery/**/*.{ts,tsx}`], area: "gallery" },
 ];
 
@@ -156,6 +157,24 @@ export const restrictions: Restriction[] = [
     imports: {
       group: ["@/gallery", "@/gallery/**", "**/gallery", "**/gallery/**"],
       message: "GAL-3: nothing imports src/gallery; it is a development entry that never ships.",
+    },
+  },
+  // FRM-1: TanStack Form only through the app hook in src/ui/form.
+  {
+    areas: ["app", "routes", "features", "shared", "gallery"],
+    imports: {
+      regex: packages(["@tanstack/react-form", "@tanstack/form-core"]),
+      message: "FRM-1: build forms with useAppForm from src/ui/form; never call useForm directly.",
+    },
+  },
+  // RTE-8: UnsavedChangesGuard is the only user of the router's blocker.
+  {
+    allowIn: ["guard"],
+    imports: {
+      regex: "^@tanstack/react-router$",
+      importNames: ["useBlocker", "Block"],
+      message:
+        "RTE-8: register a form with UnsavedChangesGuard (src/ui/form) instead of blocking navigation yourself.",
     },
   },
   // QRY-1: all HTTP goes through the one client in src/shared/api.

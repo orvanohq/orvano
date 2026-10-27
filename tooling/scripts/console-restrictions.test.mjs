@@ -184,7 +184,7 @@ describe("package regexes", () => {
 });
 
 describe("restrictionMessages", () => {
-  test("groups the 19 rule IDs that check:lint-fixtures expects to fire", () => {
+  test("groups the 20 rule IDs that check:lint-fixtures expects to fire", () => {
     assert.deepEqual([...restrictionMessages().keys()].toSorted(), [
       "DIR-2",
       "DIR-3",
@@ -196,6 +196,7 @@ describe("restrictionMessages", () => {
       "QRY-1",
       "QRY-2",
       "RTE-1",
+      "RTE-8",
       "RTL-2",
       "SEC-2",
       "STA-1",

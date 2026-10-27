@@ -1,0 +1,90 @@
+import type { ReactNode } from "react";
+import {
+  Dialog as AriaDialog,
+  DialogTrigger as AriaDialogTrigger,
+  Heading,
+  Modal,
+  ModalOverlay,
+} from "react-aria-components";
+import { cx } from "./cx";
+
+export interface DialogProps {
+  /** The visible title, which names the dialog. */
+  title: string;
+  /** `sm` 400 px, `md` 560 px (TKN-5). */
+  size?: "sm" | "md";
+  /**
+   * `alertdialog` for confirmations (UX-23, the discard question): a press outside doesn't close it, only Cancel or
+   * Escape.
+   */
+  role?: "dialog" | "alertdialog";
+  /** Controlled use. Leave both out inside a `DialogTrigger`, which opens it from its button. */
+  isOpen?: boolean;
+  onOpenChange?: (isOpen: boolean) => void;
+  children: ReactNode;
+  /** The actions: Cancel (`slot="close"`) then the primary, at the inline end (UX-36). */
+  footer?: ReactNode;
+}
+
+const sizes = {
+  sm: cx("w-dialog-sm"),
+  md: cx("w-dialog-md"),
+} as const;
+
+/**
+ * design.md _Overlays_, spec 0001 UX-6: a modal dialog for confirmations and one or two field forms. Focus moves
+ * into it, Tab stays inside, Escape closes it, and focus returns to what opened it (SRT-6). It fades and scales from
+ * 98% (MOT-1; reduced motion makes it instant).
+ */
+export function Dialog({
+  title,
+  size = "sm",
+  role = "dialog",
+  isOpen,
+  onOpenChange,
+  children,
+  footer,
+}: DialogProps) {
+  return (
+    <ModalOverlay
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      isDismissable={role === "dialog"}
+      className="fixed inset-0 z-(--z-modal) flex items-center justify-center overflow-y-auto bg-scrim p-4 transition-opacity duration-(--duration-base) ease-standard data-entering:opacity-0 data-exiting:opacity-0"
+    >
+      <Modal
+        className={cx(
+          "max-w-full rounded-lg border bg-bg-raised text-fg shadow-lg transition duration-(--duration-base) ease-standard data-entering:scale-98 data-exiting:scale-98",
+          sizes[size],
+        )}
+      >
+        <AriaDialog role={role} className="flex flex-col outline-none">
+          <Heading slot="title" className="px-5 pt-5 text-lg font-semibold">
+            {title}
+          </Heading>
+          <div className="flex flex-col gap-3 px-5 pt-3 pb-5">{children}</div>
+          {footer ? (
+            <div className="flex flex-wrap justify-end gap-2 border-t px-5 py-4">{footer}</div>
+          ) : null}
+        </AriaDialog>
+      </Modal>
+    </ModalOverlay>
+  );
+}
+
+export interface DialogTriggerProps {
+  /** A design system `Button` that opens the dialog. */
+  trigger: ReactNode;
+  /** The `Dialog`, uncontrolled. */
+  children: ReactNode;
+}
+
+/** Opens its `Dialog` from a button and returns focus to it on close. */
+export function DialogTrigger({ trigger, children }: DialogTriggerProps) {
+  return (
+    <AriaDialogTrigger>
+      {trigger}
+      {children}
+    </AriaDialogTrigger>
+  );
+}

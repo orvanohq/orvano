@@ -7,12 +7,110 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: pseudo-LOCALE\n"
 
+#: src/ui/form/field.tsx:186
+msgid "(optional)"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:31
+msgid "{count, plural, one {# API key} other {# API keys}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:39
+msgid "{count, plural, one {# backup} other {# backups}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:23
+msgid "{count, plural, one {# bucket} other {# buckets}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:25
+msgid "{count, plural, one {# column} other {# columns}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:22
+msgid "{count, plural, one {# database} other {# databases}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:28
+msgid "{count, plural, one {# deployment} other {# deployments}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:30
+msgid "{count, plural, one {# domain} other {# domains}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:40
+msgid "{count, plural, one {# file} other {# files}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:27
+msgid "{count, plural, one {# function} other {# functions}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:26
+msgid "{count, plural, one {# index} other {# indexes}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:38
+msgid "{count, plural, one {# member} other {# members}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:34
+msgid "{count, plural, one {# messaging provider} other {# messaging providers}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:36
+msgid "{count, plural, one {# messaging topic} other {# messaging topics}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:20
 #: src/ui/shell/switcher.tsx:65
 msgid "{count, plural, one {# organization} other {# organizations}}"
 msgstr ""
 
+#: src/ui/confirm-delete/dependents.ts:21
 #: src/ui/shell/switcher.tsx:76
 msgid "{count, plural, one {# project} other {# projects}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:41
+msgid "{count, plural, one {# row} other {# rows}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:29
+msgid "{count, plural, one {# site} other {# sites}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:24
+msgid "{count, plural, one {# table} other {# tables}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:37
+msgid "{count, plural, one {# user} other {# users}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:32
+msgid "{count, plural, one {# webhook} other {# webhooks}}"
+msgstr ""
+
+#: src/ui/confirm-delete/index.tsx:246
+msgid "{count, plural, one {Delete # row?} other {Delete # rows?}}"
+msgstr ""
+
+#: src/ui/confirm-delete/index.tsx:237
+msgid "{count, plural, one {Delete # row} other {Delete # rows}}"
+msgstr ""
+
+#: src/ui/form/form-components.tsx:128
+msgid "{count, plural, one {Fix this problem to continue} other {Fix these # problems to continue}}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:50
+msgid "{count} of kind {kind}"
+msgstr ""
+
+#: src/ui/confirm-delete/dependents.ts:51
+msgid "about {counts}"
 msgstr ""
 
 #: src/ui/shell/account-menu.tsx:36
@@ -29,12 +127,24 @@ msgstr ""
 msgid "All projects"
 msgstr ""
 
+#: src/ui/confirm-delete/index.tsx:206
+msgid "Also deleted:"
+msgstr ""
+
 #: src/ui/shell/nav-registry.ts:35
 msgid "Auth"
 msgstr ""
 
 #: src/ui/shell/breadcrumbs.tsx:35
 msgid "Breadcrumb"
+msgstr ""
+
+#: src/ui/confirm-delete/index.tsx:112
+msgid "Cancel"
+msgstr ""
+
+#: src/ui/side-sheet/index.tsx:65
+msgid "Close"
 msgstr ""
 
 #: src/ui/shell/resource-layout.tsx:110
@@ -53,12 +163,24 @@ msgstr ""
 msgid "Compact"
 msgstr ""
 
+#: src/ui/confirm-delete/index.tsx:198
+msgid "Couldn't count what will be deleted. You can still delete it."
+msgstr ""
+
+#: src/ui/confirm-delete/index.tsx:87
+msgid "Couldn't delete. Check your connection and try again."
+msgstr ""
+
 #: src/ui/shell/switcher.tsx:61
 msgid "Couldn't load organizations. Check your connection and try again."
 msgstr ""
 
 #: src/ui/shell/switcher.tsx:73
 msgid "Couldn't load projects. Check your connection and try again."
+msgstr ""
+
+#: src/ui/confirm-delete/index.tsx:188
+msgid "Counting what will be deleted with it…"
 msgstr ""
 
 #: src/ui/shell/account-menu.tsx:65
@@ -69,8 +191,104 @@ msgstr ""
 msgid "Databases"
 msgstr ""
 
+#: src/ui/confirm-delete/index.tsx:249
+msgid "Delete {name}?"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:64
+msgid "Delete API key"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:70
+msgid "Delete backup"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:56
+msgid "Delete bucket"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:58
+msgid "Delete column"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:55
+msgid "Delete database"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:61
+msgid "Delete deployment"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:63
+msgid "Delete domain"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:71
+msgid "Delete file"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:60
+msgid "Delete function"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:59
+msgid "Delete index"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:53
+msgid "Delete organization"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:54
+msgid "Delete project"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:66
+msgid "Delete provider"
+msgstr ""
+
+#: src/ui/confirm-delete/index.tsx:234
+msgid "Delete row"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:62
+msgid "Delete site"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:57
+msgid "Delete table"
+msgstr ""
+
+#: src/ui/confirm-delete/index.tsx:243
+msgid "Delete this row?"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:67
+msgid "Delete topic"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:68
+msgid "Delete user"
+msgstr ""
+
+#: src/ui/confirm-delete/tiers.ts:65
+msgid "Delete webhook"
+msgstr ""
+
 #: src/ui/shell/account-menu.tsx:68
 msgid "Density"
+msgstr ""
+
+#: src/ui/form/unsaved-changes-guard.tsx:58
+msgid "Discard changes"
+msgstr ""
+
+#: src/ui/form/unsaved-changes-guard.tsx:47
+msgid "Discard unsaved changes?"
+msgstr ""
+
+#: src/ui/confirm-delete/index.tsx:131
+msgid "Don't ask again for this table this session"
 msgstr ""
 
 #: src/ui/shell/resource-layout.tsx:88
@@ -85,12 +303,24 @@ msgstr ""
 msgid "Functions"
 msgstr ""
 
+#: src/ui/form/text-fields.tsx:86
+msgid "Hide password"
+msgstr ""
+
+#: src/ui/form/unsaved-changes-guard.tsx:55
+msgid "Keep editing"
+msgstr ""
+
 #: src/ui/shell/account-menu.tsx:79
 msgid "Keyboard shortcuts"
 msgstr ""
 
 #: src/ui/shell/account-menu.tsx:64
 msgid "Light"
+msgstr ""
+
+#: src/ui/form/choice-fields.tsx:156
+msgid "Loading"
 msgstr ""
 
 #: src/ui/shell/switcher.tsx:59
@@ -123,6 +353,10 @@ msgstr ""
 
 #: src/ui/shell/switcher.tsx:75
 msgid "New project"
+msgstr ""
+
+#: src/ui/form/choice-fields.tsx:156
+msgid "No matches"
 msgstr ""
 
 #: src/ui/shell/switcher.tsx:60
@@ -191,6 +425,10 @@ msgstr ""
 msgid "Realtime"
 msgstr ""
 
+#: src/ui/confirm-delete/tiers.ts:69
+msgid "Remove member"
+msgstr ""
+
 #: src/ui/shell/switcher.tsx:248
 msgid "Retry"
 msgstr ""
@@ -213,6 +451,10 @@ msgstr ""
 
 #: src/ui/shell/app-shell.tsx:116
 msgid "Show list"
+msgstr ""
+
+#: src/ui/form/text-fields.tsx:86
+msgid "Show password"
 msgstr ""
 
 #: src/ui/shell/breadcrumbs.tsx:126
@@ -255,8 +497,36 @@ msgstr ""
 msgid "Theme"
 msgstr ""
 
+#: src/ui/confirm-delete/index.tsx:256
+msgid "This deletes {name} and everything in it. You can't undo this."
+msgstr ""
+
+#: src/ui/confirm-delete/index.tsx:257
+msgid "This deletes {name}. You can't undo this."
+msgstr ""
+
+#: src/ui/confirm-delete/index.tsx:146
+msgid "Type {typePrompt} to confirm"
+msgstr ""
+
+#: src/ui/confirm-delete/index.tsx:147
+msgid "Type {typePrompt} to confirm deleting the rows"
+msgstr ""
+
+#: src/ui/confirm-delete/index.tsx:229
+msgid "Type the name to confirm."
+msgstr ""
+
+#: src/ui/confirm-delete/index.tsx:224
+msgid "Type the number of rows to confirm."
+msgstr ""
+
 #: src/ui/shell/nav-registry.ts:42
 msgid "Usage"
+msgstr ""
+
+#: src/ui/confirm-delete/index.tsx:253
+msgid "You can't undo this."
 msgstr ""
 
 #: src/ui/button.test.tsx:9
@@ -265,4 +535,8 @@ msgstr ""
 
 #: src/ui/menu.test.tsx:55
 msgid "You need the Admin role to export rows."
+msgstr ""
+
+#: src/ui/form/unsaved-changes-guard.tsx:63
+msgid "Your changes haven't been saved. If you leave now, they'll be lost."
 msgstr ""

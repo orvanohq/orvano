@@ -1,0 +1,197 @@
+import { useState } from "react";
+import { describe, expect, it } from "vitest";
+import { userEvent } from "vitest/browser";
+import { z } from "@/shared/zod";
+import { expectNoAxeViolations } from "@/test/axe";
+import { renderInRouter } from "@/test/render";
+import { Switch, useAppForm } from "./index";
+
+// Spec 0015 AC-15: each field component's keyboard model and axe, and the error summary reaching every kind of
+// control, in three engines.
+
+const regions = [
+  { id: "eu", label: "Europe" },
+  { id: "us", label: "United States" },
+];
+
+const schema = z.object({
+  password: z.string(),
+  notes: z.string(),
+  size: z.number().max(10, "Use at most 10 MB.").optional(),
+  region: z
+    .string()
+    .optional()
+    .refine((value) => value !== undefined, "Choose a region."),
+  owner: z.string().optional(),
+  access: z
+    .string()
+    .optional()
+    .refine((value) => value !== undefined, "Choose who can read it."),
+  events: z.array(z.string()),
+  encrypted: z.boolean(),
+});
+
+function EveryField() {
+  const form = useAppForm({
+    defaultValues: {
+      password: "",
+      notes: "",
+      size: 1,
+      region: undefined as string | undefined,
+      owner: undefined as string | undefined,
+      access: undefined as string | undefined,
+      events: [] as string[],
+      encrypted: false,
+    },
+    schema,
+  });
+  const [notify, setNotify] = useState(false);
+  return (
+    <form.AppForm>
+      <form.Form>
+        <form.ErrorSummary />
+        <form.AppField name="password">
+          {(field) => <field.PasswordField label="Password" />}
+        </form.AppField>
+        <form.AppField name="notes">
+          {(field) => <field.TextArea label="Notes" isOptional />}
+        </form.AppField>
+        <form.AppField name="size">{(field) => <field.NumberField label="Size" />}</form.AppField>
+        <form.AppField name="region">
+          {(field) => <field.Select label="Region" options={regions} />}
+        </form.AppField>
+        <form.AppField name="owner">
+          {(field) => <field.Combobox label="Owner" options={regions} isOptional />}
+        </form.AppField>
+        <form.AppField name="access">
+          {(field) => (
+            <field.RadioGroup
+              label="Access"
+              options={[
+                { id: "private", label: "Private" },
+                { id: "public", label: "Public" },
+              ]}
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="events">
+          {(field) => (
+            <field.CheckboxGroup
+              label="Events"
+              options={[
+                { id: "created", label: "Created" },
+                { id: "deleted", label: "Deleted" },
+              ]}
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="encrypted">
+          {(field) => <field.Checkbox label="Encrypt" />}
+        </form.AppField>
+        <Switch label="Notify me" isSelected={notify} onChange={setNotify} />
+        <form.SubmitButton>Save</form.SubmitButton>
+      </form.Form>
+    </form.AppForm>
+  );
+}
+
+async function focus(element: HTMLElement) {
+  await expect
+    .poll(() => {
+      element.focus();
+      return document.activeElement === element;
+    })
+    .toBe(true);
+}
+
+describe("field components", () => {
+  it("0015 AC-15: every field passes axe and marks optional ones", async () => {
+    const { screen } = await renderInRouter(<EveryField />);
+
+    await expect.element(screen.getByRole("textbox", { name: "Notes (optional)" })).toBeVisible();
+    await expectNoAxeViolations();
+  });
+
+  it("0015 AC-15: the password field shows and hides its value", async () => {
+    const { screen } = await renderInRouter(<EveryField />);
+    const input = screen.getByLabelText("Password", { exact: true });
+
+    await expect.element(input).toHaveAttribute("type", "password");
+    await screen.getByRole("button", { name: "Show password" }).click();
+    await expect.element(input).toHaveAttribute("type", "text");
+    await screen.getByRole("button", { name: "Hide password" }).click();
+    await expect.element(input).toHaveAttribute("type", "password");
+  });
+
+  it("0015 AC-15: the select opens with the keyboard and picks with Enter", async () => {
+    const { screen } = await renderInRouter(<EveryField />);
+    const trigger = screen.getByRole("button", { name: /Region/ });
+
+    await focus(trigger.element() as HTMLElement);
+    await userEvent.keyboard("{ArrowDown}");
+    await expect.element(screen.getByRole("option", { name: "Europe" })).toHaveFocus();
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+
+    await expect.element(trigger).toHaveTextContent("United States");
+    await expect.element(trigger).toHaveFocus();
+  });
+
+  it("0015 AC-15: the combobox filters as you type and says when nothing matches", async () => {
+    const { screen } = await renderInRouter(<EveryField />);
+    const input = screen.getByRole("combobox", { name: "Owner (optional)" });
+
+    await focus(input.element() as HTMLElement);
+    await userEvent.keyboard("zz");
+    await expect.element(screen.getByText("No matches")).toBeVisible();
+    await userEvent.keyboard("{Backspace}{Backspace}Eu");
+    await expect.element(screen.getByRole("option", { name: "Europe" })).toBeVisible();
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+
+    await expect.element(input).toHaveValue("Europe");
+  });
+
+  it("0015 AC-15: arrows select a radio, Space toggles checkboxes and the switch", async () => {
+    const { screen } = await renderInRouter(<EveryField />);
+
+    await focus(screen.getByRole("radio", { name: "Private" }).element() as HTMLElement);
+    await userEvent.keyboard("{ArrowDown}");
+    await expect.element(screen.getByRole("radio", { name: "Public" })).toBeChecked();
+
+    await focus(screen.getByRole("checkbox", { name: "Encrypt" }).element() as HTMLElement);
+    await userEvent.keyboard(" ");
+    await expect.element(screen.getByRole("checkbox", { name: "Encrypt" })).toBeChecked();
+
+    await focus(screen.getByRole("switch", { name: "Notify me" }).element() as HTMLElement);
+    await userEvent.keyboard(" ");
+    await expect.element(screen.getByRole("switch", { name: "Notify me" })).toBeChecked();
+  });
+
+  it("0015 AC-15: arrows step the number field, and its error shows once it loses focus", async () => {
+    const { screen } = await renderInRouter(<EveryField />);
+    const size = screen.getByRole("textbox", { name: "Size" });
+
+    await focus(size.element() as HTMLElement);
+    await userEvent.keyboard("{ArrowUp}");
+    await expect.element(size).toHaveValue("2");
+    await userEvent.keyboard("{Control>}a{/Control}{Meta>}a{/Meta}25");
+    await expect.element(size).not.toHaveAttribute("aria-invalid");
+
+    await focus(screen.getByRole("radio", { name: "Private" }).element() as HTMLElement);
+    await expect.element(size).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("0015 AC-16: the summary's links reach a select and a radio group", async () => {
+    const { screen } = await renderInRouter(<EveryField />);
+
+    await screen.getByRole("button", { name: "Save" }).click();
+    await expect
+      .element(screen.getByRole("group", { name: "Fix these 2 problems to continue" }))
+      .toHaveFocus();
+
+    await screen.getByRole("link", { name: "Choose a region." }).click();
+    await expect.element(screen.getByRole("button", { name: /Region/ })).toHaveFocus();
+    await screen.getByRole("link", { name: "Choose who can read it." }).click();
+    await expect.element(screen.getByRole("radio", { name: "Private" })).toHaveFocus();
+    await expectNoAxeViolations();
+  });
+});

@@ -33,7 +33,15 @@ describe("Button", () => {
     const onPress = vi.fn<() => void>();
     const { screen } = await renderInRouter(<Button onPress={onPress}>Save</Button>);
 
-    await userEvent.click(screen.getByRole("button", { name: "Save" }), { force: true });
+    const button = screen.getByRole("button", { name: "Save" });
+    await userEvent.click(button, { force: true });
+    // A click doesn't focus a button in every engine, so put focus there before the keys (CI's Firefox).
+    await expect
+      .poll(() => {
+        (button.element() as HTMLElement).focus();
+        return document.activeElement === button.element();
+      })
+      .toBe(true);
     await userEvent.keyboard("{Enter}");
     await userEvent.keyboard(" ");
 
