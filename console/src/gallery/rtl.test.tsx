@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import { expectNoAxeViolations } from "@/test/axe";
-import { NARROW, renderScene, resetShellState, setViewport, WIDE } from "./render-scene";
+import {
+  NARROW,
+  renderScene,
+  resetShellState,
+  setViewport,
+  WIDE,
+  focusElement,
+} from "./render-scene";
 
 // Spec 0015 AC-18, RTL-1: the project shell with dir="rtl" and React Aria's locale ar-XB, in three engines.
 
@@ -37,8 +44,8 @@ describe("right to left", () => {
     const handle = screen.getByRole("separator", { name: "Resize table list" });
 
     // Focused directly: the test is about the keys, and WebKit's Tab order past many links varies by settings.
-    (handle.element() as HTMLElement).focus();
-    await expect.element(handle).toHaveFocus();
+    await expect.element(handle).toHaveAttribute("aria-valuemax");
+    await focusElement(handle);
     // The content is to the left, so ArrowLeft grows the list.
     await userEvent.keyboard("{ArrowLeft}");
     await expect.element(handle).toHaveAttribute("aria-valuenow", "296");

@@ -59,3 +59,18 @@ export async function tabTo(element: Element, limit = 30) {
     await userEvent.tab();
   }
 }
+
+/**
+ * Focuses `locator`'s element directly, retrying until it holds: on a slow runner the shell can still be settling
+ * (the wide layout and the list's maximum apply after the first render), which re-renders the element.
+ */
+export async function focusElement(locator: { element: () => Element }) {
+  const { expect } = await import("vitest");
+  await expect
+    .poll(() => {
+      const element = locator.element() as HTMLElement;
+      element.focus();
+      return document.activeElement === element;
+    })
+    .toBe(true);
+}

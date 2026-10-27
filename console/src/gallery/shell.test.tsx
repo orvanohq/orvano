@@ -3,7 +3,15 @@ import { userEvent } from "vitest/browser";
 import { layout, resourceListLayout, themePreference } from "@/shared/storage/items";
 import { expectNoAxeViolations } from "@/test/axe";
 import { user } from "./fixtures";
-import { NARROW, renderScene, resetShellState, setViewport, tabTo, WIDE } from "./render-scene";
+import {
+  NARROW,
+  renderScene,
+  resetShellState,
+  setViewport,
+  tabTo,
+  WIDE,
+  focusElement,
+} from "./render-scene";
 
 // Spec 0015 milestone 2: the shell through the gallery's scenes, in Chromium, Firefox, and WebKit. The switchers'
 // timing is in src/ui/shell/switcher.test.tsx.
@@ -223,8 +231,8 @@ describe("resource layout", () => {
     await expect.element(handle).toHaveAttribute("aria-valuenow", "280");
 
     // Focused directly: the test is about the keys, and WebKit's Tab order past many links varies by settings.
-    (handle.element() as HTMLElement).focus();
-    await expect.element(handle).toHaveFocus();
+    await expect.element(handle).toHaveAttribute("aria-valuemax");
+    await focusElement(handle);
     await userEvent.keyboard("{ArrowRight}");
     await expect.element(handle).toHaveAttribute("aria-valuenow", "296");
     expect(resourceListLayout.read(ids).width).toBe(296);
@@ -247,8 +255,8 @@ describe("resource layout", () => {
 
     await expect.element(handle).toHaveAttribute("aria-valuemax", "380");
     // Focused directly: the test is about the keys, and WebKit's Tab order past many links varies by settings.
-    (handle.element() as HTMLElement).focus();
-    await expect.element(handle).toHaveFocus();
+    await expect.element(handle).toHaveAttribute("aria-valuemax");
+    await focusElement(handle);
     await userEvent.keyboard("{End}");
     await expect.element(handle).toHaveAttribute("aria-valuenow", "380");
     expect(screen.getByRole("main").element().getBoundingClientRect().width).toBeGreaterThanOrEqual(
