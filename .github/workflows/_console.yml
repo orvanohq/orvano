@@ -10,7 +10,8 @@ jobs:
   console:
     name: console
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # Room for the browser install's retries on a slow apt mirror (at most 20 minutes) on top of the usual run.
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
@@ -53,8 +54,32 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-3-engines
-      # Spec 0003 QA-1: src/ui primitives run in Chromium, Firefox, and WebKit.
-      - run: pnpm --filter @orvano/console exec playwright install --with-deps chromium firefox webkit
+      # The browsers' system packages (about 140 for WebKit and Firefox), kept between runs so a slow apt mirror can't
+      # stall the job: apt installs them from these files and downloads only what changed.
+      - name: Cache the Playwright system packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/playwright-apt
+          key: playwright-apt-${{ runner.os }}-${{ steps.playwright.outputs.version }}-3-engines
+      # Spec 0003 QA-1: src/ui primitives run in Chromium, Firefox, and WebKit. The Azure apt mirror sometimes slows to
+      # a few KB/s, so each attempt gets 6 minutes, and a retry switches to the main Ubuntu mirror.
+      - name: Install the browsers and their system packages
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          debs="$HOME/.cache/playwright-apt"
+          mkdir -p "$debs"
+          echo 'APT::Keep-Downloaded-Packages "true";' | sudo tee /etc/apt/apt.conf.d/99keep-downloaded > /dev/null
+          if compgen -G "$debs/*.deb" > /dev/null; then sudo cp "$debs"/*.deb /var/cache/apt/archives/; fi
+          for attempt in 1 2 3; do
+            if timeout 6m pnpm --filter @orvano/console exec playwright install --with-deps chromium firefox webkit; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            echo "::warning::Installing the browsers timed out or failed (attempt $attempt); retrying on archive.ubuntu.com."
+            sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list.d/*.sources /etc/apt/sources.list 2> /dev/null || true
+          done
+          cp /var/cache/apt/archives/*.deb "$debs"/ 2> /dev/null || true
       # V8 coverage works only in Chromium, so Firefox and WebKit run the src/ui tests in a second step.
       - name: Tests (Vitest browser mode, Chromium) with coverage
         run: pnpm --filter @orvano/console test:coverage
