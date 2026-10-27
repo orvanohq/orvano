@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import type { z } from "@/shared/zod";
 
 // Spec 0003 STO-1 to STO-5: the one module that touches browser storage. Reads and writes never throw: a parse or
 // schema failure returns the fallback and removes the bad entry (STO-2), and blocked storage falls back to memory
@@ -64,7 +64,7 @@ export interface StoredItem<Ids, Value> {
 /** STO-2: declares a stored item. Every item lives in `items.ts`, never anywhere else. */
 export function defineStored<Ids, Value>(options: {
   key: (ids: Ids) => string;
-  schema: z.ZodType<Value>;
+  schema: z.ZodMiniType<Value>;
   fallback: NoInfer<Value>;
 }): StoredItem<Ids, Value> {
   const parse = (raw: string | null, key: string): Value => {

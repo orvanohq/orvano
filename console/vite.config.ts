@@ -12,7 +12,7 @@ const consolePolicy =
   "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; " +
   "base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }), // spec 0003 RTE-1: before react()
     react(),
@@ -39,7 +39,23 @@ export default defineConfig({
     strictPort: true,
     headers: { "Content-Security-Policy": consolePolicy, "Referrer-Policy": "same-origin" },
   },
-  resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
+  resolve: {
+    // Spec 0015 STY-9: the size probe build renders AppShell in place of the welcome page, so `pnpm size` measures
+    // the shell's first load. The route files stay the same, so src/routeTree.gen.ts doesn't change.
+    alias: [
+      ...(mode === "size-probe"
+        ? [
+            {
+              find: "@/features/welcome/components/welcome-page",
+              replacement: fileURLToPath(
+                new URL("./src/size-probe/shell-probe.tsx", import.meta.url),
+              ),
+            },
+          ]
+        : []),
+      { find: "@", replacement: fileURLToPath(new URL("./src", import.meta.url)) },
+    ],
+  },
   build: {
     manifest: true, // spec 0003 BDL-1
     cssCodeSplit: false, // spec 0015 STY-2: one CSS file for the whole console
@@ -59,4 +75,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

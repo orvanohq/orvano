@@ -42,7 +42,7 @@ describe("check-lint-fixtures.mjs", { timeout: 120_000 }, () => {
   test("passes when every restriction fires", () => {
     const { status, output } = run();
     assert.equal(status, 0, output);
-    assert.match(output, /all 20 restriction rule IDs fire/);
+    assert.match(output, /all 21 restriction rule IDs fire/);
   });
 
   test("fails when a rule's fixture is removed", () => {

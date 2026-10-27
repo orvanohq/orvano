@@ -23,9 +23,9 @@ export type Density = z.infer<typeof densitySchema>;
 export const layout = defineStored({
   key: (ids: { userId: string }) => `orvano:v1:${ids.userId}:layout`,
   schema: z.object({
-    sidebarCollapsed: z.boolean().catch(false),
-    density: densitySchema.catch("comfortable"),
-    lastSdk: z.string().optional().catch(undefined),
+    sidebarCollapsed: z.catch(z.boolean(), false),
+    density: z.catch(densitySchema, "comfortable"),
+    lastSdk: z.catch(z.optional(z.string()), undefined),
   }),
   fallback: { sidebarCollapsed: false, density: "comfortable" },
 });
@@ -36,8 +36,8 @@ export const resourceListLayout = defineStored({
   key: (ids: { userId: string; projectId: string; service: string }) =>
     `orvano:v1:${ids.userId}:${ids.projectId}:svc:${ids.service}`,
   schema: z.object({
-    collapsed: z.boolean().catch(false),
-    width: z.number().int().min(200).max(480).catch(280),
+    collapsed: z.catch(z.boolean(), false),
+    width: z.catch(z.int().check(z.minimum(200), z.maximum(480)), 280),
   }),
   fallback: { collapsed: false, width: 280 },
 });
@@ -47,6 +47,6 @@ export type ResourceListLayout = ReturnType<typeof resourceListLayout.read>;
 export const PALETTE_RECENTS_LIMIT = 10;
 export const paletteRecents = defineStored({
   key: (ids: { userId: string }) => `orvano:v1:${ids.userId}:palette`,
-  schema: z.array(z.string()).max(PALETTE_RECENTS_LIMIT),
+  schema: z.array(z.string()).check(z.maxLength(PALETTE_RECENTS_LIMIT)),
   fallback: [],
 });

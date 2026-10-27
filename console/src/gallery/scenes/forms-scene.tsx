@@ -13,17 +13,20 @@ const regions = [
 const bucketSchema = z.object({
   name: z
     .string()
-    .trim()
-    .min(1, "Enter a bucket name.")
-    .regex(/^[a-z0-9-]*$/, "Use lowercase letters, numbers, and hyphens."),
-  password: z.string().min(8, "Use at least 8 characters."),
+    .check(
+      z.trim(),
+      z.minLength(1, "Enter a bucket name."),
+      z.regex(/^[a-z0-9-]*$/, "Use lowercase letters, numbers, and hyphens."),
+    ),
+  password: z.string().check(z.minLength(8, "Use at least 8 characters.")),
   description: z.string(),
-  maxSize: z.number({ error: "Enter a size in MB." }).min(1, "Use at least 1 MB.").optional(),
+  maxSize: z.optional(
+    z.number({ error: "Enter a size in MB." }).check(z.minimum(1, "Use at least 1 MB.")),
+  ),
   region: z
-    .string()
-    .optional()
-    .refine((region) => region !== undefined, "Choose a region."),
-  owner: z.string().optional(),
+    .optional(z.string())
+    .check(z.refine((region) => region !== undefined, "Choose a region.")),
+  owner: z.optional(z.string()),
   encrypted: z.boolean(),
   access: z.string(),
   events: z.array(z.string()),

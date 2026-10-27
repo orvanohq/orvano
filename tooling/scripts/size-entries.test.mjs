@@ -1,8 +1,9 @@
 // Spec 0003 BDL-1, spec 0008 CI-2: console/scripts/size-entries.mjs turns a Vite manifest into size-limit budgets.
-// Each test writes a manifest to a temporary folder, runs the script there, and reads the .size-limit.json back.
+// Each test writes the app and shell probe manifests (spec 0015 STY-9) to a temporary folder, runs the script there,
+// and reads the .size-limit.json back.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, test } from "node:test";
@@ -11,15 +12,34 @@ const script = join(import.meta.dirname, "..", "..", "console", "scripts", "size
 
 /**
  * @typedef {{ name: string, path: string | string[], limit: string, gzip: boolean }} Entry
- * @param {Record<string, { file: string, isEntry?: boolean, imports?: string[], dynamicImports?: string[] }>} manifest
+ * @typedef {Record<string, { file: string, isEntry?: boolean, imports?: string[], dynamicImports?: string[] }>} Manifest
+ */
+
+/**
+ * Writes each manifest that isn't null under its output folder, and runs the script there.
+ * @param {{ dist: Manifest | null, probe: Manifest | null }} manifests
+ */
+const spawn = ({ dist, probe }) => {
+  const dir = mkdtempSync(join(tmpdir(), "orvano-size-"));
+  for (const [outDir, contents] of /** @type {const} */ ([
+    ["dist", dist],
+    ["dist-size-probe", probe],
+  ])) {
+    if (!contents) continue;
+    mkdirSync(join(dir, outDir, ".vite"), { recursive: true });
+    writeFileSync(join(dir, outDir, ".vite", "manifest.json"), JSON.stringify(contents));
+  }
+  return { dir, result: spawnSync("node", [script], { cwd: dir, encoding: "utf8" }) };
+};
+
+/**
+ * @param {Manifest} manifest
+ * @param {Manifest} [probe]
  * @returns {{ status: number | null, stdout: string, entries: Entry[] }}
  */
-const run = (manifest) => {
-  const dir = mkdtempSync(join(tmpdir(), "orvano-size-"));
+const run = (manifest, probe = probeManifest) => {
+  const { dir, result } = spawn({ dist: manifest, probe });
   try {
-    mkdirSync(join(dir, "dist", ".vite"), { recursive: true });
-    writeFileSync(join(dir, "dist", ".vite", "manifest.json"), JSON.stringify(manifest));
-    const result = spawnSync("node", [script], { cwd: dir, encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
     const entries = /** @type {Entry[]} */ (
       JSON.parse(readFileSync(join(dir, ".size-limit.json"), "utf8"))
@@ -51,11 +71,32 @@ const manifest = {
   "style.css": { file: "assets/style-j0.css", isEntry: true },
 };
 
+// The probe build: the same route files, with AppShell in the welcome page (STY-9).
+/** @type {Manifest} */
+const probeManifest = {
+  "index.html": { file: "assets/index-p1.js", isEntry: true, imports: ["_ui-p2.js"] },
+  "_ui-p2.js": { file: "assets/ui-p2.js" },
+  "src/routes/__root.tsx": { file: "assets/root-p3.js", imports: ["_ui-p2.js"] },
+  "src/routes/index.tsx?tsr-split=component": {
+    file: "assets/index-route-p4.js",
+    imports: ["_shell-p5.js"],
+    dynamicImports: ["_palette-p6.js"],
+  },
+  "_shell-p5.js": { file: "assets/shell-p5.js" },
+  "_palette-p6.js": { file: "assets/palette-p6.js" },
+  "src/routes/about.tsx": { file: "assets/about-p7.js" },
+  "style.css": { file: "assets/style-p8.css", isEntry: true },
+};
+
+/** The entries after the app's CSS entry: the probe's first load, then its per file entries. */
+const probeEntries = (/** @type {Entry[]} */ entries) =>
+  entries.slice(entries.findIndex((entry) => entry.name === "CSS (STY-4)") + 1);
+
 describe("size-entries.mjs", () => {
   test("the first load holds the entry, first load routes, the en catalog, and their static imports", () => {
     const [firstLoad] = run(manifest).entries;
     assert.equal(firstLoad?.name, "First load (BDL-1)");
-    assert.equal(firstLoad.limit, "200 KB");
+    assert.equal(firstLoad.limit, "230 KB");
     assert.equal(firstLoad.gzip, true);
     assert.deepEqual([.../** @type {string[]} */ (firstLoad.path)].toSorted(), [
       "dist/assets/index-a1.js",
@@ -82,7 +123,11 @@ describe("size-entries.mjs", () => {
       ...manifest,
       "src/other.ts": { file: "assets/vendor-b2.js" },
     };
-    const perFile = run(manifestWithDuplicate).entries.slice(1, -1);
+    const { entries } = run(manifestWithDuplicate);
+    const perFile = entries.slice(
+      1,
+      entries.findIndex((entry) => entry.name === "CSS (STY-4)"),
+    );
     assert.deepEqual(
       perFile.map((entry) => entry.path),
       [
@@ -106,8 +151,10 @@ describe("size-entries.mjs", () => {
     }
   });
 
-  test("0015 AC-3: the stylesheet gets one 30 KB entry, last", () => {
-    const css = run(manifest).entries.at(-1);
+  test("0015 AC-3: the stylesheet gets one 30 KB entry, after the app's files", () => {
+    const { entries } = run(manifest);
+    const css = entries.find((entry) => entry.name === "CSS (STY-4)");
+    assert.equal(entries.indexOf(/** @type {Entry} */ (css)), 12);
     assert.deepEqual(css, {
       name: "CSS (STY-4)",
       path: ["dist/assets/style-j0.css"],
@@ -115,6 +162,59 @@ describe("size-entries.mjs", () => {
       gzip: true,
     });
   });
+
+  test("0015 STY-9: the shell probe's first load holds the entry, root and index routes, and their static imports", () => {
+    const [shell] = probeEntries(run(manifest).entries);
+    assert.equal(shell?.name, "Shell first load (AC-3, probe)");
+    assert.equal(shell.limit, "230 KB");
+    assert.equal(shell.gzip, true);
+    assert.deepEqual([.../** @type {string[]} */ (shell.path)].toSorted(), [
+      "dist-size-probe/assets/index-p1.js",
+      "dist-size-probe/assets/index-route-p4.js",
+      "dist-size-probe/assets/root-p3.js",
+      "dist-size-probe/assets/shell-p5.js",
+      "dist-size-probe/assets/ui-p2.js",
+    ]);
+  });
+
+  test("0015 STY-9: every probe JS file gets its own 80 KB entry, named by its probe path", () => {
+    const perFile = probeEntries(run(manifest).entries).slice(1);
+    assert.deepEqual(
+      perFile.map((entry) => entry.path),
+      [
+        "dist-size-probe/assets/about-p7.js",
+        "dist-size-probe/assets/index-p1.js",
+        "dist-size-probe/assets/index-route-p4.js",
+        "dist-size-probe/assets/palette-p6.js",
+        "dist-size-probe/assets/root-p3.js",
+        "dist-size-probe/assets/shell-p5.js",
+        "dist-size-probe/assets/ui-p2.js",
+      ],
+    );
+    for (const entry of perFile) {
+      assert.equal(entry.limit, "80 KB");
+      assert.equal(entry.name, `${String(entry.path)} (BDL-1, one file)`);
+    }
+  });
+
+  for (const [missing, path] of /** @type {const} */ ([
+    ["dist", "dist/.vite/manifest.json"],
+    ["probe", "dist-size-probe/.vite/manifest.json"],
+  ])) {
+    test(`fails naming ${path} when it is missing`, () => {
+      const { dir, result } = spawn({
+        dist: missing === "dist" ? null : manifest,
+        probe: missing === "probe" ? null : probeManifest,
+      });
+      try {
+        assert.equal(result.status, 1);
+        assert.match(result.stderr, new RegExp(`${path.replaceAll(".", "\\.")} is missing`));
+        assert.ok(!existsSync(join(dir, ".size-limit.json")));
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  }
 
   test("import cycles don't loop", () => {
     const { entries } = run({
@@ -125,6 +225,9 @@ describe("size-entries.mjs", () => {
   });
 
   test("reports how many entries and first load files it wrote", () => {
-    assert.match(run(manifest).stdout, /size-entries: 13 entries \(9 first load files\)/);
+    assert.match(
+      run(manifest).stdout,
+      /size-entries: 21 entries \(9 first load files, 6 probe first load files\)/,
+    );
   });
 });

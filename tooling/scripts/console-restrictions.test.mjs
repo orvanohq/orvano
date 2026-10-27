@@ -93,6 +93,19 @@ describe("regionRules", () => {
     for (const id of ["QRY-1", "STO-1", "SEC-2", "DIR-2", "DIR-3"]) assert.ok(config.has(id), id);
   });
 
+  test("spec 0015 STY-8: only shared/zod.ts imports zod, and every other region forbids it", () => {
+    assert.ok(!idsFor("shared/zod.ts").has("STY-8"));
+    for (const region of regions) {
+      const file = region.files[0]?.replace("console/src/", "") ?? "";
+      if (file !== "shared/zod.ts") assert.ok(idsFor(file).has("STY-8"), file);
+    }
+    const zod = importRegex("STY-8");
+    for (const name of ["zod", "zod/mini", "zod/v4", "zod/v4/core"])
+      assert.ok(zod.test(name), name);
+    assert.ok(!zod.test("@/shared/zod"));
+    assert.ok(!zod.test("zodiac"));
+  });
+
   test("shared/api may call fetch, but keeps every other rule", () => {
     assert.ok(!globalsFor("shared/api/**/*.{ts,tsx}").includes("fetch"));
     assert.ok(globalsFor("shared/api/**/*.{ts,tsx}").includes("localStorage"));
@@ -184,7 +197,7 @@ describe("package regexes", () => {
 });
 
 describe("restrictionMessages", () => {
-  test("groups the 20 rule IDs that check:lint-fixtures expects to fire", () => {
+  test("groups the 21 rule IDs that check:lint-fixtures expects to fire", () => {
     assert.deepEqual([...restrictionMessages().keys()].toSorted(), [
       "DIR-2",
       "DIR-3",
@@ -202,6 +215,7 @@ describe("restrictionMessages", () => {
       "STA-1",
       "STO-1",
       "STY-5",
+      "STY-8",
       "URL-3",
       "WEB-4",
       "WEB-6",

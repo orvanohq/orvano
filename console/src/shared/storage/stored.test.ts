@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { z } from "zod";
+import { z } from "@/shared/zod";
 import { defineStored, resetStorageForTests } from "./stored";
 
 // Spec 0003 STO-2, STO-3, STO-5, QA-4: corrupt and blocked storage never throw.

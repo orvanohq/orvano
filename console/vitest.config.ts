@@ -6,8 +6,11 @@ import viteConfig from "./vite.config";
 // macros, and React Compiler as the app: features and shared code in Chromium, src/ui primitives in Chromium,
 // Firefox, and WebKit.
 // The dev proxy (spec 0007 CSL-3) is left out: it would send Vitest's own browser requests to the server.
+// vite.config.ts is a function of the mode (spec 0015 STY-9); tests take its default, non probe config.
+const appConfig = viteConfig({ command: "serve", mode: "test" });
+
 export default mergeConfig(
-  { ...viteConfig, server: { ...viteConfig.server, proxy: undefined } },
+  { ...appConfig, server: { ...appConfig.server, proxy: undefined } },
   defineConfig({
     test: {
       // Spec 0008 CI-6: coverage runs with --coverage (CI), and is reported, never gated.

@@ -17,6 +17,7 @@ extend-exclude = [
   "api/generator/test/snapshots/csharp-server/",
   "console/src/locales/",
   "dist/",
+  "console/dist-size-probe/",
   "bin/",
   "obj/",
   ".vitest/",

@@ -6,7 +6,7 @@
 // disables, and the other restrictions still apply there.
 
 type Area = "app" | "routes" | "features" | "shared" | "ui" | "gallery";
-type Home = "api" | "config" | "storage" | "url" | "view-hook" | "queries" | "guard";
+type Home = "api" | "config" | "storage" | "url" | "view-hook" | "queries" | "guard" | "zod";
 
 interface Region {
   files: string[];
@@ -49,6 +49,7 @@ export const regions: Region[] = [
   { files: [`${src}/shared/config.ts`], area: "shared", home: "config" },
   { files: [`${src}/shared/storage/**/*.{ts,tsx}`], area: "shared", home: "storage" },
   { files: [`${src}/shared/url/**/*.{ts,tsx}`], area: "shared", home: "url" },
+  { files: [`${src}/shared/zod.ts`], area: "shared", home: "zod" },
   { files: [`${src}/ui/**/*.{ts,tsx}`], area: "ui" },
   { files: [`${src}/ui/form/unsaved-changes-guard.tsx`], area: "ui", home: "guard" },
   { files: [`${src}/gallery/**/*.{ts,tsx}`], area: "gallery" },
@@ -165,6 +166,16 @@ export const restrictions: Restriction[] = [
     imports: {
       regex: packages(["@tanstack/react-form", "@tanstack/form-core"]),
       message: "FRM-1: build forms with useAppForm from src/ui/form; never call useForm directly.",
+    },
+  },
+  // Spec 0015 STY-8: Zod only through `zod/mini`, re-exported by src/shared/zod.ts, in every area, tests included.
+  // Type only imports count too (use `z.ZodMiniType`).
+  {
+    allowIn: ["zod"],
+    imports: {
+      regex: packages(["zod"]),
+      message:
+        "STY-8: import z from @/shared/zod (the zod/mini API, jitless); never import zod or its subpaths directly.",
     },
   },
   // RTE-8: UnsavedChangesGuard is the only user of the router's blocker.
