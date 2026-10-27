@@ -108,6 +108,12 @@
       }
     },
     {
+      "files": ["console/src/**"],
+      "rules": {
+        "promise/valid-params": "off"
+      }
+    },
+    {
       "files": ["console/src/shared/report.ts"],
       "rules": {
         "no-console": "off"

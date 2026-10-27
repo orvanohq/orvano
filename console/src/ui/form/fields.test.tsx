@@ -18,16 +18,14 @@ const regions = [
 const schema = z.object({
   password: z.string(),
   notes: z.string(),
-  size: z.number().max(10, "Use at most 10 MB.").optional(),
+  size: z.optional(z.number().check(z.maximum(10, "Use at most 10 MB."))),
   region: z
-    .string()
-    .optional()
-    .refine((value) => value !== undefined, "Choose a region."),
-  owner: z.string().optional(),
+    .optional(z.string())
+    .check(z.refine((value) => value !== undefined, "Choose a region.")),
+  owner: z.optional(z.string()),
   access: z
-    .string()
-    .optional()
-    .refine((value) => value !== undefined, "Choose who can read it."),
+    .optional(z.string())
+    .check(z.refine((value) => value !== undefined, "Choose who can read it.")),
   events: z.array(z.string()),
   encrypted: z.boolean(),
 });

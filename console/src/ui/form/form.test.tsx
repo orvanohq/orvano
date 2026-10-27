@@ -11,8 +11,14 @@ import { hasUnsavedChanges, resetUnsavedChangesForTests } from "./unsaved-change
 // Spec 0015 AC-15, AC-16: the form wiring (spec 0003 FRM-1 to FRM-6) and the UX-8 timing, in three engines.
 
 const schema = z.object({
-  name: z.string().trim().min(1, "Enter a bucket name.").max(5, "Use at most 5 characters."),
-  region: z.string().min(1, "Choose a region."),
+  name: z
+    .string()
+    .check(
+      z.trim(),
+      z.minLength(1, "Enter a bucket name."),
+      z.maxLength(5, "Use at most 5 characters."),
+    ),
+  region: z.string().check(z.minLength(1, "Choose a region.")),
 });
 
 type Values = z.input<typeof schema>;

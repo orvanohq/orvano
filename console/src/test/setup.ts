@@ -1,5 +1,5 @@
 import { afterEach } from "vitest";
-import { z } from "zod";
+import { z } from "@/shared/zod";
 import "@/ui/theme.css";
 import { resetAnnouncerForTests } from "@/ui/announcer";
 import { resetToastsForTests } from "@/ui/toast";

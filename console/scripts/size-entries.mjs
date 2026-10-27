@@ -1,8 +1,10 @@
 // Spec 0003 BDL-1, spec 0015 STY-4, spec 0008 CI-2: turns the Vite manifest from the last build into size-limit
 // entries, so the budgets follow hashed file names. Run after `vite build`; size-limit reads the .size-limit.json it writes.
-import { readFileSync, writeFileSync } from "node:fs";
+// Spec 0015 STY-9: it also reads the shell probe build (`vite build --mode size-probe`), until feature 13 adds the
+// `_shell` routes and this probe goes away.
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
-const firstLoadLimit = "200 KB";
+const firstLoadLimit = "230 KB"; // spec 0015 STY-8
 const perFileLimit = "80 KB";
 const cssLimit = "30 KB";
 
@@ -17,27 +19,59 @@ const firstLoadRoutes = [
   /^src\/routes\/_shell\/\$orgId\/\$projectId\/index\.tsx/,
 ];
 
-/** @type {Record<string, { file: string, isEntry?: boolean, imports?: string[] }>} */
-const manifest = JSON.parse(readFileSync("dist/.vite/manifest.json", "utf8"));
+// STY-9: the probe renders AppShell from the welcome page, so its first load is the root and index route files.
+const probeRoutes = [/^src\/routes\/__root\.tsx/, /^src\/routes\/index\.tsx/];
+
+/** @typedef {Record<string, { file: string, isEntry?: boolean, imports?: string[] }>} Manifest */
+
+/** @returns {Manifest} */
+function readManifest(outDir) {
+  const path = `${outDir}/.vite/manifest.json`;
+  if (!existsSync(path)) {
+    console.error(`size-entries: ${path} is missing. Run the build that writes it first.`);
+    process.exit(1);
+  }
+  return JSON.parse(readFileSync(path, "utf8"));
+}
 
 /** Each chunk's file plus everything it imports statically. */
-function withStaticImports(key, files = new Set()) {
+function withStaticImports(manifest, key, files = new Set()) {
   const chunk = manifest[key];
   if (!chunk || files.has(chunk.file)) return files;
   files.add(chunk.file);
-  for (const imported of chunk.imports ?? []) withStaticImports(imported, files);
+  for (const imported of chunk.imports ?? []) withStaticImports(manifest, imported, files);
   return files;
 }
 
-const firstLoad = new Set();
-for (const [key, chunk] of Object.entries(manifest)) {
-  if (chunk.isEntry || firstLoadRoutes.some((route) => route.test(key)))
-    withStaticImports(key, firstLoad);
+/** The entry chunk and the chunks of the matching keys, plus their static imports. */
+function firstLoadOf(manifest, routes) {
+  const files = new Set();
+  for (const [key, chunk] of Object.entries(manifest)) {
+    if (chunk.isEntry || routes.some((route) => route.test(key)))
+      withStaticImports(manifest, key, files);
+  }
+  return files;
 }
 
-const javascript = [...new Set(Object.values(manifest).map((chunk) => chunk.file))]
-  .filter((file) => file.endsWith(".js"))
-  .toSorted();
+/** Every JavaScript file, sorted, once. */
+const javascriptOf = (manifest) =>
+  [...new Set(Object.values(manifest).map((chunk) => chunk.file))]
+    .filter((file) => file.endsWith(".js"))
+    .toSorted();
+
+/** One 80 KB entry per JavaScript file (BDL-1). */
+const perFileEntries = (manifest, outDir) =>
+  javascriptOf(manifest).map((file) => ({
+    name: `${outDir === "dist" ? file : `${outDir}/${file}`} (BDL-1, one file)`,
+    path: `${outDir}/${file}`,
+    limit: perFileLimit,
+    gzip: true,
+  }));
+
+const manifest = readManifest("dist");
+const probe = readManifest("dist-size-probe");
+const firstLoad = firstLoadOf(manifest, firstLoadRoutes);
+const probeFirstLoad = firstLoadOf(probe, probeRoutes);
 
 const entries = [
   {
@@ -46,12 +80,7 @@ const entries = [
     limit: firstLoadLimit,
     gzip: true,
   },
-  ...javascript.map((file) => ({
-    name: `${file} (BDL-1, one file)`,
-    path: `dist/${file}`,
-    limit: perFileLimit,
-    gzip: true,
-  })),
+  ...perFileEntries(manifest, "dist"),
   // STY-4: the one stylesheet (build.cssCodeSplit is off).
   {
     name: "CSS (STY-4)",
@@ -61,7 +90,19 @@ const entries = [
     limit: cssLimit,
     gzip: true,
   },
+  // STY-9: the shell's first load (AC-3), and every probe file's own limit.
+  {
+    name: "Shell first load (AC-3, probe)",
+    path: [...probeFirstLoad]
+      .filter((file) => file.endsWith(".js"))
+      .map((file) => `dist-size-probe/${file}`),
+    limit: firstLoadLimit,
+    gzip: true,
+  },
+  ...perFileEntries(probe, "dist-size-probe"),
 ];
 
 writeFileSync(".size-limit.json", `${JSON.stringify(entries, null, 2)}\n`);
-console.log(`size-entries: ${entries.length} entries (${firstLoad.size} first load files)`);
+console.log(
+  `size-entries: ${entries.length} entries (${firstLoad.size} first load files, ${probeFirstLoad.size} probe first load files)`,
+);

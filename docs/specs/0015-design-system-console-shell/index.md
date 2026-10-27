@@ -438,5 +438,5 @@ Tracer Bullet inside this feature: milestone 1 runs one thin thread through ever
 - [ ] Later: a real logo to replace the geometric mark (one file, SHL-7).
 - [ ] AC-22 (owed after milestone 5): run the screen reader script SRT-1 to SRT-12 with VoiceOver and Safari on macOS and with NVDA and Firefox on Windows, and record each result in [`verify.md`](verify.md) before the feature is `done`.
 - [x] AC-3 (settled by `/architect` on 2026-10-27): the first load with the shell is 230 KB gzip, the popovers stay eager, and the shell probe checks it in CI (STY-8, STY-9); spec 0003 BDL-1, WEB-1, URL-1, and its search schema example are amended to match. The measurements are in [rationale.md](rationale.md#ac-3-first-load-budget-2026-10-27).
-- [ ] Step 25 (by `/develop`, before `/check verify` tests AC-3): build milestone 6.
+- [x] Step 25 (by `/develop`, before `/check verify` tests AC-3): build milestone 6.
 - [ ] Feature 13: when the `_shell` routes land, delete the shell probe (STY-9) and check that the BDL-1 entry stays within 230 KB with the real session, org, and project queries.
