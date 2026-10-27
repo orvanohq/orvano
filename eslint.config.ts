@@ -78,7 +78,7 @@ export default defineConfig(
             {
               regex: {
                 pattern:
-                  "^(className|class|style|type|id|key|name|role|to|href|src|srcSet|rel|target|method|path|lang|dir|autoComplete|inputMode|htmlFor|form|as)$",
+                  "^(className|class|style|type|id|key|name|role|to|href|src|srcSet|rel|target|method|path|lang|dir|autoComplete|inputMode|htmlFor|form|as|placement)$",
               },
             },
             {

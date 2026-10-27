@@ -1,4 +1,12 @@
-import type { Crumb, ShellModel, ShellNavItem, ShellScope, SwitcherItem } from "@/ui";
+import type {
+  Crumb,
+  ResourceListItem,
+  RouteTab,
+  ShellModel,
+  ShellNavItem,
+  ShellScope,
+  SwitcherItem,
+} from "@/ui";
 
 // Spec 0015 GAL-2: placeholder data in the shapes of SHL-1. Paths follow the gallery's routes, which mirror the
 // app's shell paths.
@@ -92,16 +100,63 @@ export function shellModel(scope: ShellScope): ShellModel {
     searchProjects: search(projects),
     orgLinks: { all: { to: "/" }, create: { to: "/" } },
     projectLinks: { all: { to: "/$orgId", params: { orgId: org.id } }, create: { to: "/" } },
-    onSignOut: () => undefined,
+    // Tests listen for this; feature 13 signs out here.
+    onSignOut: () => {
+      window.dispatchEvent(new Event("gallery:sign-out"));
+    },
   };
 }
 
-export function crumbs(scope: ShellScope, page: string): Crumb[] {
+export function crumbs(scope: ShellScope, page: string, resource?: string): Crumb[] {
   if (scope === "account")
     return [
       { kind: "page", label: "Account" },
       { kind: "page", label: page },
     ];
   if (scope === "org") return [{ kind: "org" }, { kind: "page", label: page }];
+  if (resource)
+    return [
+      { kind: "org" },
+      { kind: "project" },
+      {
+        kind: "page",
+        label: page,
+        link: { to: "/$orgId/$projectId/$service", params: { ...ids, service: "databases" } },
+      },
+      { kind: "page", label: resource },
+    ];
   return [{ kind: "org" }, { kind: "project" }, { kind: "page", label: page }];
+}
+
+/** A search that always fails, for the switcher's error state. */
+export const failingSearch = () => Promise.reject(new Error("Network error"));
+
+export const tables: readonly ResourceListItem[] = [
+  "orders",
+  "users",
+  "payments",
+  "audit_log_entries_with_a_very_long_name_that_truncates",
+].map((name) => ({
+  id: name,
+  name,
+  link: {
+    to: "/$orgId/$projectId/databases/$tableId",
+    params: { ...ids, tableId: name },
+  },
+}));
+
+export function tableTabs(tableId: string): readonly RouteTab[] {
+  const params = { ...ids, tableId };
+  return [
+    {
+      id: "rows",
+      label: "Rows",
+      link: { to: "/$orgId/$projectId/databases/$tableId", params, exact: true },
+    },
+    {
+      id: "columns",
+      label: "Columns",
+      link: { to: "/$orgId/$projectId/databases/$tableId/columns", params },
+    },
+  ];
 }

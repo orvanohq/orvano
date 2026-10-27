@@ -73,7 +73,8 @@ describe("Avatar", () => {
     await renderInRouter(<Avatar name="Ada Lovelace" email="ada@example.com" />);
 
     const avatar = document.querySelector("[aria-hidden='true']");
-    expect(avatar?.textContent).toBe("AL");
+    expect(avatar?.getAttribute("data-initials")).toBe("AL");
+    expect(getComputedStyle(avatar as Element, "::before").content).toBe('"AL"');
     await expectNoAxeViolations();
   });
 });

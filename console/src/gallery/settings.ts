@@ -1,15 +1,14 @@
 import { createStore, useStore } from "@/shared/stores/create-store";
 
-// The gallery toolbar's settings (theme lives in the real theme store). A frame (the narrow width preview) reads
+// The gallery toolbar's settings (theme and density live in the real stores, so the frame shares them through
+// storage). A frame (the narrow width preview) reads
 // them from its URL, so the outer gallery and the frame agree.
 
-export type Density = "comfortable" | "compact";
 export type GalleryLocale = "en" | "pseudo-LOCALE";
 export type Direction = "ltr" | "rtl";
 export type Width = "full" | "800" | "360";
 
 export interface GallerySettings {
-  density: Density;
   locale: GalleryLocale;
   direction: Direction;
   width: Width;
@@ -21,7 +20,6 @@ const query = new URLSearchParams(window.location.search);
 export const inFrame = query.has("frame");
 
 export const settingsStore = createStore<GallerySettings>({
-  density: query.get("density") === "compact" ? "compact" : "comfortable",
   locale: query.get("locale") === "pseudo-LOCALE" ? "pseudo-LOCALE" : "en",
   direction: query.get("direction") === "rtl" ? "rtl" : "ltr",
   width: "full",
@@ -35,7 +33,6 @@ export function useSettings(): GallerySettings {
 export function frameUrl(settings: GallerySettings, hash: string): string {
   const params = new URLSearchParams({
     frame: "",
-    density: settings.density,
     locale: settings.locale,
     direction: settings.direction,
   });

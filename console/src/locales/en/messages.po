@@ -7,25 +7,103 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: en\n"
 
-#: src/ui/shell/primary-sidebar.tsx:22
+#: src/ui/shell/switcher.tsx:65
+msgid "{count, plural, one {# organization} other {# organizations}}"
+msgstr "{count, plural, one {# organization} other {# organizations}}"
+
+#: src/ui/shell/switcher.tsx:76
+msgid "{count, plural, one {# project} other {# projects}}"
+msgstr "{count, plural, one {# project} other {# projects}}"
+
+#: src/ui/shell/account-menu.tsx:36
+#: src/ui/shell/account-menu.tsx:55
+#: src/ui/shell/primary-sidebar.tsx:31
 msgid "Account"
 msgstr "Account"
+
+#: src/ui/shell/switcher.tsx:62
+msgid "All organizations"
+msgstr "All organizations"
+
+#: src/ui/shell/switcher.tsx:74
+msgid "All projects"
+msgstr "All projects"
 
 #: src/ui/shell/nav-registry.ts:35
 msgid "Auth"
 msgstr "Auth"
 
-#: src/ui/shell/app-shell.tsx:19
+#: src/ui/shell/breadcrumbs.tsx:35
 msgid "Breadcrumb"
 msgstr "Breadcrumb"
+
+#: src/ui/shell/resource-layout.tsx:110
+msgid "Collapse list"
+msgstr "Collapse list"
+
+#: src/ui/shell/primary-sidebar.tsx:97
+msgid "Collapse sidebar"
+msgstr "Collapse sidebar"
+
+#: src/ui/shell/account-menu.tsx:74
+msgid "Comfortable"
+msgstr "Comfortable"
+
+#: src/ui/shell/account-menu.tsx:75
+msgid "Compact"
+msgstr "Compact"
+
+#: src/ui/shell/switcher.tsx:61
+msgid "Couldn't load organizations. Check your connection and try again."
+msgstr "Couldn't load organizations. Check your connection and try again."
+
+#: src/ui/shell/switcher.tsx:73
+msgid "Couldn't load projects. Check your connection and try again."
+msgstr "Couldn't load projects. Check your connection and try again."
+
+#: src/ui/shell/account-menu.tsx:65
+msgid "Dark"
+msgstr "Dark"
 
 #: src/ui/shell/nav-registry.ts:36
 msgid "Databases"
 msgstr "Databases"
 
+#: src/ui/shell/account-menu.tsx:68
+msgid "Density"
+msgstr "Density"
+
+#: src/ui/shell/resource-layout.tsx:88
+msgid "Expand list"
+msgstr "Expand list"
+
+#: src/ui/shell/primary-sidebar.tsx:97
+msgid "Expand sidebar"
+msgstr "Expand sidebar"
+
 #: src/ui/shell/nav-registry.ts:39
 msgid "Functions"
 msgstr "Functions"
+
+#: src/ui/shell/account-menu.tsx:79
+msgid "Keyboard shortcuts"
+msgstr "Keyboard shortcuts"
+
+#: src/ui/shell/account-menu.tsx:64
+msgid "Light"
+msgstr "Light"
+
+#: src/ui/shell/switcher.tsx:59
+msgid "Loading organizations…"
+msgstr "Loading organizations…"
+
+#: src/ui/shell/switcher.tsx:71
+msgid "Loading projects…"
+msgstr "Loading projects…"
+
+#: src/ui/shell/resource-list.tsx:72
+msgid "Loading…"
+msgstr "Loading…"
 
 #: src/ui/shell/nav-registry.ts:43
 msgid "Logs"
@@ -39,13 +117,41 @@ msgstr "Members"
 msgid "Messaging"
 msgstr "Messaging"
 
-#: src/ui/shell/primary-sidebar.tsx:21
+#: src/ui/shell/switcher.tsx:63
+msgid "New organization"
+msgstr "New organization"
+
+#: src/ui/shell/switcher.tsx:75
+msgid "New project"
+msgstr "New project"
+
+#: src/ui/shell/switcher.tsx:60
+msgid "No organizations match"
+msgstr "No organizations match"
+
+#: src/ui/shell/switcher.tsx:72
+msgid "No projects match"
+msgstr "No projects match"
+
+#: src/ui/shell/resource-list.tsx:75
+msgid "Nothing matches “{filter}”"
+msgstr "Nothing matches “{filter}”"
+
+#: src/ui/shell/app-shell.tsx:54
+msgid "Open navigation"
+msgstr "Open navigation"
+
+#: src/ui/shell/primary-sidebar.tsx:30
 msgid "Organization"
 msgstr "Organization"
 
 #: src/ui/shell/nav-registry.ts:48
 msgid "Organization settings"
 msgstr "Organization settings"
+
+#: src/ui/shell/switcher.tsx:58
+msgid "Organizations"
+msgstr "Organizations"
 
 #: src/features/welcome/components/welcome-page.tsx:9
 #: src/shared/i18n/index.test.ts:23
@@ -60,6 +166,10 @@ msgstr "Orvano home"
 msgid "Overview"
 msgstr "Overview"
 
+#: src/ui/shell/breadcrumbs.tsx:128
+msgid "Path"
+msgstr "Path"
+
 #: src/ui/shell/nav-registry.ts:52
 msgid "Preferences"
 msgstr "Preferences"
@@ -68,17 +178,30 @@ msgstr "Preferences"
 msgid "Profile"
 msgstr "Profile"
 
-#: src/ui/shell/primary-sidebar.tsx:20
+#: src/ui/shell/primary-sidebar.tsx:29
 msgid "Project"
 msgstr "Project"
 
 #: src/ui/shell/nav-registry.ts:46
+#: src/ui/shell/switcher.tsx:70
 msgid "Projects"
 msgstr "Projects"
 
 #: src/ui/shell/nav-registry.ts:38
 msgid "Realtime"
 msgstr "Realtime"
+
+#: src/ui/shell/switcher.tsx:248
+msgid "Retry"
+msgstr "Retry"
+
+#: src/ui/shell/switcher.tsx:57
+msgid "Search organizations"
+msgstr "Search organizations"
+
+#: src/ui/shell/switcher.tsx:69
+msgid "Search projects"
+msgstr "Search projects"
 
 #: src/ui/shell/nav-registry.ts:51
 msgid "Security"
@@ -87,6 +210,18 @@ msgstr "Security"
 #: src/ui/shell/nav-registry.ts:44
 msgid "Settings"
 msgstr "Settings"
+
+#: src/ui/shell/app-shell.tsx:116
+msgid "Show list"
+msgstr "Show list"
+
+#: src/ui/shell/breadcrumbs.tsx:126
+msgid "Show the full path"
+msgstr "Show the full path"
+
+#: src/ui/shell/account-menu.tsx:82
+msgid "Sign out"
+msgstr "Sign out"
 
 #: src/ui/shell/nav-registry.ts:40
 msgid "Sites"
@@ -100,9 +235,25 @@ msgstr "Skip to content"
 msgid "Storage"
 msgstr "Storage"
 
+#: src/ui/shell/switcher.tsx:56
+msgid "Switch organization"
+msgstr "Switch organization"
+
+#: src/ui/shell/switcher.tsx:68
+msgid "Switch project"
+msgstr "Switch project"
+
+#: src/ui/shell/account-menu.tsx:63
+msgid "System"
+msgstr "System"
+
 #: src/features/welcome/components/welcome-page.tsx:12
 msgid "The server and console are running. Screens arrive with the next features."
 msgstr "The server and console are running. Screens arrive with the next features."
+
+#: src/ui/shell/account-menu.tsx:57
+msgid "Theme"
+msgstr "Theme"
 
 #: src/ui/shell/nav-registry.ts:42
 msgid "Usage"
@@ -111,3 +262,7 @@ msgstr "Usage"
 #: src/ui/button.test.tsx:9
 msgid "You need the Admin role to delete tables."
 msgstr "You need the Admin role to delete tables."
+
+#: src/ui/menu.test.tsx:55
+msgid "You need the Admin role to export rows."
+msgstr "You need the Admin role to export rows."

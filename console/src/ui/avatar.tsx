@@ -24,18 +24,20 @@ export function initials(name: string, email: string, locale: string): string {
   return letters.toLocaleUpperCase(locale);
 }
 
-/** Decorative (`aria-hidden`): its button carries the name ("Account"). */
+/**
+ * Decorative (`aria-hidden`): its button carries the name ("Account"). The initials are drawn by CSS from
+ * `data-initials`, not as text, so the button's visible text never contradicts its name (WCAG 2.5.3).
+ */
 export function Avatar({ name, email, size = "md" }: AvatarProps) {
   const { i18n } = useLingui();
   return (
     <span
       aria-hidden="true"
+      data-initials={initials(name, email, i18n.locale)}
       className={cx(
-        "inline-flex shrink-0 items-center justify-center rounded-full bg-accent-subtle font-semibold text-accent-subtle-fg select-none",
+        "inline-flex shrink-0 items-center justify-center rounded-full bg-accent-subtle font-semibold text-accent-subtle-fg select-none before:content-[attr(data-initials)]",
         size === "sm" ? "size-6 text-xs" : "size-8 text-sm",
       )}
-    >
-      {initials(name, email, i18n.locale)}
-    </span>
+    />
   );
 }

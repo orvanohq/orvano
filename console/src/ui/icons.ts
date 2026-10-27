@@ -24,7 +24,16 @@ export {
   // Direction icons: render with `flipInRtl`
   ChevronLeft as ChevronStartIcon,
   ChevronRight as ChevronEndIcon,
+  ChevronsLeft as CollapseStartIcon,
+  ChevronsRight as ExpandEndIcon,
   // Controls
   Menu as SidebarOpenIcon,
   X as CloseIcon,
+  Check as CheckIcon,
+  ChevronDown as DisclosureIcon,
+  Ellipsis as MoreIcon,
+  Plus as AddIcon,
+  Search as SearchIcon,
+  Keyboard as ShortcutsIcon,
+  LogOut as SignOutIcon,
 } from "lucide-react";

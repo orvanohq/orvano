@@ -9,7 +9,17 @@ import {
   Icon,
   IconButton,
   Link,
+  Menu,
+  MenuItem,
+  MenuSection,
+  MenuSeparator,
+  MenuTrigger,
   ServiceDatabasesIcon,
+  SignOutIcon,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
   Tooltip,
   VisuallyHidden,
   type ButtonSize,
@@ -89,6 +99,40 @@ export function PrimitivesScene() {
           <Icon icon={ChevronStartIcon} flipInRtl label="Back" />
           <Icon icon={ChevronEndIcon} flipInRtl label="Forward" />
         </Row>
+      </Section>
+
+      <Section title="Menu">
+        <Row label="sections">
+          <MenuTrigger trigger={<Button>Table actions</Button>}>
+            <Menu aria-label="Table actions">
+              <MenuSection title="Sort" selectedKey="name">
+                <MenuItem id="name">By name</MenuItem>
+                <MenuItem id="created">By creation date</MenuItem>
+              </MenuSection>
+              <MenuSeparator />
+              <MenuItem id="rename">Rename table</MenuItem>
+              <MenuItem id="export" unavailableReason={noPermission}>
+                Export rows
+              </MenuItem>
+              <MenuItem id="delete" tone="danger" icon={SignOutIcon}>
+                Delete table
+              </MenuItem>
+            </Menu>
+          </MenuTrigger>
+        </Row>
+      </Section>
+
+      <Section title="Tabs">
+        <Tabs>
+          <TabList aria-label="SDK">
+            <Tab id="js">JavaScript</Tab>
+            <Tab id="dart">Dart</Tab>
+            <Tab id="dotnet">.NET</Tab>
+          </TabList>
+          <TabPanel id="js">npm install @orvano/sdk</TabPanel>
+          <TabPanel id="dart">dart pub add orvano</TabPanel>
+          <TabPanel id="dotnet">dotnet add package Orvano</TabPanel>
+        </Tabs>
       </Section>
 
       <Section title="Avatar">
