@@ -195,6 +195,18 @@ describe("breadcrumbs and document title", () => {
     expect(breadcrumb.getByRole("list").elements()).toHaveLength(1);
   });
 
+  it("0015 AC-9: on a nested route only the last crumb is current", async () => {
+    const { screen } = await renderScene(table);
+    const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
+
+    await expect.element(breadcrumb.getByText("users")).toHaveAttribute("aria-current", "page");
+    // The router marks a link to an ancestor route active; a crumb must not repeat that (SRT-4).
+    await expect
+      .element(breadcrumb.getByRole("link", { name: "Databases" }))
+      .not.toHaveAttribute("aria-current");
+    expect(breadcrumb.element().querySelectorAll("[aria-current]")).toHaveLength(1);
+  });
+
   it("0015 AC-9: the document title mirrors the crumbs (UX-4)", async () => {
     await renderScene(table);
 

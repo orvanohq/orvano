@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { expectNoAxeViolations } from "@/test/axe";
 import { focusElement } from "@/test/focus";
+import { emulateForcedColors } from "@/test/media";
 import { renderInRouter } from "@/test/render";
 import { Button, IconButton } from "./button";
 import { CloseIcon } from "./icons";
@@ -28,6 +29,31 @@ describe("Button", () => {
       await expectNoAxeViolations();
     }
     delete document.documentElement.dataset.theme;
+  });
+
+  it("0015 AC-6: in forced colors mode every bordered variant keeps a visible border (THM-6)", async () => {
+    await emulateForcedColors(true);
+    try {
+      // Ghost is borderless in every mode by design (design.md _Button recipes_).
+      const { screen } = await renderInRouter(
+        <div>
+          {(["primary", "secondary", "danger"] as const).map((variant) => (
+            <Button key={variant} variant={variant}>
+              Create {variant}
+            </Button>
+          ))}
+        </div>,
+      );
+      for (const variant of ["primary", "secondary", "danger"]) {
+        const button = screen.getByRole("button", { name: `Create ${variant}` });
+        await expect.element(button).toBeVisible();
+        const style = getComputedStyle(button.element());
+        expect({ variant, style: style.borderTopStyle }).toEqual({ variant, style: "solid" });
+        expect(Number.parseFloat(style.borderTopWidth)).toBeGreaterThanOrEqual(1);
+      }
+    } finally {
+      await emulateForcedColors(false);
+    }
   });
 
   it("0015 AC-15: presses with Enter, Space, and a click", async () => {

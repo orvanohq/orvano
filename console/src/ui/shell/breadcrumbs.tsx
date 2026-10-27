@@ -106,7 +106,8 @@ function CrumbContent({
   }
   return (
     <span className="min-w-0 truncate text-fg-muted">
-      <Link variant="nav" {...linkOptions(crumb.link)}>
+      {/* Exact, so a crumb to an ancestor route isn't marked current too: only the last crumb is (AC-9). */}
+      <Link variant="nav" {...linkOptions(crumb.link)} activeOptions={{ exact: true }}>
         {crumb.label}
       </Link>
     </span>
