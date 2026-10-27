@@ -3,6 +3,7 @@ import { userEvent } from "vitest/browser";
 import { z } from "@/shared/zod";
 import { expectNoAxeViolations } from "@/test/axe";
 import { deferred } from "@/test/deferred";
+import { focusElement } from "@/test/focus";
 import { renderInRouter } from "@/test/render";
 import { useAppForm, type SubmitErrors } from "./index";
 import { hasUnsavedChanges, resetUnsavedChangesForTests } from "./unsaved-changes";
@@ -38,34 +39,24 @@ function BucketForm({ onSubmitAsync = () => Promise.resolve(undefined) }: FormPr
 
 afterEach(resetUnsavedChangesForTests);
 
-/** Focuses an element directly and waits until it holds (Firefox and WebKit on CI can lag a frame). */
-async function focus(element: HTMLElement) {
-  await expect
-    .poll(() => {
-      element.focus();
-      return document.activeElement === element;
-    })
-    .toBe(true);
-}
-
 describe("useAppForm timing (FRM-2, UX-8)", () => {
   it("0015 AC-16: checks a field only once it loses focus after a change, then on every change", async () => {
     const { screen } = await renderInRouter(<BucketForm />);
     const name = screen.getByRole("textbox", { name: "Bucket name" });
 
-    await focus(name.element() as HTMLElement);
+    await focusElement(name.element());
     await userEvent.keyboard("toolong");
     // Still typing: no error yet.
     await expect.element(name).not.toHaveAttribute("aria-invalid");
     await expect.element(screen.getByText("Use at most 5 characters.")).not.toBeInTheDocument();
 
-    await focus(screen.getByRole("textbox", { name: "Region" }).element() as HTMLElement);
+    await focusElement(screen.getByRole("textbox", { name: "Region" }).element());
     await expect.element(name).toHaveAttribute("aria-invalid", "true");
     await expect.element(name).toHaveAccessibleDescription(/Use at most 5 characters\./);
     await expectNoAxeViolations();
 
     // Once shown, each change checks it again, and the error clears the moment the value passes.
-    await focus(name.element() as HTMLElement);
+    await focusElement(name.element());
     await userEvent.keyboard("{Backspace}{Backspace}{Backspace}");
     await expect.element(name).not.toHaveAttribute("aria-invalid");
 
@@ -77,8 +68,8 @@ describe("useAppForm timing (FRM-2, UX-8)", () => {
   it("0015 AC-16: leaving a field you didn't change shows nothing", async () => {
     const { screen } = await renderInRouter(<BucketForm />);
 
-    await focus(screen.getByRole("textbox", { name: "Bucket name" }).element() as HTMLElement);
-    await focus(screen.getByRole("textbox", { name: "Region" }).element() as HTMLElement);
+    await focusElement(screen.getByRole("textbox", { name: "Bucket name" }).element());
+    await focusElement(screen.getByRole("textbox", { name: "Region" }).element());
 
     await expect
       .element(screen.getByRole("textbox", { name: "Bucket name" }))
@@ -92,7 +83,7 @@ describe("submitting (FRM-4, FRM-6)", () => {
     const { screen } = await renderInRouter(<BucketForm onSubmitAsync={onSubmitAsync} />);
     const name = screen.getByRole("textbox", { name: "Bucket name" });
 
-    await focus(name.element() as HTMLElement);
+    await focusElement(name.element());
     await userEvent.keyboard("toolong");
     await screen.getByRole("button", { name: "Create bucket" }).click();
 
@@ -120,9 +111,9 @@ describe("submitting (FRM-4, FRM-6)", () => {
       />,
     );
 
-    await focus(screen.getByRole("textbox", { name: "Bucket name" }).element() as HTMLElement);
+    await focusElement(screen.getByRole("textbox", { name: "Bucket name" }).element());
     await userEvent.keyboard("logs");
-    await focus(screen.getByRole("textbox", { name: "Region" }).element() as HTMLElement);
+    await focusElement(screen.getByRole("textbox", { name: "Region" }).element());
     await userEvent.keyboard("eu");
     await screen.getByRole("button", { name: "Create bucket" }).click();
 
@@ -139,9 +130,9 @@ describe("submitting (FRM-4, FRM-6)", () => {
     const onSubmitAsync = vi.fn<FormProps["onSubmitAsync"] & {}>(() => saved.promise);
     const { screen } = await renderInRouter(<BucketForm onSubmitAsync={onSubmitAsync} />);
 
-    await focus(screen.getByRole("textbox", { name: "Bucket name" }).element() as HTMLElement);
+    await focusElement(screen.getByRole("textbox", { name: "Bucket name" }).element());
     await userEvent.keyboard("logs");
-    await focus(screen.getByRole("textbox", { name: "Region" }).element() as HTMLElement);
+    await focusElement(screen.getByRole("textbox", { name: "Region" }).element());
     await userEvent.keyboard("eu");
     expect(hasUnsavedChanges()).toBe(true);
 
@@ -162,7 +153,7 @@ describe("submitting (FRM-4, FRM-6)", () => {
 describe("unsaved changes (FRM-5)", () => {
   it("0015 AC-16: a form counts as changed only while it differs from its saved values", async () => {
     const { screen } = await renderInRouter(<BucketForm />);
-    await focus(screen.getByRole("textbox", { name: "Bucket name" }).element() as HTMLElement);
+    await focusElement(screen.getByRole("textbox", { name: "Bucket name" }).element());
 
     await userEvent.keyboard("a");
     await expect.poll(hasUnsavedChanges).toBe(true);

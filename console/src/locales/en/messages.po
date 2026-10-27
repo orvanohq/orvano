@@ -7,9 +7,14 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: en\n"
 
-#: src/ui/form/field.tsx:186
+#: src/ui/form/field.tsx:177
 msgid "(optional)"
 msgstr "(optional)"
+
+#. placeholder {0}: Math.ceil(details.retryAfter)
+#: src/ui/error-copy.tsx:64
+msgid "{0, plural, one {Try again in # second.} other {Try again in # seconds.}}"
+msgstr "{0, plural, one {Try again in # second.} other {Try again in # seconds.}}"
 
 #: src/ui/confirm-delete/dependents.ts:31
 msgid "{count, plural, one {# API key} other {# API keys}}"
@@ -109,6 +114,10 @@ msgstr "{count, plural, one {Fix this problem to continue} other {Fix these # pr
 msgid "{count} of kind {kind}"
 msgstr "{count} of kind {kind}"
 
+#: src/ui/toast/index.tsx:125
+msgid "{source}, {count, plural, one {# time} other {# times}}"
+msgstr "{source}, {count, plural, one {# time} other {# times}}"
+
 #: src/ui/confirm-delete/dependents.ts:51
 msgid "about {counts}"
 msgstr "about {counts}"
@@ -131,6 +140,10 @@ msgstr "All projects"
 msgid "Also deleted:"
 msgstr "Also deleted:"
 
+#: src/ui/error-copy.tsx:54
+msgid "Ask an owner of this project for access."
+msgstr "Ask an owner of this project for access."
+
 #: src/ui/shell/nav-registry.ts:35
 msgid "Auth"
 msgstr "Auth"
@@ -142,6 +155,14 @@ msgstr "Breadcrumb"
 #: src/ui/confirm-delete/index.tsx:112
 msgid "Cancel"
 msgstr "Cancel"
+
+#: src/ui/status-chip.tsx:41
+msgid "Cancelled"
+msgstr "Cancelled"
+
+#: src/ui/error-copy.tsx:76
+msgid "Check your connection and try again."
+msgstr "Check your connection and try again."
 
 #: src/ui/side-sheet/index.tsx:65
 msgid "Close"
@@ -163,6 +184,19 @@ msgstr "Comfortable"
 msgid "Compact"
 msgstr "Compact"
 
+#: src/ui/copy-field.tsx:39
+msgid "Copied"
+msgstr "Copied"
+
+#: src/ui/copy-field.tsx:69
+#: src/ui/copy-field.tsx:172
+msgid "Copy {label}"
+msgstr "Copy {label}"
+
+#: src/ui/copy-field.tsx:123
+msgid "Copy this secret now"
+msgstr "Copy this secret now"
+
 #: src/ui/confirm-delete/index.tsx:198
 msgid "Couldn't count what will be deleted. You can still delete it."
 msgstr "Couldn't count what will be deleted. You can still delete it."
@@ -179,9 +213,17 @@ msgstr "Couldn't load organizations. Check your connection and try again."
 msgid "Couldn't load projects. Check your connection and try again."
 msgstr "Couldn't load projects. Check your connection and try again."
 
+#: src/ui/error-copy.tsx:75
+msgid "Couldn't reach the server"
+msgstr "Couldn't reach the server"
+
 #: src/ui/confirm-delete/index.tsx:188
 msgid "Counting what will be deleted with it…"
 msgstr "Counting what will be deleted with it…"
+
+#: src/ui/settings-card.tsx:56
+msgid "Danger zone"
+msgstr "Danger zone"
 
 #: src/ui/shell/account-menu.tsx:65
 msgid "Dark"
@@ -287,6 +329,10 @@ msgstr "Discard changes"
 msgid "Discard unsaved changes?"
 msgstr "Discard unsaved changes?"
 
+#: src/ui/toast/index.tsx:133
+msgid "Dismiss"
+msgstr "Dismiss"
+
 #: src/ui/confirm-delete/index.tsx:131
 msgid "Don't ask again for this table this session"
 msgstr "Don't ask again for this table this session"
@@ -299,6 +345,10 @@ msgstr "Expand list"
 msgid "Expand sidebar"
 msgstr "Expand sidebar"
 
+#: src/ui/status-chip.tsx:40
+msgid "Failed"
+msgstr "Failed"
+
 #: src/ui/shell/nav-registry.ts:39
 msgid "Functions"
 msgstr "Functions"
@@ -306,6 +356,14 @@ msgstr "Functions"
 #: src/ui/form/text-fields.tsx:86
 msgid "Hide password"
 msgstr "Hide password"
+
+#: src/ui/copy-field.tsx:135
+msgid "I've copied it"
+msgstr "I've copied it"
+
+#: src/ui/error-copy.tsx:46
+msgid "It may have been deleted, or the link is out of date."
+msgstr "It may have been deleted, or the link is out of date."
 
 #: src/ui/form/unsaved-changes-guard.tsx:55
 msgid "Keep editing"
@@ -319,7 +377,9 @@ msgstr "Keyboard shortcuts"
 msgid "Light"
 msgstr "Light"
 
-#: src/ui/form/choice-fields.tsx:156
+#: src/ui/form/choice-fields.tsx:157
+#: src/ui/progress.tsx:26
+#: src/ui/skeleton.tsx:84
 msgid "Loading"
 msgstr "Loading"
 
@@ -355,7 +415,7 @@ msgstr "New organization"
 msgid "New project"
 msgstr "New project"
 
-#: src/ui/form/choice-fields.tsx:156
+#: src/ui/form/choice-fields.tsx:157
 msgid "No matches"
 msgstr "No matches"
 
@@ -367,11 +427,19 @@ msgstr "No organizations match"
 msgid "No projects match"
 msgstr "No projects match"
 
+#: src/ui/error-copy.tsx:45
+msgid "Not found"
+msgstr "Not found"
+
 #: src/ui/shell/resource-list.tsx:75
 msgid "Nothing matches “{filter}”"
 msgstr "Nothing matches “{filter}”"
 
-#: src/ui/shell/app-shell.tsx:54
+#: src/ui/toast/index.tsx:93
+msgid "Notifications"
+msgstr "Notifications"
+
+#: src/ui/shell/app-shell.tsx:60
 msgid "Open navigation"
 msgstr "Open navigation"
 
@@ -392,6 +460,10 @@ msgstr "Organizations"
 msgid "Orvano console"
 msgstr "Orvano console"
 
+#: src/ui/error-page.tsx:71
+msgid "Orvano couldn't start"
+msgstr "Orvano couldn't start"
+
 #: src/ui/shell/brand-mark.tsx:23
 msgid "Orvano home"
 msgstr "Orvano home"
@@ -408,6 +480,14 @@ msgstr "Path"
 msgid "Preferences"
 msgstr "Preferences"
 
+#: src/ui/copy-field.tsx:46
+msgid "Press ⌘C to copy"
+msgstr "Press ⌘C to copy"
+
+#: src/ui/copy-field.tsx:46
+msgid "Press Ctrl+C to copy"
+msgstr "Press Ctrl+C to copy"
+
 #: src/ui/shell/nav-registry.ts:50
 msgid "Profile"
 msgstr "Profile"
@@ -421,17 +501,44 @@ msgstr "Project"
 msgid "Projects"
 msgstr "Projects"
 
+#: src/ui/status-chip.tsx:37
+msgid "Queued"
+msgstr "Queued"
+
+#: src/ui/status-chip.tsx:39
+msgid "Ready"
+msgstr "Ready"
+
 #: src/ui/shell/nav-registry.ts:38
 msgid "Realtime"
 msgstr "Realtime"
+
+#: src/ui/error-page.tsx:57
+msgid "Reload"
+msgstr "Reload"
 
 #: src/ui/confirm-delete/tiers.ts:69
 msgid "Remove member"
 msgstr "Remove member"
 
+#: src/ui/error-page.tsx:48
+#: src/ui/states.tsx:92
+msgid "Request ID"
+msgstr "Request ID"
+
+#: src/ui/banner.tsx:118
+msgid "Request ID: <0>{requestId}</0>"
+msgstr "Request ID: <0>{requestId}</0>"
+
+#: src/ui/banner.tsx:127
 #: src/ui/shell/switcher.tsx:248
+#: src/ui/states.tsx:86
 msgid "Retry"
 msgstr "Retry"
+
+#: src/ui/status-chip.tsx:38
+msgid "Running"
+msgstr "Running"
 
 #: src/ui/shell/switcher.tsx:57
 msgid "Search organizations"
@@ -445,11 +552,15 @@ msgstr "Search projects"
 msgid "Security"
 msgstr "Security"
 
+#: src/ui/table/index.tsx:98
+msgid "Select"
+msgstr "Select"
+
 #: src/ui/shell/nav-registry.ts:44
 msgid "Settings"
 msgstr "Settings"
 
-#: src/ui/shell/app-shell.tsx:116
+#: src/ui/shell/app-shell.tsx:124
 msgid "Show list"
 msgstr "Show list"
 
@@ -473,6 +584,11 @@ msgstr "Sites"
 msgid "Skip to content"
 msgstr "Skip to content"
 
+#: src/ui/error-copy.tsx:81
+#: src/ui/error-page.tsx:83
+msgid "Something went wrong"
+msgstr "Something went wrong"
+
 #: src/ui/shell/nav-registry.ts:37
 msgid "Storage"
 msgstr "Storage"
@@ -489,6 +605,10 @@ msgstr "Switch project"
 msgid "System"
 msgstr "System"
 
+#: src/ui/error-page.tsx:72
+msgid "The console couldn't load what it needs from the server. Check that the server is running, then reload."
+msgstr "The console couldn't load what it needs from the server. Check that the server is running, then reload."
+
 #: src/features/welcome/components/welcome-page.tsx:12
 msgid "The server and console are running. Screens arrive with the next features."
 msgstr "The server and console are running. Screens arrive with the next features."
@@ -504,6 +624,22 @@ msgstr "This deletes {name} and everything in it. You can't undo this."
 #: src/ui/confirm-delete/index.tsx:257
 msgid "This deletes {name}. You can't undo this."
 msgstr "This deletes {name}. You can't undo this."
+
+#: src/ui/error-page.tsx:84
+msgid "This page ran into a problem. Reload to try again."
+msgstr "This page ran into a problem. Reload to try again."
+
+#: src/ui/error-copy.tsx:59
+msgid "Too many requests"
+msgstr "Too many requests"
+
+#: src/ui/error-copy.tsx:84
+msgid "Try again in a moment."
+msgstr "Try again in a moment."
+
+#: src/ui/error-copy.tsx:83
+msgid "Try again. If it keeps failing, share the request ID with your administrator."
+msgstr "Try again. If it keeps failing, share the request ID with your administrator."
 
 #: src/ui/confirm-delete/index.tsx:146
 msgid "Type {typePrompt} to confirm"
@@ -525,17 +661,33 @@ msgstr "Type the number of rows to confirm."
 msgid "Usage"
 msgstr "Usage"
 
+#: src/ui/error-copy.tsx:62
+msgid "Wait a moment, then try again."
+msgstr "Wait a moment, then try again."
+
 #: src/ui/confirm-delete/index.tsx:253
 msgid "You can't undo this."
 msgstr "You can't undo this."
 
-#: src/ui/button.test.tsx:9
+#: src/ui/error-copy.tsx:51
+msgid "You don't have access"
+msgstr "You don't have access"
+
+#: src/ui/error-copy.tsx:53
+msgid "You need the {role} role for this."
+msgstr "You need the {role} role for this."
+
+#: src/ui/button.test.tsx:10
 msgid "You need the Admin role to delete tables."
 msgstr "You need the Admin role to delete tables."
 
 #: src/ui/menu.test.tsx:55
 msgid "You need the Admin role to export rows."
 msgstr "You need the Admin role to export rows."
+
+#: src/ui/copy-field.tsx:124
+msgid "You won't be able to see it again. Store it somewhere safe."
+msgstr "You won't be able to see it again. Store it somewhere safe."
 
 #: src/ui/form/unsaved-changes-guard.tsx:63
 msgid "Your changes haven't been saved. If you leave now, they'll be lost."

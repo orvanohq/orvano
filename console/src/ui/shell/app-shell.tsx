@@ -3,6 +3,7 @@ import { useLingui } from "@lingui/react/macro";
 import { useRouterState } from "@tanstack/react-router";
 import { updateLayout, useLayout } from "@/shared/stores/layout";
 import { Button, IconButton } from "../button";
+import { cx } from "../cx";
 import { SidebarOpenIcon } from "../icons";
 import { AccountMenu } from "./account-menu";
 import { BrandLink } from "./brand-mark";
@@ -21,7 +22,7 @@ import { useIsWide } from "./use-is-wide";
  * `main`. From 64rem the sidebar sits beside the content and collapses to the icon rail; below, the sidebar and the
  * resource list are drawers, which close on navigation and when the window widens (SHL-6).
  */
-export function AppShell({ model, crumbs, resourceList, children }: AppShellProps) {
+export function AppShell({ model, crumbs, resourceList, banner, children }: AppShellProps) {
   const { t } = useLingui();
   const isWide = useIsWide();
   const collapsed = useLayout(model.user.id, (layout) => layout.sidebarCollapsed);
@@ -45,7 +46,12 @@ export function AppShell({ model, crumbs, resourceList, children }: AppShellProp
   const listOpen = !isWide && listOpenAt === href;
 
   return (
-    <div className="grid h-full grid-rows-[auto_minmax(0,1fr)] bg-bg">
+    <div
+      className={cx(
+        "grid h-full bg-bg",
+        banner ? "grid-rows-[auto_auto_minmax(0,1fr)]" : "grid-rows-[auto_minmax(0,1fr)]",
+      )}
+    >
       <SkipLink />
       <header className="flex h-topbar min-w-0 items-center gap-2 border-b bg-bg-subtle px-2 lg:gap-4 lg:px-4">
         {!isWide && (
@@ -63,6 +69,7 @@ export function AppShell({ model, crumbs, resourceList, children }: AppShellProp
           <AccountMenu user={model.user} onSignOut={model.onSignOut} />
         </div>
       </header>
+      {banner}
       <div className="flex min-h-0 min-w-0">
         {isWide ? (
           <PrimarySidebar
@@ -103,7 +110,8 @@ export function AppShell({ model, crumbs, resourceList, children }: AppShellProp
           <main
             id="main"
             tabIndex={-1}
-            className="min-w-0 flex-1 overflow-auto px-4 py-6 outline-none lg:px-6"
+            // SHL-8: the toast region publishes its height, so focus never lands under a toast.
+            className="min-w-0 flex-1 scroll-pb-(--toast-inset) overflow-auto px-4 py-6 outline-none lg:px-6"
           >
             {resourceList && !isWide && (
               <div className="mb-4">

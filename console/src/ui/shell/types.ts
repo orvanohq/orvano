@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
+import type { BannerProps } from "../banner";
 import type { NavId } from "./nav-registry";
 
 // Spec 0015 SHL-1: the shell takes its data through props only. Feature 13 builds these in the `_shell` route from
@@ -51,5 +52,10 @@ export interface AppShellProps {
   model: ShellModel;
   crumbs: readonly Crumb[];
   resourceList?: ReactNode;
+  /**
+   * Spec 0001 UX-24: the one `Banner` under the top bar, for state that affects the whole project (offline, limits
+   * reached). One at a time: the caller picks which state wins. Omit it when nothing applies.
+   */
+  banner?: ReactElement<BannerProps>;
   children: ReactNode;
 }

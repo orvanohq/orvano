@@ -41,4 +41,21 @@ export {
   Minus as IndeterminateIcon,
   LoaderCircle as PendingIcon,
   CircleAlert as ErrorIcon,
+  // Feedback and data display (design.md _Feedback and states_)
+  CircleCheck as SuccessIcon,
+  Info as InfoIcon,
+  TriangleAlert as WarningIcon,
+  Copy as CopyIcon,
+  RotateCw as RetryIcon,
+  Inbox as EmptyIcon,
+  SearchX as NoResultsIcon,
+  Lock as NotAllowedIcon,
+  ArrowUp as SortAscendingIcon,
+  ArrowDown as SortDescendingIcon,
+  // StatusChip (design.md _StatusChip statuses_)
+  Clock as StatusQueuedIcon,
+  LoaderCircle as StatusRunningIcon,
+  CircleCheck as StatusReadyIcon,
+  CircleX as StatusFailedIcon,
+  CircleSlash as StatusCancelledIcon,
 } from "lucide-react";
