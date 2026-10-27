@@ -86,6 +86,8 @@ Lingui 6.9 uses ICU messages (plural, select), compiles `.po` catalogs on import
 
 Chosen by the engineer. A rough sum of the chosen runtime (React and React DOM, the router, TanStack Query and Form, React Aria for the shell's primitives, Lingui, Zod) fits under 200 KB gzip with each service lazy loaded per route, leaving room for the shell and the overview page. Measuring from Vite's manifest makes the check independent of hashed file names. size-limit (14.2) and `rollup-plugin-visualizer` (7.1, supports Rolldown) are current options for the runner and the treemap.
 
+**Amended 2026-10-27 (spec 0015 STY-8).** Measured with the shell rendered, the first load was 235.7 KB. The 5 KB estimate for Zod above was the core only; classic Zod with the console's schemas is 23.5 KB, and `zod/mini` 6.6 KB. With `zod/mini` and a `sideEffects` list the shell measures about 218.9 KB, and lazy popovers would save only about 7 KB more, so the engineer raised the first load to 230 KB. The measurements are in [spec 0015's rationale](../0015-design-system-console-shell/rationale.md#ac-3-first-load-budget-2026-10-27).
+
 ### Calls made without a question
 
 Smaller calls settled while writing, each with its runner up:

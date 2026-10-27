@@ -133,3 +133,31 @@ A read only pass on a different model (Sonnet) reviewed the first draft for deci
 - **React Aria gaps made explicit.** `unavailableReason` (PRM-4), toast merging, history, and three visible toasts through one `notify()` (PRM-8), the docs pane's focus handling (SHL-9), and the resize separator's keys (SHL-13) are Orvano's own code.
 - **Smaller gaps closed.** The breakpoint in rem with one `useIsWide()` (SHL-6), density applied at boot through one layout store (SHL-11), switcher behavior (SHL-12), lazy primitives (PRM-10), the clipboard fallback (PRM-9, AC-24), `StatusChip` statuses, `Avatar`, tooltip tokens, overlay widths, button recipes, `RelativeTime` and `Kbd` details (PRM-11), the browser floor (STY-7), and the test harness for each scenario.
 - **Contrast coverage widened** from a hand kept pair list to every text token on every surface (TKN-7); the extra 40 pairs it named were computed and all pass.
+
+### AC-3 first load budget (2026-10-27)
+
+Milestone 5 left this open: with `AppShell` in the first load, the console went over spec 0003 BDL-1's 200 KB. The options were loading the account menu, switcher, and breadcrumb menu popovers lazily, or raising the budget. `/architect` measured before deciding. Each number is gzip, from `pnpm size` on `main` at 8533e18, and counts the entry chunk, the `__root` route, and the `/` route chunk that renders the page, plus their static imports (the same set BDL-1 counts for the `_shell` routes). The shell was rendered from the welcome route in project scope, as the probe in STY-9 does.
+
+| Build                                                             | First load |
+| ----------------------------------------------------------------- | ---------- |
+| Today, welcome page in `AuthLayout`, route chunk counted          | 209.4 KB   |
+| Today, plus a `sideEffects` list in `console/package.json`        | 181.3 KB   |
+| `AppShell` rendered                                               | 235.7 KB   |
+| `AppShell`, plus `sideEffects`                                    | 236.8 KB   |
+| `AppShell`, plus `sideEffects` and lazy popovers                  | 230.3 KB   |
+| `AppShell`, plus `sideEffects` and `zod/mini` (chosen)            | 218.9 KB   |
+| `AppShell`, plus `sideEffects`, `zod/mini`, and lazy popovers     | 211.9 KB   |
+| Last line, plus a chunk group for React Aria's list and menu code | 214.8 KB   |
+
+What the measurements showed:
+
+- **The CI number hides the route chunk.** `pnpm size` reports 187.8 KB today because BDL-1's route list has no `/` route, so the welcome route's own chunk is left out. BDL-1 counts the `__root` and shell routes, not `/`, so a shell measured from `/` has to count that chunk itself, which the probe does (STY-9).
+- **The `@/ui` index pulled in the whole kit.** Without `sideEffects`, Rolldown keeps every module the index re-exports that has top level code (a `lazy()` call, a context), so even the welcome page loaded the shell, the palette actions, and the drawer. The list removes about 28 KB from today's first load. With the shell rendered it gains nothing (1 KB more from a different chunk layout), because the shell uses nearly all of those modules.
+- **Classic Zod costs about 17 KB more than `zod/mini`.** Built alone with the console's storage schemas, classic Zod is 23.5 KB and `zod/mini` 6.6 KB. Spec 0003's rationale had estimated 5 KB for Zod, which was the core only.
+- **Lazy popovers save only about 7 KB.** React Aria's selection and collection code stays in the first load through `Breadcrumbs` and the toast region, so moving the three panels out moves only the menu, list box, and autocomplete parts. A chunk group for that code made it worse, because the group is then imported by the first load. Getting under 200 KB would also mean deferring `Tooltip`, `Drawer`, the activity popover, and possibly the toast region, which is unproven and touches AC-7 to AC-11 the most.
+
+**Decision.** The engineer chose 230 KB with the popovers eager, plus `sideEffects` and `zod/mini` (STY-8, STY-9). That leaves about 11 KB for feature 13's session, config, and API client code. Runner up: 220 KB with lazy popovers (about 8 KB of headroom), whose cost is a first open that waits on a chunk unless it preloads, and a keyboard test to prove the first ArrowDown still lands on the first item. Keeping 200 KB was rejected for the reasons above.
+
+**Decided while writing (not asked).** Zod goes through `zod/mini` everywhere, not only in the first load: one API, a lint rule that can enforce it, and no way for a shared module to bring classic Zod back into the first load. TanStack Router and TanStack Form take `zod/mini` schemas through Standard Schema, the same as classic ones. Runner up: classic Zod allowed on lazy routes, which costs those routes 17 KB and needs a rule nobody can lint.
+
+**Cross check (2026-10-27).** A read only pass on Sonnet looked for decisions step 25 would still leave to its builder. The engineer chose to apply every recommended fix: how the probe alias and build run, where `size-entries.mjs` finds the probe manifest and what it counts, the size script test, the full list of files that move to `zod/mini` with conversion examples, a manifest comparison that checks the `sideEffects` list, the lint rule's home and fixture, and the probe's catalog and lint exemptions.
