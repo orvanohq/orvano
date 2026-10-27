@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import { describe, expect, it } from "vitest";
 import { expectNoAxeViolations } from "@/test/axe";
 import { renderInRouter } from "@/test/render";
-import { ContentSkeleton, GridSkeleton, PENDING_MINIMUM_MS, useDelayedPending } from "./skeleton";
+import {
+  ContentSkeleton,
+  GridSkeleton,
+  PENDING_DELAY_MS,
+  PENDING_MINIMUM_MS,
+  useDelayedPending,
+} from "./skeleton";
 
 // Spec 0015 AC-17, spec 0001 UX-21: nothing for the first 300 ms, then the skeleton for at least 500 ms. Real timers,
 // as the spec's timing scenario asks.
@@ -47,10 +53,10 @@ describe("useDelayedPending", () => {
     await expect.element(screen.getByText("loaded"), { timeout: 3000 }).toBeVisible();
     const shown = events.find((event) => event.shown);
     const hidden = events.findLast((event) => !event.shown);
-    expect(shown?.at).toBeGreaterThanOrEqual(300);
-    // Shown at 300 ms or later, it stays at least 500 ms. The times are taken in effects, after each commit, so a few
-    // milliseconds of scheduling can fall on either edge.
-    expect((hidden?.at ?? 0) - (shown?.at ?? 0)).toBeGreaterThanOrEqual(PENDING_MINIMUM_MS - 15);
+    expect(shown?.at).toBeGreaterThanOrEqual(PENDING_DELAY_MS);
+    // It appears no earlier than 300 ms and then stays at least 500 ms, so it can't be gone before 800 ms. Both are
+    // measured from the start: a gap between two effect times would shrink when a slow engine delays the first.
+    expect(hidden?.at).toBeGreaterThanOrEqual(PENDING_DELAY_MS + PENDING_MINIMUM_MS);
   });
 });
 
