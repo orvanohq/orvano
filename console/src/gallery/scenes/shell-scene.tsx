@@ -1,5 +1,6 @@
 import {
   AppShell,
+  Banner,
   Button,
   PageHeader,
   ResourceLayout,
@@ -16,18 +17,27 @@ export function ShellScene({
   withResourceList = false,
   tableId,
   tab,
+  withBanner = false,
 }: {
   scope: ShellScope;
   page: string;
   withResourceList?: boolean;
   tableId?: string;
   tab?: string;
+  withBanner?: boolean;
 }) {
   const title = page.charAt(0).toUpperCase() + page.slice(1);
   return (
     <AppShell
       model={shellModel(scope)}
       crumbs={crumbs(scope, title, tableId)}
+      banner={
+        withBanner ? (
+          <Banner tone="warning" action={<Button size="sm">Upgrade plan</Button>}>
+            Storefront is at 90% of its database storage.
+          </Banner>
+        ) : undefined
+      }
       resourceList={
         withResourceList ? (
           <ResourceLayout service="databases" label="Tables" resizeLabel="Resize table list">

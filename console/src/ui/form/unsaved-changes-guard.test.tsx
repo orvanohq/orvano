@@ -4,6 +4,7 @@ import { userEvent } from "vitest/browser";
 import { isInteractionLocked } from "@/shared/stores/interaction-lock";
 import { z } from "@/shared/zod";
 import { expectNoAxeViolations } from "@/test/axe";
+import { focusElement } from "@/test/focus";
 import { renderInRouter } from "@/test/render";
 import { Link } from "../link";
 import { SideSheet } from "../side-sheet";
@@ -42,12 +43,7 @@ function Page() {
 const elsewhere = [{ path: "/elsewhere" }];
 
 async function type(element: HTMLElement, text: string) {
-  await expect
-    .poll(() => {
-      element.focus();
-      return document.activeElement === element;
-    })
-    .toBe(true);
+  await focusElement(element);
   await userEvent.keyboard(text);
 }
 

@@ -2,6 +2,7 @@ import { msg } from "@lingui/core/macro";
 import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { expectNoAxeViolations } from "@/test/axe";
+import { focusElement } from "@/test/focus";
 import { renderInRouter } from "@/test/render";
 import { Button, IconButton } from "./button";
 import { CloseIcon } from "./icons";
@@ -36,12 +37,7 @@ describe("Button", () => {
     const button = screen.getByRole("button", { name: "Save" });
     await userEvent.click(button, { force: true });
     // A click doesn't focus a button in every engine, so put focus there before the keys (CI's Firefox).
-    await expect
-      .poll(() => {
-        (button.element() as HTMLElement).focus();
-        return document.activeElement === button.element();
-      })
-      .toBe(true);
+    await focusElement(button);
     await userEvent.keyboard("{Enter}");
     await userEvent.keyboard(" ");
 

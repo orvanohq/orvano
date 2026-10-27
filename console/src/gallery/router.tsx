@@ -7,9 +7,14 @@ import {
   type RouterHistory,
 } from "@tanstack/react-router";
 import { UnsavedChangesGuard } from "@/ui/form/unsaved-changes-guard";
+import { Announcer } from "@/ui/announcer";
 import { UiRouterProvider } from "@/ui/router-provider";
+import { ToastRegion } from "@/ui/toast";
 import { GalleryFrame } from "./frame";
+import { BootErrorPage, RootErrorPage } from "@/ui";
 import { AuthScene } from "./scenes/auth-scene";
+import { DataScene } from "./scenes/data-scene";
+import { FeedbackScene } from "./scenes/feedback-scene";
 import { FormsScene } from "./scenes/forms-scene";
 import { IndexScene } from "./scenes/index-scene";
 import { OverlaysScene } from "./scenes/overlays-scene";
@@ -32,6 +37,8 @@ const rootRoute = createRootRouteWithContext<GalleryContext>()({
       <UiRouterProvider>
         {toolbar ? <GalleryFrame /> : <Outlet />}
         <UnsavedChangesGuard />
+        <ToastRegion />
+        <Announcer />
       </UiRouterProvider>
     );
   },
@@ -59,6 +66,33 @@ const overlaysRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/overlays",
   component: OverlaysScene,
+});
+
+const feedbackRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/feedback",
+  component: FeedbackScene,
+});
+
+const dataRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/data",
+  component: DataScene,
+});
+
+// The plain error pages (FLT-2), each with a request ID as the API would give it.
+const failure = { kind: "server", requestId: "req_01JB8Z4Q7W2N" };
+
+const bootErrorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/boot-error",
+  component: () => <BootErrorPage error={failure} />,
+});
+
+const rootErrorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/root-error",
+  component: () => <RootErrorPage error={failure} />,
 });
 
 const authRoute = createRoute({
@@ -97,7 +131,7 @@ const orgSettingsRoute = createRoute({
 const projectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/$orgId/$projectId",
-  component: () => <ShellScene scope="project" page="Overview" />,
+  component: () => <ShellScene scope="project" page="Overview" withBanner />,
 });
 
 const serviceRoute = createRoute({
@@ -140,6 +174,10 @@ const routeTree = rootRoute.addChildren([
   primitivesRoute,
   formsRoute,
   overlaysRoute,
+  feedbackRoute,
+  dataRoute,
+  bootErrorRoute,
+  rootErrorRoute,
   authRoute,
   accountRoute,
   orgRoute,

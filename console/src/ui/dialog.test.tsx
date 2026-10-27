@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import { z } from "@/shared/zod";
 import { expectNoAxeViolations } from "@/test/axe";
+import { focusElement } from "@/test/focus";
 import { renderInRouter } from "@/test/render";
 import { Button } from "./button";
 import { Dialog, DialogTrigger } from "./dialog";
@@ -14,15 +15,6 @@ import { SideSheet } from "./side-sheet";
 // returns), and the sheet asking before it throws away changes (UX-6, UX-9), in three engines.
 
 afterEach(resetUnsavedChangesForTests);
-
-async function focus(element: HTMLElement) {
-  await expect
-    .poll(() => {
-      element.focus();
-      return document.activeElement === element;
-    })
-    .toBe(true);
-}
 
 describe("Dialog", () => {
   it("0015 AC-15: opens from its button, keeps Tab inside, and Escape returns focus (SRT-6)", async () => {
@@ -43,7 +35,7 @@ describe("Dialog", () => {
     );
     const opener = screen.getByRole("button", { name: "Rename table" });
 
-    await focus(opener.element() as HTMLElement);
+    await focusElement(opener.element());
     await userEvent.keyboard("{Enter}");
     const dialog = screen.getByRole("dialog", { name: "Rename table" });
     await expect.element(dialog).toBeVisible();
@@ -114,7 +106,7 @@ describe("SideSheet", () => {
     const { screen } = await renderInRouter(<WebhookSheet />);
     const opener = screen.getByRole("button", { name: "New webhook" });
 
-    await focus(opener.element() as HTMLElement);
+    await focusElement(opener.element());
     await userEvent.keyboard("{Enter}");
     const sheet = screen.getByRole("dialog", { name: "New webhook" });
     await expect.element(sheet).toBeVisible();
@@ -131,7 +123,7 @@ describe("SideSheet", () => {
 
     await screen.getByRole("button", { name: "New webhook" }).click();
     const url = screen.getByRole("textbox", { name: "URL" });
-    await focus(url.element() as HTMLElement);
+    await focusElement(url.element());
     await userEvent.keyboard("https://example.com");
     await userEvent.keyboard("{Escape}");
 

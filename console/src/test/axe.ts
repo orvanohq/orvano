@@ -9,9 +9,13 @@ const tags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
  * elements it found.
  */
 export async function expectNoAxeViolations(context: Element = document.body): Promise<void> {
-  // A popover or drawer still fading in would be measured at part opacity, so let transitions settle first.
+  // A popover or drawer still fading in would be measured at part opacity, so let transitions settle first. Endless
+  // animations (a skeleton's pulse, a spinner) never finish, so they are left running.
   await Promise.all(
-    document.getAnimations().map((animation) => animation.finished.catch(() => undefined)),
+    document
+      .getAnimations()
+      .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
+      .map((animation) => animation.finished.catch(() => undefined)),
   );
   const results = await axe.run(context, { runOnly: { type: "tag", values: tags } });
   const report = results.violations.map(

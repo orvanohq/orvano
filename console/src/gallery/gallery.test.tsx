@@ -15,6 +15,10 @@ const scenes = [
   "/primitives",
   "/forms",
   "/overlays",
+  "/feedback",
+  "/data",
+  "/boot-error",
+  "/root-error",
   "/auth-layout",
 ];
 

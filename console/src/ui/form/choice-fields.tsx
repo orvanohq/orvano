@@ -30,6 +30,7 @@ import {
   useFieldWiring,
   type FieldProps,
 } from "./field";
+import { checkboxBox as box } from "../field-styles";
 
 export interface Option {
   id: string;
@@ -162,10 +163,6 @@ export function Combobox({
     </AriaComboBox>
   );
 }
-
-const box = cx(
-  "flex size-4 shrink-0 items-center justify-center rounded-sm border border-border-strong bg-bg text-accent-fg group-data-disabled:border-border group-data-disabled:bg-bg-muted group-data-focus-visible:outline-2 group-data-focus-visible:outline-offset-2 group-data-focus-visible:outline-solid group-data-focus-visible:outline-focus group-data-indeterminate:border-accent group-data-indeterminate:bg-accent group-data-invalid:border-danger-text group-data-selected:border-accent group-data-selected:bg-accent",
-);
 
 /** One box in a 24 px target (design.md _Forms_), not bound to a form field (a dialog's "Don't ask again"). */
 export function CheckboxControl({

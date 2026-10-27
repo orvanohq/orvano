@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import { z } from "@/shared/zod";
 import { expectNoAxeViolations } from "@/test/axe";
+import { focusElement } from "@/test/focus";
 import { renderInRouter } from "@/test/render";
 import { Switch, useAppForm } from "./index";
 
@@ -95,15 +96,6 @@ function EveryField() {
   );
 }
 
-async function focus(element: HTMLElement) {
-  await expect
-    .poll(() => {
-      element.focus();
-      return document.activeElement === element;
-    })
-    .toBe(true);
-}
-
 describe("field components", () => {
   it("0015 AC-15: every field passes axe and marks optional ones", async () => {
     const { screen } = await renderInRouter(<EveryField />);
@@ -127,7 +119,7 @@ describe("field components", () => {
     const { screen } = await renderInRouter(<EveryField />);
     const trigger = screen.getByRole("button", { name: /Region/ });
 
-    await focus(trigger.element() as HTMLElement);
+    await focusElement(trigger.element());
     await userEvent.keyboard("{ArrowDown}");
     await expect.element(screen.getByRole("option", { name: "Europe" })).toHaveFocus();
     await userEvent.keyboard("{ArrowDown}{Enter}");
@@ -140,7 +132,7 @@ describe("field components", () => {
     const { screen } = await renderInRouter(<EveryField />);
     const input = screen.getByRole("combobox", { name: "Owner (optional)" });
 
-    await focus(input.element() as HTMLElement);
+    await focusElement(input.element());
     await userEvent.keyboard("zz");
     await expect.element(screen.getByText("No matches")).toBeVisible();
     await userEvent.keyboard("{Backspace}{Backspace}Eu");
@@ -153,15 +145,15 @@ describe("field components", () => {
   it("0015 AC-15: arrows select a radio, Space toggles checkboxes and the switch", async () => {
     const { screen } = await renderInRouter(<EveryField />);
 
-    await focus(screen.getByRole("radio", { name: "Private" }).element() as HTMLElement);
+    await focusElement(screen.getByRole("radio", { name: "Private" }).element());
     await userEvent.keyboard("{ArrowDown}");
     await expect.element(screen.getByRole("radio", { name: "Public" })).toBeChecked();
 
-    await focus(screen.getByRole("checkbox", { name: "Encrypt" }).element() as HTMLElement);
+    await focusElement(screen.getByRole("checkbox", { name: "Encrypt" }).element());
     await userEvent.keyboard(" ");
     await expect.element(screen.getByRole("checkbox", { name: "Encrypt" })).toBeChecked();
 
-    await focus(screen.getByRole("switch", { name: "Notify me" }).element() as HTMLElement);
+    await focusElement(screen.getByRole("switch", { name: "Notify me" }).element());
     await userEvent.keyboard(" ");
     await expect.element(screen.getByRole("switch", { name: "Notify me" })).toBeChecked();
   });
@@ -170,13 +162,13 @@ describe("field components", () => {
     const { screen } = await renderInRouter(<EveryField />);
     const size = screen.getByRole("textbox", { name: "Size" });
 
-    await focus(size.element() as HTMLElement);
+    await focusElement(size.element());
     await userEvent.keyboard("{ArrowUp}");
     await expect.element(size).toHaveValue("2");
     await userEvent.keyboard("{Control>}a{/Control}{Meta>}a{/Meta}25");
     await expect.element(size).not.toHaveAttribute("aria-invalid");
 
-    await focus(screen.getByRole("radio", { name: "Private" }).element() as HTMLElement);
+    await focusElement(screen.getByRole("radio", { name: "Private" }).element());
     await expect.element(size).toHaveAttribute("aria-invalid", "true");
   });
 

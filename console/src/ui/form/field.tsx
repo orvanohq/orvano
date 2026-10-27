@@ -3,7 +3,7 @@ import { useLingui } from "@lingui/react/macro";
 import { useSelector } from "@tanstack/react-form";
 import { Label, Text } from "react-aria-components";
 import { useStore } from "@/shared/stores/create-store";
-import { cx } from "../cx";
+import { fieldColumn } from "../field-styles";
 import { Icon } from "../icon";
 import { ErrorIcon } from "../icons";
 import { useFieldContext } from "./contexts";
@@ -116,16 +116,7 @@ export function FieldErrorText({ children }: { children?: string }) {
   );
 }
 
-/** The column every field lays out in: label, help text, control, error. */
-export const fieldColumn = cx("flex flex-col gap-1.5");
-
-/** Text inputs and the select and combobox buttons (design.md _Forms_). */
-export const inputBox = cx(
-  "h-control w-full min-w-0 rounded-md border border-border-strong bg-bg px-2.5 text-base text-fg outline-none placeholder:text-fg-muted data-disabled:border-border data-disabled:bg-bg-muted data-disabled:text-fg-muted data-focused:outline-2 data-focused:outline-offset-0 data-focused:outline-solid data-focused:outline-focus data-invalid:border-danger-text",
-);
-
-/** A text input: read only shows on a subtle surface. */
-export const textInput = cx(inputBox, "read-only:bg-bg-subtle");
+export { fieldColumn, inputBox, textInput } from "../field-styles";
 
 export interface CustomFieldProps extends FieldProps {
   /** The control, given its id, its described by ids, and whether it is invalid. */
