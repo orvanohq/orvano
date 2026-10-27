@@ -37,7 +37,7 @@ msgstr ""
 msgid "Breadcrumb"
 msgstr ""
 
-#: src/ui/shell/resource-layout.tsx:102
+#: src/ui/shell/resource-layout.tsx:110
 msgid "Collapse list"
 msgstr ""
 
@@ -73,7 +73,7 @@ msgstr ""
 msgid "Density"
 msgstr ""
 
-#: src/ui/shell/resource-layout.tsx:80
+#: src/ui/shell/resource-layout.tsx:88
 msgid "Expand list"
 msgstr ""
 
