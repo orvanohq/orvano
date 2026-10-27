@@ -50,10 +50,11 @@ export interface IconButtonProps extends BaseProps {
   flipInRtl?: boolean;
 }
 
-// design.md _Button recipes_. Hover and press styles skip unavailable buttons, which use the disabled look.
+// design.md _Button recipes_. Hover and press styles skip unavailable buttons, which use the disabled look. Filled
+// variants carry a transparent border, which forced colors mode paints, so they keep a boundary there (THM-6).
 const variants: Record<ButtonVariant, string> = {
   primary: cx(
-    "bg-accent text-accent-fg not-aria-disabled:data-hovered:bg-accent-hover not-aria-disabled:data-pressed:bg-accent-hover",
+    "border border-transparent bg-accent text-accent-fg not-aria-disabled:data-hovered:bg-accent-hover not-aria-disabled:data-pressed:bg-accent-hover",
   ),
   secondary: cx(
     "border border-border-strong bg-bg text-fg not-aria-disabled:data-hovered:bg-bg-muted not-aria-disabled:data-pressed:bg-bg-muted",
@@ -62,7 +63,7 @@ const variants: Record<ButtonVariant, string> = {
     "bg-transparent text-fg not-aria-disabled:data-hovered:bg-bg-muted not-aria-disabled:data-pressed:bg-bg-muted",
   ),
   danger: cx(
-    "bg-danger text-danger-fg not-aria-disabled:data-hovered:bg-danger-hover not-aria-disabled:data-pressed:bg-danger-hover",
+    "border border-transparent bg-danger text-danger-fg not-aria-disabled:data-hovered:bg-danger-hover not-aria-disabled:data-pressed:bg-danger-hover",
   ),
 };
 

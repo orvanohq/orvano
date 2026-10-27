@@ -567,7 +567,7 @@ msgstr "Orvano home"
 msgid "Overview"
 msgstr "Overview"
 
-#: src/ui/shell/breadcrumbs.tsx:128
+#: src/ui/shell/breadcrumbs.tsx:129
 msgid "Path"
 msgstr "Path"
 
@@ -687,7 +687,7 @@ msgstr "Show list"
 msgid "Show password"
 msgstr "Show password"
 
-#: src/ui/shell/breadcrumbs.tsx:126
+#: src/ui/shell/breadcrumbs.tsx:127
 msgid "Show the full path"
 msgstr "Show the full path"
 
@@ -817,7 +817,7 @@ msgstr "You don't have access"
 msgid "You need the {role} role for this."
 msgstr "You need the {role} role for this."
 
-#: src/ui/button.test.tsx:10
+#: src/ui/button.test.tsx:11
 msgid "You need the Admin role to delete tables."
 msgstr "You need the Admin role to delete tables."
 

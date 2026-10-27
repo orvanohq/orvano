@@ -1,5 +1,6 @@
 import { defineConfig, mergeConfig } from "vitest/config";
 import { playwright } from "@vitest/browser-playwright";
+import type { BrowserCommand } from "vitest/node";
 import viteConfig from "./vite.config";
 
 // Spec 0003 QA-1: browser mode only, on the app's own Vite config, so tests run the same router plugin, Lingui
@@ -8,6 +9,11 @@ import viteConfig from "./vite.config";
 // The dev proxy (spec 0007 CSL-3) is left out: it would send Vitest's own browser requests to the server.
 // vite.config.ts is a function of the mode (spec 0015 STY-9); tests take its default, non probe config.
 const appConfig = viteConfig({ command: "serve", mode: "test" });
+
+// Spec 0015 AC-6: forced colors mode, through Playwright's media emulation (src/test/media.ts calls it).
+const emulateForcedColors: BrowserCommand<[active: boolean]> = async ({ page }, active) => {
+  await page.emulateMedia({ forcedColors: active ? "active" : "none" });
+};
 
 export default mergeConfig(
   { ...appConfig, server: { ...appConfig.server, proxy: undefined } },
@@ -54,6 +60,7 @@ export default mergeConfig(
               headless: true,
               provider: playwright(),
               instances: [{ browser: "chromium" }, { browser: "firefox" }, { browser: "webkit" }],
+              commands: { emulateForcedColors },
             },
           },
         },
