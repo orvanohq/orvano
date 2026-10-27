@@ -58,7 +58,13 @@ describe("AppShell", () => {
     const { screen } = await renderScene("/acme/storefront/databases");
     const skip = screen.getByRole("link", { name: "Skip to content" });
 
-    await userEvent.tab();
+    // First in tab order: nothing focusable comes before it in the document.
+    const focusable = document.querySelector(
+      "a[href], button, input, select, textarea, [tabindex]:not([tabindex='-1'])",
+    );
+    expect(focusable).toBe(skip.element());
+    // A fresh Firefox frame on CI can take one Tab before focus enters the page.
+    await tabTo(skip.element());
     await expect.element(skip).toHaveFocus();
     await expect.element(skip).toBeVisible();
     await userEvent.keyboard("{Enter}");
