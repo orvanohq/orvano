@@ -22,14 +22,14 @@ I read the code and the existing tests; I did not run the gallery, the test suit
 
 Grouped so the fix sessions do not touch the same files. Numbers are the finding numbers below.
 
-| Group | Findings | Files |
-| --- | --- | --- |
-| A. Locale and bundle | 1, 2, 6 | `main.tsx`, `routes/__root.tsx`, `shared/i18n`, `vite.config.ts`, `shell/switcher.tsx` (label only) |
-| B. Overlays and focus | 3, 4, 7, 8, 9, 10, 11, 12 | `dialog.tsx`, `confirm-delete/`, `menu.tsx`, `popover.tsx`, `side-sheet/`, `docs-pane/`, `shell/app-shell.tsx`, `shell/switcher.tsx` |
-| C. Shell layout and state | 5, 13, 14, 15 | `shell/resource-layout.tsx`, `shell/resource-list.tsx`, `shell/breadcrumbs.tsx`, `table/`, `theme.css` |
-| D. Primitives and forms | 16 to 23 | `copy-field.tsx`, `form/`, `relative-time.tsx`, `error-copy.tsx`, `states.tsx`, `use-shortcut.ts` |
-| E. Theme and styles | 24 to 27 | `theme.css`, `dialog.tsx` and `popover.tsx` (classes only) |
-| F. Tooling, CI and tests | 28 to 33 | `console-restrictions.ts`, `vite.config.ts`, `e2e/`, `check-gallery-not-shipped.mjs`, `skeleton.test.tsx` |
+| Group                     | Findings                  | Files                                                                                                                                |
+| ------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| A. Locale and bundle      | 1, 2, 6                   | `main.tsx`, `routes/__root.tsx`, `shared/i18n`, `vite.config.ts`, `shell/switcher.tsx` (label only)                                  |
+| B. Overlays and focus     | 3, 4, 7, 8, 9, 10, 11, 12 | `dialog.tsx`, `confirm-delete/`, `menu.tsx`, `popover.tsx`, `side-sheet/`, `docs-pane/`, `shell/app-shell.tsx`, `shell/switcher.tsx` |
+| C. Shell layout and state | 5, 13, 14, 15             | `shell/resource-layout.tsx`, `shell/resource-list.tsx`, `shell/breadcrumbs.tsx`, `table/`, `theme.css`                               |
+| D. Primitives and forms   | 16 to 23                  | `copy-field.tsx`, `form/`, `relative-time.tsx`, `error-copy.tsx`, `states.tsx`, `use-shortcut.ts`                                    |
+| E. Theme and styles       | 24 to 27                  | `theme.css`, `dialog.tsx` and `popover.tsx` (classes only)                                                                           |
+| F. Tooling, CI and tests  | 28 to 33                  | `console-restrictions.ts`, `vite.config.ts`, `e2e/`, `check-gallery-not-shipped.mjs`, `skeleton.test.tsx`                            |
 
 Groups B and E both touch `dialog.tsx` and `popover.tsx`; run E after B, or do both in one session.
 
@@ -73,7 +73,6 @@ Groups B and E both touch `dialog.tsx` and `popover.tsx`; run E after B, or do b
 
 **Problem**: `aria-label={`${strings.dialog}: ${props.name}`}` joins a translated phrase, a hard coded `": "`, and the name. Word order and punctuation are the translator's job (I18N-1, I18N-8); some languages put the name first.
 **Suggested fix**: one message per kind: ``t`Switch project: ${name}` `` and the same for organizations. The lint rule missed this because the template literal sits in `aria-label` (it is checked, but the expression form passes).
-
 
 **Overlays, menus and focus**
 
@@ -194,7 +193,7 @@ Groups B and E both touch `dialog.tsx` and `popover.tsx`; run E after B, or do b
 
 ### 🟡 28. Lint rules leave the easy bypasses open, `tooling/config/console-restrictions.ts:62-73, 256-274`
 
-**Problem**: (a) SEC-2 names `dangerouslySetInnerHTML`, `eval`, `new Function`, and event handler strings, but not `innerHTML`, `outerHTML`, `insertAdjacentHTML` or `document.write`, which are the more common way to write raw HTML. (b) STY-5's arbitrary value pattern is `-\[` or `^\[name:`, so an arbitrary variant such as `[&_svg]:size-4` or `[@media(x)]:p-2` passes outside `src/ui`. (c) `classStrings` looks only at `className` literals and `cx(...)` arguments, so a class string in a constant or an object value (`const wide = "w-[13px]"`) passes, and RTL-2's template check covers only `className` templates, not `` cx(`ps-${x} left-0`) ``.
+**Problem**: (a) SEC-2 names `dangerouslySetInnerHTML`, `eval`, `new Function`, and event handler strings, but not `innerHTML`, `outerHTML`, `insertAdjacentHTML` or `document.write`, which are the more common way to write raw HTML. (b) STY-5's arbitrary value pattern is `-\[` or `^\[name:`, so an arbitrary variant such as `[&_svg]:size-4` or `[@media(x)]:p-2` passes outside `src/ui`. (c) `classStrings` looks only at `className` literals and `cx(...)` arguments, so a class string in a constant or an object value (`const wide = "w-[13px]"`) passes, and RTL-2's template check covers only `className` templates, not ``cx(`ps-${x} left-0`)``.
 **Why it matters**: these rules are the enforcement for AC-19 and the CSP story; each missing path is a lint pass that should have failed. Rules: STY-5, RTL-2, SEC-2.
 **Suggested fix**: add the four HTML sinks to SEC-2 with fixtures; widen the arbitrary pattern to `(^|\s)(\S*:)?\[` ; add `TemplateLiteral` quasis inside `cx(...)` to both class string selectors. Each gets a fixture under `tooling/lint-fixtures/`.
 
