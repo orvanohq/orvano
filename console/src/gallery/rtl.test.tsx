@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import { expectNoAxeViolations } from "@/test/axe";
+import { emulateForcedColors } from "@/test/media";
 import {
   NARROW,
   renderScene,
@@ -81,5 +82,28 @@ describe("right to left", () => {
       .poll(() => Math.round(drawer.element().getBoundingClientRect().right))
       .toBe(document.documentElement.clientWidth);
     expect(drawer.element().getBoundingClientRect().left).toBeGreaterThan(0);
+  });
+
+  it("0015 AC-6, AC-18: in forced colors the current item's mark sits on its right edge", async ({
+    skip,
+  }) => {
+    await emulateForcedColors(true);
+    try {
+      // WebKit doesn't emulate forced colors (Safari has no such mode).
+      if (!window.matchMedia("(forced-colors: active)").matches) skip();
+      const { screen } = await renderScene(table, { direction: "rtl" });
+      const current = screen
+        .getByRole("navigation", { name: "Project" })
+        .getByRole("link", { name: "Databases" });
+
+      await expect.element(current).toHaveAttribute("aria-current", "page");
+      const style = getComputedStyle(current.element());
+      expect({ right: style.borderRightWidth, left: style.borderLeftWidth }).toMatchObject({
+        right: "2px",
+      });
+      expect(style.borderLeftWidth).not.toBe("2px");
+    } finally {
+      await emulateForcedColors(false);
+    }
   });
 });

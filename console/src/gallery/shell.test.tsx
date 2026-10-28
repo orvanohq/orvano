@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import { layout, resourceListLayout, themePreference } from "@/shared/storage/items";
 import { expectNoAxeViolations } from "@/test/axe";
+import { emulateForcedColors } from "@/test/media";
 import { user } from "./fixtures";
 import {
   NARROW,
@@ -465,5 +466,41 @@ describe("account menu", () => {
     await screen.getByRole("menuitem", { name: "Sign out" }).click();
 
     expect(signedOut).toBe(true);
+  });
+});
+
+/** The inline start border THM-6 gives a current item in forced colors: on the left here, in left to right. */
+const startBorder = (element: Element) => {
+  const style = getComputedStyle(element);
+  return { style: style.borderLeftStyle, width: style.borderLeftWidth };
+};
+
+describe("forced colors", () => {
+  afterEach(async () => {
+    await emulateForcedColors(false);
+  });
+
+  it("0015 AC-6: the current sidebar item, open resource, and current tab keep a 2 px mark (THM-6)", async ({
+    skip,
+  }) => {
+    await emulateForcedColors(true);
+    // WebKit doesn't emulate forced colors (Safari has no such mode), so there is nothing to check there.
+    if (!window.matchMedia("(forced-colors: active)").matches) skip();
+    const { screen } = await renderScene(table);
+
+    const current = [
+      screen.getByRole("navigation", { name: "Project" }).getByRole("link", { name: "Databases" }),
+      screen.getByRole("navigation", { name: "Tables" }).getByRole("link", { name: "users" }),
+      screen.getByRole("navigation", { name: "Table" }).getByRole("link", { name: "Rows" }),
+    ];
+    for (const link of current) {
+      // oxlint-disable-next-line no-await-in-loop -- one item at a time
+      await expect.element(link).toHaveAttribute("aria-current", "page");
+      expect(startBorder(link.element())).toEqual({ style: "solid", width: "2px" });
+    }
+    const other = screen
+      .getByRole("navigation", { name: "Project" })
+      .getByRole("link", { name: "Storage" });
+    expect(startBorder(other.element()).width).not.toBe("2px");
   });
 });

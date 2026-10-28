@@ -1,9 +1,11 @@
 import { msg } from "@lingui/core/macro";
 import { describe, expect, it, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { userEvent, type Locator } from "vitest/browser";
 import { expectNoAxeViolations } from "@/test/axe";
+import { focusElement } from "@/test/focus";
 import { renderInRouter } from "@/test/render";
 import { Button } from "./button";
+import { LocaleProvider } from "./locale-provider";
 import { Menu, MenuItem, MenuSection, MenuTrigger } from "./menu";
 import { PageHeader } from "./page-header";
 import { Tab, TabList, TabPanel, Tabs } from "./tabs";
@@ -124,6 +126,79 @@ describe("Tabs", () => {
     await userEvent.keyboard("{Home}");
     await expect.element(js).toHaveFocus();
     await expectNoAxeViolations();
+  });
+});
+
+const sdkTabs = (activation?: "manual" | "automatic") => (
+  <Tabs keyboardActivation={activation}>
+    <TabList aria-label="SDK">
+      <Tab id="js">JavaScript</Tab>
+      <Tab id="dart">Dart</Tab>
+      <Tab id="dotnet">.NET</Tab>
+    </TabList>
+    <TabPanel id="js">npm install</TabPanel>
+    <TabPanel id="dart">dart pub add</TabPanel>
+    <TabPanel id="dotnet">dotnet add package</TabPanel>
+  </Tabs>
+);
+
+/**
+ * Focuses a tab and waits until React Aria has taken that focus as its own (`data-focused`), so the next arrow key
+ * moves from it. CI's WebKit can take the key before React Aria sees the focus.
+ */
+const focusTab = async (tab: Locator) => {
+  await focusElement(tab);
+  await expect.element(tab).toHaveAttribute("data-focused");
+};
+
+describe("Tabs at their edges", () => {
+  it("0001 UX-5: automatic activation selects as focus moves, and End jumps to the last tab", async () => {
+    const { screen } = await renderInRouter(sdkTabs("automatic"));
+    const dart = screen.getByRole("tab", { name: "Dart" });
+    const dotnet = screen.getByRole("tab", { name: ".NET" });
+
+    await focusTab(screen.getByRole("tab", { name: "JavaScript" }));
+    await userEvent.keyboard("{ArrowRight}");
+    await expect.element(dart).toHaveAttribute("aria-selected", "true");
+    await userEvent.keyboard("{End}");
+
+    await expect.element(dotnet).toHaveFocus();
+    await expect.element(dotnet).toHaveAttribute("aria-selected", "true");
+    await expect.element(screen.getByRole("tabpanel")).toHaveTextContent("dotnet add package");
+  });
+
+  it("0001 UX-5: arrows wrap from the last tab to the first", async () => {
+    const { screen } = await renderInRouter(sdkTabs());
+    const js = screen.getByRole("tab", { name: "JavaScript" });
+
+    await focusTab(screen.getByRole("tab", { name: ".NET" }));
+    await userEvent.keyboard("{ArrowRight}");
+
+    await expect.element(js).toHaveFocus();
+  });
+
+  it("0015 AC-18: in right to left the arrows are mirrored", async () => {
+    const { screen } = await renderInRouter(
+      // A real right to left locale: CI's WebKit resolves the pseudo locale ar-XB as left to right, so React Aria's
+      // own keys aren't mirrored there (the separator reads the layout instead, see resource-layout.tsx).
+      <div dir="rtl">
+        <LocaleProvider locale="ar">{sdkTabs()}</LocaleProvider>
+      </div>,
+    );
+    const list = screen.getByRole("tablist", { name: "SDK" });
+    const js = screen.getByRole("tab", { name: "JavaScript" });
+    const dart = screen.getByRole("tab", { name: "Dart" });
+
+    // The keys come from the page's layout direction, which is what a user sees, not from React Aria's locale.
+    const rtl = getComputedStyle(list.element()).direction === "rtl";
+    expect(rtl).toBe(true);
+    const [forward, back] = rtl ? ["{ArrowLeft}", "{ArrowRight}"] : ["{ArrowRight}", "{ArrowLeft}"];
+    await focusTab(js);
+    await userEvent.keyboard(forward);
+    await expect.element(dart).toHaveFocus();
+    await expect.element(dart).toHaveAttribute("data-focused");
+    await userEvent.keyboard(back);
+    await expect.element(js).toHaveFocus();
   });
 });
 
