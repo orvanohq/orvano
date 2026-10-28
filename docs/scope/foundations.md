@@ -178,7 +178,7 @@ spec [0015](../specs/0015-design-system-console-shell/index.md) · design [conso
   - [x] Milestone 4, feedback and data display: `notify` and toasts, banners, states and skeletons, status chips, table, copy and secret fields, relative time, error pages (steps 17 to 20; AC-12, AC-15, AC-17, AC-21, AC-24)
   - [x] Milestone 5, power features and sign off: shortcuts, command palette, activity indicator, docs pane, finished `design.md`, budgets, and the screen reader script in both pairs (steps 21 to 24; AC-1, AC-3, AC-12 to AC-14, AC-22)
   - [x] Milestone 6, the shell's first load budget: the `sideEffects` list, Zod through `zod/mini`, the 230 KB first load, and the shell probe in `pnpm size` (step 25; AC-3, settled by `/architect` 2026-10-27)
-- [ ] Verify it: `/check verify design system & console shell`
+- [x] Verify it: `/check verify design system & console shell` (PASS on 2026-10-27 in [the re-verify](../reviews/2026-10-27-reverify-design-system-console-shell.md); AC-22, the screen reader runs, is still owed to a person)
 - [ ] Test it: `/test design system & console shell`
 - [ ] Review it (fresh model): `/check review design system & console shell`
 - [ ] Document it: `/document design system & console shell`
