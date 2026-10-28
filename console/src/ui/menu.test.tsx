@@ -1,6 +1,6 @@
 import { msg } from "@lingui/core/macro";
 import { describe, expect, it, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { userEvent, type Locator } from "vitest/browser";
 import { expectNoAxeViolations } from "@/test/axe";
 import { focusElement } from "@/test/focus";
 import { renderInRouter } from "@/test/render";
@@ -142,13 +142,22 @@ const sdkTabs = (activation?: "manual" | "automatic") => (
   </Tabs>
 );
 
+/**
+ * Focuses a tab and waits until React Aria has taken that focus as its own (`data-focused`), so the next arrow key
+ * moves from it. CI's WebKit can take the key before React Aria sees the focus.
+ */
+const focusTab = async (tab: Locator) => {
+  await focusElement(tab);
+  await expect.element(tab).toHaveAttribute("data-focused");
+};
+
 describe("Tabs at their edges", () => {
   it("0001 UX-5: automatic activation selects as focus moves, and End jumps to the last tab", async () => {
     const { screen } = await renderInRouter(sdkTabs("automatic"));
     const dart = screen.getByRole("tab", { name: "Dart" });
     const dotnet = screen.getByRole("tab", { name: ".NET" });
 
-    await focusElement(screen.getByRole("tab", { name: "JavaScript" }));
+    await focusTab(screen.getByRole("tab", { name: "JavaScript" }));
     await userEvent.keyboard("{ArrowRight}");
     await expect.element(dart).toHaveAttribute("aria-selected", "true");
     await userEvent.keyboard("{End}");
@@ -162,7 +171,7 @@ describe("Tabs at their edges", () => {
     const { screen } = await renderInRouter(sdkTabs());
     const js = screen.getByRole("tab", { name: "JavaScript" });
 
-    await focusElement(screen.getByRole("tab", { name: ".NET" }));
+    await focusTab(screen.getByRole("tab", { name: ".NET" }));
     await userEvent.keyboard("{ArrowRight}");
 
     await expect.element(js).toHaveFocus();
@@ -175,15 +184,19 @@ describe("Tabs at their edges", () => {
       </div>,
     );
     const list = screen.getByRole("tablist", { name: "SDK" });
+    const js = screen.getByRole("tab", { name: "JavaScript" });
     const dart = screen.getByRole("tab", { name: "Dart" });
 
-    // The key comes from the page's layout direction, which is what a user sees.
-    expect(getComputedStyle(list.element()).direction).toBe("rtl");
-    await focusElement(screen.getByRole("tab", { name: "JavaScript" }));
-    await userEvent.keyboard("{ArrowLeft}");
+    // The keys come from the page's layout direction, which is what a user sees, not from React Aria's locale.
+    const rtl = getComputedStyle(list.element()).direction === "rtl";
+    expect(rtl).toBe(true);
+    const [forward, back] = rtl ? ["{ArrowLeft}", "{ArrowRight}"] : ["{ArrowRight}", "{ArrowLeft}"];
+    await focusTab(js);
+    await userEvent.keyboard(forward);
     await expect.element(dart).toHaveFocus();
-    await userEvent.keyboard("{ArrowRight}");
-    await expect.element(screen.getByRole("tab", { name: "JavaScript" })).toHaveFocus();
+    await expect.element(dart).toHaveAttribute("data-focused");
+    await userEvent.keyboard(back);
+    await expect.element(js).toHaveFocus();
   });
 });
 
