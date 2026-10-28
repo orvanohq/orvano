@@ -180,5 +180,5 @@ spec [0015](../specs/0015-design-system-console-shell/index.md) · design [conso
   - [x] Milestone 6, the shell's first load budget: the `sideEffects` list, Zod through `zod/mini`, the 230 KB first load, and the shell probe in `pnpm size` (step 25; AC-3, settled by `/architect` 2026-10-27)
 - [x] Verify it: `/check verify design system & console shell` (PASS on 2026-10-27 in [the re-verify](../reviews/2026-10-27-reverify-design-system-console-shell.md); AC-22, the screen reader runs, is still owed to a person)
 - [x] Test it: `/test design system & console shell` (2026-10-27: gap tests for error and edge states, forced colors, right to left, keyboard paths, and the tooling command lines; two known bugs are pinned as `it.fails`)
-- [ ] Review it (fresh model): `/check review design system & console shell`
+- [x] Review it (fresh model): `/check review design system & console shell` (2026-10-27: changes requested, 0 blockers, 5 majors, 28 minors, 13 nits, in [the review](../reviews/2026-10-27-review-design-system-console-shell.md))
 - [ ] Document it: `/document design system & console shell`
