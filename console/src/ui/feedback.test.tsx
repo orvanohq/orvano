@@ -349,9 +349,7 @@ describe("states at their edges", () => {
 
   // WCAG 1.4.10 and spec 0015 AC-8 (reflow at 320 px): a resource name can be one long word, here a 63 character
   // Postgres identifier, the longest a table name can be.
-  //
-  // Known bug (found by /test, 2026-10-27): none of these wrap a long word (no `overflow-wrap`/`break-words` in
-  // banner.tsx or states.tsx), so the text runs past the column at 320 px. Drop `.fails` once they wrap.
+  // Their text blocks set `overflow-wrap: anywhere`, which also lowers a centered flex item's minimum width.
   const long = "customer_order_line_items_archive_2024_q4_eu_west_replica_backu";
   const narrow = async (element: ReactNode) => {
     const { screen } = await renderInRouter(<div style={{ width: 320 }}>{element}</div>);
@@ -361,19 +359,24 @@ describe("states at their edges", () => {
     return { scrollWidth: box.scrollWidth, clientWidth: box.clientWidth };
   };
 
-  it.fails("0015 AC-8: an inline error wraps a long request ID and title inside 320 px", async () => {
+  it("0015 AC-8: an inline error wraps a long request ID and title inside 320 px", async () => {
     const size = await narrow(
       <InlineError error={{ kind: "server", requestId: long }} title={long} />,
     );
     expect(size.scrollWidth).toBeLessThanOrEqual(size.clientWidth);
   });
 
-  it.fails("0015 AC-8: an empty state wraps a long title inside 320 px", async () => {
+  it("0015 AC-8: an empty state wraps a long title inside 320 px", async () => {
     const size = await narrow(<EmptyState kind="no-results" title={long} description={long} />);
     expect(size.scrollWidth).toBeLessThanOrEqual(size.clientWidth);
   });
 
-  it.fails("0015 AC-8: a banner wraps a long unbroken word inside 320 px", async () => {
+  it("0015 AC-8: an error state wraps a long title inside 320 px", async () => {
+    const size = await narrow(<ErrorState error={new Error("boom")} title={long} />);
+    expect(size.scrollWidth).toBeLessThanOrEqual(size.clientWidth);
+  });
+
+  it("0015 AC-8: a banner wraps a long unbroken word inside 320 px", async () => {
     const size = await narrow(
       <Banner tone="warning" title={long}>
         {long}

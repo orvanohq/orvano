@@ -42,8 +42,8 @@ export function EmptyState({ kind, title, description, action, children }: Empty
       <span className="flex size-10 items-center justify-center rounded-full bg-bg-muted text-fg-muted">
         <Icon icon={emptyIcons[kind]} size={20} />
       </span>
-      <h2 className="text-md font-semibold text-fg">{title}</h2>
-      <p className="max-w-prose text-fg-muted">{description}</p>
+      <h2 className="text-md font-semibold text-fg wrap-anywhere">{title}</h2>
+      <p className="max-w-prose text-fg-muted wrap-anywhere">{description}</p>
       {action ? <div className="pt-1">{action}</div> : null}
       {children ? <div className="w-full max-w-content pt-3 text-start">{children}</div> : null}
     </section>
@@ -76,8 +76,8 @@ export function ErrorState({ error, title, onRetry, backLink }: ErrorStateProps)
       <span className="flex size-10 items-center justify-center rounded-full bg-danger-subtle text-danger-text">
         <Icon icon={kind === "forbidden" ? NotAllowedIcon : ErrorIcon} size={20} />
       </span>
-      <h2 className="text-md font-semibold text-fg">{copy.title}</h2>
-      <p className="max-w-prose text-fg-muted">{copy.body}</p>
+      <h2 className="text-md font-semibold text-fg wrap-anywhere">{copy.title}</h2>
+      <p className="max-w-prose text-fg-muted wrap-anywhere">{copy.body}</p>
       {kind === "not_found" && backLink ? <div className="pt-1">{backLink}</div> : null}
       {retryable && onRetry ? (
         <div className="pt-1">

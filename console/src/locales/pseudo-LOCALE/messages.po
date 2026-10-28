@@ -200,7 +200,7 @@ msgstr ""
 msgid "Close help"
 msgstr ""
 
-#: src/ui/shell/resource-layout.tsx:110
+#: src/ui/shell/resource-layout.tsx:124
 msgid "Collapse list"
 msgstr ""
 
@@ -383,7 +383,7 @@ msgstr ""
 msgid "Don't ask again for this table this session"
 msgstr ""
 
-#: src/ui/shell/resource-layout.tsx:88
+#: src/ui/shell/resource-layout.tsx:102
 msgid "Expand list"
 msgstr ""
 
