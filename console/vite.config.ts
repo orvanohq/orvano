@@ -5,6 +5,8 @@ import babel from "@rolldown/plugin-babel";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import { lingui } from "@lingui/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
+import optimizeLocales from "@react-aria/optimize-locales-plugin";
+import { reactAriaLocales } from "./src/shared/i18n/locales";
 
 // Spec 0006 NET-2, the exact policy the server sends (server/src/Orvano.Host/Web/SecurityHeaders.cs). `vite preview`
 // sends it too, so the CSP test (spec 0015 STY-6) loads the build under the real policy.
@@ -15,6 +17,8 @@ const consolePolicy =
 export default defineConfig(({ mode }) => ({
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }), // spec 0003 RTE-1: before react()
+    // Spec 0003 I18N-6: React Aria's own strings only for the shipped locales; the rest fall back to en-US.
+    { ...optimizeLocales.vite({ locales: reactAriaLocales }), enforce: "pre" },
     react(),
     lingui(), // spec 0003 I18N-2: .po files compile on import
     babel({

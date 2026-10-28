@@ -11,6 +11,7 @@ import { reportConsoleError } from "@/shared/report";
 import { z } from "@/shared/zod";
 import { startThemeSync } from "@/shared/stores/theme";
 import { BootErrorPage } from "@/ui/error-page";
+import { LocaleProvider } from "@/ui/locale-provider";
 import { createAppRouter } from "./router";
 import "@/ui/theme.css"; // spec 0015 STY-1: the one stylesheet
 
@@ -43,12 +44,15 @@ try {
     </StrictMode>,
   );
 } catch (error) {
-  // The en catalog is bundled (I18N-3), so the error page always has its strings.
+  // The en catalog is bundled (I18N-3), so the error page always has its strings. The router's root route gives React
+  // Aria the locale (I18N-6); without the router, this page does.
   await activateLocale(sourceLocale);
   root.render(
     <StrictMode>
       <I18nProvider i18n={i18n}>
-        <BootErrorPage error={error} />
+        <LocaleProvider locale={sourceLocale}>
+          <BootErrorPage error={error} />
+        </LocaleProvider>
       </I18nProvider>
     </StrictMode>,
   );

@@ -54,6 +54,7 @@ function useStrings(kind: Kind) {
   return kind === "org"
     ? {
         dialog: t`Switch organization`,
+        trigger: (name: string) => t`Switch organization: ${name}`,
         search: t`Search organizations`,
         list: t`Organizations`,
         loading: t`Loading organizations…`,
@@ -66,6 +67,7 @@ function useStrings(kind: Kind) {
       }
     : {
         dialog: t`Switch project`,
+        trigger: (name: string) => t`Switch project: ${name}`,
         search: t`Search projects`,
         list: t`Projects`,
         loading: t`Loading projects…`,
@@ -86,7 +88,7 @@ function Switcher({ kind, ...props }: SwitcherProps & { kind: Kind }) {
   return (
     <DialogTrigger>
       <AriaButton
-        aria-label={`${strings.dialog}: ${props.name}`}
+        aria-label={strings.trigger(props.name)}
         className={cx(
           "inline-flex h-control max-w-48 min-w-0 cursor-default items-center gap-1 rounded-md px-2 font-medium text-fg data-hovered:bg-bg-muted data-pressed:bg-bg-muted",
           focusRing,
