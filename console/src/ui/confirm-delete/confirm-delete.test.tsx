@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { expectNoAxeViolations } from "@/test/axe";
 import { deferred } from "@/test/deferred";
+import { focusElement } from "@/test/focus";
 import { renderInRouter } from "@/test/render";
 import {
   ConfirmDelete,
@@ -150,6 +151,57 @@ describe("ConfirmDelete", () => {
       .element(screen.getByText("Couldn't delete. Check your connection and try again."))
       .toBeVisible();
     await expect.element(screen.getByRole("alertdialog")).toBeVisible();
+  });
+
+  it("0001 UX-23: Escape and Cancel can't close it while the delete runs, so a later failure shows", async () => {
+    let fail: ((error: Error) => void) | undefined;
+    const deleting = new Promise<void>((_, reject) => {
+      fail = reject;
+    });
+    const { screen } = await renderInRouter(
+      <Harness kind="webhook" name="deploys" onConfirm={() => deleting} />,
+    );
+    const remove = screen.getByRole("button", { name: "Delete webhook" });
+
+    await remove.click();
+    await expect.element(remove).toHaveAttribute("aria-disabled", "true");
+    await expect.element(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    await focusElement(remove);
+    await userEvent.keyboard("{Escape}");
+    await expect
+      .element(screen.getByRole("alertdialog", { name: "Delete deploys?" }))
+      .toBeVisible();
+
+    fail?.(new Error("500"));
+    await expect
+      .element(screen.getByText("Couldn't delete. Check your connection and try again."))
+      .toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+    await userEvent.keyboard("{Escape}");
+    await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("0001 UX-23: a delete that succeeds after an Escape still closes it once", async () => {
+    const deleting = deferred<undefined>();
+    const onOpenChange = vi.fn<(isOpen: boolean) => void>();
+    const { screen } = await renderInRouter(
+      <ConfirmDelete
+        kind="table"
+        name="users"
+        isOpen
+        onOpenChange={onOpenChange}
+        onConfirm={() => deleting.promise}
+      />,
+    );
+    const remove = screen.getByRole("button", { name: "Delete table" });
+
+    await remove.click();
+    await focusElement(remove);
+    await userEvent.keyboard("{Escape}");
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    deleting.resolve(undefined);
+    await expect.poll(() => onOpenChange.mock.calls).toEqual([[false]]);
   });
 
   it("0015 AC-17: a single row offers Don't ask again; a bulk delete over 1,000 asks for the count", async () => {

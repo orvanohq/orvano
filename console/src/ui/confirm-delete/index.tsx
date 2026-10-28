@@ -69,6 +69,8 @@ export function ConfirmDelete(props: ConfirmDeleteProps) {
   const [failed, setFailed] = useState(false);
 
   const openChange = (open: boolean) => {
+    // UX-23: closing doesn't cancel a delete that has started, so don't pretend it does; its outcome shows here.
+    if (!open && isDeleting) return;
     if (!open) {
       setTyped("");
       setFailed(false);
@@ -91,13 +93,15 @@ export function ConfirmDelete(props: ConfirmDeleteProps) {
     setFailed(false);
     try {
       await onConfirm();
-      openChange(false);
     } catch {
       setFailed(true);
       announce(failure);
+      return;
     } finally {
       setDeleting(false);
     }
+    setTyped("");
+    onOpenChange(false);
   };
 
   return (
@@ -106,9 +110,10 @@ export function ConfirmDelete(props: ConfirmDeleteProps) {
       title={i18n._(title(props))}
       isOpen={isOpen}
       onOpenChange={openChange}
+      isDismissDisabled={isDeleting}
       footer={
         <>
-          <Button slot="close" initialFocus={confirmation === undefined}>
+          <Button slot="close" initialFocus={confirmation === undefined} isDisabled={isDeleting}>
             {t`Cancel`}
           </Button>
           <Button

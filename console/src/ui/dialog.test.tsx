@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { z } from "@/shared/zod";
 import { expectNoAxeViolations } from "@/test/axe";
 import { focusElement } from "@/test/focus";
@@ -67,6 +67,47 @@ describe("Dialog", () => {
     await screen.getByRole("button", { name: "Cancel" }).click();
 
     await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();
+  });
+});
+
+describe("Dialog taller than the window", () => {
+  afterEach(async () => {
+    // Vitest's default browser viewport.
+    await page.viewport(414, 896);
+  });
+
+  it("0015 AC-8: at 320 by 480 its title can still be reached, and so can its actions", async () => {
+    await page.viewport(320, 480);
+    const { screen } = await renderInRouter(
+      <Dialog
+        title="Keyboard shortcuts"
+        size="md"
+        isOpen
+        footer={<Button slot="close">Close</Button>}
+      >
+        {Array.from({ length: 30 }, (_, index) => (
+          <p key={index}>Shortcut {index + 1}</p>
+        ))}
+      </Dialog>,
+    );
+    const dialog = screen.getByRole("dialog", { name: "Keyboard shortcuts" });
+    await expect.element(dialog).toBeVisible();
+    const heading = screen.getByRole("heading", { name: "Keyboard shortcuts" }).element();
+    const overlay = dialog.element().closest("[data-modal]");
+    expect(overlay).not.toBeNull();
+    expect(overlay!.scrollHeight).toBeGreaterThan(overlay!.clientHeight);
+
+    // Scrolled to the start, the title is on screen, not cut off above it.
+    overlay!.scrollTop = 0;
+    await expect.poll(() => heading.getBoundingClientRect().top).toBeGreaterThanOrEqual(0);
+    expect(heading.getBoundingClientRect().bottom).toBeLessThanOrEqual(window.innerHeight);
+    expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(320);
+
+    const close = screen.getByRole("button", { name: "Close" }).element();
+    overlay!.scrollTop = overlay!.scrollHeight;
+    await expect
+      .poll(() => close.getBoundingClientRect().bottom)
+      .toBeLessThanOrEqual(window.innerHeight);
   });
 });
 

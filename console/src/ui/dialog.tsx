@@ -21,6 +21,8 @@ export interface DialogProps {
   /** Controlled use. Leave both out inside a `DialogTrigger`, which opens it from its button. */
   isOpen?: boolean;
   onOpenChange?: (isOpen: boolean) => void;
+  /** Turns off Escape and, for a `dialog`, a press outside, while an action that can't be undone runs (UX-23). */
+  isDismissDisabled?: boolean;
   children: ReactNode;
   /** The actions: Cancel (`slot="close"`) then the primary, at the inline end (UX-36). */
   footer?: ReactNode;
@@ -42,6 +44,7 @@ export function Dialog({
   role = "dialog",
   isOpen,
   onOpenChange,
+  isDismissDisabled = false,
   children,
   footer,
 }: DialogProps) {
@@ -50,12 +53,15 @@ export function Dialog({
       data-modal // SHL-10: shell shortcuts do nothing while a modal is open
       isOpen={isOpen}
       onOpenChange={onOpenChange}
-      isDismissable={role === "dialog"}
-      className="fixed inset-0 z-(--z-modal) flex items-center justify-center overflow-y-auto bg-scrim p-4 transition-opacity duration-(--duration-base) ease-standard data-entering:opacity-0 data-exiting:opacity-0"
+      isDismissable={role === "dialog" && !isDismissDisabled}
+      isKeyboardDismissDisabled={isDismissDisabled}
+      // A plain scroll container: `m-auto` centers the dialog, and its auto margins fall to zero when it's taller
+      // than the window, so its top stays reachable (AC-8 reflow). `items-center` would push the top out of reach.
+      className="fixed inset-0 z-(--z-modal) flex overflow-y-auto bg-scrim p-4 transition-opacity duration-(--duration-base) ease-standard data-entering:opacity-0 data-exiting:opacity-0"
     >
       <Modal
         className={cx(
-          "max-w-full rounded-lg border bg-bg-raised text-fg shadow-lg transition duration-(--duration-base) ease-standard data-entering:scale-98 data-exiting:scale-98",
+          "m-auto max-w-full rounded-lg border bg-bg-raised text-fg shadow-lg transition duration-(--duration-base) ease-standard data-entering:scale-98 data-exiting:scale-98",
           sizes[size],
         )}
       >

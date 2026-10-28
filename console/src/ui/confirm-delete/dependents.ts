@@ -44,9 +44,8 @@ const counted: Record<ResourceKind | "row", Counted> = {
 /** The text for one dependent: "12 tables", or "about 1,200 rows" for an estimate (UX-23). */
 export function dependentText(i18n: I18n, item: Dependent): string {
   const { count, kind } = item;
-  const counts =
-    kind in counted
-      ? i18n._(counted[kind as keyof typeof counted](count))
-      : i18n._(msg`${count} of kind ${kind}`);
+  const counts = Object.hasOwn(counted, kind)
+    ? i18n._(counted[kind as keyof typeof counted](count))
+    : i18n._(msg`${count} of kind ${kind}`);
   return item.estimated ? i18n._(msg`about ${counts}`) : counts;
 }
