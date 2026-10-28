@@ -59,9 +59,8 @@ describe("dependentText", () => {
     );
   });
 
-  // Known bug (found by /test, 2026-10-27): `kind in counted` (dependents.ts:48) also matches inherited names, so
-  // "toString" calls Object.prototype.toString and the line reads "[object Object]". Drop `.fails` once it's fixed.
-  it.fails("a kind named like an Object built in is not mistaken for a known kind", () => {
+  // Found by /test: `kind in counted` also matched inherited names, so "toString" read "[object Object]".
+  it("a kind named like an Object built in is not mistaken for a known kind", () => {
     expect(dependentText(i18n, { kind: "toString", count: 2, estimated: false })).toBe(
       "2 of kind toString",
     );
