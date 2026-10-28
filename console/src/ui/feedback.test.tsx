@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { expectNoAxeViolations } from "@/test/axe";
@@ -174,5 +175,210 @@ describe("Progress, Spinner, StatusChip, and Badge", () => {
       await expect.element(screen.getByText(label, { exact: true })).toBeVisible();
     }
     await expectNoAxeViolationsInBothThemes();
+  });
+});
+
+describe("error wording by kind (UX-22)", () => {
+  const cases: { name: string; error: unknown; title: string; body: string }[] = [
+    {
+      name: "a network failure asks you to check the connection",
+      error: { kind: "network" },
+      title: "Couldn't reach the server",
+      body: "Check your connection and try again.",
+    },
+    {
+      name: "a timeout reads like a network failure",
+      error: { kind: "timeout" },
+      title: "Couldn't reach the server",
+      body: "Check your connection and try again.",
+    },
+    {
+      name: "a permission denial with no role asks an owner",
+      error: { kind: "forbidden" },
+      title: "You don't have access",
+      body: "Ask an owner of this project for access.",
+    },
+    {
+      name: "a rate limit with no Retry-After asks you to wait",
+      error: { kind: "rate_limited" },
+      title: "Too many requests",
+      body: "Wait a moment, then try again.",
+    },
+    {
+      name: "a rate limit of one second is singular",
+      error: { kind: "rate_limited", retryAfter: 1 },
+      title: "Too many requests",
+      body: "Try again in 1 second.",
+    },
+    {
+      name: "a fractional Retry-After rounds up",
+      error: { kind: "rate_limited", retryAfter: 2.2 },
+      title: "Too many requests",
+      body: "Try again in 3 seconds.",
+    },
+    {
+      name: "an unknown kind with no request ID asks you to try again",
+      error: { kind: "conflict" },
+      title: "Something went wrong",
+      body: "Try again in a moment.",
+    },
+    {
+      name: "an empty request ID counts as none",
+      error: { kind: "server", requestId: "" },
+      title: "Something went wrong",
+      body: "Try again in a moment.",
+    },
+    {
+      name: "a thrown string reads as a plain failure",
+      error: "boom",
+      title: "Something went wrong",
+      body: "Try again in a moment.",
+    },
+    {
+      name: "a thrown null reads as a plain failure",
+      error: null,
+      title: "Something went wrong",
+      body: "Try again in a moment.",
+    },
+    {
+      name: "a non numeric Retry-After is ignored",
+      error: { kind: "rate_limited", retryAfter: "30" },
+      title: "Too many requests",
+      body: "Wait a moment, then try again.",
+    },
+  ];
+
+  for (const { name, error, title, body } of cases) {
+    it(`0001 UX-22: ${name}`, async () => {
+      const { screen } = await renderInRouter(<InlineError error={error} />);
+
+      const alert = screen.getByRole("alert");
+      await expect.poll(() => alert.element().textContent).toContain(title);
+      expect(alert.element().textContent).toContain(body);
+      expect(alert.element().textContent).not.toContain("Request ID");
+    });
+  }
+
+  it("0001 UX-22: a network failure keeps the caller's title", async () => {
+    const { screen } = await renderInRouter(
+      <InlineError error={{ kind: "network" }} title="Couldn't load tables" />,
+    );
+
+    await expect.element(screen.getByText("Couldn't load tables")).toBeVisible();
+  });
+
+  it("0015 AC-12: children replace the wording, and no Retry shows without onRetry", async () => {
+    const { screen } = await renderInRouter(
+      <InlineError error={{ kind: "server" }}>The column name is taken.</InlineError>,
+    );
+
+    await expect.element(screen.getByText("The column name is taken.")).toBeVisible();
+    expect(screen.getByRole("button").elements()).toHaveLength(0);
+  });
+});
+
+describe("states at their edges", () => {
+  it("0001 UX-22: forbidden names the role, shows no Retry, and no back link", async () => {
+    const { screen } = await renderInRouter(
+      <ErrorState
+        error={{ kind: "forbidden", requiredRole: "Owner" }}
+        onRetry={() => undefined}
+        backLink={<Button>Back to tables</Button>}
+      />,
+    );
+
+    await expect
+      .element(screen.getByRole("heading", { name: "You don't have access" }))
+      .toBeVisible();
+    await expect.element(screen.getByText("You need the Owner role for this.")).toBeVisible();
+    expect(screen.getByRole("button").elements()).toHaveLength(0);
+  });
+
+  it("0001 UX-22: not found without a back link shows only its words", async () => {
+    const { screen } = await renderInRouter(<ErrorState error={{ kind: "not_found" }} />);
+
+    await expect.element(screen.getByRole("heading", { name: "Not found" })).toBeVisible();
+    expect(screen.getByRole("button").elements()).toHaveLength(0);
+  });
+
+  it("0001 UX-20: a first use state shows the quick start below its action", async () => {
+    const { screen } = await renderInRouter(
+      <EmptyState
+        kind="first-use"
+        title="Create your first table"
+        description="Tables hold your rows."
+        action={<Button>Create table</Button>}
+      >
+        <p>npm install @orvano/sdk</p>
+      </EmptyState>,
+    );
+
+    const action = screen.getByRole("button", { name: "Create table" }).element();
+    const quickStart = screen.getByText("npm install @orvano/sdk").element();
+    await expect.element(quickStart).toBeVisible();
+    expect(
+      action.compareDocumentPosition(quickStart) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("0001 UX-20: a not allowed state with no action renders no button", async () => {
+    const { screen } = await renderInRouter(
+      <EmptyState kind="not-allowed" title="No access" description="Ask an owner." />,
+    );
+
+    await expect.element(screen.getByRole("heading", { name: "No access" })).toBeVisible();
+    expect(screen.getByRole("button").elements()).toHaveLength(0);
+    await expectNoAxeViolationsInBothThemes();
+  });
+
+  it("0015 AC-15: progress shows 0% and 100% at its ends", async () => {
+    const { screen } = await renderInRouter(
+      <div>
+        <Progress label="Starting" value={0} />
+        <Progress label="Done" value={100} />
+      </div>,
+    );
+
+    const start = screen.getByRole("progressbar", { name: "Starting" });
+    const done = screen.getByRole("progressbar", { name: "Done" });
+    await expect.element(start).toHaveAttribute("aria-valuenow", "0");
+    await expect.poll(() => start.element().textContent).toContain("0%");
+    await expect.element(done).toHaveAttribute("aria-valuenow", "100");
+    await expect.poll(() => done.element().textContent).toContain("100%");
+  });
+
+  // WCAG 1.4.10 and spec 0015 AC-8 (reflow at 320 px): a resource name can be one long word, here a 63 character
+  // Postgres identifier, the longest a table name can be.
+  //
+  // Known bug (found by /test, 2026-10-27): none of these wrap a long word (no `overflow-wrap`/`break-words` in
+  // banner.tsx or states.tsx), so the text runs past the column at 320 px. Drop `.fails` once they wrap.
+  const long = "customer_order_line_items_archive_2024_q4_eu_west_replica_backu";
+  const narrow = async (element: ReactNode) => {
+    const { screen } = await renderInRouter(<div style={{ width: 320 }}>{element}</div>);
+    await expect.element(screen.getByText(long).first()).toBeInTheDocument();
+    const box = document.querySelector<HTMLElement>("[role=status], [role=alert], section");
+    if (!box) throw new Error("nothing rendered");
+    return { scrollWidth: box.scrollWidth, clientWidth: box.clientWidth };
+  };
+
+  it.fails("0015 AC-8: an inline error wraps a long request ID and title inside 320 px", async () => {
+    const size = await narrow(
+      <InlineError error={{ kind: "server", requestId: long }} title={long} />,
+    );
+    expect(size.scrollWidth).toBeLessThanOrEqual(size.clientWidth);
+  });
+
+  it.fails("0015 AC-8: an empty state wraps a long title inside 320 px", async () => {
+    const size = await narrow(<EmptyState kind="no-results" title={long} description={long} />);
+    expect(size.scrollWidth).toBeLessThanOrEqual(size.clientWidth);
+  });
+
+  it.fails("0015 AC-8: a banner wraps a long unbroken word inside 320 px", async () => {
+    const size = await narrow(
+      <Banner tone="warning" title={long}>
+        {long}
+      </Banner>,
+    );
+    expect(size.scrollWidth).toBeLessThanOrEqual(size.clientWidth);
   });
 });

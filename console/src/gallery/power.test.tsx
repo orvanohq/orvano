@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import { DOCS_FALLBACK_URL } from "@/shared/config";
-import { paletteRecents } from "@/shared/storage/items";
+import { layout, paletteRecents, themePreference } from "@/shared/storage/items";
 import { expectNoAxeViolations } from "@/test/axe";
 import { notify } from "@/ui";
 import { isApplePlatform } from "@/ui/platform";
@@ -112,6 +112,40 @@ describe("command palette", () => {
 
     await palette.getByRole("menuitem", { name: "Use the dark theme" }).click();
     await expect.poll(() => document.documentElement.dataset.theme).toBe("dark");
+  });
+
+  it("0015 AC-11, AC-13: by keyboard alone the palette switches density and theme, and saves them", async () => {
+    const { screen } = await renderScene(project);
+    const palette = screen.getByRole("dialog", { name: "Command palette" });
+    const run = async (query: string, name: string) => {
+      await tabTo(screen.getByRole("button", { name: /^Commands/ }).element());
+      await userEvent.keyboard(modK());
+      await expect.element(palette.getByRole("combobox")).toHaveFocus();
+      await userEvent.keyboard(query);
+      await expect.element(palette.getByRole("menuitem", { name })).toBeVisible();
+      await userEvent.keyboard("{ArrowDown}");
+      await expect
+        .poll(() => palette.getByRole("combobox").element().getAttribute("aria-activedescendant"))
+        .toBeTruthy();
+      await userEvent.keyboard("{Enter}");
+      await expect.element(palette).not.toBeInTheDocument();
+    };
+
+    await run("compact", "Use compact density");
+    await expect.poll(() => document.documentElement.dataset.density).toBe("compact");
+    expect(layout.read({ userId: user.id }).density).toBe("compact");
+
+    await run("comfortable", "Use comfortable density");
+    await expect.poll(() => document.documentElement.dataset.density).toBe("comfortable");
+
+    await run("light theme", "Use the light theme");
+    await expect.poll(() => document.documentElement.dataset.theme).toBe("light");
+    expect(themePreference.read(undefined)).toBe("light");
+
+    await run("system theme", "Use the system theme");
+    await expect.poll(() => themePreference.read(undefined)).toBe("system");
+    const os = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    expect(document.documentElement.dataset.theme).toBe(os);
   });
 
   it("0015 AC-13: Mod+K does nothing while a modal is open", async () => {

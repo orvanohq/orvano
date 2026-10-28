@@ -1,5 +1,6 @@
 // Spec 0015 GAL-3: check-gallery-not-shipped.mjs fails when the build has the gallery's page or a chunk from it.
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -48,5 +49,53 @@ describe("check-gallery-not-shipped", () => {
     } finally {
       rmSync(dist, { recursive: true, force: true });
     }
+  });
+
+  describe("command line", () => {
+    const script = join(import.meta.dirname, "check-gallery-not-shipped.mjs");
+    /** @param {Record<string, { file: string, src?: string }>} manifest @param {string[]} files */
+    const run = (manifest, files = []) => {
+      const dist = mkdtempSync(join(tmpdir(), "orvano-gallery-"));
+      mkdirSync(join(dist, ".vite"));
+      writeFileSync(join(dist, ".vite", "manifest.json"), JSON.stringify(manifest));
+      for (const file of files) writeFileSync(join(dist, file), "");
+      try {
+        return spawnSync("node", [script, dist], { encoding: "utf8" });
+      } finally {
+        rmSync(dist, { recursive: true, force: true });
+      }
+    };
+
+    test("0015 AC-20: exits 0 and says so for a clean build", () => {
+      const result = run(app, ["index.html"]);
+      assert.equal(result.status, 0);
+      assert.match(result.stdout, /no gallery file or chunk in the build/);
+    });
+
+    test("0015 AC-20: exits 1 and lists every problem, one per line", () => {
+      const result = run(
+        {
+          ...app,
+          "src/gallery/main.tsx": { file: "assets/main-b2.js", src: "src/gallery/main.tsx" },
+        },
+        ["gallery.html"],
+      );
+      assert.equal(result.status, 1);
+      assert.match(
+        result.stderr,
+        /the gallery is in the build:\n {2}.*gallery\.html exists\.\n {2}assets\/main-b2\.js/,
+      );
+    });
+
+    test("exits 1 when the folder has no build", () => {
+      const dist = mkdtempSync(join(tmpdir(), "orvano-gallery-"));
+      try {
+        const result = spawnSync("node", [script, dist], { encoding: "utf8" });
+        assert.equal(result.status, 1);
+        assert.match(result.stderr, /run `pnpm build` first/);
+      } finally {
+        rmSync(dist, { recursive: true, force: true });
+      }
+    });
   });
 });

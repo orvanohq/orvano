@@ -2,8 +2,10 @@ import { msg } from "@lingui/core/macro";
 import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { expectNoAxeViolations } from "@/test/axe";
+import { focusElement } from "@/test/focus";
 import { renderInRouter } from "@/test/render";
 import { Button } from "./button";
+import { LocaleProvider } from "./locale-provider";
 import { Menu, MenuItem, MenuSection, MenuTrigger } from "./menu";
 import { PageHeader } from "./page-header";
 import { Tab, TabList, TabPanel, Tabs } from "./tabs";
@@ -124,6 +126,64 @@ describe("Tabs", () => {
     await userEvent.keyboard("{Home}");
     await expect.element(js).toHaveFocus();
     await expectNoAxeViolations();
+  });
+});
+
+const sdkTabs = (activation?: "manual" | "automatic") => (
+  <Tabs keyboardActivation={activation}>
+    <TabList aria-label="SDK">
+      <Tab id="js">JavaScript</Tab>
+      <Tab id="dart">Dart</Tab>
+      <Tab id="dotnet">.NET</Tab>
+    </TabList>
+    <TabPanel id="js">npm install</TabPanel>
+    <TabPanel id="dart">dart pub add</TabPanel>
+    <TabPanel id="dotnet">dotnet add package</TabPanel>
+  </Tabs>
+);
+
+describe("Tabs at their edges", () => {
+  it("0001 UX-5: automatic activation selects as focus moves, and End jumps to the last tab", async () => {
+    const { screen } = await renderInRouter(sdkTabs("automatic"));
+    const dart = screen.getByRole("tab", { name: "Dart" });
+    const dotnet = screen.getByRole("tab", { name: ".NET" });
+
+    await focusElement(screen.getByRole("tab", { name: "JavaScript" }));
+    await userEvent.keyboard("{ArrowRight}");
+    await expect.element(dart).toHaveAttribute("aria-selected", "true");
+    await userEvent.keyboard("{End}");
+
+    await expect.element(dotnet).toHaveFocus();
+    await expect.element(dotnet).toHaveAttribute("aria-selected", "true");
+    await expect.element(screen.getByRole("tabpanel")).toHaveTextContent("dotnet add package");
+  });
+
+  it("0001 UX-5: arrows wrap from the last tab to the first", async () => {
+    const { screen } = await renderInRouter(sdkTabs());
+    const js = screen.getByRole("tab", { name: "JavaScript" });
+
+    await focusElement(screen.getByRole("tab", { name: ".NET" }));
+    await userEvent.keyboard("{ArrowRight}");
+
+    await expect.element(js).toHaveFocus();
+  });
+
+  it("0015 AC-18: in right to left the arrows are mirrored", async () => {
+    const { screen } = await renderInRouter(
+      <div dir="rtl">
+        <LocaleProvider locale="ar-XB">{sdkTabs()}</LocaleProvider>
+      </div>,
+    );
+    const list = screen.getByRole("tablist", { name: "SDK" });
+    const dart = screen.getByRole("tab", { name: "Dart" });
+
+    // The key comes from the page's layout direction, which is what a user sees.
+    expect(getComputedStyle(list.element()).direction).toBe("rtl");
+    await focusElement(screen.getByRole("tab", { name: "JavaScript" }));
+    await userEvent.keyboard("{ArrowLeft}");
+    await expect.element(dart).toHaveFocus();
+    await userEvent.keyboard("{ArrowRight}");
+    await expect.element(screen.getByRole("tab", { name: "JavaScript" })).toHaveFocus();
   });
 });
 

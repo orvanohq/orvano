@@ -821,7 +821,7 @@ msgstr "You need the {role} role for this."
 msgid "You need the Admin role to delete tables."
 msgstr "You need the Admin role to delete tables."
 
-#: src/ui/menu.test.tsx:55
+#: src/ui/menu.test.tsx:57
 msgid "You need the Admin role to export rows."
 msgstr "You need the Admin role to export rows."
 

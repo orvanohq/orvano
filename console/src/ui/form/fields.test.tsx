@@ -4,6 +4,7 @@ import { userEvent } from "vitest/browser";
 import { z } from "@/shared/zod";
 import { expectNoAxeViolations } from "@/test/axe";
 import { focusElement } from "@/test/focus";
+import { emulateForcedColors } from "@/test/media";
 import { renderInRouter } from "@/test/render";
 import { Switch, useAppForm } from "./index";
 
@@ -100,6 +101,39 @@ describe("field components", () => {
 
     await expect.element(screen.getByRole("textbox", { name: "Notes (optional)" })).toBeVisible();
     await expectNoAxeViolations();
+  });
+
+  it("0015 AC-6: in forced colors every text control keeps a visible border (THM-6)", async ({
+    skip,
+  }) => {
+    await emulateForcedColors(true);
+    try {
+      // WebKit doesn't emulate forced colors (Safari has no such mode).
+      if (!window.matchMedia("(forced-colors: active)").matches) skip();
+      const { screen } = await renderInRouter(<EveryField />);
+
+      for (const control of [
+        screen.getByLabelText("Password", { exact: true }),
+        screen.getByRole("textbox", { name: "Notes (optional)" }),
+        screen.getByRole("textbox", { name: "Size" }),
+        screen.getByRole("combobox", { name: "Owner (optional)" }),
+      ]) {
+        // oxlint-disable-next-line no-await-in-loop -- one control at a time
+        await expect.element(control).toBeVisible();
+        // The border may sit on the control or on the group around it (a number field's buttons, a combobox).
+        const bordered = [control.element(), control.element().parentElement].map((element) =>
+          element ? getComputedStyle(element) : undefined,
+        );
+        expect(
+          bordered.some(
+            (style) =>
+              style?.borderTopStyle === "solid" && Number.parseFloat(style.borderTopWidth) >= 1,
+          ),
+        ).toBe(true);
+      }
+    } finally {
+      await emulateForcedColors(false);
+    }
   });
 
   it("0015 AC-15: the password field shows and hides its value", async () => {
