@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDirection, resolveLocale, sourceLocale } from "./locales";
+import { getDirection, reactAriaLocales, resolveLocale, sourceLocale } from "./locales";
 
 // Spec 0003 I18N-6: navigator languages matched to the shipped catalogs, else en.
 describe("resolveLocale", () => {
@@ -35,5 +35,11 @@ describe("getDirection", () => {
 
   it.each(["en", "en-US", "fr", "pseudo-LOCALE", ""])("is ltr for %s", (locale) => {
     expect(getDirection(locale)).toBe("ltr");
+  });
+});
+
+describe("reactAriaLocales", () => {
+  it("maps each shipped catalog to the region tag React Aria keys its strings by", () => {
+    expect(reactAriaLocales).toEqual(["en-US"]);
   });
 });
