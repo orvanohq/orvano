@@ -25,6 +25,11 @@ export interface ResourceLayoutProps {
   children: ReactNode;
 }
 
+type LayoutIds = Parameters<typeof resourceListLayout.read>[0];
+
+const sameIds = (a: LayoutIds, b: LayoutIds) =>
+  a.userId === b.userId && a.projectId === b.projectId && a.service === b.service;
+
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 /**
@@ -45,14 +50,23 @@ export function ResourceLayout({ service, label, resizeLabel, children }: Resour
   const { t } = useLingui();
   const shell = useShellContext();
   const ids = { userId: shell.userId, projectId: shell.projectId, service };
-  const [saved, setSaved] = useState(() => resourceListLayout.read(ids));
+  const [loaded, setLoaded] = useState(() => ({ ids, layout: resourceListLayout.read(ids) }));
   const [dragWidth, setDragWidth] = useState<number | null>(null);
+  // STO-2: one layout route can keep this element mounted while the service or project changes, so the saved layout
+  // is re-read when its key does. Adjusted during render, not in an effect: the old width never paints or saves
+  // under the new key, and the separator stays the same element, so it keeps focus.
+  let saved = loaded.layout;
+  if (!sameIds(loaded.ids, ids)) {
+    saved = resourceListLayout.read(ids);
+    setLoaded({ ids, layout: saved });
+    setDragWidth(null);
+  }
   const { attach: attachMax, max } = useListMax();
   const width = clamp(dragWidth ?? saved.width, LIST_MIN, max);
 
   const save = (next: { collapsed?: boolean; width?: number }) => {
     const value = { ...saved, ...next };
-    setSaved(value);
+    setLoaded({ ids, layout: value });
     resourceListLayout.write(ids, value);
   };
 

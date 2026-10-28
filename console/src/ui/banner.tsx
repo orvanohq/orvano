@@ -76,7 +76,7 @@ export function Banner({ tone = "info", title, children, action }: BannerProps) 
       <span className={look.text}>
         <Icon icon={look.icon} size={20} />
       </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5 wrap-anywhere">
         {title ? <p className="font-semibold">{title}</p> : null}
         <div>{children}</div>
       </div>
@@ -110,7 +110,7 @@ export function InlineError({ error, title, children, onRetry }: InlineErrorProp
       <span className="mt-0.5 text-danger-text">
         <Icon icon={ErrorIcon} />
       </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 wrap-anywhere">
         <p className="font-semibold">{copy.title}</p>
         <p>{children ?? copy.body}</p>
         {requestId ? (
