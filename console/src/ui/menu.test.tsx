@@ -179,8 +179,10 @@ describe("Tabs at their edges", () => {
 
   it("0015 AC-18: in right to left the arrows are mirrored", async () => {
     const { screen } = await renderInRouter(
+      // A real right to left locale: CI's WebKit resolves the pseudo locale ar-XB as left to right, so React Aria's
+      // own keys aren't mirrored there (the separator reads the layout instead, see resource-layout.tsx).
       <div dir="rtl">
-        <LocaleProvider locale="ar-XB">{sdkTabs()}</LocaleProvider>
+        <LocaleProvider locale="ar">{sdkTabs()}</LocaleProvider>
       </div>,
     );
     const list = screen.getByRole("tablist", { name: "SDK" });
