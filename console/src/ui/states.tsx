@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useLingui } from "@lingui/react/macro";
+import { announce } from "./announcer";
 import { Button } from "./button";
 import { CopyField } from "./copy-field";
 import { Icon } from "./icon";
@@ -64,13 +65,19 @@ export interface ErrorStateProps {
 /**
  * design.md _Feedback and states_, spec 0001 UX-22: a page or panel that failed to load, inside the shell. It says
  * what failed and what to do, offers Retry, and shows the copyable request ID; "not found" links back to its list,
- * and "forbidden" names the role needed when the API gives it.
+ * and "forbidden" names the role needed when the API gives it. Retry shows only where trying again can help.
+ *
+ * It replaces what was loading, so focus and the reading position may be gone: it says its title through the shell's
+ * `Announcer` (spec 0015 AC-12, SHL-12), never a live region of its own.
  */
 export function ErrorState({ error, title, onRetry, backLink }: ErrorStateProps) {
   const { t } = useLingui();
   const copy = useErrorCopy(error, title);
   const kind = copy.details.kind;
-  const retryable = kind !== "not_found" && kind !== "forbidden";
+  const announcement = typeof copy.body === "string" ? `${copy.title}. ${copy.body}` : copy.title;
+  useEffect(() => {
+    announce(announcement);
+  }, [announcement]);
   return (
     <section className="flex flex-col items-center gap-3 px-4 py-10 text-center">
       <span className="flex size-10 items-center justify-center rounded-full bg-danger-subtle text-danger-text">
@@ -79,7 +86,7 @@ export function ErrorState({ error, title, onRetry, backLink }: ErrorStateProps)
       <h2 className="text-md font-semibold text-fg wrap-anywhere">{copy.title}</h2>
       <p className="max-w-prose text-fg-muted wrap-anywhere">{copy.body}</p>
       {kind === "not_found" && backLink ? <div className="pt-1">{backLink}</div> : null}
-      {retryable && onRetry ? (
+      {copy.retryable && onRetry ? (
         <div className="pt-1">
           <Button onPress={onRetry}>
             <Icon icon={RetryIcon} />

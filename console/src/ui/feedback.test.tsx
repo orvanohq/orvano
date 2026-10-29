@@ -13,6 +13,12 @@ import { Badge, StatusChip } from "./status-chip";
 // Spec 0015 AC-12, AC-15: banners, inline errors, the empty and error states, progress, and status chips (UX-20,
 // UX-22, UX-24, UX-29), with axe in both themes, in three engines.
 
+/** The text in React Aria's live announcer (the one region every announcement goes through, UX-41). */
+const announced = () =>
+  Array.from(document.querySelectorAll("[aria-live]"))
+    .map((node) => node.textContent)
+    .join(" ");
+
 async function expectNoAxeViolationsInBothThemes() {
   for (const theme of ["light", "dark"]) {
     document.documentElement.dataset.theme = theme;
@@ -217,15 +223,39 @@ describe("error wording by kind (UX-22)", () => {
       body: "Try again in 3 seconds.",
     },
     {
-      name: "an unknown kind with no request ID asks you to try again",
+      name: "a signed out session asks you to sign in again",
+      error: { kind: "unauthenticated" },
+      title: "You're signed out",
+      body: "Your session ended. Sign in again to continue.",
+    },
+    {
+      name: "a conflict asks you to reload for the latest version",
       error: { kind: "conflict" },
+      title: "It changed while you were here",
+      body: "Someone else changed it. Reload the page to see the latest version.",
+    },
+    {
+      name: "a refused request says trying again won't help",
+      error: { kind: "validation" },
+      title: "The request wasn't valid",
+      body: "Trying again won't help. Check what you entered and change it.",
+    },
+    {
+      name: "a server error with no request ID asks you to try again",
+      error: { kind: "server" },
+      title: "The server had a problem",
+      body: "Try again in a moment.",
+    },
+    {
+      name: "an unknown kind with no request ID asks you to try again",
+      error: { kind: "teapot" },
       title: "Something went wrong",
       body: "Try again in a moment.",
     },
     {
       name: "an empty request ID counts as none",
       error: { kind: "server", requestId: "" },
-      title: "Something went wrong",
+      title: "The server had a problem",
       body: "Try again in a moment.",
     },
     {
@@ -274,6 +304,47 @@ describe("error wording by kind (UX-22)", () => {
 
     await expect.element(screen.getByText("The column name is taken.")).toBeVisible();
     expect(screen.getByRole("button").elements()).toHaveLength(0);
+  });
+});
+
+describe("ErrorState by kind (UX-22)", () => {
+  // Retry shows only where the same request can succeed later.
+  const kinds: { kind: string; title: string; retry: boolean }[] = [
+    { kind: "network", title: "Couldn't load tables", retry: true },
+    { kind: "timeout", title: "Couldn't load tables", retry: true },
+    { kind: "server", title: "Couldn't load tables", retry: true },
+    { kind: "rate_limited", title: "Too many requests", retry: true },
+    { kind: "unauthenticated", title: "You're signed out", retry: false },
+    { kind: "forbidden", title: "You don't have access", retry: false },
+    { kind: "not_found", title: "Not found", retry: false },
+    { kind: "conflict", title: "It changed while you were here", retry: false },
+    { kind: "validation", title: "Couldn't load tables", retry: false },
+  ];
+
+  for (const { kind, title, retry } of kinds) {
+    it(`0001 UX-22: ${kind} says "${title}" and ${retry ? "offers" : "has no"} Retry`, async () => {
+      const { screen } = await renderInRouter(
+        <ErrorState error={{ kind }} title="Couldn't load tables" onRetry={() => undefined} />,
+      );
+
+      await expect.element(screen.getByRole("heading", { name: title })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Retry" }).elements()).toHaveLength(retry ? 1 : 0);
+    });
+  }
+
+  it("0015 AC-12: says its title and next step through the announcer, with no live region of its own", async () => {
+    const { screen } = await renderInRouter(
+      <ErrorState error={{ kind: "network" }} title="Couldn't load tables" />,
+    );
+
+    await expect
+      .element(screen.getByRole("heading", { name: "Couldn't load tables" }))
+      .toBeVisible();
+    await expect
+      .poll(announced)
+      .toContain("Couldn't load tables. Check your connection and try again.");
+    const section = screen.getByRole("heading").element().closest("section");
+    expect(section?.querySelector("[aria-live], [role='alert'], [role='status']")).toBeNull();
   });
 });
 

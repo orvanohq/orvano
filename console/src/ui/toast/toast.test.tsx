@@ -26,6 +26,9 @@ const toastTitles = () =>
     (toast) => document.getElementById(toast.getAttribute("aria-labelledby") ?? "")?.textContent,
   );
 
+/** The top visible toast. */
+const topToast = () => document.querySelector("[role='alertdialog']");
+
 describe("notify and Toast", () => {
   it("0015 AC-12: shows at most three, newest on top, and keeps every message in the history", async () => {
     const { screen } = await renderRegion();
@@ -55,6 +58,25 @@ describe("notify and Toast", () => {
     await expect.element(screen.getByText("Functions, 2 times")).toBeVisible();
     expect(toastTitles()).toEqual(["Deploy failed"]);
     expect(getMessages()).toHaveLength(2);
+  });
+
+  it("0001 UX-24: a repeated toast restarts its timer and is announced again", async () => {
+    const { screen } = await renderRegion();
+    notify({ tone: "success", message: "Saved", source: "Settings" });
+    await expect.poll(toastTitles).toEqual(["Saved"]);
+    const first = topToast();
+
+    await new Promise((resolve) => setTimeout(resolve, TOAST_TIMEOUT_MS / 2));
+    notify({ tone: "success", message: "Saved", source: "Settings" });
+
+    // A new toast element replaces the first, so the region announces it again; the count carries over.
+    await expect.element(screen.getByText("Settings, 2 times")).toBeVisible();
+    expect(topToast()).not.toBe(first);
+    expect(toastTitles()).toEqual(["Saved"]);
+    // Past the first toast's 6 s, the repeat is still showing: its timer started over.
+    await new Promise((resolve) => setTimeout(resolve, TOAST_TIMEOUT_MS / 2 + 1000));
+    expect(toastTitles()).toEqual(["Saved"]);
+    await expect.poll(toastTitles, { timeout: TOAST_TIMEOUT_MS, interval: 250 }).toEqual([]);
   });
 
   it("0015 AC-12: never takes focus from the field the user is in", async () => {

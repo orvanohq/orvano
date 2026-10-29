@@ -1,4 +1,4 @@
-import { useEffect, useId, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, type ReactNode, type RefObject } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useSelector } from "@tanstack/react-form";
 import { Label, Text } from "react-aria-components";
@@ -21,30 +21,73 @@ export interface FieldProps {
   isReadOnly?: boolean;
 }
 
-let isPointerDown = false;
-if (typeof document !== "undefined") {
-  document.addEventListener("pointerdown", () => (isPointerDown = true), true);
-  for (const type of ["pointerup", "pointercancel"]) {
-    document.addEventListener(type, () => (isPointerDown = false), true);
-  }
+// Whether a pointer is pressed, and the reveals waiting for that press to end. The document listeners are on only
+// while a field is mounted.
+const press = { isDown: false, fields: 0, waiting: new Set<() => void>() };
+
+function onPointerDown() {
+  press.isDown = true;
+}
+
+/** `pointerup` or `pointercancel`, whichever comes first: each waiting reveal runs once, and the other finds none. */
+function onPointerEnd() {
+  press.isDown = false;
+  const waiting = [...press.waiting];
+  press.waiting.clear();
+  for (const run of waiting) setTimeout(run);
+}
+
+const pressListeners = [
+  ["pointerdown", onPointerDown],
+  ["pointerup", onPointerEnd],
+  ["pointercancel", onPointerEnd],
+] as const;
+
+function usePressTracking() {
+  useEffect(() => {
+    if (press.fields === 0) {
+      for (const [type, listener] of pressListeners) {
+        document.addEventListener(type, listener, true);
+      }
+    }
+    press.fields += 1;
+    return () => {
+      press.fields -= 1;
+      if (press.fields > 0) return;
+      for (const [type, listener] of pressListeners) {
+        document.removeEventListener(type, listener, true);
+      }
+      press.isDown = false;
+      press.waiting.clear();
+    };
+  }, []);
 }
 
 /**
- * Runs `reveal` now, or, when a pointer press caused the blur, once the press ends. Showing the error moves what is
- * below it, so revealing mid press would move a submit button out from under the pointer and lose the click.
+ * Runs `reveal` now, or, when a pointer press caused the blur, once the press ends or is canceled (a touch that
+ * turns into a scroll). Showing the error moves what is below it, so revealing mid press would move a submit button
+ * out from under the pointer and lose the click.
  */
 function afterPress(run: () => void) {
-  if (!isPointerDown) {
-    run();
-    return;
-  }
-  document.addEventListener(
-    "pointerup",
-    () => {
-      setTimeout(run);
-    },
-    { capture: true, once: true },
-  );
+  if (press.isDown) press.waiting.add(run);
+  else run();
+}
+
+/**
+ * Sets an ARIA attribute React Aria has no prop for on the element `ref` holds (the switch's input, the select's
+ * trigger), and removes it when `value` is undefined.
+ */
+export function useAriaAttribute(
+  ref: RefObject<HTMLElement | null>,
+  name: `aria-${string}`,
+  value: string | undefined,
+): void {
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    if (value === undefined) element.removeAttribute(name);
+    else element.setAttribute(name, value);
+  }, [ref, name, value]);
 }
 
 /**
@@ -60,6 +103,7 @@ export function useFieldWiring<Value>() {
   const value = useSelector(field.store, (state) => state.value);
   const errors = useSelector(field.store, (state) => state.meta.errors as unknown[]);
   const isRevealed = useStore(store, (state) => state.revealed.has(name));
+  usePressTracking();
 
   useEffect(() => registerField(store, name, { inputId }), [store, name, inputId]);
 
@@ -119,11 +163,13 @@ export function FieldErrorText({ children }: { children?: string }) {
 export { fieldColumn, inputBox, textInput } from "../field-styles";
 
 export interface CustomFieldProps extends FieldProps {
-  /** The control, given its id, its described by ids, and whether it is invalid. */
+  /** The control, given its id, its described by ids, whether it is invalid, and whether it can change. */
   children: (control: {
     id: string;
     "aria-describedby": string | undefined;
     "aria-invalid": boolean | undefined;
+    isDisabled: boolean | undefined;
+    isReadOnly: boolean | undefined;
     value: unknown;
     onChange: (value: unknown) => void;
     onBlur: () => void;
@@ -134,7 +180,14 @@ export interface CustomFieldProps extends FieldProps {
  * The frame for a control that isn't one of the field components (a feature's `RelationPicker`, say): it gets the
  * same label, help text, error, and timing.
  */
-export function Field({ label, description, isOptional, children }: CustomFieldProps) {
+export function Field({
+  label,
+  description,
+  isOptional,
+  isDisabled,
+  isReadOnly,
+  children,
+}: CustomFieldProps) {
   const wiring = useFieldWiring<unknown>();
   const descriptionId = useId();
   const errorId = useId();
@@ -156,6 +209,8 @@ export function Field({ label, description, isOptional, children }: CustomFieldP
         id: wiring.inputId,
         "aria-describedby": describedBy,
         "aria-invalid": wiring.error ? true : undefined,
+        isDisabled,
+        isReadOnly,
         value: wiring.value,
         onChange: wiring.onChange,
         onBlur: wiring.onBlur,
