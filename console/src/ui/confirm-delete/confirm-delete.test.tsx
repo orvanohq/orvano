@@ -72,6 +72,19 @@ describe("ConfirmDelete", () => {
     await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();
   });
 
+  it("0015 AC-17: the alert dialog is described by what it deletes (R-7, SRT-6)", async () => {
+    const { screen } = await renderInRouter(
+      <Harness kind="project" name="storefront" onConfirm={noop} />,
+    );
+
+    await expect
+      .element(screen.getByRole("alertdialog", { name: "Delete storefront?" }))
+      .toHaveAccessibleDescription(
+        "This deletes storefront and everything in it. You can't undo this.",
+      );
+    await expectNoAxeViolations();
+  });
+
   it("0015 AC-17: tier 2 starts on Cancel and names the button by kind", async () => {
     const { screen } = await renderInRouter(<Harness kind="table" name="users" onConfirm={noop} />);
 
@@ -122,6 +135,43 @@ describe("ConfirmDelete", () => {
     expect(onConfirm).toHaveBeenCalledOnce();
   });
 
+  it("0015 AC-17: a new loadDependents on a later render doesn't load again (R-10)", async () => {
+    const calls = vi.fn<LoadDependents>(() =>
+      Promise.resolve({ items: [{ kind: "table", count: 2, estimated: false }] }),
+    );
+    function Parent() {
+      const [renders, setRenders] = useState(0);
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              setRenders(renders + 1);
+            }}
+          >
+            Rendered {renders}
+          </button>
+          <Harness
+            kind="database"
+            name="main"
+            onConfirm={noop}
+            // A new function each render, as a caller that builds it inline would pass.
+            loadDependents={(signal) => calls(signal)}
+          />
+        </>
+      );
+    }
+    const { screen } = await renderInRouter(<Parent />);
+    await expect.element(screen.getByText("2 tables")).toBeVisible();
+
+    // The modal hides the rest of the page from pointers, so the parent renders again from code.
+    const again = screen.getByText(/^Rendered/).element() as HTMLButtonElement;
+    again.click();
+    await expect.poll(() => again.textContent).toBe("Rendered 1");
+    await expect.element(screen.getByText("2 tables")).toBeVisible();
+    expect(calls).toHaveBeenCalledOnce();
+  });
+
   it("0015 AC-17: aborts the count when it closes", async () => {
     let signal: AbortSignal | undefined;
     const { screen } = await renderInRouter(
@@ -147,10 +197,37 @@ describe("ConfirmDelete", () => {
     );
 
     await screen.getByRole("button", { name: "Delete webhook" }).click();
+    const alert = screen.getByRole("alertdialog").getByRole("alert");
     await expect
-      .element(screen.getByText("Couldn't delete. Check your connection and try again."))
-      .toBeVisible();
+      .poll(() => alert.element().textContent)
+      .toBe("Couldn't deleteTry again in a moment.");
     await expect.element(screen.getByRole("alertdialog")).toBeVisible();
+  });
+
+  it("0001 UX-22: a failed delete's kind picks the words (R-22)", async () => {
+    const { screen } = await renderInRouter(
+      <Harness
+        kind="webhook"
+        name="deploys"
+        onConfirm={() =>
+          Promise.reject(
+            Object.assign(new Error("403"), {
+              kind: "forbidden",
+              requiredRole: "Admin",
+              requestId: "req_123",
+            }),
+          )
+        }
+      />,
+    );
+
+    await screen.getByRole("button", { name: "Delete webhook" }).click();
+    const alert = screen.getByRole("alertdialog").getByRole("alert");
+    // The kind picks the words, not the network advice (UX-22), and the request ID shows.
+    await expect
+      .poll(() => alert.element().textContent)
+      .toBe("You don't have accessYou need the Admin role for this.Request ID: req_123");
+    await expectNoAxeViolations();
   });
 
   it("0001 UX-23: Escape and Cancel can't close it while the delete runs, so a later failure shows", async () => {
@@ -174,8 +251,8 @@ describe("ConfirmDelete", () => {
 
     fail?.(new Error("500"));
     await expect
-      .element(screen.getByText("Couldn't delete. Check your connection and try again."))
-      .toBeVisible();
+      .poll(() => screen.getByRole("alertdialog").getByRole("alert").element().textContent)
+      .toBe("Couldn't deleteTry again in a moment.");
     await expect.element(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
     await userEvent.keyboard("{Escape}");
     await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();
@@ -230,6 +307,23 @@ describe("ConfirmDelete", () => {
     await screen
       .getByRole("textbox", { name: "Type 1200 to confirm deleting the rows" })
       .fill("1,200");
+    await expect.element(remove).not.toHaveAttribute("aria-disabled");
+  });
+
+  it("0001 UX-23: the typed count must match as a whole, in the locale's digits too, grouped or not (R-22)", async () => {
+    const { screen } = await renderInRouter(<Harness kind="rows" count={1001} onConfirm={noop} />);
+    const remove = screen.getByRole("button", { name: "Delete 1,001 rows" });
+    const field = screen.getByRole("textbox", { name: "Type 1001 to confirm deleting the rows" });
+
+    await field.fill("1x0x0x1");
+    await expect.element(remove).toHaveAttribute("aria-disabled", "true");
+    await field.fill("10011");
+    await expect.element(remove).toHaveAttribute("aria-disabled", "true");
+    await field.fill("١٠٠١");
+    await expect.element(remove).not.toHaveAttribute("aria-disabled");
+    await field.fill("۱۰۰۱");
+    await expect.element(remove).not.toHaveAttribute("aria-disabled");
+    await field.fill(" 1,001 ");
     await expect.element(remove).not.toHaveAttribute("aria-disabled");
   });
 });

@@ -37,8 +37,9 @@ const sections: readonly PaletteSection[] = ["navigation", "theme", "density", "
 
 /**
  * design.md _Shell_, spec 0001 UX-25 (the SHL-10 subset): a modal dialog holding a combobox over a menu of actions
- * (React Aria `Autocomplete` with a `Menu`, PRM-8). An empty query shows your recent actions first. Arrows move through
- * the actions while focus stays in the input, Enter runs one, and Escape closes it; focus returns to where it was.
+ * (React Aria `Autocomplete` with a `Menu`, PRM-8). An empty query shows your recent actions first, and only there.
+ * Arrows move through the actions while focus stays in the input, Enter runs one, and Escape closes it; focus returns
+ * to where it was.
  */
 export function CommandPalette({ isOpen, onOpenChange, actions, userId }: CommandPaletteProps) {
   const { t } = useLingui();
@@ -50,7 +51,7 @@ export function CommandPalette({ isOpen, onOpenChange, actions, userId }: Comman
       isDismissable
       className="fixed inset-0 z-(--z-modal) flex items-start justify-center overflow-y-auto bg-scrim p-4 pt-16 transition-opacity duration-(--duration-base) ease-standard data-entering:opacity-0 data-exiting:opacity-0 lg:pt-24"
     >
-      <Modal className="w-palette max-w-full rounded-lg border bg-bg-raised text-fg shadow-lg transition duration-(--duration-base) ease-standard data-entering:scale-98 data-exiting:scale-98">
+      <Modal className="w-palette max-w-full rounded-lg border bg-bg-raised text-fg shadow-lg transition-[opacity,scale] duration-(--duration-base) ease-standard data-entering:scale-98 data-exiting:scale-98">
         <Dialog aria-label={t`Command palette`} className="flex flex-col outline-none">
           {({ close }) => <PaletteBody actions={actions} userId={userId} close={close} />}
         </Dialog>
@@ -91,10 +92,13 @@ function PaletteBody({
   );
 
   const labeled = actions.map((action) => ({ action, label: action.label(i18n) }));
-  const matching = query ? labeled.filter(({ label }) => contains(label, query)) : labeled;
   const recents = query
     ? []
     : recentIds.flatMap((id) => labeled.filter(({ action }) => action.id === id));
+  // G-20: with an empty query a recent action moves to Recent rather than showing twice.
+  const matching = query
+    ? labeled.filter(({ label }) => contains(label, query))
+    : labeled.filter(({ action }) => !recentIds.includes(action.id));
 
   const run = (key: string) => {
     const id = key.startsWith(RECENT_PREFIX) ? key.slice(RECENT_PREFIX.length) : key;

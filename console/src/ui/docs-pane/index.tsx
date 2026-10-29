@@ -8,6 +8,10 @@ import { Drawer } from "../shell/drawer";
 
 // Spec 0015 PRM-10: imported by path (`@/ui/docs-pane`) and loaded lazily where it first appears.
 
+// I18N-4, design.md _Writing in the UI_: brand and product names are placeholders, never translated (G-23).
+const product = "Orvano";
+const host = "GitHub"; // eslint-disable-line lingui/no-unlocalized-strings -- a product name, never translated (I18N-4)
+
 export interface DocsPaneProps {
   isOpen: boolean;
   /** Called with false by Escape, the close button, or (as a drawer) a press outside. */
@@ -29,14 +33,17 @@ export interface DocsPaneProps {
  */
 export function DocsPane({ isOpen, onOpenChange, isWide, onClosed }: DocsPaneProps) {
   const { t } = useLingui();
-  // Read a frame after the content unmounts: by then this holds the latest `isOpen`, so moving between drawer and
-  // region (still open) doesn't count as closing.
+  // Read a frame after the content unmounts: by then these hold the latest `isOpen` and `onClosed`, so moving between
+  // drawer and region (still open) doesn't count as closing, and closing calls the callback from the closing render
+  // (R-12: the content is gone by then, so it can't hold an Effect Event).
   const open = useRef(isOpen);
+  const closed = useRef(onClosed);
   useLayoutEffect(() => {
     open.current = isOpen;
+    closed.current = onClosed;
   });
   const onGone = () => {
-    if (!open.current) onClosed();
+    if (!open.current) closed.current();
   };
   if (!isWide) {
     return (
@@ -80,8 +87,13 @@ function DocsContent({
   const { t } = useLingui();
   const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
-  const gone = useEffectEvent(onGone);
   const close = useEffectEvent(onClose);
+  // The frame callback below runs after this content unmounted, where an Effect Event may not be called (R-12), so it
+  // reads `onGone` from a ref instead; `onGone` reads the pane's own refs, so it is current then.
+  const gone = useRef(onGone);
+  useLayoutEffect(() => {
+    gone.current = onGone;
+  });
   const aside = useRef<HTMLElement>(null);
 
   // A region beside the content gets no Escape from React Aria, so the pane handles it (SHL-9).
@@ -103,9 +115,10 @@ function DocsContent({
   // the next frame, after a drawer's own focus restore.
   useEffect(() => {
     heading.current?.focus();
+    const latest = gone;
     return () => {
       requestAnimationFrame(() => {
-        gone();
+        latest.current();
       });
     };
   }, []);
@@ -126,12 +139,12 @@ function DocsContent({
       <div className="flex flex-col gap-3 overflow-y-auto px-4 py-4">
         <p>
           <Trans>
-            Guides for each service will appear here. Until then, the Orvano documentation is on
-            GitHub.
+            Guides for each service will appear here. Until then, the {product} documentation is on{" "}
+            {host}.
           </Trans>
         </p>
         <p>
-          <ExternalLink href={DOCS_FALLBACK_URL}>{t`Open the Orvano docs`}</ExternalLink>
+          <ExternalLink href={DOCS_FALLBACK_URL}>{t`Open the ${product} docs`}</ExternalLink>
         </p>
       </div>
     </>

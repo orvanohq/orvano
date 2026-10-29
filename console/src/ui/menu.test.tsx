@@ -76,6 +76,36 @@ describe("Menu", () => {
     await expectNoAxeViolations();
   });
 
+  it("0015 PRM-4: the menu's own onAction skips an unavailable item too (R-8)", async () => {
+    const onAction = vi.fn<(key: unknown) => void>();
+    const { screen } = await renderInRouter(
+      <MenuTrigger trigger={<Button>Actions</Button>}>
+        <Menu aria-label="Actions" onAction={onAction}>
+          <MenuItem id="export" unavailableReason={msg`You need the Admin role to export rows.`}>
+            Export rows
+          </MenuItem>
+          <MenuItem id="duplicate">Duplicate</MenuItem>
+        </Menu>
+      </MenuTrigger>,
+    );
+
+    await tabUntil(screen.getByRole("button", { name: "Actions" }).element());
+    await userEvent.keyboard("{Enter}");
+    const unavailable = screen.getByRole("menuitem", { name: "Export rows" });
+    await expect.element(unavailable).toHaveFocus();
+    // Marked on its first render, not a frame later.
+    expect(unavailable.element().getAttribute("aria-disabled")).toBe("true");
+    await userEvent.keyboard("{Enter}");
+    expect(onAction).not.toHaveBeenCalled();
+
+    const button = screen.getByRole("button", { name: "Actions" });
+    await expect.element(button).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+    await expect.element(unavailable).toHaveFocus();
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    expect(onAction).toHaveBeenCalledExactlyOnceWith("duplicate");
+  });
+
   it("0015 AC-15: a selection section checks one item", async () => {
     const onSelect = vi.fn<(key: string) => void>();
     const { screen } = await renderInRouter(

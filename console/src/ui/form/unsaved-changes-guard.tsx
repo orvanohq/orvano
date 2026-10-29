@@ -45,6 +45,7 @@ export function UnsavedChangesGuard() {
     <Dialog
       role="alertdialog"
       title={t`Discard unsaved changes?`}
+      description={t`Your changes haven't been saved. If you leave now, they'll be lost.`}
       isOpen={blocker.status === "blocked" || request !== null}
       onOpenChange={(isOpen) => {
         if (!isOpen) keep();
@@ -59,8 +60,6 @@ export function UnsavedChangesGuard() {
           </Button>
         </>
       }
-    >
-      <p>{t`Your changes haven't been saved. If you leave now, they'll be lost.`}</p>
-    </Dialog>
+    />
   );
 }

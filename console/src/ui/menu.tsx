@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useId, useRef, type ComponentPropsWithRef, type ReactNode } from "react";
 import type { MessageDescriptor } from "@lingui/core";
 import { useLingui } from "@lingui/react";
 import {
@@ -48,30 +48,22 @@ export interface MenuProps {
 }
 
 /** APG menu: arrows, Enter, Escape, and type ahead (React Aria). */
-export function Menu({ children, emptyMessage, ...props }: MenuProps) {
+export function Menu({ children, emptyMessage, onAction, ...props }: MenuProps) {
   const ref = useRef<HTMLDivElement>(null);
-  // PRM-4: React Aria's MenuItem doesn't pass `aria-disabled` through, and its `isDisabled` would remove focus, so
-  // unavailable items (marked `data-unavailable`) get it here. The items render after the menu (React Aria builds
-  // its collection first), so an observer marks them as they appear. React never manages the attribute.
-  useEffect(() => {
-    const menu = ref.current;
-    if (!menu) return;
-    const mark = () => {
-      for (const item of menu.querySelectorAll("[data-unavailable]:not([aria-disabled])")) {
-        item.setAttribute("aria-disabled", "true");
-      }
-    };
-    mark();
-    const observer = new MutationObserver(mark);
-    observer.observe(menu, { childList: true, subtree: true });
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
   return (
     <AriaMenu
       {...props}
       ref={ref}
+      // PRM-4: an unavailable item ignores Enter and presses, so the menu's own handler skips it too. React Aria has
+      // no unavailable state, only `isDisabled`, which removes focus; the item marks itself (`MenuItem` below).
+      onAction={
+        onAction &&
+        ((key) => {
+          const item = ref.current?.querySelector(`[data-key="${CSS.escape(String(key))}"]`);
+          if (item?.hasAttribute("data-unavailable")) return;
+          onAction(key);
+        })
+      }
       renderEmptyState={
         emptyMessage ? () => <p className="px-2 py-3 text-fg-muted">{emptyMessage}</p> : undefined
       }
@@ -120,6 +112,15 @@ export function MenuItem({
       data-unavailable={reason ? true : undefined}
       textValue={textValue ?? (typeof children === "string" ? children : undefined)}
       onAction={reason ? undefined : onAction}
+      // PRM-4: React Aria's MenuItem doesn't pass `aria-disabled` through, and its `isDisabled` would remove focus, so
+      // the element is rendered here with it (`render`, React Aria Components 1.22). Items here are never links, so
+      // the props are a div's.
+      render={(domProps) => (
+        <div
+          {...(domProps as ComponentPropsWithRef<"div">)}
+          aria-disabled={reason ? true : undefined}
+        />
+      )}
       className={cx(itemClass, tone === "danger" && "text-danger-text")}
     >
       {({ selectionMode, isSelected }) => (
