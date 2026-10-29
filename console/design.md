@@ -95,8 +95,8 @@ System font stacks, no web font (TKN-3). Sizes are rem, so browser zoom and the 
 | `--text-xs`   | `0.75rem`   | `1rem`                                     | Chips, badges, keyboard hints, table meta (the floor: nothing smaller) |
 | `--text-sm`   | `0.8125rem` | `1.125rem`                                 | Compact rows, help text, code and IDs (with `font-mono`)               |
 | `--text-base` | `0.875rem`  | `1.25rem`                                  | Body, controls, nav, table cells                                       |
-| `--text-md`   | `1rem`      | `1.5rem`                                   | Section headings (h3), sheet and dialog titles                         |
-| `--text-lg`   | `1.25rem`   | `1.75rem`                                  | Card group headings (h2)                                               |
+| `--text-md`   | `1rem`      | `1.5rem`                                   | Section headings (h3)                                                  |
+| `--text-lg`   | `1.25rem`   | `1.75rem`                                  | Card group headings (h2), sheet and dialog titles                      |
 | `--text-xl`   | `1.5rem`    | `2rem`                                     | Page title (h1, one per page)                                          |
 
 <!-- tokens:type:end -->

@@ -103,6 +103,34 @@ const entries = [
 ];
 
 writeFileSync(".size-limit.json", `${JSON.stringify(entries, null, 2)}\n`);
+
+// STY-9, AC-3: the ten largest modules of the shell's first load, from the probe build's module sizes
+// (vite.config.ts), printed and saved for CI to upload. Rendered sizes, before minify and gzip.
+const modulesPath = "dist-size-probe/.vite/modules.json";
+const largestPath = "dist-size-probe/shell-largest-modules.txt";
+if (existsSync(modulesPath)) {
+  /** @type {Record<string, Record<string, number>>} */
+  const modules = JSON.parse(readFileSync(modulesPath, "utf8"));
+  const largest = [...probeFirstLoad]
+    .flatMap((file) =>
+      Object.entries(modules[file] ?? {}).map(([id, size]) => ({
+        // node_modules/.pnpm/<package>@<version>/node_modules/<package>/x.js → <package>/x.js
+        id: id.replace(/^.*node_modules\//, "").replace(/^\0/, ""),
+        file,
+        size,
+      })),
+    )
+    .toSorted((first, second) => second.size - first.size)
+    .slice(0, 10);
+  const report = [
+    "The ten largest modules of the shell's first load (rendered bytes, before minify and gzip):",
+    ...largest.map(({ id, file, size }) => `${String(size).padStart(9)}  ${id}  (${file})`),
+  ].join("\n");
+  writeFileSync(largestPath, `${report}\n`);
+  console.log(report);
+} else {
+  console.log(`size-entries: no ${modulesPath}, so no module breakdown.`);
+}
 console.log(
   `size-entries: ${entries.length} entries (${firstLoad.size} first load files, ${probeFirstLoad.size} probe first load files)`,
 );

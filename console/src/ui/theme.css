@@ -98,10 +98,10 @@
   /* use: Body, controls, nav, table cells */
   --text-base: 0.875rem;
   --text-base--line-height: 1.25rem;
-  /* use: Section headings (h3), sheet and dialog titles */
+  /* use: Section headings (h3) */
   --text-md: 1rem;
   --text-md--line-height: 1.5rem;
-  /* use: Card group headings (h2) */
+  /* use: Card group headings (h2), sheet and dialog titles */
   --text-lg: 1.25rem;
   --text-lg--line-height: 1.75rem;
   /* use: Page title (h1, one per page) */
@@ -229,20 +229,28 @@
 }
 
 /* THM-6: more contrast makes decorative borders strong and muted text the main text color. */
+/* The `:root:not([data-theme])` selector matches the dark fallback's, so this block also wins when the boot script
+   never ran and the OS is dark. */
 @media (prefers-contrast: more) {
-  :root {
+  :root,
+  :root:not([data-theme]) {
     --color-border: var(--color-border-strong);
     --color-fg-muted: var(--color-fg);
   }
 }
 
-/* THM-6: in forced colors the focus ring is an outline (kept by the browser), and current and selected items gain
-   a 2 px inline start border in Highlight. Icons use currentColor (Icon sets it). */
+/* THM-6: in forced colors the focus ring is an outline (kept by the browser), and the items AC-6 names (the current
+   nav item, the current tab, a selected row) gain a 2 px mark in Highlight. It is an inset outline, so nothing moves
+   (forced colors drops box shadows), and it gives way to the focus ring. Checkboxes, radios, and switches keep the
+   system's rendering. Icons use currentColor (Icon sets it). */
 @media (forced-colors: active) {
-  [aria-current="page"],
-  [aria-selected="true"],
-  [data-selected] {
-    border-inline-start: 2px solid Highlight;
+  :is(
+    [aria-current="page"],
+    [role="tab"][aria-selected="true"],
+    [role="row"][aria-selected="true"]
+  ):not(:focus-visible) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
   }
 }
 
