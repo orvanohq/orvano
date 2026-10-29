@@ -218,7 +218,7 @@ function Dependents({ load }: { load: LoadDependents }) {
 }
 
 /** Numbering systems whose digits count as typed digits, besides the active locale's own (R-22). */
-const numberingSystems = ["latn", "arab", "arabext", "beng", "deva", "fullwide", "thai"];
+const numberingSystems = ["latn", "arab", "arabext", "deva", "fullwide", "thai"];
 
 /**
  * The typed count with every digit of the active locale's numbering system (and the common others) read as ASCII, so

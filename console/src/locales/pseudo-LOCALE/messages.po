@@ -830,6 +830,7 @@ msgid "You need the Admin role to delete tables."
 msgstr ""
 
 #: src/ui/menu.test.tsx:57
+#: src/ui/menu.test.tsx:84
 msgid "You need the Admin role to export rows."
 msgstr ""
 
