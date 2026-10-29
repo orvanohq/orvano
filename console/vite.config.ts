@@ -1,5 +1,6 @@
+import { relative } from "node:path";
 import { fileURLToPath, URL } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
@@ -9,10 +10,42 @@ import optimizeLocales from "@react-aria/optimize-locales-plugin";
 import { reactAriaLocales } from "./src/shared/i18n/locales";
 
 // Spec 0006 NET-2, the exact policy the server sends (server/src/Orvano.Host/Web/SecurityHeaders.cs). `vite preview`
-// sends it too, so the CSP test (spec 0015 STY-6) loads the build under the real policy.
+// sends it too, so the CSP test (spec 0015 STY-6) loads the build under the real policy. A copy, so
+// tooling/scripts/console-csp.test.mjs fails when it differs from the server's.
 const consolePolicy =
   "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; " +
   "base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+
+// Spec 0015 STY-9, AC-3: the probe build writes each chunk's modules with their rendered size (before minify), so
+// `pnpm size` can name the largest modules of the shell's first load.
+const moduleSizes: Plugin = {
+  name: "orvano:module-sizes",
+  generateBundle(_options, bundle) {
+    const root = fileURLToPath(new URL(".", import.meta.url));
+    const chunks = Object.fromEntries(
+      Object.values(bundle).flatMap((output) =>
+        output.type === "chunk"
+          ? [
+              [
+                output.fileName,
+                Object.fromEntries(
+                  Object.entries(output.modules).map(([id, module]) => [
+                    relative(root, id),
+                    module.renderedLength,
+                  ]),
+                ),
+              ],
+            ]
+          : [],
+      ),
+    );
+    this.emitFile({
+      type: "asset",
+      fileName: ".vite/modules.json",
+      source: `${JSON.stringify(chunks, null, 2)}\n`,
+    });
+  },
+};
 
 export default defineConfig(({ mode }) => ({
   plugins: [
@@ -28,6 +61,7 @@ export default defineConfig(({ mode }) => ({
       presets: [reactCompilerPreset()],
     }),
     tailwindcss(), // spec 0015 STY-1: the one stylesheet, src/ui/theme.css
+    ...(mode === "size-probe" ? [moduleSizes] : []),
   ],
   base: "/console/", // spec 0003 WEB-8, spec 0007 CSL-1
   server: {

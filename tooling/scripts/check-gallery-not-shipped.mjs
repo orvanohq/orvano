@@ -1,9 +1,13 @@
 // Spec 0015 GAL-3: the development gallery never ships. Run after `pnpm build`; fails if the build output has
-// gallery.html or a manifest chunk whose source is under src/gallery.
+// gallery.html, a manifest chunk whose source is under src/gallery, or a script holding a string only the gallery's
+// fixtures contain (gallery code inlined into an app chunk has no manifest entry of its own).
 // Usage: node tooling/scripts/check-gallery-not-shipped.mjs [<dist folder>]   (default console/dist)
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+/** Strings only console/src/gallery/fixtures.ts contains (the test checks they are still there). */
+export const galleryMarkers = ["usr_ada"];
 
 /**
  * The problems found in one build output folder.
@@ -21,6 +25,16 @@ export function galleryProblems(dist) {
     const source = chunk.src ?? key;
     if (source === "gallery.html" || source.startsWith("src/gallery/")) {
       problems.push(`${chunk.file} is built from ${source}.`);
+    }
+  }
+  const assets = join(dist, "assets");
+  const scripts = existsSync(assets)
+    ? readdirSync(assets).filter((file) => file.endsWith(".js"))
+    : [];
+  for (const file of scripts) {
+    const text = readFileSync(join(assets, file), "utf8");
+    for (const marker of galleryMarkers.filter((value) => text.includes(value))) {
+      problems.push(`assets/${file} holds the gallery fixture string "${marker}".`);
     }
   }
   return problems;

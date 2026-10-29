@@ -469,10 +469,10 @@ describe("account menu", () => {
   });
 });
 
-/** The inline start border THM-6 gives a current item in forced colors: on the left here, in left to right. */
-const startBorder = (element: Element) => {
+/** The mark THM-6 gives a current item in forced colors: an inset outline, so nothing moves. */
+const mark = (element: Element) => {
   const style = getComputedStyle(element);
-  return { style: style.borderLeftStyle, width: style.borderLeftWidth };
+  return { style: style.outlineStyle, width: style.outlineWidth, offset: style.outlineOffset };
 };
 
 describe("forced colors", () => {
@@ -496,11 +496,11 @@ describe("forced colors", () => {
     for (const link of current) {
       // oxlint-disable-next-line no-await-in-loop -- one item at a time
       await expect.element(link).toHaveAttribute("aria-current", "page");
-      expect(startBorder(link.element())).toEqual({ style: "solid", width: "2px" });
+      expect(mark(link.element())).toEqual({ style: "solid", width: "2px", offset: "-2px" });
     }
     const other = screen
       .getByRole("navigation", { name: "Project" })
       .getByRole("link", { name: "Storage" });
-    expect(startBorder(other.element()).width).not.toBe("2px");
+    expect(mark(other.element()).style).toBe("none");
   });
 });

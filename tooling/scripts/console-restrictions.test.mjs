@@ -1,6 +1,7 @@
 // Spec 0008 LNT-3: eslint.config.ts spreads regionRules() as is, so these pin which restriction applies where.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { ESLint } from "eslint";
 import {
   regionRules,
   regions,
@@ -249,5 +250,65 @@ describe("restrictionMessages", () => {
         assert.ok(all.has(entry.message), entry.message);
       }
     }
+  });
+});
+
+describe("syntax restrictions, linted", { timeout: 60_000 }, () => {
+  // Only the restriction rules, and no type information, as in check-lint-fixtures.mjs.
+  const eslint = new ESLint({
+    ruleFilter: ({ ruleId }) => ruleId === "no-restricted-syntax",
+    overrideConfig: [
+      { languageOptions: { parserOptions: { projectService: false, project: null } } },
+    ],
+  });
+
+  /** The rule IDs each line of `code` reports, linted as a feature file. @param {string} code */
+  const idsByLine = async (code) => {
+    const [result] = await eslint.lintText(code, {
+      filePath: "console/src/features/tables/components/rows-page.tsx",
+    });
+    return (result?.messages ?? []).map((message) => message.message.split(":")[0]);
+  };
+
+  test("SEC-2 fails each raw HTML sink", async () => {
+    for (const sink of [
+      "element.innerHTML = html;",
+      "element.outerHTML += html;",
+      'element["innerHTML"] = html;',
+      'element.insertAdjacentHTML("beforeend", html);',
+      "document.write(html);",
+      "document.writeln(html);",
+    ]) {
+      // oxlint-disable-next-line no-await-in-loop -- one sink at a time
+      const ids = await idsByLine(
+        `declare const element: HTMLElement;\ndeclare const html: string;\n${sink}\n`,
+      );
+      assert.deepEqual(ids, ["SEC-2"], sink);
+    }
+    assert.deepEqual(
+      await idsByLine("declare const element: HTMLElement;\nelement.textContent = 'x';\n"),
+      [],
+    );
+  });
+
+  test("spec 0015 STY-5 fails arbitrary values behind variants and in cx templates", async () => {
+    for (const classes of [
+      '<span className="hover:[mask-type:luminance]" />',
+      '<span className="![mask-type:luminance]" />',
+      '<span className="[&>svg]:size-4" />',
+      '<span className="md:w-[13px]" />',
+      "<span className={cx(`${tone} w-[13px]`)} />",
+      "<span className={cx(`[&>svg]:size-4 ${tone}`)} />",
+    ]) {
+      // oxlint-disable-next-line no-await-in-loop -- one class string at a time
+      const ids = await idsByLine(
+        `declare const cx: (...classes: string[]) => string;\ndeclare const tone: string;\nexport const x = ${classes};\n`,
+      );
+      assert.deepEqual(ids, ["STY-5"], classes);
+    }
+    assert.deepEqual(
+      await idsByLine('export const x = <span className="w-full hover:bg-bg-muted" />;\n'),
+      [],
+    );
   });
 });

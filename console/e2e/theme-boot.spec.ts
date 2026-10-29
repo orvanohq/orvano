@@ -54,6 +54,33 @@ test("0015 AC-4: with the boot script failed, CSS alone follows the OS theme", a
   );
 });
 
+test("0015 AC-6: with the boot script failed, more contrast still applies in the OS dark theme", async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: "dark", contrast: "more" });
+  await page.route("**/theme-boot.js", (route) => route.abort());
+  await page.route("**/assets/*.js", (route) => route.abort());
+
+  await page.goto("./");
+
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme", /.*/);
+  const tokens = await page.evaluate(() => {
+    const style = getComputedStyle(document.documentElement);
+    const token = (name: string) => style.getPropertyValue(`--color-${name}`).trim();
+    return {
+      border: token("border"),
+      borderStrong: token("border-strong"),
+      fgMuted: token("fg-muted"),
+      fg: token("fg"),
+    };
+  });
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(
+    darkBackground,
+  );
+  expect(tokens.border).toBe(tokens.borderStrong);
+  expect(tokens.fgMuted).toBe(tokens.fg);
+});
+
 test("0015 AC-4: under System an OS theme change applies at once, with no reload", async ({
   page,
 }) => {
