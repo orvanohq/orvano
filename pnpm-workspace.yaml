@@ -20,3 +20,12 @@ auditConfig:
     # ships in the console bundle), and no patched release exists (2026-10-17). Remove when one ships. Expires
     # 2026-11-16 (spec 0006 SUP-5: at most 30 days); check again then and renew or remove.
     - GHSA-vfj7-8cjw-p6xm
+
+# Forced transitive versions, each with the reason and when to remove it.
+overrides:
+  # seroval (through @tanstack/router-core and @tanstack/router-plugin): GHSA-f86p-h4j2-7qgj (patched in 1.6.11) and
+  # GHSA-9wx9-5pv9-3349 (patched in 1.6.10). Every TanStack Router release still accepts seroval ^1.6.7 (2026-10-28).
+  # Remove once router-core requires seroval >=1.6.11. seroval-plugins moves with seroval, and ~ keeps both on the
+  # 1.6 line that router-core is tested on.
+  seroval: ~1.6.11
+  seroval-plugins: ~1.6.11
