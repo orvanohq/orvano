@@ -87,18 +87,28 @@ export interface ExternalLinkProps {
   children: string;
 }
 
+/** Only web addresses become links: a `javascript:` or `data:` value never reaches `href`. */
+function isWebAddress(href: string): boolean {
+  if (!URL.canParse(href)) return false;
+  const { protocol } = new URL(href);
+  return protocol === "https:" || protocol === "http:";
+}
+
 /**
  * A link out of the console (spec 0015 SHL-9: today only the docs fallback). It opens in a new tab with
- * `rel="noopener noreferrer"`, shows the external icon, and says so to screen readers.
+ * `rel="noopener noreferrer"`, shows the external icon, and says so to screen readers. An `href` that isn't an
+ * `http:` or `https:` address renders as plain text. It stands on its own line, so its target is at least 24 px high
+ * (UX-32; the inline target exception covers only links inside a sentence).
  */
 export function ExternalLink({ href, children }: ExternalLinkProps) {
   const { t } = useLingui();
+  if (!isWebAddress(href)) return <span>{children}</span>;
   return (
     <AriaLink
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className={cx(variants.inline, "inline-flex items-center gap-1")}
+      className={cx(variants.inline, "inline-flex min-h-6 items-center gap-1")}
     >
       {children}
       <Icon icon={ExternalLinkIcon} />

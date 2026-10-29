@@ -76,11 +76,15 @@ export function Skeleton({ width = "full", height = "text" }: SkeletonProps) {
   );
 }
 
-/** The busy wrapper every skeleton layout shares: `aria-busy`, and "Loading" for screen readers. */
+/**
+ * The wrapper every skeleton layout shares, with "Loading" for screen readers. It isn't `aria-busy` itself: many
+ * screen readers skip what's inside a busy element, which would hide that text. The caller marks the region being
+ * loaded instead (`aria-busy` on the list, panel, or page section the skeleton stands in for).
+ */
 function Busy({ children }: { children: ReactNode }) {
   const { t } = useLingui();
   return (
-    <div aria-busy="true" className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3">
       <VisuallyHidden>{t`Loading`}</VisuallyHidden>
       {children}
     </div>
@@ -92,7 +96,7 @@ export interface GridSkeletonProps {
   columns?: number;
 }
 
-/** The skeleton of a grid or table: a header and 8 rows at the density's row height (UX-21, UX-32). */
+/** The skeleton of a grid or table: a header and 8 rows at the density's row height (UX-21, UX-32). Put it inside an `aria-busy` region. */
 export function GridSkeleton({ columns = 4 }: GridSkeletonProps) {
   const cells = Array.from({ length: columns }, (_, index) => index);
   return (
@@ -121,7 +125,7 @@ export function GridSkeleton({ columns = 4 }: GridSkeletonProps) {
   );
 }
 
-/** The skeleton of a detail page or panel: a title line, a few lines of text, and a card. */
+/** The skeleton of a detail page or panel: a title line, a few lines of text, and a card. Put it inside an `aria-busy` region. */
 export function ContentSkeleton() {
   return (
     <Busy>

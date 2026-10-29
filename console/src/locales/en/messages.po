@@ -7,7 +7,7 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: en\n"
 
-#: src/ui/link.tsx:106
+#: src/ui/link.tsx:116
 msgid "(opens in a new tab)"
 msgstr "(opens in a new tab)"
 
@@ -64,6 +64,10 @@ msgstr "{count, plural, one {# function} other {# functions}}"
 #: src/ui/confirm-delete/dependents.ts:26
 msgid "{count, plural, one {# index} other {# indexes}}"
 msgstr "{count, plural, one {# index} other {# indexes}}"
+
+#: src/ui/shell/resource-list.tsx:60
+msgid "{count, plural, one {# match} other {# matches}}"
+msgstr "{count, plural, one {# match} other {# matches}}"
 
 #: src/ui/confirm-delete/dependents.ts:38
 msgid "{count, plural, one {# member} other {# members}}"
@@ -224,16 +228,16 @@ msgstr "Commands"
 msgid "Compact"
 msgstr "Compact"
 
-#: src/ui/copy-field.tsx:39
+#: src/ui/copy-field.tsx:42
 msgid "Copied"
 msgstr "Copied"
 
-#: src/ui/copy-field.tsx:69
-#: src/ui/copy-field.tsx:172
+#: src/ui/copy-field.tsx:72
+#: src/ui/copy-field.tsx:189
 msgid "Copy {label}"
 msgstr "Copy {label}"
 
-#: src/ui/copy-field.tsx:123
+#: src/ui/copy-field.tsx:134
 msgid "Copy this secret now"
 msgstr "Copy this secret now"
 
@@ -422,7 +426,7 @@ msgstr "Help"
 msgid "Hide password"
 msgstr "Hide password"
 
-#: src/ui/copy-field.tsx:135
+#: src/ui/copy-field.tsx:146
 msgid "I've copied it"
 msgstr "I've copied it"
 
@@ -449,7 +453,7 @@ msgstr "Light"
 
 #: src/ui/form/choice-fields.tsx:163
 #: src/ui/progress.tsx:26
-#: src/ui/skeleton.tsx:84
+#: src/ui/skeleton.tsx:88
 msgid "Loading"
 msgstr "Loading"
 
@@ -460,10 +464,6 @@ msgstr "Loading organizations…"
 #: src/ui/shell/switcher.tsx:73
 msgid "Loading projects…"
 msgstr "Loading projects…"
-
-#: src/ui/shell/resource-list.tsx:72
-msgid "Loading…"
-msgstr "Loading…"
 
 #: src/ui/shell/nav-registry.ts:43
 msgid "Logs"
@@ -518,7 +518,7 @@ msgstr "No running jobs"
 msgid "Not found"
 msgstr "Not found"
 
-#: src/ui/shell/resource-list.tsx:75
+#: src/ui/shell/resource-list.tsx:107
 msgid "Nothing matches “{filter}”"
 msgstr "Nothing matches “{filter}”"
 
@@ -579,11 +579,11 @@ msgstr "Path"
 msgid "Preferences"
 msgstr "Preferences"
 
-#: src/ui/copy-field.tsx:46
+#: src/ui/copy-field.tsx:35
 msgid "Press ⌘C to copy"
 msgstr "Press ⌘C to copy"
 
-#: src/ui/copy-field.tsx:46
+#: src/ui/copy-field.tsx:35
 msgid "Press Ctrl+C to copy"
 msgstr "Press Ctrl+C to copy"
 
@@ -665,7 +665,7 @@ msgstr "Search projects"
 msgid "Security"
 msgstr "Security"
 
-#: src/ui/table/index.tsx:98
+#: src/ui/table/index.tsx:106
 msgid "Select"
 msgstr "Select"
 
@@ -867,7 +867,7 @@ msgstr "You need the Admin role to delete tables."
 msgid "You need the Admin role to export rows."
 msgstr "You need the Admin role to export rows."
 
-#: src/ui/copy-field.tsx:124
+#: src/ui/copy-field.tsx:135
 msgid "You won't be able to see it again. Store it somewhere safe."
 msgstr "You won't be able to see it again. Store it somewhere safe."
 

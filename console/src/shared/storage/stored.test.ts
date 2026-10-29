@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "@/shared/zod";
-import { defineStored, resetStorageForTests } from "./stored";
+import { defineStored, resetStorageForTests, storageEventForTests } from "./stored";
 
 // Spec 0003 STO-2, STO-3, STO-5, QA-4: corrupt and blocked storage never throw.
 
@@ -58,11 +58,38 @@ describe("defineStored", () => {
     const listener = vi.fn<(value: { count: number }) => void>();
     const unsubscribe = item.subscribe(ids, listener);
 
-    window.dispatchEvent(new StorageEvent("storage", { key, newValue: '{"count":7}' }));
-    window.dispatchEvent(new StorageEvent("storage", { key: "other", newValue: "{}" }));
+    window.dispatchEvent(storageEventForTests(key, '{"count":7}'));
+    window.dispatchEvent(storageEventForTests("other", "{}"));
     unsubscribe();
-    window.dispatchEvent(new StorageEvent("storage", { key, newValue: '{"count":8}' }));
+    window.dispatchEvent(storageEventForTests(key, '{"count":8}'));
 
     expect(listener).toHaveBeenCalledExactlyOnceWith({ count: 7 });
+  });
+
+  it("ignores a sessionStorage change with the same key (STO-5)", () => {
+    const listener = vi.fn<(value: { count: number }) => void>();
+    const unsubscribe = item.subscribe(ids, listener);
+
+    window.dispatchEvent(
+      new StorageEvent("storage", {
+        key,
+        newValue: '{"count":7}',
+        storageArea: sessionStorage,
+      }),
+    );
+    unsubscribe();
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("goes back to the fallback when another tab clears storage (STO-5)", () => {
+    const listener = vi.fn<(value: { count: number }) => void>();
+    const unsubscribe = item.subscribe(ids, listener);
+
+    // `localStorage.clear()` in another tab sends one event with a null key.
+    window.dispatchEvent(storageEventForTests(null, null));
+    unsubscribe();
+
+    expect(listener).toHaveBeenCalledExactlyOnceWith({ count: 0 });
   });
 });

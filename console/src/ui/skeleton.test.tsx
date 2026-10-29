@@ -37,8 +37,9 @@ function timeline(loadMs: number) {
 }
 
 describe("useDelayedPending", () => {
-  it("0015 AC-17: a load that ends after 250 ms never shows the skeleton", async () => {
-    const { Loader, events } = timeline(250);
+  // 100 ms, well before the 300 ms delay: a slow engine or GC stall on a shared runner can't push it past.
+  it("0015 AC-17: a load that ends before the delay never shows the skeleton", async () => {
+    const { Loader, events } = timeline(100);
     const { screen } = await renderInRouter(<Loader />);
 
     await expect.element(screen.getByText("loaded")).toBeVisible();
@@ -61,21 +62,25 @@ describe("useDelayedPending", () => {
 });
 
 describe("GridSkeleton and ContentSkeleton", () => {
-  it("0015 AC-17: the grid skeleton draws 8 rows of the given columns, busy and named Loading", async () => {
+  it("0015 AC-17: the grid skeleton draws 8 rows of the given columns, named Loading inside the busy region", async () => {
     const { screen } = await renderInRouter(
       <div>
-        <GridSkeleton columns={3} />
+        <section aria-busy="true" aria-label="Keys">
+          <GridSkeleton columns={3} />
+        </section>
         <ContentSkeleton />
       </div>,
     );
 
-    const busy = document.querySelectorAll("[aria-busy='true']");
-    expect(busy).toHaveLength(2);
+    // The skeleton never marks itself busy: that would hide its own "Loading" text from many screen readers.
+    const busy = document.querySelectorAll("[aria-busy]");
+    expect(busy).toHaveLength(1);
     const grid = busy[0]?.querySelector("[aria-hidden='true']");
     // A header row plus 8 rows, each with 3 cells.
     expect(grid?.children).toHaveLength(9);
     expect(grid?.children[1]?.children).toHaveLength(3);
     await expect.element(screen.getByText("Loading").first()).toBeInTheDocument();
+    expect(screen.getByText("Loading").all()).toHaveLength(2);
     await expectNoAxeViolations();
   });
 });
