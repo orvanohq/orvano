@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { themePreference } from "@/shared/storage/items";
-import { resetStorageForTests } from "@/shared/storage/stored";
+import { resetStorageForTests, storageEventForTests } from "@/shared/storage/stored";
 import { setThemePreference, startThemeSync, themeStore } from "./theme";
 
 // Spec 0015 THM-1, THM-4. The OS theme change and the boot script are covered by e2e/theme-boot.spec.ts.
@@ -54,9 +54,7 @@ describe("theme store", () => {
   it("0015 AC-4: follows a change made in another tab (STO-5)", () => {
     stop = startThemeSync();
 
-    window.dispatchEvent(
-      new StorageEvent("storage", { key: "orvano:v1:theme", newValue: '"light"' }),
-    );
+    window.dispatchEvent(storageEventForTests("orvano:v1:theme", '"light"'));
 
     expect(themeStore.get().preference).toBe("light");
     expect(html.dataset.theme).toBe("light");

@@ -94,4 +94,32 @@ describe("ResourceLayout", () => {
       .toHaveAttribute("aria-valuenow", "280");
     expect(write).not.toHaveBeenCalled();
   });
+
+  it("0015 SHL-13: the separator draws a 4 px line but takes the pointer 24 px wide (UX-32)", async () => {
+    await page.viewport(1280, 800);
+    if (!i18n.locale) await activateLocale("en");
+
+    const screen = await render(<Harness projectId="storefront" service="databases" />);
+    const handle = screen.getByRole("separator", { name: "Resize item list" });
+    await expect.element(handle).toBeVisible();
+    const separator = handle.element();
+    const box = separator.getBoundingClientRect();
+    expect(box.width).toBe(4);
+
+    // The transparent hit area reaches 4 px into the list, stopping at the Collapse button, and 16 px into the
+    // content: the pointer finds the separator there, and not past it.
+    const middle = box.top + box.height / 2;
+    const at = (x: number) => document.elementFromPoint(x, middle);
+    expect(at(box.left - 3)).toBe(separator);
+    expect(at(box.right + 15)).toBe(separator);
+    expect(at(box.left - 5)).not.toBe(separator);
+    expect(at(box.right + 17)).not.toBe(separator);
+    expect(Number.parseFloat(getComputedStyle(separator, "::before").width)).toBe(24);
+    // The Collapse button keeps all of its own target.
+    const collapse = screen
+      .getByRole("button", { name: "Collapse list" })
+      .element()
+      .getBoundingClientRect();
+    expect(collapse.right).toBeLessThanOrEqual(box.left - 4);
+  });
 });

@@ -6,21 +6,21 @@ import { createStore, useStore, type Store } from "./create-store";
 
 export type { Density, Layout };
 
-const stores = new Map<string, Store<Layout>>();
+// One signed in user at a time: switching user drops the previous user's store and its storage listener.
+let current: { userId: string; store: Store<Layout>; unsubscribe: () => void } | undefined;
 
 function storeFor(userId: string): Store<Layout> {
-  let store = stores.get(userId);
-  if (!store) {
-    const created = createStore<Layout>(layout.read({ userId }));
+  if (current?.userId !== userId) {
+    current?.unsubscribe();
+    const store = createStore<Layout>(layout.read({ userId }));
     // STO-5: another tab's change shows here too.
-    layout.subscribe({ userId }, (value) => {
-      created.set(value);
+    const unsubscribe = layout.subscribe({ userId }, (value) => {
+      store.set(value);
       applyDensity(value.density);
     });
-    stores.set(userId, created);
-    store = created;
+    current = { userId, store, unsubscribe };
   }
-  return store;
+  return current.store;
 }
 
 /** Sets `data-density` on <html>, which switches `--row-height` (UX-32). */
@@ -55,5 +55,6 @@ export function useLayout<Slice>(userId: string, select: (state: Layout) => Slic
 
 /** Test only: forgets the per user stores. */
 export function resetLayoutStoresForTests(): void {
-  stores.clear();
+  current?.unsubscribe();
+  current = undefined;
 }

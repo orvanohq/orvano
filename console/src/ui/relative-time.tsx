@@ -41,22 +41,42 @@ function readClock() {
 export interface RelativeTimeProps {
   /** The moment, as a `Date` or an ISO 8601 string from the API. */
   datetime: Date | string;
+  /**
+   * Takes focus so the exact time shows on focus as well as hover (UX-34). Pass `false` in tables and lists, where a
+   * time in every row would be a tab stop with no action: the exact time is then the element's `title`.
+   */
+  focusable?: boolean;
 }
 
 /**
  * design.md _Data display_, spec 0015 PRM-11, spec 0001 UX-34: "3 minutes ago" up to 7 days, then a medium date, in a
- * `<time datetime>`. Hover or focus shows the exact local time and the same in UTC. It refreshes every minute.
+ * `<time datetime>`. Hover or focus shows the exact local time and the same in UTC. It refreshes every minute. A value
+ * that isn't a date shows as it came (an em dash for an invalid `Date`), never an error.
  */
-export function RelativeTime({ datetime }: RelativeTimeProps) {
+export function RelativeTime({ datetime, focusable = true }: RelativeTimeProps) {
   const now = useSyncExternalStore(subscribe, readClock);
   const date = typeof datetime === "string" ? new Date(datetime) : datetime;
+  if (Number.isNaN(date.getTime())) {
+    return <span>{typeof datetime === "string" && datetime !== "" ? datetime : "—"}</span>;
+  }
+
   const exact = { dateStyle: "medium", timeStyle: "long" } as const;
+  const local = formatDateTime(date, exact);
+  const utc = formatDateTime(date, { ...exact, timeZone: UTC });
+  const relative = formatRelativeTime(date, new Date(now));
+  if (!focusable) {
+    return (
+      <time dateTime={date.toISOString()} title={`${local}\n${utc}`} className="whitespace-nowrap">
+        {relative}
+      </time>
+    );
+  }
   return (
     <Tooltip
       content={
         <span className="flex flex-col">
-          <span>{formatDateTime(date, exact)}</span>
-          <span>{formatDateTime(date, { ...exact, timeZone: UTC })}</span>
+          <span>{local}</span>
+          <span>{utc}</span>
         </span>
       }
     >
@@ -67,7 +87,7 @@ export function RelativeTime({ datetime }: RelativeTimeProps) {
           tabIndex={0}
           className="rounded-sm whitespace-nowrap outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-focus"
         >
-          {formatRelativeTime(date, new Date(now))}
+          {relative}
         </time>
       </Focusable>
     </Tooltip>

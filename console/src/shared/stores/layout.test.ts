@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { layout } from "@/shared/storage/items";
-import { resetStorageForTests } from "@/shared/storage/stored";
+import { resetStorageForTests, storageEventForTests } from "@/shared/storage/stored";
 import { applyStoredDensity, resetLayoutStoresForTests, setDensity, updateLayout } from "./layout";
 
 // Spec 0015 SHL-11: one store for the layout item, updated field by field.
@@ -55,12 +55,7 @@ describe("layout store", () => {
     // What the other tab does: it saves the item, and this tab gets a storage event.
     const saved = { sidebarCollapsed: true, density: "compact" } as const;
     layout.write(ids, saved);
-    window.dispatchEvent(
-      new StorageEvent("storage", {
-        key: "orvano:v1:usr_1:layout",
-        newValue: JSON.stringify(saved),
-      }),
-    );
+    window.dispatchEvent(storageEventForTests("orvano:v1:usr_1:layout", JSON.stringify(saved)));
 
     expect(document.documentElement.dataset.density).toBe("compact");
   });
@@ -69,12 +64,28 @@ describe("layout store", () => {
     setDensity("usr_1", "comfortable");
 
     window.dispatchEvent(
-      new StorageEvent("storage", {
-        key: "orvano:v1:usr_2:layout",
-        newValue: JSON.stringify({ sidebarCollapsed: false, density: "compact" }),
-      }),
+      storageEventForTests(
+        "orvano:v1:usr_2:layout",
+        JSON.stringify({ sidebarCollapsed: false, density: "compact" }),
+      ),
     );
 
     expect(document.documentElement.dataset.density).toBe("comfortable");
+  });
+
+  it("stops listening for the previous user's layout once another user signs in", () => {
+    setDensity("usr_1", "comfortable");
+    // Signing in as someone else: their store replaces the first user's.
+    setDensity("usr_2", "comfortable");
+
+    window.dispatchEvent(
+      storageEventForTests(
+        "orvano:v1:usr_1:layout",
+        JSON.stringify({ sidebarCollapsed: false, density: "compact" }),
+      ),
+    );
+
+    expect(document.documentElement.dataset.density).toBe("comfortable");
+    layout.remove({ userId: "usr_2" });
   });
 });

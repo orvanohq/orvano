@@ -7,10 +7,17 @@ export interface AvatarProps {
   size?: "sm" | "md";
 }
 
-const first = (text: string | undefined) => (text ? (Array.from(text)[0] ?? "") : "");
+let graphemes: Intl.Segmenter | undefined;
+
+/** The first user perceived character: a letter with its combining marks, or a whole joined emoji. */
+function first(text: string | undefined): string {
+  if (!text) return "";
+  graphemes ??= new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  return graphemes.segment(text)[Symbol.iterator]().next().value?.segment ?? "";
+}
 
 /**
- * Spec 0015 PRM-11: up to two initials, the first letters of the first and last words of the name, uppercased for
+ * Spec 0015 PRM-11: up to two initials, the first graphemes of the first and last words of the name, uppercased for
  * the active locale; else the first letter of the email.
  */
 export function initials(name: string, email: string, locale: string): string {

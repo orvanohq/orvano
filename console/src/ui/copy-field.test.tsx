@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { expectNoAxeViolations } from "@/test/axe";
@@ -28,6 +29,24 @@ function stubClipboard(writeText: (text: string) => Promise<void>) {
     writeText: spy,
   } as unknown as Clipboard);
   return spy;
+}
+
+/** A sheet that creates a second key without closing: the same `SecretReveal` gets a new `secret`. */
+function RotatingSecret() {
+  const [key, setKey] = useState({ secret: "ok_live_first_aaaa", masked: "ok_live_…aaaa" });
+  return (
+    <>
+      <SecretReveal label="API key" {...key} />
+      <button
+        type="button"
+        onClick={() => {
+          setKey({ secret: "ok_live_second_bbbb", masked: "ok_live_…bbbb" });
+        }}
+      >
+        Rotate
+      </button>
+    </>
+  );
 }
 
 afterEach(() => {
@@ -115,6 +134,32 @@ describe("SecretReveal", () => {
     // Focus moves to what replaced the button, not to the page.
     await expect.poll(() => document.activeElement?.textContent).toContain("ok_live_…91c2");
   });
+
+  it("0015 PRM-7: a new secret while mounted shows the new one, not the old one or its mask", async () => {
+    stubClipboard(() => Promise.resolve());
+    const { screen } = await renderInRouter(<RotatingSecret />);
+    const field = screen.getByRole("textbox", { name: "API key" });
+
+    // Rotating before "I've copied it" swaps the value shown.
+    await expect.element(field).toHaveValue("ok_live_first_aaaa");
+    await screen.getByRole("button", { name: "Rotate" }).click();
+    await expect.element(field).toHaveValue("ok_live_second_bbbb");
+  });
+
+  it("0015 PRM-7: a new secret after I've copied it shows the new secret again", async () => {
+    stubClipboard(() => Promise.resolve());
+    const { screen } = await renderInRouter(<RotatingSecret />);
+
+    await screen.getByRole("button", { name: "I've copied it" }).click();
+    await expect.element(screen.getByText("ok_live_…aaaa")).toBeVisible();
+    await screen.getByRole("button", { name: "Rotate" }).click();
+
+    await expect
+      .element(screen.getByRole("textbox", { name: "API key" }))
+      .toHaveValue("ok_live_second_bbbb");
+    expect(document.body.textContent).not.toContain("ok_live_…aaaa");
+    expect(document.body.textContent).not.toContain("ok_live_first_aaaa");
+  });
 });
 
 describe("CodeSnippet", () => {
@@ -131,5 +176,20 @@ describe("CodeSnippet", () => {
     expect(window.getSelection()?.toString()).toBe("npm install @orvano/sdk");
     expect(announced()).not.toContain("Copied");
     await expectNoAxeViolations();
+  });
+
+  it("0015 AC-24: the code is a named region, described and announced by the hint when the copy falls back", async () => {
+    stubClipboard(() => Promise.reject(new Error("refused")));
+    const { screen } = await renderInRouter(
+      <CodeSnippet label="Install command" code="npm install @orvano/sdk" />,
+    );
+    const region = screen.getByRole("region", { name: "Install command" });
+    await expect.element(region).toHaveAttribute("tabindex", "0");
+    expect(region.element().hasAttribute("aria-describedby")).toBe(false);
+
+    await screen.getByRole("button", { name: "Copy Install command" }).click();
+
+    await expect.poll(() => description(region.element())).toMatch(/to copy$/);
+    await expect.poll(announced).toMatch(/to copy/);
   });
 });
