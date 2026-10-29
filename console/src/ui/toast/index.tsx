@@ -38,8 +38,8 @@ const counts = createStore<Readonly<Record<string, number>>>({});
 
 /**
  * Spec 0015 PRM-8: the only way to raise a message. It goes into the history (the last 50), merges with an identical
- * visible toast by bumping its count, or joins React Aria's queue (three visible, newest on top). Nothing else
- * announces it: React Aria's toast region does. Errors stay until dismissed.
+ * visible toast, or joins React Aria's queue (three visible, newest on top). Nothing else announces it: React Aria's
+ * toast region does. Errors stay until dismissed.
  */
 export function notify(options: NotifyOptions): void {
   addMessage(options);
@@ -49,10 +49,10 @@ export function notify(options: NotifyOptions): void {
       content.message === options.message &&
       content.source === options.source,
   );
-  if (same) {
-    counts.set((current) => ({ ...current, [same.key]: (current[same.key] ?? 1) + 1 }));
-    return;
-  }
+  // UX-24 "identical toasts merge and show a count". The merged toast replaces the old one rather than bumping it in
+  // place, so its timer starts again and the region announces it again: a repeat is never silent.
+  const count = same ? (counts.get()[same.key] ?? 1) + 1 : 1;
+  if (same) queue.close(same.key);
   const key = queue.add(
     { ...options },
     {
@@ -64,6 +64,7 @@ export function notify(options: NotifyOptions): void {
       },
     },
   );
+  if (count > 1) counts.set((current) => ({ ...current, [key]: count }));
 }
 
 /** Test only: closes every toast and forgets the history. */

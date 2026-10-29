@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useLingui } from "@lingui/react/macro";
 import {
   Button as AriaButton,
@@ -27,6 +28,7 @@ import {
   fieldColumn,
   inputBox,
   textInput,
+  useAriaAttribute,
   useFieldWiring,
   type FieldProps,
 } from "./field";
@@ -68,6 +70,9 @@ export interface SelectProps extends OptionsProps {
 /** design.md _Forms_: picks one of a short list. Arrows move, typing jumps to a match. Holds the option's id. */
 export function Select({ label, description, isOptional, options, ...props }: SelectProps) {
   const field = useFieldWiring<string | undefined>();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // The trigger is what holds focus, so it carries the invalid state that React Aria gives text inputs.
+  useAriaAttribute(triggerRef, "aria-invalid", field.error === undefined ? undefined : "true");
   return (
     <AriaSelect
       {...props}
@@ -84,6 +89,7 @@ export function Select({ label, description, isOptional, options, ...props }: Se
       <FieldLabel label={label} isOptional={isOptional} />
       <FieldDescription>{description}</FieldDescription>
       <AriaButton
+        ref={triggerRef}
         className={cx(
           inputBox,
           "flex items-center justify-between gap-2 text-start data-focus-visible:outline-offset-0",

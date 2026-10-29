@@ -79,15 +79,19 @@ export function PasswordField({ label, description, isOptional, ...props }: Pass
     >
       <FieldLabel label={label} isOptional={isOptional} />
       <FieldDescription>{description}</FieldDescription>
-      <div className="flex items-center gap-1">
-        <Input className={textInput} />
-        <IconButton
-          icon={isVisible ? HideIcon : ShowIcon}
-          aria-label={isVisible ? t`Hide password` : t`Show password`}
-          onPress={() => {
-            setVisible(!isVisible);
-          }}
-        />
+      {/* The show button sits inside the field's end, so the field keeps the full width of its column. */}
+      <div className="relative flex">
+        <Input className={cx(textInput, "pe-8")} />
+        <span className="absolute inset-y-0 end-0.5 flex items-center">
+          <IconButton
+            icon={isVisible ? HideIcon : ShowIcon}
+            size="sm"
+            aria-label={isVisible ? t`Hide password` : t`Show password`}
+            onPress={() => {
+              setVisible(!isVisible);
+            }}
+          />
+        </span>
       </div>
       <FieldErrorText>{field.error}</FieldErrorText>
     </AriaTextField>

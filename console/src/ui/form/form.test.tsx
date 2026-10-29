@@ -45,6 +45,11 @@ function BucketForm({ onSubmitAsync = () => Promise.resolve(undefined) }: FormPr
 
 afterEach(resetUnsavedChangesForTests);
 
+/** A pointer event on the page, as a touch that starts, ends, or turns into a scroll sends it. */
+function press(type: "pointerdown" | "pointerup" | "pointercancel") {
+  document.body.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1 }));
+}
+
 describe("useAppForm timing (FRM-2, UX-8)", () => {
   it("0015 AC-16: checks a field only once it loses focus after a change, then on every change", async () => {
     const { screen } = await renderInRouter(<BucketForm />);
@@ -69,6 +74,24 @@ describe("useAppForm timing (FRM-2, UX-8)", () => {
     // The next mistake waits for the next blur.
     await userEvent.keyboard("xyz");
     await expect.element(name).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("0015 AC-16: an error from a pointer press shows once the press ends, also when it is canceled", async () => {
+    const { screen } = await renderInRouter(<BucketForm />);
+    const name = screen.getByRole("textbox", { name: "Bucket name" });
+
+    await focusElement(name.element());
+    await userEvent.keyboard("toolong");
+    // A touch starts (it turns into a scroll), and focus leaves the field during the press.
+    press("pointerdown");
+    await focusElement(screen.getByRole("textbox", { name: "Region" }).element());
+    await expect.element(name).not.toHaveAttribute("aria-invalid");
+
+    // The browser cancels the press instead of ending it: the error still shows.
+    press("pointercancel");
+    await expect.element(name).toHaveAttribute("aria-invalid", "true");
+    press("pointerup");
+    await expect.element(screen.getByText("Use at most 5 characters.")).toBeVisible();
   });
 
   it("0015 AC-16: leaving a field you didn't change shows nothing", async () => {

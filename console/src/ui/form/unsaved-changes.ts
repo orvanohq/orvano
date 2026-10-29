@@ -39,7 +39,7 @@ export function useUnsavedChanges(changed: boolean): void {
   const search = location.search as Record<string, unknown>;
   const watched = Object.fromEntries((scope?.watch ?? []).map((key) => [key, search[key]]));
   const pathname = location.pathname;
-  const watchKey = JSON.stringify(watched);
+  const watchKey = stableKey(watched);
 
   useEffect(() => {
     if (!changed) return;
@@ -54,6 +54,22 @@ export function useUnsavedChanges(changed: boolean): void {
       forget((key) => key === id);
     };
   }, [changed, id, scope?.id, pathname, watchKey]);
+}
+
+/**
+ * One string per value, the same however its object keys are ordered, so a search param that holds an object or an
+ * array compares by what it holds, not by identity (the router parses search into a fresh object on every change).
+ */
+export function stableKey(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    item !== null && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(
+          Object.entries(item as Record<string, unknown>).toSorted(([a], [b]) =>
+            a < b ? -1 : a > b ? 1 : 0,
+          ),
+        )
+      : item,
+  );
 }
 
 function forget(match: (id: string, registration: Registration) => boolean): void {
@@ -75,7 +91,9 @@ export function affectedBy(next: BlockLocation): string[] {
     .filter(
       ([, registration]) =>
         registration.pathname !== next.pathname ||
-        Object.entries(registration.watch).some(([key, value]) => search[key] !== value),
+        Object.entries(registration.watch).some(
+          ([key, value]) => stableKey(search[key]) !== stableKey(value),
+        ),
     )
     .map(([id]) => id);
 }
