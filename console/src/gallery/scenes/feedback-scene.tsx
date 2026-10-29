@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import {
   Badge,
   Banner,
@@ -17,58 +17,102 @@ import {
   type JobStatus,
   type Tone,
 } from "@/ui";
+import { useGalleryText } from "../pseudo";
+import { Scene, Section } from "./scene";
 
 // Spec 0015 GAL-2: feedback and states in every variant, on placeholder data (milestone 4, steps 17 and 18).
 
 const tones: Tone[] = ["neutral", "info", "success", "warning", "danger"];
 const statuses: JobStatus[] = ["queued", "running", "ready", "failed", "cancelled"];
 
+/** One realistic message per tone (design.md _Writing in the UI_), each with the action it would offer. */
+const banners: readonly { tone: Tone; title: string; message: string; action: string }[] = [
+  {
+    tone: "neutral",
+    title: "Maintenance on Sunday",
+    message: "The instance restarts on Sunday at 02:00 UTC, for about five minutes.",
+    action: "View schedule",
+  },
+  {
+    tone: "info",
+    title: "A new SDK version",
+    message: "Version 2.4 of the JavaScript SDK adds realtime presence.",
+    action: "Read the changelog",
+  },
+  {
+    tone: "success",
+    title: "Backup finished",
+    message: "Last night's backup of Storefront finished at 02:14.",
+    action: "View backups",
+  },
+  {
+    tone: "warning",
+    title: "Storage almost full",
+    message: "Storefront is at 90% of its database storage.",
+    action: "Upgrade plan",
+  },
+  {
+    tone: "danger",
+    title: "Storage is full",
+    message: "Storefront can't take new rows until you free space or upgrade.",
+    action: "Upgrade plan",
+  },
+];
+
 const serverError = { kind: "server", requestId: "req_01JB8Z4Q7W2N" };
 
 export function FeedbackScene() {
+  const g = useGalleryText();
   return (
-    <main className="mx-auto flex max-w-content flex-col gap-8 p-6">
-      <h1 className="text-xl font-semibold">Feedback and states</h1>
-
+    <Scene title="Feedback and states">
       <Section title="notify and toasts">
         <p className="text-fg-muted">
-          Three show at once, newest on top. Success closes after 6 seconds; errors stay. Raise the
-          same one twice to see the count.
+          {g(
+            "Three show at once, newest on top. Success closes after 6 seconds; errors stay until you close them, and the region never covers the focused element. Raise the same one twice to see the count.",
+          )}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button
             onPress={() => {
-              notify({ tone: "success", message: "Table created", source: "Databases" });
+              notify({ tone: "success", message: g("Table created"), source: g("Databases") });
             }}
           >
-            Success
+            {g("Success")}
           </Button>
           <Button
             onPress={() => {
-              notify({ tone: "info", message: "Backup started", source: "Backups" });
+              notify({ tone: "info", message: g("Backup started"), source: g("Backups") });
             }}
           >
-            Info
+            {g("Info")}
           </Button>
           <Button
             onPress={() => {
-              notify({ tone: "error", message: "Deploy failed", source: "Functions" });
+              notify({ tone: "error", message: g("Deploy failed"), source: g("Functions") });
             }}
           >
-            Error
+            {g("Error")}
           </Button>
         </div>
       </Section>
 
       <Section title="Banner">
-        {tones.map((tone) => (
+        {banners.map((banner) => (
+          <Banner key={banner.tone} tone={banner.tone} title={g(banner.title)}>
+            {g(banner.message)}
+          </Banner>
+        ))}
+      </Section>
+
+      <Section title="Banner, with an action">
+        {banners.map((banner) => (
           <Banner
-            key={tone}
-            tone={tone}
-            title={`${tone.charAt(0).toUpperCase()}${tone.slice(1)} banner`}
-            action={tone === "warning" ? <Button size="sm">Upgrade plan</Button> : undefined}
+            key={banner.tone}
+            tone={banner.tone}
+            title={g(banner.title)}
+            action={<Button size="sm">{g(banner.action)}</Button>}
           >
-            Storefront is at 90% of its database storage.
+            {g(banner.message)}
           </Banner>
         ))}
       </Section>
@@ -76,7 +120,7 @@ export function FeedbackScene() {
       <Section title="InlineError">
         <InlineError
           error={serverError}
-          title="Couldn't save the table"
+          title={g("Couldn't save the table")}
           onRetry={() => undefined}
         />
         <InlineError error={{ kind: "forbidden", requiredRole: "Admin" }} />
@@ -86,27 +130,34 @@ export function FeedbackScene() {
       <Section title="EmptyState">
         <EmptyState
           kind="first-use"
-          title="Create your first table"
-          description="Tables hold your app's data. Start with one, then add columns."
-          action={<Button variant="primary">Create table</Button>}
+          title={g("Create your first table")}
+          description={g("Tables hold your app's data. Start with one, then add columns.")}
+          action={<Button variant="primary">{g("Create table")}</Button>}
         />
         <EmptyState
           kind="no-results"
-          title="No results"
-          description="No tables match these filters."
-          action={<Button>Clear filters</Button>}
+          title={g("No results")}
+          description={g("No tables match these filters.")}
+          action={<Button>{g("Clear filters")}</Button>}
         />
         <EmptyState
           kind="not-allowed"
-          title="Storage isn't set up"
-          description="Add a storage bucket to upload files."
-          action={<Button>Set up storage</Button>}
+          title={g("Storage isn't set up")}
+          description={g("Add a storage bucket to upload files.")}
+          action={<Button>{g("Set up storage")}</Button>}
         />
       </Section>
 
       <Section title="ErrorState">
-        <ErrorState error={serverError} title="Couldn't load tables" onRetry={() => undefined} />
-        <ErrorState error={{ kind: "not_found" }} backLink={<Button>Back to tables</Button>} />
+        <ErrorState
+          error={serverError}
+          title={g("Couldn't load tables")}
+          onRetry={() => undefined}
+        />
+        <ErrorState
+          error={{ kind: "not_found" }}
+          backLink={<Button>{g("Back to tables")}</Button>}
+        />
         <ErrorState error={{ kind: "forbidden", requiredRole: "Admin" }} />
       </Section>
 
@@ -122,11 +173,11 @@ export function FeedbackScene() {
       </Section>
 
       <Section title="Progress and Spinner">
-        <Progress label="Uploading backup.sql" value={42} />
-        <Progress label="Restoring backup" />
+        <Progress label={g("Uploading backup.sql")} value={42} />
+        <Progress label={g("Restoring backup")} />
         <div className="flex items-center gap-2">
-          <Spinner aria-label="Loading tables" />
-          <span>Spinner, inside small controls only</span>
+          <Spinner aria-label={g("Loading tables")} />
+          <span>{g("Spinner, inside small controls only")}</span>
         </div>
       </Section>
 
@@ -148,12 +199,13 @@ export function FeedbackScene() {
           <Badge tone="info">12</Badge>
         </div>
       </Section>
-    </main>
+    </Scene>
   );
 }
 
 /** useDelayedPending: nothing for 300 ms, then the skeleton for at least 500 ms (UX-21). */
 function DelayedPendingDemo() {
+  const g = useGalleryText();
   const [pending, setPending] = useState(false);
   const show = useDelayedPending(pending);
   const load = (ms: number) => {
@@ -170,26 +222,17 @@ function DelayedPendingDemo() {
             load(200);
           }}
         >
-          Load in 200 ms
+          {g("Load in 200 ms")}
         </Button>
         <Button
           onPress={() => {
             load(1500);
           }}
         >
-          Load in 1.5 s
+          {g("Load in 1.5 s")}
         </Button>
       </div>
-      {show ? <GridSkeleton /> : <p className="text-fg-muted">Loaded.</p>}
+      {show ? <GridSkeleton /> : <p className="text-fg-muted">{g("Loaded.")}</p>}
     </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {children}
-    </section>
   );
 }

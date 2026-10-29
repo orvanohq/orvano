@@ -10,7 +10,7 @@ import { UnsavedChangesGuard } from "@/ui/form/unsaved-changes-guard";
 import { Announcer } from "@/ui/announcer";
 import { UiRouterProvider } from "@/ui/router-provider";
 import { ToastRegion } from "@/ui/toast";
-import { GalleryFrame } from "./frame";
+import { GalleryFrame, useScrollToTop } from "./frame";
 import { BootErrorPage, RootErrorPage } from "@/ui";
 import { AuthScene } from "./scenes/auth-scene";
 import { DataScene } from "./scenes/data-scene";
@@ -19,7 +19,9 @@ import { FormsScene } from "./scenes/forms-scene";
 import { IndexScene } from "./scenes/index-scene";
 import { OverlaysScene } from "./scenes/overlays-scene";
 import { PrimitivesScene } from "./scenes/primitives-scene";
+import { useSceneTitle } from "./scenes/scene";
 import { ShellScene } from "./scenes/shell-scene";
+import { StatesScene } from "./scenes/states-scene";
 
 // Spec 0015 GAL-1: a code based router with hash history, so the app's routeTree.gen.ts never changes. It declares
 // the app's shell paths, so active links match as they do in the app.
@@ -35,7 +37,7 @@ const rootRoute = createRootRouteWithContext<GalleryContext>()({
     const { toolbar } = useRouter().options.context as unknown as GalleryContext;
     return (
       <UiRouterProvider>
-        {toolbar ? <GalleryFrame /> : <Outlet />}
+        {toolbar ? <GalleryFrame /> : <FramedScene />}
         <UnsavedChangesGuard />
         <ToastRegion />
         <Announcer />
@@ -43,6 +45,12 @@ const rootRoute = createRootRouteWithContext<GalleryContext>()({
     );
   },
 });
+
+/** A scene without the toolbar (in a width frame, or a test): it scrolls the window, which starts at the top. */
+function FramedScene() {
+  useScrollToTop();
+  return <Outlet />;
+}
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -60,6 +68,12 @@ const formsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/forms",
   component: FormsScene,
+});
+
+const statesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/states",
+  component: StatesScene,
 });
 
 const overlaysRoute = createRoute({
@@ -86,13 +100,19 @@ const failure = { kind: "server", requestId: "req_01JB8Z4Q7W2N" };
 const bootErrorRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/boot-error",
-  component: () => <BootErrorPage error={failure} />,
+  component: function BootErrorScene() {
+    useSceneTitle("Boot error");
+    return <BootErrorPage error={failure} />;
+  },
 });
 
 const rootErrorRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/root-error",
-  component: () => <RootErrorPage error={failure} />,
+  component: function RootErrorScene() {
+    useSceneTitle("Root error");
+    return <RootErrorPage error={failure} />;
+  },
 });
 
 const authRoute = createRoute({
@@ -173,6 +193,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   primitivesRoute,
   formsRoute,
+  statesRoute,
   overlaysRoute,
   feedbackRoute,
   dataRoute,

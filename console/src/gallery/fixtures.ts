@@ -7,6 +7,7 @@ import type {
   ShellScope,
   SwitcherItem,
 } from "@/ui";
+import type { Scenario } from "./settings";
 
 // Spec 0015 GAL-2: placeholder data in the shapes of SHL-1. Paths follow the gallery's routes, which mirror the
 // app's shell paths.
@@ -66,17 +67,33 @@ const projects: SwitcherItem[] = ["Storefront", "Billing", "Analytics", "Mobile 
   },
 );
 
-/** A search that filters a fixture list after a short delay, and honors its abort signal. */
+/** How long a slow fixture takes: long enough to look at the loading state. */
+export const SLOW_MS = 4000;
+
+/**
+ * A search that filters a fixture list after a short delay, and honors its abort signal. The scenario makes it slow,
+ * fail, or find nothing (GAL-2).
+ */
 const search =
-  (items: SwitcherItem[]) => (query: string, options: { limit: number; signal: AbortSignal }) =>
+  (items: SwitcherItem[], scenario: Scenario) =>
+  (query: string, options: { limit: number; signal: AbortSignal }) =>
     new Promise<readonly SwitcherItem[]>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        resolve(
-          items
-            .filter((item) => item.name.toLowerCase().includes(query.toLowerCase()))
-            .slice(0, options.limit),
-        );
-      }, 300);
+      const timer = setTimeout(
+        () => {
+          if (scenario === "fail") {
+            reject(new Error("Network error"));
+            return;
+          }
+          resolve(
+            scenario === "empty"
+              ? []
+              : items
+                  .filter((item) => item.name.toLowerCase().includes(query.toLowerCase()))
+                  .slice(0, options.limit),
+          );
+        },
+        scenario === "slow" ? SLOW_MS : 300,
+      );
       options.signal.addEventListener("abort", () => {
         clearTimeout(timer);
         reject(options.signal.reason as Error);
@@ -89,15 +106,15 @@ const navByScope: Record<ShellScope, readonly ShellNavItem[]> = {
   account: accountNav,
 };
 
-export function shellModel(scope: ShellScope): ShellModel {
+export function shellModel(scope: ShellScope, scenario: Scenario = "normal"): ShellModel {
   return {
     user,
     scope,
     org: scope === "account" ? undefined : org,
     project: scope === "project" ? project : undefined,
     nav: navByScope[scope],
-    searchOrgs: search(orgs),
-    searchProjects: search(projects),
+    searchOrgs: search(orgs, scenario),
+    searchProjects: search(projects, scenario),
     orgLinks: { all: { to: "/" }, create: { to: "/" } },
     projectLinks: { all: { to: "/$orgId", params: { orgId: org.id } }, create: { to: "/" } },
     // Tests listen for this; feature 13 signs out here.
@@ -128,9 +145,6 @@ export function crumbs(scope: ShellScope, page: string, resource?: string): Crum
   return [{ kind: "org" }, { kind: "project" }, { kind: "page", label: page }];
 }
 
-/** A search that always fails, for the switcher's error state. */
-export const failingSearch = () => Promise.reject(new Error("Network error"));
-
 export const tables: readonly ResourceListItem[] = [
   "orders",
   "users",
@@ -145,17 +159,20 @@ export const tables: readonly ResourceListItem[] = [
   },
 }));
 
-export function tableTabs(tableId: string): readonly RouteTab[] {
+export function tableTabs(
+  tableId: string,
+  g: (text: string) => string = (text) => text,
+): readonly RouteTab[] {
   const params = { ...ids, tableId };
   return [
     {
       id: "rows",
-      label: "Rows",
+      label: g("Rows"),
       link: { to: "/$orgId/$projectId/databases/$tableId", params, exact: true },
     },
     {
       id: "columns",
-      label: "Columns",
+      label: g("Columns"),
       link: { to: "/$orgId/$projectId/databases/$tableId/columns", params },
     },
   ];

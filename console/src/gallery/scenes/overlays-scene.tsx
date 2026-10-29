@@ -1,9 +1,11 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { ConfirmDelete, type ConfirmDeleteProps, type LoadDependents } from "@/ui/confirm-delete";
 import { useAppForm } from "@/ui/form";
 import { SideSheet } from "@/ui/side-sheet";
 import { Button, Dialog, DialogTrigger, Link } from "@/ui";
 import { z } from "@/shared/zod";
+import { useGalleryText } from "../pseudo";
+import { Row, Scene, Section } from "./scene";
 
 // Spec 0015 GAL-2: the overlays in every state, on placeholder data. The gallery imports the lazy primitives
 // directly; screens load them lazily (PRM-10).
@@ -86,35 +88,34 @@ const scenarios: Scenario[] = [
 
 /** Dialogs, the side sheet with its unsaved changes question, and every ConfirmDelete state. */
 export function OverlaysScene() {
+  const g = useGalleryText();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [confirm, setConfirm] = useState<Scenario | null>(null);
 
   return (
-    <main className="mx-auto flex max-w-content flex-col gap-8 p-6">
-      <h1 className="text-xl font-semibold">Overlays</h1>
-
+    <Scene title={g("Overlays")}>
       <Section title="Dialog">
         <Row label="sm">
-          <DialogTrigger trigger={<Button>Rename table</Button>}>
+          <DialogTrigger trigger={<Button>{g("Rename table")}</Button>}>
             <Dialog
-              title="Rename table"
+              title={g("Rename table")}
               footer={
                 <>
-                  <Button slot="close">Cancel</Button>
+                  <Button slot="close">{g("Cancel")}</Button>
                   <Button variant="primary" slot="close">
-                    Rename table
+                    {g("Rename table")}
                   </Button>
                 </>
               }
             >
-              <p>A one or two field form, or a confirmation, fits a dialog (UX-6).</p>
+              <p>{g("A one or two field form, or a confirmation, fits a dialog (UX-6).")}</p>
             </Dialog>
           </DialogTrigger>
         </Row>
         <Row label="md">
-          <DialogTrigger trigger={<Button>Show details</Button>}>
-            <Dialog title="Deployment details" size="md">
-              <p>A wider dialog, 560 px. Escape closes it.</p>
+          <DialogTrigger trigger={<Button>{g("Show details")}</Button>}>
+            <Dialog title={g("Deployment details")} size="md">
+              <p>{g("A wider dialog, 560 px. Escape closes it.")}</p>
             </Dialog>
           </DialogTrigger>
         </Row>
@@ -128,29 +129,29 @@ export function OverlaysScene() {
               setSheetOpen(true);
             }}
           >
-            New webhook
+            {g("New webhook")}
           </Button>
         </Row>
         <p className="text-fg-muted">
-          Type in the sheet, then press Escape or{" "}
+          {g("Type in the sheet, then press Escape or")}{" "}
           <Link to="/" variant="inline">
-            leave this page
+            {g("leave this page")}
           </Link>{" "}
-          to see the unsaved changes question.
+          {g("to see the unsaved changes question.")}
         </p>
         <WebhookSheet isOpen={sheetOpen} onOpenChange={setSheetOpen} />
       </Section>
 
       <Section title="ConfirmDelete">
         {scenarios.map((scenario) => (
-          <Row key={scenario.label} label={scenario.kind}>
+          <Row key={g(scenario.label)} label={scenario.kind}>
             <Button
               variant="danger"
               onPress={() => {
                 setConfirm(scenario);
               }}
             >
-              {scenario.label}
+              {g(scenario.label)}
             </Button>
           </Row>
         ))}
@@ -164,7 +165,7 @@ export function OverlaysScene() {
           />
         ) : null}
       </Section>
-    </main>
+    </Scene>
   );
 }
 
@@ -180,6 +181,7 @@ function WebhookSheet({
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }) {
+  const g = useGalleryText();
   const form = useAppForm({
     defaultValues: { url: "", secret: "" },
     schema: webhookSchema,
@@ -192,44 +194,26 @@ function WebhookSheet({
   return (
     <form.AppForm>
       <SideSheet
-        title="New webhook"
+        title={g("New webhook")}
         isOpen={isOpen}
         onOpenChange={onOpenChange}
         footer={
           <>
-            <Button slot="close">Cancel</Button>
-            <form.SubmitButton>Create webhook</form.SubmitButton>
+            <Button slot="close">{g("Cancel")}</Button>
+            <form.SubmitButton>{g("Create webhook")}</form.SubmitButton>
           </>
         }
       >
         <form.Form>
           <form.ErrorSummary />
           <form.AppField name="url">
-            {(field) => <field.TextField label="Endpoint URL" type="url" />}
+            {(field) => <field.TextField label={g("Endpoint URL")} type="url" />}
           </form.AppField>
           <form.AppField name="secret">
-            {(field) => <field.PasswordField label="Signing secret" isOptional />}
+            {(field) => <field.PasswordField label={g("Signing secret")} isOptional />}
           </form.AppField>
         </form.Form>
       </SideSheet>
     </form.AppForm>
-  );
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <span className="w-24 shrink-0 font-mono text-sm text-fg-muted">{label}</span>
-      {children}
-    </div>
   );
 }
