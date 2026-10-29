@@ -51,8 +51,10 @@ export function formatRelativeTime(date: Date, now: Date): string {
     `relative:${active}`,
     () => new Intl.RelativeTimeFormat(active, { numeric: "auto" }),
   );
+  // Whole units only, rounded toward zero, so 59.6 minutes is "59 minutes ago" and the step to "1 hour ago" comes at
+  // the hour, not 30 seconds before it.
   if (distance < MINUTE) return relative.format(0, "second");
-  if (distance < HOUR) return relative.format(Math.round(diff / MINUTE), "minute");
-  if (distance < DAY) return relative.format(Math.round(diff / HOUR), "hour");
-  return relative.format(Math.round(diff / DAY), "day");
+  if (distance < HOUR) return relative.format(Math.trunc(diff / MINUTE), "minute");
+  if (distance < DAY) return relative.format(Math.trunc(diff / HOUR), "hour");
+  return relative.format(Math.trunc(diff / DAY), "day");
 }

@@ -39,7 +39,12 @@ export interface TableProps {
   onRowAction?: (key: Key) => void;
 }
 
-/** Arrow keys move between rows and cells (APG grid); rows follow the density's height (UX-32). */
+/**
+ * Arrow keys move between rows and cells (APG grid); rows follow the density's height (UX-32). The table scrolls in
+ * its own container, a region named like the table so its scrolling is announced (SRT-13). Scroll padding the height
+ * of the sticky header keeps a focused row out from under it (SHL-8, WCAG 2.4.11), and bottom padding keeps an
+ * overlay scrollbar off the last row.
+ */
 export function Table({
   "aria-label": label,
   children,
@@ -47,7 +52,10 @@ export function Table({
   ...props
 }: TableProps) {
   return (
-    <div className="min-w-0 overflow-auto rounded-md border">
+    <section
+      aria-label={label}
+      className="min-h-0 min-w-0 scroll-pt-(--row-height) overflow-auto rounded-md border pb-3"
+    >
       <AriaTable
         {...props}
         aria-label={label}
@@ -57,7 +65,7 @@ export function Table({
       >
         {children}
       </AriaTable>
-    </div>
+    </section>
   );
 }
 
@@ -171,7 +179,12 @@ export function Row({ id, children }: { id: Key; children: ReactNode }) {
 export function Cell({ children }: { children: ReactNode }) {
   return (
     <AriaCell
-      className={cx("border-b px-3 align-middle group-last/row:border-b-0", focusRingInset)}
+      // Cells never wrap, so a row keeps the density's height (UX-32) and a masked key stays on one line: a narrow
+      // screen scrolls the table sideways instead.
+      className={cx(
+        "border-b px-3 align-middle whitespace-nowrap group-last/row:border-b-0",
+        focusRingInset,
+      )}
     >
       {children}
     </AriaCell>

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { expectNoAxeViolations } from "@/test/axe";
 import { renderInRouter } from "@/test/render";
-import { Link } from "./link";
+import { ExternalLink, Link } from "./link";
 
 // Spec 0003 RTE-6's "verify with feature 11": the createLink form keeps the router's preload and navigation.
 
@@ -91,5 +91,39 @@ describe("Link", () => {
       await expectNoAxeViolations();
     }
     delete document.documentElement.dataset.theme;
+  });
+});
+
+describe("ExternalLink", () => {
+  it("0015 SHL-9: opens a web address in a new tab, at least 24 px high (UX-32)", async () => {
+    const { screen } = await renderInRouter(
+      <ExternalLink href="https://docs.example.com/">Open the docs</ExternalLink>,
+    );
+    const link = screen.getByRole("link", { name: /Open the docs/ });
+    await expect.element(link).toHaveAttribute("href", "https://docs.example.com/");
+    await expect.element(link).toHaveAttribute("target", "_blank");
+    await expect.element(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(link.element().getBoundingClientRect().height).toBeGreaterThanOrEqual(24);
+    await expectNoAxeViolations();
+  });
+
+  it("0003 SEC-2: renders any other address as plain text, never a link", async () => {
+    for (const href of [
+      // oxlint-disable-next-line no-script-url -- the value under test
+      "javascript:alert(1)",
+      "data:text/html,<p>hi</p>",
+      "/relative/path",
+      "not a url",
+    ]) {
+      // oxlint-disable-next-line no-await-in-loop -- one render per address
+      const { screen } = await renderInRouter(
+        <ExternalLink href={href}>Open the docs</ExternalLink>,
+      );
+      // oxlint-disable-next-line no-await-in-loop -- waits for this render before checking it
+      await expect.element(screen.getByText("Open the docs")).toBeVisible();
+      expect(document.querySelector("a")).toBeNull();
+      // oxlint-disable-next-line no-await-in-loop -- unmounts before the next address renders
+      await screen.unmount();
+    }
   });
 });

@@ -226,8 +226,11 @@ function ResizeSeparator({
       aria-valuenow={width}
       aria-valuemin={LIST_MIN}
       aria-valuemax={max}
+      // A 4 px line with a transparent 24 px hit area (UX-32, WCAG 2.5.8): the `before:` box takes the pointer. It
+      // reaches 4 px into the list (its end padding, so it stops at the Collapse button) and 16 px into the content.
       className={cx(
-        "w-1 shrink-0 cursor-col-resize touch-none bg-transparent outline-none hover:bg-accent focus-visible:bg-accent",
+        "relative w-1 shrink-0 cursor-col-resize touch-none bg-transparent outline-none hover:bg-accent focus-visible:bg-accent",
+        "before:absolute before:inset-y-0 before:-start-1 before:-end-4",
         "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-solid focus-visible:outline-focus",
       )}
     />

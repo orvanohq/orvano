@@ -13,7 +13,8 @@ const day = 24 * 60 * minute;
 
 describe("RelativeTime", () => {
   it("0015 PRM-11: is a focusable time element whose tooltip shows the local time and UTC", async () => {
-    const moment = new Date(Date.now() - 3 * minute);
+    // Half a minute past 3, so the shared clock's reading (up to a second old) can't make it "2 minutes ago".
+    const moment = new Date(Date.now() - 3.5 * minute);
     const { screen } = await renderInRouter(<RelativeTime datetime={moment.toISOString()} />);
 
     const time = screen.getByText("3 minutes ago");
@@ -26,6 +27,30 @@ describe("RelativeTime", () => {
     await expect.poll(() => tooltip.element().textContent).toMatch(/UTC$/);
     const describedBy = time.element().getAttribute("aria-describedby") ?? "";
     expect(document.getElementById(describedBy)?.textContent).toMatch(/UTC$/);
+    await expectNoAxeViolations();
+  });
+
+  it("0001 UX-34: an invalid date shows the raw value or a dash, never an error", async () => {
+    const { screen } = await renderInRouter(
+      <p>
+        <RelativeTime datetime="garbage" />, <RelativeTime datetime={new Date(Number.NaN)} />
+      </p>,
+    );
+
+    await expect.element(screen.getByText("garbage")).toBeVisible();
+    await expect.element(screen.getByText("—")).toBeVisible();
+    expect(document.querySelector("time")).toBeNull();
+  });
+
+  it("0015 PRM-11: with focusable off it isn't a tab stop, and its title holds the exact time", async () => {
+    // Half a minute past 3, so the shared clock's reading (up to a second old) can't make it "2 minutes ago".
+    const moment = new Date(Date.now() - 3.5 * minute);
+    const { screen } = await renderInRouter(<RelativeTime datetime={moment} focusable={false} />);
+
+    const time = screen.getByText("3 minutes ago");
+    await expect.element(time).toHaveAttribute("datetime", moment.toISOString());
+    expect(time.element().hasAttribute("tabindex")).toBe(false);
+    expect(time.element().getAttribute("title")).toMatch(/UTC$/);
     await expectNoAxeViolations();
   });
 
@@ -49,6 +74,13 @@ describe("formatRelativeTime", () => {
     expect(at(-2 * 60 * minute)).toBe("2 hours ago");
     expect(at(-day)).toBe("yesterday");
     expect(at(-6 * day)).toBe("6 days ago");
+  });
+
+  it("0001 UX-34: steps to the next unit at its boundary, not half a unit early", () => {
+    expect(at(-(59 * minute + 36_000))).toBe("59 minutes ago");
+    expect(at(-60 * minute)).toBe("1 hour ago");
+    expect(at(-(23 * 60 * minute + 36 * minute))).toBe("23 hours ago");
+    expect(at(-(day + 23 * 60 * minute))).toBe("yesterday");
   });
 
   it("0001 UX-34: switches to a date at 7 days", () => {

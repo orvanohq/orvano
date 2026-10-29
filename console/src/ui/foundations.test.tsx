@@ -69,6 +69,13 @@ describe("Avatar", () => {
     expect(initials("istanbul ilçe", "x@example.com", "tr")).toBe("İİ");
   });
 
+  it("0015 PRM-11: takes whole graphemes, not half a character", () => {
+    // "e" plus a combining acute accent: two code points, one letter.
+    expect(initials("e\u0301mile zola", "x@example.com", "en")).toBe("E\u0301Z");
+    // A family emoji joined with zero width joiners stays one emoji.
+    expect(initials("👩‍👩‍👧 team", "x@example.com", "en")).toBe("👩‍👩‍👧T");
+  });
+
   it("0015 AC-15: is decorative and passes axe", async () => {
     await renderInRouter(<Avatar name="Ada Lovelace" email="ada@example.com" />);
 

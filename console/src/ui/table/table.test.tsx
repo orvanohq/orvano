@@ -111,6 +111,87 @@ describe("Table", () => {
     await expectNoAxeViolations();
   });
 
+  it("0015 SHL-8: the sticky header never covers the focused row in a short scroll container", async () => {
+    const many = Array.from({ length: 20 }, (_, index) => ({
+      id: `key${String(index)}`,
+      name: `Key ${String(index)}`,
+    }));
+    const { screen } = await renderInRouter(
+      // A caller that gives the table less height than its rows: the table's own container scrolls.
+      <div style={{ display: "flex", flexDirection: "column", height: 200 }}>
+        <Table aria-label="API keys">
+          <TableHeader>
+            <Column id="name" isRowHeader>
+              Name
+            </Column>
+          </TableHeader>
+          <TableBody>
+            {many.map((key) => (
+              <Row key={key.id} id={key.id}>
+                <Cell>{key.name}</Cell>
+              </Row>
+            ))}
+          </TableBody>
+        </Table>
+      </div>,
+    );
+    const region = screen.getByRole("region", { name: "API keys" });
+    await expect.element(region).toBeVisible();
+    const header = screen.getByRole("columnheader", { name: "Name" }).element();
+    const scroller = region.element();
+
+    /** The focused row is fully inside the scroller, below the sticky header. */
+    const focusedRowInView = () => {
+      const row = (document.activeElement as HTMLElement).getBoundingClientRect();
+      return (
+        row.top >= header.getBoundingClientRect().bottom - 1 &&
+        row.bottom <= scroller.getBoundingClientRect().bottom + 1
+      );
+    };
+
+    await focusElement(screen.getByRole("row").nth(1));
+    for (const key of [
+      ...Array<string>(12).fill("{ArrowDown}"),
+      ...Array<string>(11).fill("{ArrowUp}"),
+    ]) {
+      // oxlint-disable-next-line no-await-in-loop -- each key press depends on the one before
+      await userEvent.keyboard(key);
+      // oxlint-disable-next-line no-await-in-loop -- checked after each press, while the container scrolls
+      await expect.poll(focusedRowInView).toBe(true);
+    }
+    expect(scroller.scrollTop).toBeGreaterThan(0);
+  });
+
+  it("0015 AC-15: at a narrow width a masked key stays on one line and the table scrolls sideways", async () => {
+    const { screen } = await renderInRouter(
+      <div style={{ width: 160 }}>
+        <Table aria-label="API keys">
+          <TableHeader>
+            <Column id="name" isRowHeader>
+              Name
+            </Column>
+            <Column id="key">Key</Column>
+          </TableHeader>
+          <TableBody>
+            <Row id="old">
+              <Cell>Old server</Cell>
+              <Cell>ok_live_7f3a…91c2</Cell>
+            </Row>
+          </TableBody>
+        </Table>
+      </div>,
+    );
+    const cell = screen.getByText("ok_live_7f3a…91c2");
+    await expect.element(cell).toBeVisible();
+
+    expect(
+      (screen.getByRole("row").nth(1).element() as HTMLElement).getBoundingClientRect().height,
+    ).toBe(40);
+    const region = screen.getByRole("region", { name: "API keys" }).element();
+    expect(region.scrollWidth).toBeGreaterThan(region.clientWidth);
+    await expectNoAxeViolations();
+  });
+
   it("0001 UX-20: an empty table shows its empty state", async () => {
     const { screen } = await renderInRouter(
       <Table aria-label="Webhooks">

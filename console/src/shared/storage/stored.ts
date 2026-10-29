@@ -93,7 +93,11 @@ export function defineStored<Ids, Value>(options: {
     subscribe: (ids, listener) => {
       const key = options.key(ids);
       const onStorage = (event: StorageEvent) => {
-        if (event.key === key) listener(parse(event.newValue, key));
+        // Only localStorage holds these items: a sessionStorage event with the same key isn't about them.
+        if (!storageAvailable() || event.storageArea !== localStorage) return;
+        // `clear()` in another tab sends a null key: every item is gone, so this one is back to its fallback.
+        if (event.key === null) listener(options.fallback);
+        else if (event.key === key) listener(parse(event.newValue, key));
       };
       window.addEventListener("storage", onStorage);
       return () => {
@@ -101,6 +105,11 @@ export function defineStored<Ids, Value>(options: {
       };
     },
   };
+}
+
+/** Test only: the `storage` event another tab's change to localStorage fires in this one (`key` null for `clear()`). */
+export function storageEventForTests(key: string | null, newValue: string | null): StorageEvent {
+  return new StorageEvent("storage", { key, newValue, storageArea: localStorage });
 }
 
 /** Test only: forgets the probe result and the in memory items. */
