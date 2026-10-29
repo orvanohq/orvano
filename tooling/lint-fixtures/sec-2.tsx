@@ -8,3 +8,8 @@ export const Handler = (): React.JSX.Element => <button onClick="alert(1)">x</bu
 export const run = (): unknown => eval("1 + 1");
 export const make = (): unknown => new Function("return 1");
 element.setAttribute("onclick", "alert(1)");
+element.innerHTML = "<b>x</b>";
+element.outerHTML += "<i>x</i>";
+element["innerHTML"] = "<b>x</b>";
+element.insertAdjacentHTML("beforeend", "<b>x</b>");
+document.write("<b>x</b>");

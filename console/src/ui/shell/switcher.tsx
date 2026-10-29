@@ -16,7 +16,7 @@ import { announce } from "../announcer";
 import { Button } from "../button";
 import { cx, focusRing, focusRingInset } from "../cx";
 import { Icon } from "../icon";
-import { AddIcon, DisclosureIcon, SearchIcon } from "../icons";
+import { AddIcon, CheckIcon, DisclosureIcon, SearchIcon } from "../icons";
 import { Link } from "../link";
 import { Popover } from "../popover";
 import { linkOptions } from "./link-options";
@@ -32,6 +32,8 @@ type Kind = "org" | "project";
 export interface SwitcherProps {
   /** The current org or project name, shown on the trigger. */
   name: string;
+  /** The current org or project id: its result shows a check and `aria-current`, and the highlight starts on it. */
+  currentId?: string;
   search: SwitcherSearch;
   links?: { all: ShellLinkOptions; create?: ShellLinkOptions };
 }
@@ -83,14 +85,21 @@ function useStrings(kind: Kind) {
  * Spec 0015 SHL-12: the org or project crumb's button, which opens the switcher. Its name is the visible name plus
  * what it does ("Switch project: Storefront").
  */
-function Switcher({ kind, ...props }: SwitcherProps & { kind: Kind }) {
+function Switcher({
+  kind,
+  isCurrent,
+  ...props
+}: SwitcherProps & { kind: Kind; isCurrent?: boolean }) {
   const strings = useStrings(kind);
   return (
     <DialogTrigger>
       <AriaButton
         aria-label={strings.trigger(props.name)}
+        // AC-9: the last crumb is the current page, also when it is the org or project.
+        aria-current={isCurrent ? "page" : undefined}
         className={cx(
-          "inline-flex h-control max-w-48 min-w-0 cursor-default items-center gap-1 rounded-md px-2 font-medium text-fg data-hovered:bg-bg-muted data-pressed:bg-bg-muted",
+          // SHL-4: never narrower than a 24 px target, however much the name truncates.
+          "inline-flex h-control max-w-48 min-w-6 cursor-default items-center gap-1 rounded-md px-2 font-medium text-fg data-hovered:bg-bg-muted data-pressed:bg-bg-muted",
           focusRing,
         )}
       >
@@ -102,11 +111,16 @@ function Switcher({ kind, ...props }: SwitcherProps & { kind: Kind }) {
   );
 }
 
-export function OrgSwitcher(props: SwitcherProps) {
+export interface SwitcherTriggerProps extends SwitcherProps {
+  /** The crumb is the last one, so the trigger is `aria-current="page"`. */
+  isCurrent?: boolean;
+}
+
+export function OrgSwitcher(props: SwitcherTriggerProps) {
   return <Switcher kind="org" {...props} />;
 }
 
-export function ProjectSwitcher(props: SwitcherProps) {
+export function ProjectSwitcher(props: SwitcherTriggerProps) {
   return <Switcher kind="project" {...props} />;
 }
 
@@ -140,14 +154,24 @@ export function SwitcherPopover({
 function SwitcherPanel({
   kind,
   search,
+  currentId,
   links,
   close,
 }: SwitcherProps & { kind: Kind; close: () => void }) {
   const strings = useStrings(kind);
   const { t } = useLingui();
   const router = useRouter();
+  // The latest `search` without making it a dependency: a caller that passes a new function each render must not
+  // start a new search (R-10).
+  const runSearch = useEffectEvent((query: string, signal: AbortSignal) =>
+    search(query, { limit: SWITCHER_LIMIT, signal }),
+  );
+  // AC-12: the announcer, not a new live region, says the count, and the error once per failed search.
   const announceCount = useEffectEvent((count: number) => {
     announce(strings.count(count));
+  });
+  const announceError = useEffectEvent(() => {
+    announce(strings.error);
   });
   const [query, setQuery] = useState("");
   // Opening and Retry run at once; typing waits for the debounce.
@@ -158,13 +182,14 @@ function SwitcherPanel({
     const controller = new AbortController();
     const run = async () => {
       try {
-        const items = await search(query, { limit: SWITCHER_LIMIT, signal: controller.signal });
+        const items = await runSearch(query, controller.signal);
         if (controller.signal.aborted) return;
         setResult({ status: "done", items });
         announceCount(items.length);
       } catch {
         if (controller.signal.aborted) return;
         setResult((previous) => ({ status: "error", items: previous.items }));
+        announceError();
       }
     };
     const timer = setTimeout(
@@ -177,7 +202,7 @@ function SwitcherPanel({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [search, query, request]);
+  }, [query, request]);
 
   return (
     <div className="flex flex-col">
@@ -205,6 +230,13 @@ function SwitcherPanel({
           aria-label={strings.list}
           aria-busy={result.status === "loading" || undefined}
           items={result.items}
+          // The current org or project is selected, so the highlight starts on it once the results arrive (SHL-12).
+          // Selection never changes here: pressing an item navigates.
+          selectionMode={currentId === undefined ? undefined : "single"}
+          selectedKeys={currentId === undefined ? undefined : [currentId]}
+          disallowEmptySelection
+          // oxlint-disable-next-line jsx-a11y/no-autofocus -- SHL-12: virtual focus only (the search box keeps DOM focus); it starts the highlight on the current item
+          autoFocus
           onAction={(key) => {
             const item = result.items.find((candidate) => candidate.id === key);
             if (!item) return;
@@ -227,12 +259,18 @@ function SwitcherPanel({
             <ListBoxItem
               id={item.id}
               textValue={item.name}
+              // React Aria's ListBoxItem drops aria-current from its props, so it is set on the element.
+              ref={(element) => {
+                if (item.id === currentId) element?.setAttribute("aria-current", "true");
+                else element?.removeAttribute("aria-current");
+              }}
               className={cx(
-                "flex h-control items-center rounded-md px-2 text-fg data-focused:bg-bg-muted data-hovered:bg-bg-muted",
+                "flex h-control items-center gap-2 rounded-md px-2 text-fg data-focused:bg-bg-muted data-hovered:bg-bg-muted",
                 focusRingInset,
               )}
             >
-              <span className="truncate">{item.name}</span>
+              <span className="min-w-0 flex-1 truncate">{item.name}</span>
+              {item.id === currentId && <Icon icon={CheckIcon} />}
             </ListBoxItem>
           )}
         </ListBox>

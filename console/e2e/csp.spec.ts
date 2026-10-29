@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
 // Spec 0015 STY-6: the built console, served with spec 0006 NET-2's exact CSP, loads every route with no violation.
+// vite.config.ts sends that policy, and tooling/scripts/console-csp.test.mjs keeps it equal to the server's. Opening
+// overlays (a menu, a dialog, a toast) under the policy joins here with feature 13: no route the build has hosts one.
 
 /** Every route the build has, read from the generated route tree, so a new route joins this test by itself. */
 function routePaths(): string[] {

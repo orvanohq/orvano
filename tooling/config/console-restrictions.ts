@@ -61,8 +61,11 @@ export const regions: Region[] = [
  */
 const physicalDirection = String.raw`(^|\s)(\S*:)?!?(-?(m|p|scroll-m|scroll-p)[lr]-|-?(left|right)-|(text|float|clear)-(left|right)(\s|$)|rounded-([lr]|tl|tr|bl|br)(-|\s|$)|border-[lr](-|\s|$)|origin-(left|right|top-left|top-right|bottom-left|bottom-right)(\s|$)|bg-linear-to-[lr](\s|$)|bg-gradient-to-[lr](\s|$))`;
 
-/** Spec 0015 STY-5: an arbitrary value (`w-[13px]`) or property (`[mask-type:luminance]`) in a class string. */
-const arbitraryValue = String.raw`(-\[|(^|\s)\[[a-z-]+:)`;
+/**
+ * Spec 0015 STY-5: an arbitrary value (`w-[13px]`), property (`[mask-type:luminance]`), or variant (`[&>svg]:size-4`)
+ * in a class string, also behind a variant (`hover:[mask-type:luminance]`) or the important mark.
+ */
+const arbitraryValue = String.raw`(-\[|(^|[\s:!])\[)`;
 
 /** Selectors for class strings: className literals and templates, and `cx(...)` arguments. */
 const classStrings = (pattern: string) =>
@@ -70,6 +73,7 @@ const classStrings = (pattern: string) =>
     `JSXAttribute[name.name='className'] Literal[value=/${pattern}/]`,
     `JSXAttribute[name.name='className'] TemplateElement[value.raw=/${pattern}/]`,
     `CallExpression[callee.name='cx'] Literal[value=/${pattern}/]`,
+    `CallExpression[callee.name='cx'] TemplateElement[value.raw=/${pattern}/]`,
   ].join(", ");
 
 const banned = (names: string[], message: string): Restriction => ({
@@ -269,6 +273,12 @@ export const restrictions: Restriction[] = [
         selector:
           "JSXAttribute[name.name=/^on[A-Z]/] > Literal, CallExpression[callee.property.name='setAttribute'][arguments.0.value=/^on/i]",
         message: "SEC-2: no inline event handler strings; pass a function.",
+      },
+      {
+        selector:
+          "AssignmentExpression[left.property.name=/^(innerHTML|outerHTML)$/], AssignmentExpression[left.property.value=/^(innerHTML|outerHTML)$/], CallExpression[callee.property.name='insertAdjacentHTML'], CallExpression[callee.object.name='document'][callee.property.name=/^write(ln)?$/]",
+        message:
+          "SEC-2: no innerHTML, outerHTML, insertAdjacentHTML, or document.write; build the DOM with JSX or textContent.",
       },
     ],
   },

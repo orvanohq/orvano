@@ -1,7 +1,12 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useRouter } from "@tanstack/react-router";
-import { Breadcrumb, Breadcrumbs as AriaBreadcrumbs } from "react-aria-components";
+import {
+  Breadcrumb,
+  Breadcrumbs as AriaBreadcrumbs,
+  Header,
+  MenuSection as AriaMenuSection,
+} from "react-aria-components";
 import { IconButton } from "../button";
 import { Icon } from "../icon";
 import { ChevronEndIcon, MoreIcon } from "../icons";
@@ -18,18 +23,45 @@ export interface BreadcrumbsProps {
   collapsed?: boolean;
 }
 
+// SHL-4: below 25rem (400 px) only the collapsed menu and the current page show. Same unit as Tailwind's breakpoints,
+// so CSS and JavaScript agree at any default font size.
+function narrowMedia(): MediaQueryList {
+  return window.matchMedia("(width < 25rem)");
+}
+
+function subscribeNarrow(onChange: () => void): () => void {
+  const list = narrowMedia();
+  list.addEventListener("change", onChange);
+  return () => {
+    list.removeEventListener("change", onChange);
+  };
+}
+
+function useIsNarrow(): boolean {
+  return useSyncExternalStore(subscribeNarrow, () => narrowMedia().matches);
+}
+
 /**
  * Spec 0015 AC-9: the `nav` labeled "Breadcrumb" around React Aria's `Breadcrumbs` list. Org and project crumbs
  * show their names from the model and open the switchers; page crumbs are links, except the last, which is
- * `aria-current="page"`.
+ * `aria-current="page"`. Below 64rem the middle crumbs collapse into a menu, and below 25rem every crumb but the
+ * current one does (SHL-4).
  */
 export function Breadcrumbs({ model, crumbs, collapsed = false }: BreadcrumbsProps) {
   const { t } = useLingui();
-  const hidden = collapsed && crumbs.length > 2 ? crumbs.slice(1, -1) : [];
-  const shown =
-    hidden.length > 0
-      ? [{ crumb: crumbs[0], index: 0 }, null, { crumb: crumbs.at(-1), index: crumbs.length - 1 }]
-      : crumbs.map((crumb, index) => ({ crumb, index }));
+  const narrow = useIsNarrow();
+  const last = { crumb: crumbs.at(-1), index: crumbs.length - 1 };
+  let hidden: readonly Crumb[] = [];
+  let shown: ({ crumb: Crumb | undefined; index: number } | null)[];
+  if (narrow && crumbs.length > 1) {
+    hidden = crumbs.slice(0, -1);
+    shown = [null, last];
+  } else if (collapsed && crumbs.length > 2) {
+    hidden = crumbs.slice(1, -1);
+    shown = [{ crumb: crumbs[0], index: 0 }, null, last];
+  } else {
+    shown = crumbs.map((crumb, index) => ({ crumb, index }));
+  }
 
   return (
     <nav aria-label={t`Breadcrumb`} className="min-w-0 flex-1">
@@ -82,14 +114,24 @@ function CrumbContent({
   isCurrent: boolean;
 }) {
   if (crumb.kind === "org" && model.org) {
-    return <OrgSwitcher name={model.org.name} search={model.searchOrgs} links={model.orgLinks} />;
+    return (
+      <OrgSwitcher
+        name={model.org.name}
+        currentId={model.org.id}
+        search={model.searchOrgs}
+        links={model.orgLinks}
+        isCurrent={isCurrent}
+      />
+    );
   }
   if (crumb.kind === "project" && model.project) {
     return (
       <ProjectSwitcher
         name={model.project.name}
+        currentId={model.project.id}
         search={model.searchProjects}
         links={model.projectLinks}
+        isCurrent={isCurrent}
       />
     );
   }
@@ -98,6 +140,8 @@ function CrumbContent({
     return (
       <span
         aria-current={isCurrent ? "page" : undefined}
+        // SHL-4: the text is the full name, so the accessible name is too; the tooltip shows it when it truncates.
+        title={crumb.label}
         className={isCurrent ? "truncate font-medium text-fg" : "truncate text-fg-muted"}
       >
         {crumb.label}
@@ -105,7 +149,8 @@ function CrumbContent({
     );
   }
   return (
-    <span className="min-w-0 truncate text-fg-muted">
+    // SHL-4: the link keeps at least a 24 px target however far the row shrinks.
+    <span className="min-w-6 truncate text-fg-muted">
       {/* Exact, so a crumb to an ancestor route isn't marked current too: only the last crumb is (AC-9). */}
       <Link variant="nav" {...linkOptions(crumb.link)} activeOptions={{ exact: true }}>
         {crumb.label}
@@ -114,7 +159,10 @@ function CrumbContent({
   );
 }
 
-/** The middle crumbs in a menu. Org and project items open their switcher, anchored to the menu's button. */
+/**
+ * The collapsed crumbs in a menu. Org and project items open their switcher, anchored to the menu's button; a page
+ * crumb with no link is plain text, not an item that does nothing.
+ */
 function CollapsedCrumbs({ model, crumbs }: { model: ShellModel; crumbs: readonly Crumb[] }) {
   const { t } = useLingui();
   const router = useRouter();
@@ -131,17 +179,23 @@ function CollapsedCrumbs({ model, crumbs }: { model: ShellModel; crumbs: readonl
             const id = `${crumb.kind}-${String(index)}`;
             if (crumb.kind === "page") {
               const link = crumb.link;
+              if (!link) {
+                // A group holding only its label: read and shown as text, and the arrow keys pass it by.
+                return (
+                  <AriaMenuSection key={id} id={id}>
+                    <Header className="flex min-h-control items-center px-2 py-1 text-fg-muted">
+                      {crumb.label}
+                    </Header>
+                  </AriaMenuSection>
+                );
+              }
               return (
                 <MenuItem
                   key={id}
                   id={id}
-                  onAction={
-                    link
-                      ? () => {
-                          void router.navigate(linkOptions(link));
-                        }
-                      : undefined
-                  }
+                  onAction={() => {
+                    void router.navigate(linkOptions(link));
+                  }}
                 >
                   {crumb.label}
                 </MenuItem>
@@ -167,6 +221,7 @@ function CollapsedCrumbs({ model, crumbs }: { model: ShellModel; crumbs: readonl
         <SwitcherPopover
           kind={switcher}
           name={model[switcher].name}
+          currentId={model[switcher].id}
           search={switcher === "org" ? model.searchOrgs : model.searchProjects}
           links={switcher === "org" ? model.orgLinks : model.projectLinks}
           isOpen

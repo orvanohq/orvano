@@ -82,9 +82,12 @@ describe("right to left", () => {
       .poll(() => Math.round(drawer.element().getBoundingClientRect().right))
       .toBe(document.documentElement.clientWidth);
     expect(drawer.element().getBoundingClientRect().left).toBeGreaterThan(0);
+    // Its Close button sits at the inline end: the left edge.
+    const close = drawer.getByRole("button", { name: "Close" }).element().getBoundingClientRect();
+    expect(close.left - drawer.element().getBoundingClientRect().left).toBeLessThanOrEqual(16);
   });
 
-  it("0015 AC-6, AC-18: in forced colors the current item's mark sits on its right edge", async ({
+  it("0015 AC-6, AC-18: in forced colors the current item keeps its mark in right to left", async ({
     skip,
   }) => {
     await emulateForcedColors(true);
@@ -97,11 +100,12 @@ describe("right to left", () => {
         .getByRole("link", { name: "Databases" });
 
       await expect.element(current).toHaveAttribute("aria-current", "page");
+      // The mark is an inset outline (THM-6), so it neither moves the item nor depends on the direction.
       const style = getComputedStyle(current.element());
-      expect({ right: style.borderRightWidth, left: style.borderLeftWidth }).toMatchObject({
-        right: "2px",
+      expect({ style: style.outlineStyle, width: style.outlineWidth }).toEqual({
+        style: "solid",
+        width: "2px",
       });
-      expect(style.borderLeftWidth).not.toBe("2px");
     } finally {
       await emulateForcedColors(false);
     }

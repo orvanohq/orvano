@@ -16,7 +16,7 @@ msgid "(optional)"
 msgstr ""
 
 #. placeholder {0}: messages.length
-#: src/ui/shell/activity-indicator.tsx:65
+#: src/ui/shell/activity-indicator.tsx:66
 msgid "{0, plural, one {# message} other {# messages}}"
 msgstr ""
 
@@ -82,12 +82,12 @@ msgid "{count, plural, one {# messaging topic} other {# messaging topics}}"
 msgstr ""
 
 #: src/ui/confirm-delete/dependents.ts:20
-#: src/ui/shell/switcher.tsx:66
+#: src/ui/shell/switcher.tsx:68
 msgid "{count, plural, one {# organization} other {# organizations}}"
 msgstr ""
 
 #: src/ui/confirm-delete/dependents.ts:21
-#: src/ui/shell/switcher.tsx:78
+#: src/ui/shell/switcher.tsx:80
 msgid "{count, plural, one {# project} other {# projects}}"
 msgstr ""
 
@@ -145,20 +145,20 @@ msgstr ""
 msgid "Actions"
 msgstr ""
 
-#: src/ui/shell/activity-indicator.tsx:37
-#: src/ui/shell/activity-indicator.tsx:54
+#: src/ui/shell/activity-indicator.tsx:38
+#: src/ui/shell/activity-indicator.tsx:55
 msgid "Activity"
 msgstr ""
 
-#: src/ui/shell/activity-indicator.tsx:37
+#: src/ui/shell/activity-indicator.tsx:38
 msgid "Activity, new messages"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:63
+#: src/ui/shell/switcher.tsx:65
 msgid "All organizations"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:76
+#: src/ui/shell/switcher.tsx:78
 msgid "All projects"
 msgstr ""
 
@@ -179,7 +179,7 @@ msgstr ""
 msgid "Auth"
 msgstr ""
 
-#: src/ui/shell/breadcrumbs.tsx:35
+#: src/ui/shell/breadcrumbs.tsx:67
 msgid "Breadcrumb"
 msgstr ""
 
@@ -195,6 +195,7 @@ msgstr ""
 msgid "Check your connection and try again."
 msgstr ""
 
+#: src/ui/shell/drawer.tsx:69
 #: src/ui/shortcut-help/index.tsx:29
 #: src/ui/side-sheet/index.tsx:66
 msgid "Close"
@@ -220,7 +221,7 @@ msgstr ""
 msgid "Command palette"
 msgstr ""
 
-#: src/ui/shell/palette-button.tsx:38
+#: src/ui/shell/palette-button.tsx:51
 msgid "Commands"
 msgstr ""
 
@@ -249,11 +250,11 @@ msgstr ""
 msgid "Couldn't delete"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:62
+#: src/ui/shell/switcher.tsx:64
 msgid "Couldn't load organizations. Check your connection and try again."
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:75
+#: src/ui/shell/switcher.tsx:77
 msgid "Couldn't load projects. Check your connection and try again."
 msgstr ""
 
@@ -417,7 +418,7 @@ msgstr ""
 
 #: src/ui/docs-pane/index.tsx:53
 #: src/ui/docs-pane/index.tsx:135
-#: src/ui/shell/help-button.tsx:24
+#: src/ui/shell/help-button.tsx:26
 #: src/ui/shell/palette-actions.ts:48
 msgid "Help"
 msgstr ""
@@ -457,11 +458,11 @@ msgstr ""
 msgid "Loading"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:60
+#: src/ui/shell/switcher.tsx:62
 msgid "Loading organizations…"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:73
+#: src/ui/shell/switcher.tsx:75
 msgid "Loading projects…"
 msgstr ""
 
@@ -473,8 +474,8 @@ msgstr ""
 msgid "Members"
 msgstr ""
 
-#: src/ui/shell/activity-indicator.tsx:60
-#: src/ui/shell/activity-indicator.tsx:62
+#: src/ui/shell/activity-indicator.tsx:61
+#: src/ui/shell/activity-indicator.tsx:63
 msgid "Messages"
 msgstr ""
 
@@ -482,11 +483,11 @@ msgstr ""
 msgid "Messaging"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:64
+#: src/ui/shell/switcher.tsx:66
 msgid "New organization"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:77
+#: src/ui/shell/switcher.tsx:79
 msgid "New project"
 msgstr ""
 
@@ -498,19 +499,19 @@ msgstr ""
 msgid "No matching actions"
 msgstr ""
 
-#: src/ui/shell/activity-indicator.tsx:70
+#: src/ui/shell/activity-indicator.tsx:71
 msgid "No messages yet"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:61
+#: src/ui/shell/switcher.tsx:63
 msgid "No organizations match"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:74
+#: src/ui/shell/switcher.tsx:76
 msgid "No projects match"
 msgstr ""
 
-#: src/ui/shell/activity-indicator.tsx:58
+#: src/ui/shell/activity-indicator.tsx:59
 msgid "No running jobs"
 msgstr ""
 
@@ -530,7 +531,7 @@ msgstr ""
 msgid "Open help"
 msgstr ""
 
-#: src/ui/shell/app-shell.tsx:113
+#: src/ui/shell/app-shell.tsx:156
 msgid "Open navigation"
 msgstr ""
 
@@ -538,7 +539,7 @@ msgstr ""
 msgid "Open the {product} docs"
 msgstr ""
 
-#: src/ui/shell/app-shell.tsx:36
+#: src/ui/shell/app-shell.tsx:58
 msgid "Open the command palette"
 msgstr ""
 
@@ -550,7 +551,7 @@ msgstr ""
 msgid "Organization settings"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:59
+#: src/ui/shell/switcher.tsx:61
 msgid "Organizations"
 msgstr ""
 
@@ -571,7 +572,7 @@ msgstr ""
 msgid "Overview"
 msgstr ""
 
-#: src/ui/shell/breadcrumbs.tsx:129
+#: src/ui/shell/breadcrumbs.tsx:177
 msgid "Path"
 msgstr ""
 
@@ -596,7 +597,7 @@ msgid "Project"
 msgstr ""
 
 #: src/ui/shell/nav-registry.ts:46
-#: src/ui/shell/switcher.tsx:72
+#: src/ui/shell/switcher.tsx:74
 msgid "Projects"
 msgstr ""
 
@@ -634,7 +635,7 @@ msgid "Request ID: <0>{requestId}</0>"
 msgstr ""
 
 #: src/ui/banner.tsx:127
-#: src/ui/shell/switcher.tsx:250
+#: src/ui/shell/switcher.tsx:288
 #: src/ui/states.tsx:93
 msgid "Retry"
 msgstr ""
@@ -643,8 +644,8 @@ msgstr ""
 msgid "Running"
 msgstr ""
 
-#: src/ui/shell/activity-indicator.tsx:56
 #: src/ui/shell/activity-indicator.tsx:57
+#: src/ui/shell/activity-indicator.tsx:58
 msgid "Running jobs"
 msgstr ""
 
@@ -653,11 +654,11 @@ msgstr ""
 msgid "Search actions"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:58
+#: src/ui/shell/switcher.tsx:60
 msgid "Search organizations"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:71
+#: src/ui/shell/switcher.tsx:73
 msgid "Search projects"
 msgstr ""
 
@@ -678,12 +679,12 @@ msgctxt "keyboard key"
 msgid "Shift"
 msgstr ""
 
-#: src/ui/shell/app-shell.tsx:37
+#: src/ui/shell/app-shell.tsx:59
 #: src/ui/shell/palette-actions.ts:128
 msgid "Show keyboard shortcuts"
 msgstr ""
 
-#: src/ui/shell/app-shell.tsx:190
+#: src/ui/shell/app-shell.tsx:253
 msgid "Show list"
 msgstr ""
 
@@ -695,7 +696,7 @@ msgstr ""
 msgid "Show shortcuts"
 msgstr ""
 
-#: src/ui/shell/breadcrumbs.tsx:127
+#: src/ui/shell/breadcrumbs.tsx:175
 msgid "Show the full path"
 msgstr ""
 
@@ -724,19 +725,19 @@ msgstr ""
 msgid "Storage"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:56
+#: src/ui/shell/switcher.tsx:58
 msgid "Switch organization"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:57
+#: src/ui/shell/switcher.tsx:59
 msgid "Switch organization: {name}"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:69
+#: src/ui/shell/switcher.tsx:71
 msgid "Switch project"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:70
+#: src/ui/shell/switcher.tsx:72
 msgid "Switch project: {name}"
 msgstr ""
 

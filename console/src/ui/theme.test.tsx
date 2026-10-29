@@ -1,5 +1,7 @@
+import { CheckboxButton, CheckboxField } from "react-aria-components";
 import { afterEach, describe, expect, it } from "vitest";
 import { render } from "vitest-browser-react";
+import { emulateForcedColors } from "@/test/media";
 
 // Spec 0015 STY-1, AC-2: Tailwind's default scales are reset, so only the semantic tokens exist as utilities.
 
@@ -9,6 +11,12 @@ function styleOf(className: string): CSSStyleDeclaration {
   const element = document.querySelector(`[data-probe="${className}"]`);
   if (!element) throw new Error(`No probe for ${className}`);
   return getComputedStyle(element);
+}
+
+/** A probe's rendered width and height. */
+function size(probe: string): { width?: number; height?: number } {
+  const box = document.querySelector(`[data-probe="${probe}"]`)?.getBoundingClientRect();
+  return { width: box?.width, height: box?.height };
 }
 
 const rowHeight = () =>
@@ -73,5 +81,42 @@ describe("theme.css", () => {
     expect(rowHeight()).toBe("2.5rem");
     document.documentElement.dataset.density = "compact";
     expect(rowHeight()).toBe("1.75rem");
+  });
+
+  it("0015 AC-6: in forced colors the current item gains a mark and a checked checkbox keeps its size (THM-6)", async ({
+    skip,
+  }) => {
+    await render(
+      <div>
+        <CheckboxField defaultSelected>
+          <CheckboxButton data-probe="checkbox" className="inline-flex items-center gap-2">
+            <span className="size-4 rounded-sm border border-border-strong" />
+            Checked
+          </CheckboxButton>
+        </CheckboxField>
+        <a data-probe="current" href="#current" aria-current="page" className="inline-block px-3">
+          Current
+        </a>
+      </div>,
+    );
+    const before = { checkbox: size("checkbox"), current: size("current") };
+
+    await emulateForcedColors(true);
+    try {
+      // WebKit doesn't emulate forced colors (Safari has no such mode).
+      if (!window.matchMedia("(forced-colors: active)").matches) skip();
+
+      expect(size("checkbox")).toEqual(before.checkbox);
+      expect(size("current")).toEqual(before.current);
+      const current = styleOf("current");
+      expect(current.outlineStyle).toBe("solid");
+      expect(current.outlineWidth).toBe("2px");
+      expect(document.querySelector('[data-probe="checkbox"]')?.hasAttribute("data-selected")).toBe(
+        true,
+      );
+      expect(styleOf("checkbox").outlineStyle).toBe("none");
+    } finally {
+      await emulateForcedColors(false);
+    }
   });
 });

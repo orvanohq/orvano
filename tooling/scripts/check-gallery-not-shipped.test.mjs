@@ -1,21 +1,23 @@
 // Spec 0015 GAL-3: check-gallery-not-shipped.mjs fails when the build has the gallery's page or a chunk from it.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, test } from "node:test";
-import { galleryProblems } from "./check-gallery-not-shipped.mjs";
+import { galleryMarkers, galleryProblems } from "./check-gallery-not-shipped.mjs";
 
 /**
  * @param {Record<string, { file: string, src?: string }>} manifest
  * @param {string[]} files
+ * @param {Record<string, string>} contents text for files, by path
  */
-const withDist = (manifest, files = []) => {
+const withDist = (manifest, files = [], contents = {}) => {
   const dist = mkdtempSync(join(tmpdir(), "orvano-gallery-"));
   mkdirSync(join(dist, ".vite"));
+  mkdirSync(join(dist, "assets"));
   writeFileSync(join(dist, ".vite", "manifest.json"), JSON.stringify(manifest));
-  for (const file of files) writeFileSync(join(dist, file), "");
+  for (const file of files) writeFileSync(join(dist, file), contents[file] ?? "");
   try {
     return galleryProblems(dist);
   } finally {
@@ -40,6 +42,28 @@ describe("check-gallery-not-shipped", () => {
       "src/gallery/main.tsx": { file: "assets/main-b2.js", src: "src/gallery/main.tsx" },
     });
     assert.deepEqual(problems, ["assets/main-b2.js is built from src/gallery/main.tsx."]);
+  });
+
+  test("0015 AC-20: fails when an app script holds a gallery fixture string", () => {
+    const problems = withDist(app, ["assets/index-a1.js"], {
+      "assets/index-a1.js": 'const user={id:"usr_ada"};',
+    });
+    assert.deepEqual(problems, ['assets/index-a1.js holds the gallery fixture string "usr_ada".']);
+  });
+
+  test("passes app scripts without the fixture strings", () => {
+    assert.deepEqual(
+      withDist(app, ["assets/index-a1.js"], { "assets/index-a1.js": 'const user={id:"usr_1"};' }),
+      [],
+    );
+  });
+
+  test("every marker is still in the gallery fixtures, so the scan can't go stale", () => {
+    const fixtures = readFileSync(
+      join(import.meta.dirname, "..", "..", "console", "src", "gallery", "fixtures.ts"),
+      "utf8",
+    );
+    for (const marker of galleryMarkers) assert.ok(fixtures.includes(`"${marker}"`), marker);
   });
 
   test("fails when there is no build to check", () => {
