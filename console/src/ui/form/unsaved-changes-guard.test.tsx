@@ -9,7 +9,7 @@ import { renderInRouter } from "@/test/render";
 import { Link } from "../link";
 import { SideSheet } from "../side-sheet";
 import { useAppForm } from "./index";
-import { resetUnsavedChangesForTests } from "./unsaved-changes";
+import { resetUnsavedChangesForTests, stableKey } from "./unsaved-changes";
 
 // Spec 0015 AC-16, spec 0003 RTE-8: the one guard asks once, with the design system dialog, before a navigation
 // throws away changes, and holds the interaction lock (QRY-4) while any form has changes.
@@ -138,3 +138,14 @@ function SheetPage() {
     </form.AppForm>
   );
 }
+
+describe("watched search params", () => {
+  it("0003 RTE-8: an object or array param compares by what it holds, not by identity or key order", () => {
+    const filter = { column: "name", op: "eq", values: ["a", { b: 1, c: 2 }] };
+    const same = { values: ["a", { c: 2, b: 1 }], op: "eq", column: "name" };
+    expect(stableKey(filter)).toBe(stableKey(same));
+    expect(stableKey(filter)).not.toBe(stableKey({ ...filter, op: "ne" }));
+    expect(stableKey(["a", "b"])).not.toBe(stableKey(["b", "a"]));
+    expect(stableKey("row_1")).toBe(stableKey("row_1"));
+  });
+});

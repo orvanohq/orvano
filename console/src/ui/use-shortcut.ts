@@ -50,11 +50,23 @@ export function matchesShortcut(event: KeyboardEvent, keys: string): boolean {
   const apple = isApplePlatform();
   const mod = modifiers.has("Mod");
   return (
-    event.key.toLowerCase() === key.toLowerCase() &&
+    matchesKey(event, key) &&
     event.metaKey === (mod && apple) &&
     event.ctrlKey === (mod && !apple) &&
     event.altKey === modifiers.has("Alt") &&
     event.shiftKey === modifiers.has("Shift")
+  );
+}
+
+/**
+ * The key part of a modifier shortcut. A letter matches the typed letter, or, when the layout types no Latin letter
+ * (Cyrillic, Greek), the physical key (`event.code`): Mod+K is then the key where K sits. A layout that types a
+ * Latin letter (AZERTY, Dvorak) keeps matching on the letter, so the shortcut follows what the key says.
+ */
+function matchesKey(event: KeyboardEvent, key: string): boolean {
+  if (event.key.toLowerCase() === key.toLowerCase()) return true;
+  return (
+    /^[a-z]$/i.test(key) && !/^[a-z]$/i.test(event.key) && event.code === `Key${key.toUpperCase()}`
   );
 }
 
@@ -72,7 +84,9 @@ export function useShortcut({ id, keys, label, onTrigger, isEnabled = true }: Us
   useEffect(() => {
     if (!isEnabled) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing || !matchesShortcut(event, keys)) return;
+      // A held key repeats its keydown; the shortcut fires once per press.
+      if (event.defaultPrevented || event.isComposing || event.repeat) return;
+      if (!matchesShortcut(event, keys)) return;
       if (!keys.includes("+") && isTyping(event.target)) return;
       if (isModalOpen()) return;
       event.preventDefault();

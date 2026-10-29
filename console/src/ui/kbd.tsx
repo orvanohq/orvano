@@ -46,7 +46,8 @@ export interface KbdProps {
 
 /**
  * design.md _Foundations_: a keyboard shortcut as `kbd` elements, one per key inside an outer `kbd` (the HTML
- * pattern for a key combination). `radius-sm`, `bg-muted`, `text-xs`.
+ * pattern for a key combination). `radius-sm`, `bg-muted`, `text-xs`. The keys always read left to right, in an
+ * isolate, so a right to left page shows `Ctrl K`, never `K Ctrl` (design.md _Right to left_).
  */
 export function Kbd({ keys }: KbdProps) {
   const { t } = useLingui();
@@ -56,7 +57,7 @@ export function Kbd({ keys }: KbdProps) {
     alt: t({ message: "Alt", context: "keyboard key" }),
   };
   return (
-    <kbd className="inline-flex items-center gap-0.5 font-sans">
+    <kbd dir="ltr" className="inline-flex items-center gap-0.5 font-sans [unicode-bidi:isolate]">
       {displayKeys(keys, names).map((key) => (
         <kbd
           // A key appears once in a shortcut, so it is its own identity.

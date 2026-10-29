@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { msg } from "@lingui/core/macro";
 import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import { z } from "@/shared/zod";
@@ -90,6 +91,34 @@ function EveryField() {
         </form.AppField>
         <Switch label="Notify me" isSelected={notify} onChange={setNotify} />
         <form.SubmitButton>Save</form.SubmitButton>
+      </form.Form>
+    </form.AppForm>
+  );
+}
+
+/** A control that isn't a field component, framed by `Field`, which can't change. */
+function Custom() {
+  const form = useAppForm({ defaultValues: { tag: "a" } });
+  return (
+    <form.AppForm>
+      <form.Form>
+        <form.AppField name="tag">
+          {(field) => (
+            <field.Field label="Tag" isDisabled isReadOnly>
+              {({ isDisabled, isReadOnly, value, onChange, ...control }) => (
+                <input
+                  {...control}
+                  disabled={isDisabled}
+                  readOnly={isReadOnly}
+                  value={String(value)}
+                  onChange={(event) => {
+                    onChange(event.target.value);
+                  }}
+                />
+              )}
+            </field.Field>
+          )}
+        </form.AppField>
       </form.Form>
     </form.AppForm>
   );
@@ -212,10 +241,59 @@ describe("field components", () => {
       .element(screen.getByRole("group", { name: "Fix these 2 problems to continue" }))
       .toHaveFocus();
 
+    // The select's trigger holds focus, so it carries the invalid state.
+    await expect
+      .element(screen.getByRole("button", { name: /Region/ }))
+      .toHaveAttribute("aria-invalid", "true");
     await screen.getByRole("link", { name: "Choose a region." }).click();
     await expect.element(screen.getByRole("button", { name: /Region/ })).toHaveFocus();
     await screen.getByRole("link", { name: "Choose who can read it." }).click();
     await expect.element(screen.getByRole("radio", { name: "Private" })).toHaveFocus();
+    await expectNoAxeViolations();
+  });
+
+  it("0015 AC-15: a custom field passes isDisabled and isReadOnly on to its control", async () => {
+    const { screen } = await renderInRouter(<Custom />);
+    const input = screen.getByRole("textbox", { name: "Tag" });
+
+    await expect.element(input).toBeDisabled();
+    await expect.element(input).toHaveAttribute("readonly");
+  });
+});
+
+describe("Switch", () => {
+  const reason = msg`You need the Admin role to change this.`;
+
+  function Setting({ onChange }: { onChange: (isSelected: boolean) => void }) {
+    return (
+      <Switch
+        label="Public bucket"
+        isSelected={false}
+        onChange={onChange}
+        unavailableReason={reason}
+      />
+    );
+  }
+
+  it("0015 AC-15: with unavailableReason it keeps focus, ignores Space and presses, and gives its reason", async () => {
+    const changes: boolean[] = [];
+    const { screen } = await renderInRouter(<Setting onChange={(next) => changes.push(next)} />);
+    const toggle = screen.getByRole("switch", { name: "Public bucket" });
+
+    await expect.element(toggle).toHaveAttribute("aria-disabled", "true");
+    await expect
+      .element(toggle)
+      .toHaveAccessibleDescription("You need the Admin role to change this.");
+    await expect.element(screen.getByText("You need the Admin role to change this.")).toBeVisible();
+
+    await focusElement(toggle);
+    await userEvent.keyboard(" ");
+    await expect.element(toggle).toHaveFocus();
+    await expect.element(toggle).not.toBeChecked();
+    // Playwright won't press an aria-disabled control by itself; force the press to check it is ignored.
+    await screen.getByText("Public bucket").click({ force: true });
+    await expect.element(toggle).not.toBeChecked();
+    expect(changes).toEqual([]);
     await expectNoAxeViolations();
   });
 });
