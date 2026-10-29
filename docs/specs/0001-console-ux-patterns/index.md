@@ -2,6 +2,7 @@
 
 **Date**: 2026-10-15
 **Status**: Accepted
+**Updated**: 2026-10-28, reconciled with spec 0015 after feature 11: UX-25 names the palette's menu pattern and the local action subset until feature 25; the grid is react-data-grid, built by the rows feature; the feature 11 follow up waits only on spec 0015 AC-22.
 
 ## Summary
 
@@ -184,7 +185,8 @@ The reasoning, the alternatives for each pattern, the research, and the cross ch
 - **UX-25 Command palette.** Mod+K opens the palette.
   - Results come from a server search over named resources (orgs, projects, services, tables, buckets, functions, sites; never rows, files, or users), up to 20 at a time, updated 150 ms after you stop typing. The current project comes first, then the org, then your account. Recent items show first and are remembered (UX-28).
   - Actions include create table, bucket, or function; copy the API endpoint or project ID; switch theme; and open docs. An action that needs input opens its create sheet.
-  - It follows the APG dialog pattern, with the combobox and listbox patterns for the results. Escape closes it and returns focus to where you were.
+  - It follows the APG dialog pattern plus the combobox pattern, with a menu of actions and results (spec 0015 AC-13). Escape closes it and returns focus to where you were.
+  - Until feature 25 adds the server search and the create and copy actions, the palette lists local actions only: go to each nav item, switch theme or density, show shortcuts, open help (spec 0015 SHL-10).
 - **UX-26 Keyboard shortcuts.**
   - Shortcuts that work everywhere use a modifier key (Mod+K). Single key shortcuts work only while their component (the grid, for example) has focus.
   - `?` opens a list of shortcuts, except while you're typing. Targets declare their shortcuts with `aria-keyshortcuts`.
@@ -307,7 +309,7 @@ export function TablesSection() {
 
 **Negative / tradeoffs**:
 
-- The grid is the most expensive part: the APG keyboard model, virtualization, inline editing with version checks and undo, range copy and paste, column reorder with alternatives to dragging, and live updates. Building it by hand is a large job. A proven grid component should be chosen in feature 11 or 2, and wrapping it to meet UX-11 to UX-19 still takes real work.
+- The grid is the most expensive part: the APG keyboard model, virtualization, inline editing with version checks and undo, range copy and paste, column reorder with alternatives to dragging, and live updates. Building it by hand is a large job. Feature 11 chose react-data-grid (spec 0015 PRM-5); wrapping it to meet UX-11 to UX-19 is the rows feature's (16) work and still takes real effort.
 - Several rules need API support that doesn't exist yet: dependents counts, row versions, cursors in both directions with an optional count, error responses that name the field and the request ID, allowed actions per resource, a search endpoint, an active jobs list, and all or nothing bulk operations. A console screen can't fully meet its rules until those land, so early slices may meet some rules only partly.
 - Saving preferences in the browser means they don't follow a user to another device or browser. Moving them to the server later needs an API and a migration of the stored keys.
 - Bundling the docs with the install makes the self hosted package bigger and ties docs updates to Orvano releases.
@@ -319,7 +321,7 @@ export function TablesSection() {
 
 ## Follow-up
 
-- [ ] Feature 11 (design system & console shell): build the primitives listed above, pick the grid and component library, set exact row heights and contrast for both themes, and run the screen reader test script.
+- [ ] Feature 11 (design system & console shell): build the primitives listed above, pick the grid and component library, set exact row heights and contrast for both themes, and run the screen reader test script. Built and decided in spec 0015 (React Aria Components with Tailwind CSS v4, react-data-grid, the row heights and contrast in `console/design.md`); `DataGrid` and the non modal row `SideSheet` move to the rows feature (16), `LogStream` to feature 46, `JsonEditor` and `RelationPicker` to features 24 and 16. Open only until spec 0015 AC-22, the screen reader run, is recorded in its `verify.md`.
 - [ ] Feature 2 (React console practices): cover nested route layouts for UX-2 and UX-5, keeping URL query state in sync with the history rules in UX-27, cancelling requests (UX-21), and safe access to browser storage (UX-28).
 - [ ] Feature 10 (API contract & SDK generation): define an error format that names the field, the request ID, and the required role (UX-8, UX-22); a dependents endpoint for each deletable resource (UX-23); cursors in both directions with an optional cheap count (UX-14); allowed actions per resource and capabilities per project (UX-30); and snippet generation for all six SDKs (UX-37).
 - [ ] Features 16 and 25 (rows API, queries): add row versions with a refused save on mismatch (UX-12), all or nothing bulk update, delete, and paste (UX-17, UX-18), the operators for each column type and the URL filter format (UX-15), sorts that break ties by primary key, and a query time limit (UX-14).
