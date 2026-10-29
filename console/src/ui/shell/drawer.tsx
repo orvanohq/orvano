@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
+import { useLingui } from "@lingui/react/macro";
 import { Dialog, Modal, ModalOverlay } from "react-aria-components";
+import { IconButton } from "../button";
 import { cx } from "../cx";
+import { CloseIcon } from "../icons";
 
 export interface DrawerProps {
   isOpen: boolean;
@@ -15,9 +18,9 @@ export interface DrawerProps {
 }
 
 const widths = {
-  sidebar: cx("w-sidebar"),
-  "resource-list": cx("w-resource-list"),
-  full: cx("w-full"),
+  sidebar: "w-sidebar",
+  "resource-list": "w-resource-list",
+  full: "w-full",
 } as const;
 
 // MOT-1: translation is physical, so each slide pairs translate-x with its rtl: mirror. Reduced motion zeroes the
@@ -33,7 +36,8 @@ const sides = {
 
 /**
  * Spec 0015 SHL-6: a modal React Aria `Modal` sliding from the inline start (or end), labeled by its content. It
- * traps focus, closes with Escape or a press outside, and returns focus to the button that opened it.
+ * traps focus, closes with Escape, a press outside, or its Close button at the inline end top, and returns focus to
+ * the button that opened it. The full width drawer is the narrow docs pane, whose own header has Close.
  */
 export function Drawer({
   isOpen,
@@ -43,6 +47,7 @@ export function Drawer({
   side = "start",
   children,
 }: DrawerProps) {
+  const { t } = useLingui();
   return (
     <ModalOverlay
       data-modal // SHL-10: shell shortcuts do nothing while a modal is open
@@ -59,6 +64,11 @@ export function Drawer({
         )}
       >
         <Dialog aria-label={label} className="flex min-h-0 flex-1 flex-col outline-none">
+          {width !== "full" && (
+            <div className="flex shrink-0 justify-end p-2">
+              <IconButton icon={CloseIcon} aria-label={t`Close`} slot="close" />
+            </div>
+          )}
           {children}
         </Dialog>
       </Modal>

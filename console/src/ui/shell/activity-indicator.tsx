@@ -29,8 +29,9 @@ export function ActivityIndicator() {
 
   return (
     <DialogTrigger
-      onOpenChange={(open) => {
-        if (open) setSeen(newest);
+      // Seen on open and again on close, so messages that arrived while it was open don't bring the dot back.
+      onOpenChange={() => {
+        setSeen(newest);
       }}
     >
       <AriaButton

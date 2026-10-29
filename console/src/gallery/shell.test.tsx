@@ -166,6 +166,57 @@ describe("narrow layout", () => {
       .toBeVisible();
   });
 
+  it("0015 AC-8: the drawer's Close button closes it and returns focus to the opener", async () => {
+    const { screen } = await renderScene("/acme/storefront/databases");
+    const open = screen.getByRole("button", { name: "Open navigation" });
+    await tabTo(open.element());
+    await userEvent.keyboard("{Enter}");
+
+    const drawer = screen.getByRole("dialog", { name: "Project" });
+    const close = drawer.getByRole("button", { name: "Close" });
+    await expect.element(close).toBeVisible();
+    // At the inline end top: the right edge in left to right.
+    const box = drawer.element().getBoundingClientRect();
+    await expect
+      .poll(() => Math.round(box.right - close.element().getBoundingClientRect().right))
+      .toBeLessThanOrEqual(16);
+    await focusElement(close);
+    await userEvent.keyboard("{Enter}");
+
+    await expect.element(drawer).not.toBeInTheDocument();
+    await expect.element(open).toHaveFocus();
+  });
+
+  it("0015 AC-9: below 25rem only the path menu and the current page show, each at least 24 by 24 px", async () => {
+    await setViewport({ width: 320, height: 640 });
+    const { screen } = await renderScene(table);
+    const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
+    const more = breadcrumb.getByRole("button", { name: "Show the full path" });
+    await expect.element(more).toBeVisible();
+    expect(breadcrumb.getByRole("button", { name: /^Switch / }).elements()).toHaveLength(0);
+    expect(breadcrumb.getByRole("link").elements()).toHaveLength(0);
+
+    // The current page shows its full name, or truncates with the full name as its tooltip (SHL-4).
+    const current = breadcrumb.getByText("users");
+    await expect.element(current).toHaveAttribute("aria-current", "page");
+    await expect.element(current).toHaveAttribute("title", "users");
+    for (const control of breadcrumb.getByRole("button").elements()) {
+      const rect = control.getBoundingClientRect();
+      expect.soft(rect.width).toBeGreaterThanOrEqual(24);
+      expect.soft(rect.height).toBeGreaterThanOrEqual(24);
+    }
+    const root = document.documentElement;
+    expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+
+    await more.click();
+    const menu = screen.getByRole("menu");
+    await expect.element(menu.getByRole("menuitem", { name: "Acme" })).toBeVisible();
+    await expect.element(menu.getByRole("menuitem", { name: "Storefront" })).toBeVisible();
+    await expect.element(menu.getByRole("menuitem", { name: "Databases" })).toBeVisible();
+    await menu.getByRole("menuitem", { name: "Acme" }).click();
+    await expect.element(screen.getByRole("dialog", { name: "Switch organization" })).toBeVisible();
+  });
+
   it("0015 AC-8: at 320 px wide no shell region scrolls sideways", async () => {
     await setViewport({ width: 320, height: 640 });
     const { screen } = await renderScene(table);
@@ -194,6 +245,35 @@ describe("breadcrumbs and document title", () => {
     await expect.element(breadcrumb.getByRole("link", { name: "Databases" })).toBeVisible();
     await expect.element(breadcrumb.getByText("users")).toHaveAttribute("aria-current", "page");
     expect(breadcrumb.getByRole("list").elements()).toHaveLength(1);
+  });
+
+  it("0015 AC-9: every crumb control is at least 24 by 24 px", async () => {
+    const { screen } = await renderScene(table);
+    const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
+    await expect.element(breadcrumb.getByRole("link", { name: "Databases" })).toBeVisible();
+
+    const controls = [
+      ...breadcrumb.getByRole("button").elements(),
+      ...breadcrumb.getByRole("link").elements(),
+    ];
+    expect(controls).toHaveLength(3);
+    for (const control of controls) {
+      const rect = control.getBoundingClientRect();
+      expect.soft(rect.width).toBeGreaterThanOrEqual(24);
+      expect.soft(rect.height).toBeGreaterThanOrEqual(24);
+    }
+  });
+
+  it("0015 AC-9: the project switcher marks the current project", async () => {
+    const { screen } = await renderScene(table);
+    await screen.getByRole("button", { name: "Switch project: Storefront" }).click();
+
+    await expect
+      .element(screen.getByRole("option", { name: "Storefront" }))
+      .toHaveAttribute("aria-current", "true");
+    expect(
+      screen.getByRole("option", { name: "Billing" }).element().hasAttribute("aria-current"),
+    ).toBe(false);
   });
 
   it("0015 AC-9: on a nested route only the last crumb is current", async () => {
