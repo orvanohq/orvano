@@ -38,6 +38,7 @@ Read the matching practice spec first. Each rule has an ID (for example `API-1`,
 | A platform table, entity, or module `DbContext`                 | [0011 Platform data model](docs/specs/0011-platform-data-model/index.md)                                                                                      |
 | An endpoint's access check, a permission, or a grant filter     | [0012 Access control model](docs/specs/0012-access-control-model/index.md)                                                                                    |
 | API wire format, errors, the contract, or the SDK generator     | [0014 API contract and SDK generation](docs/specs/0014-api-contract-sdk-generation/index.md)                                                                  |
+| A console primitive, a design token, or the console shell       | [0015 Design system and console shell](docs/specs/0015-design-system-console-shell/index.md) and [console/design.md](console/design.md)                       |
 
 Each spec has a `rationale.md` beside it; read it only when you need the why. Each spec also lists its implementation skills under `.claude/skills/`; load only the ones the task needs.
 
@@ -83,6 +84,7 @@ Load only what the task needs. Spec 0008 wins where a skill disagrees (TL-0).
 
 - [server/AGENTS.md](server/AGENTS.md): the .NET solution, its commands, config and test conventions
 - [console/AGENTS.md](console/AGENTS.md): the React console, its pnpm commands, Lingui and test conventions
+- [console/src/ui/AGENTS.md](console/src/ui/AGENTS.md): the design system's primitives, tokens, gallery, and their rules (spec 0015)
 - [deploy/AGENTS.md](deploy/AGENTS.md): the image, the reference and dev compose files, install rules
 - [api/README.md](api/README.md): the API contract, the SDK generator, the conformance suite, and their commands (`pnpm api:emit`, `pnpm check:api`, `pnpm api:check`)
 

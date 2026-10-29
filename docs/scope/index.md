@@ -93,7 +93,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 
 ## Epics
 
-- [Foundations](foundations.md): 14 features, 10 done
+- [Foundations](foundations.md): 14 features, 13 done
 - [SDKs](sdks.md): 5 features, 1 done
 - [Platform](platform.md): 7 features, 0 done
 - [Auth](auth.md): 6 features, 0 done
