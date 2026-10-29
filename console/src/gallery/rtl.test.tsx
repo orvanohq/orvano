@@ -82,6 +82,9 @@ describe("right to left", () => {
       .poll(() => Math.round(drawer.element().getBoundingClientRect().right))
       .toBe(document.documentElement.clientWidth);
     expect(drawer.element().getBoundingClientRect().left).toBeGreaterThan(0);
+    // Its Close button sits at the inline end: the left edge.
+    const close = drawer.getByRole("button", { name: "Close" }).element().getBoundingClientRect();
+    expect(close.left - drawer.element().getBoundingClientRect().left).toBeLessThanOrEqual(16);
   });
 
   it("0015 AC-6, AC-18: in forced colors the current item keeps its mark in right to left", async ({

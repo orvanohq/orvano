@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from "react";
+import { useId, type ReactNode, type Ref } from "react";
 import type { MessageDescriptor } from "@lingui/core";
 import { useLingui } from "@lingui/react";
 import { Button as AriaButton, type PressEvent } from "react-aria-components";
@@ -29,6 +29,8 @@ interface BaseProps {
   slot?: "close";
   /** For a button that shows and hides a region beside it (the help button and the docs pane). */
   "aria-expanded"?: boolean;
+  /** The button element, for a caller that returns focus to it (the help button, SHL-9). */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 export interface ButtonProps extends BaseProps {
@@ -48,6 +50,8 @@ export interface IconButtonProps extends BaseProps {
   variant?: "ghost" | "secondary";
   size?: "sm" | "md";
   flipInRtl?: boolean;
+  /** Busy: a spinner replaces the icon, it stays focusable, ignores presses, and React Aria announces it. */
+  isPending?: boolean;
 }
 
 // design.md _Button recipes_. Hover and press styles skip unavailable buttons, which use the disabled look. Filled
@@ -122,6 +126,7 @@ function PressableButton({
   slot,
   unavailableReason,
   "aria-expanded": expanded,
+  ref,
 }: BaseProps & { className: string; label?: string; isPending?: boolean; children: ReactNode }) {
   const { i18n } = useLingui();
   const reasonId = useId();
@@ -129,6 +134,7 @@ function PressableButton({
 
   const button = (
     <AriaButton
+      ref={ref}
       className={className}
       aria-label={label}
       // A submit button that is unavailable must not submit its form either.
@@ -199,12 +205,14 @@ export function IconButton({
   variant = "ghost",
   size = "md",
   flipInRtl,
+  isPending,
   ...props
 }: IconButtonProps) {
   return (
     <PressableButton
       {...props}
       label={label}
+      isPending={isPending}
       className={cx(
         base,
         focusRing,
@@ -212,9 +220,16 @@ export function IconButton({
         variants[variant],
         unavailable[variant],
         disabled[variant],
+        "data-pending:cursor-wait",
       )}
     >
-      <Icon icon={icon} flipInRtl={flipInRtl} />
+      {isPending ? (
+        <span className="animate-spin motion-reduce:animate-none">
+          <Icon icon={PendingIcon} />
+        </span>
+      ) : (
+        <Icon icon={icon} flipInRtl={flipInRtl} />
+      )}
     </PressableButton>
   );
 }

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { expectNoAxeViolations } from "@/test/axe";
@@ -33,10 +34,11 @@ const announced = () =>
     .map((node) => node.textContent)
     .join(" ");
 
-async function renderSwitcher(search: SwitcherSearch) {
+async function renderSwitcher(search: SwitcherSearch, currentId?: string) {
   return renderInRouter(
     <ProjectSwitcher
       name="Storefront"
+      currentId={currentId}
       search={search}
       links={{ all: { to: "/projects" }, create: { to: "/projects/new" } }}
     />,
@@ -139,5 +141,71 @@ describe("ProjectSwitcher", () => {
 
     await expect.poll(() => router.state.location.pathname).toBe("/projects/billing");
     await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("0015 AC-9: marks the current project with a check and aria-current, and the highlight starts on it", async () => {
+    const { search } = fakeSearch(matching);
+    const { screen } = await renderSwitcher(search, "billing");
+    await screen.getByRole("button", { name: "Switch project: Storefront" }).click();
+
+    const current = screen.getByRole("option", { name: "Billing" });
+    await expect.element(current).toHaveAttribute("aria-current", "true");
+    expect(current.element().querySelector("svg")).not.toBeNull();
+    expect(
+      screen.getByRole("option", { name: "Storefront" }).element().hasAttribute("aria-current"),
+    ).toBe(false);
+    // The search box keeps focus; the highlight is its active descendant.
+    const box = screen.getByRole("searchbox", { name: "Search projects" });
+    await expect.element(box).toHaveFocus();
+    await expect
+      .poll(() => box.element().getAttribute("aria-activedescendant"))
+      .toBe(current.element().id);
+    await expectNoAxeViolations();
+  });
+
+  it("0015 AC-12: announces a search error once per failure, then the retry's result", async () => {
+    let fail = true;
+    const { search } = fakeSearch((query) =>
+      fail ? Promise.reject(new Error("offline")) : matching(query),
+    );
+    const { screen } = await renderSwitcher(search);
+    await screen.getByRole("button", { name: "Switch project: Storefront" }).click();
+
+    const error = "Couldn't load projects. Check your connection and try again.";
+    await expect.poll(announced).toContain(error);
+    // No new live region: the message under the list is plain text (AC-12).
+    expect(screen.getByRole("alert").elements()).toHaveLength(0);
+
+    fail = false;
+    await screen.getByRole("button", { name: "Retry" }).click();
+    await expect.poll(announced).toContain("3 projects");
+  });
+
+  it("0015 AC-9: a new search function on re-render does not search again", async () => {
+    const { search, calls } = fakeSearch(matching);
+    const host = { rerender: () => {} };
+    function Host() {
+      const [, setRenders] = useState(0);
+      useEffect(() => {
+        host.rerender = () => {
+          setRenders((count) => count + 1);
+        };
+      });
+      // A new function identity on every render, as an inline arrow in a caller would be.
+      return (
+        <ProjectSwitcher name="Storefront" search={(query, options) => search(query, options)} />
+      );
+    }
+    const { screen } = await renderInRouter(<Host />, [{ path: "/projects/$projectId" }]);
+    await screen.getByRole("button", { name: "Switch project: Storefront" }).click();
+    await expect.element(screen.getByRole("option", { name: "Billing" })).toBeVisible();
+    expect(calls).toHaveLength(1);
+
+    host.rerender();
+    host.rerender();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await expect.element(screen.getByRole("option", { name: "Billing" })).toBeVisible();
+
+    expect(calls).toHaveLength(1);
   });
 });

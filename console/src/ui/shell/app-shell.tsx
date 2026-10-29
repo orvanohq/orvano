@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from "react";
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { useRouterState } from "@tanstack/react-router";
@@ -6,6 +6,7 @@ import { updateLayout, useLayout } from "@/shared/stores/layout";
 import { Button, IconButton } from "../button";
 import { cx } from "../cx";
 import { SidebarOpenIcon } from "../icons";
+import { useDelayedPending } from "../skeleton";
 import { useShortcut } from "../use-shortcut";
 import { AccountMenu } from "./account-menu";
 import { ActivityIndicator } from "./activity-indicator";
@@ -22,16 +23,37 @@ import type { AppShellProps } from "./types";
 import { useDocumentTitle } from "./use-document-title";
 import { useIsWide } from "./use-is-wide";
 
-// PRM-10: the panels load on first use; their triggers (the palette button, `?`, the help button) are in the shell.
+// PRM-10: the panels are not in the first load; their triggers (the palette button, `?`, the help button) are in the
+// shell. The browser caches each import, so a preload and the first open share one request.
+const loadPalette = () => import("../command-palette");
+const loadShortcutHelp = () => import("../shortcut-help");
+const loadDocsPane = () => import("../docs-pane");
 const CommandPalette = lazy(() =>
-  import("../command-palette").then((module) => ({ default: module.CommandPalette })),
+  loadPalette().then((module) => ({ default: module.CommandPalette })),
 );
 const ShortcutHelp = lazy(() =>
-  import("../shortcut-help").then((module) => ({ default: module.ShortcutHelp })),
+  loadShortcutHelp().then((module) => ({ default: module.ShortcutHelp })),
 );
-const DocsPane = lazy(() =>
-  import("../docs-pane").then((module) => ({ default: module.DocsPane })),
-);
+const DocsPane = lazy(() => loadDocsPane().then((module) => ({ default: module.DocsPane })));
+
+/** design.md _Lazy panels_: fetch a panel's code ahead of use. A failure here is ignored; opening tries again. */
+function preload(load: () => Promise<unknown>): () => void {
+  return () => {
+    load().catch(() => undefined);
+  };
+}
+
+/** Rendered while a lazy panel's code loads, so its button can show a busy state (design.md _Lazy panels_). */
+function PanelLoading({ onLoadingChange }: { onLoadingChange: (loading: boolean) => void }) {
+  const change = useEffectEvent(onLoadingChange);
+  useEffect(() => {
+    change(true);
+    return () => {
+      change(false);
+    };
+  }, []);
+  return null;
+}
 
 const paletteShortcut = msg`Open the command palette`;
 const shortcutHelpShortcut = msg`Show keyboard shortcuts`;
@@ -72,7 +94,28 @@ export function AppShell({ model, crumbs, resourceList, banner, children }: AppS
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
   const [used, setUsed] = useState({ palette: false, shortcuts: false, docs: false });
-  const helpButton = useRef<HTMLSpanElement>(null);
+  const [loading, setLoading] = useState({ palette: false, docs: false });
+  // After 300 ms of loading, the panel's button shows that it is busy.
+  const paletteBusy = useDelayedPending(paletteOpen && loading.palette);
+  const docsBusy = useDelayedPending(docsOpen && loading.docs);
+  const helpButton = useRef<HTMLButtonElement>(null);
+
+  // The panels' code loads once the browser is idle, and sooner when the pointer or focus reaches their buttons.
+  useEffect(() => {
+    const preloadAll = () => {
+      for (const load of [loadPalette, loadShortcutHelp, loadDocsPane]) preload(load)();
+    };
+    if (typeof window.requestIdleCallback !== "function") {
+      const timer = setTimeout(preloadAll, 2000);
+      return () => {
+        clearTimeout(timer);
+      };
+    }
+    const id = window.requestIdleCallback(preloadAll, { timeout: 5000 });
+    return () => {
+      window.cancelIdleCallback(id);
+    };
+  }, []);
   const openPalette = () => {
     setUsed((previous) => ({ ...previous, palette: true }));
     setPaletteOpen(true);
@@ -120,19 +163,39 @@ export function AppShell({ model, crumbs, resourceList, banner, children }: AppS
         <Breadcrumbs model={model} crumbs={crumbs} collapsed={!isWide} />
         <div className="ms-auto flex shrink-0 items-center gap-1">
           <ActivityIndicator />
-          <HelpButton
-            ref={helpButton}
-            isExpanded={docsOpen}
-            onPress={() => {
-              toggleDocs(!docsOpen);
-            }}
-          />
-          <PaletteButton onPress={openPalette} {...paletteKeys} />
-          <AccountMenu
-            user={model.user}
-            onSignOut={model.onSignOut}
-            onShowShortcuts={openShortcuts}
-          />
+          <span
+            className="contents"
+            onPointerEnter={preload(loadDocsPane)}
+            onFocus={preload(loadDocsPane)}
+          >
+            <HelpButton
+              ref={helpButton}
+              isExpanded={docsOpen}
+              isPending={docsBusy}
+              onPress={() => {
+                toggleDocs(!docsOpen);
+              }}
+            />
+          </span>
+          <span
+            className="contents"
+            onPointerEnter={preload(loadPalette)}
+            onFocus={preload(loadPalette)}
+          >
+            <PaletteButton onPress={openPalette} isPending={paletteBusy} {...paletteKeys} />
+          </span>
+          {/* The account menu holds Keyboard shortcuts. */}
+          <span
+            className="contents"
+            onPointerEnter={preload(loadShortcutHelp)}
+            onFocus={preload(loadShortcutHelp)}
+          >
+            <AccountMenu
+              user={model.user}
+              onSignOut={model.onSignOut}
+              onShowShortcuts={openShortcuts}
+            />
+          </span>
         </div>
       </header>
       {banner}
@@ -195,21 +258,37 @@ export function AppShell({ model, crumbs, resourceList, banner, children }: AppS
           </main>
         </div>
         {used.docs && (
-          <Suspense fallback={null}>
+          <Suspense
+            fallback={
+              <PanelLoading
+                onLoadingChange={(docs) => {
+                  setLoading((previous) => ({ ...previous, docs }));
+                }}
+              />
+            }
+          >
             <DocsPane
               isOpen={docsOpen}
               isWide={isWide}
               onOpenChange={toggleDocs}
               onClosed={() => {
                 // SHL-9: focus returns to the help button, once the pane (or its drawer) is gone.
-                helpButton.current?.querySelector("button")?.focus();
+                helpButton.current?.focus();
               }}
             />
           </Suspense>
         )}
       </div>
       {used.palette && (
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            <PanelLoading
+              onLoadingChange={(palette) => {
+                setLoading((previous) => ({ ...previous, palette }));
+              }}
+            />
+          }
+        >
           <CommandPalette
             isOpen={paletteOpen}
             onOpenChange={setPaletteOpen}
