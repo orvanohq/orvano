@@ -1,6 +1,11 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentType } from "react";
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { z } from "@/shared/zod";
-import { useAppForm, Switch } from "@/ui/form";
+import { useAppForm, Switch, type SwitchProps } from "@/ui/form";
+import { useGalleryText } from "../pseudo";
+import { useScenarioData } from "../scenario";
+import { Row, Scene, Section } from "./scene";
 
 // Spec 0015 GAL-2: every form primitive in its states, on placeholder data. Gallery strings stay out of the catalog.
 
@@ -18,7 +23,9 @@ const bucketSchema = z.object({
       z.minLength(1, "Enter a bucket name."),
       z.regex(/^[a-z0-9-]*$/, "Use lowercase letters, numbers, and hyphens."),
     ),
-  password: z.string().check(z.minLength(8, "Use at least 8 characters.")),
+  password: z
+    .string()
+    .check(z.minLength(1, "Enter a password."), z.minLength(8, "Use at least 8 characters.")),
   description: z.string(),
   maxSize: z.optional(
     z.number({ error: "Enter a size in MB." }).check(z.minimum(1, "Use at least 1 MB.")),
@@ -46,8 +53,13 @@ const empty: Bucket = {
   events: [],
 };
 
-/** A form with every field type. Submit it empty to see the error summary; "taken" fails on the server. */
+/**
+ * A form with every field type. Submit it empty to see the error summary; "taken" fails on the server. The States
+ * scene shows each field's states without a submit.
+ */
 export function FormsScene() {
+  const g = useGalleryText();
+  const ownerOptions = useScenarioData(owners, []);
   const [saved, setSaved] = useState<Bucket | null>(null);
   const [notifications, setNotifications] = useState(true);
   const form = useAppForm({
@@ -67,9 +79,7 @@ export function FormsScene() {
   });
 
   return (
-    <main className="mx-auto flex max-w-content flex-col gap-8 p-6">
-      <h1 className="text-xl font-semibold">Forms</h1>
-
+    <Scene title="Forms">
       <Section title="A form with every field">
         <form.AppForm>
           <form.Form>
@@ -77,41 +87,59 @@ export function FormsScene() {
             <form.AppField name="name">
               {(field) => (
                 <field.TextField
-                  label="Bucket name"
-                  description="Lowercase, unique in the project."
+                  label={g("Bucket name")}
+                  description={g("Lowercase, unique in the project.")}
                 />
               )}
             </form.AppField>
             <form.AppField name="password">
               {(field) => (
-                <field.PasswordField label="Access password" autoComplete="new-password" />
+                <field.PasswordField label={g("Access password")} autoComplete="new-password" />
               )}
             </form.AppField>
             <form.AppField name="description">
-              {(field) => <field.TextArea label="Description" isOptional />}
+              {(field) => <field.TextArea label={g("Description")} isOptional />}
             </form.AppField>
             <form.AppField name="maxSize">
-              {(field) => <field.NumberField label="Maximum file size (MB)" isOptional />}
+              {(field) => (
+                <field.NumberField
+                  label={g("Maximum file size")}
+                  description={g("In MB.")}
+                  isOptional
+                />
+              )}
             </form.AppField>
             <form.AppField name="region">
               {(field) => (
-                <field.Select label="Region" options={regions} placeholder="Choose a region" />
+                <field.Select
+                  label={g("Region")}
+                  options={regions}
+                  placeholder={g("Choose a region")}
+                />
               )}
             </form.AppField>
             <form.AppField name="owner">
-              {(field) => <field.Combobox label="Owner" options={owners} isOptional />}
+              {(field) => (
+                <field.Combobox
+                  label={g("Owner")}
+                  description={g("Set Scenario to Slow or Empty for its loading and empty states.")}
+                  options={ownerOptions ?? []}
+                  isLoading={ownerOptions === undefined}
+                  isOptional
+                />
+              )}
             </form.AppField>
             <form.AppField name="access">
               {(field) => (
                 <field.RadioGroup
-                  label="Access"
+                  label={g("Access")}
                   options={[
                     {
                       id: "private",
-                      label: "Private",
-                      description: "Only signed in users with a grant",
+                      label: g("Private"),
+                      description: g("Only signed in users with a grant"),
                     },
-                    { id: "public", label: "Public read" },
+                    { id: "public", label: g("Public read") },
                   ]}
                 />
               )}
@@ -119,11 +147,11 @@ export function FormsScene() {
             <form.AppField name="events">
               {(field) => (
                 <field.CheckboxGroup
-                  label="Send events for"
+                  label={g("Send events for")}
                   isOptional
                   options={[
-                    { id: "created", label: "File created" },
-                    { id: "deleted", label: "File deleted" },
+                    { id: "created", label: g("File created") },
+                    { id: "deleted", label: g("File deleted") },
                   ]}
                 />
               )}
@@ -131,47 +159,60 @@ export function FormsScene() {
             <form.AppField name="encrypted">
               {(field) => (
                 <field.Checkbox
-                  label="Encrypt files at rest"
-                  description="Uses the instance key."
+                  label={g("Encrypt files at rest")}
+                  description={g("Uses the instance key.")}
                 />
               )}
             </form.AppField>
             <div className="flex justify-end gap-2">
-              <form.SubmitButton>Create bucket</form.SubmitButton>
+              <form.SubmitButton>{g("Create bucket")}</form.SubmitButton>
             </div>
           </form.Form>
         </form.AppForm>
-        {saved ? <p>Saved {saved.name}.</p> : null}
+        {saved ? <p>{g(`Saved ${saved.name}.`)}</p> : null}
       </Section>
 
       <Section title="Switch">
-        <Switch
-          label="Email me about failed jobs"
-          isSelected={notifications}
-          onChange={setNotifications}
-        />
-        <Switch
-          label="Unavailable setting"
-          isSelected={false}
-          onChange={() => undefined}
-          isDisabled
-        />
+        <Row label="on, off">
+          <Switch
+            label={g("Email me about failed jobs")}
+            isSelected={notifications}
+            onChange={setNotifications}
+          />
+        </Row>
+        <Row label="unavailable">
+          {/* PRM-4, design.md _Forms_: a setting you can't change stays focusable and says why. */}
+          <ReasonSwitch
+            label={g("Require two factor sign in")}
+            isSelected={false}
+            onChange={() => undefined}
+            unavailableReason={onlyOwners}
+          />
+        </Row>
+        <Row label="disabled">
+          {/* A switch that can't apply at all on this install, so it has nothing to explain. */}
+          <Switch
+            label={g("Copy backups to a second region")}
+            isSelected={false}
+            onChange={() => undefined}
+            isDisabled
+          />
+        </Row>
       </Section>
-    </main>
+    </Scene>
   );
 }
+
+const onlyOwners = msg`Only an organization owner can change this.`;
+
+// Spec 0015 PRM-4 (Q8): `Switch` takes `unavailableReason`, built in src/ui/form/switch.tsx by the triage's batch 4.
+// Until that lands the prop is ignored and the switch shows as plain off; once it has, drop this cast.
+const ReasonSwitch = Switch as ComponentType<
+  SwitchProps & { unavailableReason?: MessageDescriptor }
+>;
 
 const owners = [
   { id: "ada", label: "Ada Lovelace" },
   { id: "grace", label: "Grace Hopper" },
   { id: "katherine", label: "Katherine Johnson" },
 ];
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {children}
-    </section>
-  );
-}

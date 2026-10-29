@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { msg } from "@lingui/core/macro";
 import {
   Avatar,
@@ -27,6 +27,8 @@ import {
   type ButtonSize,
   type ButtonVariant,
 } from "@/ui";
+import { useGalleryText } from "../pseudo";
+import { Row, Scene, Section } from "./scene";
 
 const variants: ButtonVariant[] = ["primary", "secondary", "ghost", "danger"];
 const sizes: ButtonSize[] = ["sm", "md", "lg"];
@@ -34,59 +36,78 @@ const noPermission = msg`You need the Admin role to delete tables.`;
 
 /** Every foundation primitive in every variant and state (GAL-2). */
 export function PrimitivesScene() {
+  const g = useGalleryText();
   return (
-    <main className="mx-auto flex max-w-content flex-col gap-8 p-6">
-      <h1 className="text-xl font-semibold">Primitives</h1>
-
+    <Scene title="Primitives">
       <Section title="Button">
         {variants.map((variant) => (
           <Row key={variant} label={variant}>
             {sizes.map((size) => (
               <Button key={size} variant={variant} size={size}>
-                Create {size}
+                {g(`Create ${size}`)}
               </Button>
             ))}
             <Button variant={variant} unavailableReason={noPermission}>
-              Unavailable
+              {g("Unavailable")}
             </Button>
             <Button variant={variant} isDisabled>
-              Disabled
+              {g("Disabled")}
             </Button>
+          </Row>
+        ))}
+      </Section>
+
+      <Section title="Button, forced states">
+        <p className="text-fg-muted">
+          {g("Each button holds one interaction state, so the recipes can be compared at rest.")}
+        </p>
+        {variants.map((variant) => (
+          <Row key={variant} label={variant}>
+            {states.map((state) => (
+              <ForcedState key={state} state={state}>
+                <Button variant={variant}>{g(stateLabels[state])}</Button>
+              </ForcedState>
+            ))}
           </Row>
         ))}
       </Section>
 
       <Section title="IconButton">
         <Row label="ghost">
-          <IconButton icon={CloseIcon} aria-label="Close" size="sm" />
-          <IconButton icon={CloseIcon} aria-label="Close" />
-          <IconButton icon={CloseIcon} aria-label="Close" unavailableReason={noPermission} />
+          <IconButton icon={CloseIcon} aria-label={g("Close")} size="sm" />
+          <IconButton icon={CloseIcon} aria-label={g("Close")} />
+          <IconButton icon={CloseIcon} aria-label={g("Close")} unavailableReason={noPermission} />
         </Row>
         <Row label="secondary">
-          <IconButton icon={ChevronStartIcon} aria-label="Previous" variant="secondary" flipInRtl />
-          <IconButton icon={ChevronEndIcon} aria-label="Next" variant="secondary" flipInRtl />
+          <IconButton
+            icon={ChevronStartIcon}
+            aria-label={g("Previous")}
+            variant="secondary"
+            flipInRtl
+          />
+          <IconButton icon={ChevronEndIcon} aria-label={g("Next")} variant="secondary" flipInRtl />
         </Row>
       </Section>
 
       <Section title="Link">
         <p>
-          An inline link to{" "}
+          {g("An inline link to")}{" "}
           <Link to="/" variant="inline">
-            the gallery index
+            {g("the gallery index")}
           </Link>{" "}
-          in running text.
+          {g("in running text.")}
         </p>
         <Row label="nav">
           <Link to="/" variant="nav">
-            Gallery index
+            {g("Gallery index")}
           </Link>
         </Row>
       </Section>
 
       <Section title="Tooltip">
         <Row label="on a button">
-          <Tooltip content="Saves the row and closes the sheet">
-            <Button>Hover or focus me</Button>
+          <Tooltip content={g("Saves the row and closes the sheet")}>
+            <Button>{g("Hover or focus me")}</Button>
           </Tooltip>
         </Row>
       </Section>
@@ -95,29 +116,29 @@ export function PrimitivesScene() {
         <Row label="sizes">
           <Icon icon={ServiceDatabasesIcon} />
           <Icon icon={ServiceDatabasesIcon} size={20} />
-          <Icon icon={ServiceDatabasesIcon} size={24} label="Databases" />
+          <Icon icon={ServiceDatabasesIcon} size={24} label={g("Databases")} />
         </Row>
         <Row label="flipInRtl">
-          <Icon icon={ChevronStartIcon} flipInRtl label="Back" />
-          <Icon icon={ChevronEndIcon} flipInRtl label="Forward" />
+          <Icon icon={ChevronStartIcon} flipInRtl label={g("Back")} />
+          <Icon icon={ChevronEndIcon} flipInRtl label={g("Forward")} />
         </Row>
       </Section>
 
       <Section title="Menu">
         <Row label="sections">
-          <MenuTrigger trigger={<Button>Table actions</Button>}>
-            <Menu aria-label="Table actions">
-              <MenuSection title="Sort" selectedKey="name">
-                <MenuItem id="name">By name</MenuItem>
-                <MenuItem id="created">By creation date</MenuItem>
+          <MenuTrigger trigger={<Button>{g("Table actions")}</Button>}>
+            <Menu aria-label={g("Table actions")}>
+              <MenuSection title={g("Sort")} selectedKey="name">
+                <MenuItem id="name">{g("By name")}</MenuItem>
+                <MenuItem id="created">{g("By creation date")}</MenuItem>
               </MenuSection>
               <MenuSeparator />
-              <MenuItem id="rename">Rename table</MenuItem>
+              <MenuItem id="rename">{g("Rename table")}</MenuItem>
               <MenuItem id="export" unavailableReason={noPermission}>
-                Export rows
+                {g("Export rows")}
               </MenuItem>
               <MenuItem id="delete" tone="danger" icon={SignOutIcon}>
-                Delete table
+                {g("Delete table")}
               </MenuItem>
             </Menu>
           </MenuTrigger>
@@ -126,7 +147,7 @@ export function PrimitivesScene() {
 
       <Section title="Tabs">
         <Tabs>
-          <TabList aria-label="SDK">
+          <TabList aria-label={g("SDK")}>
             <Tab id="js">JavaScript</Tab>
             <Tab id="dart">Dart</Tab>
             <Tab id="dotnet">.NET</Tab>
@@ -158,35 +179,41 @@ export function PrimitivesScene() {
       <Section title="ExternalLink">
         <p>
           <ExternalLink href="https://github.com/orvanohq/orvano#readme">
-            Open the Orvano docs
+            {g("Open the Orvano docs")}
           </ExternalLink>
         </p>
       </Section>
 
       <Section title="VisuallyHidden">
         <p>
-          There is hidden text after this sentence.
-          <VisuallyHidden> Screen readers read this part.</VisuallyHidden>
+          {g("There is hidden text after this sentence.")}
+          <VisuallyHidden> {g("Screen readers read this part.")}</VisuallyHidden>
         </p>
       </Section>
-    </main>
+    </Scene>
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {children}
-    </section>
-  );
-}
+type ForcedStateName = "hovered" | "pressed" | "focus-visible";
+const states: readonly ForcedStateName[] = ["hovered", "pressed", "focus-visible"];
+const stateLabels: Record<ForcedStateName, string> = {
+  hovered: "Hovered",
+  pressed: "Pressed",
+  "focus-visible": "Focused",
+};
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * Holds the button inside it in one React Aria interaction state by setting the `data-*` attribute its styles read
+ * (design.md _Button recipes_). React Aria never renders the attribute while the state is off, so React leaves it.
+ */
+function ForcedState({ state, children }: { state: ForcedStateName; children: ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    ref.current?.querySelector("button")?.setAttribute(`data-${state}`, "true");
+  }, [state]);
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <span className="w-24 shrink-0 font-mono text-sm text-fg-muted">{label}</span>
+    <span ref={ref} className="contents">
       {children}
-    </div>
+    </span>
   );
 }

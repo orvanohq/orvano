@@ -1,17 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Cell, Column, Row, Table, TableBody, TableHeader, type SortDescriptor } from "@/ui/table";
-import {
-  Badge,
-  Button,
-  CodeSnippet,
-  CopyField,
-  DangerZone,
-  DangerZoneItem,
-  EmptyState,
-  RelativeTime,
-  SecretReveal,
-  SettingsCard,
-} from "@/ui";
+import { Button, CodeSnippet, CopyField, EmptyState, RelativeTime, SecretReveal } from "@/ui";
+import { useGalleryText } from "../pseudo";
+import { Scene, Section } from "./scene";
+import { MembersTable, NameSettingsCard, ResourceDangerZone } from "./settings-blocks";
 
 // Spec 0015 GAL-2: data display in every state, on placeholder data (milestone 4, step 19). The gallery imports the
 // lazy table directly; screens load it lazily (PRM-10).
@@ -37,23 +29,22 @@ const keys = [
 ];
 
 export function DataScene() {
+  const g = useGalleryText();
   const [sort, setSort] = useState<SortDescriptor>({ column: "name", direction: "ascending" });
   const sorted = keys.toSorted((a, b) => {
     const order = a.name.localeCompare(b.name);
     return sort.direction === "ascending" ? order : -order;
   });
   return (
-    <main className="mx-auto flex max-w-content flex-col gap-8 p-6">
-      <h1 className="text-xl font-semibold">Data display</h1>
-
+    <Scene title="Data display">
       <Section title="Table, sortable">
-        <Table aria-label="API keys" sortDescriptor={sort} onSortChange={setSort}>
+        <Table aria-label={g("API keys")} sortDescriptor={sort} onSortChange={setSort}>
           <TableHeader>
             <Column id="name" isRowHeader allowsSorting>
-              Name
+              {g("Name")}
             </Column>
-            <Column id="key">Key</Column>
-            <Column id="created">Created</Column>
+            <Column id="key">{g("Key")}</Column>
+            <Column id="created">{g("Created")}</Column>
           </TableHeader>
           <TableBody>
             {sorted.map((key) => (
@@ -72,45 +63,24 @@ export function DataScene() {
       </Section>
 
       <Section title="Table, selectable">
-        <Table aria-label="Members" selectionMode="multiple">
-          <TableHeader>
-            <Column id="email" isRowHeader>
-              Email
-            </Column>
-            <Column id="role">Role</Column>
-          </TableHeader>
-          <TableBody>
-            <Row id="ada">
-              <Cell>ada@example.com</Cell>
-              <Cell>
-                <Badge tone="info">Owner</Badge>
-              </Cell>
-            </Row>
-            <Row id="lin">
-              <Cell>lin@example.com</Cell>
-              <Cell>
-                <Badge>Developer</Badge>
-              </Cell>
-            </Row>
-          </TableBody>
-        </Table>
+        <MembersTable />
       </Section>
 
       <Section title="Table, empty">
-        <Table aria-label="Webhooks">
+        <Table aria-label={g("Webhooks")}>
           <TableHeader>
             <Column id="url" isRowHeader>
-              URL
+              {g("URL")}
             </Column>
-            <Column id="events">Events</Column>
+            <Column id="events">{g("Events")}</Column>
           </TableHeader>
           <TableBody
             emptyState={
               <EmptyState
                 kind="first-use"
-                title="No webhooks yet"
-                description="Webhooks tell your server when something happens."
-                action={<Button variant="primary">Create webhook</Button>}
+                title={g("No webhooks yet")}
+                description={g("Webhooks tell your server when something happens.")}
+                action={<Button variant="primary">{g("Create webhook")}</Button>}
               />
             }
           >
@@ -120,71 +90,61 @@ export function DataScene() {
       </Section>
 
       <Section title="SettingsCard and DangerZone">
-        <SettingsCard
+        <NameSettingsCard
           title="General"
-          description="The project's name and region."
-          footer={<Button variant="primary">Update</Button>}
-        >
-          <CopyField label="Project ID" value="prj_01JB8Z4Q7W2N" />
-        </SettingsCard>
-        <DangerZone>
-          <DangerZoneItem
-            title="Transfer project"
-            description="Move Storefront to another organization."
-            action={<Button>Transfer project</Button>}
-          />
-          <DangerZoneItem
-            title="Delete project"
-            description="Deletes the project and everything in it."
-            action={<Button variant="danger">Delete project</Button>}
-          />
-        </DangerZone>
+          description="The project's name, and the ID the SDKs use."
+          nameLabel="Project name"
+          name="Storefront"
+          idLabel="Project ID"
+          id="prj_01JB8Z4Q7W2N"
+        />
+        <ResourceDangerZone
+          transfer={{
+            title: "Transfer project",
+            description: "Move Storefront to another organization.",
+          }}
+          remove={{
+            title: "Delete project",
+            description: "Deletes the project and everything in it.",
+          }}
+        />
       </Section>
 
       <Section title="CopyField">
-        <CopyField label="Endpoint" value="https://api.example.com/v1" />
+        <CopyField label={g("Endpoint")} value="https://api.example.com/v1" />
       </Section>
 
       <Section title="SecretReveal">
         <SecretReveal
-          label="API key"
+          label={g("API key")}
           secret="ok_live_7f3a2c9d0e1b4a5f6c7d8e9f0a1b91c2"
           masked="ok_live_7f3a…91c2"
         />
       </Section>
 
       <Section title="CodeSnippet">
-        <CodeSnippet label="Install command" code="npm install @orvano/sdk" />
+        <CodeSnippet label={g("Install command")} code="npm install @orvano/sdk" />
       </Section>
 
       <Section title="RelativeTime">
         <ul className="flex flex-col gap-1">
           <li>
-            Just now: <RelativeTime datetime={new Date(now)} />
+            {g("Just now:")} <RelativeTime datetime={new Date(now)} />
           </li>
           <li>
-            Minutes ago: <RelativeTime datetime={new Date(now - 3 * minute)} />
+            {g("Minutes ago:")} <RelativeTime datetime={new Date(now - 3 * minute)} />
           </li>
           <li>
-            In the future: <RelativeTime datetime={new Date(now + 5 * minute)} />
+            {g("In the future:")} <RelativeTime datetime={new Date(now + 5 * minute)} />
           </li>
           <li>
-            Days ago: <RelativeTime datetime={new Date(now - 2 * day)} />
+            {g("Days ago:")} <RelativeTime datetime={new Date(now - 2 * day)} />
           </li>
           <li>
-            Past 7 days, a date: <RelativeTime datetime={new Date(now - 40 * day)} />
+            {g("Past 7 days, a date:")} <RelativeTime datetime={new Date(now - 40 * day)} />
           </li>
         </ul>
       </Section>
-    </main>
-  );
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {children}
-    </section>
+    </Scene>
   );
 }
