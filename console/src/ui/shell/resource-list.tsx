@@ -37,7 +37,8 @@ export const FILTER_SETTLE_MS = 500;
  * Spec 0001 UX-2: a filter box and a create button on top, then the resources as links, the open one
  * `aria-current="page"`. Links don't preload (RTE-6) and keep focus on navigation (RTE-7). Long names truncate,
  * keeping the full accessible name, with the name in a tooltip (UX-40). Once typing settles, the announcer says how
- * many match (UX-41). While the resources load the list is `aria-busy`, with a skeleton after 300 ms (UX-21).
+ * many match (UX-41). While the resources load the list is `aria-busy`, with a skeleton after 300 ms (UX-21). Each
+ * name is its own direction isolate (RTL-3).
  */
 export function ResourceList({
   items,
@@ -117,7 +118,10 @@ export function ResourceList({
                   preload={false}
                   state={{ keepFocus: true } as never}
                 >
-                  <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                  {/* RTL-3: the name sets its own direction, so truncation keeps its start; aligned as the list is. */}
+                  <span dir="auto" className="min-w-0 flex-1 truncate [text-align:match-parent]">
+                    {item.name}
+                  </span>
                 </Link>
               </Tooltip>
             </li>

@@ -56,16 +56,23 @@ const orgs: SwitcherItem[] = [
   { id: "globex", name: "Globex", link: { to: "/$orgId", params: { orgId: "globex" } } },
 ];
 
-const projects: SwitcherItem[] = ["Storefront", "Billing", "Analytics", "Mobile app"].map(
-  (name) => {
-    const id = name.toLowerCase().replaceAll(" ", "-");
-    return {
-      id,
-      name,
-      link: { to: "/$orgId/$projectId", params: { orgId: org.id, projectId: id } },
-    };
-  },
-);
+// RTL-3: a long Latin name, so right to left shows the switcher keeping its start.
+export const longProjectName = "Point of sale integrations for European stores";
+
+const projects: SwitcherItem[] = [
+  "Storefront",
+  "Billing",
+  "Analytics",
+  "Mobile app",
+  longProjectName,
+].map((name) => {
+  const id = name.toLowerCase().replaceAll(" ", "-");
+  return {
+    id,
+    name,
+    link: { to: "/$orgId/$projectId", params: { orgId: org.id, projectId: id } },
+  };
+});
 
 /** How long a slow fixture takes: long enough to look at the loading state. */
 export const SLOW_MS = 4000;
@@ -170,10 +177,14 @@ export function tableTabs(
       label: g("Rows"),
       link: { to: "/$orgId/$projectId/databases/$tableId", params, exact: true },
     },
-    {
-      id: "columns",
-      label: g("Columns"),
-      link: { to: "/$orgId/$projectId/databases/$tableId/columns", params },
-    },
+    // SHL-14: six tabs, so a narrow frame shows the row scrolling with a fade at its cut edge.
+    ...["Columns", "Indexes", "Permissions", "Triggers", "Settings"].map((name) => ({
+      id: name.toLowerCase(),
+      label: g(name),
+      link: {
+        to: "/$orgId/$projectId/databases/$tableId/$tab",
+        params: { ...params, tab: name.toLowerCase() },
+      },
+    })),
   ];
 }

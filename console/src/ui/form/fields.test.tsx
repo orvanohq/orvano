@@ -62,7 +62,14 @@ function EveryField() {
           {(field) => <field.Select label="Region" options={regions} />}
         </form.AppField>
         <form.AppField name="owner">
-          {(field) => <field.Combobox label="Owner" options={regions} isOptional />}
+          {(field) => (
+            <field.Combobox
+              label="Owner"
+              options={regions}
+              placeholder="Choose an owner"
+              isOptional
+            />
+          )}
         </form.AppField>
         <form.AppField name="access">
           {(field) => (
@@ -187,6 +194,14 @@ describe("field components", () => {
 
     await expect.element(trigger).toHaveTextContent("United States");
     await expect.element(trigger).toHaveFocus();
+  });
+
+  it("0015 AC-15: an empty combobox shows its placeholder, like an empty select", async () => {
+    const { screen } = await renderInRouter(<EveryField />);
+    const input = screen.getByRole("combobox", { name: "Owner (optional)" });
+
+    await expect.element(input).toHaveAttribute("placeholder", "Choose an owner");
+    await expect.element(input).toHaveValue("");
   });
 
   it("0015 AC-15: the combobox filters as you type and says when nothing matches", async () => {

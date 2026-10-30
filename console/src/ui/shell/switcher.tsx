@@ -103,7 +103,10 @@ function Switcher({
           focusRing,
         )}
       >
-        <span className="truncate">{props.name}</span>
+        {/* RTL-3: the name in its own direction, so truncation keeps its start; the full name is the tooltip. */}
+        <span dir="auto" title={props.name} className="truncate">
+          {props.name}
+        </span>
         <Icon icon={DisclosureIcon} />
       </AriaButton>
       <SwitcherPopover kind={kind} {...props} />
@@ -269,7 +272,9 @@ function SwitcherPanel({
                 focusRingInset,
               )}
             >
-              <span className="min-w-0 flex-1 truncate">{item.name}</span>
+              <span dir="auto" className="min-w-0 flex-1 truncate [text-align:match-parent]">
+                {item.name}
+              </span>
               {item.id === currentId && <Icon icon={CheckIcon} />}
             </ListBoxItem>
           )}

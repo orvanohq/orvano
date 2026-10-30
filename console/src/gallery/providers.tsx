@@ -5,8 +5,9 @@ import { LocaleProvider } from "@/ui";
 import { useSettings } from "./settings";
 
 /**
- * Applies the toolbar's settings: the Lingui catalog, and the direction. Right to left gives React Aria the `ar-XB` locale while Lingui keeps its
- * catalog (RTL-1). The pseudo locale's `lang` is `en-XA`, a valid pseudo tag, rather than the catalog's name.
+ * Applies the toolbar's settings: the Lingui catalog, and the direction. Right to left gives React Aria the real `ar`
+ * locale while Lingui keeps its catalog (RTL-1); never the pseudo `ar-XB`, which WebKit resolves as left to right. The
+ * pseudo locale's `lang` is `en-XA`, a valid pseudo tag, rather than the catalog's name.
  */
 export function GalleryProviders({ children }: { children: ReactNode }) {
   const { locale, direction } = useSettings();
@@ -22,7 +23,7 @@ export function GalleryProviders({ children }: { children: ReactNode }) {
 
   return (
     <I18nProvider i18n={i18n}>
-      <LocaleProvider locale={direction === "rtl" ? "ar-XB" : "en-US"}>{children}</LocaleProvider>
+      <LocaleProvider locale={direction === "rtl" ? "ar" : "en-US"}>{children}</LocaleProvider>
     </I18nProvider>
   );
 }

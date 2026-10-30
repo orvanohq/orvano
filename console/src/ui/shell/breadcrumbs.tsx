@@ -142,6 +142,8 @@ function CrumbContent({
         aria-current={isCurrent ? "page" : undefined}
         // SHL-4: the text is the full name, so the accessible name is too; the tooltip shows it when it truncates.
         title={crumb.label}
+        // RTL-3: a resource name sets its own direction, so truncation keeps its start.
+        dir="auto"
         className={isCurrent ? "truncate font-medium text-fg" : "truncate text-fg-muted"}
       >
         {crumb.label}
@@ -150,7 +152,7 @@ function CrumbContent({
   }
   return (
     // SHL-4: the link keeps at least a 24 px target however far the row shrinks.
-    <span className="min-w-6 truncate text-fg-muted">
+    <span dir="auto" className="min-w-6 truncate text-fg-muted">
       {/* Exact, so a crumb to an ancestor route isn't marked current too: only the last crumb is (AC-9). */}
       <Link variant="nav" {...linkOptions(crumb.link)} activeOptions={{ exact: true }}>
         {crumb.label}

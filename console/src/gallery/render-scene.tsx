@@ -22,7 +22,7 @@ export async function renderScene(path: string, options: { direction?: "ltr" | "
   await router.load();
   const screen = await render(
     <I18nProvider i18n={i18n}>
-      <LocaleProvider locale={rtl ? "ar-XB" : "en-US"}>
+      <LocaleProvider locale={rtl ? "ar" : "en-US"}>
         <RouterProvider router={router} />
       </LocaleProvider>
     </I18nProvider>,
