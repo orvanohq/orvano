@@ -18,7 +18,7 @@ RUN pnpm install --frozen-lockfile --filter @orvano/console...
 COPY console/ console/
 RUN pnpm --filter @orvano/console build
 
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.402-noble@sha256:0d99ebf1ccad15037b5c98c9fe8979d6b8dbac23812feae2277a0b277b5c5ffa AS server
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.403-noble@sha256:de4fe90a98845d75910b9769662465c84de1a934665c431279d1382b2bddc02b AS server
 ARG TARGETARCH
 WORKDIR /src/server
 COPY server/global.json server/Directory.Build.props server/Directory.Packages.props server/BannedSymbols.txt server/.editorconfig ./
@@ -37,7 +37,7 @@ COPY --from=console /src/console/dist /out/wwwroot/console
 # The final image has no shell, so the storage folder is made here (spec 0007 IMG-2).
 RUN mkdir -p /rootfs/var/lib/orvano/storage
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.13-noble-chiseled@sha256:84def277556c2843a44fdeefbd3145d0a2e32d8f736d0c1a7b0a96b2880b0187
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.14-noble-chiseled@sha256:c89a6a61f494f20a5ae302990e814627a8d91b332fd4a8e7c1707c2d4da9555d
 # Spec 0016 PIN-1: image.yml passes sha-<commit>; a local or CI build stays dev (or what it passes). `orvano init` pins
 # .env's ORVANO_VERSION to this value (PIN-2).
 ARG ORVANO_IMAGE_VERSION=dev
