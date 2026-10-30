@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json.Nodes;
 
 using Orvano.Host.Api.OpenApi;
+using Orvano.Modules.Platform;
 using Orvano.SharedKernel.Api;
 
 namespace Orvano.Host.IntegrationTests.Contract;
@@ -66,8 +67,10 @@ public sealed class ContractDocumentTests(ContractHostFixture host) : IClassFixt
         JsonObject document = await DocumentAsync(ContractDocuments.Public);
         JsonObject catalogue = document["x-orvano-error-codes"]!.AsObject();
 
-        catalogue.Select(member => member.Key).ShouldBe(ErrorCodes.All.Select(entry => entry.Code).Order(StringComparer.Ordinal));
-        foreach ((string code, ErrorCodeAttribute entry) in ErrorCodes.All)
+        // The shared codes plus each module's catalogue (PlatformErrorCodes, spec 0016 STP-7).
+        IReadOnlyList<(string Code, ErrorCodeAttribute Entry)> expected = [.. ErrorCodes.All, .. ErrorCodes.Catalogue(typeof(PlatformErrorCodes))];
+        catalogue.Select(member => member.Key).ShouldBe(expected.Select(entry => entry.Code).Order(StringComparer.Ordinal));
+        foreach ((string code, ErrorCodeAttribute entry) in expected)
         {
             catalogue[code]!["status"]!.GetValue<int>().ShouldBe(entry.Status);
             catalogue[code]!["description"]!.GetValue<string>().ShouldBe(entry.Description);
