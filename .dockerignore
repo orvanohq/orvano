@@ -1,4 +1,4 @@
-# The image builds from server/ and console/, plus the root pnpm workspace files the console stage needs
+# The image builds from server/ and console/, copies the install bundle from deploy/ (spec 0016 BND-1), plus the root pnpm workspace files the console stage needs
 # (package.json, pnpm-workspace.yaml, pnpm-lock.yaml, .node-version; spec 0008 TL-7).
 .git
 .github

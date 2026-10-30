@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 
 using Orvano.Infrastructure.Jobs.Data;
+using Orvano.Modules.Platform.Data;
 
 namespace Orvano.Host.Database;
 
@@ -10,7 +11,7 @@ namespace Orvano.Host.Database;
 /// </summary>
 internal static class MigrationOrder
 {
-    public static readonly IReadOnlyList<Type> DbContexts = [typeof(JobsDbContext)];
+    public static readonly IReadOnlyList<Type> DbContexts = [typeof(JobsDbContext), typeof(PlatformDbContext)];
 
     public static async Task<IReadOnlyList<string>> GetPendingAsync(IServiceProvider services, CancellationToken cancellationToken)
     {

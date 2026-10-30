@@ -9,8 +9,196 @@
     },
     "version": "2026-10-22"
   },
-  "paths": {},
+  "paths": {
+    "/v1/console/config": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Read the console's boot settings.",
+        "description": "Answers whether the install still needs its first run setup, or 503 `unavailable` while the platform schema is not migrated.",
+        "operationId": "Platform_GetConsoleConfig",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleConfigResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
   "components": {
+    "schemas": {
+      "ConsoleConfigResponse": {
+        "required": [
+          "setupRequired"
+        ],
+        "type": "object",
+        "properties": {
+          "setupRequired": {
+            "type": "boolean",
+            "description": "True until the first owner account is made; the console then shows only the setup page."
+          }
+        },
+        "description": "What the console needs before its first render."
+      },
+      "FieldError": {
+        "required": [
+          "code",
+          "field",
+          "location",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "The field's wire name; in a body, a dotted camelCase path with indexes, such as `address.city` or `tags[2]`."
+          },
+          "location": {
+            "enum": [
+              "body",
+              "query",
+              "path",
+              "header"
+            ],
+            "type": "string",
+            "description": "Where the field is."
+          },
+          "code": {
+            "type": "string",
+            "description": "What is wrong, such as `required` or `too_long`."
+          },
+          "message": {
+            "type": "string",
+            "description": "An English sentence describing the problem, safe to show."
+          }
+        },
+        "description": "One problem with one field of the request."
+      },
+      "Problem": {
+        "required": [
+          "code",
+          "detail",
+          "status",
+          "title",
+          "traceId",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Always `about:blank`: the code is the error's identity."
+          },
+          "title": {
+            "type": "string",
+            "description": "The HTTP reason phrase, such as `Not Found`."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status.",
+            "format": "int32"
+          },
+          "detail": {
+            "type": "string",
+            "description": "An English message safe to show to the user."
+          },
+          "code": {
+            "type": "string",
+            "description": "The snake_case error code; x-orvano-error-codes lists every code."
+          },
+          "traceId": {
+            "type": "string",
+            "description": "Equals the `Orvano-Request-Id` header."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "description": "On `validation_failed`: each field that is not valid."
+          },
+          "retryAfter": {
+            "type": "integer",
+            "description": "On a 429 or a 503 that knows when to come back: seconds to wait, equal to `Retry-After`.",
+            "format": "int32"
+          },
+          "requiredRole": {
+            "type": "string",
+            "description": "On a console 403: the console role that would allow the action."
+          },
+          "currentVersion": {
+            "type": "string",
+            "description": "On `version_conflict`: the resource's current version, as its `ETag` without quotes."
+          },
+          "supportedVersions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "On `unsupported_api_version`: the versions the server serves."
+          }
+        },
+        "description": "The error body of every non 2xx response (RFC 9457 problem details). `code` identifies the error."
+      }
+    },
     "parameters": {
       "Authorization": {
         "name": "Authorization",
@@ -119,5 +307,10 @@
         }
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "config"
+    }
+  ]
 }

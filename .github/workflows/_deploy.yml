@@ -25,6 +25,7 @@ jobs:
       # compose.yaml needs the values `orvano init` writes to deploy/.env; placeholders are enough to validate it.
       - name: Validate the compose files
         env:
+          ORVANO_VERSION: ci-placeholder
           ORVANO_DB_PASSWORD: ci-placeholder
           ORVANO_DOMAIN: orvano.example
           ORVANO_PROVISIONER_PASSWORD: ci-placeholder
@@ -43,3 +44,60 @@ jobs:
           fi
       - name: Build the image (linux/amd64, no push)
         run: docker buildx build --platform linux/amd64 -f deploy/Dockerfile -t orvano:ci .
+
+  # Spec 0016 SMK-1 to SMK-5: install.sh on a clean runner, from the image this pull request builds. Milestone 1 runs
+  # the amd64 Docker leg; the arm64 Docker and rootless Podman legs join the matrix with milestone 4.
+  install:
+    name: install (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: amd64 docker
+            runner: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # SMK-5, ISH-1: POSIX sh, checked by shellcheck (preinstalled on the runner image).
+      - name: shellcheck
+        run: shellcheck deploy/install.sh deploy/postgres-init/*.sh tooling/scripts/install-smoke.sh
+      - name: install.sh --help and its refusals
+        run: |
+          sh deploy/install.sh --help
+          for args in "--no-such-flag" "--local --domain orvano.example"; do
+            # shellcheck disable=SC2086 # each case is a list of flags
+            if sh deploy/install.sh $args </dev/null; then
+              echo "::error::install.sh accepted: $args"
+              exit 1
+            fi
+          done
+      # SMK-2: built natively for the runner's CPU, never pulled from a registry.
+      - name: Build the image
+        run: docker build -f deploy/Dockerfile --build-arg ORVANO_IMAGE_VERSION=ci -t orvano:ci .
+      # SMK-5: the server profile's bundle validates too.
+      - name: Validate a server mode bundle
+        run: |
+          mkdir "$RUNNER_TEMP/server-bundle"
+          docker run --rm --user "$(id -u):$(id -g)" -v "$RUNNER_TEMP/server-bundle:/out" orvano:ci \
+            init --out /out --domain orvano.example --image orvano
+          docker compose --project-directory "$RUNNER_TEMP/server-bundle" config --quiet
+      - name: Install and check (SMK-3)
+        run: sh tooling/scripts/install-smoke.sh "$RUNNER_TEMP/orvano"
+      - name: Collect compose logs
+        if: failure()
+        run: |
+          if [ -f "$RUNNER_TEMP/orvano/compose.yaml" ]; then
+            (cd "$RUNNER_TEMP/orvano" && docker compose logs --no-color > "$RUNNER_TEMP/compose.log" 2>&1) || true
+          fi
+      - name: Upload compose logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: install-compose-logs-${{ matrix.runner }}
+          path: ${{ runner.temp }}/compose.log
+          if-no-files-found: ignore

@@ -9,6 +9,7 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { consoleConfigQuery } from "@/features/console-config/api/queries";
 import { messages as sourceMessages } from "@/locales/en/messages.po";
 import { routeTree } from "@/routeTree.gen";
 import { activateLocale, getDirection, i18n } from "@/shared/i18n";
@@ -22,6 +23,36 @@ describe("createAppRouter", () => {
     const screen = await renderWithProviders("/no/such/page");
 
     await expect.element(screen.getByText(/not found/i)).toBeVisible();
+  });
+});
+
+// Spec 0016 FRS-3, AC-5: while setup is open every path lands on the setup page; once it is done, /setup goes home.
+describe("the setup redirect", () => {
+  it.each(["/", "/no/such/page"])("sends %s to /setup while setup is required", async (url) => {
+    const screen = await renderWithProviders(url, { config: { setupRequired: true } });
+
+    await expect
+      .element(screen.getByRole("heading", { level: 1, name: "Set up Orvano" }))
+      .toBeVisible();
+    expect(screen.router.state.location.pathname).toBe("/setup");
+  });
+
+  it("keeps /setup while setup is required", async () => {
+    const screen = await renderWithProviders("/setup", { config: { setupRequired: true } });
+
+    await expect
+      .element(screen.getByRole("heading", { level: 1, name: "Set up Orvano" }))
+      .toBeVisible();
+    expect(screen.router.state.location.pathname).toBe("/setup");
+  });
+
+  it("sends /setup to the console root once setup is complete", async () => {
+    const screen = await renderWithProviders("/setup", { config: { setupRequired: false } });
+
+    await expect
+      .element(screen.getByRole("heading", { level: 1, name: "Orvano console" }))
+      .toBeVisible();
+    expect(screen.router.state.location.pathname).toBe("/");
   });
 });
 
@@ -52,9 +83,11 @@ const probeTree = routeTree.addChildren({ ...routeTree.children, probe });
 
 async function renderProbe() {
   await activateLocale("en");
+  const queryClient = new QueryClient();
+  queryClient.setQueryData(consoleConfigQuery().queryKey, { setupRequired: false });
   const router = createRouter({
     routeTree: probeTree,
-    context: { queryClient: new QueryClient() },
+    context: { queryClient },
     history: createMemoryHistory({ initialEntries: ["/locale-probe"] }),
   });
   await router.load();

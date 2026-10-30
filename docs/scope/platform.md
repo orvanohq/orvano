@@ -14,7 +14,7 @@ spec [0016](../specs/0016-self-host-install/index.md)
 
 - [x] Design it (spec): `/architect self host install`
 - [ ] Build it: `/develop self host install`
-  - [ ] Milestone 1, the thread: the bundle in the image, the version pin, the two Caddy profiles, `init --local`, `Orvano.Modules.Platform` with `platform.instance`, `GET /v1/console/config`, the console redirect to setup, `install.sh --local`, and the first CI leg (spec 0016 build plan steps 1 to 8; AC-1, AC-3 to AC-5, AC-9 to AC-11, AC-13, AC-15)
+  - [x] Milestone 1, the thread: the bundle in the image, the version pin, the two Caddy profiles, `init --local`, `Orvano.Modules.Platform` with `platform.instance`, `GET /v1/console/config`, the console redirect to setup, `install.sh --local`, and the first CI leg (spec 0016 build plan steps 1 to 8; AC-1, AC-3 to AC-5, AC-9 to AC-11, AC-13, AC-15)
   - [ ] Milestone 2, the setup token: issue at start, `orvano admin setup-token`, the check endpoint with its limit, and the token checks in CI (steps 9 to 12; AC-1, AC-6, AC-7, AC-9, AC-10, AC-15)
   - [ ] Milestone 3, the setup page: the token step in `AuthLayout`, its states, end to end, axe, and CSP tests (steps 13 and 14; AC-5, AC-8)
   - [ ] Milestone 4, server mode, Podman, both CPUs: `--domain`, Podman and rootless detection, the arm64 and rootless Podman CI legs, the INS-5 checks, and the no telemetry test (steps 15 to 17; AC-2, AC-12, AC-14, AC-15)

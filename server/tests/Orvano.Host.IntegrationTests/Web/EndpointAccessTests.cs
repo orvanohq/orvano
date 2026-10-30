@@ -38,7 +38,7 @@ public sealed class EndpointAccessTests(PostgresFixture postgres) : IDisposable
             .OfType<string>()
             .ShouldBeEmpty();
         endpoints.Where(AccessDeclaration.IsPublic).Select(AccessDeclaration.Name).Order(StringComparer.Ordinal)
-            .ShouldBe(["/", "/console", "/console/{**path}", "/health/live", "/health/ready", "/v1/health"]); // EPT-5, spec 0014 HLT-1
+            .ShouldBe(["/", "/console", "/console/{**path}", "/health/live", "/health/ready", "/v1/console/config", "/v1/health"]); // EPT-5, spec 0014 HLT-1, spec 0016 FRS-1
     }
 
     [Fact, Trait("Spec", "0012:AC-13"), Trait("Spec", "0012:EPT-5")]

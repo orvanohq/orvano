@@ -26,6 +26,7 @@ COPY server/src/Orvano.Host/Orvano.Host.csproj server/src/Orvano.Host/packages.l
 COPY server/src/Orvano.SharedKernel/Orvano.SharedKernel.csproj server/src/Orvano.SharedKernel/packages.lock.json src/Orvano.SharedKernel/
 COPY server/src/Orvano.Infrastructure/Orvano.Infrastructure.csproj server/src/Orvano.Infrastructure/packages.lock.json src/Orvano.Infrastructure/
 COPY server/src/Orvano.Modules.Auth/Orvano.Modules.Auth.csproj server/src/Orvano.Modules.Auth/packages.lock.json src/Orvano.Modules.Auth/
+COPY server/src/Orvano.Modules.Platform/Orvano.Modules.Platform.csproj server/src/Orvano.Modules.Platform/packages.lock.json src/Orvano.Modules.Platform/
 # Spec 0002 GEN-4: locked mode, so the image uses exactly the tested dependency graph.
 RUN dotnet restore src/Orvano.Host/Orvano.Host.csproj --locked-mode -p:PublishReadyToRun=true
 COPY server/src/ src/
@@ -37,12 +38,20 @@ COPY --from=console /src/console/dist /out/wwwroot/console
 RUN mkdir -p /rootfs/var/lib/orvano/storage
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.13-noble-chiseled@sha256:84def277556c2843a44fdeefbd3145d0a2e32d8f736d0c1a7b0a96b2880b0187
+# Spec 0016 PIN-1: image.yml passes sha-<commit>; a local or CI build stays dev (or what it passes). `orvano init` pins
+# .env's ORVANO_VERSION to this value (PIN-2).
+ARG ORVANO_IMAGE_VERSION=dev
 # Spec 0009 LIC-6: the license travels with the image.
 LABEL org.opencontainers.image.licenses="Apache-2.0" \
-      org.opencontainers.image.source="https://github.com/orvanohq/orvano"
+      org.opencontainers.image.source="https://github.com/orvanohq/orvano" \
+      org.opencontainers.image.version="${ORVANO_IMAGE_VERSION}"
+ENV ORVANO_IMAGE_VERSION=${ORVANO_IMAGE_VERSION}
 WORKDIR /app
 COPY --from=server /out ./
 COPY LICENSE NOTICE /app/
+# Spec 0016 BND-1: the install bundle `orvano init` writes, straight from deploy/, so it always matches this image.
+COPY deploy/compose.yaml deploy/Caddyfile /app/install/
+COPY deploy/postgres-init/10-orvano-roles.sh /app/install/postgres-init/
 # 1654 is the chiseled image's non root `app` user, so a fresh named volume inherits that owner.
 COPY --from=server --chown=1654:1654 /rootfs/var/lib/orvano /var/lib/orvano
 ENV ASPNETCORE_HTTP_PORTS=8080

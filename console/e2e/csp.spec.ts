@@ -41,7 +41,12 @@ for (const path of paths) {
       }
     });
 
+    // vite preview has no API: answer boot's config call (spec 0016 FRS-2) so the route itself renders, not a redirect.
+    await page.route("**/v1/console/config", (route) =>
+      route.fulfill({ json: { setupRequired: path === "/setup" } }),
+    );
     await page.goto(path.slice(1));
+    await expect(page).toHaveURL(new URL(path.slice(1), "http://localhost:4173/console/").href);
     await expect(page.locator("main")).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-theme", /^(light|dark)$/);
     expect(violations).toEqual([]);

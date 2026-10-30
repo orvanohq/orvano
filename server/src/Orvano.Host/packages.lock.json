@@ -168,6 +168,12 @@
           "Orvano.SharedKernel": "[1.0.0, )"
         }
       },
+      "orvano.modules.platform": {
+        "type": "Project",
+        "dependencies": {
+          "Orvano.SharedKernel": "[1.0.0, )"
+        }
+      },
       "orvano.sharedkernel": {
         "type": "Project",
         "dependencies": {

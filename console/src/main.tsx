@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { I18nProvider } from "@lingui/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
+import { consoleConfigQuery } from "@/features/console-config/api/queries";
 import { createQueryClient } from "@/shared/api/query-client";
 import { activateLocale, i18n, resolveLocale, sourceLocale } from "@/shared/i18n";
 import { reportConsoleError } from "@/shared/report";
@@ -27,11 +28,15 @@ const root = createRoot(rootElement, {
 
 startThemeSync(); // spec 0015 THM-4: keeps <html data-theme> current after theme-boot.js
 
-// Spec 0003 RTE-10: boot before the first render. The runtime config and session requests join this step once
-// feature 13 adds the API client. If booting fails, the plain boot error page renders instead of the router (FLT-2).
+// Spec 0003 RTE-10: boot before the first render. The runtime config loads beside the locale into the query cache
+// (spec 0016 FRS-2); feature 13 adds the session request. If booting fails, the plain boot error page renders instead
+// of the router (FLT-2, spec 0015 AC-21).
 try {
-  await activateLocale(resolveLocale(navigator.languages));
   const queryClient = createQueryClient();
+  await Promise.all([
+    activateLocale(resolveLocale(navigator.languages)),
+    queryClient.query(consoleConfigQuery()),
+  ]);
   const router = createAppRouter({ queryClient });
 
   root.render(

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Spec 0011 MOD-1: the platform schema (console accounts, organizations, projects, API keys). Feature 12 builds only
+       platform.instance (spec 0016); feature 13 adds the rest of CAT-1. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\Orvano.SharedKernel\Orvano.SharedKernel.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orvano.Host.IntegrationTests" />
+  </ItemGroup>
+</Project>

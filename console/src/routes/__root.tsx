@@ -3,8 +3,10 @@ import { useLingui } from "@lingui/react";
 import {
   createRootRouteWithContext,
   Outlet,
+  redirect,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
+import { consoleConfigQuery } from "@/features/console-config/api/queries";
 import type { RouterContext } from "@/router";
 import { UnsavedChangesGuard } from "@/ui/form/unsaved-changes-guard";
 import { Announcer } from "@/ui/announcer";
@@ -13,7 +15,17 @@ import { LocaleProvider } from "@/ui/locale-provider";
 import { UiRouterProvider } from "@/ui/router-provider";
 import { ToastRegion } from "@/ui/toast";
 
+const SETUP_PATH = "/setup";
+
 export const Route = createRootRouteWithContext<RouterContext>()({
+  // Spec 0016 FRS-3: while setup is open every page is the setup page, and once it is done the setup page is gone.
+  // Boot put the config in the cache (RTE-10), so this reads it without a request.
+  beforeLoad: async ({ context, location }) => {
+    const { setupRequired } = await context.queryClient.query(consoleConfigQuery());
+    const onSetup = location.pathname.replace(/\/+$/, "") === SETUP_PATH;
+    if (setupRequired && !onSetup) redirect({ to: SETUP_PATH, replace: true, throw: true });
+    if (!setupRequired && onSetup) redirect({ to: "/", replace: true, throw: true });
+  },
   component: Root,
   errorComponent: RootError, // spec 0003 FLT-2
 });

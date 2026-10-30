@@ -87,6 +87,9 @@ jobs:
           push: true
           provenance: mode=max
           sbom: true
+          # Spec 0016 PIN-1: init pins installs to this version, never to edge.
+          build-args: |
+            ORVANO_IMAGE_VERSION=sha-${{ github.sha }}
           tags: |
             ${{ env.IMAGE }}:edge
             ${{ env.IMAGE }}:sha-${{ github.sha }}
