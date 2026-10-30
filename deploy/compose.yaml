@@ -1,18 +1,22 @@
-# The reference install (spec 0007 INS-1): PostgreSQL, a one shot migrate, Orvano, and Caddy for HTTPS.
-# Works with Docker Compose v2 and `podman compose`.
+# The reference install (spec 0007 INS-1): PostgreSQL, a one shot migrate, Orvano, and Caddy.
+# Works with Docker Compose 2.24 or later, and `podman compose` with Docker Compose as its provider.
 #
-# First time, in the folder that holds this file, as yourself (spec 0007 INS-3):
-#   docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano init --out /out --domain <your domain>
-#   (rootless Podman: podman run --rm --userns=keep-id -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano init --out /out --domain <your domain>)
-#   docker compose up -d
+# `orvano init` writes this file, Caddyfile, postgres-init/, .env, and root.key from inside the image, so they always
+# match the image that runs them (spec 0016 BND-1, BND-2). deploy/install.sh does all of it for you. By hand, in an
+# empty folder, as yourself (spec 0007 INS-3):
+#   docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano:edge init --out /out --domain <your domain>
+#   (rootless Podman: podman run --rm --userns=keep-id -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano:edge init --out /out --domain <your domain>)
+#   (a laptop: --local in place of --domain, for http://localhost)
+#   docker compose up -d --wait
 #
 # init sets this folder to 0700 and writes root.key (0644, so the container can read it) and .env (0600)
 # (spec 0007 INS-5). The folder is what keeps root.key private: back it up owner only or encrypted, apart from
 # your database backups, and run compose as the same user that ran init.
 name: orvano
 
-x-orvano: &orvano
-  image: ghcr.io/orvanohq/orvano:${ORVANO_VERSION:-edge}
+x-orvano:
+  &orvano # Spec 0016 PIN-2: init pins the version to the image it ran from, so a restart or `compose pull` never changes it.
+  image: ${ORVANO_IMAGE:-ghcr.io/orvanohq/orvano}:${ORVANO_VERSION:?run orvano init first}
   environment: &orvano-environment
     ORVANO_DATABASE__HOST: postgres
     ORVANO_DATABASE__USERNAME: orvano
@@ -63,34 +67,57 @@ services:
       ORVANO_ROOT_KEY_FILE: /run/secrets/orvano_root_key
       # Spec 0006 NET-1: forwarded headers are trusted from Caddy's fixed address only.
       ORVANO_TRUSTED_PROXIES: 172.30.80.10
+      # Spec 0016 LCL-3: true only in local mode, where the public URL is plain HTTP on localhost (spec 0006 CON-1).
+      ORVANO_INSECURE_COOKIES: ${ORVANO_INSECURE_COOKIES:-false}
     secrets:
       - orvano_root_key
     volumes:
       - orvano-storage:/var/lib/orvano/storage
+    # Spec 0016 LCL-2: declared here, so `up --wait` never depends on the image format keeping HEALTHCHECK.
+    healthcheck:
+      test: ["CMD", "/app/orvano", "healthcheck"]
+      interval: 10s
+      timeout: 6s
+      start_period: 30s
+      retries: 3
     depends_on:
       postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
 
+  # Spec 0016 LCL-1: two Caddy services, one per mode, chosen by COMPOSE_PROFILES in .env. They never run together,
+  # so they share Caddy's fixed address, which ORVANO_TRUSTED_PROXIES names.
+  # Server mode: a real certificate for ORVANO_DOMAIN, so ports 80 and 443 always (spec 0007 TLS-1, spec 0016 PRT-1).
   caddy:
-    image: caddy:2.11.7 # spec 0007 TLS-1
-    restart: unless-stopped
+    <<: &caddy
+      image: caddy:2.11.7 # spec 0007 TLS-1
+      restart: unless-stopped
+      volumes:
+        - ./Caddyfile:/etc/caddy/Caddyfile:ro
+        - caddy-data:/data
+        - caddy-config:/config
+      depends_on:
+        - orvano
+      networks:
+        orvano:
+          ipv4_address: 172.30.80.10
+    profiles: [server]
     environment:
-      ORVANO_DOMAIN: ${ORVANO_DOMAIN:?run orvano init first}
+      ORVANO_SITE_ADDRESS: ${ORVANO_DOMAIN:?run orvano init first}
     ports:
       - "80:80"
       - "443:443"
       - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on:
-      - orvano
-    networks:
-      orvano:
-        ipv4_address: 172.30.80.10
+
+  # Local mode: plain HTTP on this machine only, never on the network (spec 0016 LCL-4).
+  caddy-local:
+    <<: *caddy
+    profiles: [local]
+    environment:
+      ORVANO_SITE_ADDRESS: ":80"
+    ports:
+      - "127.0.0.1:${ORVANO_HTTP_PORT:-80}:80"
 
 secrets:
   orvano_root_key:

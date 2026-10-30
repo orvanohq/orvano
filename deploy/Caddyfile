@@ -1,6 +1,7 @@
 # Spec 0007 TLS-1: Caddy gets certificates automatically and proxies everything to Orvano.
+# Spec 0016 LCL-1: the site is ORVANO_DOMAIN in server mode, and plain HTTP ":80" in local mode (compose.yaml).
 # It trusts no forwarded headers from clients and sets the client address itself. The server, not Caddy,
 # sends HSTS (spec 0006 NET-1), and no body size limit is set here: Kestrel's limits apply.
-{$ORVANO_DOMAIN} {
+{$ORVANO_SITE_ADDRESS} {
 	reverse_proxy orvano:8080
 }

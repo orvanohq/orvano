@@ -26,6 +26,15 @@
                        Condition="$([System.String]::Copy('%(ReferencePath.Filename)').StartsWith('Orvano.')) And Exists('%(RootDir)%(Directory)%(Filename).xml')" />
     </ItemGroup>
   </Target>
+  <!-- Spec 0016 BND-1: `orvano init` reads its bundle from install/ beside the executable. The image copies it there from
+       deploy/ itself; these links give local runs and the tests the same files. The image's build stage has no deploy/,
+       so the condition keeps them out of a published image. -->
+  <ItemGroup Condition="Exists('..\..\..\deploy\compose.yaml')">
+    <None Include="..\..\..\deploy\compose.yaml;..\..\..\deploy\Caddyfile" Link="install\%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+    <None Include="..\..\..\deploy\postgres-init\10-orvano-roles.sh" Link="install\postgres-init\10-orvano-roles.sh"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+  </ItemGroup>
   <ItemGroup>
     <!-- Spec 0002 TST-2: integration tests reach the host's internals. -->
     <InternalsVisibleTo Include="Orvano.Host.IntegrationTests" />
