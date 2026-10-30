@@ -30,7 +30,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 61  | [Background runtime](foundations.md)              | Foundation    | done        |
 | 10  | [API contract & SDK generation](sdks.md)          | Foundation    | done        |
 | 11  | [Design system & console shell](foundations.md)   | Foundation    | in-progress |
-| 12  | [Self host install](platform.md)                  | Slice 1       | planned     |
+| 12  | [Self host install](platform.md)                  | Slice 1       | in-progress |
 | 13  | [Console accounts & projects](platform.md)        | Slice 1       | planned     |
 | 14  | [Email and password auth](auth.md)                | Slice 1       | planned     |
 | 15  | [Project databases](databases.md)                 | Slice 1       | planned     |
