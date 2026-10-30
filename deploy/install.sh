@@ -412,7 +412,7 @@ run_init() {
   if [ -n "$PUBLIC_URL" ]; then
     set -- "$@" --public-url "$PUBLIC_URL"
   fi
-  run_as_operator -v "$DIR:/out:Z" "$ref" "$@" \
+  run_as_operator -v "$DIR:/out:z" "$ref" "$@" \
     || fail "orvano init did not finish; it changed nothing it did not create." "Read the message above, fix it, then run this again."
 }
 

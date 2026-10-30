@@ -62,7 +62,7 @@ cd orvano
 Run `init` from the image. It writes `compose.yaml`, `Caddyfile`, `postgres-init/`, `.env`, and `root.key` from inside the image, so they always match it. Use `--domain orvano.example.com` in place of `--local` for a server:
 
 ```bash
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano:edge init --out /out --local
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/out:z" ghcr.io/orvanohq/orvano:edge init --out /out --local
 ```
 
 Start the stack, and wait until it is healthy:
@@ -192,19 +192,19 @@ There are two ways.
 Docker, and rootful Podman (`podman run` takes the same flags):
 
 ```bash
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano:edge init --out /out --domain orvano.example.com
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/out:z" ghcr.io/orvanohq/orvano:edge init --out /out --domain orvano.example.com
 ```
 
 Rootless Docker, where root in the container is you on the host and any other user is a stranger to your folder:
 
 ```bash
-docker run --rm --user 0:0 -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano:edge init --out /out --domain orvano.example.com
+docker run --rm --user 0:0 -v "$PWD:/out:z" ghcr.io/orvanohq/orvano:edge init --out /out --domain orvano.example.com
 ```
 
 Rootless Podman, where `--userns=keep-id` makes your user the same inside, and `--user` stops the image's own user from winning:
 
 ```bash
-podman run --rm --userns=keep-id --user "$(id -u):$(id -g)" -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano:edge init --out /out --domain orvano.example.com
+podman run --rm --userns=keep-id --user "$(id -u):$(id -g)" -v "$PWD:/out:z" ghcr.io/orvanohq/orvano:edge init --out /out --domain orvano.example.com
 ```
 
 Without `--user`, rootful Docker runs `init` as the image's own user, which cannot write to your folder, so it stops, changes nothing, and names the fix.
@@ -237,7 +237,34 @@ CI proves the install on Linux with Docker on amd64 and arm64, and with rootless
 
 ### SELinux
 
-On a host that enforces SELinux (Fedora or RHEL), the `:Z` on `init`'s folder mount relabels the folder so the container may write to it. The script always passes it, the commands in this guide include it, and every other host ignores it. This path has not been proven on an enforcing host yet. If the stack fails there, look for denials with `ausearch -m avc` and [open an issue](https://github.com/orvanohq/orvano/issues).
+SELinux labels apply on your host when both of these hold: `getenforce` prints `Enforcing`, and your engine reports SELinux. For Docker, `docker info --format '{{.SecurityOptions}}'` includes `name=selinux`. For Podman, `podman info --format '{{.Host.Security.SELinuxEnabled}}'` prints `true`. If either one does not hold, labels do not apply and you can skip this section.
+
+These hosts are examples, not the full list:
+
+| Host                                          | Labels |
+| --------------------------------------------- | ------ |
+| Docker from docker.com, default config        | off    |
+| Rootless Docker (`dockerd-rootless.sh`)       | off    |
+| Fedora's `moby-engine` (`--selinux-enabled`)  | on     |
+| Docker with `"selinux-enabled": true`         | on     |
+| Podman on Fedora or RHEL, rootful or rootless | on     |
+
+**This path has not been run on these hosts yet.** It comes from reading the SELinux policy and the engines' source. If the stack fails there, look for denials with `ausearch -m avc` and [open an issue](https://github.com/orvanohq/orvano/issues).
+
+The `:z` on `init`'s folder mount gives the folder the shared label `container_file_t:s0`. The files `init` writes take that label from the folder, so every container in the stack can read the ones mounted into it, and `compose.yaml` needs no SELinux option. The script always passes `:z`, the commands in this guide include it, and a host without labels ignores it. A folder on a file system without labels, such as NFS, can't be relabelled.
+
+The label gives reach, not secrecy. Any container that has one of these files mounted can read it, and write it if the mount and file modes allow, so the 0700 folder is the only thing keeping `root.key` and `.env` safe. Compose mounts only `postgres-init`, `Caddyfile`, and `root.key`. So:
+
+- Do not mount the install folder, or a parent of it, into another container.
+- Install into an empty folder, because `:z` relabels everything in `--dir`.
+
+`init` sets the labels once, and `install.sh` never relabels. A folder that loses them stops starting, because `orvano` and Caddy are denied. That can happen when you restore it from a backup without its labels, force a relabel of the whole host, turn labels on after the install, or put a file back with `mv` or `cp -a`, which keep the old label. To fix it, stop the stack, then run this in the install folder as its owner:
+
+```bash
+chcon -R -t container_file_t -l s0 .
+```
+
+A forced relabel of the host undoes this, so you may need the line again. Files made with plain `cp` or edited in place take the folder's label and need nothing.
 
 ### Windows through WSL2
 
