@@ -45,8 +45,8 @@ jobs:
       - name: Build the image (linux/amd64, no push)
         run: docker buildx build --platform linux/amd64 -f deploy/Dockerfile -t orvano:ci .
 
-  # Spec 0016 SMK-1 to SMK-5: install.sh on a clean runner, from the image this pull request builds. Milestone 1 runs
-  # the amd64 Docker leg; the arm64 Docker and rootless Podman legs join the matrix with milestone 4.
+  # Spec 0016 SMK-1 to SMK-5: install.sh on a clean runner, from the image this pull request builds, with SMK-3's setup
+  # token checks. The amd64 Docker leg for now; the arm64 Docker and rootless Podman legs join the matrix with milestone 4.
   install:
     name: install (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}

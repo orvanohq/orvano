@@ -389,6 +389,14 @@
       "status": 401,
       "description": "The access token expired; refresh the session once and retry."
     },
+    "setup_complete": {
+      "status": 409,
+      "description": "Setup is already complete; sign in instead."
+    },
+    "setup_token_invalid": {
+      "status": 401,
+      "description": "The setup token is wrong, expired, or replaced; make a new one with orvano admin setup-token."
+    },
     "timeout": {
       "status": 503,
       "description": "The server took too long to answer."

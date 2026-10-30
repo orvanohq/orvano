@@ -129,6 +129,10 @@ A read only cross check on another model found two blockers and eight majors; yo
 
 Minor fixes: rootless Docker and a `docker` alias to Podman, rerun flag conflicts, `.env` read without sourcing, test fixtures that set `setup_completed_at` with SQL, token trimming, the `Retry-After` format, React StrictMode, AC-14 scoped to Orvano's own calls, the unverified signature stated plainly, and follow ups for specs 0003, 0012, and 0015.
 
+### Found while building
+
+- **The init script is 0755, not 0644 (BND-2, milestone 1, #138).** With 0644, Docker Desktop's file sharing shows the bind mounted `postgres-init/10-orvano-roles.sh` to the postgres entrypoint as executable, so the entrypoint runs it directly instead of sourcing it; that fails with "bad interpreter", the `orvano` and `orvano_provisioner` roles are never made, and `migrate` fails. 0755 makes the entrypoint run it the same way on every host, and the script only reads environment variables, so the executable bit grants nothing new.
+
 ### Agent skills
 
 `docker-compose-patterns` shapes the profiles and health waits; `containerize-aspnetcore` the Dockerfile change (spec 0007 IMG-2 and IMG-4 win over its curl health checks); `authoring-github-workflows` and `github-actions-hardening` the CI job; `aspnet-minimal-api-openapi` the two endpoints (spec 0014 wins). No new tool was chosen, so no skill or MCP search ran. `shellcheck` is preinstalled on GitHub's Ubuntu runners and adds no dependency.

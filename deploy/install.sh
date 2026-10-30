@@ -292,11 +292,33 @@ start_stack() {
   fi
 }
 
-# For now the setup link; spec 0016 ISH-6 (milestone 2) prints a one time setup token link here instead.
+# ISH-6: a new one time setup link from `orvano admin setup-token` (never parsed from logs), or, once setup is done,
+# where Orvano runs. The link is the only secret this script ever prints (ISH-3).
 print_done() {
-  public_url="$(env_value ORVANO_PUBLIC_URL)"
-  say ""
-  say "Orvano is running. Finish setting it up at: $public_url/console/setup"
+  set +e
+  output="$(docker compose exec -T orvano /app/orvano admin setup-token </dev/null)"
+  status=$?
+  set -e
+  case "$status" in
+    0)
+      link="$(printf '%s\n' "$output" | grep '#token=' | tail -n 1)"
+      if [ -z "$link" ]; then
+        fail "orvano admin setup-token printed no setup link." "Run it yourself to see why: cd $DIR && docker compose exec orvano /app/orvano admin setup-token"
+      fi
+      say ""
+      say "Finish setup"
+      say "  $link"
+      say "It finishes setup once and expires in 24 hours. Make a new link with: cd $DIR && docker compose exec orvano /app/orvano admin setup-token"
+      ;;
+    3)
+      say ""
+      say "Orvano is running at $(env_value ORVANO_PUBLIC_URL)/console"
+      ;;
+    *)
+      fail "Orvano started, but making a setup link failed (exit $status)." \
+        "See why with: cd $DIR && docker compose logs orvano, then run this again."
+      ;;
+  esac
 }
 
 main() {

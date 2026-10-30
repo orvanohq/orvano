@@ -89,6 +89,11 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
     [Fact, Trait("Spec", "0011:IDS-1"), Trait("Spec", "0002:DAT-10")]
     public async Task Migrate_creates_the_one_instance_row_with_setup_open_and_no_pending_model_changes()
     {
+        // Read before a server starts: an api start issues a setup token (spec 0016 STP-3).
+        long open = (long)(await ScalarAsync(
+            "SELECT count(*) FROM platform.instance WHERE id = 1 AND setup_token_hash IS NULL AND setup_token_expires_at IS NULL "
+            + "AND setup_completed_at IS NULL AND created_at IS NOT NULL"))!;
+
         Client();
         await using (AsyncServiceScope scope = _factory!.Services.CreateAsyncScope())
         {
@@ -98,9 +103,7 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
         }
 
         (await ScalarAsync("SELECT count(*) FROM platform.instance")).ShouldBe(1L);
-        (await ScalarAsync(
-            "SELECT count(*) FROM platform.instance WHERE id = 1 AND setup_token_hash IS NULL AND setup_token_expires_at IS NULL "
-            + "AND setup_completed_at IS NULL AND created_at IS NOT NULL")).ShouldBe(1L);
+        open.ShouldBe(1L);
     }
 
     [Fact, Trait("Spec", "0011:IDS-1")]
