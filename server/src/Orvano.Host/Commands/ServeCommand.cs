@@ -15,6 +15,7 @@ using Orvano.Infrastructure;
 using Orvano.Infrastructure.RootKeys;
 using Orvano.Infrastructure.Tls;
 using Orvano.Modules.Auth;
+using Orvano.Modules.Platform;
 using Orvano.SharedKernel.Access;
 using Orvano.SharedKernel.Api;
 using Orvano.SharedKernel.Configuration;
@@ -117,6 +118,7 @@ internal static class ServeCommand
 
         // Spec 0002 LAY-5: one call per module.
         builder.Services.AddAuthModule(builder.Configuration);
+        builder.Services.AddPlatformModule(builder.Configuration);
 
         WebApplication app = builder.Build();
         app.Logger.ServerStarting(HostTelemetry.Version, roles);
@@ -155,11 +157,12 @@ internal static class ServeCommand
             .WithMetadata(new HttpMethodMetadata([HttpMethods.Get])).AllowPublicAccess();
 
         // Spec 0014 PTH-2: the /v1 groups. GET /v1/health answers in every role (HLT-1); each module maps its own
-        // endpoints under the groups it is handed, in its Map<Module>Endpoints (none yet).
-        ApiRoutes.Create(app).MapHealth();
+        // endpoints under the groups it is handed, in its Map<Module>Endpoints, in the api role only.
+        ApiRoutes routes = ApiRoutes.Create(app).MapHealth();
 
         if (roles.Api)
         {
+            routes.MapPlatformEndpoints();
             app.MapConsole();
         }
 

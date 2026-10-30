@@ -665,6 +665,7 @@
           "OpenTelemetry.Instrumentation.Runtime": "[1.20.0, )",
           "Orvano.Infrastructure": "[1.0.0, )",
           "Orvano.Modules.Auth": "[1.0.0, )",
+          "Orvano.Modules.Platform": "[1.0.0, )",
           "Orvano.SharedKernel": "[1.0.0, )",
           "System.CommandLine": "[2.0.13, )"
         }
@@ -681,6 +682,12 @@
         "type": "Project",
         "dependencies": {
           "NSec.Cryptography": "[26.4.0, )",
+          "Orvano.SharedKernel": "[1.0.0, )"
+        }
+      },
+      "orvano.modules.platform": {
+        "type": "Project",
+        "dependencies": {
           "Orvano.SharedKernel": "[1.0.0, )"
         }
       },

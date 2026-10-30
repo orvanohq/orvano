@@ -19,7 +19,7 @@ public sealed class DataModelTests
 
     // Every rule below walks Production, so a scan that missed a context would pass them all. MigrationOrder is the
     // list `orvano migrate` applies (server/AGENTS.md: every module DbContext goes there), so the scan must find
-    // exactly those. Today both are empty; the first module DbContext makes the rules real.
+    // exactly those.
     [Fact]
     [Trait("Spec", "0011:AC-8")]
     public void Server_contexts_found_by_the_scan_are_exactly_the_ones_migrate_applies()

@@ -42,6 +42,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Orvano.Infrastructure\Orvano.Infrastructure.csproj" />
     <ProjectReference Include="..\Orvano.Modules.Auth\Orvano.Modules.Auth.csproj" />
+    <ProjectReference Include="..\Orvano.Modules.Platform\Orvano.Modules.Platform.csproj" />
     <ProjectReference Include="..\Orvano.SharedKernel\Orvano.SharedKernel.csproj" />
   </ItemGroup>
 </Project>

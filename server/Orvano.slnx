@@ -3,6 +3,7 @@
     <Project Path="src/Orvano.Host/Orvano.Host.csproj" />
     <Project Path="src/Orvano.Infrastructure/Orvano.Infrastructure.csproj" />
     <Project Path="src/Orvano.Modules.Auth/Orvano.Modules.Auth.csproj" />
+    <Project Path="src/Orvano.Modules.Platform/Orvano.Modules.Platform.csproj" />
     <Project Path="src/Orvano.SharedKernel/Orvano.SharedKernel.csproj" />
   </Folder>
   <Folder Name="/tests/">

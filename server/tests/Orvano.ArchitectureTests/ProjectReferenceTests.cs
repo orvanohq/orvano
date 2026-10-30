@@ -2,6 +2,7 @@ using System.Reflection;
 
 using Orvano.Infrastructure;
 using Orvano.Modules.Auth;
+using Orvano.Modules.Platform;
 using Orvano.SharedKernel;
 
 using Shouldly;
@@ -18,7 +19,11 @@ public sealed class ProjectReferenceTests
     private static readonly Assembly Infrastructure = typeof(InfrastructureServices).Assembly;
     private static readonly Assembly Host = typeof(Program).Assembly;
 
-    public static TheoryData<string> Modules => new() { typeof(AuthModule).Assembly.GetName().Name! };
+    public static TheoryData<string> Modules => new()
+    {
+        typeof(AuthModule).Assembly.GetName().Name!,
+        typeof(PlatformModule).Assembly.GetName().Name!,
+    };
 
     [Theory]
     [MemberData(nameof(Modules))]
