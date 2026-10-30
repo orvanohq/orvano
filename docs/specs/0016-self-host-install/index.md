@@ -1,7 +1,7 @@
 # 0016. Self host install
 
 **Date**: 2026-10-29
-**Updated**: 2026-10-29, from milestone 1 (#138): BND-2's init script mode is 0755, not 0644 (rationale.md, "Found while building"). 2026-10-30, from milestone 4: AC-12 and ISH-4's init user is corrected for rootless Docker (`--user 0:0`) and rootless Podman (`--userns=keep-id` plus `--user`), SMK-2's image name check has its result, SMK-4's install folder sits under `/tmp`, and ISH-8's network gains an `ip_range` that keeps dynamic addresses off Caddy's (rationale.md, "Found while building").
+**Updated**: 2026-10-29, from milestone 1 (#138): BND-2's init script mode is 0755, not 0644 (rationale.md, "Found while building"). 2026-10-30, from milestone 4: AC-12 and ISH-4's init user is corrected for rootless Docker (`--user 0:0`) and rootless Podman (`--userns=keep-id` plus `--user`), SMK-2's image name check has its result, SMK-4's install folder sits under `/tmp`, and ISH-8's network gains an `ip_range` that keeps dynamic addresses off Caddy's (rationale.md, "Found while building"). 2026-10-30, from milestone 5: those corrections are reviewed and confirmed, build plan step 16 no longer names `localhost/orvano:ci`, and verify.md has host M's results.
 **Status**: In Progress
 
 ## Summary
@@ -265,13 +265,13 @@ Tracer Bullet inside the feature: milestone 1 runs one thin thread from the imag
 **Milestone 4: server mode, Podman, both CPUs**
 
 15. [x] `install.sh --domain` (server profile, the port checks for both ports, the `--domain` refusals) and `--engine podman` with the provider check, rootless detection, and rootless Docker (ISH-4); the `compose config` check of a server bundle in CI; satisfies **AC-2**, **AC-12**.
-16. [x] CI: the `ubuntu-24.04-arm` Docker leg and the rootless Podman leg (Docker Compose as the provider, `podman.socket`, the `localhost/orvano:ci` name check of SMK-2), and SMK-4's INS-5 checks on every leg; satisfies **AC-12**, **AC-15**.
+16. [x] CI: the `ubuntu-24.04-arm` Docker leg and the rootless Podman leg (Docker Compose as the provider, `podman.socket`, the image name check of SMK-2), and SMK-4's INS-5 checks on every leg; satisfies **AC-12**, **AC-15**.
 17. [x] TEL-1: an integration test that `serve` with no `OTEL_EXPORTER_OTLP_ENDPOINT` opens no outbound connection during start and the setup flow (an `HttpClient` handler that fails the test on any send), and a grep in CI that `install.sh` calls no URL; satisfies **AC-14**.
 
 **Milestone 5: the guide and sign off**
 
-18. `docs/self-hosting.md` (GDE-1, AC-16's list) and the README pointer (GDE-2); spec 0007's INS-3 and INS-5 Linux follow up closed with the CI results; satisfies **AC-16**.
-19. Run [verify.md](verify.md)'s manual steps (macOS with Docker Desktop, a real domain on a Linux server, rootful Podman, WSL2) and record the results there; satisfies **AC-1**, **AC-2**, **AC-12**.
+18. [x] `docs/self-hosting.md` (GDE-1, AC-16's list) and the README pointer (GDE-2); spec 0007's INS-3 and INS-5 Linux follow up closed with the CI results; satisfies **AC-16**.
+19. [ ] Run [verify.md](verify.md)'s manual steps (macOS with Docker Desktop, a real domain on a Linux server, rootful Podman, WSL2) and record the results there; satisfies **AC-1**, **AC-2**, **AC-12**.
 
 ## Consequences
 
@@ -302,7 +302,7 @@ Tracer Bullet inside the feature: milestone 1 runs one thin thread from the imag
 ## Follow-up
 
 - [ ] Spec 0011: add an `Updated` line: `platform.instance` is built by feature 12 and gains `setup_token_expires_at`; CAT-1's table header changes from (13) to (12); the feature 13 follow up no longer creates `Orvano.Modules.Platform` (it already exists) but still creates the other CAT-1 tables.
-- [ ] Spec 0007: add an `Updated` line: INS-5's refusal covers the whole bundle (BND-3); INS-3's init gains `--local` and writes the bundle (BND-2); IMG-1 copies `/app/install/` and takes `ORVANO_IMAGE_VERSION` (BND-1, PIN-1); TLS-1's Caddy site comes from `ORVANO_SITE_ADDRESS` under two profiles (LCL-1). INS-3's rootless forms change as in ISH-4 (rootless Docker `--user 0:0`, rootless Podman `--userns=keep-id` plus `--user`). Close the "prove INS-3 and INS-5 on a Linux host" follow up with SMK-4's results, and the feature 12 guide follow up with GDE-1.
+- [x] Spec 0007: add an `Updated` line: INS-5's refusal covers the whole bundle (BND-3); INS-3's init gains `--local` and writes the bundle (BND-2); IMG-1 copies `/app/install/` and takes `ORVANO_IMAGE_VERSION` (BND-1, PIN-1); TLS-1's Caddy site comes from `ORVANO_SITE_ADDRESS` under two profiles (LCL-1). INS-3's rootless forms change as in ISH-4 (rootless Docker `--user 0:0`, rootless Podman `--userns=keep-id` plus `--user`). Close the "prove INS-3 and INS-5 on a Linux host" follow up with SMK-4's results, and the feature 12 guide follow up with GDE-1.
 - [ ] Spec 0006: add an `Updated` line: CON-6's token lifecycle is STP-1 to STP-6 here (24 hour expiry, issued at start only when none is valid, replaced by `orvano admin setup-token`), the banner is CON-6's exception to SCR-5 and LOG-2 (STP-4), and CON-2 gains an exception: the setup token check, with no session, needs the `Origin` check only, no `Orvano-Csrf` header (STP-7).
 - [ ] Spec 0014: CPX-3's config call ships in feature 12 with `setupRequired` only; feature 13 adds the rest.
 - [ ] Spec 0012: EPT-5's list of public endpoints gains `GET /v1/console/config` (now from feature 12) and `POST /v1/console/setup/token`.
