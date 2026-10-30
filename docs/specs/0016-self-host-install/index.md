@@ -291,7 +291,7 @@ Tracer Bullet inside the feature: milestone 1 runs one thin thread from the imag
 **Milestone 5: the guide and sign off**
 
 18. [x] `docs/self-hosting.md` (GDE-1, AC-16's list) and the README pointer (GDE-2); spec 0007's INS-3 and INS-5 Linux follow up closed with the CI results; satisfies **AC-16**.
-19. [ ] Move every init mount from `/out:Z` to `/out:z` (SEL-1): `run_as_operator`'s call in `deploy/install.sh`, the two `docker run` and `podman run` comment lines at the top of `deploy/compose.yaml`, the two mounts in `check_server_bundle` in `tooling/scripts/install-checks.sh`, and the four commands in `docs/self-hosting.md`. Rewrite the guide's SELinux section (SEL-3 to SEL-5) and add SMK-5's check. Make the spec 0007 change listed under Follow-up. `compose.yaml`'s services do not change (SEL-2); satisfies **AC-15**, **AC-16**, **AC-17**.
+19. [x] Move every init mount from `/out:Z` to `/out:z` (SEL-1): `run_as_operator`'s call in `deploy/install.sh`, the two `docker run` and `podman run` comment lines at the top of `deploy/compose.yaml`, the two mounts in `check_server_bundle` in `tooling/scripts/install-checks.sh`, and the four commands in `docs/self-hosting.md`. Rewrite the guide's SELinux section (SEL-3 to SEL-5) and add SMK-5's check. Make the spec 0007 change listed under Follow-up. `compose.yaml`'s services do not change (SEL-2); satisfies **AC-15**, **AC-16**, **AC-17**.
 20. [ ] Run [verify.md](verify.md)'s manual steps (macOS with Docker Desktop, a real domain on a Linux server, rootful Podman, WSL2, and hosts that apply SELinux labels) and record the results there. When VFY-8 and VFY-12 pass, remove the guide's sentence saying this path has not been run (SEL-5); satisfies **AC-1**, **AC-2**, **AC-12**, **AC-17**.
 
 ## Consequences
@@ -326,7 +326,7 @@ Tracer Bullet inside the feature: milestone 1 runs one thin thread from the imag
 
 ## Follow-up
 
-- [ ] Spec 0007 (build plan step 19): add an `Updated` line, and change INS-3's three commands from `:Z` to `:z` and its sentence on `:Z` to say that `:z` gives every bundle file a label all the stack's containers can read (SEL-1). Changed with the code, so the rule never says something the install does not do.
+- [x] Spec 0007 (build plan step 19): add an `Updated` line, and change INS-3's three commands from `:Z` to `:z` and its sentence on `:Z` to say that `:z` gives every bundle file a label all the stack's containers can read (SEL-1). Changed with the code, so the rule never says something the install does not do.
 - [ ] A CI leg that really applies labels: a Fedora VM under KVM, so a labelled host is proven on every deploy PR and VFY-8 and VFY-12 stop being a person's job. First check that the runners expose `/dev/kvm`, and expect the guest's network to need care (rationale.md, "Settled after verify"). Reconsider once step 20 has run.
 - [ ] Feature 50: a restore has to keep or reset the label (SEL-4).
 - [ ] Spec 0011: add an `Updated` line: `platform.instance` is built by feature 12 and gains `setup_token_expires_at`; CAT-1's table header changes from (13) to (12); the feature 13 follow up no longer creates `Orvano.Modules.Platform` (it already exists) but still creates the other CAT-1 tables.

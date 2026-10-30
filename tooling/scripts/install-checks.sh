@@ -1,7 +1,8 @@
 #!/bin/sh
-# Spec 0016 SMK-5 and the script refusals of its Critical test scenarios: install.sh --help, every refusal that needs no
-# running install, and a server mode bundle (AC-2). Each refusal must stop before the install folder exists. It starts
-# no stack; CI's install job runs it before install-smoke.sh. You can run it on a machine with no other Orvano install:
+# Spec 0016 SMK-5 and the script refusals of its Critical test scenarios: init's mount label, install.sh --help, every
+# refusal that needs no running install, and a server mode bundle (AC-2). Each refusal must stop before the install
+# folder exists. It starts no stack; CI's install job runs it before install-smoke.sh. Run it from the repo root, on a
+# machine with no other Orvano install:
 #
 #   docker build -f deploy/Dockerfile --build-arg ORVANO_IMAGE_VERSION=ci -t orvano:ci .
 #   sh tooling/scripts/install-checks.sh
@@ -97,15 +98,28 @@ check_low_port() {
   fi
 }
 
+# SEL-1, SMK-5: no CI leg applies SELinux labels, so only this notices init's mount going back to a private label. The
+# bracket stops the pattern matching this script, which is one of the files it checks.
+check_mount_label() {
+  grep -qF ':/out:z' "$INSTALL_SCRIPT" || fail "$INSTALL_SCRIPT has no :/out:z mount"
+  for file in "$INSTALL_SCRIPT" deploy/compose.yaml docs/self-hosting.md "$0"; do
+    [ -r "$file" ] || fail "the mount label check cannot read $file"
+    if grep -n '/out:[Z]' "$file"; then
+      fail "$file mounts the install folder with a private label, and SEL-1 needs the shared one"
+    fi
+  done
+  pass "every init mount uses the shared label"
+}
+
 # AC-2, SMK-5: a server bundle has the server profile, the https URL, Caddy on the domain with ports 80 and 443, and a
 # dynamic address pool that leaves out Caddy's fixed address (ISH-8).
 check_server_bundle() {
   bundle="$WORK/server-bundle"
   mkdir "$bundle"
   if [ "$ENGINE" = podman ]; then
-    podman run --rm --userns=keep-id --user "$(id -u):$(id -g)" -v "$bundle:/out:Z" "$IMAGE:$VERSION" init --out /out --domain orvano.example --image "$IMAGE" </dev/null
+    podman run --rm --userns=keep-id --user "$(id -u):$(id -g)" -v "$bundle:/out:z" "$IMAGE:$VERSION" init --out /out --domain orvano.example --image "$IMAGE" </dev/null
   else
-    docker run --rm --user "$(id -u):$(id -g)" -v "$bundle:/out:Z" "$IMAGE:$VERSION" init --out /out --domain orvano.example --image "$IMAGE" </dev/null
+    docker run --rm --user "$(id -u):$(id -g)" -v "$bundle:/out:z" "$IMAGE:$VERSION" init --out /out --domain orvano.example --image "$IMAGE" </dev/null
   fi
   grep -qx 'COMPOSE_PROFILES=server' "$bundle/.env" || fail "the server bundle's .env has no server profile"
   grep -qx 'ORVANO_DOMAIN=orvano.example' "$bundle/.env" || fail "the server bundle's .env has no ORVANO_DOMAIN"
@@ -133,6 +147,7 @@ main() {
   LISTENER=""
   trap cleanup EXIT
 
+  check_mount_label
   check_flags
   check_no_engine
   check_busy_port
