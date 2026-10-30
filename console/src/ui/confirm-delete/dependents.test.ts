@@ -59,6 +59,12 @@ describe("dependentText", () => {
     );
   });
 
+  it("0001 UX-23: an unknown snake_case kind reads in words (R-40)", () => {
+    expect(dependentText(i18n, { kind: "foo_bar", count: 3, estimated: false })).toBe(
+      "3 of kind foo bar",
+    );
+  });
+
   // Found by /test: `kind in counted` also matched inherited names, so "toString" read "[object Object]".
   it("a kind named like an Object built in is not mistaken for a known kind", () => {
     expect(dependentText(i18n, { kind: "toString", count: 2, estimated: false })).toBe(

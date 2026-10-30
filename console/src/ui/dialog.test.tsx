@@ -7,6 +7,7 @@ import { focusElement } from "@/test/focus";
 import { renderInRouter } from "@/test/render";
 import { Button } from "./button";
 import { Dialog, DialogTrigger } from "./dialog";
+import { Menu, MenuItem, MenuTrigger } from "./menu";
 import { useAppForm } from "./form";
 import { resetUnsavedChangesForTests } from "./form/unsaved-changes";
 import { SideSheet } from "./side-sheet";
@@ -67,6 +68,70 @@ describe("Dialog", () => {
     await screen.getByRole("button", { name: "Cancel" }).click();
 
     await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();
+  });
+});
+
+describe("Dialog description", () => {
+  it.each(["dialog", "alertdialog"] as const)(
+    "0015 AC-15: a %s is described by its description (R-7, SRT-6)",
+    async (role) => {
+      const { screen } = await renderInRouter(
+        <Dialog
+          title="Delete deploys?"
+          role={role}
+          description="This deletes deploys. You can't undo this."
+          isOpen
+          footer={<Button slot="close">Cancel</Button>}
+        />,
+      );
+
+      const dialog = screen.getByRole(role, { name: "Delete deploys?" });
+      await expect
+        .element(dialog)
+        .toHaveAccessibleDescription("This deletes deploys. You can't undo this.");
+      const describedBy = dialog.element().getAttribute("aria-describedby");
+      expect(describedBy).toBeTruthy();
+      expect(document.getElementById(describedBy!)?.textContent).toBe(
+        "This deletes deploys. You can't undo this.",
+      );
+      await expectNoAxeViolations();
+    },
+  );
+});
+
+describe("overlay motion", () => {
+  afterEach(() => {
+    delete document.documentElement.dataset.theme;
+  });
+
+  // THM-5: a theme switch never animates colors, so the overlays name the properties they move (R-25).
+  it("0015 THM-5: the dialog animates only opacity and scale across a theme switch", async () => {
+    const { screen } = await renderInRouter(
+      <Dialog title="Confirm" isOpen>
+        <p>Sure?</p>
+      </Dialog>,
+    );
+    const dialog = screen.getByRole("dialog", { name: "Confirm" });
+    await expect.element(dialog).toBeVisible();
+    const modal = dialog.element().parentElement!;
+    document.documentElement.dataset.theme = "dark";
+    expect(getComputedStyle(modal).transitionProperty).toBe("opacity, scale");
+  });
+
+  it("0015 THM-5: a popover animates only opacity and scale", async () => {
+    const { screen } = await renderInRouter(
+      <MenuTrigger trigger={<Button>Account</Button>}>
+        <Menu aria-label="Account">
+          <MenuItem id="dark">Use the dark theme</MenuItem>
+        </Menu>
+      </MenuTrigger>,
+    );
+    await screen.getByRole("button", { name: "Account" }).click();
+    const menu = screen.getByRole("menu", { name: "Account" });
+    await expect.element(menu).toBeVisible();
+    const popover = menu.element().closest("[data-trigger]")!;
+    document.documentElement.dataset.theme = "dark";
+    expect(getComputedStyle(popover).transitionProperty).toBe("opacity, scale");
   });
 });
 

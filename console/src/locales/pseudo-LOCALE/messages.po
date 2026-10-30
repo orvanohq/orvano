@@ -111,11 +111,11 @@ msgstr ""
 msgid "{count, plural, one {# webhook} other {# webhooks}}"
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:251
+#: src/ui/confirm-delete/index.tsx:269
 msgid "{count, plural, one {Delete # row?} other {Delete # rows?}}"
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:242
+#: src/ui/confirm-delete/index.tsx:260
 msgid "{count, plural, one {Delete # row} other {Delete # rows}}"
 msgstr ""
 
@@ -123,15 +123,15 @@ msgstr ""
 msgid "{count, plural, one {Fix this problem to continue} other {Fix these # problems to continue}}"
 msgstr ""
 
-#: src/ui/confirm-delete/dependents.ts:49
-msgid "{count} of kind {kind}"
+#: src/ui/confirm-delete/dependents.ts:55
+msgid "{count} of kind {name}"
 msgstr ""
 
 #: src/ui/toast/index.tsx:126
 msgid "{source}, {count, plural, one {# time} other {# times}}"
 msgstr ""
 
-#: src/ui/confirm-delete/dependents.ts:50
+#: src/ui/confirm-delete/dependents.ts:56
 msgid "about {counts}"
 msgstr ""
 
@@ -141,7 +141,7 @@ msgstr ""
 msgid "Account"
 msgstr ""
 
-#: src/ui/command-palette/index.tsx:136
+#: src/ui/command-palette/index.tsx:140
 msgid "Actions"
 msgstr ""
 
@@ -162,7 +162,7 @@ msgstr ""
 msgid "All projects"
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:211
+#: src/ui/confirm-delete/index.tsx:210
 msgid "Also deleted:"
 msgstr ""
 
@@ -183,7 +183,7 @@ msgstr ""
 msgid "Breadcrumb"
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:117
+#: src/ui/confirm-delete/index.tsx:121
 msgid "Cancel"
 msgstr ""
 
@@ -201,7 +201,7 @@ msgstr ""
 msgid "Close"
 msgstr ""
 
-#: src/ui/docs-pane/index.tsx:124
+#: src/ui/docs-pane/index.tsx:137
 msgid "Close help"
 msgstr ""
 
@@ -217,7 +217,7 @@ msgstr ""
 msgid "Comfortable"
 msgstr ""
 
-#: src/ui/command-palette/index.tsx:54
+#: src/ui/command-palette/index.tsx:55
 msgid "Command palette"
 msgstr ""
 
@@ -242,12 +242,12 @@ msgstr ""
 msgid "Copy this secret now"
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:203
+#: src/ui/confirm-delete/index.tsx:202
 msgid "Couldn't count what will be deleted. You can still delete it."
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:89
-msgid "Couldn't delete. Check your connection and try again."
+#: src/ui/confirm-delete/index.tsx:160
+msgid "Couldn't delete"
 msgstr ""
 
 #: src/ui/shell/switcher.tsx:64
@@ -262,7 +262,7 @@ msgstr ""
 msgid "Couldn't reach the server"
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:193
+#: src/ui/confirm-delete/index.tsx:192
 msgid "Counting what will be deleted with it…"
 msgstr ""
 
@@ -283,7 +283,7 @@ msgstr ""
 msgid "Databases"
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:254
+#: src/ui/confirm-delete/index.tsx:272
 msgid "Delete {name}?"
 msgstr ""
 
@@ -339,7 +339,7 @@ msgstr ""
 msgid "Delete provider"
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:239
+#: src/ui/confirm-delete/index.tsx:257
 msgid "Delete row"
 msgstr ""
 
@@ -351,7 +351,7 @@ msgstr ""
 msgid "Delete table"
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:248
+#: src/ui/confirm-delete/index.tsx:266
 msgid "Delete this row?"
 msgstr ""
 
@@ -372,7 +372,7 @@ msgstr ""
 msgid "Density"
 msgstr ""
 
-#: src/ui/form/unsaved-changes-guard.tsx:58
+#: src/ui/form/unsaved-changes-guard.tsx:59
 msgid "Discard changes"
 msgstr ""
 
@@ -384,7 +384,7 @@ msgstr ""
 msgid "Dismiss"
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:136
+#: src/ui/confirm-delete/index.tsx:139
 msgid "Don't ask again for this table this session"
 msgstr ""
 
@@ -412,12 +412,12 @@ msgstr ""
 msgid "Go to {name}"
 msgstr ""
 
-#: src/ui/docs-pane/index.tsx:128
-msgid "Guides for each service will appear here. Until then, the Orvano documentation is on GitHub."
+#: src/ui/docs-pane/index.tsx:141
+msgid "Guides for each service will appear here. Until then, the {product} documentation is on {host}."
 msgstr ""
 
-#: src/ui/docs-pane/index.tsx:46
-#: src/ui/docs-pane/index.tsx:122
+#: src/ui/docs-pane/index.tsx:53
+#: src/ui/docs-pane/index.tsx:135
 #: src/ui/shell/help-button.tsx:26
 #: src/ui/shell/palette-actions.ts:48
 msgid "Help"
@@ -439,7 +439,7 @@ msgstr ""
 msgid "It may have been deleted, or the link is out of date."
 msgstr ""
 
-#: src/ui/form/unsaved-changes-guard.tsx:55
+#: src/ui/form/unsaved-changes-guard.tsx:56
 msgid "Keep editing"
 msgstr ""
 
@@ -495,7 +495,7 @@ msgstr ""
 msgid "No matches"
 msgstr ""
 
-#: src/ui/command-palette/index.tsx:137
+#: src/ui/command-palette/index.tsx:141
 msgid "No matching actions"
 msgstr ""
 
@@ -535,12 +535,12 @@ msgstr ""
 msgid "Open navigation"
 msgstr ""
 
-#: src/ui/shell/app-shell.tsx:58
-msgid "Open the command palette"
+#: src/ui/docs-pane/index.tsx:147
+msgid "Open the {product} docs"
 msgstr ""
 
-#: src/ui/docs-pane/index.tsx:134
-msgid "Open the Orvano docs"
+#: src/ui/shell/app-shell.tsx:58
+msgid "Open the command palette"
 msgstr ""
 
 #: src/ui/shell/primary-sidebar.tsx:30
@@ -613,7 +613,7 @@ msgstr ""
 msgid "Realtime"
 msgstr ""
 
-#: src/ui/command-palette/index.tsx:143
+#: src/ui/command-palette/index.tsx:147
 msgid "Recent"
 msgstr ""
 
@@ -649,8 +649,8 @@ msgstr ""
 msgid "Running jobs"
 msgstr ""
 
-#: src/ui/command-palette/index.tsx:118
-#: src/ui/command-palette/index.tsx:130
+#: src/ui/command-palette/index.tsx:122
+#: src/ui/command-palette/index.tsx:134
 msgid "Search actions"
 msgstr ""
 
@@ -766,11 +766,11 @@ msgstr ""
 msgid "Theme"
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:261
+#: src/ui/confirm-delete/index.tsx:279
 msgid "This deletes {name} and everything in it. You can't undo this."
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:262
+#: src/ui/confirm-delete/index.tsx:280
 msgid "This deletes {name}. You can't undo this."
 msgstr ""
 
@@ -800,19 +800,19 @@ msgstr ""
 msgid "Trying again won't help. If you didn't expect this, share the request ID with your administrator."
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:151
+#: src/ui/confirm-delete/index.tsx:154
 msgid "Type {typePrompt} to confirm"
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:152
+#: src/ui/confirm-delete/index.tsx:155
 msgid "Type {typePrompt} to confirm deleting the rows"
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:234
+#: src/ui/confirm-delete/index.tsx:252
 msgid "Type the name to confirm."
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:229
+#: src/ui/confirm-delete/index.tsx:247
 msgid "Type the number of rows to confirm."
 msgstr ""
 
@@ -844,7 +844,7 @@ msgstr ""
 msgid "Wait a moment, then try again."
 msgstr ""
 
-#: src/ui/confirm-delete/index.tsx:258
+#: src/ui/confirm-delete/index.tsx:276
 msgid "You can't undo this."
 msgstr ""
 
@@ -865,6 +865,7 @@ msgid "You need the Admin role to delete tables."
 msgstr ""
 
 #: src/ui/menu.test.tsx:57
+#: src/ui/menu.test.tsx:84
 msgid "You need the Admin role to export rows."
 msgstr ""
 
@@ -876,7 +877,7 @@ msgstr ""
 msgid "You're signed out"
 msgstr ""
 
-#: src/ui/form/unsaved-changes-guard.tsx:63
+#: src/ui/form/unsaved-changes-guard.tsx:48
 msgid "Your changes haven't been saved. If you leave now, they'll be lost."
 msgstr ""
 

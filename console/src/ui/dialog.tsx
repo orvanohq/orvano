@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import {
   Dialog as AriaDialog,
   DialogTrigger as AriaDialogTrigger,
@@ -23,7 +23,12 @@ export interface DialogProps {
   onOpenChange?: (isOpen: boolean) => void;
   /** Turns off Escape and, for a `dialog`, a press outside, while an action that can't be undone runs (UX-23). */
   isDismissDisabled?: boolean;
-  children: ReactNode;
+  /**
+   * The message under the title, linked with `aria-describedby` so a screen reader reads it with the title wherever
+   * focus lands (APG alert dialog, SRT-6). An `alertdialog` needs one: what happens and whether it can be undone.
+   */
+  description?: ReactNode;
+  children?: ReactNode;
   /** The actions: Cancel (`slot="close"`) then the primary, at the inline end (UX-36). */
   footer?: ReactNode;
 }
@@ -45,9 +50,13 @@ export function Dialog({
   isOpen,
   onOpenChange,
   isDismissDisabled = false,
+  description,
   children,
   footer,
 }: DialogProps) {
+  // Linked by hand rather than through React Aria's `Text slot="description"`, which it links only for an
+  // `alertdialog`: this way a plain dialog's description is read too.
+  const descriptionId = useId();
   return (
     <ModalOverlay
       data-modal // SHL-10: shell shortcuts do nothing while a modal is open
@@ -61,15 +70,22 @@ export function Dialog({
     >
       <Modal
         className={cx(
-          "m-auto max-w-full rounded-lg border bg-bg-raised text-fg shadow-lg transition duration-(--duration-base) ease-standard data-entering:scale-98 data-exiting:scale-98",
+          "m-auto max-w-full rounded-lg border bg-bg-raised text-fg shadow-lg transition-[opacity,scale] duration-(--duration-base) ease-standard data-entering:scale-98 data-exiting:scale-98",
           sizes[size],
         )}
       >
-        <AriaDialog role={role} className="flex flex-col outline-none">
+        <AriaDialog
+          role={role}
+          aria-describedby={description === undefined ? undefined : descriptionId}
+          className="flex flex-col outline-none"
+        >
           <Heading slot="title" className="px-5 pt-5 text-lg font-semibold">
             {title}
           </Heading>
-          <div className="flex flex-col gap-3 px-5 pt-3 pb-5">{children}</div>
+          <div className="flex flex-col gap-3 px-5 pt-3 pb-5">
+            {description === undefined ? null : <p id={descriptionId}>{description}</p>}
+            {children}
+          </div>
           {footer ? (
             <div className="flex flex-wrap justify-end gap-2 border-t px-5 py-4">{footer}</div>
           ) : null}

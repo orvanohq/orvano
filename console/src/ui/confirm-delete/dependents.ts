@@ -41,11 +41,17 @@ const counted: Record<ResourceKind | "row", Counted> = {
   row: (count) => msg`${plural(count, { one: "# row", other: "# rows" })}`,
 };
 
+/** A kind the console doesn't know yet, in words: `foo_bar` reads "foo bar" (R-40). */
+function humanize(kind: string): string {
+  return kind.replaceAll(/[_-]+/g, " ").trim();
+}
+
 /** The text for one dependent: "12 tables", or "about 1,200 rows" for an estimate (UX-23). */
 export function dependentText(i18n: I18n, item: Dependent): string {
   const { count, kind } = item;
+  const name = humanize(kind);
   const counts = Object.hasOwn(counted, kind)
     ? i18n._(counted[kind as keyof typeof counted](count))
-    : i18n._(msg`${count} of kind ${kind}`);
+    : i18n._(msg`${count} of kind ${name}`);
   return item.estimated ? i18n._(msg`about ${counts}`) : counts;
 }

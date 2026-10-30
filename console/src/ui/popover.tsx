@@ -23,7 +23,7 @@ export function Popover({ children, placement = "bottom start", ...props }: Popo
       {...props}
       placement={placement}
       offset={4}
-      className="z-(--z-popover) max-w-[calc(100vw-2rem)] origin-top overflow-hidden rounded-md border bg-bg-raised text-fg shadow-sm transition duration-(--duration-base) ease-standard data-entering:scale-98 data-entering:opacity-0 data-exiting:opacity-0"
+      className="z-(--z-popover) max-w-[calc(100vw-2rem)] origin-top overflow-hidden rounded-md border bg-bg-raised text-fg shadow-sm transition-[opacity,scale] duration-(--duration-base) ease-standard data-entering:scale-98 data-entering:opacity-0 data-exiting:opacity-0"
     >
       {children}
     </AriaPopover>

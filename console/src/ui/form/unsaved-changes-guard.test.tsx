@@ -58,6 +58,12 @@ describe("UnsavedChangesGuard", () => {
     await screen.getByRole("link", { name: "Leave" }).click();
     const question = screen.getByRole("alertdialog", { name: "Discard unsaved changes?" });
     await expect.element(question).toBeVisible();
+    // R-7, SRT-6: the question is read with its consequence wherever focus lands.
+    await expect
+      .element(question)
+      .toHaveAccessibleDescription(
+        "Your changes haven't been saved. If you leave now, they'll be lost.",
+      );
     expect(document.querySelectorAll("[role=alertdialog]")).toHaveLength(1);
     await expectNoAxeViolations();
 

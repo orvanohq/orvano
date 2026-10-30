@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { msg, plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Input, Label, TextField } from "react-aria-components";
-import { announce } from "../announcer";
+import { InlineError } from "../banner";
 import { Button } from "../button";
 import { Dialog } from "../dialog";
 import { Icon } from "../icon";
@@ -22,7 +22,10 @@ interface CommonProps {
   onOpenChange: (isOpen: boolean) => void;
   /** Deletes. A rejection keeps the dialog open with an inline error (UX-22); resolving closes it. */
   onConfirm: () => Promise<void>;
-  /** Spec 0014 CPX-2: loads what goes with it, once each time the dialog opens; aborted when it closes. */
+  /**
+   * Spec 0014 CPX-2: loads what goes with it, once each time the dialog opens; aborted when it closes. A new function
+   * on a later render doesn't load again.
+   */
   loadDependents?: LoadDependents;
 }
 
@@ -66,14 +69,15 @@ export function ConfirmDelete(props: ConfirmDeleteProps) {
   const { isOpen, onOpenChange, onConfirm, loadDependents } = props;
   const [typed, setTyped] = useState("");
   const [isDeleting, setDeleting] = useState(false);
-  const [failed, setFailed] = useState(false);
+  // The rejection from `onConfirm`, whose kind picks the wording (UX-22); `undefined` while there is none.
+  const [failure, setFailure] = useState<{ error: unknown }>();
 
   const openChange = (open: boolean) => {
     // UX-23: closing doesn't cancel a delete that has started, so don't pretend it does; its outcome shows here.
     if (!open && isDeleting) return;
     if (!open) {
       setTyped("");
-      setFailed(false);
+      setFailure(undefined);
     }
     onOpenChange(open);
   };
@@ -84,18 +88,17 @@ export function ConfirmDelete(props: ConfirmDeleteProps) {
     confirmation === undefined ||
     (confirmation.kind === "name"
       ? typed === confirmation.value
-      : typed.replace(/\D/g, "") === String(confirmation.value));
+      : toAsciiDigits(typed.trim(), i18n.locale) === String(confirmation.value));
   const typePrompt = confirmation ? String(confirmation.value) : "";
-  const failure = t`Couldn't delete. Check your connection and try again.`;
 
   const remove = async () => {
     setDeleting(true);
-    setFailed(false);
+    setFailure(undefined);
     try {
       await onConfirm();
-    } catch {
-      setFailed(true);
-      announce(failure);
+    } catch (error) {
+      // InlineError is `role="alert"`, so it announces itself.
+      setFailure({ error });
       return;
     } finally {
       setDeleting(false);
@@ -111,6 +114,7 @@ export function ConfirmDelete(props: ConfirmDeleteProps) {
       isOpen={isOpen}
       onOpenChange={openChange}
       isDismissDisabled={isDeleting}
+      description={i18n._(description(props))}
       footer={
         <>
           <Button slot="close" initialFocus={confirmation === undefined} isDisabled={isDeleting}>
@@ -129,7 +133,6 @@ export function ConfirmDelete(props: ConfirmDeleteProps) {
         </>
       }
     >
-      <p>{i18n._(description(props))}</p>
       {loadDependents ? <Dependents load={loadDependents} /> : null}
       {props.kind === "row" ? (
         <CheckboxControl
@@ -154,14 +157,7 @@ export function ConfirmDelete(props: ConfirmDeleteProps) {
           <Input className={textInput} />
         </TextField>
       ) : null}
-      {failed ? (
-        <p className="flex items-start gap-1.5 text-sm text-danger-text">
-          <span className="mt-0.5">
-            <Icon icon={ErrorIcon} />
-          </span>
-          {failure}
-        </p>
-      ) : null}
+      {failure ? <InlineError error={failure.error} title={t`Couldn't delete`} /> : null}
     </Dialog>
   );
 }
@@ -170,10 +166,13 @@ export function ConfirmDelete(props: ConfirmDeleteProps) {
 function Dependents({ load }: { load: LoadDependents }) {
   const { t, i18n } = useLingui();
   const [state, setState] = useState<DependentsState>({ status: "loading" });
+  // R-10: read through an Effect Event, so a caller that builds `loadDependents` in render doesn't load again (and
+  // flash "Counting…") each time its parent renders.
+  const loadOnce = useEffectEvent(load);
 
   useEffect(() => {
     const controller = new AbortController();
-    load(controller.signal).then(
+    loadOnce(controller.signal).then(
       ({ items }) => {
         if (!controller.signal.aborted) setState({ status: "loaded", items });
         return undefined;
@@ -185,7 +184,7 @@ function Dependents({ load }: { load: LoadDependents }) {
     return () => {
       controller.abort();
     };
-  }, [load]);
+  }, []);
 
   if (state.status === "loading") {
     return (
@@ -216,6 +215,25 @@ function Dependents({ load }: { load: LoadDependents }) {
       </ul>
     </div>
   );
+}
+
+/** Numbering systems whose digits count as typed digits, besides the active locale's own (R-22). */
+const numberingSystems = ["latn", "arab", "arabext", "deva", "fullwide", "thai"];
+
+/**
+ * The typed count with every digit of the active locale's numbering system (and the common others) read as ASCII, so
+ * "١٠٠١" matches 1001, and the locale's group separator dropped, so "1,001" does too. Nothing else is dropped:
+ * "1x0x0x1" stays as typed and doesn't match.
+ */
+function toAsciiDigits(text: string, locale: string): string {
+  const local = new Intl.NumberFormat(locale);
+  const group = local.formatToParts(1_000_000).find((part) => part.type === "group")?.value;
+  const digits = new Map<string, string>(group ? [[group, ""]] : []);
+  for (const system of new Set([local.resolvedOptions().numberingSystem, ...numberingSystems])) {
+    const format = new Intl.NumberFormat(`en-u-nu-${system}`, { useGrouping: false });
+    for (let digit = 0; digit <= 9; digit++) digits.set(format.format(digit), String(digit));
+  }
+  return Array.from(text, (char) => digits.get(char) ?? char).join("");
 }
 
 /** What tier 1 and a large bulk delete ask you to type, or nothing for a plain confirm. */
