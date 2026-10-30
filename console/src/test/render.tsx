@@ -10,7 +10,9 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { render } from "vitest-browser-react";
+import { consoleConfigQuery } from "@/features/console-config/api/queries";
 import { createAppRouter } from "@/router";
+import type { ConsoleConfig } from "@/shared/api/console-config";
 import { UnsavedChangesGuard } from "@/ui/form/unsaved-changes-guard";
 import { UiRouterProvider } from "@/ui/router-provider";
 import { activateLocale, i18n } from "@/shared/i18n";
@@ -18,26 +20,31 @@ import { activateLocale, i18n } from "@/shared/i18n";
 /**
  * Spec 0003 QA-3: renders the real route tree at an in app URL (`/`, not `/console/`: memory history does not apply
  * the router's base path), with a fresh query client that never retries. MSW handlers join here once the console
- * calls the API (QA-2).
+ * calls the API (QA-2). `config` is what boot loaded (RTE-10); by default setup is done, so pages render as themselves.
  */
-export async function renderWithProviders(url: string) {
+export async function renderWithProviders(
+  url: string,
+  { config = { setupRequired: false } }: { config?: ConsoleConfig } = {},
+) {
   // The boot step from main.tsx (RTE-10): I18nProvider renders nothing until a locale is active.
   if (!i18n.locale) await activateLocale("en");
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  queryClient.setQueryData(consoleConfigQuery().queryKey, config);
   const router = createAppRouter({
     queryClient,
     history: createMemoryHistory({ initialEntries: [url] }),
   });
   await router.load();
-  return render(
+  const screen = await render(
     <I18nProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
       </QueryClientProvider>
     </I18nProvider>,
   );
+  return Object.assign(screen, { router });
 }
 
 /**

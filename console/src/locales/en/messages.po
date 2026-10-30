@@ -670,6 +670,10 @@ msgstr "Security"
 msgid "Select"
 msgstr "Select"
 
+#: src/features/setup/components/setup-page.tsx:10
+msgid "Set up Orvano"
+msgstr "Set up Orvano"
+
 #: src/ui/shell/nav-registry.ts:44
 msgid "Settings"
 msgstr "Settings"
