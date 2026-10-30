@@ -18,7 +18,7 @@ spec [0016](../specs/0016-self-host-install/index.md)
   - [x] Milestone 2, the setup token: issue at start, `orvano admin setup-token`, the check endpoint with its limit, and the token checks in CI (steps 9 to 12; AC-1, AC-6, AC-7, AC-9, AC-10, AC-15)
   - [x] Milestone 3, the setup page: the token step in `AuthLayout`, its states, end to end, axe, and CSP tests (steps 13 and 14; AC-5, AC-8)
   - [x] Milestone 4, server mode, Podman, both CPUs: `--domain`, Podman and rootless detection, the arm64 and rootless Podman CI legs, the INS-5 checks, and the no telemetry test (steps 15 to 17; AC-2, AC-12, AC-14, AC-15)
-  - [ ] Milestone 5, the guide and sign off: `docs/self-hosting.md`, the README pointer, and the manual verify runs (steps 18 and 19; AC-1, AC-2, AC-12, AC-16)
+  - [ ] Milestone 5, the guide and sign off: `docs/self-hosting.md`, the README pointer, the SELinux mount fix, and the manual verify runs (steps 18 to 20; AC-1, AC-2, AC-12, AC-15 to AC-17)
 - [ ] Verify it: `/check verify self host install`
 - [ ] Test it: `/test self host install`
 - [ ] Review it (fresh model): `/check review self host install`
