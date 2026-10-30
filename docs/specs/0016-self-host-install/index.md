@@ -1,7 +1,7 @@
 # 0016. Self host install
 
 **Date**: 2026-10-29
-**Updated**: 2026-10-29, from milestone 1 (#138): BND-2's init script mode is 0755, not 0644 (rationale.md, "Found while building"). 2026-10-30, from milestone 4: AC-12 and ISH-4's init user is corrected for rootless Docker (`--user 0:0`) and rootless Podman (`--userns=keep-id` plus `--user`), SMK-2's image name check has its result, and SMK-4's install folder sits under `/tmp` (rationale.md, "Found while building").
+**Updated**: 2026-10-29, from milestone 1 (#138): BND-2's init script mode is 0755, not 0644 (rationale.md, "Found while building"). 2026-10-30, from milestone 4: AC-12 and ISH-4's init user is corrected for rootless Docker (`--user 0:0`) and rootless Podman (`--userns=keep-id` plus `--user`), SMK-2's image name check has its result, SMK-4's install folder sits under `/tmp`, and ISH-8's network gains an `ip_range` that keeps dynamic addresses off Caddy's (rationale.md, "Found while building").
 **Status**: In Progress
 
 ## Summary
@@ -75,7 +75,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 - **ISH-5 (MUST)**: First run, in order: pull `<image>:<version>` only when `<engine> image inspect` does not find it; run `init --out /out` with `--local` or `--domain`, plus `--image`, `--http-port`, and `--public-url` when given; `cd` into the folder; `<engine> compose --profile <local|server> up -d --wait --wait-timeout 300` (the profile read from `.env`, LCL-2); then ISH-6. A failure after init leaves the folder in place and prints the command to see logs (`<engine> compose logs orvano migrate`).
 - **ISH-6 (MUST)**: After the stack is healthy, the script runs `<engine> compose exec -T orvano /app/orvano admin setup-token </dev/null`. Exit 0: it prints the link from the command's output under a short "Finish setup" heading, with one line saying the link works once, expires in 24 hours, and can be made again with the same command. Exit 3 (setup complete): it prints "Orvano is running at <ORVANO_PUBLIC_URL>/console", with the URL read from `.env` by `sed` (never sourced). Any other exit fails the script.
 - **ISH-7 (MUST)**: A rerun on a folder that has both `.env` and `root.key` skips the pull and init, runs `compose up -d --wait` (which also starts a stopped install), and then ISH-6. It never edits a file in the folder. A folder with only one of the two stops with a message that names the missing file and does nothing else. An empty folder (a first run that failed before init) counts as new.
-- **ISH-8 (MUST)**: One install per host: `compose.yaml` keeps `name: orvano` and the fixed subnet `172.30.80.0/24`, so a second folder would reuse the first one's volumes with new passwords. ISH-2 refuses a first run when volumes of project `orvano` exist, naming the fix (rerun in the existing folder, or remove the old install with `compose down -v` there). The guide states the limit.
+- **ISH-8 (MUST)**: One install per host: `compose.yaml` keeps `name: orvano` and the fixed subnet `172.30.80.0/24`, so a second folder would reuse the first one's volumes with new passwords. Containers with no fixed address draw from `ip_range: 172.30.80.128/25`, so none can take Caddy's `172.30.80.10`. ISH-2 refuses a first run when volumes of project `orvano` exist, naming the fix (rerun in the existing folder, or remove the old install with `compose down -v` there). The guide states the limit.
 
 #### Init bundle (BND)
 

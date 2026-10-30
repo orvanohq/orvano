@@ -97,7 +97,8 @@ check_low_port() {
   fi
 }
 
-# AC-2, SMK-5: a server bundle has the server profile, the https URL, and Caddy on the domain with ports 80 and 443.
+# AC-2, SMK-5: a server bundle has the server profile, the https URL, Caddy on the domain with ports 80 and 443, and a
+# dynamic address pool that leaves out Caddy's fixed address (ISH-8).
 check_server_bundle() {
   bundle="$WORK/server-bundle"
   mkdir "$bundle"
@@ -113,7 +114,7 @@ check_server_bundle() {
     fail "the server bundle's .env allows insecure cookies"
   fi
   config="$(cd "$bundle" && "$ENGINE" compose config </dev/null)" || fail "compose config failed on the server bundle"
-  for expected in 'ORVANO_SITE_ADDRESS: orvano.example' 'published: "80"' 'published: "443"'; do
+  for expected in 'ORVANO_SITE_ADDRESS: orvano.example' 'published: "80"' 'published: "443"' 'ip_range: 172.30.80.128/25'; do
     printf '%s\n' "$config" | grep -qF "$expected" || fail "the server bundle's compose config has no '$expected'"
   done
   if printf '%s\n' "$config" | grep -q 'caddy-local:'; then
