@@ -64,39 +64,28 @@ Every compose file runs unchanged with `podman compose`. For Testcontainers, poi
 | ------------------------------------------- | --------------------------------------------------------------------------------------- |
 | `orvano serve`                              | Runs the server (the default). `ORVANO_ROLES` picks `api`, `worker`, or both.           |
 | `orvano migrate`                            | Applies database migrations under an advisory lock, then exits. `serve` never migrates. |
-| `orvano init --out <dir> --domain <domain>` | Writes `root.key` and `.env` for a new install. Never overwrites.                       |
+| `orvano init --out <dir> --domain <domain>` | Writes the install bundle, `.env`, and `root.key`. Never overwrites.                    |
 | `orvano healthcheck`                        | Exits 0 when the local server is ready. Used by the container health check.             |
 | `orvano admin selftest`                     | Checks that the Argon2id password hasher's native library loads.                        |
+| `orvano admin setup-token`                  | Makes a new first run setup link, replacing the previous one.                           |
 
 Configuration comes from `ORVANO_` environment variables (`ORVANO_DATABASE__HOST`, with `__` for nesting); any key also takes a `_FILE` form that reads its value from a file. [`deploy/.env.example`](deploy/.env.example) lists them.
 
 ## Self hosting
 
-The reference install is `deploy/compose.yaml`: PostgreSQL, a one shot `migrate`, Orvano, and Caddy. On a laptop, one command installs it on `http://localhost` (Linux or macOS with Docker):
+One command installs Orvano on a server, with a real HTTPS certificate:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/orvanohq/orvano/main/deploy/install.sh | sh -s -- --domain orvano.example.com
+```
+
+Or on a laptop, on `http://localhost`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/orvanohq/orvano/main/deploy/install.sh | sh -s -- --local
 ```
 
-It writes the install to `./orvano` and prints the console's setup link. Run it again in the same place to start a stopped install.
-
-For a server with automatic HTTPS, run `init` from the image in an empty folder. It writes `compose.yaml`, `Caddyfile`, `postgres-init/`, `.env`, and `root.key` from inside the image, so they always match it:
-
-```bash
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano:edge init --out /out --domain orvano.example.com
-```
-
-With rootless Podman, use `--userns=keep-id` in place of `--user`:
-
-```bash
-podman run --rm --userns=keep-id -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano:edge init --out /out --domain orvano.example.com
-```
-
-```bash
-docker compose up -d --wait
-```
-
-`init` runs as you, sets the install folder to 0700, and writes `root.key` at 0644 (so the container's non root user can read it) and `.env` at 0600. The folder is what keeps the key private, so run compose as the same user, and make any copy of `root.key` owner only (`chmod 600`) or encrypted. Back it up apart from your database backups: it encrypts every stored secret. The full install guide comes with feature 12.
+Each one writes the install to `./orvano` and prints the console's setup link. [docs/self-hosting.md](docs/self-hosting.md) is the full guide: reading the script first, the manual path, every `.env` variable, HTTPS, rootless engines and Podman, SELinux, Windows, and backups.
 
 ## Building the image
 
