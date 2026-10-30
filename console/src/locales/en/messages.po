@@ -11,7 +11,7 @@ msgstr ""
 msgid "(opens in a new tab)"
 msgstr "(opens in a new tab)"
 
-#: src/ui/form/field.tsx:232
+#: src/ui/form/field.tsx:239
 msgid "(optional)"
 msgstr "(optional)"
 
@@ -127,9 +127,17 @@ msgstr "{count, plural, one {Fix this problem to continue} other {Fix these # pr
 msgid "{count} of kind {name}"
 msgstr "{count} of kind {name}"
 
+#: src/features/setup/components/setup-page.tsx:55
+msgid "{seconds, plural, one {Too many tries. Try again in # second.} other {Too many tries. Try again in # seconds.}}"
+msgstr "{seconds, plural, one {Too many tries. Try again in # second.} other {Too many tries. Try again in # seconds.}}"
+
 #: src/ui/toast/index.tsx:126
 msgid "{source}, {count, plural, one {# time} other {# times}}"
 msgstr "{source}, {count, plural, one {# time} other {# times}}"
+
+#: src/features/setup/schemas/setup-token.ts:14
+msgid "A setup token is at most 100 characters."
+msgstr "A setup token is at most 100 characters."
 
 #: src/ui/confirm-delete/dependents.ts:56
 msgid "about {counts}"
@@ -229,6 +237,10 @@ msgstr "Commands"
 msgid "Compact"
 msgstr "Compact"
 
+#: src/features/setup/components/setup-page.tsx:152
+msgid "Continue"
+msgstr "Continue"
+
 #: src/ui/copy-field.tsx:42
 msgid "Copied"
 msgstr "Copied"
@@ -261,6 +273,10 @@ msgstr "Couldn't load projects. Check your connection and try again."
 #: src/ui/error-copy.tsx:108
 msgid "Couldn't reach the server"
 msgstr "Couldn't reach the server"
+
+#: src/features/setup/components/setup-page.tsx:65
+msgid "Couldn't reach the server. Check your connection and try again."
+msgstr "Couldn't reach the server. Check your connection and try again."
 
 #: src/ui/confirm-delete/index.tsx:192
 msgid "Counting what will be deleted with it…"
@@ -388,6 +404,10 @@ msgstr "Dismiss"
 msgid "Don't ask again for this table this session"
 msgstr "Don't ask again for this table this session"
 
+#: src/features/setup/schemas/setup-token.ts:13
+msgid "Enter the setup token."
+msgstr "Enter the setup token."
+
 #: src/ui/shell/resource-layout.tsx:102
 msgid "Expand list"
 msgstr "Expand list"
@@ -423,7 +443,7 @@ msgstr "Guides for each service will appear here. Until then, the {product} docu
 msgid "Help"
 msgstr "Help"
 
-#: src/ui/form/text-fields.tsx:89
+#: src/ui/form/text-fields.tsx:95
 msgid "Hide password"
 msgstr "Hide password"
 
@@ -543,6 +563,10 @@ msgstr "Open the {product} docs"
 msgid "Open the command palette"
 msgstr "Open the command palette"
 
+#: src/features/setup/components/setup-page.tsx:62
+msgid "Open the console at its own address, the one in {PUBLIC_URL_SETTING}, not at an IP address or another name. Then use the setup link again."
+msgstr "Open the console at its own address, the one in {PUBLIC_URL_SETTING}, not at an IP address or another name. Then use the setup link again."
+
 #: src/ui/shell/primary-sidebar.tsx:30
 msgid "Organization"
 msgstr "Organization"
@@ -571,6 +595,10 @@ msgstr "Orvano home"
 #: src/ui/shell/nav-registry.ts:34
 msgid "Overview"
 msgstr "Overview"
+
+#: src/features/setup/components/setup-page.tsx:131
+msgid "Paste the setup token from the install output or the server log, or make a new one on the server with <0>{SETUP_TOKEN_COMMAND}</0>."
+msgstr "Paste the setup token from the install output or the server log, or make a new one on the server with <0>{SETUP_TOKEN_COMMAND}</0>."
 
 #: src/ui/shell/breadcrumbs.tsx:179
 msgid "Path"
@@ -670,13 +698,21 @@ msgstr "Security"
 msgid "Select"
 msgstr "Select"
 
-#: src/features/setup/components/setup-page.tsx:10
+#: src/features/setup/components/setup-page.tsx:30
 msgid "Set up Orvano"
 msgstr "Set up Orvano"
 
 #: src/ui/shell/nav-registry.ts:44
 msgid "Settings"
 msgstr "Settings"
+
+#: src/features/setup/components/setup-page.tsx:142
+msgid "Setup token"
+msgstr "Setup token"
+
+#: src/features/setup/components/setup-page.tsx:175
+msgid "Setup token accepted"
+msgstr "Setup token accepted"
 
 #: src/ui/kbd.tsx:56
 msgctxt "keyboard key"
@@ -692,7 +728,7 @@ msgstr "Show keyboard shortcuts"
 msgid "Show list"
 msgstr "Show list"
 
-#: src/ui/form/text-fields.tsx:89
+#: src/ui/form/text-fields.tsx:95
 msgid "Show password"
 msgstr "Show password"
 
@@ -753,6 +789,10 @@ msgstr "System"
 msgid "The console couldn't load what it needs from the server. Check that the server is running, then reload."
 msgstr "The console couldn't load what it needs from the server. Check that the server is running, then reload."
 
+#: src/features/setup/components/setup-page.tsx:178
+msgid "The next step, creating the owner account, comes in a later version of the console. Keep this page open, or make a new setup link when you come back."
+msgstr "The next step, creating the owner account, comes in a later version of the console. Keep this page open, or make a new setup link when you come back."
+
 #: src/ui/error-copy.tsx:82
 msgid "The request wasn't valid"
 msgstr "The request wasn't valid"
@@ -764,6 +804,10 @@ msgstr "The server and console are running. Screens arrive with the next feature
 #: src/ui/error-copy.tsx:115
 msgid "The server had a problem"
 msgstr "The server had a problem"
+
+#: src/features/setup/components/setup-page.tsx:67
+msgid "The server had a problem. Try again in a moment."
+msgstr "The server had a problem. Try again in a moment."
 
 #: src/ui/shell/account-menu.tsx:57
 #: src/ui/shell/palette-actions.ts:46
@@ -782,9 +826,17 @@ msgstr "This deletes {name}. You can't undo this."
 msgid "This page ran into a problem. Reload to try again."
 msgstr "This page ran into a problem. Reload to try again."
 
+#: src/features/setup/components/setup-page.tsx:87
+msgid "This setup link or token is not valid any more. Make a new one with {SETUP_TOKEN_COMMAND}."
+msgstr "This setup link or token is not valid any more. Make a new one with {SETUP_TOKEN_COMMAND}."
+
 #: src/ui/error-copy.tsx:91
 msgid "Too many requests"
 msgstr "Too many requests"
+
+#: src/features/setup/components/setup-page.tsx:53
+msgid "Too many tries. Wait a moment, then try again."
+msgstr "Too many tries. Wait a moment, then try again."
 
 #: src/ui/error-copy.tsx:118
 #: src/ui/error-copy.tsx:127

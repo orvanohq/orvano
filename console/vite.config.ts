@@ -106,7 +106,12 @@ export default defineConfig(({ mode }) => ({
         codeSplitting: {
           groups: [
             { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
-            { name: "tanstack", test: /node_modules[\\/]@tanstack[\\/]/ },
+            // TanStack Form (and the two helpers only it uses) stays out of this group, which loads first: it goes
+            // with the screens that have a form (the setup page now), so the shell's first load stays in AC-3's budget.
+            {
+              name: "tanstack",
+              test: /node_modules[\\/]@tanstack[\\/](?!react-form|form-core|pacer-lite|devtools-event-client)/,
+            },
             { name: "lingui", test: /node_modules[\\/]@lingui[\\/]/ },
           ],
         },

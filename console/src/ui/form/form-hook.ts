@@ -66,8 +66,13 @@ export function useAppForm<Values>({
     canSubmitWhenInvalid: true,
     validators: {
       onChange: schema,
+      // TanStack Form reads `{ form, fields }` as form and field errors only when `fields` is there, so an error that
+      // names no field still gets an empty `fields`.
       onSubmitAsync: onSubmitAsync
-        ? ({ value, signal }) => onSubmitAsync({ value, signal })
+        ? async ({ value, signal }) => {
+            const errors = await onSubmitAsync({ value, signal });
+            return errors && { form: errors.form, fields: errors.fields ?? {} };
+          }
         : undefined,
     },
     onSubmit: ({ value, formApi }) => {

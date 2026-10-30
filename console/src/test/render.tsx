@@ -1,6 +1,6 @@
 import { I18nProvider } from "@lingui/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { StrictMode, type ReactNode } from "react";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -10,21 +10,24 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { render } from "vitest-browser-react";
-import { consoleConfigQuery } from "@/features/console-config/api/queries";
+import { consoleConfigQuery, type ConsoleConfig } from "@/features/console-config/api/queries";
 import { createAppRouter } from "@/router";
-import type { ConsoleConfig } from "@/shared/api/console-config";
 import { UnsavedChangesGuard } from "@/ui/form/unsaved-changes-guard";
 import { UiRouterProvider } from "@/ui/router-provider";
 import { activateLocale, i18n } from "@/shared/i18n";
 
 /**
  * Spec 0003 QA-3: renders the real route tree at an in app URL (`/`, not `/console/`: memory history does not apply
- * the router's base path), with a fresh query client that never retries. MSW handlers join here once the console
- * calls the API (QA-2). `config` is what boot loaded (RTE-10); by default setup is done, so pages render as themselves.
+ * the router's base path), with a fresh query client that never retries. The API answers through MSW (QA-2,
+ * `src/test/msw.ts`). `config` is what boot loaded (RTE-10); by default setup is done, so pages render as themselves.
+ * `strict` renders in StrictMode, as main.tsx does, for code that must survive its doubled effects.
  */
 export async function renderWithProviders(
   url: string,
-  { config = { setupRequired: false } }: { config?: ConsoleConfig } = {},
+  {
+    config = { setupRequired: false },
+    strict = false,
+  }: { config?: ConsoleConfig; strict?: boolean } = {},
 ) {
   // The boot step from main.tsx (RTE-10): I18nProvider renders nothing until a locale is active.
   if (!i18n.locale) await activateLocale("en");
@@ -37,14 +40,15 @@ export async function renderWithProviders(
     history: createMemoryHistory({ initialEntries: [url] }),
   });
   await router.load();
-  const screen = await render(
+  const app = (
     <I18nProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
       </QueryClientProvider>
-    </I18nProvider>,
+    </I18nProvider>
   );
-  return Object.assign(screen, { router });
+  const screen = await render(strict ? <StrictMode>{app}</StrictMode> : app);
+  return Object.assign(screen, { router, queryClient });
 }
 
 /**

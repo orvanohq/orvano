@@ -11,7 +11,7 @@ msgstr ""
 msgid "(opens in a new tab)"
 msgstr ""
 
-#: src/ui/form/field.tsx:232
+#: src/ui/form/field.tsx:239
 msgid "(optional)"
 msgstr ""
 
@@ -127,8 +127,16 @@ msgstr ""
 msgid "{count} of kind {name}"
 msgstr ""
 
+#: src/features/setup/components/setup-page.tsx:55
+msgid "{seconds, plural, one {Too many tries. Try again in # second.} other {Too many tries. Try again in # seconds.}}"
+msgstr ""
+
 #: src/ui/toast/index.tsx:126
 msgid "{source}, {count, plural, one {# time} other {# times}}"
+msgstr ""
+
+#: src/features/setup/schemas/setup-token.ts:14
+msgid "A setup token is at most 100 characters."
 msgstr ""
 
 #: src/ui/confirm-delete/dependents.ts:56
@@ -229,6 +237,10 @@ msgstr ""
 msgid "Compact"
 msgstr ""
 
+#: src/features/setup/components/setup-page.tsx:152
+msgid "Continue"
+msgstr ""
+
 #: src/ui/copy-field.tsx:42
 msgid "Copied"
 msgstr ""
@@ -260,6 +272,10 @@ msgstr ""
 
 #: src/ui/error-copy.tsx:108
 msgid "Couldn't reach the server"
+msgstr ""
+
+#: src/features/setup/components/setup-page.tsx:65
+msgid "Couldn't reach the server. Check your connection and try again."
 msgstr ""
 
 #: src/ui/confirm-delete/index.tsx:192
@@ -388,6 +404,10 @@ msgstr ""
 msgid "Don't ask again for this table this session"
 msgstr ""
 
+#: src/features/setup/schemas/setup-token.ts:13
+msgid "Enter the setup token."
+msgstr ""
+
 #: src/ui/shell/resource-layout.tsx:102
 msgid "Expand list"
 msgstr ""
@@ -423,7 +443,7 @@ msgstr ""
 msgid "Help"
 msgstr ""
 
-#: src/ui/form/text-fields.tsx:89
+#: src/ui/form/text-fields.tsx:95
 msgid "Hide password"
 msgstr ""
 
@@ -543,6 +563,10 @@ msgstr ""
 msgid "Open the command palette"
 msgstr ""
 
+#: src/features/setup/components/setup-page.tsx:62
+msgid "Open the console at its own address, the one in {PUBLIC_URL_SETTING}, not at an IP address or another name. Then use the setup link again."
+msgstr ""
+
 #: src/ui/shell/primary-sidebar.tsx:30
 msgid "Organization"
 msgstr ""
@@ -570,6 +594,10 @@ msgstr ""
 
 #: src/ui/shell/nav-registry.ts:34
 msgid "Overview"
+msgstr ""
+
+#: src/features/setup/components/setup-page.tsx:131
+msgid "Paste the setup token from the install output or the server log, or make a new one on the server with <0>{SETUP_TOKEN_COMMAND}</0>."
 msgstr ""
 
 #: src/ui/shell/breadcrumbs.tsx:179
@@ -670,12 +698,20 @@ msgstr ""
 msgid "Select"
 msgstr ""
 
-#: src/features/setup/components/setup-page.tsx:10
+#: src/features/setup/components/setup-page.tsx:30
 msgid "Set up Orvano"
 msgstr ""
 
 #: src/ui/shell/nav-registry.ts:44
 msgid "Settings"
+msgstr ""
+
+#: src/features/setup/components/setup-page.tsx:142
+msgid "Setup token"
+msgstr ""
+
+#: src/features/setup/components/setup-page.tsx:175
+msgid "Setup token accepted"
 msgstr ""
 
 #: src/ui/kbd.tsx:56
@@ -692,7 +728,7 @@ msgstr ""
 msgid "Show list"
 msgstr ""
 
-#: src/ui/form/text-fields.tsx:89
+#: src/ui/form/text-fields.tsx:95
 msgid "Show password"
 msgstr ""
 
@@ -753,6 +789,10 @@ msgstr ""
 msgid "The console couldn't load what it needs from the server. Check that the server is running, then reload."
 msgstr ""
 
+#: src/features/setup/components/setup-page.tsx:178
+msgid "The next step, creating the owner account, comes in a later version of the console. Keep this page open, or make a new setup link when you come back."
+msgstr ""
+
 #: src/ui/error-copy.tsx:82
 msgid "The request wasn't valid"
 msgstr ""
@@ -763,6 +803,10 @@ msgstr ""
 
 #: src/ui/error-copy.tsx:115
 msgid "The server had a problem"
+msgstr ""
+
+#: src/features/setup/components/setup-page.tsx:67
+msgid "The server had a problem. Try again in a moment."
 msgstr ""
 
 #: src/ui/shell/account-menu.tsx:57
@@ -782,8 +826,16 @@ msgstr ""
 msgid "This page ran into a problem. Reload to try again."
 msgstr ""
 
+#: src/features/setup/components/setup-page.tsx:87
+msgid "This setup link or token is not valid any more. Make a new one with {SETUP_TOKEN_COMMAND}."
+msgstr ""
+
 #: src/ui/error-copy.tsx:91
 msgid "Too many requests"
+msgstr ""
+
+#: src/features/setup/components/setup-page.tsx:53
+msgid "Too many tries. Wait a moment, then try again."
 msgstr ""
 
 #: src/ui/error-copy.tsx:118

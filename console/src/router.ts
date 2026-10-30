@@ -1,5 +1,6 @@
 import { createRouter, type RouterHistory } from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
+import type { ApiError } from "@/shared/api/errors";
 import { config } from "@/shared/config";
 import { routeTree } from "./routeTree.gen";
 
@@ -26,5 +27,14 @@ export function createAppRouter(opts: { queryClient: QueryClient; history?: Rout
 declare module "@tanstack/react-router" {
   interface Register {
     router: ReturnType<typeof createAppRouter>;
+  }
+}
+
+// Spec 0003 QRY-4: every query and mutation fails with the client's ApiError (FLT-1), and a mutation's meta says where
+// its error shows (FLT-3).
+declare module "@tanstack/react-query" {
+  interface Register {
+    defaultError: ApiError;
+    mutationMeta: { surface?: "toast" };
   }
 }

@@ -16,6 +16,8 @@ const paths = routePaths();
 
 test("0015 AC-23: the route list comes from the route tree", () => {
   expect(paths).toContain("/");
+  // Spec 0016 FRS-7: the first run setup page loads under the policy too.
+  expect(paths).toContain("/setup");
 });
 
 for (const path of paths) {

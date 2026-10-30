@@ -154,6 +154,55 @@ describe("submitting (FRM-4, FRM-6)", () => {
       .toHaveAccessibleDescription(/A bucket with this name already exists\./);
   });
 
+  it("0015 AC-16: server errors stay after a submit by Enter, when the summary takes focus from the field", async () => {
+    const { screen } = await renderInRouter(
+      <BucketForm
+        onSubmitAsync={() =>
+          Promise.resolve({
+            form: "The server refused the bucket.",
+            fields: { name: "A bucket with this name already exists." },
+          })
+        }
+      />,
+    );
+    const name = screen.getByRole("textbox", { name: "Bucket name" });
+
+    await focusElement(screen.getByRole("textbox", { name: "Region" }).element());
+    await userEvent.keyboard("eu");
+    await focusElement(name.element());
+    await userEvent.keyboard("logs{Enter}");
+
+    const summary = screen.getByRole("group", { name: "Fix these 2 problems to continue" });
+    await expect.element(summary).toHaveFocus();
+    await expect.element(summary.getByText("The server refused the bucket.")).toBeVisible();
+    await expect.element(name).toHaveAttribute("aria-invalid", "true");
+    await expect
+      .element(name)
+      .toHaveAccessibleDescription(/A bucket with this name already exists\./);
+
+    // A change still clears it, as the field's own errors clear (UX-8).
+    await focusElement(name.element());
+    await userEvent.keyboard("2");
+    await expect.element(name).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("0015 AC-16: a server error that names no field shows in the summary and keeps the values", async () => {
+    const { screen } = await renderInRouter(
+      <BucketForm onSubmitAsync={() => Promise.resolve({ form: "The server is busy." })} />,
+    );
+    const name = screen.getByRole("textbox", { name: "Bucket name" });
+
+    await focusElement(name.element());
+    await userEvent.keyboard("logs");
+    await focusElement(screen.getByRole("textbox", { name: "Region" }).element());
+    await userEvent.keyboard("eu{Enter}");
+
+    const summary = screen.getByRole("group", { name: "Fix this problem to continue" });
+    await expect.element(summary).toHaveFocus();
+    await expect.element(summary.getByText("The server is busy.")).toBeVisible();
+    await expect.element(name).toHaveValue("logs");
+  });
+
   it("0015 AC-16: shows the busy state while saving and ignores a second press", async () => {
     const saved = deferred<undefined>();
     const onSubmitAsync = vi.fn<FormProps["onSubmitAsync"] & {}>(() => saved.promise);

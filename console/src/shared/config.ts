@@ -6,6 +6,8 @@ export const config = {
   dev: import.meta.env.DEV,
   /** `/console`, fixed at build time for every install (spec 0007 CSL-1). */
   basePath: baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl,
+  /** The API is same origin, with its `/v1` paths at the root, outside the base path (spec 0003 QRY-1). */
+  apiBaseUrl: "",
 } as const;
 
 /**
