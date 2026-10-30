@@ -43,7 +43,8 @@ internal static partial class InitCommand
     private static readonly string[] BundleFiles = ["compose.yaml", "Caddyfile", Path.Combine(PostgresInit, RolesScript)];
 
     private const string UserHint =
-        "Run init as yourself: docker run --user \"$(id -u):$(id -g)\" ... (rootless Podman: podman run --userns=keep-id ...).";
+        "Run init as yourself: docker run --user \"$(id -u):$(id -g)\" ... "
+        + "(rootless Docker: --user 0:0, which is you on the host; rootless Podman: add --userns=keep-id to the --user form).";
 
     private const string FolderHint =
         "Use a folder you own on a local disk (chown it to yourself, or make a new one), not FAT, NFS, or a shared folder.";
@@ -295,7 +296,9 @@ internal static partial class InitCommand
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            // Spec 0007 INS-3: the usual cause on Linux is init without --user, so this message names that form too.
             Console.Error.WriteLine($"Cannot set {folder} to mode 0700: {ex.Message}");
+            Console.Error.WriteLine(UserHint);
             Console.Error.WriteLine(FolderHint);
             return false;
         }

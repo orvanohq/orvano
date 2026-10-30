@@ -1,16 +1,16 @@
 #!/bin/sh
 # Spec 0016 SMK-3: installs Orvano with deploy/install.sh --local from a local image, then proves the redirect, the CSP,
 # setupRequired, the printed setup token (204, a changed token 401, a foreign Origin 403), persistence of the data and
-# the token across `compose down` and `up`, a rerun that changes no file and replaces the token, and the one install
-# per host refusal. Fails on the first miss. CI's install job runs it; you can run it on a machine
-# with no other Orvano install:
+# the token across `compose down` and `up`, a rerun that changes no file and replaces the token, the reruns that conflict
+# with the folder's .env, the state after setup is complete, and the one install per host refusal. Fails on the first
+# miss. CI's install job runs it; you can run it on a machine with no other Orvano install:
 #
 #   docker build -f deploy/Dockerfile --build-arg ORVANO_IMAGE_VERSION=ci -t orvano:ci .
 #   sh tooling/scripts/install-smoke.sh "$PWD/.install-smoke"
 #
-# Environment: INSTALL_SCRIPT (default deploy/install.sh), HTTP_PORT (default 8080), IMAGE (default orvano), VERSION
-# (default ci). It leaves the install running so a failure can be inspected; remove it with `docker compose down -v`
-# in the folder.
+# Environment: ENGINE (default docker), INSTALL_SCRIPT (default deploy/install.sh), HTTP_PORT (default 8080), IMAGE
+# (default orvano), VERSION (default ci). It leaves the install running so a failure can be inspected; remove it with
+# `<engine> compose down -v` in the folder.
 set -eu
 
 fail() {
@@ -31,11 +31,27 @@ sha() {
 }
 
 install() {
-  sh "$INSTALL_SCRIPT" --local --http-port "$HTTP_PORT" --image "$IMAGE" --version "$VERSION" --dir "$1" </dev/null
+  sh "$INSTALL_SCRIPT" --local --http-port "$HTTP_PORT" --image "$IMAGE" --version "$VERSION" --engine "$ENGINE" --dir "$1" </dev/null
+}
+
+# The rest of the flags come from the caller; the folder is always the install's. Fails unless install.sh refuses and
+# says the expected text, and the folder's .env stays as it was.
+rerun_refused() {
+  expected="$1"
+  shift
+  if output="$(sh "$INSTALL_SCRIPT" "$@" --image "$IMAGE" --version "$VERSION" --engine "$ENGINE" --dir "$DIR" </dev/null 2>&1)"; then
+    fail "a rerun with '$*' was not refused"
+  fi
+  printf '%s\n' "$output" | grep -q "$expected" || fail "the rerun with '$*' failed for another reason: $output"
+  [ "$(sha "$DIR/.env")" = "$env_sha" ] || fail "the refused rerun with '$*' changed .env"
+}
+
+psql_in_stack() {
+  (cd "$DIR" && "$ENGINE" compose exec -T postgres psql -U postgres -d orvano -tAc "$1" </dev/null)
 }
 
 created_at() {
-  (cd "$DIR" && docker compose exec -T postgres psql -U postgres -d orvano -tAc 'select created_at from platform.instance' </dev/null)
+  psql_in_stack 'select created_at from platform.instance'
 }
 
 config() {
@@ -61,6 +77,7 @@ expect_check() {
 main() {
   [ "$#" -ge 1 ] || fail "usage: install-smoke.sh <install folder>"
   DIR="$1"
+  ENGINE="${ENGINE:-docker}"
   INSTALL_SCRIPT="${INSTALL_SCRIPT:-deploy/install.sh}"
   HTTP_PORT="${HTTP_PORT:-8080}"
   IMAGE="${IMAGE:-orvano}"
@@ -104,7 +121,7 @@ main() {
   env_sha="$(sha "$DIR/.env")"
 
   # AC-9: down and up keep the data.
-  (cd "$DIR" && docker compose down </dev/null && docker compose up -d --wait --wait-timeout 300 </dev/null) || fail "compose down and up failed"
+  (cd "$DIR" && "$ENGINE" compose down </dev/null && "$ENGINE" compose up -d --wait --wait-timeout 300 </dev/null) || fail "compose down and up failed"
   [ "$(created_at)" = "$first_created" ] || fail "created_at changed across compose down and up"
   [ "$(config)" = '{"setupRequired":true}' ] || fail "setupRequired changed across compose down and up"
   expect_check "$token" "$ORIGIN" 204 "the printed token after compose down and up"
@@ -122,6 +139,11 @@ main() {
   expect_check "$new_token" "$ORIGIN" 204 "the rerun's new token"
   pass "a rerun keeps created_at, root.key, and .env, and its new link replaces the old token"
 
+  # AC-11, ISH-2: a rerun whose flags conflict with the folder's .env stops and changes nothing.
+  rerun_refused "is a local mode install" --domain orvano.example
+  rerun_refused "uses port $HTTP_PORT" --local --http-port "$((HTTP_PORT + 1))"
+  pass "reruns whose flags conflict with .env are refused"
+
   # ISH-8: one install per host.
   second="$DIR-second"
   if refusal="$(install "$second" 2>&1 >/dev/null)"; then
@@ -130,6 +152,16 @@ main() {
   printf '%s\n' "$refusal" | grep -q "Another Orvano install" || fail "the second install failed for another reason: $refusal"
   [ ! -e "$second/.env" ] || fail "the refused second install wrote $second/.env"
   pass "a second install folder is refused"
+
+  # AC-10, ISH-6: after setup, a rerun says where Orvano runs. Feature 13 sets this column for real (spec 0016 Value
+  # sourcing). This reaches `admin setup-token`'s exit 3 through the engine's compose exec.
+  psql_in_stack 'update platform.instance set setup_completed_at = now()' >/dev/null
+  done_run="$(install "$DIR")" || fail "the rerun after setup exited non zero"
+  printf '%s\n' "$done_run" | grep -q "Orvano is running at $ORIGIN/console" || fail "the rerun after setup printed: $done_run"
+  if printf '%s\n' "$done_run" | grep -q '#token='; then
+    fail "the rerun after setup printed a setup link"
+  fi
+  pass "a rerun after setup says where Orvano runs"
 
   printf 'Install smoke passed.\n'
 }

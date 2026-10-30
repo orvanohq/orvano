@@ -5,7 +5,8 @@
 # match the image that runs them (spec 0016 BND-1, BND-2). deploy/install.sh does all of it for you. By hand, in an
 # empty folder, as yourself (spec 0007 INS-3):
 #   docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano:edge init --out /out --domain <your domain>
-#   (rootless Podman: podman run --rm --userns=keep-id -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano:edge init --out /out --domain <your domain>)
+#   (rootless Podman: podman run --rm --userns=keep-id --user "$(id -u):$(id -g)" -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano:edge init --out /out --domain <your domain>)
+#   (rootless Docker: --user 0:0 in place of your own ids, because root in the container is you on the host)
 #   (a laptop: --local in place of --domain, for http://localhost)
 #   docker compose up -d --wait
 #
@@ -133,4 +134,7 @@ networks:
   orvano:
     ipam:
       config:
+        # Spec 0016 ISH-8: containers with no fixed address draw from the upper half only, so none can ever take Caddy's
+        # 172.30.80.10. Podman hands out addresses in sequence and keeps counting across `compose up`.
         - subnet: 172.30.80.0/24
+          ip_range: 172.30.80.128/25
