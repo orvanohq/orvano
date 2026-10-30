@@ -19,7 +19,7 @@ public sealed class ContractDocumentTests(ContractHostFixture host) : IClassFixt
 
         // /health/live, /health/ready, and the console SPA routes are outside /v1, so in neither (CTR-2, HLT-5).
         Paths(publicDocument).ShouldBe(["/v1/health"]);
-        Paths(console).ShouldBe(["/v1/console/config"]); // spec 0016 FRS-1
+        Paths(console).ShouldBe(["/v1/console/config", "/v1/console/setup/token"]); // spec 0016 FRS-1, STP-7
     }
 
     [Theory, Trait("Spec", "0014:AC-4"), Trait("Spec", "0014:CTR-4"), Trait("Spec", "0014:VRS-2")]

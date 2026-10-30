@@ -24,6 +24,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/console/setup/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check the first run setup token.
+         * @description Answers 204 when the token is the current, unexpired one, without using it up; 401 `setup_token_invalid` for a wrong, expired, or replaced token; 409 `setup_complete` once setup is done; 403 when the request's Origin is not the console's; 429 after 10 checks in a minute from one address.
+         */
+        post: operations["Platform_CheckSetupToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -77,6 +97,11 @@ export interface components {
             currentVersion?: string;
             /** @description On `unsupported_api_version`: the versions the server serves. */
             supportedVersions?: string[];
+        };
+        /** @description A setup token to check. */
+        SetupTokenCheckRequest: {
+            /** @description The token from the setup link or from `orvano admin setup-token`; surrounding spaces are ignored. */
+            token: string;
         };
     };
     responses: never;
@@ -135,6 +160,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConsoleConfigResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description An error. The code says which one; x-orvano-error-codes describes every code. */
+            default: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Platform_CheckSetupToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupTokenCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description Service Unavailable */

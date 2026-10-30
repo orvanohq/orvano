@@ -1,6 +1,7 @@
 # 0016. Self host install
 
 **Date**: 2026-10-29
+**Updated**: 2026-10-29, from milestone 1 (#138): BND-2's init script mode is 0755, not 0644 (rationale.md, "Found while building").
 **Status**: In Progress
 
 ## Summary
@@ -79,7 +80,7 @@ Reasoning and options: see [rationale.md](rationale.md).
 #### Init bundle (BND)
 
 - **BND-1 (MUST)**: The `Dockerfile` copies `deploy/compose.yaml`, `deploy/Caddyfile`, and `deploy/postgres-init/` into the final image at `/app/install/`. Those files in `deploy/` stay the one source of truth; there is no second copy in the repo.
-- **BND-2 (MUST)**: `orvano init --out <dir>` writes `compose.yaml`, `Caddyfile`, and `postgres-init/10-orvano-roles.sh` from `/app/install/`, then `.env` and `root.key`, keeping INS-5's order; its failure cleanup removes every path this run created, `postgres-init/` included, so a retry is not refused by BND-3. Modes: `compose.yaml`, `Caddyfile`, and the init script 0644; `postgres-init/` 0755; `.env` 0600; `root.key` 0644 inside the 0700 folder (INS-5).
+- **BND-2 (MUST)**: `orvano init --out <dir>` writes `compose.yaml`, `Caddyfile`, and `postgres-init/10-orvano-roles.sh` from `/app/install/`, then `.env` and `root.key`, keeping INS-5's order; its failure cleanup removes every path this run created, `postgres-init/` included, so a retry is not refused by BND-3. Modes: `compose.yaml` and `Caddyfile` 0644; the init script and `postgres-init/` 0755 (0644 breaks Docker Desktop, see rationale.md); `.env` 0600; `root.key` 0644 inside the 0700 folder (INS-5).
 - **BND-3 (MUST)**: INS-5's first step widens: if any of the five bundle paths exists, init refuses and changes nothing (not even the folder's mode), and the message names each existing path.
 - **BND-4 (MUST)**: Init's flags: `--domain <domain>` or `--local` (exactly one), `--image <repository>` (written to `.env` as `ORVANO_IMAGE` only when it is not the default), `--public-url <url>` (`--domain` only, default `https://<domain>`, must be `https`), `--http-port <n>` (`--local` only, default 80; the public URL is `http://localhost`, plus `:<n>` when not 80). `--domain` refuses an IP literal, `localhost`, and a name without a dot, pointing to `--local`, because Caddy cannot get a public certificate for them. Server mode always uses ports 80 and 443 (PRT-1).
 
@@ -251,10 +252,10 @@ Tracer Bullet inside the feature: milestone 1 runs one thin thread from the imag
 
 **Milestone 2: the setup token**
 
-9. Token issue (STP-1, STP-2) in the Platform module, the start hook in `serve` for the `api` role with the banner on `Console.Out` (STP-3, STP-4), and `orvano admin setup-token` with its exit codes (STP-5); integration tests with `FakeTimeProvider`; satisfies **AC-6**.
-10. `install.sh` ISH-6 (print the link from `admin setup-token`, or the running URL after setup); satisfies **AC-1**, **AC-10**.
-11. `POST /v1/console/setup/token` with STP-6's check, the error codes, the `Origin` check, and STP-8's limiter; contract entry; integration tests for each answer; satisfies **AC-7**.
-12. CI: add the token checks of SMK-3 (valid `204`, changed `401`, foreign origin `403`, still valid after `down` and `up`, old token `401` after a rerun); satisfies **AC-7**, **AC-9**, **AC-15**.
+9. [x] Token issue (STP-1, STP-2) in the Platform module, the start hook in `serve` for the `api` role with the banner on `Console.Out` (STP-3, STP-4), and `orvano admin setup-token` with its exit codes (STP-5); integration tests with `FakeTimeProvider`; satisfies **AC-6**.
+10. [x] `install.sh` ISH-6 (print the link from `admin setup-token`, or the running URL after setup); satisfies **AC-1**, **AC-10**.
+11. [x] `POST /v1/console/setup/token` with STP-6's check, the error codes, the `Origin` check, and STP-8's limiter; contract entry; integration tests for each answer; satisfies **AC-7**.
+12. [x] CI: add the token checks of SMK-3 (valid `204`, changed `401`, foreign origin `403`, still valid after `down` and `up`, old token `401` after a rerun); satisfies **AC-7**, **AC-9**, **AC-15**.
 
 **Milestone 3: the setup page**
 

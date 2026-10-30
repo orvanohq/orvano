@@ -88,6 +88,8 @@ internal static class ServeCommand
 
         var roles = ServerRoles.Parse(builder.Configuration[ServerRoles.ConfigurationKey]);
         RootKey.EnsureConfigured(builder.Configuration);
+        ConsoleAddress.PublicUrl(builder.Configuration); // fails on a malformed ORVANO_PUBLIC_URL
+        string? consoleOrigin = ConsoleAddress.Origin(builder.Configuration); // spec 0006 CON-2
         ConfigureTls(builder);
 
         builder.AddOrvanoLogging();
@@ -119,6 +121,12 @@ internal static class ServeCommand
         // Spec 0002 LAY-5: one call per module.
         builder.Services.AddAuthModule(builder.Configuration);
         builder.Services.AddPlatformModule(builder.Configuration);
+        if (roles.Api)
+        {
+            builder.Services.AddSetupTokenAtStart(); // spec 0016 STP-3: after StartupChecks, registered above
+        }
+
+        builder.Services.AddOrvanoRateLimiter(); // spec 0016 STP-8; modules add their policies
 
         WebApplication app = builder.Build();
         app.Logger.ServerStarting(HostTelemetry.Version, roles);
@@ -147,6 +155,10 @@ internal static class ServeCommand
         // Spec 0012 EPT-1: the access layer resolves the caller (resolvers registered with AddCallerResolver) and
         // enforces each endpoint's declaration before binding and validation. Only endpoints answer after it.
         app.UseAccessRequirements();
+
+        // Spec 0016 STP-8 then spec 0006 CON-2: only endpoints that ask for them, before the body is bound.
+        app.UseRateLimiter();
+        app.UseConsoleOriginCheck(consoleOrigin);
 
         // Health checks answer in every role, so container health checks work for workers too (spec 0007 IMG-4).
         // Public (spec 0012 EPT-5): probes carry no credential, and the answer is the same for every caller.
