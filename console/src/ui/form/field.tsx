@@ -118,7 +118,14 @@ export function useFieldWiring<Value>() {
       if (!firstMessage(field.state.meta.errors)) hide(store, name);
     },
     onBlur: () => {
-      field.handleBlur();
+      // TanStack Form drops the server's submit errors, the field's and the form's, at any later validation that finds
+      // none, a blur's included. While one is there, nothing changed since the server judged the values (a change
+      // validates and drops it), so a blur alone keeps it: after a submit by Enter, the ErrorSummary takes focus and
+      // blurs this field (FRM-4).
+      const hasSubmitError =
+        field.state.meta.errorMap.onSubmit !== undefined ||
+        field.form.state.errorMap.onSubmit !== undefined;
+      if (!hasSubmitError) field.handleBlur();
       if (field.state.meta.isDirty) {
         afterPress(() => {
           reveal(store, [name]);

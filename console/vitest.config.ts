@@ -1,12 +1,14 @@
 import { defineConfig, mergeConfig } from "vitest/config";
 import { playwright } from "@vitest/browser-playwright";
+import { msw } from "msw/vite";
 import type { BrowserCommand } from "vitest/node";
 import viteConfig from "./vite.config";
 
 // Spec 0003 QA-1: browser mode only, on the app's own Vite config, so tests run the same router plugin, Lingui
 // macros, and React Compiler as the app: features and shared code in Chromium, src/ui primitives in Chromium,
 // Firefox, and WebKit.
-// The dev proxy (spec 0007 CSL-3) is left out: it would send Vitest's own browser requests to the server.
+// The dev proxy (spec 0007 CSL-3) is left out: it would send Vitest's own browser requests to the server. MSW's Vite
+// plugin serves its worker script to the tests only (spec 0003 QA-2), so the build never has it.
 // vite.config.ts is a function of the mode (spec 0015 STY-9); tests take its default, non probe config.
 const appConfig = viteConfig({ command: "serve", mode: "test" });
 
@@ -16,7 +18,11 @@ const emulateForcedColors: BrowserCommand<[active: boolean]> = async ({ page }, 
 };
 
 export default mergeConfig(
-  { ...appConfig, server: { ...appConfig.server, proxy: undefined } },
+  {
+    ...appConfig,
+    plugins: [...(appConfig.plugins ?? []), msw({ mode: "worker-only" })],
+    server: { ...appConfig.server, proxy: undefined },
+  },
   defineConfig({
     test: {
       // Spec 0008 CI-6: coverage runs with --coverage (CI), and is reported, never gated.
@@ -39,7 +45,8 @@ export default mergeConfig(
             name: "app",
             include: ["src/**/*.test.{ts,tsx}"],
             exclude: ["src/ui/**", "src/gallery/**"],
-            setupFiles: ["src/test/setup.ts"],
+            // Features and shared code call the API, so they run against MSW (QA-2); primitives never do.
+            setupFiles: ["src/test/setup.ts", "src/test/setup-msw.ts"],
             browser: {
               enabled: true,
               headless: true,

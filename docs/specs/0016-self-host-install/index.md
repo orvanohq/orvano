@@ -259,8 +259,8 @@ Tracer Bullet inside the feature: milestone 1 runs one thin thread from the imag
 
 **Milestone 3: the setup page**
 
-13. The setup page: the fragment read and `replaceState`, the token field and states of FRS-4 to FRS-6, the API call through the generated console client, Lingui strings with the `ar` catalogue; component tests; satisfies **AC-8**.
-14. End to end and accessibility: a Playwright test from `/console/` to the accepted state, axe in both themes and right to left, `/setup` added to the CSP test (FRS-7); satisfies **AC-5**, **AC-8**.
+13. [x] The setup page: the fragment read and `replaceState`, the token field and states of FRS-4 to FRS-6, the API call through the generated console client, Lingui strings with the `ar` catalogue; component tests; satisfies **AC-8**.
+14. [x] End to end and accessibility: a Playwright test from `/console/` to the accepted state, axe in both themes and right to left, `/setup` added to the CSP test (FRS-7); satisfies **AC-5**, **AC-8**.
 
 **Milestone 4: server mode, Podman, both CPUs**
 

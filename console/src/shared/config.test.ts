@@ -9,6 +9,10 @@ describe("config", () => {
   });
 
   it("exposes only build facts", () => {
-    expect(Object.keys(config).toSorted()).toEqual(["basePath", "dev"]);
+    expect(Object.keys(config).toSorted()).toEqual(["apiBaseUrl", "basePath", "dev"]);
+  });
+
+  it("0003 QRY-1: calls the API on the console's own origin", () => {
+    expect(config.apiBaseUrl).toBe("");
   });
 });

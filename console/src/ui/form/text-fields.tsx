@@ -23,6 +23,12 @@ import {
 export interface TextFieldProps extends FieldProps {
   type?: "text" | "email" | "url" | "search" | "tel";
   autoComplete?: string;
+  /**
+   * `"false"` for codes and secrets the browser must not check: some spell checkers send what you type to a
+   * service. Pass `autoCorrect="off"` beside it, so a phone doesn't change a typed code.
+   */
+  spellCheck?: "true" | "false";
+  autoCorrect?: "on" | "off";
   placeholder?: string;
   maxLength?: number;
 }
