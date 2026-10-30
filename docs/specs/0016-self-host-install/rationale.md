@@ -132,6 +132,10 @@ Minor fixes: rootless Docker and a `docker` alias to Podman, rerun flag conflict
 ### Found while building
 
 - **The init script is 0755, not 0644 (BND-2, milestone 1, #138).** With 0644, Docker Desktop's file sharing shows the bind mounted `postgres-init/10-orvano-roles.sh` to the postgres entrypoint as executable, so the entrypoint runs it directly instead of sourcing it; that fails with "bad interpreter", the `orvano` and `orvano_provisioner` roles are never made, and `migrate` fails. 0755 makes the entrypoint run it the same way on every host, and the script only reads environment variables, so the executable bit grants nothing new.
+- **Rootless Docker runs init as `--user 0:0`, not the operator's uid (ISH-4, AC-12, milestone 4).** Rootless Docker maps root in the container to the operator on the host, and every other uid to a subordinate id. With `--user "$(id -u):$(id -g)"` the operator's folder shows as owned by root and the write fails with "Permission denied". With `--user 0:0` the files land owned by the operator, which is what INS-3 asks for. Tested with the `docker:28.1.1-dind-rootless` image: a full `install.sh --local` reached setup, and uid 1654 read `root.key`.
+- **Rootless Podman needs `--user` as well as `--userns=keep-id` (ISH-4, AC-12, milestone 4).** `keep-id` maps the operator's uid to itself, but an image with a `USER` line still runs as that user, here 1654, so init could not chmod the folder. Adding `--user "$(id -u):$(id -g)"` fixes it. Tested on Podman 4.9.4 rootless.
+- **`docker save | podman load` keeps Docker's name (SMK-2, milestone 4).** The image lands as `docker.io/library/orvano:ci`, not `localhost/orvano:ci`. Podman's socket answers `200` for `orvano:ci` and `404` for `localhost/orvano:ci`, so `--image orvano` is the right flag.
+- **`podman compose exec` passes the exit code through (ISH-6, milestone 4).** `admin setup-token`'s exit 3 reaches the script, but Podman also prints its own "Error: executing ...: exit status 3" to standard error. The script holds that output back unless the exit is a real failure.
 
 ### Agent skills
 

@@ -32,7 +32,7 @@ const areaPaths = {
   deploy: [
     /^deploy\//,
     /^\.dockerignore$/,
-    /^tooling\/scripts\/install-smoke\.sh$/,
+    /^tooling\/scripts\/install-[a-z]+\.sh$/,
     /^server\//,
     /^console\//,
   ],

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -5,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
 
 using Npgsql;
 
@@ -344,8 +346,35 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
         result.Error.ShouldContain("Could not make a setup link");
     }
 
+    // No outbound calls (TEL-1)
+
+    [Fact, Trait("Spec", "0016:TEL-1"), Trait("Spec", "0016:AC-14")]
+    public async Task Serve_calls_nothing_outside_during_start_and_the_setup_flow_when_no_otlp_endpoint_is_set()
+    {
+        var outbound = new OutboundCalls();
+
+        (HttpClient client, string output) = await StartAsync(outbound: outbound);
+        (await client.GetAsync(new Uri("/v1/console/config", UriKind.Relative), Token)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await CheckAsync(client, TokenIn(output))).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await CheckAsync(client, "orv_setup_wrong")).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+        outbound.Sent.ShouldBeEmpty();
+    }
+
+    [Fact, Trait("Spec", "0016:TEL-1")]
+    public async Task Outbound_calls_records_a_send_from_the_hosts_http_client_factory()
+    {
+        var outbound = new OutboundCalls();
+        await StartAsync(outbound: outbound);
+        using HttpClient http = _factories[^1].Services.GetRequiredService<IHttpClientFactory>().CreateClient();
+
+        await Should.ThrowAsync<InvalidOperationException>(() => http.GetAsync(new Uri("https://orvano.example/update-check"), Token));
+
+        outbound.Sent.ShouldBe([new Uri("https://orvano.example/update-check")]);
+    }
+
     private async Task<(HttpClient Client, string Output)> StartAsync(
-        string? roles = null, string? publicUrl = PublicUrl, string? consoleOrigin = null)
+        string? roles = null, string? publicUrl = PublicUrl, string? consoleOrigin = null, OutboundCalls? outbound = null)
     {
         Dictionary<string, string> settings = OrvanoApiFactory.DefaultSettings(postgres);
         settings["Database:Name"] = _database;
@@ -364,11 +393,21 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
             settings["CONSOLE_ORIGIN"] = consoleOrigin;
         }
 
+        if (outbound is not null)
+        {
+            settings["OTEL_EXPORTER_OTLP_ENDPOINT"] = string.Empty;
+        }
+
         var output = new StringWriter();
         var factory = new OrvanoApiFactory(settings, _console.ContentRoot, services =>
         {
             services.AddSingleton<TimeProvider>(_clock);
             services.AddSingleton(new SetupOutput(output));
+            if (outbound is not null)
+            {
+                services.AddHttpClient();
+                services.AddSingleton<IHttpMessageHandlerBuilderFilter>(outbound);
+            }
         });
         _factories.Add(factory);
         HttpClient client = factory.CreateClient(new() { AllowAutoRedirect = false });
@@ -435,4 +474,27 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
 
     [GeneratedRegex("#token=(?<token>orv_setup_[A-Za-z0-9_-]+)")]
     private static partial Regex TokenPattern();
+
+    /// <summary>Stands in for every factory made client's real handler: a send is recorded and fails (spec 0016 TEL-1).</summary>
+    private sealed class OutboundCalls : IHttpMessageHandlerBuilderFilter
+    {
+        private readonly ConcurrentQueue<Uri?> _sent = new();
+
+        public IReadOnlyCollection<Uri?> Sent => _sent;
+
+        public Action<HttpMessageHandlerBuilder> Configure(Action<HttpMessageHandlerBuilder> next) => builder =>
+        {
+            next(builder);
+            builder.PrimaryHandler = new FailingHandler(_sent);
+        };
+
+        private sealed class FailingHandler(ConcurrentQueue<Uri?> sent) : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                sent.Enqueue(request.RequestUri);
+                throw new InvalidOperationException($"Orvano tried to call {request.RequestUri}; spec 0016 TEL-1 allows no outbound call.");
+            }
+        }
+    }
 }
