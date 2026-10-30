@@ -52,6 +52,8 @@ describe("useDelayedPending", () => {
     const { screen } = await renderInRouter(<Loader />);
 
     await expect.element(screen.getByText("loaded"), { timeout: 3000 }).toBeVisible();
+    // The text lands at the commit, and the effect that records the hide runs after it, later on a slow runner.
+    await expect.poll(() => events.at(-1)?.shown).toBe(false);
     const shown = events.find((event) => event.shown);
     const hidden = events.findLast((event) => !event.shown);
     expect(shown?.at).toBeGreaterThanOrEqual(PENDING_DELAY_MS);
