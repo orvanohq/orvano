@@ -72,7 +72,7 @@ export function GalleryFrame() {
         </Select>
         <Select label="Direction" value={settings.direction} onChange={update("direction")}>
           <option value="ltr">Left to right</option>
-          <option value="rtl">Right to left (ar-XB)</option>
+          <option value="rtl">Right to left (ar)</option>
         </Select>
         <Select label="Width" value={settings.width} onChange={update("width")}>
           <option value="full">Full</option>

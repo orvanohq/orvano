@@ -172,19 +172,13 @@ const tableRoute = createRoute({
   },
 });
 
-const tableColumnsRoute = createRoute({
+const tableTabRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/$orgId/$projectId/databases/$tableId/columns",
-  component: function TableColumnsScene() {
-    const { tableId } = tableColumnsRoute.useParams();
+  path: "/$orgId/$projectId/databases/$tableId/$tab",
+  component: function TableTabScene() {
+    const { tableId, tab } = tableTabRoute.useParams();
     return (
-      <ShellScene
-        scope="project"
-        page="databases"
-        withResourceList
-        tableId={tableId}
-        tab="columns"
-      />
+      <ShellScene scope="project" page="databases" withResourceList tableId={tableId} tab={tab} />
     );
   },
 });
@@ -207,7 +201,7 @@ const routeTree = rootRoute.addChildren([
   projectRoute,
   serviceRoute,
   tableRoute,
-  tableColumnsRoute,
+  tableTabRoute,
 ]);
 
 export function createGalleryRouter(options: { history: RouterHistory; toolbar: boolean }) {

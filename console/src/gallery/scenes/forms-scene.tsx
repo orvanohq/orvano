@@ -125,6 +125,7 @@ export function FormsScene() {
                   description={g("Set Scenario to Slow or Empty for its loading and empty states.")}
                   options={ownerOptions ?? []}
                   isLoading={ownerOptions === undefined}
+                  placeholder={g("Choose an owner")}
                   isOptional
                 />
               )}

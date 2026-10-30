@@ -65,7 +65,7 @@ msgstr "{count, plural, one {# function} other {# functions}}"
 msgid "{count, plural, one {# index} other {# indexes}}"
 msgstr "{count, plural, one {# index} other {# indexes}}"
 
-#: src/ui/shell/resource-list.tsx:60
+#: src/ui/shell/resource-list.tsx:61
 msgid "{count, plural, one {# match} other {# matches}}"
 msgstr "{count, plural, one {# match} other {# matches}}"
 
@@ -452,7 +452,7 @@ msgstr "Keyboard shortcuts"
 msgid "Light"
 msgstr "Light"
 
-#: src/ui/form/choice-fields.tsx:163
+#: src/ui/form/choice-fields.tsx:166
 #: src/ui/progress.tsx:26
 #: src/ui/skeleton.tsx:88
 msgid "Loading"
@@ -491,7 +491,7 @@ msgstr "New organization"
 msgid "New project"
 msgstr "New project"
 
-#: src/ui/form/choice-fields.tsx:163
+#: src/ui/form/choice-fields.tsx:166
 msgid "No matches"
 msgstr "No matches"
 
@@ -519,7 +519,7 @@ msgstr "No running jobs"
 msgid "Not found"
 msgstr "Not found"
 
-#: src/ui/shell/resource-list.tsx:107
+#: src/ui/shell/resource-list.tsx:108
 msgid "Nothing matches “{filter}”"
 msgstr "Nothing matches “{filter}”"
 
@@ -572,7 +572,7 @@ msgstr "Orvano home"
 msgid "Overview"
 msgstr "Overview"
 
-#: src/ui/shell/breadcrumbs.tsx:177
+#: src/ui/shell/breadcrumbs.tsx:179
 msgid "Path"
 msgstr "Path"
 
@@ -635,7 +635,7 @@ msgid "Request ID: <0>{requestId}</0>"
 msgstr "Request ID: <0>{requestId}</0>"
 
 #: src/ui/banner.tsx:127
-#: src/ui/shell/switcher.tsx:288
+#: src/ui/shell/switcher.tsx:293
 #: src/ui/states.tsx:93
 msgid "Retry"
 msgstr "Retry"
@@ -696,7 +696,7 @@ msgstr "Show password"
 msgid "Show shortcuts"
 msgstr "Show shortcuts"
 
-#: src/ui/shell/breadcrumbs.tsx:175
+#: src/ui/shell/breadcrumbs.tsx:177
 msgid "Show the full path"
 msgstr "Show the full path"
 
@@ -856,7 +856,7 @@ msgstr "You don't have access"
 msgid "You need the {role} role for this."
 msgstr "You need the {role} role for this."
 
-#: src/ui/form/fields.test.tsx:265
+#: src/ui/form/fields.test.tsx:280
 msgid "You need the Admin role to change this."
 msgstr "You need the Admin role to change this."
 

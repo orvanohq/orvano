@@ -192,6 +192,36 @@ describe("Table", () => {
     await expectNoAxeViolations();
   });
 
+  it("0015 RTL-3: a text cell is a direction isolate, so a Latin name keeps its order in right to left", async () => {
+    const { screen } = await renderInRouter(
+      <div dir="rtl">
+        <Table aria-label="API keys">
+          <TableHeader>
+            <Column id="name" isRowHeader>
+              Name
+            </Column>
+            <Column id="state">State</Column>
+          </TableHeader>
+          <TableBody>
+            <Row id="old">
+              <Cell>Old server (v2)</Cell>
+              <Cell>
+                <span>Active</span>
+              </Cell>
+            </Row>
+          </TableBody>
+        </Table>
+      </div>,
+    );
+    const name = screen.getByText("Old server (v2)");
+    await expect.element(name).toBeVisible();
+
+    expect(name.element().tagName).toBe("BDI");
+    expect(getComputedStyle(name.element()).direction).toBe("ltr");
+    // Other content sets its own direction, so it isn't wrapped.
+    expect(screen.getByText("Active").element().parentElement?.tagName).not.toBe("BDI");
+  });
+
   it("0001 UX-20: an empty table shows its empty state", async () => {
     const { screen } = await renderInRouter(
       <Table aria-label="Webhooks">

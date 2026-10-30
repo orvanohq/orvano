@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
+import { activateLocale } from "@/shared/i18n";
 import { layout, resourceListLayout, themePreference } from "@/shared/storage/items";
 import { expectNoAxeViolations } from "@/test/axe";
 import { emulateForcedColors } from "@/test/media";
@@ -227,6 +228,34 @@ describe("narrow layout", () => {
     for (const region of ["banner", "main"] as const) {
       const element = screen.getByRole(region).element();
       expect.soft(element.scrollWidth).toBeLessThanOrEqual(element.clientWidth);
+    }
+  });
+
+  it("0015 AC-8, AC-9: at 320 px the top bar holds with the pseudo locale's 35% longer strings", async () => {
+    // The gallery review's combined check: G-1's narrow top bar with G-2's padded pseudo catalog.
+    await activateLocale("pseudo-LOCALE");
+    try {
+      await setViewport({ width: 320, height: 640 });
+      const { screen } = await renderScene(table);
+      const banner = screen.getByRole("banner");
+      await expect.element(banner).toBeVisible();
+
+      const root = document.documentElement;
+      expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+      expect(banner.element().scrollWidth).toBeLessThanOrEqual(banner.element().clientWidth);
+      const buttons = banner.getByRole("button").elements();
+      // The sidebar, path, activity, help, palette, and account buttons, each named in the pseudo catalog.
+      expect(buttons.length).toBeGreaterThanOrEqual(6);
+      for (const button of buttons) {
+        expect.soft(button.getAttribute("aria-label") ?? button.textContent).toMatch(/^\[/);
+        const rect = button.getBoundingClientRect();
+        expect.soft(rect.width).toBeGreaterThanOrEqual(24);
+        expect.soft(rect.height).toBeGreaterThanOrEqual(24);
+        expect.soft(rect.left).toBeGreaterThanOrEqual(0);
+        expect.soft(rect.right).toBeLessThanOrEqual(root.clientWidth);
+      }
+    } finally {
+      await activateLocale("en");
     }
   });
 });
@@ -472,6 +501,42 @@ describe("page header and route tabs", () => {
       .element(tabs.getByRole("link", { name: "Rows" }))
       .not.toHaveAttribute("aria-current");
     expect(router.state.location.state).toMatchObject({ keepFocus: true });
+  });
+
+  it("0015 SHL-14: on overflow the route tabs scroll on one row, with a fade at each cut edge", async () => {
+    await setViewport({ width: 360, height: 640 });
+    const { router, screen } = await renderScene(table);
+    const tabs = screen.getByRole("navigation", { name: "Table" });
+    const links = tabs.getByRole("link").elements();
+
+    expect(links).toHaveLength(6);
+    // One row: never wrapped, and the row scrolls instead.
+    expect(new Set(links.map((link) => Math.round(link.getBoundingClientRect().top))).size).toBe(1);
+    expect(tabs.element().scrollWidth).toBeGreaterThan(tabs.element().clientWidth);
+    await expect.element(tabs).toHaveAttribute("data-cut-end");
+    await expect.element(tabs).not.toHaveAttribute("data-cut-start");
+    expect(getComputedStyle(tabs.element()).maskImage).toContain("linear-gradient");
+
+    // Navigating to a tab past the edge scrolls it into view.
+    router.history.push(`${table}/settings`);
+    const current = tabs.getByRole("link", { name: "Settings" });
+    await expect.element(current).toHaveAttribute("aria-current", "page");
+    await expect.element(tabs).toHaveAttribute("data-cut-start");
+    const row = tabs.element().getBoundingClientRect();
+    const tab = current.element().getBoundingClientRect();
+    // A pixel of slack: scroll positions round to whole pixels.
+    expect(tab.left).toBeGreaterThanOrEqual(row.left - 1);
+    expect(tab.right).toBeLessThanOrEqual(row.right + 1);
+  });
+
+  it("0015 SHL-14: when every tab fits there is no fade", async () => {
+    const { screen } = await renderScene(table);
+    const tabs = screen.getByRole("navigation", { name: "Table" });
+
+    await expect.element(tabs.getByRole("link", { name: "Settings" })).toBeVisible();
+    expect(tabs.element().scrollWidth).toBeLessThanOrEqual(tabs.element().clientWidth);
+    await expect.element(tabs).not.toHaveAttribute("data-cut-start");
+    await expect.element(tabs).not.toHaveAttribute("data-cut-end");
   });
 });
 

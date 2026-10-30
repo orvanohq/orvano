@@ -176,6 +176,10 @@ export function Row({ id, children }: { id: Key; children: ReactNode }) {
   );
 }
 
+/**
+ * One cell. Text is the user's (a name, a key, an endpoint), so it sits in a `bdi` direction isolate: a Latin name in
+ * a right to left table keeps its own order (RTL-3). Other content (a chip, a time) sets its own.
+ */
 export function Cell({ children }: { children: ReactNode }) {
   return (
     <AriaCell
@@ -186,7 +190,11 @@ export function Cell({ children }: { children: ReactNode }) {
         focusRingInset,
       )}
     >
-      {children}
+      {typeof children === "string" || typeof children === "number" ? (
+        <bdi>{children}</bdi>
+      ) : (
+        children
+      )}
     </AriaCell>
   );
 }

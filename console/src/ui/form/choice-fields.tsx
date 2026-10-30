@@ -115,6 +115,8 @@ export interface ComboboxProps extends OptionsProps {
   onInputChange?: (value: string) => void;
   /** The caller is loading options for the typed text. */
   isLoading?: boolean;
+  /** Shown while the box is empty, so an empty combobox reads like an empty `Select` ("Choose an owner"). */
+  placeholder?: string;
 }
 
 /**
@@ -127,6 +129,7 @@ export function Combobox({
   isOptional,
   options,
   isLoading,
+  placeholder,
   ...props
 }: ComboboxProps) {
   const { t } = useLingui();
@@ -149,7 +152,7 @@ export function Combobox({
       <FieldLabel label={label} isOptional={isOptional} />
       <FieldDescription>{description}</FieldDescription>
       <div className="relative flex">
-        <Input className={cx(textInput, "pe-8")} />
+        <Input placeholder={placeholder} className={cx(textInput, "pe-8")} />
         <AriaButton className="absolute inset-y-0 end-0 flex w-8 items-center justify-center text-fg-muted">
           <Icon icon={DisclosureIcon} />
         </AriaButton>
