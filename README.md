@@ -72,20 +72,28 @@ Configuration comes from `ORVANO_` environment variables (`ORVANO_DATABASE__HOST
 
 ## Self hosting
 
-The reference install is `deploy/compose.yaml`: PostgreSQL, a one shot `migrate`, Orvano, and Caddy for automatic HTTPS. Copy `compose.yaml`, `Caddyfile`, and `postgres-init/` into an install folder, then:
+The reference install is `deploy/compose.yaml`: PostgreSQL, a one shot `migrate`, Orvano, and Caddy. On a laptop, one command installs it on `http://localhost` (Linux or macOS with Docker):
 
 ```bash
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano init --out /out --domain orvano.example.com
+curl -fsSL https://raw.githubusercontent.com/orvanohq/orvano/main/deploy/install.sh | sh -s -- --local
+```
+
+It writes the install to `./orvano` and prints the console's setup link. Run it again in the same place to start a stopped install.
+
+For a server with automatic HTTPS, run `init` from the image in an empty folder. It writes `compose.yaml`, `Caddyfile`, `postgres-init/`, `.env`, and `root.key` from inside the image, so they always match it:
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano:edge init --out /out --domain orvano.example.com
 ```
 
 With rootless Podman, use `--userns=keep-id` in place of `--user`:
 
 ```bash
-podman run --rm --userns=keep-id -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano init --out /out --domain orvano.example.com
+podman run --rm --userns=keep-id -v "$PWD:/out:Z" ghcr.io/orvanohq/orvano:edge init --out /out --domain orvano.example.com
 ```
 
 ```bash
-docker compose up -d
+docker compose up -d --wait
 ```
 
 `init` runs as you, sets the install folder to 0700, and writes `root.key` at 0644 (so the container's non root user can read it) and `.env` at 0600. The folder is what keeps the key private, so run compose as the same user, and make any copy of `root.key` owner only (`chmod 600`) or encrypted. Back it up apart from your database backups: it encrypts every stored secret. The full install guide comes with feature 12.

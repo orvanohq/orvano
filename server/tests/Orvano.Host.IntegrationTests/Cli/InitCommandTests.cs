@@ -238,7 +238,7 @@ public sealed class InitCommandTests : IDisposable
     }
 
     [Fact, Trait("Spec", "0016:BND-2")]
-    public async Task Init_writes_the_bundle_files_0644_and_postgres_init_0755()
+    public async Task Init_writes_compose_and_Caddyfile_0644_and_postgres_init_and_its_script_0755()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), "Unix file modes");
         if (OperatingSystem.IsWindows())
@@ -248,12 +248,10 @@ public sealed class InitCommandTests : IDisposable
 
         await InitAsync("--local");
 
-        foreach (string file in BundleFiles)
-        {
-            File.GetUnixFileMode(Path.Combine(_install.FullName, file)).ShouldBe((UnixFileMode)0b110_100_100, file);
-        }
-
+        File.GetUnixFileMode(Path.Combine(_install.FullName, "compose.yaml")).ShouldBe((UnixFileMode)0b110_100_100);
+        File.GetUnixFileMode(Path.Combine(_install.FullName, "Caddyfile")).ShouldBe((UnixFileMode)0b110_100_100);
         File.GetUnixFileMode(Path.Combine(_install.FullName, "postgres-init")).ShouldBe((UnixFileMode)0b111_101_101);
+        File.GetUnixFileMode(Path.Combine(_install.FullName, "postgres-init", "10-orvano-roles.sh")).ShouldBe((UnixFileMode)0b111_101_101);
     }
 
     [Theory, Trait("Spec", "0016:BND-3")]

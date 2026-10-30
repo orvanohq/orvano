@@ -26,12 +26,14 @@ internal static partial class InitCommand
     /// <summary>The image's own version, set by the <c>Dockerfile</c> (spec 0016 PIN-1); <c>dev</c> outside an image.</summary>
     public const string ImageVersionVariable = "ORVANO_IMAGE_VERSION";
 
-    // Spec 0007 INS-5: root.key 0644 and .env 0600, inside a 0700 folder. Spec 0016 BND-2: the copied files 0644, and
-    // postgres-init/ 0755, so the postgres container can read the script through its own mount.
+    // Spec 0007 INS-5: root.key 0644 and .env 0600, inside a 0700 folder. Spec 0016 BND-2: compose.yaml and Caddyfile
+    // 0644, and postgres-init/ 0755, so the postgres container reads the script through its own mount. The script is
+    // 0755, as in the repository: the postgres entrypoint runs a script it sees as executable, and Docker Desktop's file
+    // sharing reports a 0644 file as executable, so the run then fails with "Permission denied".
     private const UnixFileMode OwnerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite;
     private const UnixFileMode Readable = OwnerOnly | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
     private const UnixFileMode FolderMode = OwnerOnly | UnixFileMode.UserExecute;
-    private const UnixFileMode OpenFolderMode = Readable | UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute;
+    private const UnixFileMode Executable = Readable | UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute;
     private const UnixFileMode AllPermissions = (UnixFileMode)0b111_111_111;
 
     private const string PostgresInit = "postgres-init";
@@ -155,13 +157,13 @@ internal static partial class InitCommand
             string folder = Path.Combine(output.FullName, PostgresInit);
             Directory.CreateDirectory(folder);
             created.Add(folder);
-            SetMode(folder, OpenFolderMode);
+            SetMode(folder, Executable);
 
             foreach (string file in BundleFiles)
             {
                 string path = Path.Combine(output.FullName, file);
                 Write(path, File.ReadAllBytes(Path.Combine(bundle, file)), created);
-                SetMode(path, Readable);
+                SetMode(path, file.EndsWith(".sh", StringComparison.Ordinal) ? Executable : Readable);
             }
 
             Write(envPath, Encoding.UTF8.GetBytes(EnvironmentFile(settings)), created);

@@ -29,7 +29,13 @@ const areaPaths = {
   // api/: the server job checks the committed contract for drift, the console job lints it and its API types.
   server: [/^server\//, /^api\//],
   console: [/^console\//, /^tooling\/lint-fixtures\//, /^api\//],
-  deploy: [/^deploy\//, /^\.dockerignore$/, /^server\//, /^console\//],
+  deploy: [
+    /^deploy\//,
+    /^\.dockerignore$/,
+    /^tooling\/scripts\/install-smoke\.sh$/,
+    /^server\//,
+    /^console\//,
+  ],
   windows: [
     /^console\//,
     /^\.vite-hooks\//,
