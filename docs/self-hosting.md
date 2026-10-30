@@ -14,7 +14,7 @@ On a laptop, on `http://localhost`:
 curl -fsSL https://raw.githubusercontent.com/orvanohq/orvano/main/deploy/install.sh | sh -s -- --local
 ```
 
-Either one writes the install to `./orvano`, starts PostgreSQL, a one shot `migrate`, Orvano, and Caddy, waits until Orvano is healthy, and prints a setup link. Open it to [finish setup](#finish-setup).
+Either one writes the install to `./orvano`, under the folder you run it from, starts PostgreSQL, a one shot `migrate`, Orvano, and Caddy, waits until Orvano is healthy, and prints a setup link. Open it to [finish setup](#finish-setup). If `./orvano` already has something in it, such as a clone of this repo, the script stops and asks for another folder with `--dir`.
 
 You need Linux or macOS with one of these (on Windows, see [Windows through WSL2](#windows-through-wsl2)):
 
@@ -101,7 +101,7 @@ docker compose exec orvano /app/orvano admin setup-token
 | ---------------------- | ---------------------------------------------------------------------------------------- |
 | `--local`              | `http://localhost` on this machine only, no certificate needed.                          |
 | `--domain <domain>`    | A server with a real HTTPS certificate, on ports 80 and 443.                             |
-| `--dir <path>`         | The install folder. Default `./orvano`.                                                  |
+| `--dir <path>`         | A new or empty install folder. Default `./orvano`.                                       |
 | `--version <tag>`      | The image tag to install from. Default `edge`.                                           |
 | `--http-port <port>`   | `--local` only: the port on `127.0.0.1`. Default 80.                                     |
 | `--public-url <url>`   | `--domain` only: the `https` URL clients use. Default `https://<domain>`.                |
@@ -110,6 +110,8 @@ docker compose exec orvano /app/orvano admin setup-token
 | `-h`, `--help`         | Shows the help.                                                                          |
 
 Pass exactly one of `--local` and `--domain`.
+
+A first install stops before it changes anything if the folder has anything in it, hidden files too. It needs the folder to itself: it sets the folder to 0700, leaves `root.key` and `.env` there, and on a host with [SELinux labels](#selinux) relabels everything inside. `.DS_Store` and `lost+found` don't count. A folder that has both `.env` and `root.key` is an install already, so running the script there [starts it again](#start-stop-and-run-it-again).
 
 ### Local mode
 
@@ -256,7 +258,7 @@ The `:z` on `init`'s folder mount gives the folder the shared label `container_f
 The label gives reach, not secrecy. Any container that has one of these files mounted can read it, and write it if the mount and file modes allow, so the 0700 folder is the only thing keeping `root.key` and `.env` safe. Compose mounts only `postgres-init`, `Caddyfile`, and `root.key`. So:
 
 - Do not mount the install folder, or a parent of it, into another container.
-- Install into an empty folder, because `:z` relabels everything in `--dir`.
+- Install into an empty folder, because `:z` relabels everything in `--dir`. `install.sh` refuses any other folder on a first install. On the manual path, keeping to this is up to you.
 
 `init` sets the labels once, and `install.sh` never relabels. A folder that loses them stops starting, because `orvano` and Caddy are denied. That can happen when you restore it from a backup without its labels, force a relabel of the whole host, turn labels on after the install, or put a file back with `mv` or `cp -a`, which keep the old label. To fix it, stop the stack, then run this in the install folder as its owner:
 
