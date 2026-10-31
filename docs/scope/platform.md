@@ -33,7 +33,7 @@ spec [0017](../specs/0017-console-accounts-projects/index.md)
 
 - [x] Design it (spec): `/architect console accounts & projects`
 - [ ] Build it: `/develop console accounts & projects`
-  - [ ] Milestone 1, the thread: the snapshot move, password work, the `ConsoleAccounts` migration, the two new access requirements, sessions, the owner form, sign in, the config and session boot, thin projects and keys, `keys.current`, the `_shell` routes, and a Playwright run from setup to a live key (spec 0017 build plan steps 1 to 9; AC-1 to AC-7, AC-9, AC-10, AC-13, AC-15, AC-20 to AC-22, AC-27)
+  - [x] Milestone 1, the thread: the snapshot move, password work, the `ConsoleAccounts` migration, the two new access requirements, sessions, the owner form, sign in, the config and session boot, thin projects and keys, `keys.current`, the `_shell` routes, and a Playwright run from setup to a live key (spec 0017 build plan steps 1 to 9; AC-1 to AC-7, AC-9, AC-10, AC-13, AC-15, AC-20 to AC-22, AC-27)
   - [ ] Milestone 2, every SDK: `orvano admin bootstrap-project`, the runners in six SDK repos and three templates, the `keys.current` scenarios, and the regenerate PRs passing everywhere (steps 10 to 13; AC-15 to AC-17)
   - [ ] Milestone 3, keys, projects, organizations: re-auth, revoke, regenerate, rename, expiry, the full key form, origins and CORS, project delete and teardown, organizations and switchers, `allowedActions`, and the leak tests (steps 14 to 20; AC-7 to AC-14, AC-21, AC-25)
   - [ ] Milestone 4, account and recovery: the account page, `orvano admin reset-operator`, the session expired dialog, sign out across tabs, and the cleanup job (steps 21 to 24; AC-6, AC-8, AC-10, AC-18, AC-19, AC-26)
