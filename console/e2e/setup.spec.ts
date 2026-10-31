@@ -97,6 +97,22 @@ test.describe("first run setup", () => {
     expect(sent).toEqual([TOKEN]);
   });
 
+  test("0016 FRS-5: a new link opened on the accepted page leaves the address and replaces the token", async ({
+    page,
+  }) => {
+    const sent = await mockSetupApi(page);
+    await page.goto(`setup#token=${TOKEN}`);
+    const accepted = page.getByRole("heading", { level: 2, name: "Setup token accepted" });
+    await expect(accepted).toBeVisible();
+
+    // Only the fragment differs, so this is the same document, as when a link lands in an open tab.
+    await page.goto(`setup#token=${TOKEN}2`);
+
+    await expect(page).toHaveURL(/\/console\/setup$/);
+    await expect.poll(() => sent).toEqual([TOKEN, `${TOKEN}2`]);
+    await expect(accepted).toBeFocused();
+  });
+
   test("0016 FRS-6: a rejected link token stays in the field with the error", async ({ page }) => {
     await mockSetupApi(page, 401);
 

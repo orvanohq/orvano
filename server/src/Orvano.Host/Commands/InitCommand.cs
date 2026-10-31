@@ -270,7 +270,8 @@ internal static partial class InitCommand
         if (IPAddress.TryParse(domain.Trim('[', ']'), out _)
             || domain.Equals("localhost", StringComparison.OrdinalIgnoreCase)
             || domain.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)
-            || !domain.Contains('.', StringComparison.Ordinal))
+            || !domain.Contains('.', StringComparison.Ordinal)
+            || domain.EndsWith('.'))
         {
             Console.Error.WriteLine($"'{domain}' cannot get a public HTTPS certificate: use a full domain name such as orvano.example.com.");
             Console.Error.WriteLine(LocalHint);

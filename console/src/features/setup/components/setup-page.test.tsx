@@ -231,10 +231,51 @@ describe("SetupPage", () => {
       .toBeVisible();
   });
 
-  // Bug, for /debug: the hashchange listener goes with the token step, so once a token is accepted nothing takes a new
-  // link's token out of the address (FRS-5, URL-5). Drop `.fails` with the fix.
-  it.fails("0016 FRS-5: a link opened in a tab that already accepted a token leaves the address too", async () => {
-    checkEndpoint();
+  it("0016 FRS-5: a link opened on the accepted page leaves the address and replaces the accepted token", async () => {
+    const answer = deferred<Response>();
+    const sent = checkEndpoint(() =>
+      sent.length === 1 ? new Response(null, { status: 204 }) : answer.promise,
+    );
+    openWithFragment(`token=${TOKEN}`);
+    const screen = await renderWithProviders("/setup", setup);
+    const accepted = screen.getByRole("heading", { level: 2, name: "Setup token accepted" });
+    await expect.element(accepted).toBeVisible();
+
+    openWithFragment(`token=${TOKEN}2`);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+
+    expect(window.location.hash).toBe("");
+    await expect
+      .element(screen.getByRole("button", { name: "Continue" }))
+      .toHaveAttribute("data-pending", "true");
+    await expect.poll(() => sent).toEqual([TOKEN, `${TOKEN}2`]);
+    answer.resolve(new Response(null, { status: 204 }));
+    await expect.element(accepted).toHaveFocus();
+  });
+
+  it("0016 FRS-5: a link that lands just as a token is accepted leaves the address too", async () => {
+    const answer = deferred<Response>();
+    const sent = checkEndpoint(() =>
+      sent.length === 1 ? answer.promise : new Response(null, { status: 204 }),
+    );
+    openWithFragment(`token=${TOKEN}`);
+    const screen = await renderWithProviders("/setup", setup);
+    await expect.poll(() => sent).toEqual([TOKEN]);
+
+    openWithFragment(`token=${TOKEN}2`);
+    answer.resolve(new Response(null, { status: 204 }));
+
+    await expect.poll(() => window.location.hash).toBe("");
+    await expect.poll(() => sent).toEqual([TOKEN, `${TOKEN}2`]);
+    await expect
+      .element(screen.getByRole("heading", { level: 2, name: "Setup token accepted" }))
+      .toBeVisible();
+  });
+
+  it("0016 FRS-5: a rejected link on the accepted page shows the error on its token", async () => {
+    const sent = checkEndpoint(() =>
+      sent.length === 1 ? new Response(null, { status: 204 }) : problem(401, "setup_token_invalid"),
+    );
     openWithFragment(`token=${TOKEN}`);
     const screen = await renderWithProviders("/setup", setup);
     await expect
@@ -244,7 +285,25 @@ describe("SetupPage", () => {
     openWithFragment(`token=${TOKEN}2`);
     window.dispatchEvent(new HashChangeEvent("hashchange"));
 
-    await expect.poll(() => window.location.hash).toBe("");
+    const field = screen.getByRole("textbox", { name: "Setup token" });
+    await expect.element(field).toHaveAttribute("aria-invalid", "true");
+    await expect.element(field).toHaveValue(`${TOKEN}2`);
+    expect(window.location.hash).toBe("");
+  });
+
+  it("0016 FRS-5: on the accepted page, an empty token leaves the address and a fragment without one stays", async () => {
+    const sent = checkEndpoint();
+    openWithFragment(`token=${TOKEN}`);
+    const screen = await renderWithProviders("/setup", setup);
+    const accepted = screen.getByRole("heading", { level: 2, name: "Setup token accepted" });
+    await expect.element(accepted).toBeVisible();
+
+    openWithFragment("from=mail&token=");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+
+    expect(window.location.hash).toBe("#from=mail");
+    await expect.element(accepted).toBeVisible();
+    expect(sent).toEqual([TOKEN]);
   });
 
   it("0016 FRS-6: while checking, the button is busy and the field is read only", async () => {
