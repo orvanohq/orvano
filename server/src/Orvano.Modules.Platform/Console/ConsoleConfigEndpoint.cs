@@ -2,12 +2,12 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 using Npgsql;
 
 using Orvano.Modules.Platform.Data;
+using Orvano.Modules.Platform.Setup;
 using Orvano.SharedKernel;
 using Orvano.SharedKernel.Access;
 using Orvano.SharedKernel.Api;
@@ -29,6 +29,8 @@ internal static class ConsoleConfigEndpoint
     {
         // Public (spec 0012 EPT-5, spec 0016 FRS-1): the console calls it before anyone signs in, and the answer is the
         // same for every caller. It sends Cache-Control: no-store by default (HDR-5), so a finished setup shows at once.
+        // No rate limit: a refused load is the console's boot error page (FRS-2), and SetupCompletion leaves it a database
+        // read only while setup is open. Feature 23's shared engine can cover that window.
         console.MapGet("/config", GetAsync)
             .AllowPublicAccess()
             .WithName("Platform_GetConsoleConfig")
@@ -40,12 +42,12 @@ internal static class ConsoleConfigEndpoint
     }
 
     internal static async Task<Results<Ok<ConsoleConfigResponse>, ErrorProblemResult>> GetAsync(
-        PlatformDbContext db, ILogger<PlatformDbContext> logger, CancellationToken cancellationToken)
+        SetupCompletion setup, PlatformDbContext db, ILogger<PlatformDbContext> logger, CancellationToken cancellationToken)
     {
         try
         {
-            // FRS-1: setup is required while setup_completed_at is null; a missing row counts as not set up.
-            bool complete = await db.Instances.AsNoTracking().AnyAsync(x => x.SetupCompletedAt != null, cancellationToken);
+            // FRS-1: setup is required while setup_completed_at is null.
+            bool complete = await setup.IsCompleteAsync(db, cancellationToken);
             return TypedResults.Ok(new ConsoleConfigResponse(!complete));
         }
         catch (PostgresException ex) when (ex.SqlState is PostgresErrorCodes.UndefinedTable or PostgresErrorCodes.InvalidSchemaName)

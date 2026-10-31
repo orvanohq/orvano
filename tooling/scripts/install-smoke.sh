@@ -150,12 +150,14 @@ main() {
     fail "a second install folder on the same host was not refused"
   fi
   printf '%s\n' "$refusal" | grep -q "Another Orvano install" || fail "the second install failed for another reason: $refusal"
+  printf '%s\n' "$refusal" | grep -q "$ENGINE compose -p orvano down -v" || fail "the refusal names no fix for $ENGINE: $refusal"
   [ ! -e "$second/.env" ] || fail "the refused second install wrote $second/.env"
   pass "a second install folder is refused"
 
   # AC-10, ISH-6: after setup, a rerun says where Orvano runs. Feature 13 sets this column for real (spec 0016 Value
   # sourcing). This reaches `admin setup-token`'s exit 3 through the engine's compose exec.
   psql_in_stack 'update platform.instance set setup_completed_at = now()' >/dev/null
+  [ "$(config)" = '{"setupRequired":false}' ] || fail "setupRequired stayed true after setup: $(config)"
   done_run="$(install "$DIR")" || fail "the rerun after setup exited non zero"
   printf '%s\n' "$done_run" | grep -q "Orvano is running at $ORIGIN/console" || fail "the rerun after setup printed: $done_run"
   if printf '%s\n' "$done_run" | grep -q '#token='; then

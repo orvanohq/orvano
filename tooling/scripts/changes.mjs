@@ -35,6 +35,10 @@ const areaPaths = {
     /^tooling\/scripts\/install-[a-z]+\.sh$/,
     /^server\//,
     /^console\//,
+    // install-checks.sh reads the guide (spec 0016 SMK-5, GDE-2), and the image copies LICENSE and NOTICE.
+    /^docs\/self-hosting\.md$/,
+    /^LICENSE$/,
+    /^NOTICE$/,
   ],
   windows: [
     /^console\//,

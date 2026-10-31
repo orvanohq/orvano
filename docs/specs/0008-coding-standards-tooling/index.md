@@ -194,7 +194,7 @@ Versions below are the ones the build pinned on 2026-10-16, the newest that clea
     | -------------- | ------------------------------------------------------------------------------------------------------------- |
     | `_server.yml`  | `server/**`                                                                                                   |
     | `_console.yml` | `console/**`, `tooling/lint-fixtures/**`                                                                      |
-    | `_deploy.yml`  | `deploy/**`, `.dockerignore`, and also `server/**` or `console/**` (for the image build)                      |
+    | `_deploy.yml`  | `deploy/**`, `.dockerignore`, `LICENSE`, `NOTICE`, `docs/self-hosting.md`, `server/**`, `console/**`          |
     | `_repo.yml`    | always runs                                                                                                   |
     | `_windows.yml` | `console/**`, `.vite-hooks/**`, `tooling/scripts/format-cs.mjs`, `server/.editorconfig`, plus the global list |
 
