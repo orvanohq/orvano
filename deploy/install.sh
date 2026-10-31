@@ -134,7 +134,7 @@ parse_args() {
   fi
   if [ -n "$HTTP_PORT" ]; then
     case "$HTTP_PORT" in
-      '' | *[!0-9]*) usage_error "--http-port must be a number from 1 to 65535." ;;
+      '' | *[!0-9]* | ??????*) usage_error "--http-port must be a number from 1 to 65535." ;;
     esac
     if [ "$HTTP_PORT" -lt 1 ] || [ "$HTTP_PORT" -gt 65535 ]; then
       usage_error "--http-port must be a number from 1 to 65535."

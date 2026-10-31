@@ -380,7 +380,255 @@ public sealed class InitCommandTests : IDisposable
         result.Error.ShouldContain("--local");
     }
 
+    // F-4 of docs/reviews/2026-10-30-verify-self-host-install.md, still open: these get past BND-4, and "localhost." reaches
+    // .env. Explicit until that is fixed, so CI stays green: dotnet test --project tests/Orvano.Host.IntegrationTests -- --explicit only
+    // (add --filter-method to run this one). Remove Explicit with the fix.
+    [Theory(Explicit = true), Trait("Spec", "0016:BND-4")]
+    [InlineData("localhost.")]
+    [InlineData("127.0.0.1.")]
+    [InlineData("orvano.")]
+    public async Task Init_refuses_a_trailing_dot_when_the_name_cannot_get_a_certificate(string domain)
+    {
+        OrvanoCli.Result result = await InitAsync("--domain", domain);
+
+        result.ExitCode.ShouldBe(1);
+        Directory.GetFileSystemEntries(_install.FullName).ShouldBeEmpty();
+    }
+
+    [Theory, Trait("Spec", "0016:BND-4")]
+    [InlineData("1.2.3")]
+    [InlineData("127.1")]
+    [InlineData("0x7f.0.0.1")]
+    [InlineData("orvano.LOCALHOST")]
+    [InlineData("LocalHost")]
+    public async Task Init_refuses_and_writes_nothing_when_the_domain_is_an_address_in_disguise(string domain)
+    {
+        OrvanoCli.Result result = await InitAsync("--domain", domain);
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("cannot get a public HTTPS certificate");
+        Directory.GetFileSystemEntries(_install.FullName).ShouldBeEmpty();
+    }
+
+    [Theory, Trait("Spec", "0016:BND-4"), Trait("Spec", "0016:PRT-1")]
+    [InlineData("80", "http://localhost", null)]
+    [InlineData("080", "http://localhost", null)]
+    [InlineData("1", "http://localhost:1", "1")]
+    [InlineData("65535", "http://localhost:65535", "65535")]
+    public async Task Init_writes_the_port_only_when_it_is_not_80(string port, string publicUrl, string? written)
+    {
+        OrvanoCli.Result result = await InitAsync("--local", "--http-port", port);
+
+        result.ExitCode.ShouldBe(0, result.Error);
+        Dictionary<string, string> env = await ReadEnvAsync();
+        env["ORVANO_PUBLIC_URL"].ShouldBe(publicUrl);
+        env.GetValueOrDefault("ORVANO_HTTP_PORT").ShouldBe(written);
+    }
+
+    [Theory, Trait("Spec", "0016:BND-4")]
+    [InlineData(" 80")]
+    [InlineData("+80")]
+    [InlineData("-1")]
+    [InlineData("8.0")]
+    [InlineData("0x50")]
+    [InlineData("٨٠")]
+    [InlineData("99999999999999999999")]
+    public async Task Init_refuses_and_writes_nothing_when_the_port_is_not_a_plain_number(string port)
+    {
+        OrvanoCli.Result result = await InitAsync("--local", "--http-port", port);
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("--http-port must be a port number");
+        Directory.GetFileSystemEntries(_install.FullName).ShouldBeEmpty();
+    }
+
+    [Fact, Trait("Spec", "0016:BND-4")]
+    public async Task Init_keeps_only_the_scheme_host_and_port_of_the_public_url()
+    {
+        await InitAsync("--domain", "orvano.example.com", "--public-url", "https://api.example.com:8443/base?x=1#top");
+
+        (await ReadEnvAsync())["ORVANO_PUBLIC_URL"].ShouldBe("https://api.example.com:8443");
+    }
+
+    [Fact, Trait("Spec", "0016:BND-4"), Trait("Spec", "0006:SCR-2")]
+    public async Task Init_refuses_and_writes_nothing_when_a_new_line_in_the_public_url_would_add_a_setting()
+    {
+        OrvanoCli.Result result = await InitAsync("--domain", "orvano.example.com", "--public-url", "https://api.example.com\nORVANO_ROOT_KEY=x");
+
+        result.ExitCode.ShouldBe(1);
+        Directory.GetFileSystemEntries(_install.FullName).ShouldBeEmpty();
+    }
+
+    [Theory, Trait("Spec", "0016:PIN-2")]
+    [InlineData("bad tag")]
+    [InlineData("sha-1\nORVANO_ROOT_KEY=x")]
+    [InlineData("-leading-dash")]
+    public async Task Init_refuses_and_writes_nothing_when_the_image_version_is_not_a_tag(string version)
+    {
+        OrvanoCli.Result result = await OrvanoCli.RunAsync(["init", "--out", _install.FullName, "--local"],
+            new Dictionary<string, string> { ["ORVANO_IMAGE_VERSION"] = version }, TestContext.Current.CancellationToken);
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("not a valid image tag");
+        Directory.GetFileSystemEntries(_install.FullName).ShouldBeEmpty();
+    }
+
+    [Fact, Trait("Spec", "0016:BND-4")]
+    public async Task Init_refuses_and_makes_no_folder_when_the_flags_do_not_fit_and_the_folder_is_new()
+    {
+        string fresh = Path.Combine(_install.FullName, "new-install");
+
+        OrvanoCli.Result result = await OrvanoCli.RunAsync(["init", "--out", fresh, "--domain", "localhost"], null, TestContext.Current.CancellationToken);
+
+        result.ExitCode.ShouldBe(1);
+        Directory.Exists(fresh).ShouldBeFalse();
+    }
+
+    [Theory, Trait("Spec", "0016:BND-3")]
+    [InlineData("compose.yaml")]
+    [InlineData("Caddyfile")]
+    [InlineData("postgres-init")]
+    [InlineData(".env")]
+    [InlineData("root.key")]
+    public async Task Init_refuses_and_keeps_the_link_when_a_bundle_path_is_a_dangling_link(string name)
+    {
+        string path = Path.Combine(_install.FullName, name);
+        File.CreateSymbolicLink(path, Path.Combine(_install.FullName, "nowhere"));
+
+        OrvanoCli.Result result = await InitAsync("--local");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain($"{path} already exists");
+        Directory.GetFileSystemEntries(_install.FullName).ShouldBe([path]);
+    }
+
+    [Theory, Trait("Spec", "0016:BND-3")]
+    [InlineData("compose.yaml")]
+    [InlineData(".env")]
+    [InlineData("root.key")]
+    public async Task Init_refuses_when_a_folder_has_a_bundle_files_name(string name)
+    {
+        string path = Path.Combine(_install.FullName, name);
+        Directory.CreateDirectory(path);
+
+        OrvanoCli.Result result = await InitAsync("--local");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain($"{path} already exists");
+        Directory.GetFileSystemEntries(_install.FullName).ShouldBe([path]);
+    }
+
+    [Fact, Trait("Spec", "0016:BND-3")]
+    public async Task Init_names_every_existing_path_when_it_refuses()
+    {
+        await File.WriteAllTextAsync(Path.Combine(_install.FullName, "Caddyfile"), "mine\n", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(KeyPath, "mine\n", TestContext.Current.CancellationToken);
+
+        OrvanoCli.Result result = await InitAsync("--local");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain($"{Path.Combine(_install.FullName, "Caddyfile")} already exists");
+        result.Error.ShouldContain($"{KeyPath} already exists");
+        (await File.ReadAllTextAsync(KeyPath, TestContext.Current.CancellationToken)).ShouldBe("mine\n");
+    }
+
+    [Fact, Trait("Spec", "0016:BND-2")]
+    public async Task Init_exits_1_with_the_hint_when_the_out_path_is_a_file()
+    {
+        string file = Path.Combine(_install.FullName, "a-file");
+        await File.WriteAllTextAsync(file, "mine\n", TestContext.Current.CancellationToken);
+
+        OrvanoCli.Result result = await OrvanoCli.RunAsync(["init", "--out", file, "--local"], null, TestContext.Current.CancellationToken);
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("Cannot write to");
+        result.Error.ShouldNotContain("Unhandled exception");
+        (await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken)).ShouldBe("mine\n");
+    }
+
+    [Fact, Trait("Spec", "0007:INS-3")]
+    public async Task Init_exits_1_with_the_hint_when_it_cannot_create_the_folder()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows() || Environment.UserName == "root", "Unix file modes, as a user they bind");
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        File.SetUnixFileMode(_install.FullName, (UnixFileMode)0b101_101_101);
+        try
+        {
+            OrvanoCli.Result result = await OrvanoCli.RunAsync(["init", "--out", Path.Combine(_install.FullName, "new-install"), "--local"], null,
+                TestContext.Current.CancellationToken);
+
+            result.ExitCode.ShouldBe(1);
+            result.Error.ShouldContain("Cannot write to");
+            result.Error.ShouldContain("--user");
+            result.Error.ShouldNotContain("Unhandled exception");
+        }
+        finally
+        {
+            File.SetUnixFileMode(_install.FullName, (UnixFileMode)0b111_000_000);
+        }
+    }
+
+    [Fact, Trait("Spec", "0016:BND-2")]
+    public async Task Init_removes_what_it_wrote_and_a_retry_works_when_a_write_fails()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Unix file size limit");
+        string keep = Path.Combine(_install.FullName, "notes.txt");
+        await File.WriteAllTextAsync(keep, "mine\n", TestContext.Current.CancellationToken);
+
+        // A file size limit far below compose.yaml's size, the first and largest file, fails the write part way through.
+        // SIGXFSZ stays ignored across exec, so the write fails instead of killing the process.
+        OrvanoCli.Result failed = await InShellAsync("trap '' XFSZ; ulimit -f 1; exec \"$@\"", "--local");
+
+        failed.ExitCode.ShouldBe(1, failed.Error);
+        failed.Error.ShouldContain("Cannot write to");
+        failed.Error.ShouldNotContain("Unhandled exception");
+        Directory.GetFileSystemEntries(_install.FullName).ShouldBe([keep]);
+
+        OrvanoCli.Result retry = await InitAsync("--local");
+
+        retry.ExitCode.ShouldBe(0, retry.Error);
+        (await File.ReadAllTextAsync(keep, TestContext.Current.CancellationToken)).ShouldBe("mine\n");
+    }
+
+    [Fact, Trait("Spec", "0006:SCR-2"), Trait("Spec", "0016:PIN-2")]
+    public async Task Init_makes_passwords_compose_can_read_and_prints_none_of_them()
+    {
+        OrvanoCli.Result result = await InitAsync("--local");
+
+        Dictionary<string, string> env = await ReadEnvAsync();
+        foreach (string name in new[] { "POSTGRES_PASSWORD", "ORVANO_DB_PASSWORD", "ORVANO_PROVISIONER_PASSWORD" })
+        {
+            env[name].ShouldMatch("^[A-Za-z0-9_-]{43}$"); // nothing compose would interpolate or a shell would split
+            (result.Output + result.Error).ShouldNotContain(env[name]);
+        }
+    }
+
     private static readonly string[] BundleFiles = ["compose.yaml", "Caddyfile", Path.Combine("postgres-init", "10-orvano-roles.sh")];
+
+    /// <summary>Runs init under <paramref name="script"/>, which ends by running its arguments.</summary>
+    private async Task<OrvanoCli.Result> InShellAsync(string script, params string[] args)
+    {
+        ProcessStartInfo init = OrvanoCli.StartInfo(["init", "--out", _install.FullName, .. args]);
+        var shell = new ProcessStartInfo("/bin/sh") { RedirectStandardOutput = true, RedirectStandardError = true };
+        shell.ArgumentList.Add("-c");
+        shell.ArgumentList.Add(script);
+        shell.ArgumentList.Add("sh");
+        shell.ArgumentList.Add(init.FileName);
+        foreach (string arg in init.ArgumentList)
+        {
+            shell.ArgumentList.Add(arg);
+        }
+
+        using Process process = Process.Start(shell)!;
+        Task<string> output = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
+        Task<string> error = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
+        await process.WaitForExitAsync(TestContext.Current.CancellationToken);
+        return new OrvanoCli.Result(process.ExitCode, await output, await error);
+    }
 
     private Task<OrvanoCli.Result> InitAsync(params string[] args) =>
         OrvanoCli.RunAsync(["init", "--out", _install.FullName, .. args], null, TestContext.Current.CancellationToken);

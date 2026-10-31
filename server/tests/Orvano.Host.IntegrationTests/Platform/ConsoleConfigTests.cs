@@ -66,6 +66,29 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
     }
 
     [Fact, Trait("Spec", "0016:FRS-1")]
+    public async Task Config_answers_setup_required_when_the_instance_row_is_missing()
+    {
+        await ExecuteAsync("DELETE FROM platform.instance");
+
+        using HttpResponseMessage response = await Client().GetAsync(new Uri("/v1/console/config", UriKind.Relative), Token);
+
+        (await response.Content.ReadAsStringAsync(Token)).ShouldBe("""{"setupRequired":true}""");
+    }
+
+    // STP-8's limit is on the check alone: a boot loads the config, so a reload must never be refused.
+    [Fact, Trait("Spec", "0016:STP-8"), Trait("Spec", "0016:FRS-2")]
+    public async Task Config_answers_200_past_the_token_checks_limit()
+    {
+        HttpClient client = Client();
+
+        for (int i = 0; i < 12; i++)
+        {
+            using HttpResponseMessage response = await client.GetAsync(new Uri("/v1/console/config", UriKind.Relative), Token);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        }
+    }
+
+    [Fact, Trait("Spec", "0016:FRS-1")]
     public async Task Config_answers_503_unavailable_when_the_platform_schema_is_missing()
     {
         HttpClient client = Client();

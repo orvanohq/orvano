@@ -1,15 +1,21 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
+using Microsoft.Extensions.Logging;
 
 using Npgsql;
 
+using Orvano.Host.IntegrationTests.Cli;
 using Orvano.Modules.Platform;
 using Orvano.Modules.Platform.Setup;
 using Orvano.SharedKernel.Api;
@@ -28,6 +34,7 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
     private readonly ConsoleBuild _console = new();
     private readonly List<OrvanoApiFactory> _factories = [];
     private readonly ManualClock _clock = new();
+    private readonly RecordedLogs _logs = new();
     private string _database = string.Empty;
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -123,6 +130,97 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
     }
 
     [Fact, Trait("Spec", "0016:STP-3")]
+    public async Task Start_warns_and_prints_nothing_when_the_instance_row_is_missing()
+    {
+        await ExecuteAsync("DELETE FROM platform.instance");
+
+        (_, string output) = await StartAsync();
+
+        output.ShouldBeEmpty();
+        _logs.Lines.ShouldContain(line => line.StartsWith("Warning", StringComparison.Ordinal) && line.Contains("does not exist yet", StringComparison.Ordinal));
+    }
+
+    [Fact, Trait("Spec", "0016:STP-3")]
+    public async Task Start_issues_a_token_when_the_row_has_a_hash_without_an_expiry()
+    {
+        await ExecuteAsync("UPDATE platform.instance SET setup_token_hash = '\\x00'");
+
+        (HttpClient client, string output) = await StartAsync();
+
+        (await CheckAsync(client, TokenIn(output))).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+    }
+
+    [Fact, Trait("Spec", "0016:STP-3"), Trait("Spec", "0016:AC-6")]
+    public async Task Start_leaves_a_leftover_token_alone_and_prints_nothing_when_setup_is_complete()
+    {
+        await StartAsync();
+        byte[]? hash = await HashAsync();
+        await ExecuteAsync("UPDATE platform.instance SET setup_completed_at = now() WHERE id = 1");
+
+        (_, string output) = await StartAsync();
+
+        output.ShouldBeEmpty();
+        (await HashAsync()).ShouldBe(hash);
+    }
+
+    [Fact, Trait("Spec", "0016:STP-2")]
+    public async Task Issue_moves_updated_at_to_the_clock_and_keeps_created_at()
+    {
+        object? createdAt = await ScalarAsync("SELECT created_at FROM platform.instance");
+
+        await StartAsync();
+
+        (await TimeAsync("updated_at")).ShouldBe(_clock.GetUtcNow());
+        (await ScalarAsync("SELECT created_at FROM platform.instance")).ShouldBe(createdAt);
+    }
+
+    [Theory, Trait("Spec", "0016:STP-4")]
+    [InlineData("https://orvano.example/", "https://orvano.example/console/setup#token=")]
+    [InlineData("https://orvano.example/base/", "https://orvano.example/base/console/setup#token=")]
+    [InlineData("HTTP://LOCALHOST:8080", "http://localhost:8080/console/setup#token=")]
+    public async Task Banner_builds_the_link_without_a_double_slash_when_the_public_url_is(string publicUrl, string link)
+    {
+        (_, string output) = await StartAsync(publicUrl: publicUrl);
+
+        output.ShouldContain($"Finish setting up Orvano: {link}orv_setup_");
+    }
+
+    [Fact, Trait("Spec", "0016:STP-4")]
+    public void Banner_states_the_expiry_in_UTC_when_the_time_has_an_offset()
+    {
+        var output = new StringWriter();
+
+        new SetupOutput(output).WriteBanner("link", new DateTimeOffset(2026, 10, 20, 14, 30, 5, TimeSpan.FromHours(2)));
+
+        output.ToString().ShouldContain("This link works until setup is done or 2026-10-20T12:30:05Z.");
+    }
+
+    [Fact, Trait("Spec", "0016:STP-4"), Trait("Spec", "0006:SCR-5")]
+    public async Task Logs_never_hold_the_token_during_start_a_replaced_token_and_each_check()
+    {
+        (HttpClient client, string output) = await StartAsync();
+        string first = TokenIn(output);
+        (await CheckAsync(client, first)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        SetupLink? link = await PlatformSetup.IssueLinkAsync(_factories[^1].Services, Token);
+        (await CheckAsync(client, first)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+        _logs.Lines.ShouldNotBeEmpty();
+        _logs.Lines.ShouldNotContain(line => line.Contains(first, StringComparison.Ordinal));
+        _logs.Lines.ShouldNotContain(line => line.Contains(TokenIn(link!.Url), StringComparison.Ordinal));
+    }
+
+    [Fact, Trait("Spec", "0016:STP-3")]
+    public async Task Concurrent_starts_print_one_banner_and_short_banners_for_the_rest()
+    {
+        (HttpClient Client, string Output)[] starts = await Task.WhenAll(
+            Enumerable.Range(0, 4).Select(_ => Task.Run(() => StartAsync(), Token)));
+
+        string[] outputs = [.. starts.Select(start => start.Output)];
+        outputs.Count(output => output.Contains("#token=", StringComparison.Ordinal)).ShouldBe(1, string.Join('|', outputs));
+        outputs.Count(output => output.StartsWith("Orvano setup is waiting.", StringComparison.Ordinal)).ShouldBe(3, string.Join('|', outputs));
+    }
+
+    [Fact, Trait("Spec", "0016:STP-3")]
     public async Task Concurrent_issues_at_start_make_at_most_one_token()
     {
         (_, string output) = await StartAsync(roles: "worker"); // no hook, so the row has no token
@@ -164,6 +262,98 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
         using HttpResponseMessage response = await CheckAsync(client, $"  {TokenIn(output)}\n");
 
         response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+    }
+
+    [Fact, Trait("Spec", "0016:STP-6"), Trait("Spec", "0016:STP-1")]
+    public async Task Check_answers_204_in_the_last_second_before_the_token_expires()
+    {
+        (HttpClient client, string output) = await StartAsync();
+        _clock.Advance(TimeSpan.FromHours(24) - TimeSpan.FromSeconds(1));
+
+        using HttpResponseMessage response = await CheckAsync(client, TokenIn(output));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+    }
+
+    [Theory, Trait("Spec", "0016:STP-6"), Trait("Spec", "0016:STP-7")]
+    [InlineData("hash without an expiry")]
+    [InlineData("expiry without a hash")]
+    [InlineData("no row")]
+    public async Task Check_answers_401_setup_token_invalid_when_the_row_is_not_whole(string state)
+    {
+        (HttpClient client, string output) = await StartAsync();
+        await ExecuteAsync(state switch
+        {
+            "hash without an expiry" => "UPDATE platform.instance SET setup_token_expires_at = NULL",
+            "expiry without a hash" => "UPDATE platform.instance SET setup_token_hash = NULL",
+            _ => "DELETE FROM platform.instance",
+        });
+
+        using HttpResponseMessage response = await CheckAsync(client, TokenIn(output));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        using JsonDocument problem = await ProblemAsync(response);
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(PlatformErrorCodes.SetupTokenInvalid);
+    }
+
+    [Theory, Trait("Spec", "0016:STP-6"), Trait("Spec", "0016:STP-7")]
+    [InlineData("\u0000")]
+    [InlineData("orv_setup_\u0645\u0631\u062d\u0628\u0627")]
+    [InlineData("\ud83d\ude00")]
+    [InlineData("%00'; DROP TABLE platform.instance; --")]
+    public async Task Check_answers_401_and_changes_nothing_when_the_token_is_not_token_shaped(string token)
+    {
+        (HttpClient client, _) = await StartAsync();
+        byte[]? hash = await HashAsync();
+
+        using HttpResponseMessage response = await CheckAsync(client, token);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await HashAsync()).ShouldBe(hash);
+    }
+
+    [Fact, Trait("Spec", "0016:STP-7")]
+    public async Task Check_takes_a_100_character_token_and_refuses_101_as_too_long()
+    {
+        (HttpClient client, _) = await StartAsync();
+
+        using HttpResponseMessage hundred = await CheckAsync(client, new string('a', 100));
+        using HttpResponseMessage hundredAndOne = await CheckAsync(client, new string('a', 101));
+
+        hundred.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        hundredAndOne.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        using JsonDocument problem = await ProblemAsync(hundredAndOne);
+        problem.RootElement.GetProperty("errors")[0].GetProperty("code").GetString().ShouldBe(FieldCodes.TooLong);
+    }
+
+    [Fact, Trait("Spec", "0016:STP-7"), Trait("Spec", "0014:HDR-5")]
+    public async Task Check_sends_no_store_on_each_refusal()
+    {
+        (HttpClient client, string output) = await StartAsync();
+
+        using HttpResponseMessage wrong = await CheckAsync(client, "orv_setup_wrong");
+        using HttpResponseMessage invalid = await PostAsync(client, "{}", PublicUrl);
+        using HttpResponseMessage foreign = await PostAsync(client, Body(TokenIn(output)), "http://evil.example");
+        await ExecuteAsync("UPDATE platform.instance SET setup_completed_at = now() WHERE id = 1");
+        using HttpResponseMessage complete = await CheckAsync(client, TokenIn(output));
+
+        foreach (HttpResponseMessage response in new[] { wrong, invalid, foreign, complete })
+        {
+            response.Headers.CacheControl?.NoStore.ShouldBeTrue(response.StatusCode.ToString());
+        }
+    }
+
+    [Fact, Trait("Spec", "0016:STP-7")]
+    public async Task Check_answers_503_unavailable_when_the_platform_schema_is_missing()
+    {
+        (HttpClient client, string output) = await StartAsync();
+        await ExecuteAsync("DROP SCHEMA platform CASCADE");
+
+        using HttpResponseMessage response = await CheckAsync(client, TokenIn(output));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        using JsonDocument problem = await ProblemAsync(response);
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(ErrorCodes.Unavailable);
     }
 
     [Theory, Trait("Spec", "0016:STP-6"), Trait("Spec", "0016:STP-7"), Trait("Spec", "0016:AC-7")]
@@ -229,6 +419,41 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
         problem.RootElement.GetProperty("errors")[0].GetProperty("field").GetString().ShouldBe("token");
     }
 
+    [Theory, Trait("Spec", "0016:STP-7"), Trait("Spec", "0014:PRB-3")]
+    [InlineData("")]
+    [InlineData("{")]
+    [InlineData("[]")]
+    [InlineData("\"orv_setup_x\"")]
+    [InlineData("""{"token":123}""")]
+    [InlineData("""{"token":{}}""")]
+    [InlineData("""{"token":"\ud800"}""")]
+    public async Task Check_answers_400_invalid_request_when_the_body_cannot_be_read(string body)
+    {
+        (HttpClient client, _) = await StartAsync();
+
+        using HttpResponseMessage response = await PostAsync(client, body, PublicUrl);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        using JsonDocument problem = await ProblemAsync(response);
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(ErrorCodes.InvalidRequest);
+    }
+
+    [Fact, Trait("Spec", "0016:STP-7"), Trait("Spec", "0014:PRB-3")]
+    public async Task Check_answers_415_when_the_body_is_not_json()
+    {
+        (HttpClient client, _) = await StartAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Post, CheckPath)
+        {
+            Content = new StringContent(Body("orv_setup_x"), Encoding.UTF8, "text/plain"),
+        };
+        request.Headers.TryAddWithoutValidation("Origin", PublicUrl);
+
+        using HttpResponseMessage response = await client.SendAsync(request, Token);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnsupportedMediaType);
+        (await ProblemAsync(response)).Dispose();
+    }
+
     [Theory, Trait("Spec", "0016:STP-7"), Trait("Spec", "0006:CON-2"), Trait("Spec", "0016:AC-7")]
     [InlineData("http://evil.example")]
     [InlineData("http://localhost")]
@@ -247,6 +472,53 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
         malformed.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         using JsonDocument problem = await ProblemAsync(valid);
         problem.RootElement.GetProperty("code").GetString().ShouldBe(ErrorCodes.Forbidden);
+    }
+
+    [Theory, Trait("Spec", "0006:CON-2")]
+    [InlineData("http://localhost:8081")]
+    [InlineData("http://localhost:8080/path")]
+    [InlineData("http://localhost:8080?x=1")]
+    [InlineData("http://user@localhost:8080")]
+    [InlineData("http://localhost:8080, http://localhost:8080")]
+    [InlineData("http://localhost.evil.example:8080")]
+    [InlineData("localhost:8080")]
+    [InlineData("ftp://localhost:8080")]
+    public async Task Check_answers_403_when_the_origin_only_looks_like_the_console(string origin)
+    {
+        (HttpClient client, string output) = await StartAsync();
+
+        using HttpResponseMessage response = await PostAsync(client, Body(TokenIn(output)), origin);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Theory, Trait("Spec", "0006:CON-2")]
+    [InlineData("http://localhost:8080", "HTTP://LOCALHOST:8080")]
+    [InlineData("https://orvano.example", "https://orvano.example:443")]
+    [InlineData("https://orvano.example:443", "https://orvano.example")]
+    [InlineData("https://orvano.example/base/", "https://orvano.example")]
+    public async Task Check_compares_scheme_host_and_port_when_the_origin_is_the_console(string publicUrl, string origin)
+    {
+        (HttpClient client, string output) = await StartAsync(publicUrl: publicUrl);
+
+        using HttpResponseMessage response = await PostAsync(client, Body(TokenIn(output)), origin);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+    }
+
+    [Fact, Trait("Spec", "0006:CON-2")]
+    public async Task Check_answers_403_when_the_request_has_two_origin_headers()
+    {
+        (HttpClient client, string output) = await StartAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Post, CheckPath)
+        {
+            Content = new StringContent(Body(TokenIn(output)), Encoding.UTF8, "application/json"),
+        };
+        request.Headers.TryAddWithoutValidation("Origin", [PublicUrl, PublicUrl]);
+
+        using HttpResponseMessage response = await client.SendAsync(request, Token);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
     [Fact, Trait("Spec", "0006:CON-2")]
@@ -289,6 +561,45 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
         limited.Headers.RetryAfter?.Delta.ShouldNotBeNull();
         using JsonDocument problem = await ProblemAsync(limited);
         problem.RootElement.GetProperty("code").GetString().ShouldBe(ErrorCodes.RateLimited);
+    }
+
+    [Fact, Trait("Spec", "0016:STP-8")]
+    public async Task Check_limits_each_client_address_on_its_own()
+    {
+        await StartAsync();
+        OrvanoApiFactory factory = _factories[^1];
+
+        await SpendTheLimitAsync(factory, from: "203.0.113.1");
+
+        (await CheckFromAsync(factory, "203.0.113.1")).ShouldBe(StatusCodes.Status429TooManyRequests);
+        (await CheckFromAsync(factory, "203.0.113.2")).ShouldBe(StatusCodes.Status401Unauthorized);
+    }
+
+    [Fact, Trait("Spec", "0016:STP-8"), Trait("Spec", "0006:NET-1")]
+    public async Task Check_counts_forged_forwarded_addresses_as_one_client_when_no_proxy_is_trusted()
+    {
+        await StartAsync();
+        OrvanoApiFactory factory = _factories[^1];
+
+        for (int i = 0; i < 10; i++)
+        {
+            (await CheckFromAsync(factory, "203.0.113.1", forwardedFor: $"198.51.100.{i}")).ShouldBe(StatusCodes.Status401Unauthorized);
+        }
+
+        (await CheckFromAsync(factory, "203.0.113.1", forwardedFor: "198.51.100.200")).ShouldBe(StatusCodes.Status429TooManyRequests);
+    }
+
+    [Fact, Trait("Spec", "0016:STP-8"), Trait("Spec", "0006:NET-1")]
+    public async Task Check_limits_by_the_forwarded_address_when_a_trusted_proxy_sends_it()
+    {
+        const string caddy = "10.20.30.40";
+        await StartAsync(trustedProxies: caddy);
+        OrvanoApiFactory factory = _factories[^1];
+
+        await SpendTheLimitAsync(factory, from: caddy, forwardedFor: "203.0.113.1");
+
+        (await CheckFromAsync(factory, caddy, forwardedFor: "203.0.113.1")).ShouldBe(StatusCodes.Status429TooManyRequests);
+        (await CheckFromAsync(factory, caddy, forwardedFor: "203.0.113.2")).ShouldBe(StatusCodes.Status401Unauthorized);
     }
 
     [Fact, Trait("Spec", "0016:STP-7")]
@@ -346,6 +657,108 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
         result.Error.ShouldContain("Could not make a setup link");
     }
 
+    [Fact, Trait("Spec", "0016:STP-5")]
+    public async Task Admin_setup_token_exits_1_when_the_instance_row_is_missing()
+    {
+        await ExecuteAsync("DELETE FROM platform.instance");
+
+        OrvanoCli.Result result = await AdminSetupTokenAsync();
+
+        result.ExitCode.ShouldBe(1);
+        result.Output.ShouldBeEmpty();
+        result.Error.ShouldContain("Run `orvano migrate` first");
+    }
+
+    [Fact, Trait("Spec", "0016:STP-5")]
+    public async Task Admin_setup_token_exits_1_naming_the_variable_and_keeps_the_token_when_the_public_url_is_bad()
+    {
+        OrvanoCli.Result first = await AdminSetupTokenAsync();
+        byte[]? hash = await HashAsync();
+
+        OrvanoCli.Result result = await AdminSetupTokenAsync(publicUrl: "ftp://orvano.example");
+
+        first.ExitCode.ShouldBe(0, first.Error);
+        result.ExitCode.ShouldBe(1);
+        result.Output.ShouldBeEmpty();
+        result.Error.ShouldContain("ORVANO_PUBLIC_URL");
+        (await HashAsync()).ShouldBe(hash);
+    }
+
+    [Fact, Trait("Spec", "0016:STP-5"), Trait("Spec", "0002:CFG-3")]
+    public async Task Admin_setup_token_reads_the_same_configuration_as_serve_when_the_password_is_in_a_file()
+    {
+        string password = Path.Combine(_console.ContentRoot, "database-password");
+        await File.WriteAllTextAsync(password, PostgresFixture.Password, Token);
+        var environment = postgres.DatabaseEnvironment.ToDictionary();
+        environment["ORVANO_DATABASE__NAME"] = _database;
+        environment.Remove("ORVANO_DATABASE__PASSWORD");
+        environment["ORVANO_DATABASE__PASSWORD_FILE"] = password;
+
+        OrvanoCli.Result result = await OrvanoCli.RunAsync(["admin", "setup-token"], environment, Token);
+
+        result.ExitCode.ShouldBe(0, result.Error);
+        result.Output.ShouldContain("#token=orv_setup_");
+    }
+
+    // Takes about a minute: the EF Core retry backs off six times before it gives up.
+    [Fact, Trait("Spec", "0016:STP-5")]
+    public async Task Admin_setup_token_exits_1_without_a_stack_trace_when_the_database_is_unreachable()
+    {
+        var environment = postgres.DatabaseEnvironment.ToDictionary();
+        environment["ORVANO_DATABASE__HOST"] = "127.0.0.1";
+        environment["ORVANO_DATABASE__PORT"] = Ports.Free().ToString(CultureInfo.InvariantCulture);
+
+        OrvanoCli.Result result = await OrvanoCli.RunAsync(["admin", "setup-token"], environment, Token, timeLimit: TimeSpan.FromMinutes(3));
+
+        result.ExitCode.ShouldBe(1);
+        result.Output.ShouldBeEmpty();
+        result.Error.ShouldContain("Could not make a setup link");
+        result.Error.ShouldNotContain("Unhandled exception");
+        result.Error.ShouldNotContain(PostgresFixture.Password);
+    }
+
+    // The real process: the banner goes through the real standard output, next to the real JSON logs (STP-4)
+
+    [Fact, Trait("Spec", "0016:STP-4"), Trait("Spec", "0016:AC-6"), Trait("Spec", "0016:AC-7")]
+    public async Task Serve_prints_the_banner_whole_and_writes_the_token_nowhere_else()
+    {
+        int port = Ports.Free();
+        string url = $"http://localhost:{port.ToString(CultureInfo.InvariantCulture)}";
+        var environment = postgres.DatabaseEnvironment.ToDictionary();
+        environment["ORVANO_DATABASE__NAME"] = _database;
+        environment["ORVANO_ROOT_KEY"] = TestRootKey.Create();
+        environment["ORVANO_PUBLIC_URL"] = url;
+        environment["ASPNETCORE_HTTP_PORTS"] = port.ToString(CultureInfo.InvariantCulture);
+        var lines = new ConcurrentQueue<string>();
+        using Process server = Process.Start(OrvanoCli.StartInfo(["serve"], environment)) ?? throw new InvalidOperationException("serve did not start");
+        server.OutputDataReceived += (_, line) => lines.Enqueue(line.Data ?? string.Empty);
+        server.ErrorDataReceived += (_, line) => lines.Enqueue(line.Data ?? string.Empty);
+        server.BeginOutputReadLine();
+        server.BeginErrorReadLine();
+        string token;
+        try
+        {
+#pragma warning disable RS0030 // PRF-3, OUT-1: one client for one test's process, so there is no pool to protect
+            using var client = new HttpClient { BaseAddress = new Uri(url) };
+#pragma warning restore RS0030
+            await WaitUntilReadyAsync(client, server);
+            token = TokenIn(string.Join('\n', lines));
+
+            (await PostAsync(client, Body(token), url)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+            (await PostAsync(client, Body("orv_setup_wrong"), url)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        }
+        finally
+        {
+            server.Kill(entireProcessTree: true);
+            await server.WaitForExitAsync(Token);
+        }
+
+        string everything = string.Join('\n', lines);
+        Regex.Count(everything, Regex.Escape(token)).ShouldBe(1, everything);
+        everything.ShouldContain(
+            $"\n\nFinish setting up Orvano: {url}/console/setup#token={token}\nThis link works until setup is done or ", Case.Sensitive, everything);
+    }
+
     // No outbound calls (TEL-1)
 
     [Fact, Trait("Spec", "0016:TEL-1"), Trait("Spec", "0016:AC-14")]
@@ -374,7 +787,8 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
     }
 
     private async Task<(HttpClient Client, string Output)> StartAsync(
-        string? roles = null, string? publicUrl = PublicUrl, string? consoleOrigin = null, OutboundCalls? outbound = null)
+        string? roles = null, string? publicUrl = PublicUrl, string? consoleOrigin = null, OutboundCalls? outbound = null,
+        string? trustedProxies = null)
     {
         Dictionary<string, string> settings = OrvanoApiFactory.DefaultSettings(postgres);
         settings["Database:Name"] = _database;
@@ -393,6 +807,11 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
             settings["CONSOLE_ORIGIN"] = consoleOrigin;
         }
 
+        if (trustedProxies is not null)
+        {
+            settings["TRUSTED_PROXIES"] = trustedProxies;
+        }
+
         if (outbound is not null)
         {
             settings["OTEL_EXPORTER_OTLP_ENDPOINT"] = string.Empty;
@@ -403,23 +822,79 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
         {
             services.AddSingleton<TimeProvider>(_clock);
             services.AddSingleton(new SetupOutput(output));
+            services.AddSingleton<ILoggerProvider>(_logs);
             if (outbound is not null)
             {
                 services.AddHttpClient();
                 services.AddSingleton<IHttpMessageHandlerBuilderFilter>(outbound);
             }
         });
-        _factories.Add(factory);
+        lock (_factories)
+        {
+            _factories.Add(factory);
+        }
+
         HttpClient client = factory.CreateClient(new() { AllowAutoRedirect = false });
         return (client, output.ToString());
     }
 
-    private Task<OrvanoCli.Result> AdminSetupTokenAsync(string? database = null)
+    private Task<OrvanoCli.Result> AdminSetupTokenAsync(string? database = null, string publicUrl = PublicUrl)
     {
         var environment = postgres.DatabaseEnvironment.ToDictionary();
         environment["ORVANO_DATABASE__NAME"] = database ?? _database;
-        environment["ORVANO_PUBLIC_URL"] = PublicUrl;
+        environment["ORVANO_PUBLIC_URL"] = publicUrl;
         return OrvanoCli.RunAsync(["admin", "setup-token"], environment, Token);
+    }
+
+    private static async Task WaitUntilReadyAsync(HttpClient client, Process server)
+    {
+        for (int attempt = 0; attempt < 120 && !server.HasExited; attempt++)
+        {
+            try
+            {
+                using HttpResponseMessage ready = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), Token);
+                if (ready.IsSuccessStatusCode)
+                {
+                    return;
+                }
+            }
+            catch (HttpRequestException)
+            {
+                // Not listening yet.
+            }
+
+            await Task.Delay(250, Token);
+        }
+
+        throw new InvalidOperationException("serve never answered /health/ready");
+    }
+
+    private static async Task SpendTheLimitAsync(OrvanoApiFactory factory, string from, string? forwardedFor = null)
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            (await CheckFromAsync(factory, from, forwardedFor)).ShouldBe(StatusCodes.Status401Unauthorized);
+        }
+    }
+
+    /// <summary>A wrong token from <paramref name="from"/>, which only the test server can set (spec 0016 STP-8).</summary>
+    private static async Task<int> CheckFromAsync(OrvanoApiFactory factory, string from, string? forwardedFor = null)
+    {
+        HttpContext context = await factory.Server.SendAsync(http =>
+        {
+            http.Request.Method = HttpMethods.Post;
+            http.Request.Path = CheckPath.OriginalString;
+            http.Request.ContentType = "application/json";
+            http.Request.Headers.Origin = PublicUrl;
+            http.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(Body("orv_setup_wrong")));
+            http.Features.Set<IHttpRequestBodyDetectionFeature>(new HasBody());
+            http.Connection.RemoteIpAddress = IPAddress.Parse(from);
+            if (forwardedFor is not null)
+            {
+                http.Request.Headers["X-Forwarded-For"] = forwardedFor;
+            }
+        }, Token);
+        return context.Response.StatusCode;
     }
 
     private static string TokenIn(string output) => TokenPattern().Match(output) is { Success: true } match
@@ -452,8 +927,10 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
 
     private async Task<byte[]?> HashAsync() => await ScalarAsync("SELECT setup_token_hash FROM platform.instance") as byte[];
 
-    private async Task<DateTimeOffset?> ExpiresAtAsync() =>
-        await ScalarAsync("SELECT setup_token_expires_at FROM platform.instance") is DateTime at
+    private Task<DateTimeOffset?> ExpiresAtAsync() => TimeAsync("setup_token_expires_at");
+
+    private async Task<DateTimeOffset?> TimeAsync(string column) =>
+        await ScalarAsync($"SELECT {column} FROM platform.instance") is DateTime at
             ? new DateTimeOffset(DateTime.SpecifyKind(at, DateTimeKind.Utc))
             : null;
 
@@ -474,6 +951,34 @@ public sealed partial class SetupTokenTests(PostgresFixture postgres) : IAsyncLi
 
     [GeneratedRegex("#token=(?<token>orv_setup_[A-Za-z0-9_-]+)")]
     private static partial Regex TokenPattern();
+
+    /// <summary>The test server says a request it did not make from an <see cref="HttpClient"/> has no body.</summary>
+    private sealed class HasBody : IHttpRequestBodyDetectionFeature
+    {
+        public bool CanHaveBody => true;
+    }
+
+    /// <summary>Keeps every line that reaches <c>ILogger</c>, so a test can show what never did (spec 0016 STP-4).</summary>
+    private sealed class RecordedLogs : ILoggerProvider, ILogger
+    {
+        private readonly ConcurrentQueue<string> _lines = new();
+
+        public IReadOnlyCollection<string> Lines => _lines;
+
+        public ILogger CreateLogger(string categoryName) => this;
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            _lines.Enqueue($"{logLevel} {formatter(state, exception)} {exception}");
+
+        public void Dispose()
+        {
+        }
+    }
 
     /// <summary>Stands in for every factory made client's real handler: a send is recorded and fails (spec 0016 TEL-1).</summary>
     private sealed class OutboundCalls : IHttpMessageHandlerBuilderFilter

@@ -172,6 +172,81 @@ describe("SetupPage", () => {
     expect(sent).toEqual([]);
   });
 
+  it("0016 FRS-5: a link with an empty token drops the fragment and asks for the token", async () => {
+    const sent = checkEndpoint();
+    openWithFragment("token=");
+
+    const screen = await renderWithProviders("/setup", setup);
+
+    await expect
+      .element(screen.getByRole("textbox", { name: "Setup token" }))
+      .toHaveAccessibleDescription("Enter the setup token.");
+    expect(window.location.hash).toBe("");
+    expect(sent).toEqual([]);
+  });
+
+  it("0016 FRS-5: a link with an overlong token is refused here, without a request", async () => {
+    const sent = checkEndpoint();
+    openWithFragment(`token=${"a".repeat(101)}`);
+
+    const screen = await renderWithProviders("/setup", setup);
+
+    await expect
+      .element(screen.getByRole("textbox", { name: "Setup token" }))
+      .toHaveAccessibleDescription("A setup token is at most 100 characters.");
+    expect(window.location.hash).toBe("");
+    expect(sent).toEqual([]);
+  });
+
+  it("0016 FRS-5: the token leaves the fragment, and what else the fragment holds stays", async () => {
+    const sent = checkEndpoint();
+    openWithFragment(`from=mail&token=${TOKEN}`);
+
+    const screen = await renderWithProviders("/setup", setup);
+
+    await expect
+      .element(screen.getByRole("heading", { level: 2, name: "Setup token accepted" }))
+      .toBeVisible();
+    expect(window.location.hash).toBe("#from=mail");
+    expect(sent).toEqual([TOKEN]);
+  });
+
+  it("0016 FRS-5: a link opened while a check runs leaves the address and replaces that check", async () => {
+    const answer = deferred<Response>();
+    const sent = checkEndpoint(() => answer.promise);
+    openWithFragment(`token=${TOKEN}`);
+    const screen = await renderWithProviders("/setup", setup);
+    await expect
+      .element(screen.getByRole("button", { name: "Continue" }))
+      .toHaveAttribute("data-pending", "true");
+
+    openWithFragment(`token=${TOKEN}2`);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+
+    await expect.poll(() => window.location.hash).toBe("");
+    await expect.poll(() => sent.at(-1)).toBe(`${TOKEN}2`);
+    answer.resolve(new Response(null, { status: 204 }));
+    await expect
+      .element(screen.getByRole("heading", { level: 2, name: "Setup token accepted" }))
+      .toBeVisible();
+  });
+
+  // Bug, for /debug: the hashchange listener goes with the token step, so once a token is accepted nothing takes a new
+  // link's token out of the address (FRS-5, URL-5). Drop `.fails` with the fix.
+  it.fails("0016 FRS-5: a link opened in a tab that already accepted a token leaves the address too", async () => {
+    checkEndpoint();
+    openWithFragment(`token=${TOKEN}`);
+    const screen = await renderWithProviders("/setup", setup);
+    await expect
+      .element(screen.getByRole("heading", { level: 2, name: "Setup token accepted" }))
+      .toBeVisible();
+
+    openWithFragment(`token=${TOKEN}2`);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+
+    await expect.poll(() => window.location.hash).toBe("");
+  });
+
   it("0016 FRS-6: while checking, the button is busy and the field is read only", async () => {
     const answer = deferred<Response>();
     checkEndpoint(() => answer.promise);
@@ -314,6 +389,129 @@ describe("SetupPage", () => {
     expect(calls).toBe(2);
   });
 
+  it("0016 FRS-6: only spaces count as empty, and nothing is sent", async () => {
+    const sent = checkEndpoint();
+    const screen = await renderWithProviders("/setup", setup);
+
+    await typeToken(screen, "   ");
+    await userEvent.keyboard("{Enter}");
+
+    await expect
+      .element(screen.getByRole("textbox", { name: "Setup token" }))
+      .toHaveAccessibleDescription("Enter the setup token.");
+    expect(sent).toEqual([]);
+  });
+
+  it("0016 FRS-6: a body the server refuses shows on the field, as a rejected token does", async () => {
+    checkEndpoint(() => problem(400, "validation_failed"));
+    const screen = await renderWithProviders("/setup", setup);
+
+    const field = await typeToken(screen, TOKEN);
+    await userEvent.keyboard("{Enter}");
+
+    await expect.element(field).toHaveAttribute("aria-invalid", "true");
+    await expect
+      .element(field)
+      .toHaveAccessibleDescription(/^This setup link or token is not valid any more\./);
+  });
+
+  it.each([
+    [1, "Too many tries. Try again in 1 second."],
+    [1.2, "Too many tries. Try again in 2 seconds."],
+  ])("0016 FRS-6: a wait of %s seconds reads in whole seconds", async (retryAfter, message) => {
+    checkEndpoint(() => problem(429, "rate_limited", { retryAfter }));
+    const screen = await renderWithProviders("/setup", setup);
+
+    await typeToken(screen, TOKEN);
+    await userEvent.keyboard("{Enter}");
+
+    await expect.element(screen.getByText(message)).toBeVisible();
+  });
+
+  it("0016 FRS-6: too many checks with no Retry-After say to wait a moment", async () => {
+    checkEndpoint(() => problem(429, "rate_limited"));
+    const screen = await renderWithProviders("/setup", setup);
+
+    await typeToken(screen, TOKEN);
+    await userEvent.keyboard("{Enter}");
+
+    await expect
+      .element(screen.getByText("Too many tries. Wait a moment, then try again."))
+      .toBeVisible();
+  });
+
+  it.each([
+    [500, "internal_error", "The server had a problem. Try again in a moment."],
+    [503, "unavailable", "The server had a problem. Try again in a moment."],
+    [408, "timeout", "Couldn't reach the server. Check your connection and try again."],
+  ])(
+    "0016 FRS-6: a %s keeps the token, marks nothing wrong with it, and Continue checks again",
+    async (status, code, message) => {
+      let calls = 0;
+      worker.use(
+        http.post("/v1/console/setup/token", () => {
+          calls += 1;
+          return calls === 1 ? problem(status, code) : new Response(null, { status: 204 });
+        }),
+      );
+      const screen = await renderWithProviders("/setup", setup);
+
+      const field = await typeToken(screen, TOKEN);
+      await userEvent.keyboard("{Enter}");
+      await expect.element(screen.getByText(message)).toBeVisible();
+      await expect.element(field).toHaveValue(TOKEN);
+      await expect.element(field).not.toHaveAttribute("aria-invalid");
+
+      await screen.getByRole("button", { name: "Continue" }).click();
+
+      await expect
+        .element(screen.getByRole("heading", { level: 2, name: "Setup token accepted" }))
+        .toBeVisible();
+    },
+  );
+
+  it("0016 FRS-6: a wrong origin keeps the token for the next try", async () => {
+    checkEndpoint(() => problem(403, "forbidden"));
+    const screen = await renderWithProviders("/setup", setup);
+
+    const field = await typeToken(screen, TOKEN);
+    await userEvent.keyboard("{Enter}");
+
+    await expect
+      .element(screen.getByRole("group", { name: "Fix this problem to continue" }))
+      .toHaveFocus();
+    await expect.element(field).toHaveValue(TOKEN);
+    await expect.element(field).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("0016 FRS-6: setup completed meanwhile, with the config call failing, ends on the error page", async () => {
+    checkEndpoint(() => problem(409, "setup_complete"));
+    worker.use(http.get("/v1/console/config", () => Response.error()));
+    const screen = await renderWithProviders("/setup", setup);
+
+    await typeToken(screen, TOKEN);
+    await userEvent.keyboard("{Enter}");
+
+    await expect.element(screen.getByRole("button", { name: "Reload" })).toBeVisible();
+  });
+
+  it("0016 FRS-4: the field then Continue take focus in order, and Enter in the field submits", async () => {
+    const sent = checkEndpoint();
+    const screen = await renderWithProviders("/setup", setup);
+
+    const field = await typeToken(screen, TOKEN);
+    await userEvent.tab();
+    await expect.element(screen.getByRole("button", { name: "Continue" })).toHaveFocus();
+    await userEvent.tab({ shift: true });
+    await expect.element(field).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+
+    await expect
+      .element(screen.getByRole("heading", { level: 2, name: "Setup token accepted" }))
+      .toBeVisible();
+    expect(sent).toEqual([TOKEN]);
+  });
+
   it("0016 FRS-6: setup completed meanwhile reloads the config, which sends the page home", async () => {
     checkEndpoint(() => problem(409, "setup_complete"));
     worker.use(
@@ -400,6 +598,17 @@ describe("SetupPage accessibility", () => {
       await expectNoAxeViolationsInBothThemes();
     },
   );
+
+  it("0016 FRS-7: the wait reads right in Arabic, whose plural categories the catalogue doesn't list", async () => {
+    await activateArabic();
+    checkEndpoint(() => problem(429, "rate_limited", { retryAfter: 2 }));
+    const screen = await renderWithProviders("/setup", setup);
+
+    await typeToken(screen, TOKEN);
+    await userEvent.keyboard("{Enter}");
+
+    await expect.element(screen.getByText("Too many tries. Try again in 2 seconds.")).toBeVisible();
+  });
 
   it("0015 RTL-1: in a right to left locale the page lays out from the right", async () => {
     await activateArabic();

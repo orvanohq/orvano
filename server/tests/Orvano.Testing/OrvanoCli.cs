@@ -58,14 +58,14 @@ public static class OrvanoCli
     }
 
     public static async Task<Result> RunAsync(IEnumerable<string> args, IReadOnlyDictionary<string, string>? environment,
-        CancellationToken cancellationToken, string? workingDirectory = null)
+        CancellationToken cancellationToken, string? workingDirectory = null, TimeSpan? timeLimit = null)
     {
         using Process process = Process.Start(StartInfo(args, environment, workingDirectory))
             ?? throw new InvalidOperationException("dotnet did not start");
         Task<string> output = process.StandardOutput.ReadToEndAsync(cancellationToken);
         Task<string> error = process.StandardError.ReadToEndAsync(cancellationToken);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromMinutes(1));
+        timeout.CancelAfter(timeLimit ?? TimeSpan.FromMinutes(1));
         try
         {
             await process.WaitForExitAsync(timeout.Token);
