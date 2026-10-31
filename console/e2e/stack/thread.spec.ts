@@ -11,6 +11,16 @@ function sql(statement: string) {
   compose("exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "orvano", "-c", statement);
 }
 
+/** Waits for the answer to an account save, which is what proves it landed. */
+function accountSaved(page: Page, status: number) {
+  return page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/v1/console/account") &&
+      response.request().method() === "PATCH" &&
+      response.status() === status,
+  );
+}
+
 async function signIn(page: Page, password: string) {
   await page.getByRole("textbox", { name: "Email" }).fill(EMAIL);
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -113,11 +123,11 @@ test("0017 AC-6, AC-18, AC-19: a password change, sign out in every tab, a reset
   page,
   context,
 }) => {
-  await page.goto("sign-in");
+  await page.goto("console/sign-in");
   await signIn(page, PASSWORD);
   await expect(page.getByRole("button", { name: "Account" })).toBeVisible();
   const otherTab = await context.newPage();
-  await otherTab.goto("account");
+  await otherTab.goto("console/account");
   await expect(otherTab.getByRole("heading", { level: 1, name: "Account" })).toBeVisible();
 
   // The password, through the account menu. The cookie and CSRF token change, and the other tab keeps working.
@@ -130,13 +140,12 @@ test("0017 AC-6, AC-18, AC-19: a password change, sign out in every tab, a reset
   await expect(page.getByLabel("Current password", { exact: true })).toHaveValue("");
 
   await otherTab.getByRole("textbox", { name: "Name" }).fill("Grace Owner");
+  const saved = accountSaved(otherTab, 200);
   await otherTab
     .getByRole("region", { name: "Profile" })
     .getByRole("button", { name: "Update" })
     .click();
-  await expect(
-    otherTab.getByRole("region", { name: "Profile" }).getByRole("button", { name: "Update" }),
-  ).toHaveAttribute("aria-disabled", "true");
+  await saved;
   await page.reload();
   await expect(page.getByRole("textbox", { name: "Name" })).toHaveValue("Grace Owner");
 
@@ -174,14 +183,15 @@ test("0017 AC-6, AC-18, AC-19: a password change, sign out in every tab, a reset
   await page.getByRole("button", { name: "Change password" }).click();
   await expect(page.getByText("This link isn't valid any more.")).toBeVisible();
 
-  await page.goto("sign-in");
+  await page.goto("console/sign-in");
   await signIn(page, RESET_PASSWORD);
   await expect(page.getByRole("button", { name: "Account" })).toBeVisible();
 
   // The session ends mid edit: the form stays, the dialog opens over it, and the save goes through after sign in.
-  await page.goto("account");
+  await page.goto("console/account");
   await page.getByRole("textbox", { name: "Name" }).fill("Ada Lovelace");
   sql("UPDATE platform.operator_session SET revoked_at = now()");
+  const retried = accountSaved(page, 200);
   await page
     .getByRole("region", { name: "Profile" })
     .getByRole("button", { name: "Update" })
@@ -191,10 +201,8 @@ test("0017 AC-6, AC-18, AC-19: a password change, sign out in every tab, a reset
   await dialog.getByLabel("Password", { exact: true }).fill(RESET_PASSWORD);
   await dialog.getByRole("button", { name: "Sign in" }).click();
   await expect(dialog).toBeHidden();
+  await retried;
   await expect(page.getByRole("textbox", { name: "Name" })).toHaveValue("Ada Lovelace");
-  await expect(
-    page.getByRole("region", { name: "Profile" }).getByRole("button", { name: "Update" }),
-  ).toHaveAttribute("aria-disabled", "true");
   await page.reload();
   await expect(page.getByRole("textbox", { name: "Name" })).toHaveValue("Ada Lovelace");
 });

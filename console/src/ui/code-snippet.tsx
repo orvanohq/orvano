@@ -37,7 +37,7 @@ export function CodeSnippet({ label, code }: CodeSnippetProps) {
             <code>{code}</code>
           </pre>
         </section>
-        <div className="absolute end-2 top-2">
+        <div className="absolute end-2 top-2 rounded-md bg-bg-muted">
           <IconButton
             size="sm"
             icon={state === "copied" ? CheckIcon : CopyIcon}

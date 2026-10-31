@@ -15,7 +15,7 @@ function navFor(
   projectId: string | undefined,
   services: readonly string[] | undefined,
 ): readonly ShellNavItem[] {
-  if (orgId === undefined) return [];
+  if (orgId === undefined) return [{ id: "profile", link: { to: "/account" } }];
   if (projectId === undefined) {
     return [
       { id: "projects", link: { to: "/$orgId", params: { orgId }, exact: true } },
