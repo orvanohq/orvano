@@ -358,6 +358,10 @@
       "status": 500,
       "description": "Something went wrong on the server."
     },
+    "invalid_credentials": {
+      "status": 401,
+      "description": "The email or password is wrong."
+    },
     "invalid_cursor": {
       "status": 400,
       "description": "The cursor does not parse, or was issued for another filter or sort."
@@ -377,6 +381,10 @@
     "payload_too_large": {
       "status": 413,
       "description": "The request body is too large."
+    },
+    "project_not_active": {
+      "status": 409,
+      "description": "The project is being created or deleted, so this can't be done now."
     },
     "rate_limited": {
       "status": 429,

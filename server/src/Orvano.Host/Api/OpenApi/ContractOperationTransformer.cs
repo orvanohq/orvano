@@ -143,6 +143,9 @@ internal sealed partial class ContractOperationTransformer : IOpenApiOperationTr
                     concrete.Description ??= "The nextCursor of the previous page; omit it for the first page.";
                     schema.MaxLength = PageQuery.MaxCursorLength;
                     break;
+                case "query":
+                    concrete.Description ??= "Matches the name as a contains, ignoring case.";
+                    break;
                 default:
                     break;
             }

@@ -26,8 +26,18 @@ public static class FieldCodes
 
     public const string NotUnique = "not_unique";
 
+    /// <summary>A new password on the bundled common list (spec 0017 PSW-1).</summary>
+    public const string PasswordTooCommon = "password_too_common";
+
+    /// <summary>The account's current password was wrong (spec 0017 SES-8, ACC-2).</summary>
+    public const string InvalidPassword = "invalid_password";
+
+    /// <summary>An allowed origin that isn't an exact <c>scheme://host[:port]</c> (spec 0017 PJT-6).</summary>
+    public const string InvalidOrigin = "invalid_origin";
+
     public static IReadOnlySet<string> All { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
         Required, TooShort, TooLong, OutOfRange, InvalidFormat, InvalidEmail, InvalidValue, UnknownField, NotUnique,
+        PasswordTooCommon, InvalidPassword, InvalidOrigin,
     };
 }

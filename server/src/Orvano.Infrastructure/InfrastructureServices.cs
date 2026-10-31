@@ -3,12 +3,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
+using Orvano.Infrastructure.Audit;
 using Orvano.Infrastructure.Caching;
 using Orvano.Infrastructure.Jobs;
 using Orvano.Infrastructure.Jobs.Data;
 using Orvano.Infrastructure.Outbox;
 using Orvano.Infrastructure.Signals;
 using Orvano.Infrastructure.Tls;
+using Orvano.SharedKernel.Audit;
 using Orvano.SharedKernel.Data;
 using Orvano.SharedKernel.Jobs;
 using Orvano.SharedKernel.Outbox;
@@ -37,6 +39,7 @@ public static class InfrastructureServices
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<OrvanoInstance>();
+        services.TryAddSingleton<IAuditSink, LogAuditSink>(); // spec 0017 AUS-2
         services.AddMetrics();
         services.TryAddSingleton<InfrastructureTelemetry>();
 

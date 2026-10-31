@@ -90,6 +90,7 @@ internal static class ServeCommand
         RootKey.EnsureConfigured(builder.Configuration);
         ConsoleAddress.PublicUrl(builder.Configuration); // fails on a malformed ORVANO_PUBLIC_URL
         string? consoleOrigin = ConsoleAddress.Origin(builder.Configuration); // spec 0006 CON-2
+        bool insecureCookies = ConsoleAddress.InsecureCookies(builder.Configuration); // fails with an HTTPS public URL (CON-1)
         ConfigureTls(builder);
 
         builder.AddOrvanoLogging();
@@ -130,6 +131,10 @@ internal static class ServeCommand
 
         WebApplication app = builder.Build();
         app.Logger.ServerStarting(HostTelemetry.Version, roles);
+        if (insecureCookies)
+        {
+            app.Logger.InsecureCookies();
+        }
 
         if (trustsProxies)
         {
@@ -156,9 +161,11 @@ internal static class ServeCommand
         // enforces each endpoint's declaration before binding and validation. Only endpoints answer after it.
         app.UseAccessRequirements();
 
-        // Spec 0016 STP-8 then spec 0006 CON-2: only endpoints that ask for them, before the body is bound.
+        // Spec 0016 STP-8 then spec 0006 CON-2: only endpoints that ask for them, before the body is bound. Then spec 0017
+        // SES-7, by the caller: every state change an operator makes needs its Origin and its CSRF token.
         app.UseRateLimiter();
         app.UseConsoleOriginCheck(consoleOrigin);
+        app.UseConsoleStateChangeCheck(consoleOrigin);
 
         // Health checks answer in every role, so container health checks work for workers too (spec 0007 IMG-4).
         // Public (spec 0012 EPT-5): probes carry no credential, and the answer is the same for every caller.

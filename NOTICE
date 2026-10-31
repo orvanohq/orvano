@@ -3,3 +3,8 @@ Copyright The Orvano Authors
 
 This product is licensed under the Apache License, Version 2.0.
 See the LICENSE file for details.
+
+This product bundles a list of common passwords from SecLists
+(https://github.com/danielmiessler/SecLists), Copyright (c) 2018 Daniel Miessler,
+licensed under the MIT License. See
+server/src/Orvano.Modules.Auth/Passwords/CommonPasswords.LICENSE.txt.

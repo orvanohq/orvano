@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 using Orvano.Modules.Auth;
+using Orvano.Modules.Platform;
 using Orvano.SharedKernel;
 using Orvano.SharedKernel.Api;
 
@@ -20,7 +21,7 @@ public sealed partial class WireRulesTests
 {
     private const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly;
 
-    private static readonly Assembly[] Modules = [typeof(AuthModule).Assembly];
+    private static readonly Assembly[] Modules = [typeof(AuthModule).Assembly, typeof(PlatformModule).Assembly];
 
     private static readonly Assembly[] RequestAssemblies = [typeof(LogEventIds).Assembly, .. Modules];
 
@@ -37,7 +38,7 @@ public sealed partial class WireRulesTests
     [Fact]
     [Trait("Spec", "0014:PRB-5")]
     public void Every_validation_attribute_message_is_a_field_code_when_built() =>
-        AttributeViolations(RequestAssemblies.SelectMany(assembly => assembly.GetTypes())).ShouldBeEmpty();
+        AttributeViolations(RequestAssemblies.SelectMany(assembly => assembly.GetTypes()).Where(type => !IsOptions(type))).ShouldBeEmpty();
 
     [Fact]
     [Trait("Spec", "0014:PRB-5")]
@@ -69,6 +70,9 @@ public sealed partial class WireRulesTests
         where typeof(JsonSerializerContext).IsAssignableFrom(type) && !type.IsAbstract
         where type.GetCustomAttribute<JsonSourceGenerationOptionsAttribute>() is not { UnmappedMemberHandling: JsonUnmappedMemberHandling.Disallow }
         select type.FullName;
+
+    // Settings classes (spec 0002 CFG): startup reads their messages, and no request ever binds them.
+    private static bool IsOptions(Type type) => type.GetField("Section", BindingFlags.Public | BindingFlags.Static) is { IsLiteral: true };
 
     private static IEnumerable<string> AttributeViolations(IEnumerable<Type> types)
     {

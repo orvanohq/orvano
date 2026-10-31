@@ -34,9 +34,20 @@ internal sealed class Argon2idPasswordHasher(Argon2Cost cost) : IPasswordHasher
         }
 
         byte[] salt = RandomNumberGenerator.GetBytes(SaltSize);
-        byte[] hash = Derive(password, salt, cost, HashSize);
-        return string.Create(CultureInfo.InvariantCulture,
+        return Format(cost, salt, Derive(password, salt, cost, HashSize));
+    }
+
+    /// <summary>The PHC string for these parts.</summary>
+    internal static string Format(Argon2Cost cost, byte[] salt, byte[] hash) =>
+        string.Create(CultureInfo.InvariantCulture,
             $"$argon2id$v={Version}$m={cost.MemoryKiB},t={cost.Iterations},p=1${ToBase64(salt)}${ToBase64(hash)}");
+
+    /// <summary>The cost a PHC string was made with (spec 0017 PSW-4). False for a malformed string.</summary>
+    internal static bool TryReadCost(string phc, out Argon2Cost cost)
+    {
+        bool parsed = TryParse(phc, out StoredHash stored);
+        cost = stored.Cost;
+        return parsed;
     }
 
     public bool Verify(string password, string hash)

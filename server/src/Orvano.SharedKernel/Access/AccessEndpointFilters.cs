@@ -25,7 +25,7 @@ public interface IMembershipLookup
 /// </summary>
 public static class AccessEndpointFilters
 {
-    /// <summary>The route values the console permission check reads.</summary>
+    /// <summary>The route values the access checks read.</summary>
     public const string OrganizationIdRouteValue = "organizationId";
 
     public const string ProjectIdRouteValue = "projectId";
@@ -72,6 +72,29 @@ public static class AccessEndpointFilters
             StatusCodes.Status401Unauthorized,
             StatusCodes.Status403Forbidden,
             StatusCodes.Status404NotFound);
+    }
+
+    /// <summary>
+    /// A console route that belongs to the person, not to an organization: the session, the account, the organization
+    /// list and create (spec 0017 ACX-1). Only operators pass. It needs no route value and sets no project. Anything an
+    /// organization owns uses <see cref="RequireConsolePermission{TBuilder}"/>.
+    /// </summary>
+    public static TBuilder RequireOperator<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.Require(new OperatorRequirement(), StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden);
+    }
+
+    /// <summary>
+    /// A route any key of the project may call (spec 0017 ACX-2): guests, end users, and secret keys pass, run keys do
+    /// not. Its route must hold <c>{projectId}</c> (EPT-4). Its audience is both client and server (XTN-1).
+    /// </summary>
+    public static TBuilder RequireProjectKey<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.Require(new ProjectKeyRequirement(), StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden);
     }
 
     /// <summary>

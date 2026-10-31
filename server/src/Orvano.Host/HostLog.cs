@@ -12,6 +12,10 @@ internal static partial class HostLog
     [LoggerMessage(EventId = LogEventIds.Host + 2, Level = LogLevel.Error, Message = "Startup failed: {Reason}")]
     public static partial void StartupFailed(this ILogger logger, string reason);
 
+    [LoggerMessage(EventId = LogEventIds.Host + 3, Level = LogLevel.Warning,
+        Message = "ORVANO_INSECURE_COOKIES is on: the console session cookie is sent without Secure (spec 0006 CON-1)")]
+    public static partial void InsecureCookies(this ILogger logger);
+
     [LoggerMessage(EventId = LogEventIds.Host + 10, Level = LogLevel.Information,
         Message = "Applying migrations for {Context}")]
     public static partial void MigrationsApplying(this ILogger logger, string context);

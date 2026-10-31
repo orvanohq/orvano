@@ -11,4 +11,10 @@ public static class PlatformErrorCodes
 
     [ErrorCode(ErrorKind.Conflict, "Setup is already complete; sign in instead.")]
     public const string SetupComplete = "setup_complete";
+
+    [ErrorCode(ErrorKind.Unauthorized, "The email or password is wrong.")]
+    public const string InvalidCredentials = "invalid_credentials";
+
+    [ErrorCode(ErrorKind.Conflict, "The project is being created or deleted, so this can't be done now.")]
+    public const string ProjectNotActive = "project_not_active";
 }

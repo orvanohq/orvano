@@ -30,6 +30,45 @@ public sealed class DataModelTests
         Production.Select(context => context.Type).ShouldBe(migrated, ignoreOrder: true);
     }
 
+    [Theory]
+    [Trait("Spec", "0011:REF-3"), Trait("Spec", "0017:AC-10")]
+    [InlineData("Orvano.Modules.Platform.Data.Project", "OrganizationId", DeleteBehavior.Restrict)] // LIF-3
+    [InlineData("Orvano.Modules.Platform.Data.ApiKey", "CreatedByOperatorId", DeleteBehavior.SetNull)]
+    public void Platform_pins_the_same_schema_delete_rules_of_REF_3(string entity, string property, DeleteBehavior rule)
+    {
+        IModel model = Production.Single(context => context.Type.Name == "PlatformDbContext").Model;
+
+        model.FindEntityType(entity).ShouldNotBeNull().FindProperty(property).ShouldNotBeNull()
+            .GetContainingForeignKeys().ShouldHaveSingleItem().DeleteBehavior.ShouldBe(rule);
+    }
+
+    [Fact]
+    [Trait("Spec", "0002:DAT-2a"), Trait("Spec", "0017:ACX-5")]
+    public void Server_contexts_filter_every_project_scoped_entity_by_project()
+    {
+        IEnumerable<string> missing =
+            from context in Production
+            from entity in context.Model.GetEntityTypes()
+            where typeof(IProjectScoped).IsAssignableFrom(entity.ClrType)
+            where entity.GetDeclaredQueryFilters().All(filter => filter.Key != ProjectFilter.Name)
+            select entity.ClrType.Name;
+
+        missing.ShouldBeEmpty();
+    }
+
+    [Fact]
+    [Trait("Spec", "0002:DAT-2a")]
+    public void Platform_entities_with_a_ProjectId_are_project_scoped()
+    {
+        IEnumerable<string> missing =
+            from entity in Production.Single(context => context.Type.Name == "PlatformDbContext").Model.GetEntityTypes()
+            where !Anchors.IsStub(entity.ClrType) && entity.FindProperty(nameof(IProjectScoped.ProjectId)) is not null
+            where !typeof(IProjectScoped).IsAssignableFrom(entity.ClrType)
+            select entity.ClrType.Name;
+
+        missing.ShouldBeEmpty();
+    }
+
     [Fact]
     [Trait("Spec", "0011:AC-3")]
     public void Server_contexts_are_set_up_with_UseOrvanoConventions() =>

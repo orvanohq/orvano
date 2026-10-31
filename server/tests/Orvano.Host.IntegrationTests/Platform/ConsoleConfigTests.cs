@@ -22,6 +22,9 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
+    private static string Config(bool setupRequired) =>
+        $$"""{"setupRequired":{{(setupRequired ? "true" : "false")}},"instanceName":"Orvano","publicUrl":null,"features":[]}""";
+
     public async ValueTask InitializeAsync() => _database = await postgres.CreateMigratedDatabaseAsync("platform", Token);
 
     public ValueTask DisposeAsync()
@@ -37,7 +40,7 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
         using HttpResponseMessage response = await Client().GetAsync(new Uri("/v1/console/config", UriKind.Relative), Token);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await response.Content.ReadAsStringAsync(Token)).ShouldBe("""{"setupRequired":true}""");
+        (await response.Content.ReadAsStringAsync(Token)).ShouldBe(Config(true));
         response.Headers.CacheControl?.NoStore.ShouldBeTrue();
     }
 
@@ -49,7 +52,20 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
 
         using HttpResponseMessage response = await Client().GetAsync(new Uri("/v1/console/config", UriKind.Relative), Token);
 
-        (await response.Content.ReadAsStringAsync(Token)).ShouldBe("""{"setupRequired":false}""");
+        (await response.Content.ReadAsStringAsync(Token)).ShouldBe(Config(false));
+    }
+
+    [Fact, Trait("Spec", "0017:BOT-1"), Trait("Spec", "0017:AC-20")]
+    public async Task Config_answers_the_instance_name_and_public_url_from_settings_with_no_session()
+    {
+        Dictionary<string, string> settings = OrvanoApiFactory.DefaultSettings(postgres);
+        settings["Database:Name"] = _database;
+        settings["Instance:Name"] = "Staging";
+        settings["PUBLIC_URL"] = "https://orvano.example.com/";
+        _factory = new OrvanoApiFactory(settings, _console.ContentRoot);
+
+        (await ReadConfigAsync(_factory.CreateClient())).ShouldBe(
+            """{"setupRequired":true,"instanceName":"Staging","publicUrl":"https://orvano.example.com","features":[]}""");
     }
 
     // Review R-1: only a finished setup is kept, because setup never reopens (spec 0016 State transitions).
@@ -57,12 +73,12 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
     public async Task Config_answers_false_on_the_next_read_when_setup_completes_after_a_true()
     {
         HttpClient client = Client();
-        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":true}""");
-        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":true}""");
+        (await ReadConfigAsync(client)).ShouldBe(Config(true));
+        (await ReadConfigAsync(client)).ShouldBe(Config(true));
 
         await ExecuteAsync("UPDATE platform.instance SET setup_completed_at = now() WHERE id = 1");
 
-        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":false}""");
+        (await ReadConfigAsync(client)).ShouldBe(Config(false));
     }
 
     // Feature 13 sets the column in the transaction that makes the owner (STP-6), with no call into this process.
@@ -76,11 +92,11 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
         await using var complete = new NpgsqlCommand("UPDATE platform.instance SET setup_completed_at = now() WHERE id = 1", connection, transaction);
         await complete.ExecuteNonQueryAsync(Token);
 
-        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":true}""");
+        (await ReadConfigAsync(client)).ShouldBe(Config(true));
 
         await transaction.CommitAsync(Token);
 
-        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":false}""");
+        (await ReadConfigAsync(client)).ShouldBe(Config(false));
     }
 
     [Fact, Trait("Spec", "0016:FRS-1")]
@@ -88,13 +104,13 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
     {
         await ExecuteAsync("UPDATE platform.instance SET setup_completed_at = now() WHERE id = 1");
         HttpClient client = Client();
-        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":false}""");
+        (await ReadConfigAsync(client)).ShouldBe(Config(false));
 
         await ExecuteAsync("DROP SCHEMA platform CASCADE");
 
         using HttpResponseMessage response = await client.GetAsync(new Uri("/v1/console/config", UriKind.Relative), Token);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await response.Content.ReadAsStringAsync(Token)).ShouldBe("""{"setupRequired":false}""");
+        (await response.Content.ReadAsStringAsync(Token)).ShouldBe(Config(false));
         response.Headers.CacheControl?.NoStore.ShouldBeTrue();
     }
 
@@ -110,10 +126,10 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
         }
 
         await ExecuteAsync("ALTER SCHEMA platform_away RENAME TO platform");
-        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":true}""");
+        (await ReadConfigAsync(client)).ShouldBe(Config(true));
 
         await ExecuteAsync("UPDATE platform.instance SET setup_completed_at = now() WHERE id = 1");
-        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":false}""");
+        (await ReadConfigAsync(client)).ShouldBe(Config(false));
     }
 
     // More than one api replica may run, and nothing tells one that another saw setup finish.
@@ -123,18 +139,18 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
         HttpClient first = Client();
         using OrvanoApiFactory other = Factory();
         using HttpClient second = other.CreateClient(new() { AllowAutoRedirect = false });
-        (await ReadConfigAsync(first)).ShouldBe("""{"setupRequired":true}""");
-        (await ReadConfigAsync(second)).ShouldBe("""{"setupRequired":true}""");
+        (await ReadConfigAsync(first)).ShouldBe(Config(true));
+        (await ReadConfigAsync(second)).ShouldBe(Config(true));
         await ExecuteAsync("UPDATE platform.instance SET setup_completed_at = now() WHERE id = 1");
-        (await ReadConfigAsync(first)).ShouldBe("""{"setupRequired":false}""");
+        (await ReadConfigAsync(first)).ShouldBe(Config(false));
 
         // Nothing real clears the column; here it shows which replica still asks the database.
         await ExecuteAsync("UPDATE platform.instance SET setup_completed_at = NULL WHERE id = 1");
-        (await ReadConfigAsync(first)).ShouldBe("""{"setupRequired":false}""");
-        (await ReadConfigAsync(second)).ShouldBe("""{"setupRequired":true}""");
+        (await ReadConfigAsync(first)).ShouldBe(Config(false));
+        (await ReadConfigAsync(second)).ShouldBe(Config(true));
 
         await ExecuteAsync("UPDATE platform.instance SET setup_completed_at = now() WHERE id = 1");
-        (await ReadConfigAsync(second)).ShouldBe("""{"setupRequired":false}""");
+        (await ReadConfigAsync(second)).ShouldBe(Config(false));
     }
 
     [Theory, Trait("Spec", "0016:FRS-1"), Trait("Spec", "0012:EPT-5")]
@@ -157,7 +173,7 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
 
         using HttpResponseMessage response = await Client().GetAsync(new Uri("/v1/console/config", UriKind.Relative), Token);
 
-        (await response.Content.ReadAsStringAsync(Token)).ShouldBe("""{"setupRequired":true}""");
+        (await response.Content.ReadAsStringAsync(Token)).ShouldBe(Config(true));
     }
 
     // STP-8's limit is on the check alone: a boot loads the config, so a reload must never be refused.
