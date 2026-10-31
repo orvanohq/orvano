@@ -547,7 +547,11 @@ check_first_run_flow() {
   not_called "docker run"
   fake volumes=orvano_postgres-data
   refused "Another Orvano install already uses this machine" --local --http-port 8080
+  # ISH-8: the fix needs no folder, because that folder may be gone, and it names this run's engine and what it deletes.
+  refused "all of its data, from any folder: docker compose -p orvano down -v" --local --http-port 8080
+  refused "all of its data, from any folder: podman compose -p orvano down -v" --local --http-port 8080 --engine podman
   not_called "docker run"
+  not_called "podman run"
   fake init_exit=1
   new_folder
   fake_install "$folder" --local --http-port 8080

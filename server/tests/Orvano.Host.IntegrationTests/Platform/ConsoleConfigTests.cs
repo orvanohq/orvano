@@ -52,6 +52,91 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
         (await response.Content.ReadAsStringAsync(Token)).ShouldBe("""{"setupRequired":false}""");
     }
 
+    // Review R-1: only a finished setup is kept, because setup never reopens (spec 0016 State transitions).
+    [Fact, Trait("Spec", "0016:FRS-1")]
+    public async Task Config_answers_false_on_the_next_read_when_setup_completes_after_a_true()
+    {
+        HttpClient client = Client();
+        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":true}""");
+        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":true}""");
+
+        await ExecuteAsync("UPDATE platform.instance SET setup_completed_at = now() WHERE id = 1");
+
+        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":false}""");
+    }
+
+    // Feature 13 sets the column in the transaction that makes the owner (STP-6), with no call into this process.
+    [Fact, Trait("Spec", "0016:FRS-1"), Trait("Spec", "0016:STP-6")]
+    public async Task Config_answers_true_until_the_transaction_that_completes_setup_commits()
+    {
+        HttpClient client = Client();
+        await using var data = NpgsqlDataSource.Create(postgres.ConnectionString(_database));
+        await using NpgsqlConnection connection = await data.OpenConnectionAsync(Token);
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(Token);
+        await using var complete = new NpgsqlCommand("UPDATE platform.instance SET setup_completed_at = now() WHERE id = 1", connection, transaction);
+        await complete.ExecuteNonQueryAsync(Token);
+
+        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":true}""");
+
+        await transaction.CommitAsync(Token);
+
+        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":false}""");
+    }
+
+    [Fact, Trait("Spec", "0016:FRS-1")]
+    public async Task Config_keeps_false_without_the_database_when_it_has_read_a_finished_setup()
+    {
+        await ExecuteAsync("UPDATE platform.instance SET setup_completed_at = now() WHERE id = 1");
+        HttpClient client = Client();
+        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":false}""");
+
+        await ExecuteAsync("DROP SCHEMA platform CASCADE");
+
+        using HttpResponseMessage response = await client.GetAsync(new Uri("/v1/console/config", UriKind.Relative), Token);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync(Token)).ShouldBe("""{"setupRequired":false}""");
+        response.Headers.CacheControl?.NoStore.ShouldBeTrue();
+    }
+
+    [Fact, Trait("Spec", "0016:FRS-1")]
+    public async Task Config_keeps_nothing_from_a_failed_read()
+    {
+        HttpClient client = Client();
+        await ExecuteAsync("ALTER SCHEMA platform RENAME TO platform_away");
+
+        using (HttpResponseMessage failed = await client.GetAsync(new Uri("/v1/console/config", UriKind.Relative), Token))
+        {
+            failed.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        }
+
+        await ExecuteAsync("ALTER SCHEMA platform_away RENAME TO platform");
+        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":true}""");
+
+        await ExecuteAsync("UPDATE platform.instance SET setup_completed_at = now() WHERE id = 1");
+        (await ReadConfigAsync(client)).ShouldBe("""{"setupRequired":false}""");
+    }
+
+    // More than one api replica may run, and nothing tells one that another saw setup finish.
+    [Fact, Trait("Spec", "0016:FRS-1")]
+    public async Task Config_finds_a_finished_setup_for_itself_on_each_replica()
+    {
+        HttpClient first = Client();
+        using OrvanoApiFactory other = Factory();
+        using HttpClient second = other.CreateClient(new() { AllowAutoRedirect = false });
+        (await ReadConfigAsync(first)).ShouldBe("""{"setupRequired":true}""");
+        (await ReadConfigAsync(second)).ShouldBe("""{"setupRequired":true}""");
+        await ExecuteAsync("UPDATE platform.instance SET setup_completed_at = now() WHERE id = 1");
+        (await ReadConfigAsync(first)).ShouldBe("""{"setupRequired":false}""");
+
+        // Nothing real clears the column; here it shows which replica still asks the database.
+        await ExecuteAsync("UPDATE platform.instance SET setup_completed_at = NULL WHERE id = 1");
+        (await ReadConfigAsync(first)).ShouldBe("""{"setupRequired":false}""");
+        (await ReadConfigAsync(second)).ShouldBe("""{"setupRequired":true}""");
+
+        await ExecuteAsync("UPDATE platform.instance SET setup_completed_at = now() WHERE id = 1");
+        (await ReadConfigAsync(second)).ShouldBe("""{"setupRequired":false}""");
+    }
+
     [Theory, Trait("Spec", "0016:FRS-1"), Trait("Spec", "0012:EPT-5")]
     [InlineData("Orvano-Key", "orv_pk_not_a_real_key")]
     [InlineData("Authorization", "Bearer not-a-token")]
@@ -153,6 +238,12 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
 
     private HttpClient Client(string? roles = null)
     {
+        _factory = Factory(roles);
+        return _factory.CreateClient(new() { AllowAutoRedirect = false });
+    }
+
+    private OrvanoApiFactory Factory(string? roles = null)
+    {
         Dictionary<string, string> settings = OrvanoApiFactory.DefaultSettings(postgres);
         settings["Database:Name"] = _database;
         if (roles is not null)
@@ -160,8 +251,13 @@ public sealed class ConsoleConfigTests(PostgresFixture postgres) : IAsyncLifetim
             settings["ROLES"] = roles;
         }
 
-        _factory = new OrvanoApiFactory(settings, _console.ContentRoot);
-        return _factory.CreateClient(new() { AllowAutoRedirect = false });
+        return new OrvanoApiFactory(settings, _console.ContentRoot);
+    }
+
+    private static async Task<string> ReadConfigAsync(HttpClient client)
+    {
+        using HttpResponseMessage response = await client.GetAsync(new Uri("/v1/console/config", UriKind.Relative), Token);
+        return await response.Content.ReadAsStringAsync(Token);
     }
 
     private async Task ExecuteAsync(string sql)

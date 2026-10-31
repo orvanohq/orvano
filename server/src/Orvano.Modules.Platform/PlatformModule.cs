@@ -22,6 +22,7 @@ public static class PlatformModule
         services.AddDbContext<PlatformDbContext>((provider, options) => options.UseOrvanoConventions(PlatformDbContext.Schema, provider));
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<SetupTokens>();
+        services.AddSingleton<SetupCompletion>();
         services.AddErrorCodes(typeof(PlatformErrorCodes));
         services.Configure<RateLimiterOptions>(SetupTokenEndpoint.AddPolicy); // spec 0016 STP-8; the host adds the limiter
         services.AddValidation(); // spec 0002 VAL-1

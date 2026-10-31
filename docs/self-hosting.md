@@ -151,6 +151,12 @@ To remove an install and **all of its data**, run this in its folder, then delet
 docker compose down -v
 ```
 
+If the folder is already gone, say after a first install that failed to start, the old volumes still exist and the script refuses a new install. This command needs no folder. It deletes that install's containers, network, and volumes, so **all of its data**:
+
+```bash
+docker compose -p orvano down -v
+```
+
 ### The `.env` file
 
 `init` writes `.env` at 0600. Compose reads it; Orvano's image never sees the file itself. [`deploy/.env.example`](../deploy/.env.example) lists the same variables. Running `install.sh` again never changes it.

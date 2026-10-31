@@ -397,7 +397,7 @@ check_port() {
 check_first_run() {
   if [ -n "$("$ENGINE" volume ls -q --filter label=com.docker.compose.project=orvano </dev/null)" ]; then
     fail "Another Orvano install already uses this machine (its volumes exist), and only one install per host works." \
-      "Run this again with --dir pointing at that install's folder, or remove it there with: $ENGINE compose down -v"
+      "Run this again with --dir pointing at that install's folder. Or delete that install and all of its data, from any folder: $ENGINE compose -p orvano down -v"
   fi
   if [ "$PROFILE" = server ]; then
     check_port 80 "; a server always needs ports 80 and 443, for its certificate."

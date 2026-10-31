@@ -105,6 +105,24 @@ describe("changedAreas", () => {
     assert.deepEqual(changedAreas([".dockerignore"]), { ...none, deploy: true });
   });
 
+  for (const file of ["docs/self-hosting.md", "LICENSE", "NOTICE"]) {
+    test(`${file}, which a deploy check reads, marks deploy only`, () => {
+      assert.deepEqual(changedAreas([file]), { ...none, deploy: true });
+    });
+  }
+
+  test("only the root LICENSE and NOTICE, and only the self hosting guide, mark deploy", () => {
+    assert.deepEqual(
+      changedAreas([
+        "docs/LICENSE",
+        "docs/NOTICE",
+        "docs/self-hosting.md.bak",
+        "docs/self-hosting/x.md",
+      ]),
+      none,
+    );
+  });
+
   test("the hooks folder marks windows only", () => {
     assert.deepEqual(changedAreas([".vite-hooks/pre-commit"]), { ...none, windows: true });
   });
