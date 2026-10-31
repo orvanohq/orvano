@@ -101,17 +101,19 @@ check_flags() {
   refused "--domain needs a value" --domain
   refused "--version needs a value" --local --version --engine docker
   refused "--http-port needs a value" --local --http-port -1
-  # ISH-1: the = forms take the same checks.
+  # ISH-1: the = forms take the same checks. An empty one (say, from an unset variable) must not fall back to the default.
   refused "--http-port must be" --local --http-port=eighty
-  refused "--version must be" --local --version=
   refused "cannot get a public HTTPS certificate" --domain=localhost
+  for flag in --dir --domain --version --engine --http-port --public-url --image; do
+    refused "$flag needs a value" --local "$flag="
+  done
   for port in 0 65536 eighty 8.0 99999999999999999999; do
     refused "--http-port must be" --local --http-port "$port"
   done
   refused "--version must be" --local --version 'edge;touch'
   refused "--image must be" --local --image Orvano
   refused "--image must be" --local --image 'orvano example'
-  for domain in 203.0.113.7 ::1 localhost LOCALHOST orvano.localhost orvano; do
+  for domain in 203.0.113.7 ::1 localhost LOCALHOST orvano.localhost orvano localhost. 127.0.0.1. orvano.example.; do
     refused "cannot get a public HTTPS certificate" --domain "$domain"
   done
 }
@@ -552,6 +554,17 @@ check_first_run_flow() {
   exited 1
   said "orvano init did not finish"
   not_called "compose --profile"
+  [ ! -e "$folder" ] || fail "a failed init left its folder behind"
+  # A name only init refuses: the run takes back every folder it made, and none it didn't.
+  new_folder
+  mkdir "$folder"
+  fake_install "$folder/new/install" --domain 'bad domain.example'
+  exited 1
+  [ -d "$folder" ] || fail "a failed init removed a folder it did not make"
+  [ ! -e "$folder/new" ] || fail "a failed init left a folder it made behind"
+  fake_install "$folder" --domain 'bad domain.example'
+  exited 1
+  [ -d "$folder" ] || fail "a failed init removed the empty folder it was given"
   pass "a missing image is pulled once, and a failed pull, a second install, or a failed init stops"
 
   : >"$WORK/run/a-file"
@@ -678,25 +691,6 @@ check_cut_short() {
   pass "a script cut short runs nothing"
 }
 
-# Bugs found by /test, for /debug. Each case passes while the bug is there and fails once it is fixed, which is the
-# reminder to turn it into a refusal in check_flags and remove it here.
-check_known_bugs() {
-  # BND-4's check comes after mkdir: a name init will refuse gets past check_domain, and an empty folder stays behind.
-  fake init_exit=1
-  fake_install "$WORK/bad-domain" --domain 'bad domain.example'
-  [ -d "$WORK/bad-domain" ] || fail "--domain 'bad domain.example' is refused early now; move this to check_flags"
-  # F-4 of the verify report: a trailing dot gets past the certificate check.
-  fake
-  new_folder
-  fake_install "$folder" --domain localhost.
-  called "init --out /out --domain localhost."
-  # The = forms skip option_value's empty check, so --dir= (say, from an unset variable) installs into the current folder.
-  mkdir "$WORK/run/empty-dir"
-  fake
-  output="$(cd "$WORK/run/empty-dir" && sh "$FULL_SCRIPT" --local --http-port 8080 --dir= </dev/null 2>&1)" || true
-  called "/run/empty-dir:/out:z"
-}
-
 # Every case that needs an engine this machine doesn't have, in one run of the fake.
 check_fake_engine() {
   FOLDERS=0
@@ -709,7 +703,6 @@ check_fake_engine() {
   check_setup_link
   check_rerun_flow
   check_cut_short
-  check_known_bugs
   [ ! -s "$WORK/fake/forbidden" ] || fail "install.sh ran a tool ISH-3 forbids: $(cat "$WORK/fake/forbidden")"
   PATH="$REAL_PATH"
   pass "every fake engine case behaved, and no case ran sudo, a package manager, or a download"

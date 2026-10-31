@@ -24,13 +24,33 @@ const PUBLIC_URL_SETTING = "ORVANO_PUBLIC_URL";
 export function SetupPage() {
   // Held for feature 13's owner form, which sends it again with the new account (STP-6).
   const [acceptedToken, setAcceptedToken] = useState<string>();
+  const [linkToken, setLinkToken] = useState<string>();
+
+  // FRS-5: the accepted state has no token step to read a link, so a link opened here is taken at this level. Only the
+  // newest token works (STP-2, STP-5), so it replaces the accepted one and goes back through the token step.
+  useEffect(() => {
+    if (acceptedToken === undefined) return undefined;
+    function replaceAcceptedToken() {
+      const token = takeFragmentParam("token");
+      if (!token) return;
+      setLinkToken(token);
+      setAcceptedToken(undefined);
+    }
+    // The token step's listener is gone by now, so a link that landed since is taken here first.
+    replaceAcceptedToken();
+    window.addEventListener("hashchange", replaceAcceptedToken);
+    return () => {
+      window.removeEventListener("hashchange", replaceAcceptedToken);
+    };
+  }, [acceptedToken]);
+
   return (
     <AuthLayout>
       <h1 className="text-xl font-semibold">
         <Trans>Set up Orvano</Trans>
       </h1>
       {acceptedToken === undefined ? (
-        <TokenStep onAccepted={setAcceptedToken} />
+        <TokenStep linkToken={linkToken} onAccepted={setAcceptedToken} />
       ) : (
         <TokenAccepted />
       )}
@@ -38,7 +58,13 @@ export function SetupPage() {
   );
 }
 
-function TokenStep({ onAccepted }: { onAccepted: (token: string) => void }) {
+function TokenStep({
+  linkToken,
+  onAccepted,
+}: {
+  linkToken: string | undefined;
+  onAccepted: (token: string) => void;
+}) {
   const { t } = useLingui();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -106,24 +132,26 @@ function TokenStep({ onAccepted }: { onAccepted: (token: string) => void }) {
   // FRS-5: a setup link carries the token in its fragment. Take it once, before anything else can read the address,
   // and check it. The ref keeps StrictMode's second effect run from losing the token or checking it twice. A link
   // opened in a tab already on this page changes only the fragment, with no new page load, so a `hashchange` takes it
-  // the same way.
+  // the same way. `linkToken` is a link SetupPage took while this step wasn't on the page.
   const linkRead = useRef(false);
   useEffect(() => {
-    function checkLinkToken() {
-      const token = takeFragmentParam("token");
+    function checkToken(token: string | undefined) {
       if (token === undefined) return;
       form.setFieldValue("token", token);
       void form.handleSubmit();
     }
+    function checkLinkToken() {
+      checkToken(takeFragmentParam("token"));
+    }
     if (!linkRead.current) {
       linkRead.current = true;
-      checkLinkToken();
+      checkToken(takeFragmentParam("token") ?? linkToken);
     }
     window.addEventListener("hashchange", checkLinkToken);
     return () => {
       window.removeEventListener("hashchange", checkLinkToken);
     };
-  }, [form]);
+  }, [form, linkToken]);
 
   return (
     <>

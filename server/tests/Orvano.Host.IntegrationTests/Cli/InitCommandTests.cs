@@ -380,18 +380,18 @@ public sealed class InitCommandTests : IDisposable
         result.Error.ShouldContain("--local");
     }
 
-    // F-4 of docs/reviews/2026-10-30-verify-self-host-install.md, still open: these get past BND-4, and "localhost." reaches
-    // .env. Explicit until that is fixed, so CI stays green: dotnet test --project tests/Orvano.Host.IntegrationTests -- --explicit only
-    // (add --filter-method to run this one). Remove Explicit with the fix.
-    [Theory(Explicit = true), Trait("Spec", "0016:BND-4")]
+    // F-4 of docs/reviews/2026-10-30-verify-self-host-install.md: ACME refuses a name that ends in a dot, however good the rest.
+    [Theory, Trait("Spec", "0016:BND-4")]
     [InlineData("localhost.")]
     [InlineData("127.0.0.1.")]
     [InlineData("orvano.")]
-    public async Task Init_refuses_a_trailing_dot_when_the_name_cannot_get_a_certificate(string domain)
+    [InlineData("orvano.example.")]
+    public async Task Init_refuses_and_writes_nothing_when_the_domain_ends_in_a_dot(string domain)
     {
         OrvanoCli.Result result = await InitAsync("--domain", domain);
 
         result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("cannot get a public HTTPS certificate");
         Directory.GetFileSystemEntries(_install.FullName).ShouldBeEmpty();
     }
 

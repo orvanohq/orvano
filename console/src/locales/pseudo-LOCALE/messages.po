@@ -127,7 +127,7 @@ msgstr ""
 msgid "{count} of kind {name}"
 msgstr ""
 
-#: src/features/setup/components/setup-page.tsx:55
+#: src/features/setup/components/setup-page.tsx:81
 msgid "{seconds, plural, one {Too many tries. Try again in # second.} other {Too many tries. Try again in # seconds.}}"
 msgstr ""
 
@@ -237,7 +237,7 @@ msgstr ""
 msgid "Compact"
 msgstr ""
 
-#: src/features/setup/components/setup-page.tsx:152
+#: src/features/setup/components/setup-page.tsx:180
 msgid "Continue"
 msgstr ""
 
@@ -274,7 +274,7 @@ msgstr ""
 msgid "Couldn't reach the server"
 msgstr ""
 
-#: src/features/setup/components/setup-page.tsx:65
+#: src/features/setup/components/setup-page.tsx:91
 msgid "Couldn't reach the server. Check your connection and try again."
 msgstr ""
 
@@ -563,7 +563,7 @@ msgstr ""
 msgid "Open the command palette"
 msgstr ""
 
-#: src/features/setup/components/setup-page.tsx:62
+#: src/features/setup/components/setup-page.tsx:88
 msgid "Open the console at its own address, the one in {PUBLIC_URL_SETTING}, not at an IP address or another name. Then use the setup link again."
 msgstr ""
 
@@ -596,7 +596,7 @@ msgstr ""
 msgid "Overview"
 msgstr ""
 
-#: src/features/setup/components/setup-page.tsx:131
+#: src/features/setup/components/setup-page.tsx:159
 msgid "Paste the setup token from the install output or the server log, or make a new one on the server with <0>{SETUP_TOKEN_COMMAND}</0>."
 msgstr ""
 
@@ -698,7 +698,7 @@ msgstr ""
 msgid "Select"
 msgstr ""
 
-#: src/features/setup/components/setup-page.tsx:30
+#: src/features/setup/components/setup-page.tsx:50
 msgid "Set up Orvano"
 msgstr ""
 
@@ -706,11 +706,11 @@ msgstr ""
 msgid "Settings"
 msgstr ""
 
-#: src/features/setup/components/setup-page.tsx:142
+#: src/features/setup/components/setup-page.tsx:170
 msgid "Setup token"
 msgstr ""
 
-#: src/features/setup/components/setup-page.tsx:175
+#: src/features/setup/components/setup-page.tsx:203
 msgid "Setup token accepted"
 msgstr ""
 
@@ -789,7 +789,7 @@ msgstr ""
 msgid "The console couldn't load what it needs from the server. Check that the server is running, then reload."
 msgstr ""
 
-#: src/features/setup/components/setup-page.tsx:178
+#: src/features/setup/components/setup-page.tsx:206
 msgid "The next step, creating the owner account, comes in a later version of the console. Keep this page open, or make a new setup link when you come back."
 msgstr ""
 
@@ -805,7 +805,7 @@ msgstr ""
 msgid "The server had a problem"
 msgstr ""
 
-#: src/features/setup/components/setup-page.tsx:67
+#: src/features/setup/components/setup-page.tsx:93
 msgid "The server had a problem. Try again in a moment."
 msgstr ""
 
@@ -826,7 +826,7 @@ msgstr ""
 msgid "This page ran into a problem. Reload to try again."
 msgstr ""
 
-#: src/features/setup/components/setup-page.tsx:87
+#: src/features/setup/components/setup-page.tsx:113
 msgid "This setup link or token is not valid any more. Make a new one with {SETUP_TOKEN_COMMAND}."
 msgstr ""
 
@@ -834,7 +834,7 @@ msgstr ""
 msgid "Too many requests"
 msgstr ""
 
-#: src/features/setup/components/setup-page.tsx:53
+#: src/features/setup/components/setup-page.tsx:79
 msgid "Too many tries. Wait a moment, then try again."
 msgstr ""
 

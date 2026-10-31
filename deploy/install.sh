@@ -76,10 +76,10 @@ option_value() {
 }
 
 # BND-4, checked here too so a bad domain stops before anything is pulled: Caddy cannot get a public certificate for an
-# IP address, localhost, or a name without a dot.
+# IP address, localhost, a name without a dot, or a name that ends in one.
 check_domain() {
   case "$(printf '%s' "$DOMAIN" | tr '[:upper:]' '[:lower:]')" in
-    *:* | localhost | *.localhost) ;;
+    *:* | *. | localhost | *.localhost) ;;
     # A dot, and something other than digits and dots.
     *[!0-9.]*.* | *.*[!0-9.]*) return ;;
   esac
@@ -101,19 +101,19 @@ parse_args() {
     case "$1" in
       --local) LOCAL=1 ;;
       --domain) DOMAIN="$(option_value "$@")"; shift ;;
-      --domain=*) DOMAIN="${1#*=}" ;;
+      --domain=*) DOMAIN="$(option_value --domain "${1#*=}")" ;;
       --dir) DIR="$(option_value "$@")"; shift ;;
-      --dir=*) DIR="${1#*=}" ;;
+      --dir=*) DIR="$(option_value --dir "${1#*=}")" ;;
       --version) VERSION="$(option_value "$@")"; shift ;;
-      --version=*) VERSION="${1#*=}" ;;
+      --version=*) VERSION="$(option_value --version "${1#*=}")" ;;
       --engine) ENGINE="$(option_value "$@")"; shift ;;
-      --engine=*) ENGINE="${1#*=}" ;;
+      --engine=*) ENGINE="$(option_value --engine "${1#*=}")" ;;
       --http-port) HTTP_PORT="$(option_value "$@")"; shift ;;
-      --http-port=*) HTTP_PORT="${1#*=}" ;;
+      --http-port=*) HTTP_PORT="$(option_value --http-port "${1#*=}")" ;;
       --public-url) PUBLIC_URL="$(option_value "$@")"; shift ;;
-      --public-url=*) PUBLIC_URL="${1#*=}" ;;
+      --public-url=*) PUBLIC_URL="$(option_value --public-url "${1#*=}")" ;;
       --image) IMAGE="$(option_value "$@")"; shift ;;
-      --image=*) IMAGE="${1#*=}" ;;
+      --image=*) IMAGE="$(option_value --image "${1#*=}")" ;;
       -h | --help) usage; exit 0 ;;
       *) usage_error "Unknown option: $1" ;;
     esac
@@ -442,8 +442,19 @@ run_init() {
   if [ -n "$PUBLIC_URL" ]; then
     set -- "$@" --public-url "$PUBLIC_URL"
   fi
-  run_as_operator -v "$DIR:/out:z" "$ref" "$@" \
-    || fail "orvano init did not finish; it changed nothing it did not create." "Read the message above, fix it, then run this again."
+  if ! run_as_operator -v "$DIR:/out:z" "$ref" "$@"; then
+    remove_new_dirs
+    fail "orvano init did not finish; it changed nothing it did not create." "Read the message above, fix it, then run this again."
+  fi
+}
+
+# A refused run leaves nothing behind: takes back what mkdir -p made, up to the folder check_dir found already there.
+# rmdir takes only an empty folder, so anything inside stays.
+remove_new_dirs() {
+  folder="$DIR"
+  while [ "$folder" != "$probe" ] && rmdir "$folder" 2>/dev/null; do
+    folder="$(dirname "$folder")"
+  done
 }
 
 # ISH-5 and ISH-7: start (or restart) the stack and wait until Orvano is healthy.
