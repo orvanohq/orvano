@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -91,7 +92,8 @@ internal sealed partial class ConsoleTestHost : IDisposable
         string? origin = PublicUrl,
         string? csrf = null,
         string? key = null,
-        string? authorization = null)
+        string? authorization = null,
+        string? ifMatch = null)
     {
         using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
         if (body is not null)
@@ -124,6 +126,11 @@ internal sealed partial class ConsoleTestHost : IDisposable
             request.Headers.TryAddWithoutValidation("Authorization", authorization);
         }
 
+        if (ifMatch is not null)
+        {
+            request.Headers.TryAddWithoutValidation("If-Match", $"\"{ifMatch}\"");
+        }
+
         return await Client.SendAsync(request, Token);
     }
 
@@ -146,6 +153,27 @@ internal sealed partial class ConsoleTestHost : IDisposable
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
         return await ReadSessionAsync(response);
     }
+
+    /// <summary>A second operator with the owner's password, a member of nothing, signed in the way sign in does it.</summary>
+    public async Task<ConsoleSession> AddOperatorAsync(string email = "stranger@example.com")
+    {
+        DateTimeOffset now = Clock.GetUtcNow();
+        await WithDatabaseAsync(async db =>
+        {
+            db.Operators.Add(new Operator
+            {
+                Email = email,
+                EmailNormalized = email,
+                Name = "Stranger",
+                PasswordHash = await db.Operators.Select(x => x.PasswordHash).FirstAsync(Token),
+                PasswordChangedAt = now,
+            });
+            return await db.SaveChangesAsync(Token);
+        });
+        return await SignInAsync(email) with { OrganizationId = Guid.Empty };
+    }
+
+    public Task WaitUntilConnectedAsync() => _factory.WaitUntilConnectedAsync(Token);
 
     public async Task<Guid> CreateProjectAsync(ConsoleSession session, string name = "Shop", Guid? organizationId = null)
     {

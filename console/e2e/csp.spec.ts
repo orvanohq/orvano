@@ -24,7 +24,10 @@ test("0015 AC-23: the route list comes from the route tree", () => {
 });
 
 for (const path of paths) {
-  test(`0015 AC-23: ${path} loads under the console CSP with no violation`, async ({ page }) => {
+  test(`0015 AC-23: ${path} loads under the console CSP with no violation`, async ({
+    page,
+    baseURL,
+  }) => {
     // Feature 13's shell routes take params; give them sample values here when they land.
 
     const response = await page.request.get(path.slice(1));
@@ -61,8 +64,9 @@ for (const path of paths) {
     );
     const url = path.replace("$orgId", ORG_ID).replace("$projectId", PROJECT_ID);
     await page.goto(url.slice(1));
-    const landing = path === "/" ? `/${ORG_ID}` : url.replace(/\/settings$/, "/settings/keys");
-    await expect(page).toHaveURL(new URL(landing.slice(1), "http://localhost:4173/console/").href);
+    const landing =
+      path === "/" ? `/${ORG_ID}` : path === "/$orgId/$projectId/settings" ? `${url}/general` : url;
+    await expect(page).toHaveURL(new URL(landing.slice(1), baseURL).href);
     await expect(page.locator("main")).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-theme", /^(light|dark)$/);
     expect(violations).toEqual([]);

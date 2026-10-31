@@ -1,24 +1,42 @@
 import { useState } from "react";
+import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { Badge, Button, EmptyState, PageHeader, RelativeTime, SecretReveal } from "@/ui";
-import { useAppForm } from "@/ui/form";
-import { SideSheet } from "@/ui/side-sheet";
+import { useCan } from "@/shared/access";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  IconButton,
+  Menu,
+  MenuItem,
+  MenuTrigger,
+  MoreIcon,
+  RelativeTime,
+} from "@/ui";
 import { Cell, Column, Row, Table, TableBody, TableHeader } from "@/ui/table";
-import { useCreateApiKey, type CreatedApiKey } from "../api/mutations";
 import { apiKeysQuery, type ApiKey } from "../api/queries";
-import { createKeySchema, SECRET_SCOPES, toCreateKeyRequest } from "../schemas/create-key";
+import { CreateKeySheet } from "./create-key-sheet";
+import { RegenerateKeyDialog, RenameKeyDialog, RevokeKeyDialog } from "./key-dialogs";
+import { maskedKey } from "./masked-key";
 
-/** Spec 0017 AKY-4, AKY-5, AC-13: a project's keys, and the sheet that makes one and shows it once. */
+type KeyAction = "rename" | "revoke" | "regenerate";
+
+const notAllowed = msg`You don't have permission to change keys.`;
+
+/** Spec 0017 AKY-4 to AKY-8, AC-13, AC-14: a project's keys, the sheet that makes one, and what each key can do next. */
 export function KeysPage() {
   const { t } = useLingui();
   const { projectId } = useParams({ from: "/_shell/$orgId/$projectId/settings/keys" });
   const { data } = useSuspenseQuery(apiKeysQuery(projectId));
+  const canWrite = useCan("project", "keys.write");
   const [isCreating, setCreating] = useState(false);
+  const [acting, setActing] = useState<{ action: KeyAction; key: ApiKey }>();
   const create = (
     <Button
       variant="primary"
+      unavailableReason={canWrite ? undefined : notAllowed}
       onPress={() => {
         setCreating(true);
       }}
@@ -26,10 +44,13 @@ export function KeysPage() {
       {t`Create API key`}
     </Button>
   );
+  const close = () => {
+    setActing(undefined);
+  };
+  const dialog = acting && { projectId, apiKey: acting.key, onClose: close };
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader title={t`API keys`} actions={data.items.length > 0 ? create : undefined} />
+    <div className="flex flex-col gap-4">
       {data.items.length === 0 ? (
         <EmptyState
           kind="first-use"
@@ -38,7 +59,15 @@ export function KeysPage() {
           action={create}
         />
       ) : (
-        <KeysTable keys={data.items} />
+        <>
+          <div className="flex justify-end">{create}</div>
+          <KeysTable
+            keys={data.items}
+            onAction={(action, key) => {
+              setActing({ action, key });
+            }}
+          />
+        </>
       )}
       {isCreating ? (
         <CreateKeySheet
@@ -48,15 +77,20 @@ export function KeysPage() {
           }}
         />
       ) : null}
+      {dialog && acting.action === "rename" ? <RenameKeyDialog {...dialog} /> : null}
+      {dialog && acting.action === "revoke" ? <RevokeKeyDialog {...dialog} /> : null}
+      {dialog && acting.action === "regenerate" ? <RegenerateKeyDialog {...dialog} /> : null}
     </div>
   );
 }
 
-function maskedKey(key: Pick<ApiKey, "prefix" | "last4">): string {
-  return `${key.prefix}…${key.last4}`;
-}
-
-function KeysTable({ keys }: { keys: readonly ApiKey[] }) {
+function KeysTable({
+  keys,
+  onAction,
+}: {
+  keys: readonly ApiKey[];
+  onAction: (action: KeyAction, key: ApiKey) => void;
+}) {
   const { t } = useLingui();
   return (
     <Table aria-label={t`API keys`}>
@@ -67,7 +101,10 @@ function KeysTable({ keys }: { keys: readonly ApiKey[] }) {
         <Column id="key">{t`Key`}</Column>
         <Column id="type">{t`Type`}</Column>
         <Column id="status">{t`Status`}</Column>
+        <Column id="lastUsed">{t`Last used`}</Column>
+        <Column id="expires">{t`Expires`}</Column>
         <Column id="created">{t`Created`}</Column>
+        <Column id="actions">{t`Actions`}</Column>
       </TableHeader>
       <TableBody>
         {keys.map((key) => (
@@ -81,12 +118,84 @@ function KeysTable({ keys }: { keys: readonly ApiKey[] }) {
               <KeyStatus status={key.status} />
             </Cell>
             <Cell>
+              {key.lastUsedAt ? (
+                <RelativeTime datetime={key.lastUsedAt} focusable={false} />
+              ) : (
+                t`Never`
+              )}
+            </Cell>
+            <Cell>
+              {key.expiresAt ? (
+                <RelativeTime datetime={key.expiresAt} focusable={false} />
+              ) : (
+                t`Never`
+              )}
+            </Cell>
+            <Cell>
               <RelativeTime datetime={key.createdAt} focusable={false} />
+            </Cell>
+            <Cell>
+              <KeyActions apiKey={key} onAction={onAction} />
             </Cell>
           </Row>
         ))}
       </TableBody>
     </Table>
+  );
+}
+
+/** Spec 0001 UX-11, UX-30: a list's row actions go in a menu, and what you can't do stays visible with the reason. */
+function KeyActions({
+  apiKey,
+  onAction,
+}: {
+  apiKey: ApiKey;
+  onAction: (action: KeyAction, key: ApiKey) => void;
+}) {
+  const { t } = useLingui();
+  const canWrite = useCan("api_key", "keys.write", apiKey);
+  const { name } = apiKey;
+  const whyNot = canWrite ? undefined : notAllowed;
+  const whyNotRegenerate =
+    whyNot ??
+    (apiKey.status === "active" ? undefined : msg`Only an active key can be regenerated.`);
+  const whyNotRevoke =
+    whyNot ?? (apiKey.status === "revoked" ? msg`It's already revoked.` : undefined);
+  return (
+    <MenuTrigger
+      trigger={<IconButton variant="ghost" icon={MoreIcon} aria-label={t`Actions for ${name}`} />}
+    >
+      <Menu aria-label={t`Actions for ${name}`}>
+        <MenuItem
+          id="rename"
+          unavailableReason={whyNot}
+          onAction={() => {
+            onAction("rename", apiKey);
+          }}
+        >
+          {t`Rename`}
+        </MenuItem>
+        <MenuItem
+          id="regenerate"
+          unavailableReason={whyNotRegenerate}
+          onAction={() => {
+            onAction("regenerate", apiKey);
+          }}
+        >
+          {t`Regenerate`}
+        </MenuItem>
+        <MenuItem
+          id="revoke"
+          tone="danger"
+          unavailableReason={whyNotRevoke}
+          onAction={() => {
+            onAction("revoke", apiKey);
+          }}
+        >
+          {t`Revoke`}
+        </MenuItem>
+      </Menu>
+    </MenuTrigger>
   );
 }
 
@@ -100,88 +209,4 @@ function KeyStatus({ status }: { status: ApiKey["status"] }) {
     default:
       return <Badge>{t`Revoked`}</Badge>;
   }
-}
-
-function CreateKeySheet({ projectId, onClose }: { projectId: string; onClose: () => void }) {
-  const { t } = useLingui();
-  const createKey = useCreateApiKey(projectId);
-  // PRM-7: the key lives in this component's state, and goes when the sheet closes.
-  const [created, setCreated] = useState<CreatedApiKey>();
-  const form = useAppForm({
-    defaultValues: { name: "", type: "secret", scopes: [] as string[] },
-    schema: createKeySchema,
-    onSubmitAsync: async ({ value }) => {
-      try {
-        setCreated(await createKey.mutateAsync(toCreateKeyRequest(createKeySchema.parse(value))));
-        return undefined;
-      } catch {
-        return { form: t`The key wasn't created. Try again in a moment.` };
-      }
-    },
-  });
-
-  return (
-    <SideSheet
-      title={t`Create API key`}
-      isOpen
-      onOpenChange={(isOpen) => {
-        if (!isOpen) onClose();
-      }}
-      footer={
-        created ? (
-          <Button onPress={onClose}>{t`Done`}</Button>
-        ) : (
-          <form.AppForm>
-            <form.SubmitButton>{t`Create key`}</form.SubmitButton>
-          </form.AppForm>
-        )
-      }
-    >
-      {created ? (
-        <SecretReveal label={t`API key`} secret={created.key} masked={maskedKey(created)} />
-      ) : (
-        <form.AppForm>
-          <form.Form>
-            <form.ErrorSummary />
-            <form.AppField name="name">
-              {(field) => <field.TextField label={t`Name`} maxLength={128} />}
-            </form.AppField>
-            <form.AppField name="type">
-              {(field) => (
-                <field.RadioGroup
-                  label={t`Type`}
-                  options={[
-                    {
-                      id: "secret",
-                      label: t`Secret`,
-                      description: t`For your servers. Never put it in a browser or an app.`,
-                    },
-                    {
-                      id: "publishable",
-                      label: t`Publishable`,
-                      description: t`Safe in client code. It gets every client API.`,
-                    },
-                  ]}
-                />
-              )}
-            </form.AppField>
-            <form.Subscribe selector={(state) => state.values.type}>
-              {(type) =>
-                type === "secret" ? (
-                  <form.AppField name="scopes">
-                    {(field) => (
-                      <field.CheckboxGroup
-                        label={t`Scopes`}
-                        options={SECRET_SCOPES.map((scope) => ({ id: scope, label: scope }))}
-                      />
-                    )}
-                  </form.AppField>
-                ) : null
-              }
-            </form.Subscribe>
-          </form.Form>
-        </form.AppForm>
-      )}
-    </SideSheet>
-  );
 }

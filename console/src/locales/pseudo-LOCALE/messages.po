@@ -21,11 +21,11 @@ msgid "{0, plural, one {# message} other {# messages}}"
 msgstr ""
 
 #. placeholder {0}: Math.ceil(details.retryAfter)
-#: src/ui/error-copy.tsx:96
+#: src/ui/error-copy.tsx:106
 msgid "{0, plural, one {Try again in # second.} other {Try again in # seconds.}}"
 msgstr ""
 
-#: src/features/projects/components/project-overview.tsx:45
+#: src/features/projects/components/project-overview.tsx:44
 msgid "{activeKeys} active"
 msgstr ""
 
@@ -86,12 +86,12 @@ msgid "{count, plural, one {# messaging topic} other {# messaging topics}}"
 msgstr ""
 
 #: src/ui/confirm-delete/dependents.ts:20
-#: src/ui/shell/switcher.tsx:68
+#: src/ui/shell/switcher.tsx:69
 msgid "{count, plural, one {# organization} other {# organizations}}"
 msgstr ""
 
 #: src/ui/confirm-delete/dependents.ts:21
-#: src/ui/shell/switcher.tsx:80
+#: src/ui/shell/switcher.tsx:81
 msgid "{count, plural, one {# project} other {# projects}}"
 msgstr ""
 
@@ -123,7 +123,7 @@ msgstr ""
 msgid "{count, plural, one {Delete # row} other {Delete # rows}}"
 msgstr ""
 
-#: src/ui/form/form-components.tsx:128
+#: src/ui/form/form-components.tsx:138
 msgid "{count, plural, one {Fix this problem to continue} other {Fix these # problems to continue}}"
 msgstr ""
 
@@ -131,8 +131,13 @@ msgstr ""
 msgid "{count} of kind {name}"
 msgstr ""
 
+#: src/features/session/components/reauth-dialog.tsx:19
 #: src/features/session/components/sign-in-page.tsx:34
 msgid "{minutes, plural, one {Too many tries. Try again in # minute.} other {Too many tries. Try again in # minutes.}}"
+msgstr ""
+
+#: src/features/projects/components/origins-settings.tsx:43
+msgid "{origin} isn't an exact origin. Use one such as https://app.example.com, at most 100 of them."
 msgstr ""
 
 #: src/features/setup/components/setup-page.tsx:99
@@ -143,15 +148,16 @@ msgstr ""
 msgid "{source}, {count, plural, one {# time} other {# times}}"
 msgstr ""
 
-#: src/features/projects/components/project-overview.tsx:35
+#: src/features/projects/components/project-overview.tsx:34
 msgid "A key lets your app reach this project."
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:37
+#: src/features/api-keys/components/keys-page.tsx:58
 msgid "A key lets your app reach this project. It's shown only once."
 msgstr ""
 
-#: src/features/api-keys/schemas/create-key.ts:33
+#: src/features/api-keys/schemas/create-key.ts:61
+#: src/features/api-keys/schemas/rename-key.ts:11
 msgid "A key name is at most 128 characters."
 msgstr ""
 
@@ -159,11 +165,12 @@ msgstr ""
 msgid "A name is at most 128 characters."
 msgstr ""
 
-#: src/features/projects/components/organization-page.tsx:37
+#: src/features/projects/components/organization-page.tsx:56
 msgid "A project holds your data and the keys your apps use to reach it."
 msgstr ""
 
 #: src/features/projects/schemas/create-project.ts:14
+#: src/features/projects/schemas/update-project.ts:15
 msgid "A project name is at most 128 characters."
 msgstr ""
 
@@ -181,12 +188,18 @@ msgstr ""
 msgid "Account"
 msgstr ""
 
+#: src/features/api-keys/components/keys-page.tsx:107
 #: src/ui/command-palette/index.tsx:140
 msgid "Actions"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:97
-#: src/features/projects/components/organization-page.tsx:80
+#: src/features/api-keys/components/keys-page.tsx:166
+#: src/features/api-keys/components/keys-page.tsx:168
+msgid "Actions for {name}"
+msgstr ""
+
+#: src/features/api-keys/components/keys-page.tsx:206
+#: src/features/projects/components/organization-page.tsx:115
 msgid "Active"
 msgstr ""
 
@@ -199,15 +212,22 @@ msgstr ""
 msgid "Activity, new messages"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:65
+#: src/features/api-keys/components/scope-checklist.tsx:72
+msgid "All of {name}"
+msgstr ""
+
+#: src/ui/shell/switcher.tsx:66
 msgid "All organizations"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:78
+#: src/ui/shell/switcher.tsx:79
 msgid "All projects"
 msgstr ""
 
-#: src/features/projects/components/organization-page.tsx:155
+#: src/features/projects/components/organization-page.tsx:189
+#: src/features/projects/components/origins-settings.tsx:53
+#: src/features/projects/components/project-settings.tsx:27
+#: src/routes/_shell/$orgId/$projectId/settings/origins.tsx:6
 msgid "Allowed origins"
 msgstr ""
 
@@ -225,26 +245,28 @@ msgstr ""
 msgid "An email is at most 254 characters."
 msgstr ""
 
+#: src/features/organizations/schemas/organization.ts:14
 #: src/features/setup/schemas/owner.ts:29
 msgid "An organization name is at most 128 characters."
 msgstr ""
 
-#: src/features/projects/components/project-overview.tsx:28
+#: src/features/projects/components/project-overview.tsx:27
 msgid "API address"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:141
+#: src/features/api-keys/components/create-key-sheet.tsx:69
+#: src/features/api-keys/components/key-dialogs.tsx:106
 msgid "API key"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:32
-#: src/features/api-keys/components/keys-page.tsx:62
-#: src/features/projects/components/project-overview.tsx:43
+#: src/features/api-keys/components/keys-page.tsx:96
+#: src/features/projects/components/project-overview.tsx:42
+#: src/features/projects/components/project-settings.tsx:22
 #: src/routes/_shell/$orgId/$projectId/settings/keys.tsx:7
 msgid "API keys"
 msgstr ""
 
-#: src/ui/error-copy.tsx:69
+#: src/ui/error-copy.tsx:79
 msgid "Ask an owner of this project for access."
 msgstr ""
 
@@ -260,7 +282,12 @@ msgstr ""
 msgid "Breadcrumb"
 msgstr ""
 
-#: src/features/projects/components/organization-page.tsx:140
+#: src/features/api-keys/components/key-dialogs.tsx:53
+#: src/features/api-keys/components/key-dialogs.tsx:152
+#: src/features/organizations/components/organization-dialogs.tsx:47
+#: src/features/organizations/components/organization-dialogs.tsx:103
+#: src/features/projects/components/organization-page.tsx:174
+#: src/features/session/components/reauth-dialog.tsx:59
 #: src/ui/confirm-delete/index.tsx:121
 msgid "Cancel"
 msgstr ""
@@ -269,12 +296,16 @@ msgstr ""
 msgid "Cancelled"
 msgstr ""
 
-#: src/ui/error-copy.tsx:109
+#: src/ui/error-copy.tsx:119
 msgid "Check your connection and try again."
 msgstr ""
 
-#: src/features/api-keys/schemas/create-key.ts:41
+#: src/features/api-keys/schemas/create-key.ts:70
 msgid "Choose at least one scope."
+msgstr ""
+
+#: src/features/api-keys/components/scope-checklist.tsx:32
+msgid "Client APIs"
 msgstr ""
 
 #: src/ui/shell/drawer.tsx:69
@@ -311,7 +342,17 @@ msgstr ""
 msgid "Compact"
 msgstr ""
 
-#: src/features/projects/components/connect-panel.tsx:12
+#: src/features/session/components/reauth-dialog.tsx:61
+msgid "Confirm"
+msgstr ""
+
+#: src/features/session/components/reauth-dialog.tsx:50
+#: src/ui/error-copy.tsx:53
+msgid "Confirm your password"
+msgstr ""
+
+#: src/features/projects/components/connect-panel.tsx:44
+#: src/features/projects/components/connect-panel.tsx:48
 msgid "Connect"
 msgstr ""
 
@@ -340,15 +381,15 @@ msgstr ""
 msgid "Couldn't delete"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:64
+#: src/ui/shell/switcher.tsx:65
 msgid "Couldn't load organizations. Check your connection and try again."
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:77
+#: src/ui/shell/switcher.tsx:78
 msgid "Couldn't load projects. Check your connection and try again."
 msgstr ""
 
-#: src/ui/error-copy.tsx:108
+#: src/ui/error-copy.tsx:118
 msgid "Couldn't reach the server"
 msgstr ""
 
@@ -361,41 +402,45 @@ msgstr ""
 msgid "Counting what will be deleted with it…"
 msgstr ""
 
-#: src/features/projects/components/project-overview.tsx:34
+#: src/features/projects/components/project-overview.tsx:33
 msgid "Create an API key"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:26
-#: src/features/api-keys/components/keys-page.tsx:125
-#: src/features/projects/components/project-overview.tsx:38
+#: src/features/api-keys/components/create-key-sheet.tsx:52
+#: src/features/api-keys/components/keys-page.tsx:44
+#: src/features/projects/components/project-overview.tsx:37
 msgid "Create API key"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:135
+#: src/features/api-keys/components/create-key-sheet.tsx:62
 msgid "Create key"
+msgstr ""
+
+#: src/features/organizations/components/organization-dialogs.tsx:49
+msgid "Create organization"
 msgstr ""
 
 #: src/features/setup/components/owner-step.tsx:118
 msgid "Create owner account"
 msgstr ""
 
-#: src/features/projects/components/organization-page.tsx:142
+#: src/features/projects/components/organization-page.tsx:176
 msgid "Create project"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:36
+#: src/features/api-keys/components/keys-page.tsx:57
 msgid "Create your first key"
 msgstr ""
 
-#: src/features/projects/components/organization-page.tsx:36
+#: src/features/projects/components/organization-page.tsx:55
 msgid "Create your first project"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:70
+#: src/features/api-keys/components/keys-page.tsx:106
 msgid "Created"
 msgstr ""
 
-#: src/features/projects/components/organization-page.tsx:82
+#: src/features/projects/components/organization-page.tsx:117
 msgid "Creating"
 msgstr ""
 
@@ -412,6 +457,8 @@ msgstr ""
 msgid "Dark"
 msgstr ""
 
+#: src/features/api-keys/components/scope-checklist.tsx:25
+#: src/features/api-keys/components/scope-checklist.tsx:33
 #: src/ui/shell/nav-registry.ts:36
 msgid "Databases"
 msgstr ""
@@ -464,6 +511,8 @@ msgstr ""
 msgid "Delete organization"
 msgstr ""
 
+#: src/features/projects/components/general-settings.tsx:73
+#: src/features/projects/components/general-settings.tsx:89
 #: src/ui/confirm-delete/tiers.ts:54
 msgid "Delete project"
 msgstr ""
@@ -500,7 +549,7 @@ msgstr ""
 msgid "Delete webhook"
 msgstr ""
 
-#: src/features/projects/components/organization-page.tsx:84
+#: src/features/projects/components/organization-page.tsx:119
 msgid "Deleting"
 msgstr ""
 
@@ -525,7 +574,8 @@ msgstr ""
 msgid "Don't ask again for this table this session"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:132
+#: src/features/api-keys/components/create-key-sheet.tsx:59
+#: src/features/api-keys/components/key-dialogs.tsx:104
 msgid "Done"
 msgstr ""
 
@@ -534,11 +584,13 @@ msgstr ""
 msgid "Email"
 msgstr ""
 
-#: src/features/api-keys/schemas/create-key.ts:32
+#: src/features/api-keys/schemas/create-key.ts:60
+#: src/features/api-keys/schemas/rename-key.ts:10
 msgid "Enter a key name."
 msgstr ""
 
 #: src/features/projects/schemas/create-project.ts:13
+#: src/features/projects/schemas/update-project.ts:14
 msgid "Enter a project name."
 msgstr ""
 
@@ -546,6 +598,7 @@ msgstr ""
 msgid "Enter a valid email address."
 msgstr ""
 
+#: src/features/organizations/schemas/organization.ts:13
 #: src/features/setup/schemas/owner.ts:28
 msgid "Enter an organization name."
 msgstr ""
@@ -563,6 +616,7 @@ msgstr ""
 msgid "Enter your name."
 msgstr ""
 
+#: src/features/session/schemas/reauth.ts:9
 #: src/features/session/schemas/sign-in.ts:16
 msgid "Enter your password."
 msgstr ""
@@ -575,20 +629,33 @@ msgstr ""
 msgid "Expand sidebar"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:99
+#: src/features/api-keys/components/keys-page.tsx:208
 msgid "Expired"
+msgstr ""
+
+#: src/features/api-keys/components/create-key-sheet.tsx:139
+#: src/features/api-keys/components/keys-page.tsx:105
+msgid "Expires"
 msgstr ""
 
 #: src/ui/status-chip.tsx:40
 msgid "Failed"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:157
+#: src/features/api-keys/components/create-key-sheet.tsx:101
 msgid "For your servers. Never put it in a browser or an app."
 msgstr ""
 
+#: src/features/api-keys/components/scope-checklist.tsx:26
+#: src/features/api-keys/components/scope-checklist.tsx:34
 #: src/ui/shell/nav-registry.ts:39
 msgid "Functions"
+msgstr ""
+
+#: src/features/projects/components/general-settings.tsx:49
+#: src/features/projects/components/project-settings.tsx:17
+#: src/routes/_shell/$orgId/$projectId/settings/general.tsx:6
+msgid "General"
 msgstr ""
 
 #: src/ui/shell/palette-actions.ts:45
@@ -610,7 +677,7 @@ msgstr ""
 msgid "Help"
 msgstr ""
 
-#: src/ui/form/text-fields.tsx:95
+#: src/ui/form/text-fields.tsx:98
 msgid "Hide password"
 msgstr ""
 
@@ -618,29 +685,49 @@ msgstr ""
 msgid "I've copied it"
 msgstr ""
 
-#: src/features/projects/components/connect-panel.tsx:24
+#: src/features/api-keys/components/create-key-sheet.tsx:142
+msgid "In 30 days"
+msgstr ""
+
+#: src/features/api-keys/components/create-key-sheet.tsx:144
+msgid "In 365 days"
+msgstr ""
+
+#: src/features/api-keys/components/create-key-sheet.tsx:143
+msgid "In 90 days"
+msgstr ""
+
+#: src/features/projects/components/connect-panel.tsx:32
 msgid "Install command"
 msgstr ""
 
-#: src/ui/error-copy.tsx:75
+#: src/ui/error-copy.tsx:85
 msgid "It changed while you were here"
 msgstr ""
 
-#: src/ui/error-copy.tsx:53
+#: src/ui/error-copy.tsx:63
 msgid "It may have been deleted, or the link is out of date."
+msgstr ""
+
+#: src/features/api-keys/components/keys-page.tsx:163
+msgid "It's already revoked."
 msgstr ""
 
 #: src/ui/form/unsaved-changes-guard.tsx:56
 msgid "Keep editing"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:67
+#: src/features/api-keys/components/keys-page.tsx:101
 msgid "Key"
 msgstr ""
 
 #: src/ui/shell/account-menu.tsx:79
 #: src/ui/shortcut-help/index.tsx:23
 msgid "Keyboard shortcuts"
+msgstr ""
+
+#: src/features/api-keys/components/keys-page.tsx:104
+msgid "Last used"
 msgstr ""
 
 #: src/ui/shell/account-menu.tsx:64
@@ -653,11 +740,11 @@ msgstr ""
 msgid "Loading"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:62
+#: src/ui/shell/switcher.tsx:63
 msgid "Loading organizations…"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:75
+#: src/ui/shell/switcher.tsx:76
 msgid "Loading projects…"
 msgstr ""
 
@@ -674,24 +761,40 @@ msgstr ""
 msgid "Messages"
 msgstr ""
 
+#: src/features/api-keys/components/scope-checklist.tsx:35
 #: src/ui/shell/nav-registry.ts:41
 msgid "Messaging"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:65
-#: src/features/api-keys/components/keys-page.tsx:147
-#: src/features/projects/components/organization-page.tsx:54
-#: src/features/projects/components/organization-page.tsx:150
+#: src/features/api-keys/components/create-key-sheet.tsx:84
+#: src/features/api-keys/components/key-dialogs.tsx:162
+#: src/features/api-keys/components/keys-page.tsx:99
+#: src/features/organizations/components/organization-dialogs.tsx:57
+#: src/features/organizations/components/organization-dialogs.tsx:113
+#: src/features/projects/components/general-settings.tsx:55
+#: src/features/projects/components/organization-page.tsx:85
+#: src/features/projects/components/organization-page.tsx:184
 msgid "Name"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:66
+#: src/features/api-keys/components/create-key-sheet.tsx:141
+#: src/features/api-keys/components/keys-page.tsx:124
+#: src/features/api-keys/components/keys-page.tsx:131
+msgid "Never"
+msgstr ""
+
+#: src/features/api-keys/components/key-dialogs.tsx:96
+msgid "New key for {name}"
+msgstr ""
+
+#: src/features/organizations/components/organization-dialogs.tsx:41
+#: src/ui/shell/switcher.tsx:67
 msgid "New organization"
 msgstr ""
 
-#: src/features/projects/components/organization-page.tsx:26
-#: src/features/projects/components/organization-page.tsx:133
-#: src/ui/shell/switcher.tsx:79
+#: src/features/projects/components/organization-page.tsx:45
+#: src/features/projects/components/organization-page.tsx:167
+#: src/ui/shell/switcher.tsx:80
 msgid "New project"
 msgstr ""
 
@@ -711,11 +814,11 @@ msgstr ""
 msgid "No organization"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:63
+#: src/ui/shell/switcher.tsx:64
 msgid "No organizations match"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:76
+#: src/ui/shell/switcher.tsx:77
 msgid "No projects match"
 msgstr ""
 
@@ -723,8 +826,12 @@ msgstr ""
 msgid "No running jobs"
 msgstr ""
 
-#: src/ui/error-copy.tsx:52
+#: src/ui/error-copy.tsx:62
 msgid "Not found"
+msgstr ""
+
+#: src/ui/form/form-components.tsx:73
+msgid "Nothing has changed."
 msgstr ""
 
 #: src/ui/shell/resource-list.tsx:108
@@ -737,6 +844,14 @@ msgstr ""
 
 #: src/features/setup/components/setup-page.tsx:224
 msgid "Now create the owner account. It can do everything in this install."
+msgstr ""
+
+#: src/features/projects/components/origins-settings.tsx:63
+msgid "One per line, such as https://app.example.com."
+msgstr ""
+
+#: src/features/api-keys/components/keys-page.tsx:161
+msgid "Only an active key can be regenerated."
 msgstr ""
 
 #: src/ui/shell/palette-actions.ts:135
@@ -767,16 +882,26 @@ msgstr ""
 msgid "Organization"
 msgstr ""
 
+#: src/features/organizations/components/organization-settings.tsx:36
+msgid "Organization ID"
+msgstr ""
+
 #: src/features/setup/components/owner-step.tsx:107
 msgid "Organization name"
 msgstr ""
 
+#: src/features/organizations/components/organization-settings.tsx:20
+#: src/routes/_shell/$orgId/settings.tsx:6
 #: src/ui/shell/nav-registry.ts:48
 msgid "Organization settings"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:61
+#: src/ui/shell/switcher.tsx:62
 msgid "Organizations"
+msgstr ""
+
+#: src/features/projects/components/origins-settings.tsx:62
+msgid "Origins"
 msgstr ""
 
 #: src/ui/error-page.tsx:71
@@ -787,11 +912,16 @@ msgstr ""
 msgid "Orvano home"
 msgstr ""
 
+#: src/features/api-keys/components/scope-checklist.tsx:66
+msgid "Other"
+msgstr ""
+
 #: src/routes/_shell/$orgId/$projectId/index.tsx:7
 #: src/ui/shell/nav-registry.ts:34
 msgid "Overview"
 msgstr ""
 
+#: src/features/session/components/reauth-dialog.tsx:71
 #: src/features/session/components/sign-in-page.tsx:80
 #: src/features/setup/components/owner-step.tsx:112
 msgid "Password"
@@ -825,24 +955,29 @@ msgstr ""
 msgid "Project"
 msgstr ""
 
-#: src/features/projects/components/project-overview.tsx:25
+#: src/features/projects/components/project-overview.tsx:24
 msgid "Project details"
 msgstr ""
 
-#: src/features/projects/components/project-overview.tsx:27
+#: src/features/projects/components/project-overview.tsx:26
 msgid "Project ID"
 msgstr ""
 
-#: src/features/projects/components/organization-page.tsx:32
+#: src/features/projects/components/project-settings.tsx:11
+#: src/features/projects/components/project-settings.tsx:13
+msgid "Project settings"
+msgstr ""
+
 #: src/features/projects/components/organization-page.tsx:51
+#: src/features/projects/components/organization-page.tsx:82
 #: src/routes/_shell/$orgId/index.tsx:7
 #: src/ui/shell/nav-registry.ts:46
-#: src/ui/shell/switcher.tsx:74
+#: src/ui/shell/switcher.tsx:75
 msgid "Projects"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:79
-#: src/features/api-keys/components/keys-page.tsx:161
+#: src/features/api-keys/components/create-key-sheet.tsx:105
+#: src/features/api-keys/components/keys-page.tsx:116
 msgid "Publishable"
 msgstr ""
 
@@ -850,10 +985,36 @@ msgstr ""
 msgid "Queued"
 msgstr ""
 
+#: src/features/api-keys/components/scope-checklist.tsx:9
+msgid "Read databases"
+msgstr ""
+
+#: src/features/api-keys/components/scope-checklist.tsx:12
+msgid "Read functions"
+msgstr ""
+
+#: src/features/api-keys/components/scope-checklist.tsx:14
+msgid "Read messaging"
+msgstr ""
+
+#: src/features/api-keys/components/scope-checklist.tsx:17
+msgid "Read sites"
+msgstr ""
+
+#: src/features/api-keys/components/scope-checklist.tsx:19
+msgid "Read storage"
+msgstr ""
+
+#: src/features/api-keys/components/scope-checklist.tsx:21
+msgid "Read users"
+msgstr ""
+
 #: src/ui/status-chip.tsx:39
 msgid "Ready"
 msgstr ""
 
+#: src/features/api-keys/components/scope-checklist.tsx:27
+#: src/features/api-keys/components/scope-checklist.tsx:36
 #: src/ui/shell/nav-registry.ts:38
 msgid "Realtime"
 msgstr ""
@@ -862,12 +1023,39 @@ msgstr ""
 msgid "Recent"
 msgstr ""
 
+#: src/features/api-keys/components/keys-page.tsx:185
+msgid "Regenerate"
+msgstr ""
+
+#: src/features/api-keys/components/key-dialogs.tsx:112
+msgid "Regenerate {name}?"
+msgstr ""
+
+#: src/features/api-keys/components/key-dialogs.tsx:114
+msgid "Regenerate key"
+msgstr ""
+
 #: src/ui/error-page.tsx:57
 msgid "Reload"
 msgstr ""
 
 #: src/ui/confirm-delete/tiers.ts:69
 msgid "Remove member"
+msgstr ""
+
+#: src/features/api-keys/components/key-dialogs.tsx:154
+#: src/features/api-keys/components/keys-page.tsx:176
+#: src/features/organizations/components/organization-dialogs.tsx:105
+#: src/features/organizations/components/organization-settings.tsx:32
+msgid "Rename"
+msgstr ""
+
+#: src/features/api-keys/components/key-dialogs.tsx:144
+msgid "Rename key"
+msgstr ""
+
+#: src/features/organizations/components/organization-dialogs.tsx:95
+msgid "Rename organization"
 msgstr ""
 
 #: src/ui/error-page.tsx:48
@@ -880,13 +1068,29 @@ msgid "Request ID: <0>{requestId}</0>"
 msgstr ""
 
 #: src/ui/banner.tsx:127
-#: src/ui/shell/switcher.tsx:293
+#: src/ui/shell/switcher.tsx:301
 #: src/ui/states.tsx:93
 msgid "Retry"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:101
+#: src/features/api-keys/components/keys-page.tsx:195
+msgid "Revoke"
+msgstr ""
+
+#: src/features/api-keys/components/key-dialogs.tsx:73
+msgid "Revoke {name}?"
+msgstr ""
+
+#: src/features/api-keys/components/key-dialogs.tsx:75
+msgid "Revoke key"
+msgstr ""
+
+#: src/features/api-keys/components/keys-page.tsx:210
 msgid "Revoked"
+msgstr ""
+
+#: src/features/api-keys/components/scope-checklist.tsx:11
+msgid "Run functions"
 msgstr ""
 
 #: src/ui/status-chip.tsx:38
@@ -898,15 +1102,16 @@ msgstr ""
 msgid "Running jobs"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:162
-msgid "Safe in client code. It gets every client API."
+#: src/features/api-keys/components/create-key-sheet.tsx:106
+msgid "Safe in client code."
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:174
+#: src/features/api-keys/components/create-key-sheet.tsx:114
+#: src/features/api-keys/components/create-key-sheet.tsx:118
 msgid "Scopes"
 msgstr ""
 
-#: src/features/projects/components/connect-panel.tsx:14
+#: src/features/projects/components/connect-panel.tsx:22
 msgid "SDK"
 msgstr ""
 
@@ -915,16 +1120,16 @@ msgstr ""
 msgid "Search actions"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:60
+#: src/ui/shell/switcher.tsx:61
 msgid "Search organizations"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:73
+#: src/ui/shell/switcher.tsx:74
 msgid "Search projects"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:79
-#: src/features/api-keys/components/keys-page.tsx:156
+#: src/features/api-keys/components/create-key-sheet.tsx:100
+#: src/features/api-keys/components/keys-page.tsx:116
 msgid "Secret"
 msgstr ""
 
@@ -936,17 +1141,21 @@ msgstr ""
 msgid "Select"
 msgstr ""
 
+#: src/features/api-keys/components/scope-checklist.tsx:15
+msgid "Send messages"
+msgstr ""
+
 #: src/features/setup/components/setup-page.tsx:28
 #: src/features/setup/components/setup-page.tsx:58
 msgid "Set up Orvano"
 msgstr ""
 
-#: src/routes/_shell/$orgId/$projectId/settings/route.tsx:5
+#: src/routes/_shell/$orgId/$projectId/settings/route.tsx:6
 #: src/ui/shell/nav-registry.ts:44
 msgid "Settings"
 msgstr ""
 
-#: src/features/projects/components/connect-panel.tsx:26
+#: src/features/projects/components/connect-panel.tsx:34
 msgid "Setup code"
 msgstr ""
 
@@ -972,7 +1181,7 @@ msgstr ""
 msgid "Show list"
 msgstr ""
 
-#: src/ui/form/text-fields.tsx:95
+#: src/ui/form/text-fields.tsx:98
 msgid "Show password"
 msgstr ""
 
@@ -984,6 +1193,7 @@ msgstr ""
 msgid "Show the full path"
 msgstr ""
 
+#: src/features/api-keys/components/scope-checklist.tsx:23
 #: src/features/session/components/sign-in-page.tsx:21
 #: src/features/session/components/sign-in-page.tsx:71
 #: src/features/session/components/sign-in-page.tsx:82
@@ -995,6 +1205,11 @@ msgstr ""
 msgid "Sign out"
 msgstr ""
 
+#: src/features/api-keys/components/scope-checklist.tsx:24
+msgid "Sign up"
+msgstr ""
+
+#: src/features/api-keys/components/scope-checklist.tsx:37
 #: src/ui/shell/nav-registry.ts:40
 msgid "Sites"
 msgstr ""
@@ -1003,37 +1218,51 @@ msgstr ""
 msgid "Skip to content"
 msgstr ""
 
-#: src/ui/error-copy.tsx:76
+#: src/ui/error-copy.tsx:86
 msgid "Someone else changed it. Reload the page to see the latest version."
 msgstr ""
 
-#: src/ui/error-copy.tsx:124
+#: src/features/organizations/components/organization-dialogs.tsx:87
+msgid "Someone else changed this organization. Reload the page, then try again."
+msgstr ""
+
+#: src/features/projects/components/save-failure.ts:7
+msgid "Someone else changed this project. Reload the page, then try again."
+msgstr ""
+
+#: src/ui/error-copy.tsx:134
 #: src/ui/error-page.tsx:83
 msgid "Something went wrong"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:69
-#: src/features/projects/components/organization-page.tsx:56
+#: src/features/api-keys/components/keys-page.tsx:103
+#: src/features/projects/components/organization-page.tsx:87
 msgid "Status"
 msgstr ""
 
+#: src/features/api-keys/components/scope-checklist.tsx:28
+#: src/features/api-keys/components/scope-checklist.tsx:38
 #: src/ui/shell/nav-registry.ts:37
 msgid "Storage"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:58
-msgid "Switch organization"
+#: src/features/api-keys/components/scope-checklist.tsx:16
+msgid "Subscribe to realtime"
 msgstr ""
 
 #: src/ui/shell/switcher.tsx:59
+msgid "Switch organization"
+msgstr ""
+
+#: src/ui/shell/switcher.tsx:60
 msgid "Switch organization: {name}"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:71
+#: src/ui/shell/switcher.tsx:72
 msgid "Switch project"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:72
+#: src/ui/shell/switcher.tsx:73
 msgid "Switch project: {name}"
 msgstr ""
 
@@ -1041,8 +1270,20 @@ msgstr ""
 msgid "System"
 msgstr ""
 
-#: src/features/projects/components/organization-page.tsx:156
+#: src/features/api-keys/components/key-dialogs.tsx:61
+msgid "That didn't work"
+msgstr ""
+
+#: src/features/session/components/reauth-dialog.tsx:39
+msgid "That password is wrong."
+msgstr ""
+
+#: src/features/projects/components/organization-page.tsx:190
 msgid "The browser origins your app runs on, one per line. You can change them later."
+msgstr ""
+
+#: src/features/projects/components/origins-settings.tsx:54
+msgid "The browser origins your app runs on. A change applies within a minute."
 msgstr ""
 
 #: src/ui/error-page.tsx:72
@@ -1053,19 +1294,43 @@ msgstr ""
 msgid "The email or password is wrong."
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:118
+#: src/features/api-keys/components/key-dialogs.tsx:74
+msgid "The key stops working on its next request. You can't undo this."
+msgstr ""
+
+#: src/features/api-keys/components/create-key-sheet.tsx:43
+msgid "The key wasn't created, because your password wasn't confirmed."
+msgstr ""
+
+#: src/features/api-keys/components/create-key-sheet.tsx:44
 msgid "The key wasn't created. Try again in a moment."
 msgstr ""
 
-#: src/features/projects/components/organization-page.tsx:126
+#: src/features/api-keys/components/key-dialogs.tsx:138
+msgid "The key wasn't renamed. Try again in a moment."
+msgstr ""
+
+#: src/features/api-keys/components/key-dialogs.tsx:113
+msgid "The old key stops at once. The new one has the same scopes and expiry. You can't undo this."
+msgstr ""
+
+#: src/features/organizations/components/organization-dialogs.tsx:35
+msgid "The organization wasn't created. Try again in a moment."
+msgstr ""
+
+#: src/features/organizations/components/organization-dialogs.tsx:88
+msgid "The organization wasn't renamed. Try again in a moment."
+msgstr ""
+
+#: src/features/projects/components/organization-page.tsx:160
 msgid "The project wasn't created. Try again in a moment."
 msgstr ""
 
-#: src/ui/error-copy.tsx:82
+#: src/ui/error-copy.tsx:92
 msgid "The request wasn't valid"
 msgstr ""
 
-#: src/ui/error-copy.tsx:115
+#: src/ui/error-copy.tsx:125
 msgid "The server had a problem"
 msgstr ""
 
@@ -1088,6 +1353,10 @@ msgstr ""
 msgid "This deletes {name}. You can't undo this."
 msgstr ""
 
+#: src/ui/error-copy.tsx:54
+msgid "This needs your password. Try again and enter it."
+msgstr ""
+
 #: src/ui/error-page.tsx:84
 msgid "This page ran into a problem. Reload to try again."
 msgstr ""
@@ -1100,40 +1369,53 @@ msgstr ""
 msgid "This password is too long."
 msgstr ""
 
+#: src/features/projects/components/general-settings.tsx:82
+msgid "This project is already being deleted."
+msgstr ""
+
+#: src/features/projects/components/save-failure.ts:10
+msgid "This project is being deleted, so it can't change."
+msgstr ""
+
+#: src/features/projects/components/general-settings.tsx:74
+msgid "This removes the project, its keys, and everything in it. You can't undo this."
+msgstr ""
+
 #: src/features/setup/components/setup-page.tsx:131
 msgid "This setup link or token is not valid any more. Make a new one with {SETUP_TOKEN_COMMAND}."
 msgstr ""
 
-#: src/ui/error-copy.tsx:91
+#: src/ui/error-copy.tsx:101
 msgid "Too many requests"
 msgstr ""
 
+#: src/features/session/components/reauth-dialog.tsx:17
 #: src/features/session/components/sign-in-page.tsx:32
 #: src/features/setup/components/owner-step.tsx:70
 #: src/features/setup/components/setup-page.tsx:97
 msgid "Too many tries. Wait a moment, then try again."
 msgstr ""
 
-#: src/ui/error-copy.tsx:118
-#: src/ui/error-copy.tsx:127
+#: src/ui/error-copy.tsx:128
+#: src/ui/error-copy.tsx:137
 msgid "Try again in a moment."
 msgstr ""
 
-#: src/ui/error-copy.tsx:117
-#: src/ui/error-copy.tsx:126
+#: src/ui/error-copy.tsx:127
+#: src/ui/error-copy.tsx:136
 msgid "Try again. If it keeps failing, share the request ID with your administrator."
 msgstr ""
 
-#: src/ui/error-copy.tsx:85
+#: src/ui/error-copy.tsx:95
 msgid "Trying again won't help. Check what you entered and change it."
 msgstr ""
 
-#: src/ui/error-copy.tsx:84
+#: src/ui/error-copy.tsx:94
 msgid "Trying again won't help. If you didn't expect this, share the request ID with your administrator."
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:68
-#: src/features/api-keys/components/keys-page.tsx:152
+#: src/features/api-keys/components/create-key-sheet.tsx:96
+#: src/features/api-keys/components/keys-page.tsx:102
 msgid "Type"
 msgstr ""
 
@@ -1153,6 +1435,11 @@ msgstr ""
 msgid "Type the number of rows to confirm."
 msgstr ""
 
+#: src/features/projects/components/general-settings.tsx:50
+#: src/features/projects/components/origins-settings.tsx:55
+msgid "Update"
+msgstr ""
+
 #: src/ui/shell/nav-registry.ts:42
 msgid "Usage"
 msgstr ""
@@ -1170,7 +1457,8 @@ msgstr ""
 msgid "Use compact density"
 msgstr ""
 
-#: src/features/projects/components/organization-page.tsx:122
+#: src/features/projects/components/organization-page.tsx:156
+#: src/features/projects/components/origins-settings.tsx:44
 msgid "Use exact origins such as https://app.example.com, one per line."
 msgstr ""
 
@@ -1186,8 +1474,32 @@ msgstr ""
 msgid "Use the system theme"
 msgstr ""
 
-#: src/ui/error-copy.tsx:94
+#: src/features/api-keys/components/scope-checklist.tsx:39
+msgid "Users"
+msgstr ""
+
+#: src/ui/error-copy.tsx:104
 msgid "Wait a moment, then try again."
+msgstr ""
+
+#: src/features/api-keys/components/scope-checklist.tsx:10
+msgid "Write databases"
+msgstr ""
+
+#: src/features/api-keys/components/scope-checklist.tsx:13
+msgid "Write functions"
+msgstr ""
+
+#: src/features/api-keys/components/scope-checklist.tsx:18
+msgid "Write sites"
+msgstr ""
+
+#: src/features/api-keys/components/scope-checklist.tsx:20
+msgid "Write storage"
+msgstr ""
+
+#: src/features/api-keys/components/scope-checklist.tsx:22
+msgid "Write users"
 msgstr ""
 
 #: src/features/shell/components/no-organization.tsx:11
@@ -1198,24 +1510,44 @@ msgstr ""
 msgid "You can't undo this."
 msgstr ""
 
-#: src/ui/error-copy.tsx:66
+#: src/ui/error-copy.tsx:76
 msgid "You don't have access"
 msgstr ""
 
-#: src/ui/error-copy.tsx:68
+#: src/features/api-keys/components/keys-page.tsx:26
+msgid "You don't have permission to change keys."
+msgstr ""
+
+#: src/features/projects/components/organization-page.tsx:39
+msgid "You don't have permission to create projects here."
+msgstr ""
+
+#: src/features/projects/components/general-settings.tsx:83
+msgid "You don't have permission to delete this project."
+msgstr ""
+
+#: src/features/organizations/components/organization-settings.tsx:26
+msgid "You don't have permission to rename this organization."
+msgstr ""
+
+#: src/features/session/components/reauth-dialog.tsx:51
+msgid "You haven't entered it for a while, and this action needs it."
+msgstr ""
+
+#: src/ui/error-copy.tsx:78
 msgid "You need the {role} role for this."
 msgstr ""
 
-#: src/ui/form/fields.test.tsx:280
+#: src/ui/form/fields.test.tsx:287
 msgid "You need the Admin role to change this."
 msgstr ""
 
-#: src/ui/button.test.tsx:11
+#: src/ui/button.test.tsx:12
 msgid "You need the Admin role to delete tables."
 msgstr ""
 
-#: src/ui/menu.test.tsx:57
-#: src/ui/menu.test.tsx:84
+#: src/ui/menu.test.tsx:77
+#: src/ui/menu.test.tsx:104
 msgid "You need the Admin role to export rows."
 msgstr ""
 
@@ -1223,7 +1555,7 @@ msgstr ""
 msgid "You won't be able to see it again. Store it somewhere safe."
 msgstr ""
 
-#: src/ui/error-copy.tsx:59
+#: src/ui/error-copy.tsx:69
 msgid "You're signed out"
 msgstr ""
 
@@ -1231,10 +1563,18 @@ msgstr ""
 msgid "Your changes haven't been saved. If you leave now, they'll be lost."
 msgstr ""
 
+#: src/features/projects/components/save-failure.ts:12
+msgid "Your changes weren't saved. Try again in a moment."
+msgstr ""
+
 #: src/features/setup/components/owner-step.tsx:94
 msgid "Your name"
 msgstr ""
 
-#: src/ui/error-copy.tsx:60
+#: src/features/session/components/reauth-dialog.tsx:24
+msgid "Your password couldn't be checked. Try again in a moment."
+msgstr ""
+
+#: src/ui/error-copy.tsx:70
 msgid "Your session ended. Sign in again to continue."
 msgstr ""

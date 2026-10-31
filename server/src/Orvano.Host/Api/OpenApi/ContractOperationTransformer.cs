@@ -156,6 +156,7 @@ internal sealed partial class ContractOperationTransformer : IOpenApiOperationTr
     {
         [AccessEndpointFilters.ProjectIdRouteValue] = "The project's ID.",
         [AccessEndpointFilters.OrganizationIdRouteValue] = "The organization's ID.",
+        ["keyId"] = "The API key's ID.",
     };
 
     [GeneratedRegex(@"\{(?<name>[A-Za-z0-9_]+)[^}]*\}", RegexOptions.CultureInvariant)]

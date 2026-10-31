@@ -90,7 +90,7 @@ export interface MenuItemProps {
 }
 
 const itemClass = cx(
-  "group flex min-h-control cursor-default items-center gap-2 rounded-md px-2 py-1 text-fg data-focused:bg-bg-muted data-unavailable:text-fg-muted",
+  "group flex min-h-control cursor-default items-center gap-2 rounded-md px-2 py-1 data-focused:bg-bg-muted data-unavailable:text-fg-muted",
   focusRingInset,
 );
 
@@ -121,7 +121,7 @@ export function MenuItem({
           aria-disabled={reason ? true : undefined}
         />
       )}
-      className={cx(itemClass, tone === "danger" && "text-danger-text")}
+      className={cx(itemClass, tone === "danger" ? "text-danger-text" : "text-fg")}
     >
       {({ selectionMode, isSelected }) => (
         <>

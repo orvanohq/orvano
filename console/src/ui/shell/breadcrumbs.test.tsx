@@ -33,7 +33,7 @@ describe("Breadcrumbs", () => {
     const crumbs: Crumb[] = [
       { kind: "org" },
       { kind: "page", label: "Settings" },
-      { kind: "page", label: "Billing", link: { to: "/billing" } },
+      { kind: "page", label: "Billing", link: { to: "/billing" as "/" } },
       { kind: "page", label: "Invoices" },
     ];
     const { screen } = await renderInRouter(

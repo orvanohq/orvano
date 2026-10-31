@@ -2,9 +2,9 @@ import { useLingui } from "@lingui/react/macro";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Outlet, useMatches, useParams } from "@tanstack/react-router";
 import { consoleConfigQuery } from "@/features/console-config";
-import { organizationQuery } from "@/features/organizations";
+import { organizationQuery, searchOrganizations } from "@/features/organizations";
 import { projectQuery, searchProjects } from "@/features/projects";
-import { sessionQuery, signOut } from "@/features/session";
+import { ReauthHost, sessionQuery, signOut } from "@/features/session";
 import { config } from "@/shared/config";
 import { AppShell, type Crumb, type ShellNavItem, type SwitcherSearch } from "@/ui";
 import { useDocumentTitle } from "@/ui/shell/use-document-title";
@@ -17,18 +17,31 @@ function navFor(
 ): readonly ShellNavItem[] {
   if (orgId === undefined) return [];
   if (projectId === undefined) {
-    return [{ id: "projects", link: { to: "/$orgId", params: { orgId }, exact: true } }];
+    return [
+      { id: "projects", link: { to: "/$orgId", params: { orgId }, exact: true } },
+      { id: "org-settings", link: { to: "/$orgId/settings", params: { orgId } } },
+    ];
   }
   const params = { orgId, projectId };
   return [
     { id: "overview", link: { to: "/$orgId/$projectId", params, exact: true } },
     ...(services ?? []).map((service) => ({
       id: service as ShellNavItem["id"],
-      link: { to: `/$orgId/$projectId/${service}`, params },
+      // A service's route comes with the feature that adds it to `services`.
+      link: { to: `/$orgId/$projectId/${service}` as "/$orgId/$projectId", params },
     })),
-    { id: "settings", link: { to: "/$orgId/$projectId/settings/keys", params } },
+    { id: "settings", link: { to: "/$orgId/$projectId/settings", params } },
   ];
 }
+
+const searchOrgs: SwitcherSearch = async (query, options) => {
+  const items = await searchOrganizations(query, options);
+  return items.map((item) => ({
+    id: item.id,
+    name: item.name,
+    link: { to: "/$orgId", params: { orgId: item.id } },
+  }));
+};
 
 /** Spec 0017 CNS-3: the shell's model and crumbs, from the session, the organization and project, and `staticData.crumb`. */
 export function ShellLayout() {
@@ -65,21 +78,6 @@ export function ShellLayout() {
   });
   if (!session) return null; // `_shell`'s guard sends a signed out visit to sign in
 
-  // Step 19 moves this to the paged organization list; the session's first 100 serve until then.
-  const searchOrgs: SwitcherSearch = (query, { limit }) => {
-    const lower = query.toLowerCase();
-    return Promise.resolve(
-      session.memberships
-        .filter((membership) => membership.organizationName.toLowerCase().includes(lower))
-        .slice(0, limit)
-        .map((membership) => ({
-          id: membership.organizationId,
-          name: membership.organizationName,
-          link: { to: "/$orgId", params: { orgId: membership.organizationId } },
-        })),
-    );
-  };
-
   const searchProjectsInOrg: SwitcherSearch = async (query, options) => {
     if (orgId === undefined) return [];
     const items = await searchProjects(orgId, query, options);
@@ -105,8 +103,18 @@ export function ShellLayout() {
         nav: navFor(orgId, projectId, project?.services),
         searchOrgs,
         searchProjects: searchProjectsInOrg,
-        orgLinks: { all: { to: "/" } },
-        projectLinks: orgId ? { all: { to: "/$orgId", params: { orgId } } } : undefined,
+        orgLinks: {
+          all: { to: "/" },
+          create: orgId
+            ? { to: "/$orgId", params: { orgId }, search: { create: "organization" } }
+            : undefined,
+        },
+        projectLinks: orgId
+          ? {
+              all: { to: "/$orgId", params: { orgId } },
+              create: { to: "/$orgId", params: { orgId }, search: { create: "project" } },
+            }
+          : undefined,
         onSignOut: () => {
           // Spec 0017 SES-6, spec 0003 QRY-9: a full page load drops every cache.
           void signOut().finally(() => {
@@ -117,6 +125,7 @@ export function ShellLayout() {
       crumbs={crumbs}
     >
       <Outlet />
+      <ReauthHost />
     </AppShell>
   );
 }

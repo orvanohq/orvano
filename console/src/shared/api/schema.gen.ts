@@ -24,6 +24,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/console/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the operator's organizations.
+         * @description Lists only the organizations the operator belongs to, oldest first. `query` matches the name, ignoring case.
+         */
+        get: operations["Platform_ListOrganizations"];
+        put?: never;
+        /**
+         * Create an organization.
+         * @description The operator becomes its owner.
+         */
+        post: operations["Platform_CreateOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/console/organizations/{organizationId}": {
         parameters: {
             query?: never;
@@ -41,7 +65,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Rename an organization.
+         * @description Answers 404 for an organization the operator isn't a member of.
+         */
+        patch: operations["Platform_UpdateOrganization"];
         trace?: never;
     };
     "/v1/console/organizations/{organizationId}/projects": {
@@ -59,7 +87,7 @@ export interface paths {
         put?: never;
         /**
          * Create a project.
-         * @description Answers 201 once the project is active.
+         * @description Answers 201 once the project is active. If a step fails, the project goes to teardown and the answer is an error.
          */
         post: operations["Platform_CreateProject"];
         delete?: never;
@@ -80,6 +108,34 @@ export interface paths {
          * @description Answers 404 for a project outside the operator's organizations.
          */
         get: operations["Platform_GetProject"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a project.
+         * @description Answers 202 once the project is `deleting`: its keys stop on their next request, and a job removes it. A project already `deleting` answers 202 too.
+         */
+        delete: operations["Platform_DeleteProject"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a project's name or allowed origins.
+         * @description A change to the origins applies within 60 seconds.
+         */
+        patch: operations["Platform_UpdateProject"];
+        trace?: never;
+    };
+    "/v1/console/projects/{projectId}/dependents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count what goes with a project.
+         * @description Counts what deleting the project removes with it.
+         */
+        get: operations["Platform_GetProjectDependents"];
         put?: never;
         post?: never;
         delete?: never;
@@ -112,6 +168,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/console/projects/{projectId}/keys/{keyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename an API key.
+         * @description Changes only the name; a key's type, scopes, and expiry never change.
+         */
+        patch: operations["Platform_RenameApiKey"];
+        trace?: never;
+    };
+    "/v1/console/projects/{projectId}/keys/{keyId}/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace an API key.
+         * @description Revokes the key and answers 201 with a new one of the same type, name, scopes, and expiry. The old key stops at once.
+         */
+        post: operations["Platform_RegenerateApiKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/console/projects/{projectId}/keys/{keyId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke an API key.
+         * @description The key stops working on its next request. Revoking it again changes nothing.
+         */
+        post: operations["Platform_RevokeApiKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/console/session": {
         parameters: {
             query?: never;
@@ -135,6 +251,26 @@ export interface paths {
          * @description Ends this session at once and clears its cookie.
          */
         delete: operations["Platform_SignOut"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/console/session/reauth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm the password.
+         * @description Lets this session do what needs a recent password check for the next 10 minutes. A wrong password fails on `password` with `invalid_password` and counts toward the sign in throttle.
+         */
+        post: operations["Platform_Reauth"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -261,6 +397,11 @@ export interface components {
              */
             expiresInDays?: number | null;
         };
+        /** @description A new organization. */
+        CreateOrganizationRequest: {
+            /** @description Its name. */
+            name: string;
+        };
         /** @description A new project. */
         CreateProjectRequest: {
             /** @description Its name. */
@@ -316,6 +457,23 @@ export interface components {
             createdAt: string;
             /** @description The console permissions the operator holds on it. */
             allowedActions: string[];
+        };
+        /** @description One kind of thing that goes with a resource when it's deleted (spec 0014 CPX-2). */
+        DependentResponse: {
+            /** @description The kind of thing, as a snake_case resource name. */
+            kind: string;
+            /**
+             * Format: int32
+             * @description How many.
+             */
+            count: number;
+            /** @description Whether the count is an estimate. */
+            estimated: boolean;
+        };
+        /** @description What goes with a resource when it's deleted (spec 0014 CPX-2). */
+        DependentsResponse: {
+            /** @description Each kind of thing and its count. */
+            items: components["schemas"]["DependentResponse"][];
         };
         /** @description One problem with one field of the request. */
         FieldError: {
@@ -394,6 +552,18 @@ export interface components {
         PageOfApiKeyResponse: {
             /** @description The items on this page, in the list's order. */
             items: components["schemas"]["ApiKeyResponse"][];
+            /** @description The cursor for the next page, or null on the last page. */
+            nextCursor: string | null;
+            /**
+             * Format: int32
+             * @description How many items the whole list has, or null when the operation does not count them.
+             */
+            total: number | null;
+        };
+        /** @description One page of a list. */
+        PageOfOrganizationResponse: {
+            /** @description The items on this page, in the list's order. */
+            items: components["schemas"]["OrganizationResponse"][];
             /** @description The cursor for the next page, or null on the last page. */
             nextCursor: string | null;
             /**
@@ -485,6 +655,16 @@ export interface components {
          * @enum {string}
          */
         ProjectStatus: "creating" | "active" | "deleting";
+        /** @description The password that proves it's still the operator. */
+        ReauthRequest: {
+            /** @description The account's password. */
+            password: string;
+        };
+        /** @description A new name for an API key. */
+        RenameApiKeyRequest: {
+            /** @description Its new name. */
+            name: string;
+        };
         /** @description The signed in operator and their session. */
         SessionResponse: {
             /** @description The account. */
@@ -523,6 +703,18 @@ export interface components {
             email: string;
             /** @description The account's password. */
             password: string;
+        };
+        /** @description A change to an organization. A field left out stays as it is. */
+        UpdateOrganizationRequest: {
+            /** @description Its new name. */
+            name?: string;
+        };
+        /** @description A change to a project. A field left out stays as it is. */
+        UpdateProjectRequest: {
+            /** @description Its new name. */
+            name?: string;
+            /** @description The exact browser origins it accepts, at most 100. */
+            allowedOrigins?: string[];
         };
     };
     responses: never;
@@ -609,6 +801,140 @@ export interface operations {
             };
         };
     };
+    Platform_ListOrganizations: {
+        parameters: {
+            query?: {
+                /** @description How many items to return, 1 to 100; 50 when not sent. */
+                limit?: number;
+                /** @description The nextCursor of the previous page; omit it for the first page. */
+                cursor?: string;
+                /** @description Matches the name as a contains, ignoring case. */
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOfOrganizationResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description An error. The code says which one; x-orvano-error-codes describes every code. */
+            default: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Platform_CreateOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOrganizationRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description An error. The code says which one; x-orvano-error-codes describes every code. */
+            default: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     Platform_GetOrganization: {
         parameters: {
             query?: never;
@@ -656,6 +982,106 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description An error. The code says which one; x-orvano-error-codes describes every code. */
+            default: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Platform_UpdateOrganization: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `ETag` of the version you read. A write to a changed resource answers `412 version_conflict`. */
+                "If-Match"?: components["parameters"]["If-Match"];
+            };
+            path: {
+                /** @description The organization's ID. */
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOrganizationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
                 headers: {
                     "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
                     "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
@@ -911,6 +1337,283 @@ export interface operations {
             };
         };
     };
+    Platform_DeleteProject: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `ETag` of the version you read. A write to a changed resource answers `412 version_conflict`. */
+                "If-Match"?: components["parameters"]["If-Match"];
+            };
+            path: {
+                /** @description The project's ID. */
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description An error. The code says which one; x-orvano-error-codes describes every code. */
+            default: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Platform_UpdateProject: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `ETag` of the version you read. A write to a changed resource answers `412 version_conflict`. */
+                "If-Match"?: components["parameters"]["If-Match"];
+            };
+            path: {
+                /** @description The project's ID. */
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProjectRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description An error. The code says which one; x-orvano-error-codes describes every code. */
+            default: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Platform_GetProjectDependents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The project's ID. */
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DependentsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description An error. The code says which one; x-orvano-error-codes describes every code. */
+            default: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     Platform_ListApiKeys: {
         parameters: {
             query?: {
@@ -1059,6 +1762,259 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description An error. The code says which one; x-orvano-error-codes describes every code. */
+            default: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Platform_RenameApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The project's ID. */
+                projectId: string;
+                /** @description The API key's ID. */
+                keyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameApiKeyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description An error. The code says which one; x-orvano-error-codes describes every code. */
+            default: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Platform_RegenerateApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The project's ID. */
+                projectId: string;
+                /** @description The API key's ID. */
+                keyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedApiKeyResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description An error. The code says which one; x-orvano-error-codes describes every code. */
+            default: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Platform_RevokeApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The project's ID. */
+                projectId: string;
+                /** @description The API key's ID. */
+                keyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
                     "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
@@ -1267,6 +2223,99 @@ export interface operations {
                 headers: {
                     "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
                     "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description An error. The code says which one; x-orvano-error-codes describes every code. */
+            default: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    Platform_Reauth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReauthRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    "Orvano-Request-Id": components["headers"]["Orvano-Request-Id"];
+                    "Orvano-Api-Version": components["headers"]["Orvano-Api-Version"];
+                    "Retry-After": components["headers"]["Retry-After"];
                     [name: string]: unknown;
                 };
                 content: {

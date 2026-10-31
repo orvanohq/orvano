@@ -61,25 +61,6 @@ public sealed class ConsoleProjectKeyTests(PostgresFixture postgres) : IAsyncLif
 
     private Task<int> ExecuteAsync(string sql) => _host.WithDatabaseAsync(db => db.Database.ExecuteSqlRawAsync(sql, Token));
 
-    // A second operator, a member of nothing, with a session made the way sign in makes one.
-    private async Task<ConsoleSession> StrangerAsync()
-    {
-        DateTimeOffset now = _host.Clock.GetUtcNow();
-        await _host.WithDatabaseAsync(async db =>
-        {
-            db.Operators.Add(new Operator
-            {
-                Email = "stranger@example.com",
-                EmailNormalized = "stranger@example.com",
-                Name = "Stranger",
-                PasswordHash = (await db.Operators.Select(x => x.PasswordHash).FirstAsync(Token)),
-                PasswordChangedAt = now,
-            });
-            return await db.SaveChangesAsync(Token);
-        });
-        return await _host.SignInAsync("stranger@example.com") with { OrganizationId = Guid.Empty };
-    }
-
     // Organizations and membership
 
     [Fact, Trait("Spec", "0017:ORG-3"), Trait("Spec", "0017:AC-9")]
@@ -98,7 +79,7 @@ public sealed class ConsoleProjectKeyTests(PostgresFixture postgres) : IAsyncLif
     public async Task Every_organization_and_project_route_answers_404_when_the_operator_has_no_membership()
     {
         Guid projectId = await _host.CreateProjectAsync(_owner);
-        ConsoleSession stranger = await StrangerAsync();
+        ConsoleSession stranger = await _host.AddOperatorAsync();
 
         foreach ((HttpMethod method, string path, string? body) in new (HttpMethod, string, string?)[]
         {

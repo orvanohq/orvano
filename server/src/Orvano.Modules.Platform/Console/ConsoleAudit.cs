@@ -9,11 +9,18 @@ namespace Orvano.Modules.Platform.Console;
 internal static class AuditActions
 {
     public const string SignIn = "operator.sign_in";
+    public const string Reauth = "operator.reauth";
     public const string SignOut = "operator.sign_out";
     public const string OperatorCreated = "operator.created";
     public const string OrganizationCreated = "organization.created";
+    public const string OrganizationUpdated = "organization.updated";
     public const string ProjectCreated = "project.created";
+    public const string ProjectUpdated = "project.updated";
+    public const string ProjectDeleteRequested = "project.delete_requested";
+    public const string ProjectDeleted = "project.deleted";
     public const string ApiKeyCreated = "api_key.created";
+    public const string ApiKeyRegenerated = "api_key.regenerated";
+    public const string ApiKeyRevoked = "api_key.revoked";
 }
 
 /// <summary>Records a console action after its commit. A sink failure is logged and never fails the request (AUS-3).</summary>

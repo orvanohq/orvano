@@ -37,6 +37,10 @@ public sealed record SignInRequest(
     [property: Required(ErrorMessage = FieldCodes.Required), MaxLength(Operator.MaxEmailLength, ErrorMessage = FieldCodes.TooLong)] string Email,
     [property: Required(ErrorMessage = FieldCodes.Required)] string Password);
 
+/// <summary>The password that proves it's still the operator.</summary>
+/// <param name="Password">The account's password.</param>
+public sealed record ReauthRequest([property: Required(ErrorMessage = FieldCodes.Required)] string Password);
+
 /// <summary>The first owner, their organization, and the proof of a setup token.</summary>
 /// <param name="Token">The token the setup page accepted.</param>
 /// <param name="Name">The owner's name.</param>

@@ -478,6 +478,10 @@
     }
   ],
   "x-orvano-error-codes": {
+    "api_key_not_active": {
+      "status": 409,
+      "description": "The API key is revoked or expired, so it can't be regenerated."
+    },
     "conflict": {
       "status": 409,
       "description": "The request conflicts with the resource's current state."
@@ -539,6 +543,10 @@
       "members": [
         "retryAfter"
       ]
+    },
+    "reauth_required": {
+      "status": 403,
+      "description": "This needs a recent password check; confirm the password, then try again."
     },
     "session_expired": {
       "status": 401,

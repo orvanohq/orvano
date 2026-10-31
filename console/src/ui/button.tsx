@@ -23,6 +23,8 @@ interface BaseProps {
    * Enter, and exposes the reason through `aria-describedby` and a tooltip.
    */
   unavailableReason?: MessageDescriptor;
+  /** `unavailableReason` comes and goes while the button has focus (an Update button after a save), so keep its shape. */
+  reasonMayChange?: boolean;
   /** Takes focus when it mounts: the safe choice in a dialog (Cancel in a tier 2 delete, UX-23). */
   initialFocus?: boolean;
   /** `close` closes the `Dialog` or `SideSheet` it sits in (a sheet asks first when it has unsaved changes). */
@@ -125,6 +127,7 @@ function PressableButton({
   initialFocus,
   slot,
   unavailableReason,
+  reasonMayChange,
   "aria-expanded": expanded,
   ref,
 }: BaseProps & { className: string; label?: string; isPending?: boolean; children: ReactNode }) {
@@ -154,11 +157,13 @@ function PressableButton({
     </AriaButton>
   );
 
-  if (reason) {
+  if (reason || reasonMayChange) {
     return (
       <>
-        <Tooltip content={reason}>{button}</Tooltip>
-        <VisuallyHidden id={reasonId}>{reason}</VisuallyHidden>
+        <Tooltip content={reason} isDisabled={!reason}>
+          {button}
+        </Tooltip>
+        {reason ? <VisuallyHidden id={reasonId}>{reason}</VisuallyHidden> : null}
       </>
     );
   }

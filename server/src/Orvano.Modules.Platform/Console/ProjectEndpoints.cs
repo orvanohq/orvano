@@ -12,10 +12,11 @@ using Orvano.SharedKernel;
 using Orvano.SharedKernel.Access;
 using Orvano.SharedKernel.Api;
 using Orvano.SharedKernel.Data;
+using Orvano.SharedKernel.Signals;
 
 namespace Orvano.Modules.Platform.Console;
 
-/// <summary>Projects (spec 0017 PJT-1, PJT-5). Rename, origins, and delete come with build plan steps 17 and 18.</summary>
+/// <summary>Projects (spec 0017 PJT-1, PJT-5, PJT-7).</summary>
 internal static class ProjectEndpoints
 {
     public static RouteGroupBuilder MapProjects(this RouteGroupBuilder console)
@@ -32,7 +33,8 @@ internal static class ProjectEndpoints
             .RequireConsolePermission(ConsolePermission.ProjectsCreate)
             .WithName("Platform_CreateProject")
             .WithSummary("Create a project.")
-            .WithDescription("Answers 201 once the project is active.")
+            .WithDescription("Answers 201 once the project is active. If a step fails, the project goes to teardown and the "
+                + "answer is an error.")
             .WithErrors(ErrorCodes.ValidationFailed)
             .ProducesValidationProblem();
 
@@ -42,13 +44,44 @@ internal static class ProjectEndpoints
             .WithSummary("Read a project.")
             .WithDescription("Answers 404 for a project outside the operator's organizations.")
             .WithErrors();
+
+        console.MapPatch("/projects/{projectId:guid}", UpdateAsync)
+            .RequireConsolePermission(ConsolePermission.ProjectWrite)
+            .WithConcurrency()
+            .WithName("Platform_UpdateProject")
+            .WithSummary("Change a project's name or allowed origins.")
+            .WithDescription("A change to the origins applies within 60 seconds.")
+            .WithErrors(ErrorCodes.ValidationFailed, ErrorCodes.VersionConflict, PlatformErrorCodes.ProjectNotActive)
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed);
+
+        console.MapDelete("/projects/{projectId:guid}", DeleteAsync)
+            .RequireConsolePermission(ConsolePermission.ProjectDelete)
+            .RequireRecentReauth()
+            .WithConcurrency()
+            .WithName("Platform_DeleteProject")
+            .WithSummary("Delete a project.")
+            .WithDescription("Answers 202 once the project is `deleting`: its keys stop on their next request, and a job "
+                + "removes it. A project already `deleting` answers 202 too.")
+            .WithErrors(ErrorCodes.VersionConflict, PlatformErrorCodes.ProjectNotActive, PlatformErrorCodes.ReauthRequired)
+            .Produces<ProjectResponse>(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed);
+
+        console.MapGet("/projects/{projectId:guid}/dependents", DependentsAsync)
+            .RequireConsolePermission(ConsolePermission.ProjectRead)
+            .WithName("Platform_GetProjectDependents")
+            .WithSummary("Count what goes with a project.")
+            .WithDescription("Counts what deleting the project removes with it.")
+            .WithErrors();
         return console;
     }
 
     internal static async Task<Results<Ok<Page<ProjectResponse>>, ErrorProblemResult>> ListAsync(
         Guid organizationId,
         [AsParameters] PageQuery page,
-        [AsParameters] ProjectFilterQuery filter,
+        [AsParameters] NameFilterQuery filter,
         PlatformDbContext db,
         IMembershipLookup memberships,
         ICallerContext caller,
@@ -71,8 +104,8 @@ internal static class ProjectEndpoints
 
         if (filter.Query is { Length: > 0 } query)
         {
-            string pattern = "%" + query.Replace(@"\", @"\\", StringComparison.Ordinal).Replace("%", @"\%", StringComparison.Ordinal).Replace("_", @"\_", StringComparison.Ordinal) + "%";
-            rows = rows.Where(x => EF.Functions.ILike(x.Name, pattern, @"\"));
+            string pattern = ConsoleSearch.Contains(query);
+            rows = rows.Where(x => EF.Functions.ILike(x.Name, pattern, ConsoleSearch.Escape));
         }
 
         int limit = page.Size;
@@ -135,6 +168,154 @@ internal static class ProjectEndpoints
         ResourceVersion.SetETag(http.Response, project.Version);
         return TypedResults.Ok(ToResponse(project, origins, role));
     }
+
+    internal static async Task<Results<Ok<ProjectResponse>, ErrorProblemResult>> UpdateAsync(
+        Guid projectId,
+        UpdateProjectRequest request,
+        IfMatch ifMatch,
+        PlatformDbContext db,
+        ICacheInvalidator invalidator,
+        IMembershipLookup memberships,
+        ConsoleAudit audit,
+        ICallerContext caller,
+        HttpContext http,
+        CancellationToken cancellationToken)
+    {
+        string? name = null;
+        if (request.Name.HasValue)
+        {
+            name = request.Name.Value.Trim();
+            if (name.Length == 0)
+            {
+                return ConsoleFields.Invalid("name", FieldCodes.Required).ToProblem();
+            }
+        }
+
+        string[]? origins = null;
+        if (request.AllowedOrigins.HasValue)
+        {
+            Result<string[]> normalized = AllowedOrigins.Normalize(request.AllowedOrigins.Value);
+            if (!normalized.IsSuccess)
+            {
+                return normalized.Error.ToProblem();
+            }
+
+            origins = normalized.Value;
+        }
+
+        Result<(Project Project, string[] Origins)> updated = await db.InTransactionAsync<Result<(Project, string[])>>(
+            async token =>
+            {
+                await LockAsync(db, projectId, token);
+                Project project = await db.Projects.SingleAsync(x => x.Id == projectId, token);
+                if (project.Status != ProjectStatus.Active)
+                {
+                    return PlatformErrors.ProjectNotActive;
+                }
+
+                Result fresh = ifMatch.Check(project.Version);
+                if (!fresh.IsSuccess)
+                {
+                    return fresh.Error;
+                }
+
+                ProjectSettings settings = await db.ProjectSettings.SingleAsync(x => x.ProjectId == projectId, token);
+                project.Name = name ?? project.Name;
+                settings.AllowedOrigins = origins ?? settings.AllowedOrigins;
+
+                // PJT-5: the project's version moves even when only the origins change.
+                db.Entry(project).Property(x => x.UpdatedAt).IsModified = true;
+                await db.SaveChangesAsync(token);
+                if (origins is not null)
+                {
+                    invalidator.Invalidate(db, ProjectDirectory.Tag(projectId)); // PJT-4
+                }
+
+                return (project, settings.AllowedOrigins);
+            },
+            cancellationToken);
+        if (!updated.IsSuccess)
+        {
+            return updated.Error.ToProblem();
+        }
+
+        Project saved = updated.Value.Project;
+        Guid operatorId = caller.Current.OperatorId!.Value;
+        await audit.RecordAsync(http, AuditActions.ProjectUpdated, operatorId, "project", projectId, saved.OrganizationId, projectId);
+        string? role = await memberships.FindRoleAsync(operatorId, saved.OrganizationId, cancellationToken);
+        ResourceVersion.SetETag(http.Response, saved.Version);
+        return TypedResults.Ok(ToResponse(saved, updated.Value.Origins, role));
+    }
+
+    internal static async Task<Results<Accepted<ProjectResponse>, ErrorProblemResult>> DeleteAsync(
+        Guid projectId,
+        IfMatch ifMatch,
+        PlatformDbContext db,
+        ProjectDeletion deletion,
+        IMembershipLookup memberships,
+        ConsoleAudit audit,
+        ICallerContext caller,
+        HttpContext http,
+        CancellationToken cancellationToken)
+    {
+        bool requested = false;
+        Result<Project> marked = await db.InTransactionAsync<Result<Project>>(
+            async token =>
+            {
+                requested = false;
+                await LockAsync(db, projectId, token);
+                Project project = await db.Projects.SingleAsync(x => x.Id == projectId, token);
+                if (project.Status == ProjectStatus.Deleting)
+                {
+                    return project;
+                }
+
+                if (project.Status != ProjectStatus.Active)
+                {
+                    return PlatformErrors.ProjectNotActive;
+                }
+
+                Result fresh = ifMatch.Check(project.Version);
+                if (!fresh.IsSuccess)
+                {
+                    return fresh.Error;
+                }
+
+                await deletion.MarkAsync(project, token);
+                requested = true;
+                return project;
+            },
+            cancellationToken);
+        if (!marked.IsSuccess)
+        {
+            return marked.Error.ToProblem();
+        }
+
+        Project saved = marked.Value;
+        Guid operatorId = caller.Current.OperatorId!.Value;
+        if (requested)
+        {
+            await audit.RecordAsync(http, AuditActions.ProjectDeleteRequested, operatorId, "project", projectId, saved.OrganizationId, projectId);
+        }
+
+        string[] origins = await db.ProjectSettings.AsNoTracking()
+            .Where(x => x.ProjectId == projectId)
+            .Select(x => x.AllowedOrigins)
+            .SingleAsync(cancellationToken);
+        string? role = await memberships.FindRoleAsync(operatorId, saved.OrganizationId, cancellationToken);
+        ResourceVersion.SetETag(http.Response, saved.Version);
+        return TypedResults.Accepted((string?)null, ToResponse(saved, origins, role));
+    }
+
+    internal static async Task<Ok<DependentsResponse>> DependentsAsync(Guid projectId, PlatformDbContext db, CancellationToken cancellationToken)
+    {
+        int keys = await db.ApiKeys.AsNoTracking().CountAsync(x => x.ProjectId == projectId, cancellationToken);
+        return TypedResults.Ok(new DependentsResponse([new DependentResponse("api_key", keys, Estimated: false)]));
+    }
+
+    // A status flip and a write queue here, so If-Match and the status are read as they are at the write.
+    private static async Task LockAsync(PlatformDbContext db, Guid projectId, CancellationToken cancellationToken) =>
+        await db.Database.ExecuteSqlAsync($"SELECT 1 FROM platform.project WHERE id = {projectId} FOR UPDATE", cancellationToken);
 
     private static ProjectResponse ToResponse(Project project, IReadOnlyList<string> allowedOrigins, string? role) => new(
         project.Id,

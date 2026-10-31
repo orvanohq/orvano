@@ -82,6 +82,241 @@
         }
       }
     },
+    "/v1/console/organizations": {
+      "get": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "List the operator's organizations.",
+        "description": "Lists only the organizations the operator belongs to, oldest first. `query` matches the name, ignoring case.",
+        "operationId": "Platform_ListOrganizations",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many items to return, 1 to 100; 50 when not sent.",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The nextCursor of the previous page; omit it for the first page.",
+            "schema": {
+              "maxLength": 2048,
+              "type": "string"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "description": "Matches the name as a contains, ignoring case.",
+            "schema": {
+              "maxLength": 128,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfOrganizationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-orvano-paging": {
+          "total": false
+        }
+      },
+      "post": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Create an organization.",
+        "description": "The operator becomes its owner.",
+        "operationId": "Platform_CreateOrganization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrganizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/console/organizations/{organizationId}": {
       "get": {
         "tags": [
@@ -197,6 +432,174 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Rename an organization.",
+        "description": "Answers 404 for an organization the operator isn't a member of.",
+        "operationId": "Platform_UpdateOrganization",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "description": "The organization's ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/If-Match"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-orvano-concurrency": true
       }
     },
     "/v1/console/organizations/{organizationId}/projects": {
@@ -353,7 +756,7 @@
           "organizations"
         ],
         "summary": "Create a project.",
-        "description": "Answers 201 once the project is active.",
+        "description": "Answers 201 once the project is active. If a step fails, the project goes to teardown and the answer is an error.",
         "operationId": "Platform_CreateProject",
         "parameters": [
           {
@@ -527,6 +930,467 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Change a project's name or allowed origins.",
+        "description": "A change to the origins applies within 60 seconds.",
+        "operationId": "Platform_UpdateProject",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "The project's ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/If-Match"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-orvano-concurrency": true
+      },
+      "delete": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Delete a project.",
+        "description": "Answers 202 once the project is `deleting`: its keys stop on their next request, and a job removes it. A project already `deleting` answers 202 too.",
+        "operationId": "Platform_DeleteProject",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "The project's ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/If-Match"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-orvano-concurrency": true
+      }
+    },
+    "/v1/console/projects/{projectId}/dependents": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Count what goes with a project.",
+        "description": "Counts what deleting the project removes with it.",
+        "operationId": "Platform_GetProjectDependents",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "The project's ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DependentsResponse"
                 }
               }
             }
@@ -911,6 +1775,451 @@
         }
       }
     },
+    "/v1/console/projects/{projectId}/keys/{keyId}": {
+      "patch": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Rename an API key.",
+        "description": "Changes only the name; a key's type, scopes, and expiry never change.",
+        "operationId": "Platform_RenameApiKey",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "The project's ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "keyId",
+            "in": "path",
+            "description": "The API key's ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameApiKeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/console/projects/{projectId}/keys/{keyId}/regenerate": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Replace an API key.",
+        "description": "Revokes the key and answers 201 with a new one of the same type, name, scopes, and expiry. The old key stops at once.",
+        "operationId": "Platform_RegenerateApiKey",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "The project's ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "keyId",
+            "in": "path",
+            "description": "The API key's ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedApiKeyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/console/projects/{projectId}/keys/{keyId}/revoke": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Revoke an API key.",
+        "description": "The key stops working on its next request. Revoking it again changes nothing.",
+        "operationId": "Platform_RevokeApiKey",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "The project's ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "keyId",
+            "in": "path",
+            "description": "The API key's ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/console/session": {
       "post": {
         "tags": [
@@ -1197,6 +2506,156 @@
               },
               "Orvano-Api-Version": {
                 "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/console/session/reauth": {
+      "post": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Confirm the password.",
+        "description": "Lets this session do what needs a recent password check for the next 10 minutes. A wrong password fails on `password` with `invalid_password` and counts toward the sign in throttle.",
+        "operationId": "Platform_Reauth",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReauthRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
               }
             },
             "content": {
@@ -1754,6 +3213,21 @@
         "additionalProperties": false,
         "description": "A new API key."
       },
+      "CreateOrganizationRequest": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 128,
+            "type": "string",
+            "description": "Its name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A new organization."
+      },
       "CreateProjectRequest": {
         "required": [
           "name"
@@ -1877,6 +3351,46 @@
           }
         },
         "description": "A key just made. This is the only answer that holds the key (spec 0017 AKY-3)."
+      },
+      "DependentResponse": {
+        "required": [
+          "count",
+          "estimated",
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "The kind of thing, as a snake_case resource name."
+          },
+          "count": {
+            "type": "integer",
+            "description": "How many.",
+            "format": "int32"
+          },
+          "estimated": {
+            "type": "boolean",
+            "description": "Whether the count is an estimate."
+          }
+        },
+        "description": "One kind of thing that goes with a resource when it's deleted (spec 0014 CPX-2)."
+      },
+      "DependentsResponse": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DependentResponse"
+            },
+            "description": "Each kind of thing and its count."
+          }
+        },
+        "description": "What goes with a resource when it's deleted (spec 0014 CPX-2)."
       },
       "FieldError": {
         "required": [
@@ -2045,6 +3559,39 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ApiKeyResponse"
+            },
+            "description": "The items on this page, in the list's order."
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The cursor for the next page, or null on the last page."
+          },
+          "total": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "How many items the whole list has, or null when the operation does not count them.",
+            "format": "int32"
+          }
+        },
+        "description": "One page of a list."
+      },
+      "PageOfOrganizationResponse": {
+        "required": [
+          "items",
+          "nextCursor",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationResponse"
             },
             "description": "The items on this page, in the list's order."
           },
@@ -2245,6 +3792,35 @@
         "type": "string",
         "description": "A project's lifecycle (spec 0011 LIF, TXN-1). Only ProjectStatus.Active reaches the data plane (LIF-4)."
       },
+      "ReauthRequest": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "The account's password."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The password that proves it's still the operator."
+      },
+      "RenameApiKeyRequest": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 128,
+            "type": "string",
+            "description": "Its new name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A new name for an API key."
+      },
       "SessionResponse": {
         "required": [
           "csrfToken",
@@ -2349,6 +3925,35 @@
         },
         "additionalProperties": false,
         "description": "An email and password to sign in with."
+      },
+      "UpdateOrganizationRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Its new name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A change to an organization. A field left out stays as it is."
+      },
+      "UpdateProjectRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Its new name."
+          },
+          "allowedOrigins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The exact browser origins it accepts, at most 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A change to a project. A field left out stays as it is."
       }
     },
     "parameters": {
