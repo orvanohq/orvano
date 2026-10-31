@@ -293,6 +293,49 @@ namespace Orvano.Modules.Platform.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Orvano.Modules.Platform.Data.OperatorResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("OperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operator_id");
+
+                    b.Property<byte[]>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("token_hash");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_operator_reset_token");
+
+                    b.HasIndex("OperatorId")
+                        .HasDatabaseName("ix_operator_reset_token_operator_id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_operator_reset_token_token_hash");
+
+                    b.ToTable("operator_reset_token", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_operator_reset_token_token_hash_length", "octet_length(token_hash) = 32");
+                        });
+                });
+
             modelBuilder.Entity("Orvano.Modules.Platform.Data.OperatorSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -516,6 +559,16 @@ namespace Orvano.Modules.Platform.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_membership_organization_organization_id");
+                });
+
+            modelBuilder.Entity("Orvano.Modules.Platform.Data.OperatorResetToken", b =>
+                {
+                    b.HasOne("Orvano.Modules.Platform.Data.Operator", null)
+                        .WithMany()
+                        .HasForeignKey("OperatorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_operator_reset_token_operator_operator_id");
                 });
 
             modelBuilder.Entity("Orvano.Modules.Platform.Data.OperatorSession", b =>

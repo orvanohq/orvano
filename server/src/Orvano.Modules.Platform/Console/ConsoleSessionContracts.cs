@@ -41,6 +41,29 @@ public sealed record SignInRequest(
 /// <param name="Password">The account's password.</param>
 public sealed record ReauthRequest([property: Required(ErrorMessage = FieldCodes.Required)] string Password);
 
+/// <summary>A change to the signed in account. A field left out stays as it is.</summary>
+/// <param name="Name">The name it shows.</param>
+/// <param name="Email">The email to sign in with. Changing it needs a recent password check.</param>
+/// <param name="Locale">The language: <c>en</c>, <c>ar</c>, or null to follow the browser.</param>
+public sealed record UpdateAccountRequest(
+    [property: OptionalValue<MaxLengthAttribute>(Operator.MaxNameLength, ErrorMessage = FieldCodes.TooLong)] Optional<string> Name,
+    [property: OptionalValue<MaxLengthAttribute>(Operator.MaxEmailLength, ErrorMessage = FieldCodes.TooLong)] Optional<string> Email,
+    Optional<string?> Locale);
+
+/// <summary>The current password and the one to replace it.</summary>
+/// <param name="CurrentPassword">The account's password now.</param>
+/// <param name="NewPassword">The new password.</param>
+public sealed record ChangePasswordRequest(
+    [property: Required(ErrorMessage = FieldCodes.Required)] string CurrentPassword,
+    [property: Required(ErrorMessage = FieldCodes.Required)] string NewPassword);
+
+/// <summary>A reset link's token and a new password.</summary>
+/// <param name="Token">The token from the reset link.</param>
+/// <param name="Password">The new password.</param>
+public sealed record ResetPasswordRequest(
+    [property: Required(ErrorMessage = FieldCodes.Required), MaxLength(100, ErrorMessage = FieldCodes.TooLong)] string Token,
+    [property: Required(ErrorMessage = FieldCodes.Required)] string Password);
+
 /// <summary>The first owner, their organization, and the proof of a setup token.</summary>
 /// <param name="Token">The token the setup page accepted.</param>
 /// <param name="Name">The owner's name.</param>

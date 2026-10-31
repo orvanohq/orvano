@@ -12,6 +12,10 @@ internal static class AuditActions
     public const string Reauth = "operator.reauth";
     public const string SignOut = "operator.sign_out";
     public const string OperatorCreated = "operator.created";
+    public const string OperatorUpdated = "operator.updated";
+    public const string PasswordChanged = "operator.password_changed";
+    public const string PasswordReset = "operator.password_reset";
+    public const string SessionRevoked = "session.revoked";
     public const string OrganizationCreated = "organization.created";
     public const string OrganizationUpdated = "organization.updated";
     public const string ProjectCreated = "project.created";
@@ -34,7 +38,8 @@ internal sealed class ConsoleAudit(IAuditSink sink, ILogger<ConsoleAudit> logger
         Guid? targetId = null,
         Guid? organizationId = null,
         Guid? projectId = null,
-        AuditResult result = AuditResult.Success)
+        AuditResult result = AuditResult.Success,
+        IReadOnlyDictionary<string, string>? metadata = null)
     {
         ArgumentNullException.ThrowIfNull(http);
         var audit = new AuditEvent(
@@ -47,7 +52,8 @@ internal sealed class ConsoleAudit(IAuditSink sink, ILogger<ConsoleAudit> logger
             targetId,
             result,
             http.Connection.RemoteIpAddress?.ToString(),
-            http.Request.Headers.UserAgent.ToString() is { Length: > 0 } userAgent ? userAgent : null);
+            http.Request.Headers.UserAgent.ToString() is { Length: > 0 } userAgent ? userAgent : null,
+            metadata);
         await SendAsync(audit);
     }
 

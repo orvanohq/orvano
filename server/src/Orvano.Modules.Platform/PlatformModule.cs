@@ -42,6 +42,7 @@ public static class PlatformModule
         services.AddSingleton<ConsoleSessionCookie>();
         services.AddSingleton<SignInThrottle>();
         services.AddScoped<ConsoleSessions>();
+        services.AddScoped<OperatorResets>();
         services.AddScoped<ConsoleAudit>();
         services.AddScoped<IMembershipLookup, PlatformMembershipLookup>();
         services.AddCallerResolver<ConsoleSessionResolver>();
@@ -50,6 +51,9 @@ public static class PlatformModule
         services.AddScoped<ProjectDeletion>();
         services.AddJobHandler<ProjectTeardown, ProjectTeardownHandler>(
             PlatformJsonContext.Default.ProjectTeardown, options => options.RequiresProject = true);
+        services.AddJobHandler<PlatformCleanup, PlatformCleanupHandler>(
+            PlatformJsonContext.Default.PlatformCleanup, options => options.MaxAttempts = 3); // spec 0017 CLN-1
+        services.AddJobSchedule(PlatformCleanup.ScheduleName, PlatformCleanup.Cron, new PlatformCleanup());
         services.AddScoped<IProjectDirectory, ProjectDirectory>();
 
         services.AddSingleton<ApiKeyUsage>();
@@ -82,6 +86,7 @@ public static class PlatformModule
         routes.Console.MapSetupTokenCheck();
         routes.Console.MapSetupOwner();
         routes.Console.MapConsoleSessions();
+        routes.Console.MapConsoleAccount();
         routes.Console.MapOrganizations();
         routes.Console.MapProjects();
         routes.Console.MapApiKeys();

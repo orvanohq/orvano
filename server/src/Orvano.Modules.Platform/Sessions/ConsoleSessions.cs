@@ -46,6 +46,15 @@ internal sealed class ConsoleSessions(PlatformDbContext db, IOptions<ConsoleOpti
         return new NewSession(token, row);
     }
 
+    /// <summary>Ends every live session of the operator (TOK-6) and returns how many. Call inside a transaction.</summary>
+    public Task<int> RevokeAllAsync(Guid operatorId, CancellationToken cancellationToken)
+    {
+        DateTimeOffset now = clock.GetUtcNow();
+        return db.OperatorSessions
+            .Where(x => x.OperatorId == operatorId && x.RevokedAt == null && x.ExpiresAt > now)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RevokedAt, now), cancellationToken);
+    }
+
     /// <summary>SES-5: the operator, their first memberships by organization id, and the CSRF token.</summary>
     public async Task<SessionResponse> DescribeAsync(
         Guid operatorId, ReadOnlyMemory<byte> csrfToken, DateTimeOffset expiresAt, CancellationToken cancellationToken)
