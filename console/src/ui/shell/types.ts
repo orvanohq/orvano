@@ -17,6 +17,8 @@ export interface ShellLinkOptions {
 
 export interface ShellModel {
   user: { id: string; name: string; email: string };
+  /** What the install calls itself (spec 0017 BOT-1); "Orvano" when left out. */
+  instanceName?: string;
   scope: ShellScope;
   org?: { id: string; name: string }; // set for org and project scope
   project?: { id: string; name: string }; // set for project scope

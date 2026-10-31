@@ -10,17 +10,21 @@ import { afterEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { consoleConfigQuery } from "@/features/console-config/api/queries";
+import { sessionQuery } from "@/features/session/api/queries";
 import { messages as sourceMessages } from "@/locales/en/messages.po";
 import { routeTree } from "@/routeTree.gen";
 import { activateLocale, getDirection, i18n } from "@/shared/i18n";
 import { focusElement } from "@/test/focus";
 import { renderWithProviders } from "@/test/render";
 import { Progress, Tab, TabList, TabPanel, Tabs } from "@/ui";
+import { http, shellHandlers, testConfig, testOrgId, testProjectId } from "@/test/handlers";
+import { worker } from "@/test/msw";
 
 // Spec 0003 RTE-3: the router runs under the /console base path and handles unknown paths itself.
 describe("createAppRouter", () => {
   it("shows a not found view when the path matches no route", async () => {
-    const screen = await renderWithProviders("/no/such/page");
+    worker.use(...shellHandlers);
+    const screen = await renderWithProviders(`/${testOrgId}/${testProjectId}/no-such-page`);
 
     await expect.element(screen.getByText(/not found/i)).toBeVisible();
   });
@@ -31,7 +35,10 @@ describe("the setup redirect", () => {
   it.each(["/", "/no/such/page", "/setupx", "/setup/extra", "/gallery"])(
     "sends %s to /setup while setup is required",
     async (url) => {
-      const screen = await renderWithProviders(url, { config: { setupRequired: true } });
+      const screen = await renderWithProviders(url, {
+        config: { setupRequired: true },
+        session: null,
+      });
 
       await expect
         .element(screen.getByRole("heading", { level: 1, name: "Set up Orvano" }))
@@ -43,7 +50,10 @@ describe("the setup redirect", () => {
   it.each(["/setup", "/setup/", "/setup?from=mail"])(
     "keeps %s while setup is required",
     async (url) => {
-      const screen = await renderWithProviders(url, { config: { setupRequired: true } });
+      const screen = await renderWithProviders(url, {
+        config: { setupRequired: true },
+        session: null,
+      });
 
       await expect
         .element(screen.getByRole("heading", { level: 1, name: "Set up Orvano" }))
@@ -55,12 +65,18 @@ describe("the setup redirect", () => {
   it.each(["/setup", "/setup/"])(
     "sends %s to the console root once setup is complete",
     async (url) => {
+      worker.use(
+        ...shellHandlers,
+        http.get("/v1/console/organizations/{organizationId}/projects", ({ response }) =>
+          response(200).json({ items: [], nextCursor: null, total: null }),
+        ),
+      );
       const screen = await renderWithProviders(url, { config: { setupRequired: false } });
 
       await expect
-        .element(screen.getByRole("heading", { level: 1, name: "Orvano console" }))
+        .element(screen.getByRole("heading", { level: 1, name: "Projects" }))
         .toBeVisible();
-      expect(screen.router.state.location.pathname).toBe("/");
+      expect(screen.router.state.location.pathname).toBe(`/${testOrgId}`);
     },
   );
 });
@@ -93,7 +109,8 @@ const probeTree = routeTree.addChildren({ ...routeTree.children, probe });
 async function renderProbe() {
   await activateLocale("en");
   const queryClient = new QueryClient();
-  queryClient.setQueryData(consoleConfigQuery().queryKey, { setupRequired: false });
+  queryClient.setQueryData(consoleConfigQuery().queryKey, { ...testConfig, setupRequired: false });
+  queryClient.setQueryData(sessionQuery().queryKey, null);
   const router = createRouter({
     routeTree: probeTree,
     context: { queryClient },

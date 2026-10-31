@@ -19,8 +19,8 @@ const firstLoadRoutes = [
   /^src\/routes\/_shell\/\$orgId\/\$projectId\/index\.tsx/,
 ];
 
-// STY-9: the probe renders AppShell from the welcome page, so its first load is the root and index route files.
-const probeRoutes = [/^src\/routes\/__root\.tsx/, /^src\/routes\/index\.tsx/];
+// STY-9: the probe renders AppShell from the `_shell` index page, so its first load is the root and that route's files.
+const probeRoutes = [/^src\/routes\/__root\.tsx/, /^src\/routes\/_shell\/index\.tsx/];
 
 /** @typedef {Record<string, { file: string, isEntry?: boolean, imports?: string[] }>} Manifest */
 

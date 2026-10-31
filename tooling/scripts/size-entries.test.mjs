@@ -82,7 +82,7 @@ const probeManifest = {
   "index.html": { file: "assets/index-p1.js", isEntry: true, imports: ["_ui-p2.js"] },
   "_ui-p2.js": { file: "assets/ui-p2.js" },
   "src/routes/__root.tsx": { file: "assets/root-p3.js", imports: ["_ui-p2.js"] },
-  "src/routes/index.tsx?tsr-split=component": {
+  "src/routes/_shell/index.tsx?tsr-split=component": {
     file: "assets/index-route-p4.js",
     imports: ["_shell-p5.js"],
     dynamicImports: ["_palette-p6.js"],
