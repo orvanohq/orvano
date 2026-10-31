@@ -77,9 +77,11 @@ describe("the session expired dialog", () => {
     });
     expect(sent[1]).toEqual(sent[0]);
     await expect.element(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Grace Owner");
-    expect(screen.queryClient.getQueryData(["session"])).toMatchObject({
-      csrfToken: signedIn.csrfToken,
-      operator: { version: operator.version },
+    await vi.waitFor(() => {
+      expect(screen.queryClient.getQueryData(["session"])).toMatchObject({
+        csrfToken: signedIn.csrfToken,
+        operator: { version: operator.version },
+      });
     });
     expect(reloadConsole).not.toHaveBeenCalled();
   });

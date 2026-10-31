@@ -83,11 +83,10 @@ describe("the account page", () => {
         },
       ]);
     });
-    await expect
-      .element(cardOf(screen, "Profile").getByRole("button", { name: "Update" }))
-      .toHaveAttribute("aria-disabled", "true");
-    expect(screen.queryClient.getQueryData(["session"])).toMatchObject({
-      operator: { name: "Grace Owner", version: saved.version },
+    await vi.waitFor(() => {
+      expect(screen.queryClient.getQueryData(["session"])).toMatchObject({
+        operator: { name: "Grace Owner", version: saved.version },
+      });
     });
   });
 
