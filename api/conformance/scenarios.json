@@ -2399,6 +2399,92 @@
           }
         }
       ]
+    },
+    {
+      "id": "keys.current.bad_key",
+      "title": "A key the server does not know answers 401, on a project that exists (AKY-9)",
+      "mode": "live",
+      "audience": [
+        "client",
+        "server"
+      ],
+      "requires": [
+        "project"
+      ],
+      "client": {
+        "key": "not-a-real-key"
+      },
+      "steps": [
+        {
+          "call": "keys.current",
+          "options": {
+            "retry": 0
+          },
+          "expect": {
+            "error": {
+              "kind": "unauthenticated",
+              "status": 401,
+              "code": "unauthorized"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "keys.current.client",
+      "title": "A publishable key answers its project, its type, and its client scopes (SDK-1)",
+      "mode": "live",
+      "audience": [
+        "client"
+      ],
+      "requires": [
+        "project"
+      ],
+      "steps": [
+        {
+          "call": "keys.current",
+          "expect": {
+            "result": {
+              "projectId": "${projectId}",
+              "type": "publishable",
+              "scopes": {
+                "$contains": [
+                  "client.auth",
+                  "client.databases"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "keys.current.server",
+      "title": "A secret key answers its project, its type, and its scopes (SDK-1)",
+      "mode": "live",
+      "audience": [
+        "server"
+      ],
+      "requires": [
+        "project"
+      ],
+      "steps": [
+        {
+          "call": "keys.current",
+          "expect": {
+            "result": {
+              "projectId": "${projectId}",
+              "type": "secret",
+              "scopes": {
+                "$contains": [
+                  "databases.read",
+                  "storage.read"
+                ]
+              }
+            }
+          }
+        }
+      ]
     }
   ]
 }

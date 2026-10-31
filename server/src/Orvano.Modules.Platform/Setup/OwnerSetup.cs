@@ -52,36 +52,50 @@ internal sealed class OwnerSetup(
             async token =>
             {
                 // OWN-3: the second of two submits waits here, then sees setup complete.
-                await db.Database.ExecuteSqlAsync(
-                    $"SELECT 1 FROM platform.instance WHERE id = {Instance.SingletonId} FOR UPDATE", token);
+                await LockInstanceAsync(db, token);
                 if (Refusal(await tokens.CheckAsync(request.Token, token)) is { } late)
                 {
                     return late;
                 }
 
-                DateTimeOffset now = clock.GetUtcNow();
-                var owner = new Operator
-                {
-                    Email = request.Email.Trim(),
-                    EmailNormalized = EmailAddress.Normalize(request.Email),
-                    Name = request.Name.Trim(),
-                    PasswordHash = hash.Value,
-                    PasswordChangedAt = now,
-                };
-                var organization = new Organization { Name = request.OrganizationName.Trim() };
-                db.Operators.Add(owner);
-                db.Organizations.Add(organization);
-                db.Memberships.Add(new Membership { OperatorId = owner.Id, OrganizationId = organization.Id, Role = RolePermissions.Owner });
+                (Operator owner, Organization organization) = await AddOwnerAsync(
+                    db, request.Email, request.Name, request.OrganizationName, hash.Value, clock.GetUtcNow(), token);
                 NewSession session = sessions.Add(owner.Id, http);
-
-                Instance instance = await db.Instances.SingleAsync(x => x.Id == Instance.SingletonId, token);
-                instance.SetupCompletedAt = now;
-                instance.SetupTokenHash = null;
-                instance.SetupTokenExpiresAt = null;
                 await db.SaveChangesAsync(token);
                 return new CreatedOwner(owner.Id, organization.Id, session);
             },
             cancellationToken);
+    }
+
+    /// <summary>OWN-3's row lock, which the bootstrap command takes too (BST-2).</summary>
+    internal static async Task LockInstanceAsync(PlatformDbContext db, CancellationToken cancellationToken) =>
+        await db.Database.ExecuteSqlAsync($"SELECT 1 FROM platform.instance WHERE id = {Instance.SingletonId} FOR UPDATE", cancellationToken);
+
+    /// <summary>
+    /// OWN-3's rows and the instance update, for the owner form and the bootstrap command (BST-2). The caller holds the row
+    /// lock and saves.
+    /// </summary>
+    internal static async Task<(Operator Owner, Organization Organization)> AddOwnerAsync(
+        PlatformDbContext db, string email, string name, string organizationName, string passwordHash, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var owner = new Operator
+        {
+            Email = email.Trim(),
+            EmailNormalized = EmailAddress.Normalize(email),
+            Name = name.Trim(),
+            PasswordHash = passwordHash,
+            PasswordChangedAt = now,
+        };
+        var organization = new Organization { Name = organizationName.Trim() };
+        db.Operators.Add(owner);
+        db.Organizations.Add(organization);
+        db.Memberships.Add(new Membership { OperatorId = owner.Id, OrganizationId = organization.Id, Role = RolePermissions.Owner });
+
+        Instance instance = await db.Instances.SingleAsync(x => x.Id == Instance.SingletonId, cancellationToken);
+        instance.SetupCompletedAt = now;
+        instance.SetupTokenHash = null;
+        instance.SetupTokenExpiresAt = null;
+        return (owner, organization);
     }
 
     private static Error? Refusal(SetupTokenCheck check) => check switch

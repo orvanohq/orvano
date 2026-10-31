@@ -1,6 +1,7 @@
 // Spec 0014 CNF-4, STB-2: a reference runner. It renders ts-client and ts-server from the real contract and
 // scenarios, then runs every stub scenario against the stub server, in process. Live scenarios run too when
-// ORVANO_CONFORMANCE_URL points at a server (api/conformance/compose.yaml serves one on http://localhost:18080).
+// ORVANO_CONFORMANCE_URL points at a server (api/conformance/compose.yaml serves one on http://localhost:18080), and
+// those that require a project when ORVANO_CONFORMANCE_PROJECT holds the JSON of `orvano admin bootstrap-project` (CNF-7).
 // The runners in sdk-js and sdk-js-server follow this one.
 import { mkdtempSync, rmSync } from "node:fs";
 import type { Server } from "node:http";
@@ -23,6 +24,11 @@ const contract = loadContract(join(api, "openapi.json"));
 const liveUrl = process.env["ORVANO_CONFORMANCE_URL"];
 const projectId = "0192f0c1-0000-7000-8000-000000000001";
 const key = "conformance-key";
+const bootstrap = process.env["ORVANO_CONFORMANCE_PROJECT"];
+const project =
+  bootstrap === undefined
+    ? undefined
+    : (JSON.parse(bootstrap) as { projectId: string; publishableKey: string; secretKey: string });
 
 interface Dispatcher {
   dispatch: (
@@ -86,11 +92,16 @@ afterAll(() => {
 /** Runs one scenario and returns every mismatch (CNF-3). */
 async function run(sdk: Sdk, scenario: Scenario, clientName: string): Promise<string[]> {
   const token = `run-${Math.random().toString(36).slice(2, 12)}`;
+  // SDK-4: a scenario that requires a project runs on the real one, with the key of this SDK's audience.
+  const real = scenario.requires.includes("project") ? project : undefined;
+  const audienceKey = clientName.startsWith("client/") ? real?.publishableKey : real?.secretKey;
+  const openKey =
+    typeof scenario.client?.["key"] === "string" ? scenario.client["key"] : audienceKey;
   const variables: Record<string, string> = {
     apiVersion: sdk.apiVersion,
     clientName,
-    key,
-    projectId,
+    key: openKey ?? key,
+    projectId: real?.projectId ?? projectId,
   };
   const { match, substitute, dispatch } = sdk.dispatcher;
   const url = scenario.mode === "stub" ? stubUrl : (liveUrl ?? "");
@@ -117,9 +128,11 @@ async function run(sdk: Sdk, scenario: Scenario, clientName: string): Promise<st
     last = { status: response.status, headers: Object.fromEntries(response.headers), body };
     return response;
   };
-  const client = sdk.createClientHandle({ url, project: projectId, fetch: capture }, clientName, {
-    "Orvano-Key": typeof scenario.client?.["key"] === "string" ? scenario.client["key"] : key,
-  });
+  const client = sdk.createClientHandle(
+    { url, project: variables["projectId"], fetch: capture },
+    clientName,
+    { "Orvano-Key": variables["key"] ?? key },
+  );
 
   const problems: string[] = [];
   for (const [index, step] of scenario.steps.entries()) {
@@ -184,7 +197,9 @@ for (const [target, clientName] of [
     });
 
     for (const scenario of scenarios) {
-      const skip = scenario.mode === "live" && liveUrl === undefined;
+      const skip =
+        (scenario.mode === "live" && liveUrl === undefined) ||
+        (scenario.requires.includes("project") && project === undefined);
       it.skipIf(skip)(`${scenario.id}: ${scenario.title}`, async () => {
         expect(await run(sdk, scenario, clientName)).toEqual([]);
       });

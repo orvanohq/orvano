@@ -41,6 +41,16 @@ internal sealed class ConsoleAudit(IAuditSink sink, ILogger<ConsoleAudit> logger
             result,
             http.Connection.RemoteIpAddress?.ToString(),
             http.Request.Headers.UserAgent.ToString() is { Length: > 0 } userAgent ? userAgent : null);
+        await SendAsync(audit);
+    }
+
+    /// <summary>A host command's action (AUS-3): no request, so no address, and the actor is the system.</summary>
+    public Task RecordSystemAsync(string action, string targetKind, Guid targetId, Guid? organizationId = null, Guid? projectId = null) =>
+        SendAsync(new AuditEvent(
+            AuditActorKind.System, null, organizationId, projectId, action, targetKind, targetId, AuditResult.Success, null, null));
+
+    private async Task SendAsync(AuditEvent audit)
+    {
         try
         {
             await sink.RecordAsync(audit, CancellationToken.None);
@@ -49,7 +59,7 @@ internal sealed class ConsoleAudit(IAuditSink sink, ILogger<ConsoleAudit> logger
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            logger.AuditNotRecorded(action, ex.GetType().Name);
+            logger.AuditNotRecorded(audit.Action, ex.GetType().Name);
         }
     }
 }
