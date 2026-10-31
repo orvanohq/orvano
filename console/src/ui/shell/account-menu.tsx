@@ -8,12 +8,13 @@ import {
 } from "@/shared/stores/theme";
 import { Avatar } from "../avatar";
 import { cx, focusRing } from "../cx";
-import { ShortcutsIcon, SignOutIcon } from "../icons";
+import { AccountProfileIcon, ShortcutsIcon, SignOutIcon } from "../icons";
 import { Menu, MenuItem, MenuSection, MenuSeparator, MenuTrigger } from "../menu";
 import type { ShellModel } from "./types";
 
 export interface AccountMenuProps {
   user: ShellModel["user"];
+  onShowAccount?: () => void;
   onSignOut: () => void;
   /** Opens `ShortcutHelp`, which lands with milestone 5 (PRM-10). */
   onShowShortcuts?: () => void;
@@ -21,9 +22,9 @@ export interface AccountMenuProps {
 
 /**
  * Spec 0015 AC-11: the avatar button (named "Account") at the top bar's inline end. The menu shows the name and
- * email, Theme and Density as single selection sections, Keyboard shortcuts, and Sign out.
+ * email, Theme and Density as single selection sections, the account page, Keyboard shortcuts, and Sign out.
  */
-export function AccountMenu({ user, onSignOut, onShowShortcuts }: AccountMenuProps) {
+export function AccountMenu({ user, onShowAccount, onSignOut, onShowShortcuts }: AccountMenuProps) {
   const { t } = useLingui();
   const theme = useThemePreference();
   const density = useLayout(user.id, (layout) => layout.density);
@@ -75,6 +76,11 @@ export function AccountMenu({ user, onSignOut, onShowShortcuts }: AccountMenuPro
           <MenuItem id="compact">{t`Compact`}</MenuItem>
         </MenuSection>
         <MenuSeparator />
+        {onShowAccount ? (
+          <MenuItem id="account" icon={AccountProfileIcon} onAction={onShowAccount}>
+            {t`Account`}
+          </MenuItem>
+        ) : null}
         <MenuItem id="shortcuts" icon={ShortcutsIcon} onAction={onShowShortcuts}>
           {t`Keyboard shortcuts`}
         </MenuItem>

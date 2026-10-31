@@ -4,7 +4,9 @@ import { userEvent } from "vitest/browser";
 import { expectNoAxeViolations } from "@/test/axe";
 import { focusElement } from "@/test/focus";
 import { renderInRouter } from "@/test/render";
-import { CodeSnippet, CopyField, SecretReveal } from "./copy-field";
+import { CodeSnippet } from "./code-snippet";
+import { CopyField } from "./copy-field";
+import { SecretReveal } from "./secret-reveal";
 
 // Spec 0015 AC-24, PRM-7, PRM-9, spec 0001 UX-33: copying through the clipboard, the fallback when it is missing or
 // refuses, and a secret shown once, in three engines.

@@ -2,7 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { consoleConfigQuery } from "@/features/console-config";
-import { sessionQuery } from "@/features/session";
+import { passwordFailure, sessionQuery } from "@/features/session";
 import { ApiError } from "@/shared/api/errors";
 import { useAppForm } from "@/ui/form";
 import { createOwner } from "../api/mutations";
@@ -55,16 +55,7 @@ export function OwnerStep({
         }
         const passwordError = error instanceof ApiError ? error.fieldErrors[0] : undefined;
         if (passwordError?.field === "password") {
-          return {
-            fields: {
-              password:
-                passwordError.code === "password_too_common"
-                  ? t`This password is too common. Choose another.`
-                  : passwordError.code === "too_long"
-                    ? t`This password is too long.`
-                    : t`Use at least 8 characters.`,
-            },
-          };
+          return { fields: { password: passwordFailure(passwordError.code) } };
         }
         if (error instanceof ApiError && error.kind === "rate_limited") {
           return { form: t`Too many tries. Wait a moment, then try again.` };

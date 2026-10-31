@@ -1,11 +1,11 @@
 import { useLingui } from "@lingui/react/macro";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { Outlet, useMatches, useParams } from "@tanstack/react-router";
+import { Outlet, useMatches, useNavigate, useParams } from "@tanstack/react-router";
 import { consoleConfigQuery } from "@/features/console-config";
 import { organizationQuery, searchOrganizations } from "@/features/organizations";
 import { projectQuery, searchProjects } from "@/features/projects";
-import { ReauthHost, sessionQuery, signOut } from "@/features/session";
-import { config } from "@/shared/config";
+import { SessionPrompts, sessionQuery } from "@/features/session";
+import { signOutEverywhere } from "@/shared/session-channel";
 import { AppShell, type Crumb, type ShellNavItem, type SwitcherSearch } from "@/ui";
 import { useDocumentTitle } from "@/ui/shell/use-document-title";
 
@@ -59,6 +59,7 @@ export function ShellLayout() {
     enabled: projectId !== undefined,
   });
   const matches = useMatches();
+  const navigate = useNavigate();
 
   const pages = matches.flatMap((match) =>
     match.staticData.crumb ? [{ crumb: match.staticData.crumb, match }] : [],
@@ -115,17 +116,17 @@ export function ShellLayout() {
               create: { to: "/$orgId", params: { orgId }, search: { create: "project" } },
             }
           : undefined,
+        onShowAccount: () => {
+          void navigate({ to: "/account" });
+        },
         onSignOut: () => {
-          // Spec 0017 SES-6, spec 0003 QRY-9: a full page load drops every cache.
-          void signOut().finally(() => {
-            window.location.assign(`${config.basePath}/sign-in`);
-          });
+          void signOutEverywhere();
         },
       }}
       crumbs={crumbs}
     >
       <Outlet />
-      <ReauthHost />
+      <SessionPrompts />
     </AppShell>
   );
 }

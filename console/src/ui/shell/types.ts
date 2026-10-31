@@ -28,6 +28,8 @@ export interface ShellModel {
   searchProjects: SwitcherSearch;
   orgLinks?: { all: ShellLinkOptions; create?: ShellLinkOptions };
   projectLinks?: { all: ShellLinkOptions; create?: ShellLinkOptions };
+  /** Opens the account page (spec 0017 ACC-3). */
+  onShowAccount?: () => void;
   onSignOut: () => void;
 }
 

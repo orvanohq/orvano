@@ -6,8 +6,9 @@ import { RouterProvider } from "@tanstack/react-router";
 import { consoleConfigQuery } from "@/features/console-config/api/queries";
 import { connectSessionToken, sessionQuery } from "@/features/session/api/queries";
 import { createQueryClient } from "@/shared/api/query-client";
-import { activateLocale, i18n, resolveLocale, sourceLocale } from "@/shared/i18n";
+import { accountLocale, activateLocale, i18n, sourceLocale } from "@/shared/i18n";
 import { reportConsoleError } from "@/shared/report";
+import { connectSessionChannel } from "@/shared/session-channel";
 // Spec 0003 RTE-10 step 1, SEC-2: Zod never compiles code at runtime, so the CSP needs no unsafe-eval. `@/shared/zod`
 // sets that; calling it here too keeps it in place for any schema built later.
 import { z } from "@/shared/zod";
@@ -36,17 +37,16 @@ startThemeSync(); // spec 0015 THM-4: keeps <html data-theme> current after them
 try {
   const queryClient = createQueryClient();
   connectSessionToken(queryClient);
+  connectSessionChannel(() => {
+    void import("@/features/session/follow-session")
+      .then(({ followSession }) => followSession(queryClient))
+      .catch(reportConsoleError);
+  });
   const [, session] = await Promise.all([
     queryClient.query(consoleConfigQuery()),
     queryClient.query(sessionQuery()),
   ]);
-  await activateLocale(
-    resolveLocale(
-      session?.operator.locale
-        ? [session.operator.locale, ...navigator.languages]
-        : navigator.languages,
-    ),
-  );
+  await activateLocale(accountLocale(session?.operator.locale));
   if (session) applyStoredDensity(session.operator.id); // spec 0015 SHL-11
   const router = createAppRouter({ queryClient });
 

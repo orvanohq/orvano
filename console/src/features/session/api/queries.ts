@@ -8,7 +8,7 @@ export type Session = components["schemas"]["SessionResponse"];
 
 /**
  * Spec 0017 BOT-2, spec 0003 RTE-10: the session, loaded at boot. `null` means signed out, since a 401 here is no
- * failure. It changes only through sign in and sign out, which write it here or reload the page.
+ * failure. It changes through sign in, sign out, and account changes, which write it here or reload the page.
  */
 export const sessionQuery = () =>
   queryOptions({

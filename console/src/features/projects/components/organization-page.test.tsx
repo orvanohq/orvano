@@ -100,3 +100,43 @@ describe("the project overview", () => {
     }
   });
 });
+
+// Spec 0001 UX-14, spec 0014 PAG-2: a project past the first page can be reached.
+describe("paging the organization page", () => {
+  const second = { ...testProject, id: "01970000-0000-7000-8000-00000000000f", name: "Bakery" };
+  const pages = http.get(
+    "/v1/console/organizations/{organizationId}/projects",
+    ({ request, response }) =>
+      new URL(request.url).searchParams.get("cursor") === "page-2"
+        ? response(200).json({ items: [second], nextCursor: null, total: null })
+        : response(200).json({ items: [testProject], nextCursor: "page-2", total: null }),
+  );
+
+  it("0001 UX-14: Next and Previous move between pages, and a dialog keeps the page", async () => {
+    worker.use(pages, ...shellHandlers);
+    const screen = await renderWithProviders(`/${testOrgId}`);
+
+    await screen.getByRole("button", { name: "Next" }).click();
+    await expect.element(screen.getByRole("link", { name: "Bakery" })).toBeVisible();
+    expect(screen.router.state.location.search).toEqual({ cursor: "page-2" });
+
+    await screen.getByRole("button", { name: "New project" }).click();
+    await screen.getByRole("button", { name: "Cancel" }).click();
+    await expect.element(screen.getByRole("link", { name: "Bakery" })).toBeVisible();
+    expect(screen.router.state.location.search).toEqual({ cursor: "page-2" });
+
+    await screen.getByRole("button", { name: "Previous" }).click();
+    await expect.element(screen.getByRole("link", { name: "Shop" })).toBeVisible();
+    await expectNoAxeViolations(document.body);
+  });
+
+  it("0017 CNS-5: an empty later page is no first use: Previous stays there", async () => {
+    worker.use(page([]), ...shellHandlers);
+    const screen = await renderWithProviders(`/${testOrgId}?cursor=page-2`);
+
+    await expect.element(screen.getByRole("button", { name: "Previous" })).toBeVisible();
+    await expect
+      .element(screen.getByRole("heading", { name: "Create your first project" }))
+      .not.toBeInTheDocument();
+  });
+});

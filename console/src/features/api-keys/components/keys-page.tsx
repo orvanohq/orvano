@@ -4,6 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useCan } from "@/shared/access";
+import { PAGE_SIZES } from "@/shared/url/paging";
 import {
   Badge,
   Button,
@@ -15,11 +16,12 @@ import {
   MoreIcon,
   RelativeTime,
 } from "@/ui";
-import { Cell, Column, Row, Table, TableBody, TableHeader } from "@/ui/table";
+import { Cell, Column, Pagination, Row, Table, TableBody, TableHeader } from "@/ui/table";
 import { apiKeysQuery, type ApiKey } from "../api/queries";
 import { CreateKeySheet } from "./create-key-sheet";
 import { RegenerateKeyDialog, RenameKeyDialog, RevokeKeyDialog } from "./key-dialogs";
 import { maskedKey } from "./masked-key";
+import { useKeysView } from "./use-keys-view";
 
 type KeyAction = "rename" | "revoke" | "regenerate";
 
@@ -29,7 +31,9 @@ const notAllowed = msg`You don't have permission to change keys.`;
 export function KeysPage() {
   const { t } = useLingui();
   const { projectId } = useParams({ from: "/_shell/$orgId/$projectId/settings/keys" });
-  const { data } = useSuspenseQuery(apiKeysQuery(projectId));
+  const { page, paging } = useKeysView();
+  const { data } = useSuspenseQuery(apiKeysQuery(projectId, page));
+  const { nextCursor } = data;
   const canWrite = useCan("project", "keys.write");
   const [isCreating, setCreating] = useState(false);
   const [acting, setActing] = useState<{ action: KeyAction; key: ApiKey }>();
@@ -51,7 +55,7 @@ export function KeysPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      {data.items.length === 0 ? (
+      {data.items.length === 0 && page.cursor === undefined ? (
         <EmptyState
           kind="first-use"
           title={t`Create your first key`}
@@ -66,6 +70,19 @@ export function KeysPage() {
             onAction={(action, key) => {
               setActing({ action, key });
             }}
+          />
+          <Pagination
+            pageSize={paging.pageSize}
+            pageSizes={PAGE_SIZES}
+            onPageSizeChange={paging.setPageSize}
+            onPrevious={paging.previous}
+            onNext={
+              nextCursor === null
+                ? undefined
+                : () => {
+                    paging.next(nextCursor);
+                  }
+            }
           />
         </>
       )}

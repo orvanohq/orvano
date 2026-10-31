@@ -12,9 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as ShellRouteImport } from './routes/_shell'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as AuthResetRouteImport } from './routes/_auth/reset'
 import { Route as AuthSignInRouteImport } from './routes/_auth/sign-in'
 import { Route as ShellIndexRouteImport } from './routes/_shell/index'
 import { Route as ShellOrgIdRouteRouteImport } from './routes/_shell/$orgId/route'
+import { Route as ShellAccountRouteImport } from './routes/_shell/account'
 import { Route as ShellOrgIdIndexRouteImport } from './routes/_shell/$orgId/index'
 import { Route as ShellOrgIdProjectIdRouteRouteImport } from './routes/_shell/$orgId/$projectId/route'
 import { Route as ShellOrgIdSettingsRouteImport } from './routes/_shell/$orgId/settings'
@@ -38,6 +40,11 @@ const SetupRoute = SetupRouteImport.update({
   path: '/setup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthResetRoute = AuthResetRouteImport.update({
+  id: '/reset',
+  path: '/reset',
+  getParentRoute: () => AuthRoute,
+} as any)
 const AuthSignInRoute = AuthSignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
@@ -51,6 +58,11 @@ const ShellIndexRoute = ShellIndexRouteImport.update({
 const ShellOrgIdRouteRoute = ShellOrgIdRouteRouteImport.update({
   id: '/$orgId',
   path: '/$orgId',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellAccountRoute = ShellAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => ShellRoute,
 } as any)
 const ShellOrgIdIndexRoute = ShellOrgIdIndexRouteImport.update({
@@ -110,7 +122,9 @@ export interface FileRoutesByFullPath {
   '/': typeof ShellIndexRoute
   '/setup': typeof SetupRoute
   '/$orgId': typeof ShellOrgIdRouteRouteWithChildren
+  '/reset': typeof AuthResetRoute
   '/sign-in': typeof AuthSignInRoute
+  '/account': typeof ShellAccountRoute
   '/$orgId/$projectId': typeof ShellOrgIdProjectIdRouteRouteWithChildren
   '/$orgId/settings': typeof ShellOrgIdSettingsRoute
   '/$orgId/': typeof ShellOrgIdIndexRoute
@@ -124,7 +138,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof ShellIndexRoute
   '/setup': typeof SetupRoute
+  '/reset': typeof AuthResetRoute
   '/sign-in': typeof AuthSignInRoute
+  '/account': typeof ShellAccountRoute
   '/$orgId/settings': typeof ShellOrgIdSettingsRoute
   '/$orgId': typeof ShellOrgIdIndexRoute
   '/$orgId/$projectId': typeof ShellOrgIdProjectIdIndexRoute
@@ -139,7 +155,9 @@ export interface FileRoutesById {
   '/_shell': typeof ShellRouteWithChildren
   '/setup': typeof SetupRoute
   '/_shell/$orgId': typeof ShellOrgIdRouteRouteWithChildren
+  '/_auth/reset': typeof AuthResetRoute
   '/_auth/sign-in': typeof AuthSignInRoute
+  '/_shell/account': typeof ShellAccountRoute
   '/_shell/': typeof ShellIndexRoute
   '/_shell/$orgId/$projectId': typeof ShellOrgIdProjectIdRouteRouteWithChildren
   '/_shell/$orgId/settings': typeof ShellOrgIdSettingsRoute
@@ -157,7 +175,9 @@ export interface FileRouteTypes {
     | '/'
     | '/setup'
     | '/$orgId'
+    | '/reset'
     | '/sign-in'
+    | '/account'
     | '/$orgId/$projectId'
     | '/$orgId/settings'
     | '/$orgId/'
@@ -171,7 +191,9 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/setup'
+    | '/reset'
     | '/sign-in'
+    | '/account'
     | '/$orgId/settings'
     | '/$orgId'
     | '/$orgId/$projectId'
@@ -185,7 +207,9 @@ export interface FileRouteTypes {
     | '/_shell'
     | '/setup'
     | '/_shell/$orgId'
+    | '/_auth/reset'
     | '/_auth/sign-in'
+    | '/_shell/account'
     | '/_shell/'
     | '/_shell/$orgId/$projectId'
     | '/_shell/$orgId/settings'
@@ -227,6 +251,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_auth/reset': {
+      id: '/_auth/reset'
+      path: '/reset'
+      fullPath: '/reset'
+      preLoaderRoute: typeof AuthResetRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/sign-in': {
       id: '/_auth/sign-in'
       path: '/sign-in'
@@ -246,6 +277,13 @@ declare module '@tanstack/react-router' {
       path: '/$orgId'
       fullPath: '/$orgId'
       preLoaderRoute: typeof ShellOrgIdRouteRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/account': {
+      id: '/_shell/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof ShellAccountRouteImport
       parentRoute: typeof ShellRoute
     }
     '/_shell/$orgId/': {
@@ -315,10 +353,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthRouteChildren {
+  AuthResetRoute: typeof AuthResetRoute
   AuthSignInRoute: typeof AuthSignInRoute
 }
 
 const AuthRouteChildren: AuthRouteChildren = {
+  AuthResetRoute: AuthResetRoute,
   AuthSignInRoute: AuthSignInRoute,
 }
 
@@ -382,11 +422,13 @@ const ShellOrgIdRouteRouteWithChildren = ShellOrgIdRouteRoute._addFileChildren(
 
 interface ShellRouteChildren {
   ShellOrgIdRouteRoute: typeof ShellOrgIdRouteRouteWithChildren
+  ShellAccountRoute: typeof ShellAccountRoute
   ShellIndexRoute: typeof ShellIndexRoute
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
   ShellOrgIdRouteRoute: ShellOrgIdRouteRouteWithChildren,
+  ShellAccountRoute: ShellAccountRoute,
   ShellIndexRoute: ShellIndexRoute,
 }
 

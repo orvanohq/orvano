@@ -24,6 +24,7 @@ import { VisuallyHidden } from "../visually-hidden";
 // from `@/ui/table`, never the `@/ui` index. Grids of rows use `DataGrid` (the rows feature, PRM-5).
 
 export type { Key, Selection, SortDescriptor };
+export { Pagination, type PaginationProps } from "./pagination";
 
 export interface TableProps {
   /** Required: names the table for screen readers ("API keys"). */

@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { get } from "@/shared/api/client";
 import type { components } from "@/shared/api/schema.gen";
+import { DEFAULT_PAGE_SIZE, type ListPage } from "@/shared/url/paging";
 
 export type Project = components["schemas"]["ProjectResponse"];
 
@@ -12,13 +13,21 @@ export const projectQuery = (projectId: string) =>
       get("/v1/console/projects/{projectId}", { params: { path: { projectId } }, signal }),
   });
 
-/** The first page of an organization's projects. */
-export const projectsQuery = (organizationId: string) =>
+/** Every cached page of an organization's projects, as a query filter. */
+export const projectsFilter = (organizationId: string) => ({
+  queryKey: ["organizations", organizationId, "projects"],
+});
+
+/** One page of an organization's projects. */
+export const projectsQuery = (
+  organizationId: string,
+  { cursor, limit }: ListPage = { limit: DEFAULT_PAGE_SIZE },
+) =>
   queryOptions({
-    queryKey: ["organizations", organizationId, "projects"],
+    queryKey: [...projectsFilter(organizationId).queryKey, { cursor, limit }],
     queryFn: ({ signal }) =>
       get("/v1/console/organizations/{organizationId}/projects", {
-        params: { path: { organizationId } },
+        params: { path: { organizationId }, query: { cursor, limit } },
         signal,
       }),
   });

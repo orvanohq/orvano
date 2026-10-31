@@ -21,6 +21,11 @@ export function resolveLocale(requested: readonly string[]): Locale {
   return sourceLocale;
 }
 
+/** I18N-6: the account's language, then the browser's, then `en`. */
+export function accountLocale(account: string | null | undefined): Locale {
+  return resolveLocale(account ? [account, ...navigator.languages] : navigator.languages);
+}
+
 export function getDirection(locale: string): "ltr" | "rtl" {
   const language = locale.toLowerCase().split("-")[0] ?? "";
   return rightToLeft.has(language) ? "rtl" : "ltr";

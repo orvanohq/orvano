@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { withReauth } from "@/features/session";
 import { del, get, patch, post } from "@/shared/api/client";
 import type { components } from "@/shared/api/schema.gen";
-import { projectQuery, projectsQuery, type Project } from "./queries";
+import { projectQuery, projectsFilter, type Project } from "./queries";
 
 type CreateProjectRequest = components["schemas"]["CreateProjectRequest"];
 type UpdateProjectRequest = components["schemas"]["UpdateProjectRequest"];
@@ -16,7 +16,7 @@ export function useCreateProject(organizationId: string) {
         params: { path: { organizationId } },
         body: request,
       })) as Project,
-    onSuccess: () => queryClient.invalidateQueries(projectsQuery(organizationId)),
+    onSuccess: () => queryClient.invalidateQueries(projectsFilter(organizationId)),
   });
 }
 
@@ -33,7 +33,7 @@ export function useUpdateProject(project: Project) {
       }),
     onSuccess: async (saved) => {
       queryClient.setQueryData(projectQuery(projectId).queryKey, saved);
-      await queryClient.invalidateQueries(projectsQuery(project.organizationId));
+      await queryClient.invalidateQueries(projectsFilter(project.organizationId));
     },
   });
 }
@@ -49,7 +49,7 @@ export function useDeleteProject(project: Project) {
           params: { path: { projectId }, header: { "If-Match": `"${project.version}"` } },
         }),
       ),
-    onSuccess: () => queryClient.invalidateQueries(projectsQuery(project.organizationId)),
+    onSuccess: () => queryClient.invalidateQueries(projectsFilter(project.organizationId)),
   });
 }
 

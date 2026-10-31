@@ -2,13 +2,21 @@ import { msg } from "@lingui/core/macro";
 import { createFileRoute } from "@tanstack/react-router";
 import { projectsQuery } from "@/features/projects";
 import { OrganizationPage } from "@/features/projects/components/organization-page";
+import { ListPageError } from "@/features/shell/components/list-page-error";
+import { toListPage, validatePageSearch, type PageSearch } from "@/shared/url/paging";
 
 export const Route = createFileRoute("/_shell/$orgId/")({
   staticData: { crumb: msg`Projects` },
-  validateSearch: (search: Record<string, unknown>): { create?: "project" | "organization" } =>
-    search.create === "project" || search.create === "organization"
-      ? { create: search.create }
-      : {},
-  loader: ({ context, params }) => context.queryClient.query(projectsQuery(params.orgId)),
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): PageSearch & { create?: "project" | "organization" | undefined } => ({
+    ...validatePageSearch(search),
+    create:
+      search.create === "project" || search.create === "organization" ? search.create : undefined,
+  }),
+  loaderDeps: ({ search }) => toListPage(search),
+  loader: ({ context, params, deps }) =>
+    context.queryClient.query(projectsQuery(params.orgId, deps)),
   component: OrganizationPage,
+  errorComponent: ListPageError,
 });

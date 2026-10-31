@@ -192,6 +192,7 @@ export function AppShell({ model, crumbs, resourceList, banner, children }: AppS
           >
             <AccountMenu
               user={model.user}
+              onShowAccount={model.onShowAccount}
               onSignOut={model.onSignOut}
               onShowShortcuts={openShortcuts}
             />

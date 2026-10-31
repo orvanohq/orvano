@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { Cell, Column, Row, Table, TableBody, TableHeader, type SortDescriptor } from "@/ui/table";
+import {
+  Cell,
+  Column,
+  Pagination,
+  Row,
+  Table,
+  TableBody,
+  TableHeader,
+  type SortDescriptor,
+} from "@/ui/table";
 import { Button, CodeSnippet, CopyField, EmptyState, RelativeTime, SecretReveal } from "@/ui";
 import { useGalleryText } from "../pseudo";
 import { Scene, Section } from "./scene";
@@ -31,6 +40,7 @@ const keys = [
 export function DataScene() {
   const g = useGalleryText();
   const [sort, setSort] = useState<SortDescriptor>({ column: "name", direction: "ascending" });
+  const [pageSize, setPageSize] = useState(50);
   const sorted = keys.toSorted((a, b) => {
     const order = a.name.localeCompare(b.name);
     return sort.direction === "ascending" ? order : -order;
@@ -87,6 +97,24 @@ export function DataScene() {
             {[]}
           </TableBody>
         </Table>
+      </Section>
+
+      <Section title="Pagination, first page">
+        <Pagination
+          pageSize={pageSize}
+          pageSizes={[25, 50, 100]}
+          onPageSizeChange={setPageSize}
+          onNext={() => undefined}
+        />
+      </Section>
+
+      <Section title="Pagination, last page">
+        <Pagination
+          pageSize={pageSize}
+          pageSizes={[25, 50, 100]}
+          onPageSizeChange={setPageSize}
+          onPrevious={() => undefined}
+        />
       </Section>
 
       <Section title="SettingsCard and DangerZone">

@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { isReauthRequired, withReauth } from "@/features/session";
 import { patch, post } from "@/shared/api/client";
 import type { components } from "@/shared/api/schema.gen";
-import { apiKeysQuery, type ApiKey } from "./queries";
+import { apiKeysFilter, type ApiKey, type ApiKeyPage } from "./queries";
 
 type CreateApiKeyRequest = components["schemas"]["CreateApiKeyRequest"];
 export type CreatedApiKey = components["schemas"]["CreatedApiKeyResponse"];
@@ -22,16 +22,16 @@ export function useCreateApiKey(projectId: string) {
             body: request,
           })) as CreatedApiKey,
       ),
-    onSuccess: () => queryClient.invalidateQueries(apiKeysQuery(projectId)),
+    onSuccess: () => queryClient.invalidateQueries(apiKeysFilter(projectId)),
   });
 }
 
-/** Spec 0003 QRY-6: a write to one key patches that key in the cached page. */
+/** Spec 0003 QRY-6: a write to one key patches that key in whichever cached page holds it. */
 function usePatchKey(projectId: string) {
   const queryClient = useQueryClient();
   return (key: ApiKey) => {
-    queryClient.setQueryData(
-      apiKeysQuery(projectId).queryKey,
+    queryClient.setQueriesData<ApiKeyPage>(
+      apiKeysFilter(projectId),
       (page) =>
         page && { ...page, items: page.items.map((item) => (item.id === key.id ? key : item)) },
     );
@@ -65,7 +65,7 @@ export function useRegenerateApiKey(projectId: string) {
             params: { path: { projectId, keyId } },
           })) as CreatedApiKey,
       ),
-    onSuccess: () => queryClient.invalidateQueries(apiKeysQuery(projectId)),
+    onSuccess: () => queryClient.invalidateQueries(apiKeysFilter(projectId)),
   });
 }
 

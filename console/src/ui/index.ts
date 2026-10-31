@@ -25,14 +25,9 @@ export { Tooltip, type TooltipProps } from "./tooltip";
 export { VisuallyHidden } from "./visually-hidden";
 export { announce, Announcer } from "./announcer";
 export { Banner, InlineError, type BannerProps, type InlineErrorProps, type Tone } from "./banner";
-export {
-  CodeSnippet,
-  CopyField,
-  SecretReveal,
-  type CodeSnippetProps,
-  type CopyFieldProps,
-  type SecretRevealProps,
-} from "./copy-field";
+export { CodeSnippet, type CodeSnippetProps } from "./code-snippet";
+export { CopyField, type CopyFieldProps } from "./copy-field";
+export { SecretReveal, type SecretRevealProps } from "./secret-reveal";
 export { errorDetails, type ErrorDetails } from "./error-copy";
 export { BootErrorPage, RootErrorPage } from "./error-page";
 export { Progress, Spinner, type ProgressProps, type SpinnerProps } from "./progress";
