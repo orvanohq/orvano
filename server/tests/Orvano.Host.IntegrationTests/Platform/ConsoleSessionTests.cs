@@ -44,7 +44,7 @@ public sealed class ConsoleSessionTests(PostgresFixture postgres) : IAsyncLifeti
         return host;
     }
 
-    private static string SignInBody(string email, string phrase) => JsonSerializer.Serialize(new { email, password = phrase });
+    private static string SignInBody(string email, string password) => JsonSerializer.Serialize(new { email, password });
 
     private Task<int> ExecuteAsync(string sql) => _host.WithDatabaseAsync(db => db.Database.ExecuteSqlRawAsync(sql, Token));
 
@@ -55,7 +55,7 @@ public sealed class ConsoleSessionTests(PostgresFixture postgres) : IAsyncLifeti
     {
         await _host.CreateOwnerAsync();
 
-        using HttpResponseMessage response = await _host.PostAsync(Path, SignInBody(" OWNER@example.com ", ConsoleTestHost.OwnerPhrase));
+        using HttpResponseMessage response = await _host.PostAsync(Path, SignInBody(" OWNER@example.com ", ConsoleTestHost.OwnerPassword));
 
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
         string cookie = ConsoleTestHost.SetCookie(response)!;
@@ -80,7 +80,7 @@ public sealed class ConsoleSessionTests(PostgresFixture postgres) : IAsyncLifeti
         ConsoleTestHost host = Start(new() { ["INSECURE_COOKIES"] = "true" });
         await host.CreateOwnerAsync();
 
-        using HttpResponseMessage response = await host.PostAsync(Path, SignInBody(ConsoleTestHost.OwnerEmail, ConsoleTestHost.OwnerPhrase));
+        using HttpResponseMessage response = await host.PostAsync(Path, SignInBody(ConsoleTestHost.OwnerEmail, ConsoleTestHost.OwnerPassword));
 
         string cookie = ConsoleTestHost.SetCookie(response)!;
         cookie.ShouldStartWith("orvano_session=");
@@ -110,7 +110,7 @@ public sealed class ConsoleSessionTests(PostgresFixture postgres) : IAsyncLifeti
 
         await ExecuteAsync("UPDATE platform.operator SET status = 'disabled'");
         int beforeDisabled = _host.Hasher.Verifies;
-        using HttpResponseMessage disabled = await _host.PostAsync(Path, SignInBody(ConsoleTestHost.OwnerEmail, ConsoleTestHost.OwnerPhrase));
+        using HttpResponseMessage disabled = await _host.PostAsync(Path, SignInBody(ConsoleTestHost.OwnerEmail, ConsoleTestHost.OwnerPassword));
         disabled.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         (await ConsoleTestHost.ErrorCodeAsync(disabled)).ShouldBe("invalid_credentials");
         bodies.Add((await ConsoleTestHost.ReadJsonAsync(disabled)).RootElement.GetProperty("detail").GetString()!);
@@ -133,7 +133,7 @@ public sealed class ConsoleSessionTests(PostgresFixture postgres) : IAsyncLifeti
         int verifies = _host.Hasher.Verifies;
         _host.Clock.Advance(TimeSpan.FromMinutes(5));
 
-        using HttpResponseMessage response = await _host.PostAsync(Path, SignInBody(ConsoleTestHost.OwnerEmail, ConsoleTestHost.OwnerPhrase));
+        using HttpResponseMessage response = await _host.PostAsync(Path, SignInBody(ConsoleTestHost.OwnerEmail, ConsoleTestHost.OwnerPassword));
 
         response.StatusCode.ShouldBe((HttpStatusCode)429);
         (await ConsoleTestHost.ErrorCodeAsync(response)).ShouldBe(ErrorCodes.RateLimited);
@@ -148,7 +148,7 @@ public sealed class ConsoleSessionTests(PostgresFixture postgres) : IAsyncLifeti
     public async Task Sign_in_rewrites_the_hash_when_the_stored_parameters_are_weaker()
     {
         await _host.CreateOwnerAsync();
-        string weak = new Argon2idPasswordHasher(Argon2Cost.Floor).Hash(ConsoleTestHost.OwnerPhrase);
+        string weak = new Argon2idPasswordHasher(Argon2Cost.Floor).Hash(ConsoleTestHost.OwnerPassword);
         await _host.WithDatabaseAsync(db => db.Operators.ExecuteUpdateAsync(s => s.SetProperty(x => x.PasswordHash, weak), Token));
 
         await _host.SignInAsync();
