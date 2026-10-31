@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import { expect, test, type Page } from "@playwright/test";
+import { mockSignedOut } from "./mocks";
 
 // Spec 0016 AC-5, AC-8, FRS-5 to FRS-7: the built console under `vite preview` (with spec 0006 NET-2's CSP), from
 // /console/ to the accepted setup token. vite preview has no API, so the two calls are answered here; the real server
@@ -11,6 +12,7 @@ const axeSource = createRequire(import.meta.url).resolve("axe-core/axe.min.js");
 /** Answers boot's config call with setup open, and the token check with `status`; returns the tokens sent. */
 async function mockSetupApi(page: Page, status = 204) {
   const sent: string[] = [];
+  await mockSignedOut(page);
   await page.route("**/v1/console/config", (route) =>
     route.fulfill({ json: { setupRequired: true }, headers: { "Cache-Control": "no-store" } }),
   );
@@ -133,6 +135,7 @@ test.describe("first run boot", () => {
     page,
   }) => {
     const sent: string[] = [];
+    await mockSignedOut(page);
     await page.route("**/v1/console/config", (route) =>
       route.fulfill({ json: { setupRequired: false }, headers: { "Cache-Control": "no-store" } }),
     );
@@ -143,7 +146,7 @@ test.describe("first run boot", () => {
 
     await page.goto(`setup#token=${TOKEN}`);
 
-    await expect(page.getByRole("heading", { level: 1, name: "Orvano console" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
     expect(page.url()).not.toContain(TOKEN);
     expect(sent).toEqual([]);
   });
@@ -163,6 +166,7 @@ test.describe("first run boot", () => {
   test("0016 FRS-2: a failed config load shows the boot error page, and Reload tries again", async ({
     page,
   }) => {
+    await mockSignedOut(page);
     let failing = true;
     await page.route("**/v1/console/config", (route) =>
       failing

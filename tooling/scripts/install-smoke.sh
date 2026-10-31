@@ -104,7 +104,7 @@ main() {
   pass "GET /console/ answers 200 with the CSP"
 
   # AC-5: a fresh install needs setup.
-  [ "$(config)" = '{"setupRequired":true}' ] || fail "config is '$(config)', not setupRequired true"
+  config | grep -q '"setupRequired":true' || fail "config is '$(config)', not setupRequired true"
   pass "GET /v1/console/config has setupRequired true"
 
   # AC-7: the printed token checks out; a changed one and a foreign Origin do not. Checking uses nothing up.
@@ -123,7 +123,7 @@ main() {
   # AC-9: down and up keep the data.
   (cd "$DIR" && "$ENGINE" compose down </dev/null && "$ENGINE" compose up -d --wait --wait-timeout 300 </dev/null) || fail "compose down and up failed"
   [ "$(created_at)" = "$first_created" ] || fail "created_at changed across compose down and up"
-  [ "$(config)" = '{"setupRequired":true}' ] || fail "setupRequired changed across compose down and up"
+  config | grep -q '"setupRequired":true' || fail "setupRequired changed across compose down and up"
   expect_check "$token" "$ORIGIN" 204 "the printed token after compose down and up"
   pass "compose down then up keeps platform.instance, setupRequired, and the setup token"
 
@@ -154,10 +154,20 @@ main() {
   [ ! -e "$second/.env" ] || fail "the refused second install wrote $second/.env"
   pass "a second install folder is refused"
 
-  # AC-10, ISH-6: after setup, a rerun says where Orvano runs. Feature 13 sets this column for real (spec 0016 Value
-  # sourcing). This reaches `admin setup-token`'s exit 3 through the engine's compose exec.
-  psql_in_stack 'update platform.instance set setup_completed_at = now()' >/dev/null
-  [ "$(config)" = '{"setupRequired":false}' ] || fail "setupRequired stayed true after setup: $(config)"
+  # Spec 0017 AC-1: the owner form closes setup for real, and the token is spent.
+  owner="$(printf '{"token":"%s","name":"Smoke Owner","email":"owner@example.com","password":"correct horse battery staple","organizationName":"Smoke"}' "$new_token")"
+  status="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$BASE/v1/console/setup/owner" \
+    -H "Origin: $ORIGIN" -H 'Content-Type: application/json' --data "$owner")"
+  [ "$status" = 201 ] || fail "the owner form answered $status, not 201"
+  config | grep -q '"setupRequired":false' || fail "setupRequired stayed true after setup: $(config)"
+  pass "the owner form answers 201, and setupRequired turns false"
+
+  code=0
+  (cd "$DIR" && "$ENGINE" compose exec -T orvano /app/orvano admin setup-token </dev/null >/dev/null 2>&1) || code=$?
+  [ "$code" = 3 ] || fail "admin setup-token exited $code after setup, not 3"
+  pass "admin setup-token exits 3 once setup is complete"
+
+  # AC-10, ISH-6: after setup, a rerun says where Orvano runs.
   done_run="$(install "$DIR")" || fail "the rerun after setup exited non zero"
   printf '%s\n' "$done_run" | grep -q "Orvano is running at $ORIGIN/console" || fail "the rerun after setup printed: $done_run"
   if printf '%s\n' "$done_run" | grep -q '#token='; then

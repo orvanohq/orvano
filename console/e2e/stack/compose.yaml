@@ -1,0 +1,76 @@
+# Spec 0003 QA-5: the real image and PostgreSQL for the full stack Playwright run, with throwaway values. It mirrors
+# api/conformance/compose.yaml on its own project and port, so the two can run side by side.
+# Orvano answers on http://localhost:18090. Set ORVANO_E2E_IMAGE to try another build (default orvano:ci).
+name: orvano-e2e
+
+x-orvano: &orvano
+  image: ${ORVANO_E2E_IMAGE:-orvano:ci}
+  environment: &orvano-environment
+    ORVANO_DATABASE__HOST: postgres
+    ORVANO_DATABASE__USERNAME: orvano
+    # Fixed throwaway test passwords: this database lives only for one test run (spec 0006 SCR-5).
+    ORVANO_DATABASE__PASSWORD: e2e-owner
+    ORVANO_PROJECTDB__ADMINUSERNAME: orvano_provisioner
+    ORVANO_PROJECTDB__ADMINPASSWORD: e2e-provisioner
+    ORVANO_PUBLIC_URL: http://localhost:18090
+
+services:
+  postgres:
+    image: postgres:18.6 # spec 0007 PG-1: the same exact tag as deploy/compose.yaml
+    environment:
+      POSTGRES_PASSWORD: e2e-postgres
+      ORVANO_DB_PASSWORD: e2e-owner
+      ORVANO_PROVISIONER_PASSWORD: e2e-provisioner
+    tmpfs:
+      - /var/lib/postgresql
+    volumes:
+      - ../../../deploy/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d orvano"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  # A fresh root key for every run: 32 random bytes, base64, the form `orvano init` writes.
+  root-key:
+    image: node:24.22.1-alpine3.24
+    command:
+      - node
+      - -e
+      - >-
+        require("node:fs").writeFileSync("/keys/root.key",
+        require("node:crypto").randomBytes(32).toString("base64") + "\n", { mode: 0o644 })
+    volumes:
+      - root-key:/keys
+
+  migrate:
+    <<: *orvano
+    command: ["migrate"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  orvano:
+    <<: *orvano
+    environment:
+      <<: *orvano-environment
+      ORVANO_ROLES: api,worker
+      ORVANO_ROOT_KEY_FILE: /keys/root.key
+    ports:
+      - "127.0.0.1:18090:8080"
+    volumes:
+      - root-key:/keys:ro
+    healthcheck:
+      test: ["CMD", "/app/orvano", "healthcheck"] # spec 0007 IMG-4
+      interval: 2s
+      timeout: 6s
+      retries: 60
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      root-key:
+        condition: service_completed_successfully
+
+volumes:
+  root-key:

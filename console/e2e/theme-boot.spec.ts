@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockSignedOut } from "./mocks";
 
 // Spec 0015 THM-1 to THM-5: public/theme-boot.js sets the theme before the first paint, the app follows the OS under
 // System, and with storage blocked CSS alone follows the OS.
@@ -7,6 +8,7 @@ const darkBackground = "oklch(0.16 0.005 286)";
 
 // vite preview has no API: answer boot's config call (spec 0016 FRS-2) so the app renders its own pages.
 test.beforeEach(async ({ page }) => {
+  await mockSignedOut(page);
   await page.route("**/v1/console/config", (route) =>
     route.fulfill({ json: { setupRequired: false } }),
   );

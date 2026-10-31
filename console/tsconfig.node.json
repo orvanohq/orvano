@@ -17,6 +17,7 @@
     "vitest.config.ts",
     "lingui.config.ts",
     "playwright.config.ts",
+    "playwright.stack.config.ts",
     "e2e"
   ]
 }
