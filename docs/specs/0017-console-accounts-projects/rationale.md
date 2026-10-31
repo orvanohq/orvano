@@ -16,7 +16,7 @@ Forces that shaped the choices:
 - The user wants to reach the core loop soon, so breadth beyond the Done when line has to earn its place.
 - Spec text must stay trustworthy. `/sync` had to flag six `Updated` lines whose rule text was stale, so this spec changes rule text directly.
 
-Workspace: the core monorepo, with changes in `server/`, `console/`, `api/`, and small runner changes in six SDK repos and three templates. Compliance: operator personal data only, under spec 0006's ASVS 5.0 Level 2 bar.
+Workspace: the core monorepo, with changes in `server/`, `console/`, `api/`, and small runner changes in six SDK repos. Compliance: operator personal data only, under spec 0006's ASVS 5.0 Level 2 bar.
 
 ## Options considered
 
@@ -102,6 +102,16 @@ Commit 1 of the PR fixes what `/sync` flagged. Commit 2 holds this spec, its ame
 - **Spec 0015**: RTL-1, since the real catalog now exists.
 
 Spec 0016's Follow-up for feature 13 stays open until the code lands.
+
+### Found while building
+
+`/develop` found these while gating milestone 2 (build plan steps 10 to 13), and the engineer decided each one on 2026-10-30.
+
+- **`keys.current.bad_key` uses `client: { key: not-a-real-key }`, not `options.headers` (SDK-3).** Every SDK refuses `Orvano-Key` in per call headers before anything is sent, so the scenario as written would have failed in the SDK and never reached the server. `health.get.ignores_bad_key` already passes a wrong key the working way, and the runners read `client.key` ahead of their default key, so SDK-4 keeps that order once the default comes from the bootstrap command.
+- **No template PRs (SDK-4, step 11).** None of the three templates has a runner, a `conformance/` folder, or a conformance job, so there was nothing to change. They export from `tooling/starters/**` (spec 0010 TPL-2). That makes six runner PRs, not nine.
+- **The per project CORS policy moves up to the milestone 2 core PR (PJT-6, SDK-5, steps 12 and 17).** Chromium browser mode reaches a project route cross origin, so `keys.current` fails there without the policy, and AC-16 needs it. Step 17 was too late, since milestone 2 closes first. Step 17 keeps the origins page and cache invalidation. Nothing can change a project's origins before then, so the policy has nothing to invalidate until that step, and origin validation already came with milestone 1.
+- **AC-16 closes on the runtimes CI really runs (AC-16, step 13).** CNF-5 and SQA-3 name Deno and Bun nightly, but no SDK repo has a nightly conformance workflow, and the feature 10 notes list them as not done. Holding AC-16 for them would tie this feature to work that has no owner, so Deno and Bun are reported as not run and become a separate task (Follow-up).
+- **CNF-5 and SQA-3 keep their rule and gain a note.** The nightly runs are still the target, so the rules stand. Read alone, though, they say something runs that doesn't, so each one now says it isn't built and points to the Follow-up here.
 
 ### Cross check (2026-10-30)
 
