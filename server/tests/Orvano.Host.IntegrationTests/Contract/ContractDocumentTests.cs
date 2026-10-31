@@ -22,10 +22,13 @@ public sealed class ContractDocumentTests(ContractHostFixture host) : IClassFixt
         Paths(publicDocument).ShouldBe(["/v1/health", "/v1/projects/{projectId}/keys/current"]);
         Paths(console).ShouldBe(
         [
+            "/v1/console/account", // spec 0017 ACC-1
+            "/v1/console/account/password",
             "/v1/console/config", // spec 0016 FRS-1
             "/v1/console/organizations", // spec 0017
             "/v1/console/organizations/{organizationId}",
             "/v1/console/organizations/{organizationId}/projects",
+            "/v1/console/password-resets", // spec 0017 RST-3
             "/v1/console/projects/{projectId}",
             "/v1/console/projects/{projectId}/dependents",
             "/v1/console/projects/{projectId}/keys",

@@ -81,7 +81,7 @@ public sealed class OutboxCleanupTests(PostgresFixture postgres) : IAsyncLifetim
             await transaction.RollbackAsync(Token);
         }
 
-        runs.Select(run => (run.Kind, run.Outcome)).ShouldBe([("jobs.cleanup", "succeeded"), ("outbox.cleanup", "succeeded")], ignoreOrder: true);
+        runs.Select(run => (run.Kind, run.Outcome)).ShouldBe([("jobs.cleanup", "succeeded"), ("outbox.cleanup", "succeeded"), ("platform.cleanup", "succeeded")], ignoreOrder: true);
         (await _rows.CountAsync("true", Token)).ShouldBe(11);
         (await _rows.CountAsync("occurred_at = $1", Token, now.AddDays(-6))).ShouldBe(10);
         (await _rows.CountAsync("id = $1 AND dispatched_at IS NULL", Token, waiting)).ShouldBe(1); // never an undispatched row
@@ -133,7 +133,7 @@ public sealed class OutboxCleanupTests(PostgresFixture postgres) : IAsyncLifetim
             await transaction.RollbackAsync(Token);
         }
 
-        runs.Select(run => (run.Kind, run.Outcome)).ShouldBe([("jobs.cleanup", "succeeded"), ("outbox.cleanup", "succeeded")], ignoreOrder: true);
+        runs.Select(run => (run.Kind, run.Outcome)).ShouldBe([("jobs.cleanup", "succeeded"), ("outbox.cleanup", "succeeded"), ("platform.cleanup", "succeeded")], ignoreOrder: true);
         (await _rows.CountAsync("true", Token)).ShouldBe(2);
         (await _rows.CountAsync("id = ANY($1) AND dispatched_at IS NULL", Token, new[] { young, registered })).ShouldBe(2);
         deletes.Count.ShouldBe(3); // OCL-1's one empty statement, then 5000 and 1000
