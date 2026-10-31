@@ -22,7 +22,7 @@ spec [0016](../specs/0016-self-host-install/index.md)
 - [ ] Verify it: `/check verify self host install` (ran in #146; blocked only on the deferred rows below, so run it again once they have results)
 - [ ] Test it: `/test self host install`
 - [ ] Review it (fresh model): `/check review self host install`
-- [ ] Document it: `/document self host install`
+- [x] Document it: `/document self host install`
 - [ ] Deferred until before feature 59: the real host verify rows (spec 0016 step 20; VFY-6 to VFY-10 and VFY-12; AC-1, AC-2, AC-9, AC-12, AC-17). Decided 2026-10-30 so they don't hold up slice 1. Real certificates, SELinux hosts, rootful Podman, and WSL2 stay unproven until these run, and feature 12 can't be `done` before then.
 
 ### 13. Console accounts & projects · needs a decision
