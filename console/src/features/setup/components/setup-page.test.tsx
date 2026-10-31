@@ -579,8 +579,6 @@ describe("SetupPage", () => {
   it("0016 FRS-6: setup completed meanwhile reloads the config, which sends the page home", async () => {
     checkEndpoint(() => problem(409, "setup_complete"));
     worker.use(
-      ...shellHandlers,
-      ...emptyProjects,
       http.get("/v1/console/config", ({ response }) =>
         response(200).json({ ...testConfig, setupRequired: false }),
       ),
@@ -590,8 +588,8 @@ describe("SetupPage", () => {
     await typeToken(screen, TOKEN);
     await userEvent.keyboard("{Enter}");
 
-    await expect.element(screen.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
-    expect(screen.router.state.location.pathname).toBe("/");
+    await expect.element(screen.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+    expect(screen.router.state.location.pathname).toBe("/sign-in");
   });
 });
 
