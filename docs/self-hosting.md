@@ -91,7 +91,7 @@ A link stops working 24 hours after it was made, or as soon as a newer one is ma
 docker compose exec orvano /app/orvano admin setup-token
 ```
 
-`orvano` also prints a link to its log on its first start, and `install.sh` replaces that one straight away, so use the link the script printed. A later restart leaves a valid token alone. With more than one `api` replica, each one may print its own link and only the newest works, so use `admin setup-token`.
+`orvano` also prints a link to its log on its first start, and `install.sh` replaces that one straight away, so use the link the script printed. A later restart leaves a valid token alone. With more than one `api` replica, only one prints a link and the others say setup is waiting, so use `admin setup-token`.
 
 ## Reference
 
@@ -181,7 +181,7 @@ The server reads more settings from its environment. To change one, add it to th
 | `ORVANO_ROLES`                                   | The roles this process runs, `api`, `worker`, or both (the default).            |
 | `ORVANO_DATABASE__POOLSIZE`                      | The platform connection pool. Default 30, at least 6.                           |
 | `ORVANO_DATABASE__SSLMODE`                       | TLS to PostgreSQL.                                                              |
-| `ORVANO_PROJECTDB__MAXCONNECTIONS`               | The cap on open project database connections. Default 150.                      |
+| `ORVANO_PROJECTDB__MAXCONNECTIONS`               | Read once project databases arrive: the cap on their connections. Default 150.  |
 | `ORVANO_TLS__CERTFILE` and `ORVANO_TLS__KEYFILE` | PEM files for HTTPS without Caddy. See [HTTPS](#https).                         |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`                    | Sends traces, metrics, and logs over OTLP. Export stays off until you set this. |
 
@@ -241,7 +241,7 @@ A rootless install stops when you log out unless your user lingers, and without 
 loginctl enable-linger "$USER"
 ```
 
-CI proves the install on Linux with Docker on amd64 and arm64, and with rootless Podman on amd64, on every change. Rootful Podman, rootless Docker, and a reboot under Podman are not covered by CI.
+CI proves the install on Linux with Docker on amd64 and arm64, and with rootless Podman on amd64, on every change to the server, the console, or the install files. Rootful Podman, rootless Docker, and a reboot under Podman are not covered by CI.
 
 ### SELinux
 
