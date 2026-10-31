@@ -458,6 +458,24 @@ export function contractFile(model: TargetModel, source: Provenance, sdkPackage:
   return `${text}} as const;\n`;
 }
 
+/**
+ * Spec 0005 KEY-1: @orvano/server's browser guard exports a stub under every public name. The guard re-exports these, so
+ * a new service has its stub in the same regenerate PR, with no hand edit. It's the guard's own import that throws; a
+ * stub only keeps the name, so a bundler reports that message rather than a missing export.
+ */
+export function browserStubsFile(model: TargetModel, source: Provenance): string {
+  let text = fileHeader(source);
+  text +=
+    "// Spec 0005 KEY-1: src/browser-guard.ts re-exports these, so a new service needs no hand edit there.\n";
+  text +=
+    'const message =\n  "@orvano/server holds a secret key and must never ship to a browser or a device. Use @orvano/client there.";\n';
+  for (const service of model.services) {
+    text += `\n${tsDoc([], ["@public"])}`;
+    text += `export function ${serviceClassName(service)}(): never {\n  throw new Error(message);\n}\n`;
+  }
+  return text;
+}
+
 export function indexFile(model: TargetModel, source: Provenance): string {
   let text = fileHeader(source);
   text +=
