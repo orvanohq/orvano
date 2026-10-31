@@ -1,3 +1,4 @@
+import type { RegisteredRouter } from "@tanstack/react-router";
 import type { ReactElement, ReactNode } from "react";
 import type { BannerProps } from "../banner";
 import type { NavId } from "./nav-registry";
@@ -7,9 +8,9 @@ import type { NavId } from "./nav-registry";
 
 export type ShellScope = "account" | "org" | "project";
 
-// Loose until feature 13 registers the shell routes, then narrowed to the router's typed link options.
 export interface ShellLinkOptions {
-  to: string;
+  /** Spec 0017 CNS-3: a route the console has. The gallery's own routes go through its `galleryLink`. */
+  to: keyof RegisteredRouter["routesByPath"];
   params?: Record<string, string>;
   search?: Record<string, unknown>;
   exact?: boolean;

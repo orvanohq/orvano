@@ -167,7 +167,7 @@ export function FieldErrorText({ children }: { children?: string }) {
   );
 }
 
-export { fieldColumn, inputBox, textInput } from "../field-styles";
+export { fieldColumn, inputBox, textArea, textInput } from "../field-styles";
 
 export interface CustomFieldProps extends FieldProps {
   /** The control, given its id, its described by ids, whether it is invalid, and whether it can change. */

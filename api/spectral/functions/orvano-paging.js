@@ -1,5 +1,6 @@
 // Spec 0014 PAG-1, PAG-2, PAG-7, CLT-2: every list is paged. A 200 response holding an array of items needs
-// x-orvano-paging, and a paged operation takes `limit` and `cursor` and returns { items, nextCursor, total }.
+// x-orvano-paging, and a paged operation takes `limit` and `cursor` and returns { items, nextCursor, total }. CPX-2's
+// `GET .../dependents` is the one exception: its { items } is one count per kind, not a list of records.
 const types = (schema) => [schema?.type ?? []].flat();
 
 export default function orvanoPaging(operation, _options, context) {
@@ -8,6 +9,7 @@ export default function orvanoPaging(operation, _options, context) {
   const paging = operation["x-orvano-paging"];
   const path = [...context.path];
   const pageShaped = types(schema?.properties?.items).includes("array");
+  if (String(path.at(-2)).endsWith("/dependents")) return [];
 
   if (paging === undefined) {
     return types(schema).includes("array") || pageShaped

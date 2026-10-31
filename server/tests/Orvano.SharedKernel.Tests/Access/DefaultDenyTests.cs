@@ -35,6 +35,18 @@ public sealed class DefaultDenyTests
     }
 
     [Fact]
+    [Trait("Spec", "0017:SES-8")]
+    public async Task Startup_fails_when_a_recent_password_check_is_asked_of_a_read_or_a_route_no_operator_passes()
+    {
+        (await StartupErrorAsync(app => app.MapGet("/read", () => "ok").RequireOperator().RequireRecentReauth()))
+            .Message.ShouldContain("/read");
+        (await StartupErrorAsync(app => app.MapPost("/open", () => "ok").AllowPublicAccess().RequireRecentReauth()))
+            .Message.ShouldContain("/open");
+        (await StartupErrorAsync(app => app.MapPost("/keyed", () => "ok").RequireScope(Scopes.StorageRead).RequireRecentReauth()))
+            .Message.ShouldContain("RequireRecentReauth");
+    }
+
+    [Fact]
     [Trait("Spec", "0012:AC-13")]
     [Trait("Spec", "0012:EPT-3")]
     public async Task Startup_fails_when_an_endpoint_declares_a_requirement_and_public_access()

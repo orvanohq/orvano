@@ -36,6 +36,7 @@ client.use({
 type Client = typeof client;
 export type GetPath = ClientPathsWithMethod<Client, "get">;
 export type PostPath = ClientPathsWithMethod<Client, "post">;
+export type PatchPath = ClientPathsWithMethod<Client, "patch">;
 export type DeletePath = ClientPathsWithMethod<Client, "delete">;
 
 /** QRY-3: every request gives up after 30 seconds, as an `ApiError` with kind `timeout`. */
@@ -87,6 +88,17 @@ export async function post<Path extends PostPath>(
     (init) => client.POST(path, { ...options, ...init } as never),
     options.signal,
   )) as MethodResponse<Client, "post", Path> | undefined;
+}
+
+/** A partial update (spec 0014 JSW-9). */
+export async function patch<Path extends PatchPath>(
+  path: Path,
+  options: MaybeOptionalInit<paths[Path], "patch"> & { signal?: AbortSignal },
+): Promise<MethodResponse<Client, "patch", Path>> {
+  return (await send(
+    (init) => client.PATCH(path, { ...options, ...init } as never),
+    options.signal,
+  )) as MethodResponse<Client, "patch", Path>;
 }
 
 /** A delete. Resolves with the response's data, or `undefined` for a `204`. */

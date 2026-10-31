@@ -4,6 +4,7 @@ import type {
   RouteTab,
   ShellModel,
   ShellNavItem,
+  ShellLinkOptions,
   ShellScope,
   SwitcherItem,
 } from "@/ui";
@@ -11,6 +12,9 @@ import type { Scenario } from "./settings";
 
 // Spec 0015 GAL-2: placeholder data in the shapes of SHL-1. Paths follow the gallery's routes, which mirror the
 // app's shell paths.
+
+/** `ShellLinkOptions` names the console's routes, and these mirror ones it doesn't have yet. */
+const galleryRoute = (to: string) => to as ShellLinkOptions["to"];
 
 export const user = { id: "usr_ada", name: "Ada Lovelace", email: "ada@example.com" };
 export const org = { id: "acme", name: "Acme" };
@@ -35,20 +39,23 @@ export const projectNav: readonly ShellNavItem[] = [
   { id: "overview", link: { to: "/$orgId/$projectId", params: ids, exact: true } },
   ...projectServices.map((service): ShellNavItem => ({
     id: service,
-    link: { to: "/$orgId/$projectId/$service", params: { ...ids, service } },
+    link: { to: galleryRoute("/$orgId/$projectId/$service"), params: { ...ids, service } },
   })),
 ];
 
 export const orgNav: readonly ShellNavItem[] = [
   { id: "projects", link: { to: "/$orgId", params: { orgId: org.id }, exact: true } },
-  { id: "members", link: { to: "/$orgId/members", params: { orgId: org.id } } },
+  { id: "members", link: { to: galleryRoute("/$orgId/members"), params: { orgId: org.id } } },
   { id: "org-settings", link: { to: "/$orgId/settings", params: { orgId: org.id } } },
 ];
 
 export const accountNav: readonly ShellNavItem[] = [
-  { id: "profile", link: { to: "/account/$page", params: { page: "profile" } } },
-  { id: "security", link: { to: "/account/$page", params: { page: "security" } } },
-  { id: "preferences", link: { to: "/account/$page", params: { page: "preferences" } } },
+  { id: "profile", link: { to: galleryRoute("/account/$page"), params: { page: "profile" } } },
+  { id: "security", link: { to: galleryRoute("/account/$page"), params: { page: "security" } } },
+  {
+    id: "preferences",
+    link: { to: galleryRoute("/account/$page"), params: { page: "preferences" } },
+  },
 ];
 
 const orgs: SwitcherItem[] = [
@@ -145,7 +152,10 @@ export function crumbs(scope: ShellScope, page: string, resource?: string): Crum
       {
         kind: "page",
         label: page,
-        link: { to: "/$orgId/$projectId/$service", params: { ...ids, service: "databases" } },
+        link: {
+          to: galleryRoute("/$orgId/$projectId/$service"),
+          params: { ...ids, service: "databases" },
+        },
       },
       { kind: "page", label: resource },
     ];
@@ -161,7 +171,7 @@ export const tables: readonly ResourceListItem[] = [
   id: name,
   name,
   link: {
-    to: "/$orgId/$projectId/databases/$tableId",
+    to: galleryRoute("/$orgId/$projectId/databases/$tableId"),
     params: { ...ids, tableId: name },
   },
 }));
@@ -175,14 +185,14 @@ export function tableTabs(
     {
       id: "rows",
       label: g("Rows"),
-      link: { to: "/$orgId/$projectId/databases/$tableId", params, exact: true },
+      link: { to: galleryRoute("/$orgId/$projectId/databases/$tableId"), params, exact: true },
     },
     // SHL-14: six tabs, so a narrow frame shows the row scrolling with a fade at its cut edge.
     ...["Columns", "Indexes", "Permissions", "Triggers", "Settings"].map((name) => ({
       id: name.toLowerCase(),
       label: g(name),
       link: {
-        to: "/$orgId/$projectId/databases/$tableId/$tab",
+        to: galleryRoute("/$orgId/$projectId/databases/$tableId/$tab"),
         params: { ...params, tab: name.toLowerCase() },
       },
     })),

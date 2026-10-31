@@ -98,6 +98,18 @@ public static class AccessEndpointFilters
     }
 
     /// <summary>
+    /// CON-7, spec 0017 SES-8: a modifier on an operator route that changes state, not a requirement kind (EPT-3). The
+    /// state change check answers <c>403 reauth_required</c> before the body is read when the session's last password
+    /// check is more than 10 minutes old.
+    /// </summary>
+    public static TBuilder RequireRecentReauth<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.WithMetadata(new RecentReauthModifier());
+    }
+
+    /// <summary>
     /// EPT-5: the endpoint runs with no caller. Resolvers do not run, a credential sent with it is ignored, and
     /// <see cref="ICallerContext.Current"/> throws if read. Serve nothing that depends on a project or a caller, and
     /// say in a comment why the endpoint is public.

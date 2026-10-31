@@ -132,6 +132,13 @@ function Custom() {
 }
 
 describe("field components", () => {
+  it("0015 PRM-1: a text area is as tall as its rows", async () => {
+    const { screen } = await renderInRouter(<EveryField />);
+    const notes = screen.getByRole("textbox", { name: /Notes/ }).element();
+
+    expect(notes.getBoundingClientRect().height).toBeGreaterThan(70);
+  });
+
   it("0015 AC-15: every field passes axe and marks optional ones", async () => {
     const { screen } = await renderInRouter(<EveryField />);
 

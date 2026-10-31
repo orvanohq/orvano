@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
-import { plural } from "@lingui/core/macro";
+import { msg, plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { useSelector } from "@tanstack/react-form";
 import { useStore } from "@/shared/stores/create-store";
@@ -50,6 +50,8 @@ export function Form({ children }: FormProps) {
 export interface SubmitButtonProps {
   /** Says what it does: "Create bucket", "Save changes" (never "Submit"). */
   children: ReactNode;
+  /** A settings card's Update button: unavailable until something changed (FRM-5). */
+  isUpdate?: boolean;
 }
 
 /**
@@ -57,12 +59,20 @@ export interface SubmitButtonProps {
  * shows the busy state, which is announced, and ignores a second press. It submits its form from anywhere inside the
  * form's `AppForm`, a sheet's footer included.
  */
-export function SubmitButton({ children }: SubmitButtonProps) {
+export function SubmitButton({ children, isUpdate = false }: SubmitButtonProps) {
   const form = useFormContext();
   const isSubmitting = useSelector(form.store, (state) => state.isSubmitting);
+  const isUnchanged = useSelector(form.store, (state) => state.isDefaultValue);
   const formId = useStore(formUi(form), (state) => state.formId);
   return (
-    <Button variant="primary" type="submit" form={formId} isPending={isSubmitting}>
+    <Button
+      variant="primary"
+      type="submit"
+      form={formId}
+      isPending={isSubmitting}
+      unavailableReason={isUpdate && isUnchanged ? msg`Nothing has changed.` : undefined}
+      reasonMayChange={isUpdate}
+    >
       {children}
     </Button>
   );

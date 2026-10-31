@@ -14,6 +14,7 @@ using Orvano.Modules.Platform.Setup;
 using Orvano.SharedKernel.Access;
 using Orvano.SharedKernel.Api;
 using Orvano.SharedKernel.Data;
+using Orvano.SharedKernel.Jobs;
 using Orvano.SharedKernel.Projects;
 
 namespace Orvano.Modules.Platform;
@@ -46,6 +47,9 @@ public static class PlatformModule
         services.AddCallerResolver<ConsoleSessionResolver>();
 
         services.AddScoped<ProjectCreation>();
+        services.AddScoped<ProjectDeletion>();
+        services.AddJobHandler<ProjectTeardown, ProjectTeardownHandler>(
+            PlatformJsonContext.Default.ProjectTeardown, options => options.RequiresProject = true);
         services.AddScoped<IProjectDirectory, ProjectDirectory>();
 
         services.AddSingleton<ApiKeyUsage>();

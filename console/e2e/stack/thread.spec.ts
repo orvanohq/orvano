@@ -4,9 +4,9 @@ import { compose } from "./stack";
 const EMAIL = "owner@example.com";
 const PASSWORD = "correct horse battery staple";
 
-// Spec 0017 AC-27, AC-1, AC-5, AC-13, AC-15: the real console, server, and PostgreSQL, from first run setup to a key that
-// answers over HTTP. Revoking it joins this run with build plan step 15.
-test("0017 AC-27: first run setup, sign in again, a project, a scoped key shown once, and a live keys.current", async ({
+// Spec 0017 AC-27, AC-1, AC-5, AC-12 to AC-15: the real console, server, worker, and PostgreSQL, from first run setup to a
+// key that answers over HTTP, then its revoke, and the project's delete and teardown.
+test("0017 AC-27: first run setup, sign in again, a project, a scoped key shown once, a live keys.current, its revoke, and a project delete", async ({
   page,
   request,
 }) => {
@@ -48,7 +48,7 @@ test("0017 AC-27: first run setup, sign in again, a project, a scoped key shown 
   await page.getByRole("link", { name: "Create API key" }).click();
   await page.getByRole("button", { name: "Create API key" }).click();
   await page.getByRole("textbox", { name: "Name" }).fill("Worker");
-  await page.getByText("storage.read", { exact: true }).click();
+  await page.getByText("Read storage", { exact: true }).click();
   await page.getByRole("button", { name: "Create key" }).click();
   const key = await page.getByRole("textbox", { name: "API key" }).inputValue();
   expect(key).toMatch(/^orv_sk_[\w-]{43}$/);
@@ -70,4 +70,26 @@ test("0017 AC-27: first run setup, sign in again, a project, a scoped key shown 
     headers: { "Orvano-Key": `${key.slice(0, -4)}AAAA` },
   });
   expect(wrong.status()).toBe(401);
+
+  // Revoked, it stops on the next request.
+  await page.getByRole("button", { name: "Actions for Worker" }).click();
+  await page.getByRole("menuitem", { name: "Revoke" }).click();
+  await page.getByRole("button", { name: "Revoke key" }).click();
+  await expect(page.getByRole("row", { name: /Worker/ }).getByText("Revoked")).toBeVisible();
+  const revoked = await request.get(`/v1/projects/${projectId}/keys/current`, {
+    headers: { "Orvano-Key": key },
+  });
+  expect(revoked.status()).toBe(401);
+
+  // A project delete asks for its name, and the list watches it go.
+  await page.getByRole("link", { name: "General" }).click();
+  await page.getByRole("button", { name: "Delete project" }).click();
+  const confirm = page.getByRole("alertdialog", { name: "Delete Shop?" });
+  await expect(confirm.getByText("1 API key")).toBeVisible();
+  await confirm.getByRole("textbox").fill("Shop");
+  await confirm.getByRole("button", { name: "Delete project" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create your first project" })).toBeVisible({
+    timeout: 30_000,
+  });
 });

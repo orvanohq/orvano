@@ -2,3 +2,5 @@
 export { connectSessionToken, sessionQuery, type Session } from "./api/queries";
 export { signOut } from "./api/mutations";
 export { requireSession, requireSignedOut, safeRedirect } from "./guards";
+export { ReauthHost } from "./components/reauth-host";
+export { isReauthRequired, withReauth } from "./reauth";

@@ -9,7 +9,7 @@ using Orvano.Testing;
 namespace Orvano.Host.IntegrationTests.Platform;
 
 // Spec 0017 PJT-6, spec 0007 COR-1 to COR-3: the per project policy on project routes, which browser conformance needs
-// (SDK-4). Build plan step 17 adds changing the origins and their cache invalidation (AC-11).
+// (SDK-4), and changing the origins with their cache invalidation (PJT-4, AC-11).
 public sealed class ProjectCorsTests(PostgresFixture postgres) : IAsyncLifetime
 {
     private const string Allowed = "http://localhost:63315";
@@ -18,12 +18,14 @@ public sealed class ProjectCorsTests(PostgresFixture postgres) : IAsyncLifetime
     private ConsoleTestHost _host = null!;
     private ConsoleSession _owner = null!;
     private Guid _projectId;
+    private string _database = string.Empty;
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     public async ValueTask InitializeAsync()
     {
-        _host = new ConsoleTestHost(postgres, await postgres.CreateMigratedDatabaseAsync("cors", Token));
+        _database = await postgres.CreateMigratedDatabaseAsync("cors", Token);
+        _host = new ConsoleTestHost(postgres, _database);
         _owner = await _host.CreateOwnerAsync();
         _projectId = await CreateProjectAsync([Allowed]);
     }
@@ -46,13 +48,15 @@ public sealed class ProjectCorsTests(PostgresFixture postgres) : IAsyncLifetime
         return (await ConsoleTestHost.ReadJsonAsync(response)).RootElement.GetProperty("id").GetGuid();
     }
 
-    private async Task<HttpResponseMessage> PreflightAsync(string path, string origin)
+    private Task<HttpResponseMessage> PreflightAsync(string path, string origin) => PreflightOnAsync(_host, path, origin);
+
+    private static async Task<HttpResponseMessage> PreflightOnAsync(ConsoleTestHost host, string path, string origin)
     {
         using var request = new HttpRequestMessage(HttpMethod.Options, new Uri(path, UriKind.Relative));
         request.Headers.TryAddWithoutValidation("Origin", origin);
         request.Headers.TryAddWithoutValidation("Access-Control-Request-Method", "GET");
         request.Headers.TryAddWithoutValidation("Access-Control-Request-Headers", $"{OrvanoHeaders.Key},{OrvanoHeaders.ApiVersion}");
-        return await _host.Client.SendAsync(request, Token);
+        return await host.Client.SendAsync(request, Token);
     }
 
     private static string? Header(HttpResponseMessage response, string name) =>
@@ -70,6 +74,34 @@ public sealed class ProjectCorsTests(PostgresFixture postgres) : IAsyncLifetime
         Header(response, "Access-Control-Max-Age").ShouldBe("600");
         Header(response, "Access-Control-Allow-Credentials").ShouldBeNull();
         Header(response, "Vary").ShouldBe("Origin");
+    }
+
+    [Fact, Trait("Spec", "0017:PJT-4"), Trait("Spec", "0017:PJT-5"), Trait("Spec", "0007:CCH-2"), Trait("Spec", "0017:AC-11")]
+    public async Task Origin_change_applies_on_a_second_host_when_its_signal_arrives()
+    {
+        await _host.WaitUntilConnectedAsync();
+        using var second = new ConsoleTestHost(postgres, _database, _host.Clock);
+        await second.WaitUntilConnectedAsync();
+        using (HttpResponseMessage before = await PreflightOnAsync(second, Current(_projectId), Allowed))
+        {
+            Header(before, "Access-Control-Allow-Origin").ShouldBe(Allowed); // the second host has it cached now
+        }
+
+        using HttpResponseMessage changed = await _host.SendAsync(
+            HttpMethod.Patch, $"/v1/console/projects/{_projectId}", JsonSerializer.Serialize(new { allowedOrigins = new[] { Other } }), _owner);
+        changed.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        await Eventually.TrueAsync(
+            async () =>
+            {
+                using HttpResponseMessage response = await PreflightOnAsync(second, Current(_projectId), Other);
+                return Header(response, "Access-Control-Allow-Origin") == Other;
+            },
+            TimeSpan.FromSeconds(15),
+            "the second host never saw the new origin",
+            Token);
+        using HttpResponseMessage old = await PreflightOnAsync(second, Current(_projectId), Allowed);
+        Header(old, "Access-Control-Allow-Origin").ShouldBeNull();
     }
 
     [Fact, Trait("Spec", "0017:PJT-6"), Trait("Spec", "0007:COR-2")]

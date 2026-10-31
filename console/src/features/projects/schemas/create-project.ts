@@ -18,14 +18,16 @@ export const createProjectSchema = z.object({
 
 export type CreateProjectValues = z.input<typeof createProjectSchema>;
 
+/** One origin per line, blank lines dropped. */
+export function originList(text: string): string[] {
+  return text
+    .split("\n")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin !== "");
+}
+
 export function toCreateProjectRequest(
   values: z.output<typeof createProjectSchema>,
 ): CreateProjectRequest {
-  return {
-    name: values.name,
-    allowedOrigins: values.allowedOrigins
-      .split("\n")
-      .map((origin) => origin.trim())
-      .filter((origin) => origin !== ""),
-  };
+  return { name: values.name, allowedOrigins: originList(values.allowedOrigins) };
 }

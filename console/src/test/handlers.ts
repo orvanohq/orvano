@@ -70,7 +70,13 @@ export const defaultHandlers = [
 export const testOrgId = testSession.memberships[0]?.organizationId ?? "";
 export const testProjectId = "01970000-0000-7000-8000-00000000000b";
 
-const allowedProjectActions = ["project.read", "project.write", "keys.read", "keys.write"];
+const allowedProjectActions = [
+  "project.read",
+  "project.write",
+  "project.delete",
+  "keys.read",
+  "keys.write",
+];
 
 /** The answers an app page needs for the session's organization and one project, for a test to `worker.use(...)`. */
 export const shellHandlers = [
@@ -78,7 +84,7 @@ export const shellHandlers = [
     response(200).json({
       id: testOrgId,
       name: "Acme",
-      allowedActions: ["org.read", "projects.create"],
+      allowedActions: ["org.read", "org.write", "projects.create"],
       version: "AAAAAAAAAAE",
       createdAt: "2030-01-01T00:00:00Z",
       updatedAt: "2030-01-01T00:00:00Z",

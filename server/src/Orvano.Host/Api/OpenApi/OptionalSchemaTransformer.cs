@@ -18,6 +18,8 @@ internal sealed class OptionalSchemaTransformer : IOpenApiSchemaTransformer
     /// <summary>Schema metadata (never written) that marks an Optional property, so the request rule leaves it out of <c>required</c>.</summary>
     public const string OptionalMetadata = "orvano-optional";
 
+    private const string RefDescription = "x-ref-description";
+
     private static readonly NullabilityInfoContext Nullability = new();
 
     public async Task TransformAsync(OpenApiSchema schema, OpenApiSchemaTransformerContext context, CancellationToken cancellationToken)
@@ -28,6 +30,13 @@ internal sealed class OptionalSchemaTransformer : IOpenApiSchemaTransformer
             Type value = type.GetGenericArguments()[0];
             OpenApiSchema inner = await context.GetOrCreateSchemaAsync(Nullable.GetUnderlyingType(value) ?? value, null, cancellationToken);
             Copy(inner, schema);
+
+            // The XML docs ran first and took this property for a reference, so its description waits in the metadata.
+            if (schema.Metadata?.TryGetValue(RefDescription, out object? description) == true)
+            {
+                schema.Description = description as string;
+            }
+
             schema.Metadata = new Dictionary<string, object>(inner.Metadata ?? new Dictionary<string, object>()) { [OptionalMetadata] = true };
             if (AllowsNull(value, context.JsonPropertyInfo?.AttributeProvider as PropertyInfo) && schema.Type is { } kind)
             {

@@ -5,6 +5,10 @@ import { OrganizationPage } from "@/features/projects/components/organization-pa
 
 export const Route = createFileRoute("/_shell/$orgId/")({
   staticData: { crumb: msg`Projects` },
+  validateSearch: (search: Record<string, unknown>): { create?: "project" | "organization" } =>
+    search.create === "project" || search.create === "organization"
+      ? { create: search.create }
+      : {},
   loader: ({ context, params }) => context.queryClient.query(projectsQuery(params.orgId)),
   component: OrganizationPage,
 });

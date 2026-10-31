@@ -1,35 +1,50 @@
 import { useLingui } from "@lingui/react/macro";
 import { CodeSnippet, SettingsCard, Tab, TabList, TabPanel, Tabs } from "@/ui";
-import { connectSnippets } from "./connect-snippets";
-
-const KEY_PLACEHOLDER = "YOUR_PUBLISHABLE_KEY";
+import { connectSnippets, keyPlaceholders } from "./connect-snippets";
 
 /** Spec 0017 CNS-6, spec 0001 UX-37: the SDK picker, with each SDK's setup and a `keys.current` call. */
 // oxlint-disable-next-line import/no-default-export -- React.lazy takes a default export
-export default function ConnectPanel({ url, projectId }: { url: string; projectId: string }) {
+export default function ConnectPanel({
+  url,
+  projectId,
+  keyType = "publishable",
+  isInSheet = false,
+}: {
+  url: string;
+  projectId: string;
+  keyType?: "publishable" | "secret";
+  /** A sheet is narrow, so the panel gives up its card's padding to keep the code and every SDK tab in view. */
+  isInSheet?: boolean;
+}) {
   const { t } = useLingui();
-  return (
-    <SettingsCard title={t`Connect`}>
-      <Tabs>
-        <TabList aria-label={t`SDK`}>
-          {connectSnippets.map((snippet) => (
-            <Tab key={snippet.id} id={snippet.id}>
-              {snippet.name}
-            </Tab>
-          ))}
-        </TabList>
+  const picker = (
+    <Tabs>
+      <TabList aria-label={t`SDK`}>
         {connectSnippets.map((snippet) => (
-          <TabPanel key={snippet.id} id={snippet.id}>
-            <div className="flex flex-col gap-4 pt-4">
-              <CodeSnippet label={t`Install command`} code={snippet.install} />
-              <CodeSnippet
-                label={t`Setup code`}
-                code={snippet.code({ url, projectId, key: KEY_PLACEHOLDER })}
-              />
-            </div>
-          </TabPanel>
+          <Tab key={snippet.id} id={snippet.id}>
+            {snippet.name}
+          </Tab>
         ))}
-      </Tabs>
-    </SettingsCard>
+      </TabList>
+      {connectSnippets.map((snippet) => (
+        <TabPanel key={snippet.id} id={snippet.id}>
+          <div className="flex flex-col gap-4 pt-4">
+            <CodeSnippet label={t`Install command`} code={snippet.install} />
+            <CodeSnippet
+              label={t`Setup code`}
+              code={snippet.code({ url, projectId, key: keyPlaceholders[keyType] })}
+            />
+          </div>
+        </TabPanel>
+      ))}
+    </Tabs>
+  );
+  return isInSheet ? (
+    <div className="flex flex-col gap-2">
+      <h3 className="font-semibold text-fg">{t`Connect`}</h3>
+      {picker}
+    </div>
+  ) : (
+    <SettingsCard title={t`Connect`}>{picker}</SettingsCard>
   );
 }

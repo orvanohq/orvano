@@ -134,7 +134,7 @@ export default defineConfig(({ mode }) => ({
             {
               name: "shell-core",
               priority: 1,
-              test: /src[\\/](ui[\\/](?!command-palette|docs-pane|shortcut-help|confirm-delete|side-sheet|table|form[\\/]|tabs|relative-time|status-chip|progress)|shared[\\/])/,
+              test: /src[\\/](ui[\\/](?!command-palette|docs-pane|shortcut-help|confirm-delete|side-sheet|table|form[\\/]|tabs|route-tabs|relative-time|status-chip|progress)|shared[\\/])/,
             },
             // Every route's loader reads one of these, so they load together rather than as one small file each.
             { name: "queries", test: /src[\\/]features[\\/][^\\/]+[\\/]api[\\/]queries\.ts/ },

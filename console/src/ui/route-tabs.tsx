@@ -83,7 +83,7 @@ export function RouteTabs({ "aria-label": label, tabs }: RouteTabsProps) {
       data-cut-start={cut.start || undefined}
       data-cut-end={cut.end || undefined}
       // The fade is a mask, so it works on any background. Gradients are physical, so right to left mirrors it.
-      className="overflow-x-auto border-b [--fade-e:0px] [--fade-s:0px] [mask-image:linear-gradient(to_right,transparent,#000_var(--fade-s),#000_calc(100%_-_var(--fade-e)),transparent)] data-cut-end:[--fade-e:2rem] data-cut-start:[--fade-s:2rem] rtl:[mask-image:linear-gradient(to_left,transparent,#000_var(--fade-s),#000_calc(100%_-_var(--fade-e)),transparent)]"
+      className="overflow-x-auto overflow-y-hidden border-b [--fade-e:0px] [--fade-s:0px] [mask-image:linear-gradient(to_right,transparent,#000_var(--fade-s),#000_calc(100%_-_var(--fade-e)),transparent)] data-cut-end:[--fade-e:2rem] data-cut-start:[--fade-s:2rem] rtl:[mask-image:linear-gradient(to_left,transparent,#000_var(--fade-s),#000_calc(100%_-_var(--fade-e)),transparent)]"
     >
       <ul className="flex">
         {tabs.map((tab) => (
