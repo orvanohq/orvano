@@ -47,6 +47,7 @@ const targets: Target[] = [
         source,
         settings.sdkPackage,
         conformanceFor(model, settings.audience, conformance),
+        settings.browserGuard,
       );
     },
   })),

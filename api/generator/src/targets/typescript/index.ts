@@ -6,6 +6,7 @@ import type { Audience, TargetModel } from "../../model.ts";
 import { byString } from "../../naming.ts";
 import { scenariosJson, type OutputFile, type Ownership, type Provenance } from "../../output.ts";
 import {
+  browserStubsFile,
   checkNames,
   contractFile,
   errorCodesFile,
@@ -29,6 +30,7 @@ export function renderTypescript(
   source: Provenance,
   sdkPackage: string,
   conformance: { fixture: TargetModel; scenarios: readonly Scenario[] },
+  browserGuard: boolean,
 ): OutputFile[] {
   checkNames(model);
   const files: OutputFile[] = [
@@ -40,6 +42,9 @@ export function renderTypescript(
       path: `src/generated/${serviceFileName(service)}`,
       content: serviceFile(service, source, model),
     })),
+    ...(browserGuard
+      ? [{ path: "src/generated/browser-stubs.ts", content: browserStubsFile(model, source) }]
+      : []),
     ...runtimeFiles(source),
     {
       path: "conformance/dispatch.generated.ts",
@@ -64,7 +69,10 @@ function runtimeFiles(source: Provenance): OutputFile[] {
     }));
 }
 
-export const typescriptTargets: Record<string, { audience: Audience; sdkPackage: string }> = {
-  "ts-client": { audience: "client", sdkPackage: "@orvano/client" },
-  "ts-server": { audience: "server", sdkPackage: "@orvano/server" },
+export const typescriptTargets: Record<
+  string,
+  { audience: Audience; sdkPackage: string; browserGuard: boolean }
+> = {
+  "ts-client": { audience: "client", sdkPackage: "@orvano/client", browserGuard: false },
+  "ts-server": { audience: "server", sdkPackage: "@orvano/server", browserGuard: true },
 };
