@@ -13,17 +13,17 @@ One documented way to run the whole Orvano stack on a server or a laptop, config
 spec [0016](../specs/0016-self-host-install/index.md)
 
 - [x] Design it (spec): `/architect self host install`
-- [ ] Build it: `/develop self host install`
+- [x] Build it: `/develop self host install`
   - [x] Milestone 1, the thread: the bundle in the image, the version pin, the two Caddy profiles, `init --local`, `Orvano.Modules.Platform` with `platform.instance`, `GET /v1/console/config`, the console redirect to setup, `install.sh --local`, and the first CI leg (spec 0016 build plan steps 1 to 8; AC-1, AC-3 to AC-5, AC-9 to AC-11, AC-13, AC-15)
   - [x] Milestone 2, the setup token: issue at start, `orvano admin setup-token`, the check endpoint with its limit, and the token checks in CI (steps 9 to 12; AC-1, AC-6, AC-7, AC-9, AC-10, AC-15)
   - [x] Milestone 3, the setup page: the token step in `AuthLayout`, its states, end to end, axe, and CSP tests (steps 13 and 14; AC-5, AC-8)
   - [x] Milestone 4, server mode, Podman, both CPUs: `--domain`, Podman and rootless detection, the arm64 and rootless Podman CI legs, the INS-5 checks, and the no telemetry test (steps 15 to 17; AC-2, AC-12, AC-14, AC-15)
   - [x] Milestone 5, the guide and the Mac runs: `docs/self-hosting.md`, the README pointer, the SELinux mount fix, the non-empty folder refusal, and every Mac verify row (steps 18 and 19, plus host M in step 20; AC-15, AC-16)
 - [ ] Verify it: `/check verify self host install` (ran in #146; blocked only on the deferred rows below, so run it again once they have results)
-- [ ] Test it: `/test self host install`
-- [ ] Review it (fresh model): `/check review self host install`
+- [x] Test it: `/test self host install` (#152, #153)
+- [x] Review it (fresh model): `/check review self host install` (#154: approve with nits; its medium findings are fixed in #155)
 - [x] Document it: `/document self host install`
-- [ ] Deferred until before feature 59: the real host verify rows (spec 0016 step 20; VFY-6 to VFY-10 and VFY-12; AC-1, AC-2, AC-9, AC-12, AC-17). Decided 2026-10-30 so they don't hold up slice 1. Real certificates, SELinux hosts, rootful Podman, and WSL2 stay unproven until these run, and feature 12 can't be `done` before then.
+- [ ] Deferred until before feature 59: the real host verify rows (spec 0016 step 20; VFY-6 to VFY-10 and VFY-12; AC-1, AC-2, AC-9, AC-12, AC-17). Decided 2026-10-30 so they don't hold up slice 1. Real certificates, SELinux hosts, rootful Podman, and WSL2 stay unproven until these run, and feature 12 can't be `done` before then. Also due before feature 59: R-4 to R-10 (R-4 holds for `--engine` too) and suspicions S-1 to S-8 in [the review](../reviews/2026-10-30-review-self-host-install.md), and F-3 and F-5 to F-8 in [the verify report](../reviews/2026-10-30-verify-self-host-install.md).
 
 ### 13. Console accounts & projects · needs a decision
 

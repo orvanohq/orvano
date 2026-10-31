@@ -39,6 +39,7 @@ Read the matching practice spec first. Each rule has an ID (for example `API-1`,
 | An endpoint's access check, a permission, or a grant filter     | [0012 Access control model](docs/specs/0012-access-control-model/index.md)                                                                                    |
 | API wire format, errors, the contract, or the SDK generator     | [0014 API contract and SDK generation](docs/specs/0014-api-contract-sdk-generation/index.md)                                                                  |
 | A console primitive, a design token, or the console shell       | [0015 Design system and console shell](docs/specs/0015-design-system-console-shell/index.md) and [console/design.md](console/design.md)                       |
+| The install script, `orvano init`, or first run setup           | [0016 Self host install](docs/specs/0016-self-host-install/index.md)                                                                                          |
 
 Each spec has a `rationale.md` beside it; read it only when you need the why. Each spec also lists its implementation skills under `.claude/skills/`; load only the ones the task needs.
 

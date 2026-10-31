@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-26
 **Status**: In Progress
-**Updated**: 2026-10-27, AC-3 first load budget settled: 230 KB with the shell, popovers stay eager, the barrel tree shakes, Zod through `zod/mini`, and a shell probe in `pnpm size` (STY-8, STY-9, step 25; spec 0003 BDL-1 amended). 2026-10-28, the review triage's questions settled: the top bar below 25rem, the live regions, the palette pattern, `ar` for right to left, user text in an isolate, `RouteTabs` overflow, `unavailableReason` on `Switch`, the gallery's scope, and new screen reader steps (AC-9, AC-12, AC-13, AC-15, AC-18, AC-20, AC-22, THM-6, SHL-4, SHL-12, SHL-14, PRM-4, RTL-1, RTL-3, GAL-2, GAL-3, SRT-1 to SRT-13; reasons in [rationale.md](rationale.md#review-triage-decisions-2026-10-28)).
+**Updated**: 2026-10-27, AC-3 first load budget settled: 230 KB with the shell, popovers stay eager, the barrel tree shakes, Zod through `zod/mini`, and a shell probe in `pnpm size` (STY-8, STY-9, step 25; spec 0003 BDL-1 amended). 2026-10-28, the review triage's questions settled: the top bar below 25rem, the live regions, the palette pattern, `ar` for right to left, user text in an isolate, `RouteTabs` overflow, `unavailableReason` on `Switch`, the gallery's scope, and new screen reader steps (AC-9, AC-12, AC-13, AC-15, AC-18, AC-20, AC-22, THM-6, SHL-4, SHL-12, SHL-14, PRM-4, RTL-1, RTL-3, GAL-2, GAL-3, SRT-1 to SRT-13; reasons in [rationale.md](rationale.md#review-triage-decisions-2026-10-28)). 2026-10-30, for spec 0016: AC-21's boot error page now also covers a failed config load (FRS-2), and AC-23's CSP test loads `/setup` (FRS-7). The text below is not changed yet; spec 0016 wins.
 
 ## Summary
 
@@ -444,4 +444,4 @@ Tracer Bullet inside this feature: milestone 1 runs one thin thread through ever
 - [x] Step 25 (by `/develop`, before `/check verify` tests AC-3): build milestone 6.
 - [ ] Feature 13: when the `_shell` routes land, delete the shell probe (STY-9) and check that the BDL-1 entry stays within 230 KB with the real session, org, and project queries.
 - [x] Review triage questions Q1 to Q13 (settled by `/architect` on 2026-10-28): see [rationale.md](rationale.md#review-triage-decisions-2026-10-28) and the [triage](../../reviews/2026-10-28-triage-design-system-console-shell.md#decisions).
-- [ ] Review fix batches 1 to 7 (by `/develop`, before AC-22 is run): build the [triage](../../reviews/2026-10-28-triage-design-system-console-shell.md)'s batches against the rules above (SHL-4, SHL-12, SHL-14, PRM-4 on `Switch`, RTL-1, RTL-3, THM-6, GAL-2, GAL-3, STY-6).
+- [x] Review fix batches 1 to 7 (by `/develop`, before AC-22 is run): build the [triage](../../reviews/2026-10-28-triage-design-system-console-shell.md)'s batches against the rules above (SHL-4, SHL-12, SHL-14, PRM-4 on `Switch`, RTL-1, RTL-3, THM-6, GAL-2, GAL-3, STY-6).

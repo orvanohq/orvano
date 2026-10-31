@@ -23,6 +23,7 @@ Run these from `console/`, or from the root as `pnpm --filter @orvano/console <s
 - pnpm waits 3 days before installing a new release, and blocks install scripts (root `pnpm-workspace.yaml`).
 - The restriction rules (imports, globals, syntax from spec 0003) live in `tooling/config/console-restrictions.ts`, one rule set per folder. A rule's allowed home (for example `src/shared/config.ts` for WEB-8) is a region there, never an inline disable. Each rule ID has a fixture in `tooling/lint-fixtures/` that must fire (`pnpm check:lint-fixtures`).
 - `vite.config.ts` splits React, TanStack, and Lingui into their own chunks so no file passes BDL-1's 80 KB gzip.
+- The root route sends every path to `/setup` while `GET /v1/console/config` says `setupRequired`, so a fresh dev database opens there too (spec 0016 FRS-3): the server prints a link when it starts, and `orvano admin setup-token` makes a new one. The setup token lives only in component state or a ref, never in storage, the query cache, a query key, or a log (FRS-5).
 - Design system: build all UI to [`design.md`](design.md) (art direction and the maximalist product bar); token values live in CSS (`src/ui/theme.css`). How the primitives are built is [spec 0015](../docs/specs/0015-design-system-console-shell/index.md).
 - Feature code imports primitives from `@/ui` (`src/ui/index.ts`); only the lazy ones (PRM-10) and heavy ones (BDL-2) are imported by their own path.
 - `package.json` `sideEffects` lists the only files with import side effects (CSS, the two entries, `src/shared/zod.ts`). A new module with a top level side effect goes on that list, or the build drops it.
@@ -33,7 +34,7 @@ Run these from `console/`, or from the root as `pnpm --filter @orvano/console <s
 
 ## Tests
 
-- Render through `renderWithProviders(url)` in `src/test/render.tsx`, which runs the real route tree. Pass in app URLs (`/`, not `/console/`): memory history does not apply the router's base path.
+- Render through `renderWithProviders(url)` in `src/test/render.tsx`, which runs the real route tree. Pass in app URLs (`/`, not `/console/`): memory history does not apply the router's base path. It seeds the boot config with setup done; pass `config: { setupRequired: true }` to test the redirect to `/setup` (spec 0016 FRS-3).
 - Lingui's `I18nProvider` renders nothing until a locale is active, so the helper activates `en` like `main.tsx` does.
 - Vitest browser mode serves from `/`, so `BASE_URL` is `/` in tests, and `vitest.config.ts` drops the dev proxy (it would forward Vitest's own requests to the server).
 - A failed browser test saves a screenshot under `.vitest/attachments/failure-screenshots/` (git ignored). Look there first when a test fails.

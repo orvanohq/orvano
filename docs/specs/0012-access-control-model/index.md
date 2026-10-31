@@ -5,6 +5,7 @@
 **Updated**: 2026-10-18, to agree with spec 0007: label and resource grant changes travel as `cache` tags (SIG-1, CCH-2), both caches expire after 60 seconds (security related entries), feature 61 builds the signal bus, and specs 0011 and 0006 carry this spec's amendments (build plan step 9). 2026-10-19, after the review of PRs #32 to #35: the access layer entry point for credential resolvers (RSV, `ICallerResolver`), default deny at the endpoint level (EPT, AC-13), endpoint requirements described as metadata the access layer middleware enforces (SCP-5, CPL-3), `MayChangeItemGrants` taking `rowSecurity` (WRT-1), and `Normalize` refusing client writers on table, bucket, and function grants (WRT-6). Build plan steps 10 and 11 are new.
 **Updated**: 2026-10-19, for spec 0013 milestone 2: PRJ-3 allows `JobAccessScope` (JQ-6) as the one setter outside the access layer, for job scopes.
 **Updated**: 2026-10-25, reconciled with spec 0014: DEN-4's codes sit in the PRB-8 catalogue; EPT-5's public list gains `GET /v1/health` (and `GET /v1/console/config` with feature 13); the feature 10 follow up is closed.
+**Updated**: 2026-10-30, for spec 0016: EPT-5's list of public endpoints gains `GET /v1/console/config` (now from feature 12) and `POST /v1/console/setup/token`. The text below is not changed yet; spec 0016 wins.
 
 ## Summary
 
