@@ -580,7 +580,8 @@ public sealed class InitCommandTests : IDisposable
         await File.WriteAllTextAsync(keep, "mine\n", TestContext.Current.CancellationToken);
 
         // A file size limit far below compose.yaml's size, the first and largest file, fails the write part way through.
-        // SIGXFSZ stays ignored across exec, so the write fails instead of killing the process.
+        // SIGXFSZ stays ignored across exec, so the write fails instead of killing the process. InShellAsync turns off
+        // the runtime's W^X mapping, which on Linux needs a file bigger than this limit before Main runs.
         OrvanoCli.Result failed = await InShellAsync("trap '' XFSZ; ulimit -f 1; exec \"$@\"", "--local");
 
         failed.ExitCode.ShouldBe(1, failed.Error);
@@ -614,6 +615,7 @@ public sealed class InitCommandTests : IDisposable
     {
         ProcessStartInfo init = OrvanoCli.StartInfo(["init", "--out", _install.FullName, .. args]);
         var shell = new ProcessStartInfo("/bin/sh") { RedirectStandardOutput = true, RedirectStandardError = true };
+        shell.Environment["DOTNET_EnableWriteXorExecute"] = "0";
         shell.ArgumentList.Add("-c");
         shell.ArgumentList.Add(script);
         shell.ArgumentList.Add("sh");

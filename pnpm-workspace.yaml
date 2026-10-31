@@ -20,6 +20,12 @@ auditConfig:
     # ships in the console bundle), and no patched release exists (2026-10-17). Remove when one ships. Expires
     # 2026-11-16 (spec 0006 SUP-5: at most 30 days); check again then and renew or remove.
     - GHSA-vfj7-8cjw-p6xm
+    # minimatch: denial of service through glob part amplification. Reached only through dev tools (ESLint and others
+    # that glob the repo's own files; `pnpm audit --prod` is clean, and nothing ships in the console bundle). The
+    # advisory, published 2026-10-30, patches only 11.0.1, and ESLint's tree needs the 3.x, 5.x, and 10.x lines, so no
+    # override fits (2026-10-30). Remove when those packages take a patched minimatch. Expires 2026-11-29 (spec 0006
+    # SUP-5: at most 30 days); check again then and renew or remove.
+    - GHSA-g3hv-75wg-m249
 
 # Forced transitive versions, each with the reason and when to remove it.
 overrides:
