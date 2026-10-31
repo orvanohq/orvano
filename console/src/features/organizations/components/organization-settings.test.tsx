@@ -69,8 +69,8 @@ describe("organizations", () => {
     await userEvent.fill(dialog.getByRole("textbox", { name: "Name" }), "Globex");
     await dialog.getByRole("button", { name: "Create organization" }).click();
 
-    await expect.poll(() => screen.router.state.location.pathname).toBe(`/${second.id}`);
-    await expect.element(screen.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
+    // The resolved location: the page keeps its old heading until the new organization has loaded.
+    await expect.poll(() => screen.router.state.resolvedLocation?.pathname).toBe(`/${second.id}`);
     expect(sent).toEqual([{ name: "Globex" }]);
   });
 

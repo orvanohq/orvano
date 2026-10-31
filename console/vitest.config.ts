@@ -22,6 +22,8 @@ export default mergeConfig(
     ...appConfig,
     plugins: [...(appConfig.plugins ?? []), msw({ mode: "worker-only" })],
     server: { ...appConfig.server, proxy: undefined },
+    // Vite finds this one late on a cold cache, and the reload that follows fails whichever test file is loading.
+    optimizeDeps: { include: ["react-dom/client"] },
   },
   defineConfig({
     test: {
