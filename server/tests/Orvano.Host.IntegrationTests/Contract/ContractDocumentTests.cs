@@ -19,7 +19,7 @@ public sealed class ContractDocumentTests(ContractHostFixture host) : IClassFixt
         JsonObject console = await DocumentAsync(ContractDocuments.Console);
 
         // /health/live, /health/ready, and the console SPA routes are outside /v1, so in neither (CTR-2, HLT-5).
-        Paths(publicDocument).ShouldBe(["/v1/health"]);
+        Paths(publicDocument).ShouldBe(["/v1/health", "/v1/projects/{projectId}/keys/current"]);
         Paths(console).ShouldBe(
         [
             "/v1/console/config", // spec 0016 FRS-1
@@ -31,6 +31,19 @@ public sealed class ContractDocumentTests(ContractHostFixture host) : IClassFixt
             "/v1/console/setup/owner",
             "/v1/console/setup/token", // spec 0016 STP-7
         ]);
+    }
+
+    [Fact, Trait("Spec", "0017:SDK-1"), Trait("Spec", "0017:SDK-2"), Trait("Spec", "0017:SDK-6"), Trait("Spec", "0017:AC-16")]
+    public async Task Current_key_is_public_for_both_audiences_and_metered()
+    {
+        JsonObject document = await DocumentAsync(ContractDocuments.Public);
+
+        JsonNode operation = document["paths"]!["/v1/projects/{projectId}/keys/current"]!["get"]!;
+
+        operation["x-orvano-sdk"]!["service"]!.GetValue<string>().ShouldBe("keys");
+        operation["x-orvano-sdk"]!["method"]!.GetValue<string>().ShouldBe("current");
+        operation["x-orvano-audience"]!.AsArray().Select(x => x!.GetValue<string>()).ShouldBe(["client", "server"]);
+        operation["x-orvano-metered"]!.GetValue<string>().ShouldBe("platform.keys.read");
     }
 
     [Theory, Trait("Spec", "0014:AC-4"), Trait("Spec", "0014:CTR-4"), Trait("Spec", "0014:VRS-2")]
