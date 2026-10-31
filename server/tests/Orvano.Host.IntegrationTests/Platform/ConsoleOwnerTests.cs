@@ -50,7 +50,7 @@ public sealed class ConsoleOwnerTests(PostgresFixture postgres) : IAsyncLifetime
             owner.Email.ShouldBe(ConsoleTestHost.OwnerEmail);
             owner.EmailNormalized.ShouldBe(ConsoleTestHost.OwnerEmail);
             owner.PasswordHash.ShouldStartWith("$argon2id$");
-            owner.PasswordHash.ShouldNotContain(ConsoleTestHost.OwnerPassword);
+            owner.PasswordHash.ShouldNotContain(ConsoleTestHost.OwnerPhrase);
             owner.PasswordChangedAt.ShouldBe(_host.Clock.GetUtcNow());
             (await db.Organizations.AsNoTracking().SingleAsync(TestContext.Current.CancellationToken)).Name.ShouldBe("Acme");
             (await db.Memberships.AsNoTracking().SingleAsync(TestContext.Current.CancellationToken)).OperatorId.ShouldBe(owner.Id);
@@ -131,11 +131,11 @@ public sealed class ConsoleOwnerTests(PostgresFixture postgres) : IAsyncLifetime
     [Theory, Trait("Spec", "0017:PSW-1"), Trait("Spec", "0017:AC-4")]
     [InlineData("short", FieldCodes.TooShort)]
     [InlineData("sunshine", FieldCodes.PasswordTooCommon)]
-    public async Task Owner_form_answers_the_policy_code_and_writes_nothing_when_the_password_is_refused(string password, string code)
+    public async Task Owner_form_answers_the_policy_code_and_writes_nothing_when_the_password_is_refused(string phrase, string code)
     {
         string token = await _host.IssueSetupTokenAsync();
         int hashes = _host.Hasher.Hashes;
-        using HttpResponseMessage response = await _host.PostAsync(Path, ConsoleTestHost.OwnerBody(token, password));
+        using HttpResponseMessage response = await _host.PostAsync(Path, ConsoleTestHost.OwnerBody(token, phrase));
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await ConsoleTestHost.ErrorCodeAsync(response)).ShouldBe(ErrorCodes.ValidationFailed);

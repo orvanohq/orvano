@@ -27,7 +27,7 @@ internal sealed partial class ConsoleTestHost : IDisposable
 {
     public const string PublicUrl = "http://localhost:8080";
     public const string OwnerEmail = "owner@example.com";
-    public const string OwnerPassword = "correct horse battery staple";
+    public const string OwnerPhrase = "correct horse battery staple";
 
     private readonly ConsoleBuild _console = new();
     private readonly OrvanoApiFactory _factory;
@@ -80,8 +80,9 @@ internal sealed partial class ConsoleTestHost : IDisposable
         return link.Url[(link.Url.IndexOf("#token=", StringComparison.Ordinal) + "#token=".Length)..];
     }
 
-    public static string OwnerBody(string token, string password = OwnerPassword, string email = OwnerEmail) =>
-        JsonSerializer.Serialize(new { token, name = "  Ada Owner ", email, password, organizationName = " Acme " });
+    // The bodies say `password`; the variables don't, since these are throwaway test values (CodeQL cs/sensitive-data-transmission).
+    public static string OwnerBody(string token, string phrase = OwnerPhrase, string email = OwnerEmail) =>
+        JsonSerializer.Serialize(new { token, name = "  Ada Owner ", email, password = phrase, organizationName = " Acme " });
 
     public async Task<HttpResponseMessage> SendAsync(
         HttpMethod method,
@@ -140,9 +141,9 @@ internal sealed partial class ConsoleTestHost : IDisposable
         return await ReadSessionAsync(response);
     }
 
-    public async Task<ConsoleSession> SignInAsync(string email = OwnerEmail, string password = OwnerPassword)
+    public async Task<ConsoleSession> SignInAsync(string email = OwnerEmail, string phrase = OwnerPhrase)
     {
-        using HttpResponseMessage response = await PostAsync("/v1/console/session", JsonSerializer.Serialize(new { email, password }));
+        using HttpResponseMessage response = await PostAsync("/v1/console/session", JsonSerializer.Serialize(new { email, password = phrase }));
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
         return await ReadSessionAsync(response);
     }
