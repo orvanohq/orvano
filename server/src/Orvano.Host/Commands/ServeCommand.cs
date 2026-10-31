@@ -154,7 +154,8 @@ internal static class ServeCommand
         app.UseRouting();
 
         // Spec 0007 COR-1: CORS sits after routing and before the access layer, so a browser preflight is answered
-        // without a credential and never reaches the access layer or an endpoint.
+        // without a credential and never reaches the access layer or an endpoint. Vary goes first, so a preflight has it too.
+        OrvanoCorsPolicyProvider.UseProjectVary(app);
         app.UseCors();
 
         // Spec 0012 EPT-1: the access layer resolves the caller (resolvers registered with AddCallerResolver) and
@@ -178,6 +179,7 @@ internal static class ServeCommand
         // Spec 0014 PTH-2: the /v1 groups. GET /v1/health answers in every role (HLT-1); each module maps its own
         // endpoints under the groups it is handed, in its Map<Module>Endpoints, in the api role only.
         ApiRoutes routes = ApiRoutes.Create(app).MapHealth();
+        routes.Project.RequireCors(OrvanoCorsPolicyProvider.ProjectPolicyName);
 
         if (roles.Api)
         {

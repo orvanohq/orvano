@@ -30,7 +30,7 @@
           "items": { "enum": ["client", "server"] }
         },
         "requires": {
-          "description": "Capabilities the runner must set up first (CNF-7). Empty until feature 13 adds `project`.",
+          "description": "Capabilities the runner must set up first (CNF-7). `project` gets a real project and its keys.",
           "type": "array",
           "uniqueItems": true,
           "items": { "enum": ["project"] }

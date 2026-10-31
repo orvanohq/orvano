@@ -90,10 +90,146 @@
           "method": "get"
         }
       }
+    },
+    "/v1/projects/{projectId}/keys/current": {
+      "get": {
+        "tags": [
+          "keys"
+        ],
+        "summary": "Read the key this request carries.",
+        "description": "Answers the key's project, type, and scopes, so an SDK can prove its key works.",
+        "operationId": "Platform_GetCurrentKey",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "The project's ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentKeyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error. The code says which one; x-orvano-error-codes describes every code.",
+            "headers": {
+              "Orvano-Request-Id": {
+                "$ref": "#/components/headers/Orvano-Request-Id"
+              },
+              "Orvano-Api-Version": {
+                "$ref": "#/components/headers/Orvano-Api-Version"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "x-orvano-audience": [
+          "client",
+          "server"
+        ],
+        "x-orvano-errors": [],
+        "x-orvano-metered": "platform.keys.read",
+        "x-orvano-sdk": {
+          "service": "keys",
+          "method": "current"
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "CurrentKeyResponse": {
+        "required": [
+          "projectId",
+          "scopes",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "The project the key belongs to.",
+            "format": "uuid"
+          },
+          "type": {
+            "description": "Publishable or secret.",
+            "$ref": "#/components/schemas/KeyType"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the key may do."
+          }
+        },
+        "description": "A key's own view of itself."
+      },
       "FieldError": {
         "required": [
           "code",
@@ -148,6 +284,14 @@
           }
         },
         "description": "The server is up and ready to serve requests."
+      },
+      "KeyType": {
+        "enum": [
+          "publishable",
+          "secret"
+        ],
+        "type": "string",
+        "description": "The two API key types (spec 0006 KEY-1), stored as `platform.api_key.type`."
       },
       "Problem": {
         "required": [
@@ -328,6 +472,9 @@
   "tags": [
     {
       "name": "health"
+    },
+    {
+      "name": "keys"
     }
   ],
   "x-orvano-error-codes": {

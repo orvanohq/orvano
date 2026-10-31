@@ -19,7 +19,7 @@ One set of language neutral scenarios that every Orvano SDK runs, so all six beh
   title: What it proves, in one line
   mode: live # live: the real server. stub: the stub server, with `stub` and `expectRequests`
   audience: [client, server] # which SDKs run it
-  requires: [] # capabilities to set up first; `project` arrives with feature 13 (CNF-7)
+  requires: [] # capabilities to set up first; `project` gets a real project and its keys (CNF-7)
   steps:
     - call: health.get # <service>.<method> from x-orvano-sdk
       params: {} # the operation's inputs
@@ -29,7 +29,7 @@ One set of language neutral scenarios that every Orvano SDK runs, so all six beh
         response: { status: 200, headers: { orvano-api-version: $, { apiVersion } } } # what the runner saw last
 ```
 
-Matching (CNF-3): objects match by subset, arrays exactly, and `$any`, `$uuid`, `$timestamp`, `$regex`, and `$contains` match by rule. `{ $absent: true }` as an object member says the object must not have it, which is how a scenario proves a partial update leaves an unset field out (JSW-10). The runner substitutes `${apiVersion}`, `${clientName}`, `${key}`, `${projectId}`, and saved names first. In a stub scenario, a `respond.headers` value of `{ $httpDateIn: 2 }` is an HTTP date two seconds from now.
+Matching (CNF-3): objects match by subset, arrays exactly, and `$any`, `$uuid`, `$timestamp`, `$regex`, and `$contains` match by rule. `{ $absent: true }` as an object member says the object must not have it, which is how a scenario proves a partial update leaves an unset field out (JSW-10). The runner substitutes `${apiVersion}`, `${clientName}`, `${key}`, `${projectId}`, and saved names first. For a scenario that `requires: [project]`, the runner runs `orvano admin bootstrap-project` once (spec 0017 SDK-4), and `${projectId}` is that project, with the publishable key for a client SDK and the secret key for a server SDK. A scenario's `client.key` still replaces the key. In a stub scenario, a `respond.headers` value of `{ $httpDateIn: 2 }` is an HTTP date two seconds from now.
 
 ## When you change a scenario
 

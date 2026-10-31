@@ -15,14 +15,11 @@ internal static class CurrentKeyEndpoint
 {
     public static RouteGroupBuilder MapCurrentKey(this RouteGroupBuilder project)
     {
-        // Out of the public contract until milestone 2 adds its scenarios: the runners must merge first (SDK-5), and a
-        // contract operation with no live scenario fails CNF-9. XTN-2 still needs its SDK name and errors at startup.
         project.MapGet("/keys/current", Get)
             .RequireProjectKey()
             .WithSdk("keys", "current")
             .WithErrors()
             .WithMeter("platform.keys.read")
-            .ExcludeFromDescription()
             .WithName("Platform_GetCurrentKey")
             .WithSummary("Read the key this request carries.")
             .WithDescription("Answers the key's project, type, and scopes, so an SDK can prove its key works.");

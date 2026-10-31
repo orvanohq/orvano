@@ -1,4 +1,6 @@
 using System.CommandLine;
+using System.Text;
+using System.Text.Json;
 
 using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
@@ -12,13 +14,15 @@ using Orvano.Modules.Auth;
 using Orvano.Modules.Auth.Contracts;
 using Orvano.Modules.Platform;
 using Orvano.Modules.Platform.Setup;
+using Orvano.SharedKernel;
 using Orvano.SharedKernel.Configuration;
 
 namespace Orvano.Host.Commands;
 
 /// <summary>
 /// <c>orvano admin &lt;command&gt;</c>: operator commands that need host access (spec 0007 RUN-1).
-/// Spec 0006's <c>reset-operator</c> and <c>reset-secrets</c> arrive with the features that own them.
+/// Spec 0006's <c>reset-operator</c> and <c>reset-secrets</c> arrive with the features that own them. Each reads the same
+/// configuration as <c>serve</c>, and host access is the gate: none is reachable over HTTP.
 /// </summary>
 internal static class AdminCommand
 {
@@ -33,7 +37,27 @@ internal static class AdminCommand
         };
         setupToken.SetAction((parseResult, cancellationToken) => SetupTokenAsync([.. parseResult.UnmatchedTokens], cancellationToken));
 
-        return new Command("admin", "Operator commands.") { selfTest, setupToken };
+        var ownerEmail = new Option<string>("--owner-email") { Description = "The owner's email: a new owner while setup is open, an existing one after.", Required = true };
+        var organization = new Option<string>("--organization") { Description = "The organization's name, reused when the owner already has one.", Required = true };
+        var project = new Option<string>("--project") { Description = "The new project's name.", Required = true };
+        var origin = new Option<string[]>("--origin") { Description = "An exact allowed origin. Repeat it for more than one.", AllowMultipleArgumentsPerToken = false };
+        var bootstrapProject = new Command(
+            "bootstrap-project",
+            "Make a project with a publishable and a secret key, printed once as JSON. While setup is open this takes setup over (spec 0017 BST-1).")
+        {
+            ownerEmail, organization, project, origin,
+        };
+        bootstrapProject.TreatUnmatchedTokensAsErrors = false;
+        bootstrapProject.SetAction((parseResult, cancellationToken) => BootstrapProjectAsync(
+            new BootstrapProjectRequest(
+                parseResult.GetRequiredValue(ownerEmail),
+                parseResult.GetRequiredValue(organization),
+                parseResult.GetRequiredValue(project),
+                parseResult.GetValue(origin) ?? []),
+            [.. parseResult.UnmatchedTokens],
+            cancellationToken));
+
+        return new Command("admin", "Operator commands.") { selfTest, setupToken, bootstrapProject };
     }
 
     /// <summary>Exit code of <c>admin setup-token</c> once setup is complete (STP-5); <c>install.sh</c> reads it (ISH-6).</summary>
@@ -42,9 +66,71 @@ internal static class AdminCommand
     /// <summary>
     /// STP-5: reads the same configuration as <c>serve</c> (the database, not the root key), always issues a new token,
     /// and prints only the link to standard output. Logs (warnings and up) go to standard error, so the output is the link alone.
-    /// Host access is the gate: this is not reachable over HTTP.
     /// </summary>
-    private static async Task<int> SetupTokenAsync(string[] configArgs, CancellationToken cancellationToken)
+    private static Task<int> SetupTokenAsync(string[] configArgs, CancellationToken cancellationToken) => WithHostAsync(
+        configArgs,
+        "Could not make a setup link",
+        async host =>
+        {
+            if (await PlatformSetup.IssueLinkAsync(host.Services, cancellationToken) is not { } link)
+            {
+                await Console.Error.WriteLineAsync("Setup is already complete.");
+                return SetupCompleteExitCode;
+            }
+
+            await Console.Out.WriteLineAsync(link.Url);
+            return 0;
+        });
+
+    /// <summary>
+    /// BST-4: prints one JSON object to standard output and exits 0, or writes the error to standard error and exits 1. Like
+    /// the setup link, this output is the one time secret display, so it never goes through <c>ILogger</c>.
+    /// </summary>
+    private static Task<int> BootstrapProjectAsync(BootstrapProjectRequest request, string[] configArgs, CancellationToken cancellationToken) => WithHostAsync(
+        configArgs,
+        "Could not bootstrap the project",
+        async host =>
+        {
+            Result<BootstrappedProject> result = await PlatformSetup.BootstrapProjectAsync(host.Services, request, cancellationToken);
+            if (!result.IsSuccess)
+            {
+                await Console.Error.WriteLineAsync(Describe(result.Error));
+                return 1;
+            }
+
+            await Console.Out.WriteLineAsync(ToJson(result.Value));
+            return 0;
+        });
+
+    private static string Describe(Error error) =>
+        error.Fields is [{ } field, ..] ? $"{field.Field}: {field.Message}" : error.Message;
+
+    private static string ToJson(BootstrappedProject project)
+    {
+        using var buffer = new MemoryStream();
+        using (var json = new Utf8JsonWriter(buffer))
+        {
+            json.WriteStartObject();
+            json.WriteString("organizationId", project.OrganizationId);
+            json.WriteString("projectId", project.ProjectId);
+            json.WriteString("publishableKey", project.PublishableKey);
+            json.WriteString("secretKey", project.SecretKey);
+            json.WriteStartArray("allowedOrigins");
+            foreach (string origin in project.AllowedOrigins)
+            {
+                json.WriteStringValue(origin);
+            }
+
+            json.WriteEndArray();
+            json.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(buffer.ToArray());
+    }
+
+    // The host an admin command runs in: the same configuration as `serve`, and only problems on standard error, so
+    // standard output holds the command's answer alone.
+    private static async Task<int> WithHostAsync(string[] configArgs, string failure, Func<IHost, Task<int>> run)
     {
         try
         {
@@ -64,14 +150,7 @@ internal static class AdminCommand
             builder.Services.AddPlatformModule(builder.Configuration);
 
             using IHost host = builder.Build();
-            if (await PlatformSetup.IssueLinkAsync(host.Services, cancellationToken) is not { } link)
-            {
-                await Console.Error.WriteLineAsync("Setup is already complete.");
-                return SetupCompleteExitCode;
-            }
-
-            await Console.Out.WriteLineAsync(link.Url);
-            return 0;
+            return await run(host);
         }
         catch (ConfigurationException ex)
         {
@@ -83,7 +162,7 @@ internal static class AdminCommand
         }
         catch (Exception ex) when (ex is Npgsql.NpgsqlException or InvalidOperationException or TimeoutException or Microsoft.EntityFrameworkCore.Storage.RetryLimitExceededException)
         {
-            await Console.Error.WriteLineAsync($"Could not make a setup link: {ex.Message}");
+            await Console.Error.WriteLineAsync($"{failure}: {ex.Message}");
         }
 
         return 1;

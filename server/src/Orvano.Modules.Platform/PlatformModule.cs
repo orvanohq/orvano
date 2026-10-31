@@ -36,6 +36,7 @@ public static class PlatformModule
         services.AddScoped<SetupTokens>();
         services.AddSingleton<SetupCompletion>();
         services.AddScoped<OwnerSetup>();
+        services.AddScoped<ProjectBootstrap>();
 
         services.AddSingleton<ConsoleSessionCookie>();
         services.AddSingleton<SignInThrottle>();
