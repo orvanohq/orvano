@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-22
 **Status**: Accepted
-**Updated**: 2026-10-23, open points from verify: RGN-3 and AC-15 scope the drift check to the pin and the generated paths; RGN-6, RGN-9, and AC-16 say `sdk-nextjs` takes new SDK pins in the catch up; CNF-3 adds `$absent`; CNF-8 says which CI layer owns the run list; spec 0007 IMG-3 names the `sha-<commit>` tag. 2026-10-25, the Follow-up items for specs 0002, 0003, 0004, 0005, 0006, 0007, and 0012 are applied to those specs.
+**Updated**: 2026-10-23, open points from verify: RGN-3 and AC-15 scope the drift check to the pin and the generated paths; RGN-6, RGN-9, and AC-16 say `sdk-nextjs` takes new SDK pins in the catch up; CNF-3 adds `$absent`; CNF-8 says which CI layer owns the run list; spec 0007 IMG-3 names the `sha-<commit>` tag. 2026-10-25, the Follow-up items for specs 0002, 0003, 0004, 0005, 0006, 0007, and 0012 are applied to those specs. 2026-10-30, for spec 0016: CPX-3's config call ships in feature 12 with `setupRequired` only; feature 13 adds the rest. The text below is not changed yet; spec 0016 wins.
 
 ## Summary
 

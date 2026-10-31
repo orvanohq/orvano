@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-16
 **Status**: Accepted
-**Updated**: 2026-10-18, to agree with spec 0011: TOK-5's reuse window issues a sibling token, TOK-6 loads revocations from `auth.session_revocation`, TOK-9 stores short codes as HMAC (ENC-4). 2026-10-18, for spec 0012: KEY-4's scope list and TEN-2's token and control plane checks now point to spec 0012, and the feature 9 follow up is closed. 2026-10-25, reconciled with spec 0014: CON-2's header is `Orvano-Csrf`; KEY-6's header is `Orvano-Key`; NET-3 is covered by HDR-5; the feature 10 follow up is closed.
+**Updated**: 2026-10-18, to agree with spec 0011: TOK-5's reuse window issues a sibling token, TOK-6 loads revocations from `auth.session_revocation`, TOK-9 stores short codes as HMAC (ENC-4). 2026-10-18, for spec 0012: KEY-4's scope list and TEN-2's token and control plane checks now point to spec 0012, and the feature 9 follow up is closed. 2026-10-25, reconciled with spec 0014: CON-2's header is `Orvano-Csrf`; KEY-6's header is `Orvano-Key`; NET-3 is covered by HDR-5; the feature 10 follow up is closed. 2026-10-30, for spec 0016: CON-6's token lifecycle is STP-1 to STP-6 there (24 hour expiry, issued at start only when none is valid, replaced by `orvano admin setup-token`), the banner is CON-6's exception to SCR-5 and LOG-2 (STP-4), and CON-2 gains an exception: the setup token check, with no session, needs the `Origin` check only, no `Orvano-Csrf` header (STP-7). The text below is not changed yet; spec 0016 wins.
 
 ## Summary
 

@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-18
 **Status**: Accepted
-**Updated**: 2026-10-18, for spec 0012 (access control model): CAT-2 gains `databases.table` and the grant columns on buckets, files, and functions; `api_key.scopes` takes spec 0012's scope lists with a CHECK per key type; `audit_event.actor_kind` gains `function`; the feature 9 follow up is closed.
+**Updated**: 2026-10-18, for spec 0012 (access control model): CAT-2 gains `databases.table` and the grant columns on buckets, files, and functions; `api_key.scopes` takes spec 0012's scope lists with a CHECK per key type; `audit_event.actor_kind` gains `function`; the feature 9 follow up is closed. 2026-10-30, for spec 0016: `platform.instance` is built by feature 12 and gains `setup_token_expires_at`; CAT-1's table header changes from (13) to (12); the feature 13 follow up no longer creates `Orvano.Modules.Platform` (it already exists) but still creates the other CAT-1 tables. The text below is not changed yet; spec 0016 wins.
 
 ## Summary
 
