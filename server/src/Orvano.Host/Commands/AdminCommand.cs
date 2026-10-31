@@ -80,7 +80,7 @@ internal static class AdminCommand
         {
             await Console.Error.WriteLineAsync(OptionsErrors.Describe(ex));
         }
-        catch (Exception ex) when (ex is Npgsql.NpgsqlException or InvalidOperationException or TimeoutException)
+        catch (Exception ex) when (ex is Npgsql.NpgsqlException or InvalidOperationException or TimeoutException or Microsoft.EntityFrameworkCore.Storage.RetryLimitExceededException)
         {
             await Console.Error.WriteLineAsync($"Could not make a setup link: {ex.Message}");
         }

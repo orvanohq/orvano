@@ -28,32 +28,41 @@ describe("createAppRouter", () => {
 
 // Spec 0016 FRS-3, AC-5: while setup is open every path lands on the setup page; once it is done, /setup goes home.
 describe("the setup redirect", () => {
-  it.each(["/", "/no/such/page"])("sends %s to /setup while setup is required", async (url) => {
-    const screen = await renderWithProviders(url, { config: { setupRequired: true } });
+  it.each(["/", "/no/such/page", "/setupx", "/setup/extra", "/gallery"])(
+    "sends %s to /setup while setup is required",
+    async (url) => {
+      const screen = await renderWithProviders(url, { config: { setupRequired: true } });
 
-    await expect
-      .element(screen.getByRole("heading", { level: 1, name: "Set up Orvano" }))
-      .toBeVisible();
-    expect(screen.router.state.location.pathname).toBe("/setup");
-  });
+      await expect
+        .element(screen.getByRole("heading", { level: 1, name: "Set up Orvano" }))
+        .toBeVisible();
+      expect(screen.router.state.location.pathname).toBe("/setup");
+    },
+  );
 
-  it("keeps /setup while setup is required", async () => {
-    const screen = await renderWithProviders("/setup", { config: { setupRequired: true } });
+  it.each(["/setup", "/setup/", "/setup?from=mail"])(
+    "keeps %s while setup is required",
+    async (url) => {
+      const screen = await renderWithProviders(url, { config: { setupRequired: true } });
 
-    await expect
-      .element(screen.getByRole("heading", { level: 1, name: "Set up Orvano" }))
-      .toBeVisible();
-    expect(screen.router.state.location.pathname).toBe("/setup");
-  });
+      await expect
+        .element(screen.getByRole("heading", { level: 1, name: "Set up Orvano" }))
+        .toBeVisible();
+      expect(screen.router.state.location.pathname.replace(/\/$/, "")).toBe("/setup");
+    },
+  );
 
-  it("sends /setup to the console root once setup is complete", async () => {
-    const screen = await renderWithProviders("/setup", { config: { setupRequired: false } });
+  it.each(["/setup", "/setup/"])(
+    "sends %s to the console root once setup is complete",
+    async (url) => {
+      const screen = await renderWithProviders(url, { config: { setupRequired: false } });
 
-    await expect
-      .element(screen.getByRole("heading", { level: 1, name: "Orvano console" }))
-      .toBeVisible();
-    expect(screen.router.state.location.pathname).toBe("/");
-  });
+      await expect
+        .element(screen.getByRole("heading", { level: 1, name: "Orvano console" }))
+        .toBeVisible();
+      expect(screen.router.state.location.pathname).toBe("/");
+    },
+  );
 });
 
 // Spec 0003 I18N-6, spec 0015 RTL-1: the root route gives React Aria the console's locale, and follows it when it

@@ -112,6 +112,71 @@ test.describe("first run setup", () => {
   });
 });
 
+test.describe("first run boot", () => {
+  test("0016 FRS-3, URL-5: an old setup link after setup is done lands on the console with a clean address", async ({
+    page,
+  }) => {
+    const sent: string[] = [];
+    await page.route("**/v1/console/config", (route) =>
+      route.fulfill({ json: { setupRequired: false }, headers: { "Cache-Control": "no-store" } }),
+    );
+    await page.route("**/v1/console/setup/token", (route) => {
+      sent.push(route.request().url());
+      return route.abort();
+    });
+
+    await page.goto(`setup#token=${TOKEN}`);
+
+    await expect(page.getByRole("heading", { level: 1, name: "Orvano console" })).toBeVisible();
+    expect(page.url()).not.toContain(TOKEN);
+    expect(sent).toEqual([]);
+  });
+
+  test("0016 FRS-3: /console/ with a token still lands on setup, and leaves no token behind", async ({
+    page,
+  }) => {
+    await mockSetupApi(page);
+
+    await page.goto(`./#token=${TOKEN}`);
+
+    await expect(page.getByRole("heading", { level: 1, name: "Set up Orvano" })).toBeVisible();
+    await expect(page).toHaveURL(/\/console\/setup/);
+    expect(page.url()).not.toContain(TOKEN);
+  });
+
+  test("0016 FRS-2: a failed config load shows the boot error page, and Reload tries again", async ({
+    page,
+  }) => {
+    let failing = true;
+    await page.route("**/v1/console/config", (route) =>
+      failing
+        ? route.fulfill({ status: 500, body: "no" })
+        : route.fulfill({ json: { setupRequired: true } }),
+    );
+
+    await page.goto("./");
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Orvano couldn't start" }),
+    ).toBeVisible();
+    failing = false;
+    await page.getByRole("button", { name: "Reload" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Set up Orvano" })).toBeVisible();
+  });
+
+  test("0016 FRS-2: a config call that never connects shows the boot error page", async ({
+    page,
+  }) => {
+    await page.route("**/v1/console/config", (route) => route.abort());
+
+    await page.goto("setup");
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Orvano couldn't start" }),
+    ).toBeVisible();
+  });
+});
+
 /** Spec 0003 QA-5: axe with the WCAG tags plus best-practice, on the whole page. */
 async function expectNoAxeViolations(page: Page) {
   await page.addScriptTag({ path: axeSource });

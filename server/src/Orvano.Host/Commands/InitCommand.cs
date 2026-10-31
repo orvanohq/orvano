@@ -171,7 +171,7 @@ internal static partial class InitCommand
             Write(keyPath, Encoding.UTF8.GetBytes(RootKey.Generate() + "\n"), created);
             SetMode(keyPath, Readable); // explicit, so a strict umask cannot leave it at 0600
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentOutOfRangeException) // the last is .NET's EFBIG
         {
             // Newest first, so the folder goes after the file inside it.
             foreach (string path in Enumerable.Reverse(created))

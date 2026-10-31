@@ -113,6 +113,18 @@ public sealed class ServeAndMigrateTests(PostgresFixture postgres)
         result.Error.ShouldContain("caddy");
     }
 
+    [Theory, Trait("Spec", "0006:CON-2"), Trait("Spec", "0016:STP-4")]
+    [InlineData("ORVANO_PUBLIC_URL")]
+    [InlineData("ORVANO_CONSOLE_ORIGIN")]
+    public async Task Serve_exits_1_naming_the_variable_when_a_console_address_is_not_a_url(string variable)
+    {
+        OrvanoCli.Result result = await OrvanoCli.RunAsync(["serve"], ServeEnvironment(new() { [variable] = "ftp://orvano.example" }),
+            TestContext.Current.CancellationToken);
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain(variable);
+    }
+
     [Fact, Trait("Spec", "0007:TLS-2")]
     public async Task Serve_exits_1_naming_both_variables_when_only_the_certificate_is_set()
     {
