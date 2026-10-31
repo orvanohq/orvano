@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-22
 **Status**: Accepted
-**Updated**: 2026-10-23, open points from verify: RGN-3 and AC-15 scope the drift check to the pin and the generated paths; RGN-6, RGN-9, and AC-16 say `sdk-nextjs` takes new SDK pins in the catch up; CNF-3 adds `$absent`; CNF-8 says which CI layer owns the run list; spec 0007 IMG-3 names the `sha-<commit>` tag. 2026-10-25, the Follow-up items for specs 0002, 0003, 0004, 0005, 0006, 0007, and 0012 are applied to those specs. 2026-10-30, for spec 0016: CPX-3's config call ships in feature 12 with `setupRequired` only; feature 13 adds the rest. The text below is not changed yet; spec 0016 wins.
+**Updated**: 2026-10-23, open points from verify: RGN-3 and AC-15 scope the drift check to the pin and the generated paths; RGN-6, RGN-9, and AC-16 say `sdk-nextjs` takes new SDK pins in the catch up; CNF-3 adds `$absent`; CNF-8 says which CI layer owns the run list; spec 0007 IMG-3 names the `sha-<commit>` tag. 2026-10-25, the Follow-up items for specs 0002, 0003, 0004, 0005, 0006, 0007, and 0012 are applied to those specs. 2026-10-30, for spec 0016: CPX-3's config call ships in feature 12 with `setupRequired` only; feature 13 adds the rest.
 
 ## Summary
 
@@ -297,7 +297,7 @@ Each rule has an ID; cite it in review. These IDs are new; where they amend an o
 
 - **CPX-1 (MUST)**: Console resource payloads carry `allowedActions: string[]`, the spec 0012 console permission names the operator holds that apply to the resource, so the console's `useCan` reads them (spec 0003). Feature 13 fills them.
 - **CPX-2 (MUST)**: A resource that shows "what goes with it" (spec 0001) has `GET <resource path>/{id}/dependents` returning `{ items: [{ kind, count, estimated }] }`, `kind` a snake_case resource name.
-- **CPX-3 (MUST)**: The console boot calls (spec 0003 RTE-10) are `GET /v1/console/config` (public, the same for every caller: instance name and feature switches) and `GET /v1/console/session` (the operator, their memberships, and the CSRF token, spec 0006 CON-2). Feature 13 builds both and owns their payloads.
+- **CPX-3 (MUST)**: The console boot calls (spec 0003 RTE-10) are `GET /v1/console/config` (public, the same for every caller: instance name and feature switches) and `GET /v1/console/session` (the operator, their memberships, and the CSRF token, spec 0006 CON-2). Feature 12 shipped the config call with `setupRequired` only (spec 0016 FRS-1). Feature 13 adds the rest of that payload, builds the session call, and owns both payloads.
 
 ### Data model sketch
 

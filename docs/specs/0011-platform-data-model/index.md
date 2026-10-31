@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-18
 **Status**: Accepted
-**Updated**: 2026-10-18, for spec 0012 (access control model): CAT-2 gains `databases.table` and the grant columns on buckets, files, and functions; `api_key.scopes` takes spec 0012's scope lists with a CHECK per key type; `audit_event.actor_kind` gains `function`; the feature 9 follow up is closed. 2026-10-30, for spec 0016: `platform.instance` is built by feature 12 and gains `setup_token_expires_at`; CAT-1's table header changes from (13) to (12); the feature 13 follow up no longer creates `Orvano.Modules.Platform` (it already exists) but still creates the other CAT-1 tables. The text below is not changed yet; spec 0016 wins.
+**Updated**: 2026-10-18, for spec 0012 (access control model): CAT-2 gains `databases.table` and the grant columns on buckets, files, and functions; `api_key.scopes` takes spec 0012's scope lists with a CHECK per key type; `audit_event.actor_kind` gains `function`; the feature 9 follow up is closed. 2026-10-30, for spec 0016: `platform.instance` is built by feature 12 and gains `setup_token_expires_at`; `Orvano.Modules.Platform` already exists, so the feature 13 follow up creates only the other CAT-1 tables.
 
 ## Summary
 
@@ -55,7 +55,7 @@ Each rule has an ID so reviews and later specs can cite it. **MUST** fails the r
 
 #### MOD: modules and schemas
 
-- **MOD-1 (MUST)**: One schema per module, named after it (spec 0002 DAT-1): `platform` (new `Orvano.Modules.Platform`: console accounts, organizations, projects, API keys), `auth` (end users), `jobs` and `crypto` (`Orvano.Infrastructure`, each with its own `DbContext`), `databases`, `storage`, `realtime` (webhooks too), `functions`, `sites`, `messaging`, `operations` (audit, usage, request logs, privacy requests).
+- **MOD-1 (MUST)**: One schema per module, named after it (spec 0002 DAT-1): `platform` (`Orvano.Modules.Platform`, created by feature 12: the install's setup state, console accounts, organizations, projects, API keys), `auth` (end users), `jobs` and `crypto` (`Orvano.Infrastructure`, each with its own `DbContext`), `databases`, `storage`, `realtime` (webhooks too), `functions`, `sites`, `messaging`, `operations` (audit, usage, request logs, privacy requests).
 - **MOD-2 (MUST)**: `MigrationOrder` (DAT-10) is `jobs`, `crypto`, `platform`, `auth`, `databases`, `storage`, `realtime`, `functions`, `sites`, `messaging`, `operations`. A module is added to the list by the feature that creates its first table.
 - **MOD-3 (MUST)**: A module reads and writes only its own schema (LAY-4). An FK into another schema (REF) is a constraint, not a read path: code never joins across schemas.
 
@@ -169,14 +169,15 @@ Each rule has an ID so reviews and later specs can cite it. **MUST** fails the r
 
 #### CAT-1: tier 1 tables (full columns; built by the feature in brackets)
 
-**`platform.instance`** (13): singleton.
+**`platform.instance`** (12): singleton.
 
-| Column               | Type          | Null | Class | Notes                               |
-| -------------------- | ------------- | ---- | ----- | ----------------------------------- |
-| `id`                 | `smallint`    | no   |       | PK, CHECK `id = 1`                  |
-| `setup_token_hash`   | `bytea`       | yes  | S     | CON-6; cleared when setup completes |
-| `setup_completed_at` | `timestamptz` | yes  |       |                                     |
-| Std                  |               |      |       |                                     |
+| Column                   | Type          | Null | Class | Notes                                  |
+| ------------------------ | ------------- | ---- | ----- | -------------------------------------- |
+| `id`                     | `smallint`    | no   |       | PK, CHECK `id = 1`                     |
+| `setup_token_hash`       | `bytea`       | yes  | S     | CON-6; cleared when setup completes    |
+| `setup_token_expires_at` | `timestamptz` | yes  |       | spec 0016 STP-1; cleared with the hash |
+| `setup_completed_at`     | `timestamptz` | yes  |       |                                        |
+| Std                      |               |      |       |                                        |
 
 **`platform.operator`** (13)
 
@@ -505,13 +506,13 @@ Tracer Bullet: feature 8 is a thin shared strand, and the first real thread thro
 
 **Neutral**:
 
-- The new Platform module (`Orvano.Modules.Platform`, log block 9000) and the Operations module (8000) are created by features 13 and 45 to 48, not here.
+- The Platform module (`Orvano.Modules.Platform`, log block 9000) and the Operations module (8000) are created by feature 12 and by features 45 to 48, not here.
 - `crypto` needs its own `DbContext` in Infrastructure beside `jobs`.
 
 ## Follow-up
 
 - [x] Feature 9: the scope list for `api_key.scopes`, the permission columns for buckets and tables, and whether `IProjectScoped` filtering is refined (DAT-2a). Closed by spec 0012 (2026-10-18): scopes from SCP-1 and SCP-2 with a CHECK per type (SCP-3), grant columns on `databases.table`, `storage.bucket`, `storage.file`, and `functions.function` in CAT-2, and DAT-2a stays as written (spec 0012 PRJ-3 only fixes who sets `IProjectContext`).
-- [ ] Feature 13: create `Orvano.Modules.Platform`, the `IProjectDirectory` and `IProjectLifecycleParticipant` contracts (TXN-1, TXN-2, LIF-4), and the CAT-1 platform tables; create `crypto` (ENC-2) if operator TOTP ships there.
+- [ ] Feature 13: create the `IProjectDirectory` and `IProjectLifecycleParticipant` contracts (TXN-1, TXN-2, LIF-4), and the other CAT-1 platform tables (feature 12 made `Orvano.Modules.Platform` and `platform.instance`); create `crypto` (ENC-2) if operator TOTP ships there.
 - [ ] Feature 14: the CAT-1 auth tables, the cleanup schedule (RET-1), and `auth.session_revocation` loading for TOK-6.
 - [ ] Feature 15: `databases.database`, naming of `db_name` and `role_name`, and the `server` setting's values.
 - [ ] Feature 23: where throttle counters live (memory per replica, or a table); not part of this catalog.
