@@ -18,11 +18,12 @@ spec [0016](../specs/0016-self-host-install/index.md)
   - [x] Milestone 2, the setup token: issue at start, `orvano admin setup-token`, the check endpoint with its limit, and the token checks in CI (steps 9 to 12; AC-1, AC-6, AC-7, AC-9, AC-10, AC-15)
   - [x] Milestone 3, the setup page: the token step in `AuthLayout`, its states, end to end, axe, and CSP tests (steps 13 and 14; AC-5, AC-8)
   - [x] Milestone 4, server mode, Podman, both CPUs: `--domain`, Podman and rootless detection, the arm64 and rootless Podman CI legs, the INS-5 checks, and the no telemetry test (steps 15 to 17; AC-2, AC-12, AC-14, AC-15)
-  - [ ] Milestone 5, the guide and sign off: `docs/self-hosting.md`, the README pointer, the SELinux mount fix, and the manual verify runs (steps 18 to 20; AC-1, AC-2, AC-12, AC-15 to AC-17)
-- [ ] Verify it: `/check verify self host install`
+  - [x] Milestone 5, the guide and the Mac runs: `docs/self-hosting.md`, the README pointer, the SELinux mount fix, the non-empty folder refusal, and every Mac verify row (steps 18 and 19, plus host M in step 20; AC-15, AC-16)
+- [ ] Verify it: `/check verify self host install` (ran in #146; blocked only on the deferred rows below, so run it again once they have results)
 - [ ] Test it: `/test self host install`
 - [ ] Review it (fresh model): `/check review self host install`
 - [ ] Document it: `/document self host install`
+- [ ] Deferred until before feature 59: the real host verify rows (spec 0016 step 20; VFY-6 to VFY-10 and VFY-12; AC-1, AC-2, AC-9, AC-12, AC-17). Decided 2026-10-30 so they don't hold up slice 1. Real certificates, SELinux hosts, rootful Podman, and WSL2 stay unproven until these run, and feature 12 can't be `done` before then.
 
 ### 13. Console accounts & projects · needs a decision
 
@@ -62,7 +63,7 @@ Invite other people into an organization with roles that limit what they can see
 
 ### 59. Server releases · needs a decision
 
-Build and publish versioned, signed server and console images with release notes, so self host install (feature 12) and instance upgrades (feature 53) have something real to install.
+Build and publish versioned, signed server and console images with release notes, so self host install (feature 12) and instance upgrades (feature 53) have something real to install. Run feature 12's deferred verify rows before the first release.
 **Done when:** tagging a release builds, signs, and publishes the images and release notes, and a clean machine installs that exact version by following the install docs.
 
 - [ ] Design it (spec): `/architect server releases`
