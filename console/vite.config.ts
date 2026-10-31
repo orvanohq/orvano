@@ -105,25 +105,40 @@ export default defineConfig(({ mode }) => ({
         // well under 80 KB.
         codeSplitting: {
           groups: [
-            { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+            {
+              name: "react",
+              priority: 2,
+              test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+            },
             // TanStack Form (and the two helpers only it uses) stays out of this group, which loads first: it goes
             // with the screens that have a form, so the shell's first load stays in AC-3's budget. So does useMutation:
             // only those screens call it.
             {
               name: "tanstack",
+              priority: 2,
               test: /node_modules[\\/]@tanstack[\\/](?!react-form|form-core|pacer-lite|devtools-event-client|react-query[\\/]build[\\/]modern[\\/]useMutation|query-core[\\/]build[\\/]modern[\\/]mutationObserver)/,
             },
-            // Spec 0015 STY-8: what the shell's first load shares. Left to the importer split, the routes cut these into
-            // two dozen small files, and each compresses alone, which costs more than 10 KB of BDL-1. What only later pages
-            // use stays out: the lazy panels, the form, the table, and the primitives no first load page renders.
+            // Spec 0015 STY-8: what the shell's first load shares. Left to the importer split, the routes cut this into
+            // about 40 small files, each compressed alone, which costs 16 KB of BDL-1. Libraries go first (priority 2), so
+            // `shell-core` stays under the 80 KB file limit. Don't use a group's `maxSize` here, or `strictExecutionOrder`:
+            // the first split a cycle and the production build crashed at boot; the second cost back all the gain.
+            { name: "zod", priority: 2, test: /node_modules[\\/]zod[\\/]/ },
+            { name: "icons", priority: 2, test: /node_modules[\\/]lucide-react[\\/]/ },
+            {
+              name: "aria-core",
+              priority: 2,
+              test: /node_modules[\\/]react-aria[\\/]dist[\\/]private[\\/](utils|interactions|focus|ssr|i18n|overlays)[\\/]/,
+            },
+            // What only later pages use stays out: the lazy panels, the form, the table, and primitives no first load
+            // page renders.
             {
               name: "shell-core",
-              maxSize: 300_000, // bytes before gzip, which keeps each part under BDL-1's 80 KB file limit
+              priority: 1,
               test: /src[\\/](ui[\\/](?!command-palette|docs-pane|shortcut-help|confirm-delete|side-sheet|table|form[\\/]|tabs|relative-time|status-chip|progress)|shared[\\/])/,
             },
             // Every route's loader reads one of these, so they load together rather than as one small file each.
             { name: "queries", test: /src[\\/]features[\\/][^\\/]+[\\/]api[\\/]queries\.ts/ },
-            { name: "lingui", test: /node_modules[\\/]@lingui[\\/]/ },
+            { name: "lingui", priority: 2, test: /node_modules[\\/]@lingui[\\/]/ },
           ],
         },
       },
