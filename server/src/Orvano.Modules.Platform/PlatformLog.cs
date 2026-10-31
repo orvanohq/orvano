@@ -16,4 +16,12 @@ internal static partial class PlatformLog
     [LoggerMessage(EventId = LogEventIds.Platform + 2, Level = LogLevel.Warning,
         Message = "No setup token was issued at start ({ExceptionType}: {Reason}); run orvano admin setup-token once the database is ready")]
     public static partial void SetupTokenNotIssued(this ILogger logger, string exceptionType, string reason);
+
+    // Spec 0017 AUS-3: the exception's type only, since a message could hold what the event held.
+    [LoggerMessage(EventId = LogEventIds.Platform + 3, Level = LogLevel.Warning, Message = "Audit event {Action} was not recorded: {ExceptionType}")]
+    public static partial void AuditNotRecorded(this ILogger logger, string action, string exceptionType);
+
+    // Spec 0017 AKY-11: a failed write never fails the request.
+    [LoggerMessage(EventId = LogEventIds.Platform + 4, Level = LogLevel.Warning, Message = "last_used_at was not written for API key {KeyId}: {ExceptionType}")]
+    public static partial void KeyUsageNotWritten(this ILogger logger, Guid keyId, string exceptionType);
 }

@@ -33,6 +33,66 @@ public enum ConsolePermission
     UsageRead,
 }
 
+/// <summary>The names of <see cref="ConsolePermission"/> on the wire (CPL-1, spec 0014 CPX-1).</summary>
+public static class ConsolePermissions
+{
+    /// <summary>What an organization's payload can allow (spec 0017 SES-5).</summary>
+    public static IReadOnlyList<ConsolePermission> OnOrganization { get; } =
+    [
+        ConsolePermission.OrgRead, ConsolePermission.OrgWrite, ConsolePermission.OrgDelete, ConsolePermission.MembersRead,
+        ConsolePermission.MembersWrite, ConsolePermission.ProjectsCreate,
+    ];
+
+    /// <summary>What a project's payload can allow.</summary>
+    public static IReadOnlyList<ConsolePermission> OnProject { get; } =
+    [
+        ConsolePermission.ProjectRead, ConsolePermission.ProjectWrite, ConsolePermission.ProjectDelete, ConsolePermission.KeysRead,
+        ConsolePermission.KeysWrite, ConsolePermission.UsersRead, ConsolePermission.UsersWrite, ConsolePermission.DataRead,
+        ConsolePermission.DataWrite, ConsolePermission.SchemaWrite, ConsolePermission.FunctionsDeploy, ConsolePermission.MessagingWrite,
+        ConsolePermission.SitesWrite, ConsolePermission.AuditRead, ConsolePermission.UsageRead,
+    ];
+
+    /// <summary>What an API key's payload can allow.</summary>
+    public static IReadOnlyList<ConsolePermission> OnKey { get; } = [ConsolePermission.KeysRead, ConsolePermission.KeysWrite];
+
+    public static string ToToken(this ConsolePermission permission) => permission switch
+    {
+        ConsolePermission.OrgRead => "org.read",
+        ConsolePermission.OrgWrite => "org.write",
+        ConsolePermission.OrgDelete => "org.delete",
+        ConsolePermission.MembersRead => "members.read",
+        ConsolePermission.MembersWrite => "members.write",
+        ConsolePermission.ProjectsCreate => "projects.create",
+        ConsolePermission.ProjectRead => "project.read",
+        ConsolePermission.ProjectWrite => "project.write",
+        ConsolePermission.ProjectDelete => "project.delete",
+        ConsolePermission.KeysRead => "keys.read",
+        ConsolePermission.KeysWrite => "keys.write",
+        ConsolePermission.UsersRead => "users.read",
+        ConsolePermission.UsersWrite => "users.write",
+        ConsolePermission.DataRead => "data.read",
+        ConsolePermission.DataWrite => "data.write",
+        ConsolePermission.SchemaWrite => "schema.write",
+        ConsolePermission.FunctionsDeploy => "functions.deploy",
+        ConsolePermission.MessagingWrite => "messaging.write",
+        ConsolePermission.SitesWrite => "sites.write",
+        ConsolePermission.AuditRead => "audit.read",
+        ConsolePermission.UsageRead => "usage.read",
+        _ => throw new ArgumentOutOfRangeException(nameof(permission), permission, null),
+    };
+
+    /// <summary>
+    /// CPX-1: the names of <paramref name="onResource"/> that <paramref name="role"/> holds, the <c>allowedActions</c>
+    /// of a payload.
+    /// </summary>
+    public static string[] Allowed(string? role, IReadOnlyList<ConsolePermission> onResource)
+    {
+        ArgumentNullException.ThrowIfNull(onResource);
+        IReadOnlySet<ConsolePermission> held = RolePermissions.For(role);
+        return [.. onResource.Where(held.Contains).Select(ToToken)];
+    }
+}
+
 /// <summary>
 /// CPL-2: what each <c>platform.membership.role</c> may do, in code. Feature 51 adds roles here and to the role
 /// CHECK; endpoints do not change.

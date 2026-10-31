@@ -560,6 +560,7 @@
       "orvano.modules.platform": {
         "type": "Project",
         "dependencies": {
+          "Orvano.Modules.Auth": "[1.0.0, )",
           "Orvano.SharedKernel": "[1.0.0, )"
         }
       },

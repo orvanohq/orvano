@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using Npgsql;
 
@@ -11,6 +13,7 @@ using Orvano.Modules.Platform.Setup;
 using Orvano.SharedKernel;
 using Orvano.SharedKernel.Access;
 using Orvano.SharedKernel.Api;
+using Orvano.SharedKernel.Configuration;
 
 namespace Orvano.Modules.Platform.Console;
 
@@ -18,11 +21,17 @@ namespace Orvano.Modules.Platform.Console;
 
 /// <summary>What the console needs before its first render.</summary>
 /// <param name="SetupRequired">True until the first owner account is made; the console then shows only the setup page.</param>
-public sealed record ConsoleConfigResponse(bool SetupRequired);
+/// <param name="InstanceName">The name the console shows for this install.</param>
+/// <param name="PublicUrl">Where this install is reached, or null when it isn't set.</param>
+/// <param name="Features">The switches this install has on.</param>
+public sealed record ConsoleConfigResponse(bool SetupRequired, string InstanceName, string? PublicUrl, IReadOnlyList<string> Features);
 
-/// <summary><c>GET /v1/console/config</c> (spec 0014 CPX-3, spec 0016 FRS-1). Feature 13 adds the instance name and switches.</summary>
+/// <summary><c>GET /v1/console/config</c> (spec 0014 CPX-3, spec 0016 FRS-1, spec 0017 BOT-1).</summary>
 internal static class ConsoleConfigEndpoint
 {
+    /// <summary>BOT-1's switches, a code constant, empty today.</summary>
+    private static readonly string[] Features = [];
+
     private static readonly Error NotReady = Error.Unavailable(ErrorCodes.Unavailable, "The server is not ready.");
 
     public static RouteGroupBuilder MapConsoleConfig(this RouteGroupBuilder console)
@@ -42,13 +51,18 @@ internal static class ConsoleConfigEndpoint
     }
 
     internal static async Task<Results<Ok<ConsoleConfigResponse>, ErrorProblemResult>> GetAsync(
-        SetupCompletion setup, PlatformDbContext db, ILogger<PlatformDbContext> logger, CancellationToken cancellationToken)
+        SetupCompletion setup,
+        PlatformDbContext db,
+        IOptions<InstanceOptions> instance,
+        IConfiguration configuration,
+        ILogger<PlatformDbContext> logger,
+        CancellationToken cancellationToken)
     {
         try
         {
             // FRS-1: setup is required while setup_completed_at is null.
             bool complete = await setup.IsCompleteAsync(db, cancellationToken);
-            return TypedResults.Ok(new ConsoleConfigResponse(!complete));
+            return TypedResults.Ok(new ConsoleConfigResponse(!complete, instance.Value.Name, ConsoleAddress.PublicUrl(configuration), Features));
         }
         catch (PostgresException ex) when (ex.SqlState is PostgresErrorCodes.UndefinedTable or PostgresErrorCodes.InvalidSchemaName)
         {

@@ -9,12 +9,25 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthRouteImport } from './routes/_auth'
+import { Route as ShellRouteImport } from './routes/_shell'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as AuthSignInRouteImport } from './routes/_auth/sign-in'
+import { Route as ShellIndexRouteImport } from './routes/_shell/index'
+import { Route as ShellOrgIdRouteRouteImport } from './routes/_shell/$orgId/route'
+import { Route as ShellOrgIdIndexRouteImport } from './routes/_shell/$orgId/index'
+import { Route as ShellOrgIdProjectIdRouteRouteImport } from './routes/_shell/$orgId/$projectId/route'
+import { Route as ShellOrgIdProjectIdIndexRouteImport } from './routes/_shell/$orgId/$projectId/index'
+import { Route as ShellOrgIdProjectIdSettingsRouteRouteImport } from './routes/_shell/$orgId/$projectId/settings/route'
+import { Route as ShellOrgIdProjectIdSettingsIndexRouteImport } from './routes/_shell/$orgId/$projectId/settings/index'
+import { Route as ShellOrgIdProjectIdSettingsKeysRouteImport } from './routes/_shell/$orgId/$projectId/settings/keys'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthRoute = AuthRouteImport.update({
+  id: '/_auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShellRoute = ShellRouteImport.update({
+  id: '/_shell',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SetupRoute = SetupRouteImport.update({
@@ -22,40 +35,151 @@ const SetupRoute = SetupRouteImport.update({
   path: '/setup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthSignInRoute = AuthSignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => AuthRoute,
+} as any)
+const ShellIndexRoute = ShellIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellOrgIdRouteRoute = ShellOrgIdRouteRouteImport.update({
+  id: '/$orgId',
+  path: '/$orgId',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellOrgIdIndexRoute = ShellOrgIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ShellOrgIdRouteRoute,
+} as any)
+const ShellOrgIdProjectIdRouteRoute =
+  ShellOrgIdProjectIdRouteRouteImport.update({
+    id: '/$projectId',
+    path: '/$projectId',
+    getParentRoute: () => ShellOrgIdRouteRoute,
+  } as any)
+const ShellOrgIdProjectIdIndexRoute =
+  ShellOrgIdProjectIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => ShellOrgIdProjectIdRouteRoute,
+  } as any)
+const ShellOrgIdProjectIdSettingsRouteRoute =
+  ShellOrgIdProjectIdSettingsRouteRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => ShellOrgIdProjectIdRouteRoute,
+  } as any)
+const ShellOrgIdProjectIdSettingsIndexRoute =
+  ShellOrgIdProjectIdSettingsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => ShellOrgIdProjectIdSettingsRouteRoute,
+  } as any)
+const ShellOrgIdProjectIdSettingsKeysRoute =
+  ShellOrgIdProjectIdSettingsKeysRouteImport.update({
+    id: '/keys',
+    path: '/keys',
+    getParentRoute: () => ShellOrgIdProjectIdSettingsRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof ShellIndexRoute
   '/setup': typeof SetupRoute
+  '/$orgId': typeof ShellOrgIdRouteRouteWithChildren
+  '/sign-in': typeof AuthSignInRoute
+  '/$orgId/$projectId': typeof ShellOrgIdProjectIdRouteRouteWithChildren
+  '/$orgId/': typeof ShellOrgIdIndexRoute
+  '/$orgId/$projectId/settings': typeof ShellOrgIdProjectIdSettingsRouteRouteWithChildren
+  '/$orgId/$projectId/': typeof ShellOrgIdProjectIdIndexRoute
+  '/$orgId/$projectId/settings/keys': typeof ShellOrgIdProjectIdSettingsKeysRoute
+  '/$orgId/$projectId/settings/': typeof ShellOrgIdProjectIdSettingsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/': typeof ShellIndexRoute
   '/setup': typeof SetupRoute
+  '/sign-in': typeof AuthSignInRoute
+  '/$orgId': typeof ShellOrgIdIndexRoute
+  '/$orgId/$projectId': typeof ShellOrgIdProjectIdIndexRoute
+  '/$orgId/$projectId/settings/keys': typeof ShellOrgIdProjectIdSettingsKeysRoute
+  '/$orgId/$projectId/settings': typeof ShellOrgIdProjectIdSettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_auth': typeof AuthRouteWithChildren
+  '/_shell': typeof ShellRouteWithChildren
   '/setup': typeof SetupRoute
+  '/_shell/$orgId': typeof ShellOrgIdRouteRouteWithChildren
+  '/_auth/sign-in': typeof AuthSignInRoute
+  '/_shell/': typeof ShellIndexRoute
+  '/_shell/$orgId/$projectId': typeof ShellOrgIdProjectIdRouteRouteWithChildren
+  '/_shell/$orgId/': typeof ShellOrgIdIndexRoute
+  '/_shell/$orgId/$projectId/settings': typeof ShellOrgIdProjectIdSettingsRouteRouteWithChildren
+  '/_shell/$orgId/$projectId/': typeof ShellOrgIdProjectIdIndexRoute
+  '/_shell/$orgId/$projectId/settings/keys': typeof ShellOrgIdProjectIdSettingsKeysRoute
+  '/_shell/$orgId/$projectId/settings/': typeof ShellOrgIdProjectIdSettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/setup'
+  fullPaths:
+    | '/'
+    | '/setup'
+    | '/$orgId'
+    | '/sign-in'
+    | '/$orgId/$projectId'
+    | '/$orgId/'
+    | '/$orgId/$projectId/settings'
+    | '/$orgId/$projectId/'
+    | '/$orgId/$projectId/settings/keys'
+    | '/$orgId/$projectId/settings/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/setup'
-  id: '__root__' | '/' | '/setup'
+  to:
+    | '/'
+    | '/setup'
+    | '/sign-in'
+    | '/$orgId'
+    | '/$orgId/$projectId'
+    | '/$orgId/$projectId/settings/keys'
+    | '/$orgId/$projectId/settings'
+  id:
+    | '__root__'
+    | '/_auth'
+    | '/_shell'
+    | '/setup'
+    | '/_shell/$orgId'
+    | '/_auth/sign-in'
+    | '/_shell/'
+    | '/_shell/$orgId/$projectId'
+    | '/_shell/$orgId/'
+    | '/_shell/$orgId/$projectId/settings'
+    | '/_shell/$orgId/$projectId/'
+    | '/_shell/$orgId/$projectId/settings/keys'
+    | '/_shell/$orgId/$projectId/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRouteWithChildren
+  ShellRoute: typeof ShellRouteWithChildren
   SetupRoute: typeof SetupRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
+    '/_auth': {
+      id: '/_auth'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_shell': {
+      id: '/_shell'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ShellRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/setup': {
@@ -65,11 +189,145 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_auth/sign-in': {
+      id: '/_auth/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof AuthSignInRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/_shell/': {
+      id: '/_shell/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof ShellIndexRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/$orgId': {
+      id: '/_shell/$orgId'
+      path: '/$orgId'
+      fullPath: '/$orgId'
+      preLoaderRoute: typeof ShellOrgIdRouteRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/$orgId/': {
+      id: '/_shell/$orgId/'
+      path: '/'
+      fullPath: '/$orgId/'
+      preLoaderRoute: typeof ShellOrgIdIndexRouteImport
+      parentRoute: typeof ShellOrgIdRouteRoute
+    }
+    '/_shell/$orgId/$projectId': {
+      id: '/_shell/$orgId/$projectId'
+      path: '/$projectId'
+      fullPath: '/$orgId/$projectId'
+      preLoaderRoute: typeof ShellOrgIdProjectIdRouteRouteImport
+      parentRoute: typeof ShellOrgIdRouteRoute
+    }
+    '/_shell/$orgId/$projectId/': {
+      id: '/_shell/$orgId/$projectId/'
+      path: '/'
+      fullPath: '/$orgId/$projectId/'
+      preLoaderRoute: typeof ShellOrgIdProjectIdIndexRouteImport
+      parentRoute: typeof ShellOrgIdProjectIdRouteRoute
+    }
+    '/_shell/$orgId/$projectId/settings': {
+      id: '/_shell/$orgId/$projectId/settings'
+      path: '/settings'
+      fullPath: '/$orgId/$projectId/settings'
+      preLoaderRoute: typeof ShellOrgIdProjectIdSettingsRouteRouteImport
+      parentRoute: typeof ShellOrgIdProjectIdRouteRoute
+    }
+    '/_shell/$orgId/$projectId/settings/': {
+      id: '/_shell/$orgId/$projectId/settings/'
+      path: '/'
+      fullPath: '/$orgId/$projectId/settings/'
+      preLoaderRoute: typeof ShellOrgIdProjectIdSettingsIndexRouteImport
+      parentRoute: typeof ShellOrgIdProjectIdSettingsRouteRoute
+    }
+    '/_shell/$orgId/$projectId/settings/keys': {
+      id: '/_shell/$orgId/$projectId/settings/keys'
+      path: '/keys'
+      fullPath: '/$orgId/$projectId/settings/keys'
+      preLoaderRoute: typeof ShellOrgIdProjectIdSettingsKeysRouteImport
+      parentRoute: typeof ShellOrgIdProjectIdSettingsRouteRoute
+    }
   }
 }
 
+interface AuthRouteChildren {
+  AuthSignInRoute: typeof AuthSignInRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthSignInRoute: AuthSignInRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
+interface ShellOrgIdProjectIdSettingsRouteRouteChildren {
+  ShellOrgIdProjectIdSettingsKeysRoute: typeof ShellOrgIdProjectIdSettingsKeysRoute
+  ShellOrgIdProjectIdSettingsIndexRoute: typeof ShellOrgIdProjectIdSettingsIndexRoute
+}
+
+const ShellOrgIdProjectIdSettingsRouteRouteChildren: ShellOrgIdProjectIdSettingsRouteRouteChildren =
+  {
+    ShellOrgIdProjectIdSettingsKeysRoute: ShellOrgIdProjectIdSettingsKeysRoute,
+    ShellOrgIdProjectIdSettingsIndexRoute:
+      ShellOrgIdProjectIdSettingsIndexRoute,
+  }
+
+const ShellOrgIdProjectIdSettingsRouteRouteWithChildren =
+  ShellOrgIdProjectIdSettingsRouteRoute._addFileChildren(
+    ShellOrgIdProjectIdSettingsRouteRouteChildren,
+  )
+
+interface ShellOrgIdProjectIdRouteRouteChildren {
+  ShellOrgIdProjectIdSettingsRouteRoute: typeof ShellOrgIdProjectIdSettingsRouteRouteWithChildren
+  ShellOrgIdProjectIdIndexRoute: typeof ShellOrgIdProjectIdIndexRoute
+}
+
+const ShellOrgIdProjectIdRouteRouteChildren: ShellOrgIdProjectIdRouteRouteChildren =
+  {
+    ShellOrgIdProjectIdSettingsRouteRoute:
+      ShellOrgIdProjectIdSettingsRouteRouteWithChildren,
+    ShellOrgIdProjectIdIndexRoute: ShellOrgIdProjectIdIndexRoute,
+  }
+
+const ShellOrgIdProjectIdRouteRouteWithChildren =
+  ShellOrgIdProjectIdRouteRoute._addFileChildren(
+    ShellOrgIdProjectIdRouteRouteChildren,
+  )
+
+interface ShellOrgIdRouteRouteChildren {
+  ShellOrgIdProjectIdRouteRoute: typeof ShellOrgIdProjectIdRouteRouteWithChildren
+  ShellOrgIdIndexRoute: typeof ShellOrgIdIndexRoute
+}
+
+const ShellOrgIdRouteRouteChildren: ShellOrgIdRouteRouteChildren = {
+  ShellOrgIdProjectIdRouteRoute: ShellOrgIdProjectIdRouteRouteWithChildren,
+  ShellOrgIdIndexRoute: ShellOrgIdIndexRoute,
+}
+
+const ShellOrgIdRouteRouteWithChildren = ShellOrgIdRouteRoute._addFileChildren(
+  ShellOrgIdRouteRouteChildren,
+)
+
+interface ShellRouteChildren {
+  ShellOrgIdRouteRoute: typeof ShellOrgIdRouteRouteWithChildren
+  ShellIndexRoute: typeof ShellIndexRoute
+}
+
+const ShellRouteChildren: ShellRouteChildren = {
+  ShellOrgIdRouteRoute: ShellOrgIdRouteRouteWithChildren,
+  ShellIndexRoute: ShellIndexRoute,
+}
+
+const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AuthRoute: AuthRouteWithChildren,
+  ShellRoute: ShellRouteWithChildren,
   SetupRoute: SetupRoute,
 }
 export const routeTree = rootRouteImport

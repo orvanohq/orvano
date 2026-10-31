@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http;
 
+using Orvano.SharedKernel.Api;
+
 namespace Orvano.SharedKernel.Access;
 
 /// <summary>
@@ -44,12 +46,28 @@ public abstract record CallerResolution
     public sealed record Resolved(Caller Caller) : CallerResolution;
 
     /// <summary>
-    /// Stops the chain with <c>401 unauthorized</c>. The reason is logged at Information, never sent (PRJ-4). Make it a
-    /// fixed phrase, optionally with an id the server issued (a key id, a session id), such as "revoked key" or "expired
-    /// token": never the credential, a secret, or a value copied from the request. The log keeps its first 100
-    /// characters.
+    /// Stops the chain with a <c>401</c>. The reason is logged at Information, never sent (PRJ-4). Make it a fixed phrase,
+    /// optionally with an id the server issued (a key id, a session id), such as "revoked key" or "expired token": never
+    /// the credential, a secret, or a value copied from the request. The log keeps its first 100 characters.
+    /// <see cref="Code"/> is <c>unauthorized</c> or, for a session that ended, <c>session_expired</c> (spec 0017 ACX-3).
     /// </summary>
-    public sealed record Failed(string Reason) : CallerResolution;
+    public sealed record Failed : CallerResolution
+    {
+        public Failed(string reason, string code = ErrorCodes.Unauthorized)
+        {
+            if (code is not (ErrorCodes.Unauthorized or ErrorCodes.SessionExpired))
+            {
+                throw new ArgumentException($"A failed credential answers {ErrorCodes.Unauthorized} or {ErrorCodes.SessionExpired}, not '{code}'.", nameof(code));
+            }
+
+            Reason = reason;
+            Code = code;
+        }
+
+        public string Reason { get; }
+
+        public string Code { get; }
+    }
 }
 
 /// <summary>The fixed resolver orders (RSV-3). A new credential kind picks its order and says what it builds on.</summary>

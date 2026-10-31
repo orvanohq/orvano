@@ -19,7 +19,7 @@ internal sealed class Instance : ITimestamped, IVersioned
     /// <summary>When the setup token stops working: its issue time plus 24 hours (STP-1).</summary>
     public DateTimeOffset? SetupTokenExpiresAt { get; set; }
 
-    /// <summary>Set by feature 13 when the owner account is made; null while setup is open.</summary>
+    /// <summary>Set when the owner account is made (spec 0017 OWN-3); null while setup is open.</summary>
     public DateTimeOffset? SetupCompletedAt { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }

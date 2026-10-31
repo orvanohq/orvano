@@ -1,5 +1,6 @@
 using System.Reflection;
 
+using Orvano.ArchitectureTests.Access;
 using Orvano.Infrastructure;
 using Orvano.Modules.Auth;
 using Orvano.Modules.Platform;
@@ -42,6 +43,22 @@ public sealed class ProjectReferenceTests
     [Fact]
     public void SharedKernel_references_no_other_Orvano_project_when_built() =>
         OrvanoReferences(SharedKernel).ShouldBeEmpty();
+
+    [Fact]
+    [Trait("Spec", "0017:PSW-3")]
+    public void Auth_does_not_reference_Platform_when_built() =>
+        OrvanoReferences(typeof(AuthModule).Assembly).ShouldNotContain(typeof(PlatformModule).Assembly.GetName().Name!);
+
+    [Fact]
+    [Trait("Spec", "0017:PSW-3"), Trait("Spec", "0002:LAY-3")]
+    public void Platform_uses_only_the_Contracts_of_Auth_when_built()
+    {
+        string contracts = typeof(Orvano.Modules.Auth.Contracts.IPasswordHasher).Namespace + ".";
+        string[] outsideContracts = [.. TypeReferences.Violations(typeof(PlatformModule).Assembly.GetTypes(), ["Orvano.Modules.Auth."])
+            .Where(line => !line.Contains(" uses " + contracts, StringComparison.Ordinal))];
+
+        outsideContracts.ShouldBeEmpty();
+    }
 
     private static List<string> OrvanoReferences(Assembly assembly) =>
         [.. assembly.GetReferencedAssemblies()

@@ -60,6 +60,7 @@ internal static class AdminCommand
             builder.Logging.AddFilter<ConsoleLoggerProvider>(null, LogLevel.Warning); // a quiet command: only problems
             builder.AddPlatformDatabase();
             builder.Services.AddInfrastructure();
+            builder.Services.AddAuthModule(builder.Configuration);
             builder.Services.AddPlatformModule(builder.Configuration);
 
             using IHost host = builder.Build();

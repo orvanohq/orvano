@@ -5,14 +5,19 @@ import { activateLocale, getDirection, i18n } from "@/shared/i18n";
 import { expectNoAxeViolations } from "@/test/axe";
 import { deferred } from "@/test/deferred";
 import { focusElement } from "@/test/focus";
-import { http, problem } from "@/test/handlers";
+import { http, problem, shellHandlers, testConfig, testOrgId, testSession } from "@/test/handlers";
 import { worker } from "@/test/msw";
 import { renderWithProviders } from "@/test/render";
 
 // Spec 0016 FRS-4 to FRS-7, AC-8: the setup page's token step. The API answers through MSW (spec 0003 QA-2).
 
 const TOKEN = "orv_setup_dGhpcyBpcyBhIHRlc3QgdG9rZW4gb2YgMzIgYnl0ZXM";
-const setup = { config: { setupRequired: true } };
+const setup = { config: { setupRequired: true }, session: null };
+const emptyProjects = [
+  http.get("/v1/console/organizations/{organizationId}/projects", ({ response }) =>
+    response(200).json({ items: [], nextCursor: null, total: null }),
+  ),
+];
 
 /** Records each token the page sends to the check endpoint, and answers with `answer` (204 by default). */
 function checkEndpoint(
@@ -575,7 +580,7 @@ describe("SetupPage", () => {
     checkEndpoint(() => problem(409, "setup_complete"));
     worker.use(
       http.get("/v1/console/config", ({ response }) =>
-        response(200).json({ setupRequired: false }),
+        response(200).json({ ...testConfig, setupRequired: false }),
       ),
     );
     const screen = await renderWithProviders("/setup", setup);
@@ -583,10 +588,8 @@ describe("SetupPage", () => {
     await typeToken(screen, TOKEN);
     await userEvent.keyboard("{Enter}");
 
-    await expect
-      .element(screen.getByRole("heading", { level: 1, name: "Orvano console" }))
-      .toBeVisible();
-    expect(screen.router.state.location.pathname).toBe("/");
+    await expect.element(screen.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+    expect(screen.router.state.location.pathname).toBe("/sign-in");
   });
 });
 
@@ -608,6 +611,117 @@ async function expectNoAxeViolationsInBothThemes() {
 }
 
 // Spec 0016 FRS-7, AC-8: axe in both themes, left to right and right to left, for each state with its own markup.
+async function acceptToken(screen: Awaited<ReturnType<typeof renderWithProviders>>) {
+  await typeToken(screen, TOKEN);
+  await userEvent.keyboard("{Enter}");
+  await expect
+    .element(screen.getByRole("heading", { level: 2, name: "Setup token accepted" }))
+    .toBeVisible();
+}
+
+async function fillOwner(screen: Awaited<ReturnType<typeof renderWithProviders>>) {
+  await userEvent.fill(screen.getByRole("textbox", { name: "Your name" }), "Ada Owner");
+  await userEvent.fill(screen.getByRole("textbox", { name: "Email" }), "ada@example.com");
+  await userEvent.fill(screen.getByRole("textbox", { name: "Organization name" }), "Acme");
+  await userEvent.fill(screen.getByLabelText("Password", { exact: true }), "correct horse");
+}
+
+const ownerEndpoint = (answer: () => Response) => {
+  const sent: unknown[] = [];
+  worker.use(
+    http.post("/v1/console/setup/owner", async ({ request }) => {
+      sent.push(await request.clone().json());
+      return answer();
+    }),
+  );
+  return sent;
+};
+
+// Spec 0017 OWN-5 to OWN-7, AC-1, AC-2: the owner form in the accepted state.
+describe("the owner step", () => {
+  it("0017 OWN-5, OWN-7: sends the accepted token, writes the session, and lands on the organization", async () => {
+    checkEndpoint();
+    const sent = ownerEndpoint(() => Response.json(testSession, { status: 201 }));
+    let configRead = 0;
+    worker.use(
+      ...shellHandlers,
+      ...emptyProjects,
+      http.get("/v1/console/config", ({ response }) => {
+        configRead += 1;
+        return response(200).json({ ...testConfig, setupRequired: false });
+      }),
+    );
+    const screen = await renderWithProviders("/setup", setup);
+
+    await acceptToken(screen);
+    await fillOwner(screen);
+    await screen.getByRole("button", { name: "Create owner account" }).click();
+
+    await expect.element(screen.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
+    expect(sent).toEqual([
+      {
+        token: TOKEN,
+        name: "Ada Owner",
+        email: "ada@example.com",
+        password: "correct horse",
+        organizationName: "Acme",
+      },
+    ]);
+    expect(screen.router.state.location.pathname).toBe(`/${testOrgId}`);
+    expect(configRead).toBe(1);
+  });
+
+  it("0017 OWN-6, AC-2: a refused token brings the token step back and keeps all but the password", async () => {
+    checkEndpoint();
+    ownerEndpoint(() => problem(401, "setup_token_invalid"));
+    const screen = await renderWithProviders("/setup", setup);
+
+    await acceptToken(screen);
+    await fillOwner(screen);
+    await screen.getByRole("button", { name: "Create owner account" }).click();
+
+    await expect.element(screen.getByRole("textbox", { name: "Setup token" })).toBeVisible();
+    await acceptToken(screen);
+    await expect
+      .element(screen.getByRole("textbox", { name: "Your name" }))
+      .toHaveValue("Ada Owner");
+    await expect
+      .element(screen.getByRole("textbox", { name: "Email" }))
+      .toHaveValue("ada@example.com");
+    await expect
+      .element(screen.getByRole("textbox", { name: "Organization name" }))
+      .toHaveValue("Acme");
+    await expect.element(screen.getByLabelText("Password", { exact: true })).toHaveValue("");
+  });
+
+  it("0017 AC-4: a common password shows on its field", async () => {
+    checkEndpoint();
+    ownerEndpoint(() =>
+      Response.json(
+        {
+          type: "about:blank",
+          title: "Bad",
+          status: 400,
+          code: "validation_failed",
+          errors: [
+            { field: "password", location: "body", code: "password_too_common", message: "x" },
+          ],
+        },
+        { status: 400, headers: { "Content-Type": "application/problem+json" } },
+      ),
+    );
+    const screen = await renderWithProviders("/setup", setup);
+
+    await acceptToken(screen);
+    await fillOwner(screen);
+    await screen.getByRole("button", { name: "Create owner account" }).click();
+
+    await expect
+      .element(screen.getByText("This password is too common. Choose another.").first())
+      .toBeVisible();
+  });
+});
+
 describe("SetupPage accessibility", () => {
   it.each(["ltr", "rtl"] as const)(
     "0016 FRS-7: the token step and its errors pass axe in both themes (%s)",

@@ -19,6 +19,10 @@ internal sealed record ClientApiRequirement(string ClientApi) : AccessRequiremen
 
 internal sealed record ConsolePermissionRequirement(ConsolePermission Permission) : AccessRequirement;
 
+internal sealed record OperatorRequirement : AccessRequirement;
+
+internal sealed record ProjectKeyRequirement : AccessRequirement;
+
 /// <summary>What <see cref="AccessEndpointFilters.AllowPublicAccess{TBuilder}"/> adds (EPT-5).</summary>
 internal sealed record PublicAccess;
 
@@ -36,7 +40,12 @@ public static class AccessDeclaration
         bool isPublic = IsPublic(endpoint);
         if (requirements.Count == 0)
         {
-            return isPublic ? null : "it declares no access; add RequireScope, RequireClientApi, RequireConsolePermission, or AllowPublicAccess";
+            if (isPublic && ChangesConsoleStateWithoutOrigin(endpoint))
+            {
+                return "it is a public console endpoint that changes state; add RequireConsoleOrigin (spec 0017 ACX-4)";
+            }
+
+            return isPublic ? null : "it declares no access; add RequireScope, RequireClientApi, RequireConsolePermission, RequireOperator, RequireProjectKey, or AllowPublicAccess";
         }
 
         if (isPublic)
@@ -57,8 +66,29 @@ public static class AccessDeclaration
             return $"RequireConsolePermission needs an '{{{AccessEndpointFilters.OrganizationIdRouteValue}}}' or '{{{AccessEndpointFilters.ProjectIdRouteValue}}}' route value";
         }
 
+        if (requirements[0] is ProjectKeyRequirement
+            && endpoint is RouteEndpoint { RoutePattern: var keyPattern }
+            && keyPattern.GetParameter(AccessEndpointFilters.ProjectIdRouteValue) is null)
+        {
+            return $"RequireProjectKey needs a '{{{AccessEndpointFilters.ProjectIdRouteValue}}}' route value";
+        }
+
         return null;
     }
+
+    /// <summary>
+    /// Whether only an operator can pass the endpoint: <c>RequireOperator</c> or <c>RequireConsolePermission</c>. The
+    /// session resolver reads its cookie only here, and an API key is refused here (spec 0017 SES-4, AKY-10).
+    /// </summary>
+    public static bool RequiresOperator(Endpoint endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        return endpoint.Metadata.GetOrderedMetadata<AccessRequirement>().Any(requirement => requirement is OperatorRequirement or ConsolePermissionRequirement);
+    }
+
+    /// <summary>Whether <paramref name="method"/> changes state (spec 0017 SES-7, ACX-4).</summary>
+    public static bool ChangesState(string method) =>
+        !(HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method));
 
     /// <summary>Whether the endpoint carries <see cref="AccessEndpointFilters.AllowPublicAccess{TBuilder}"/> (EPT-5).</summary>
     public static bool IsPublic(Endpoint endpoint)
@@ -69,8 +99,8 @@ public static class AccessDeclaration
 
     /// <summary>
     /// The SDK audience the declaration implies (spec 0014 XTN-1): <c>RequireClientApi</c> is <c>client</c>,
-    /// <c>RequireScope</c> is <c>server</c>, <c>AllowPublicAccess</c> is both. Console routes and endpoints that
-    /// declare their access wrongly have none (null).
+    /// <c>RequireScope</c> is <c>server</c>, <c>AllowPublicAccess</c> and <c>RequireProjectKey</c> are both. Console routes
+    /// and endpoints that declare their access wrongly have none (null).
     /// </summary>
     public static IReadOnlyList<string>? Audience(Endpoint endpoint)
     {
@@ -86,9 +116,18 @@ public static class AccessDeclaration
             {
                 ClientApiRequirement => [Audiences.Client],
                 ScopeRequirement => [Audiences.Server],
+                ProjectKeyRequirement => [Audiences.Client, Audiences.Server],
                 _ => null,
             };
     }
+
+    // ACX-4: nothing but the Origin check stands between a browser and a public console endpoint that changes state.
+    private static bool ChangesConsoleStateWithoutOrigin(Endpoint endpoint) =>
+        endpoint is RouteEndpoint { RoutePattern.RawText: { } route }
+        && new PathString("/" + route.TrimStart('/')).StartsWithSegments(ApiPaths.Console, StringComparison.OrdinalIgnoreCase)
+        && endpoint.Metadata.GetMetadata<ConsoleOriginMetadata>() is null
+        && endpoint.Metadata.GetMetadata<HttpMethodMetadata>() is { } methods
+        && methods.HttpMethods.Any(ChangesState);
 
     /// <summary>The endpoint's route pattern, else its display name, for error messages.</summary>
     public static string Name(Endpoint endpoint)
@@ -165,9 +204,10 @@ public static class AccessRequirementsMiddleware
                 return;
             }
 
-            if (await EstablishCallerAsync(http, logger) is not { } caller)
+            (Caller? established, Error? refusal) = await EstablishCallerAsync(http, logger);
+            if (established is not { } caller)
             {
-                await AccessErrors.Unauthorized.ToProblem().ExecuteAsync(http);
+                await (refusal ?? AccessErrors.Unauthorized).ToProblem().ExecuteAsync(http);
                 return;
             }
 
@@ -178,6 +218,8 @@ public static class AccessRequirementsMiddleware
                 {
                     ScopeRequirement scope => CheckScope(caller, scope.Scope),
                     ClientApiRequirement clientApi => CheckClientApi(caller, clientApi.ClientApi),
+                    OperatorRequirement => caller.Kind == CallerKind.Operator ? null : AccessErrors.Forbidden,
+                    ProjectKeyRequirement => CheckProjectKey(caller),
                     ConsolePermissionRequirement console => CheckConsolePermission(
                         membership ??= await FindConsoleMembershipAsync(http, caller, http.RequestAborted), console.Permission),
                     _ => throw new InvalidOperationException($"Unknown access requirement {requirement.GetType().Name}."),
@@ -200,8 +242,9 @@ public static class AccessRequirementsMiddleware
         });
     }
 
-    // RSV-2 to RSV-5: runs the chain, compares the project, and establishes the caller. Null means answer 401.
-    private static async Task<Caller?> EstablishCallerAsync(HttpContext http, ILogger logger)
+    // RSV-2 to RSV-5: runs the chain, compares the project, and establishes the caller. A null caller means answer 401,
+    // with the resolver's own error when it named one (ACX-3).
+    private static async Task<(Caller? Caller, Error? Refusal)> EstablishCallerAsync(HttpContext http, ILogger logger)
     {
         bool routeHasProject = http.Request.RouteValues.ContainsKey(AccessEndpointFilters.ProjectIdRouteValue);
         Guid? routeProjectId = routeHasProject ? RouteGuid(http, AccessEndpointFilters.ProjectIdRouteValue) : null;
@@ -225,7 +268,8 @@ public static class AccessRequirementsMiddleware
                         logger.CredentialRefused(resolver.GetType().Name, Truncate(failed.Reason));
                     }
 
-                    return null; // PRJ-4: no fallback
+                    // PRJ-4: no fallback
+                    return (null, failed.Code == ErrorCodes.SessionExpired ? AccessErrors.SessionExpired : null);
                 default:
                     throw new InvalidOperationException($"{resolver.GetType().Name} returned an unknown resolution.");
             }
@@ -233,7 +277,7 @@ public static class AccessRequirementsMiddleware
 
         if (caller is null)
         {
-            return null; // RSV-5
+            return (null, null); // RSV-5
         }
 
         AccessContext context = http.RequestServices.GetRequiredService<AccessContext>();
@@ -246,7 +290,7 @@ public static class AccessRequirementsMiddleware
                 if (routeHasProject && (routeProjectId is null || caller.ProjectId != routeProjectId))
                 {
                     logger.ProjectMismatch(caller.Kind);
-                    return null; // PRJ-2
+                    return (null, null); // PRJ-2
                 }
 
                 context.Establish(caller, routeProjectId);
@@ -255,7 +299,7 @@ public static class AccessRequirementsMiddleware
                 throw new InvalidOperationException($"A resolver returned a {caller.Kind} caller, which never comes from HTTP (CLR-3).");
         }
 
-        return caller;
+        return (caller, null);
     }
 
     private static Error? CheckScope(Caller caller, string scope)
@@ -280,6 +324,15 @@ public static class AccessRequirementsMiddleware
 
         return caller.Scopes.Contains(clientApi) ? null : AccessErrors.Forbidden;
     }
+
+    // ACX-2: every key of the project, run keys aside, with its stored scopes back inside the ceiling (KEY-4).
+    private static Error? CheckProjectKey(Caller caller) => caller.Kind switch
+    {
+        CallerKind.Guest or CallerKind.EndUser =>
+            Scopes.WithinCeiling(KeyType.Publishable, caller.Scopes) ? null : AccessErrors.InsufficientScope,
+        CallerKind.SecretKey => Scopes.WithinCeiling(KeyType.Secret, caller.Scopes) ? null : AccessErrors.InsufficientScope,
+        _ => AccessErrors.Forbidden,
+    };
 
     // CPL-3: the operator's membership for the route's organization (or the project's organization), or the refusal.
     private static async Task<ConsoleMembership> FindConsoleMembershipAsync(HttpContext http, Caller caller, CancellationToken cancellationToken)

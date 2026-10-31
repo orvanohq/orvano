@@ -1,3 +1,4 @@
+import type { MessageDescriptor } from "@lingui/core";
 import { createRouter, type RouterHistory } from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
 import type { ApiError } from "@/shared/api/errors";
@@ -27,6 +28,10 @@ export function createAppRouter(opts: { queryClient: QueryClient; history?: Rout
 declare module "@tanstack/react-router" {
   interface Register {
     router: ReturnType<typeof createAppRouter>;
+  }
+  /** Spec 0015 SHL-1: a page's crumb, read by the `_shell` route. */
+  interface StaticDataRouteOption {
+    crumb?: MessageDescriptor;
   }
 }
 

@@ -11,9 +11,32 @@ import type { paths } from "./schema.gen";
 // Same origin, so the browser sends the console's own credentials and nothing else (SEC-1).
 const client = createClient<paths>({ baseUrl: config.apiBaseUrl, credentials: "same-origin" });
 
+/** Where the CSRF token comes from: the session query (spec 0017 SES-7), which the session feature connects at boot. */
+let readCsrfToken: () => string | undefined = () => undefined;
+
+export function connectCsrfToken(read: () => string | undefined): void {
+  readCsrfToken = read;
+}
+
+// eslint-disable-next-line lingui/no-unlocalized-strings -- HTTP methods, never shown
+const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+// Spec 0003 SEC-1, spec 0017 SES-7: the one place the header is added, on every state change once there's a session.
+client.use({
+  onRequest({ request }) {
+    const token = readCsrfToken();
+    if (token && !READ_METHODS.has(request.method)) {
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- a header name, never shown
+      request.headers.set("Orvano-Csrf", token);
+    }
+    return request;
+  },
+});
+
 type Client = typeof client;
 export type GetPath = ClientPathsWithMethod<Client, "get">;
 export type PostPath = ClientPathsWithMethod<Client, "post">;
+export type DeletePath = ClientPathsWithMethod<Client, "delete">;
 
 /** QRY-3: every request gives up after 30 seconds, as an `ApiError` with kind `timeout`. */
 export const REQUEST_TIMEOUT_MS = 30_000;
@@ -64,4 +87,15 @@ export async function post<Path extends PostPath>(
     (init) => client.POST(path, { ...options, ...init } as never),
     options.signal,
   )) as MethodResponse<Client, "post", Path> | undefined;
+}
+
+/** A delete. Resolves with the response's data, or `undefined` for a `204`. */
+export async function del<Path extends DeletePath>(
+  path: Path,
+  options: MaybeOptionalInit<paths[Path], "delete"> & { signal?: AbortSignal },
+): Promise<MethodResponse<Client, "delete", Path> | undefined> {
+  return (await send(
+    (init) => client.DELETE(path, { ...options, ...init } as never),
+    options.signal,
+  )) as MethodResponse<Client, "delete", Path> | undefined;
 }

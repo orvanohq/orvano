@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 
 using Orvano.SharedKernel;
+using Orvano.SharedKernel.Audit;
 using Orvano.SharedKernel.Signals;
 
 namespace Orvano.Infrastructure;
@@ -194,4 +195,19 @@ internal static partial class InfrastructureLog
     [LoggerMessage(EventId = LogEventIds.Infrastructure + 206, Level = LogLevel.Warning,
         Message = "Outbox cleanup deleted {Deleted} events from the {Outbox} outbox that waited more than 30 days for a version that registers their type")]
     public static partial void OutboxEventsExpired(this ILogger logger, string outbox, int deleted);
+
+    // Spec 0017 AUS-2: ids and codes only. Addresses and user agents stay out of ordinary logs.
+    [LoggerMessage(EventId = LogEventIds.Infrastructure + 207, Level = LogLevel.Information,
+        Message = "Audit {Action}: {Result} by {ActorKind} {ActorId} in organization {OrganizationId} project {ProjectId} on {TargetKind} {TargetId} {Metadata}")]
+    public static partial void AuditRecorded(
+        this ILogger logger,
+        string action,
+        AuditResult result,
+        AuditActorKind actorKind,
+        Guid? actorId,
+        Guid? organizationId,
+        Guid? projectId,
+        string? targetKind,
+        Guid? targetId,
+        IReadOnlyDictionary<string, string>? metadata);
 }

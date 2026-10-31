@@ -20,6 +20,6 @@ describe("activateLocale", () => {
 
     expect(i18n.locale).toBe("pseudo-LOCALE");
     expect(document.documentElement.lang).toBe("pseudo-LOCALE");
-    expect(i18n._("BgyUl6")).not.toBe("Orvano console");
+    expect(i18n._("5lWFkC")).not.toBe("Sign in");
   });
 });

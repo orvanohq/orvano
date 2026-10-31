@@ -5,6 +5,11 @@
     <ProjectReference Include="..\Orvano.SharedKernel\Orvano.SharedKernel.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Spec 0017 PSW-2: SecLists' 10k-most-common.txt (MIT), its first 10,000 lines; the license sits beside it. -->
+    <EmbeddedResource Include="Passwords\CommonPasswords.txt" LogicalName="Orvano.Modules.Auth.Passwords.CommonPasswords.txt" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="Orvano.Modules.Auth.Tests" />
+    <InternalsVisibleTo Include="Orvano.Host.IntegrationTests" />
   </ItemGroup>
 </Project>

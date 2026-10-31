@@ -1,6 +1,6 @@
 import { AppShell, PageHeader, type Crumb, type ShellModel } from "@/ui";
 
-// Spec 0015 STY-9: the shell probe. `vite build --mode size-probe` swaps the welcome page for this file, so
+// Spec 0015 STY-9: the shell probe. `vite build --mode size-probe` swaps the `_shell` index page for this file, so
 // `pnpm size` measures the first load with AppShell rendered (AC-3, STY-8) until feature 13's `_shell` routes are
 // measured directly. It imports only @/ui (never the gallery, GAL-3), and its labels are placeholder props that
 // stay out of the catalog. Feature 13 deletes it.
@@ -18,7 +18,7 @@ const model: ShellModel = {
 
 const crumbs: Crumb[] = [{ kind: "org" }, { kind: "project" }, { kind: "page", label: "Overview" }];
 
-export function WelcomePage() {
+export function NoOrganization() {
   return (
     <AppShell model={model} crumbs={crumbs}>
       <PageHeader title="Overview" description="The shell probe for the first load budget." />

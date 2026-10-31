@@ -1,8 +1,8 @@
 import { HttpResponse, delay } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { http, problem } from "@/test/handlers";
+import { http, problem, testConfig } from "@/test/handlers";
 import { worker } from "@/test/msw";
-import { get, post } from "./client";
+import { connectCsrfToken, get, post } from "./client";
 import { ApiError, apiErrorFromResponse, kindFromStatus, type FieldError } from "./errors";
 
 afterEach(() => {
@@ -13,14 +13,35 @@ afterEach(() => {
 describe("the API client", () => {
   it("0003 QRY-1: returns a read's data", async () => {
     worker.use(
-      http.get("/v1/console/config", ({ response }) => response(200).json({ setupRequired: true })),
+      http.get("/v1/console/config", ({ response }) =>
+        response(200).json({ ...testConfig, setupRequired: true }),
+      ),
     );
 
     await expect(
       get("/v1/console/config", { signal: new AbortController().signal }),
-    ).resolves.toEqual({
-      setupRequired: true,
-    });
+    ).resolves.toEqual({ ...testConfig, setupRequired: true });
+  });
+
+  it("0017 SES-7: sends the session's CSRF token on a state change, and never on a read", async () => {
+    connectCsrfToken(() => "the-token");
+    const seen: (string | null)[] = [];
+    worker.use(
+      http.get("/v1/console/config", ({ request, response }) => {
+        seen.push(request.headers.get("Orvano-Csrf"));
+        return response(200).json(testConfig);
+      }),
+      http.post("/v1/console/setup/token", ({ request, response }) => {
+        seen.push(request.headers.get("Orvano-Csrf"));
+        return response(204).empty();
+      }),
+    );
+
+    await get("/v1/console/config", { signal: new AbortController().signal });
+    await post("/v1/console/setup/token", { body: { token: "abc" } });
+
+    connectCsrfToken(() => undefined);
+    expect(seen).toEqual([null, "the-token"]);
   });
 
   it("0003 QRY-1: sends a write's body as JSON and resolves a 204 with no data", async () => {
@@ -136,7 +157,7 @@ describe("the API client", () => {
     worker.use(
       http.get("/v1/console/config", async ({ response }) => {
         await delay("infinite");
-        return response(200).json({ setupRequired: false });
+        return response(200).json({ ...testConfig, setupRequired: false });
       }),
     );
     const controller = new AbortController();
@@ -158,7 +179,7 @@ describe("the API client", () => {
     worker.use(
       http.get("/v1/console/config", async ({ response }) => {
         await delay("infinite");
-        return response(200).json({ setupRequired: false });
+        return response(200).json({ ...testConfig, setupRequired: false });
       }),
     );
 

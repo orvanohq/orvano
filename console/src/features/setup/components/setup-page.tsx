@@ -1,15 +1,17 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { consoleConfigQuery } from "@/features/console-config";
 import { ApiError } from "@/shared/api/errors";
 import { takeFragmentParam } from "@/shared/url/link-token";
 import { AuthLayout, Icon, SuccessIcon } from "@/ui";
 import { useAppForm } from "@/ui/form";
+import { useDocumentTitle } from "@/ui/shell/use-document-title";
 import { checkSetupToken } from "../api/mutations";
 import { setupTokenSchema, toSetupTokenCheckRequest } from "../schemas/setup-token";
+import { OwnerStep, type OwnerDraft } from "./owner-step";
 
 /** The command that makes a new setup link (spec 0016 STP-5). Code, so it is never translated. */
 const SETUP_TOKEN_COMMAND = "orvano admin setup-token";
@@ -17,14 +19,20 @@ const SETUP_TOKEN_COMMAND = "orvano admin setup-token";
 const PUBLIC_URL_SETTING = "ORVANO_PUBLIC_URL";
 
 /**
- * Spec 0016 FRS-4 to FRS-6: the first run setup page. Its first step checks the setup token; once the token is
- * accepted, the page keeps it in memory (never in storage, the URL, or a cache) for the owner account form that
- * feature 13 adds after it.
+ * Spec 0016 FRS-4 to FRS-6, spec 0017 OWN-5, OWN-6: the first run setup page. Its first step checks the setup token;
+ * once the token is accepted, the page keeps it in memory (never in storage, the URL, or a cache) for the owner form.
  */
 export function SetupPage() {
-  // Held for feature 13's owner form, which sends it again with the new account (STP-6).
+  const { t } = useLingui();
+  const { data: consoleConfig } = useSuspenseQuery(consoleConfigQuery());
+  useDocumentTitle([{ kind: "page", label: t`Set up Orvano` }], {
+    instanceName: consoleConfig.instanceName,
+  });
+  // Sent again with the new account (OWN-1).
   const [acceptedToken, setAcceptedToken] = useState<string>();
   const [linkToken, setLinkToken] = useState<string>();
+  // OWN-6: the typed name, email, and organization survive the token step coming back. The password never does.
+  const [draft, setDraft] = useState<OwnerDraft>({ name: "", email: "", organizationName: "" });
 
   // FRS-5: the accepted state has no token step to read a link, so a link opened here is taken at this level. Only the
   // newest token works (STP-2, STP-5), so it replaces the accepted one and goes back through the token step.
@@ -45,14 +53,24 @@ export function SetupPage() {
   }, [acceptedToken]);
 
   return (
-    <AuthLayout>
+    <AuthLayout instanceName={consoleConfig.instanceName}>
       <h1 className="text-xl font-semibold">
         <Trans>Set up Orvano</Trans>
       </h1>
       {acceptedToken === undefined ? (
         <TokenStep linkToken={linkToken} onAccepted={setAcceptedToken} />
       ) : (
-        <TokenAccepted />
+        <>
+          <TokenAccepted />
+          <OwnerStep
+            token={acceptedToken}
+            draft={draft}
+            onDraftChange={setDraft}
+            onTokenRefused={() => {
+              setAcceptedToken(undefined);
+            }}
+          />
+        </>
       )}
     </AuthLayout>
   );
@@ -203,10 +221,7 @@ function TokenAccepted() {
         <Trans>Setup token accepted</Trans>
       </h2>
       <p className="text-fg-muted">
-        <Trans>
-          The next step, creating the owner account, comes in a later version of the console. Keep
-          this page open, or make a new setup link when you come back.
-        </Trans>
+        <Trans>Now create the owner account. It can do everything in this install.</Trans>
       </p>
     </section>
   );

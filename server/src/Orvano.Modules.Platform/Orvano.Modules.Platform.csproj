@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Spec 0011 MOD-1: the platform schema (console accounts, organizations, projects, API keys). Feature 12 builds only
-       platform.instance (spec 0016); feature 13 adds the rest of CAT-1. -->
+  <!-- Spec 0011 MOD-1: the platform schema (console accounts, organizations, projects, API keys), spec 0016 and spec 0017. -->
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- Spec 0017 PSW-3: Auth's Contracts only, one way; an architecture test holds it. -->
+    <ProjectReference Include="..\Orvano.Modules.Auth\Orvano.Modules.Auth.csproj" />
     <ProjectReference Include="..\Orvano.SharedKernel\Orvano.SharedKernel.csproj" />
   </ItemGroup>
   <ItemGroup>

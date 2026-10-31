@@ -10,6 +10,9 @@ public interface ICallerContext
 {
     /// <summary>Throws when read before the access layer ran, so a route without it fails loudly.</summary>
     Caller Current { get; }
+
+    /// <summary>The caller, or null on a public endpoint (spec 0017 SES-7's check needs to ask, and <see cref="Current"/> throws).</summary>
+    Caller? Established { get; }
 }
 
 /// <summary>
@@ -41,6 +44,8 @@ internal sealed class AccessContext : ICallerContext, IProjectContext
 
     public Caller Current => _caller ?? throw new InvalidOperationException(
         "The caller is not known yet: the access layer has not run for this request.");
+
+    public Caller? Established => _caller;
 
     public Guid Id => _projectId ?? throw new InvalidOperationException(
         "This request has no project: the route has none, or the access layer has not set it.");

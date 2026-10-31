@@ -13,6 +13,8 @@ public static class ConsoleAddress
 
     public const string ConsoleOriginKey = "CONSOLE_ORIGIN";
 
+    public const string InsecureCookiesKey = "INSECURE_COOKIES";
+
     /// <summary>The public URL without a trailing slash, or null when it is not set.</summary>
     /// <exception cref="ConfigurationException">It is set but is not an absolute <c>http</c> or <c>https</c> URL.</exception>
     public static string? PublicUrl(IConfiguration configuration)
@@ -31,6 +33,33 @@ public static class ConsoleAddress
         ArgumentNullException.ThrowIfNull(configuration);
         Uri? url = Parse(configuration, ConsoleOriginKey) ?? Parse(configuration, PublicUrlKey);
         return url is null ? null : OriginOf(url);
+    }
+
+    /// <summary>
+    /// Whether the session cookie drops <c>Secure</c> and its <c>__Host-</c> name, for plain HTTP installs (spec 0006 CON-1).
+    /// </summary>
+    /// <exception cref="ConfigurationException">It is on while <c>ORVANO_PUBLIC_URL</c> is HTTPS, or it is not a boolean.</exception>
+    public static bool InsecureCookies(IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        string? value = configuration[InsecureCookiesKey];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        if (!bool.TryParse(value.Trim(), out bool insecure))
+        {
+            throw new ConfigurationException($"{ConfigurationNames.ToEnvironmentVariable(InsecureCookiesKey)} must be true or false.");
+        }
+
+        if (insecure && Parse(configuration, PublicUrlKey) is { Scheme: "https" })
+        {
+            throw new ConfigurationException(
+                $"{ConfigurationNames.ToEnvironmentVariable(InsecureCookiesKey)} can't be true while {ConfigurationNames.ToEnvironmentVariable(PublicUrlKey)} is HTTPS.");
+        }
+
+        return insecure;
     }
 
     /// <summary>The origin of <paramref name="url"/> in the form a browser sends in <c>Origin</c>.</summary>

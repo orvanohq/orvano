@@ -30,11 +30,6 @@ internal static class SetupTokenEndpoint
 {
     public const string RateLimitPolicy = "platform.setup-token";
 
-    private static readonly Error Invalid = Error.Unauthorized(
-        PlatformErrorCodes.SetupTokenInvalid, "This setup link or token is not valid any more. Make a new one with orvano admin setup-token.");
-
-    private static readonly Error Complete = Error.Conflict(PlatformErrorCodes.SetupComplete, "Setup is already complete; sign in instead.");
-
     private static readonly Error NotReady = Error.Unavailable(ErrorCodes.Unavailable, "The server is not ready.");
 
     public static RouteGroupBuilder MapSetupTokenCheck(this RouteGroupBuilder console)
@@ -74,8 +69,8 @@ internal static class SetupTokenEndpoint
             return await tokens.CheckAsync(request.Token, cancellationToken) switch
             {
                 SetupTokenCheck.Valid => TypedResults.NoContent(),
-                SetupTokenCheck.SetupComplete => Complete.ToProblem(),
-                _ => Invalid.ToProblem(),
+                SetupTokenCheck.SetupComplete => SetupErrors.Complete.ToProblem(),
+                _ => SetupErrors.Invalid.ToProblem(),
             };
         }
         catch (PostgresException ex) when (ex.SqlState is PostgresErrorCodes.UndefinedTable or PostgresErrorCodes.InvalidSchemaName)

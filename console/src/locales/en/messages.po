@@ -25,6 +25,10 @@ msgstr "{0, plural, one {# message} other {# messages}}"
 msgid "{0, plural, one {Try again in # second.} other {Try again in # seconds.}}"
 msgstr "{0, plural, one {Try again in # second.} other {Try again in # seconds.}}"
 
+#: src/features/projects/components/project-overview.tsx:45
+msgid "{activeKeys} active"
+msgstr "{activeKeys} active"
+
 #: src/ui/confirm-delete/dependents.ts:31
 msgid "{count, plural, one {# API key} other {# API keys}}"
 msgstr "{count, plural, one {# API key} other {# API keys}}"
@@ -127,13 +131,41 @@ msgstr "{count, plural, one {Fix this problem to continue} other {Fix these # pr
 msgid "{count} of kind {name}"
 msgstr "{count} of kind {name}"
 
-#: src/features/setup/components/setup-page.tsx:81
+#: src/features/session/components/sign-in-page.tsx:34
+msgid "{minutes, plural, one {Too many tries. Try again in # minute.} other {Too many tries. Try again in # minutes.}}"
+msgstr "{minutes, plural, one {Too many tries. Try again in # minute.} other {Too many tries. Try again in # minutes.}}"
+
+#: src/features/setup/components/setup-page.tsx:99
 msgid "{seconds, plural, one {Too many tries. Try again in # second.} other {Too many tries. Try again in # seconds.}}"
 msgstr "{seconds, plural, one {Too many tries. Try again in # second.} other {Too many tries. Try again in # seconds.}}"
 
 #: src/ui/toast/index.tsx:126
 msgid "{source}, {count, plural, one {# time} other {# times}}"
 msgstr "{source}, {count, plural, one {# time} other {# times}}"
+
+#: src/features/projects/components/project-overview.tsx:35
+msgid "A key lets your app reach this project."
+msgstr "A key lets your app reach this project."
+
+#: src/features/api-keys/components/keys-page.tsx:37
+msgid "A key lets your app reach this project. It's shown only once."
+msgstr "A key lets your app reach this project. It's shown only once."
+
+#: src/features/api-keys/schemas/create-key.ts:33
+msgid "A key name is at most 128 characters."
+msgstr "A key name is at most 128 characters."
+
+#: src/features/setup/schemas/owner.ts:14
+msgid "A name is at most 128 characters."
+msgstr "A name is at most 128 characters."
+
+#: src/features/projects/components/organization-page.tsx:37
+msgid "A project holds your data and the keys your apps use to reach it."
+msgstr "A project holds your data and the keys your apps use to reach it."
+
+#: src/features/projects/schemas/create-project.ts:14
+msgid "A project name is at most 128 characters."
+msgstr "A project name is at most 128 characters."
 
 #: src/features/setup/schemas/setup-token.ts:14
 msgid "A setup token is at most 100 characters."
@@ -153,6 +185,11 @@ msgstr "Account"
 msgid "Actions"
 msgstr "Actions"
 
+#: src/features/api-keys/components/keys-page.tsx:97
+#: src/features/projects/components/organization-page.tsx:80
+msgid "Active"
+msgstr "Active"
+
 #: src/ui/shell/activity-indicator.tsx:38
 #: src/ui/shell/activity-indicator.tsx:55
 msgid "Activity"
@@ -170,6 +207,10 @@ msgstr "All organizations"
 msgid "All projects"
 msgstr "All projects"
 
+#: src/features/projects/components/organization-page.tsx:155
+msgid "Allowed origins"
+msgstr "Allowed origins"
+
 #: src/ui/confirm-delete/index.tsx:210
 msgid "Also deleted:"
 msgstr "Also deleted:"
@@ -179,9 +220,37 @@ msgctxt "keyboard key"
 msgid "Alt"
 msgstr "Alt"
 
+#: src/features/session/schemas/sign-in.ts:14
+#: src/features/setup/schemas/owner.ts:21
+msgid "An email is at most 254 characters."
+msgstr "An email is at most 254 characters."
+
+#: src/features/setup/schemas/owner.ts:29
+msgid "An organization name is at most 128 characters."
+msgstr "An organization name is at most 128 characters."
+
+#: src/features/projects/components/project-overview.tsx:28
+msgid "API address"
+msgstr "API address"
+
+#: src/features/api-keys/components/keys-page.tsx:141
+msgid "API key"
+msgstr "API key"
+
+#: src/features/api-keys/components/keys-page.tsx:32
+#: src/features/api-keys/components/keys-page.tsx:62
+#: src/features/projects/components/project-overview.tsx:43
+#: src/routes/_shell/$orgId/$projectId/settings/keys.tsx:7
+msgid "API keys"
+msgstr "API keys"
+
 #: src/ui/error-copy.tsx:69
 msgid "Ask an owner of this project for access."
 msgstr "Ask an owner of this project for access."
+
+#: src/features/setup/components/owner-step.tsx:113
+msgid "At least 8 characters. Common passwords are refused."
+msgstr "At least 8 characters. Common passwords are refused."
 
 #: src/ui/shell/nav-registry.ts:35
 msgid "Auth"
@@ -191,6 +260,7 @@ msgstr "Auth"
 msgid "Breadcrumb"
 msgstr "Breadcrumb"
 
+#: src/features/projects/components/organization-page.tsx:140
 #: src/ui/confirm-delete/index.tsx:121
 msgid "Cancel"
 msgstr "Cancel"
@@ -202,6 +272,10 @@ msgstr "Cancelled"
 #: src/ui/error-copy.tsx:109
 msgid "Check your connection and try again."
 msgstr "Check your connection and try again."
+
+#: src/features/api-keys/schemas/create-key.ts:41
+msgid "Choose at least one scope."
+msgstr "Choose at least one scope."
 
 #: src/ui/shell/drawer.tsx:69
 #: src/ui/shortcut-help/index.tsx:29
@@ -237,7 +311,11 @@ msgstr "Commands"
 msgid "Compact"
 msgstr "Compact"
 
-#: src/features/setup/components/setup-page.tsx:180
+#: src/features/projects/components/connect-panel.tsx:12
+msgid "Connect"
+msgstr "Connect"
+
+#: src/features/setup/components/setup-page.tsx:198
 msgid "Continue"
 msgstr "Continue"
 
@@ -274,13 +352,52 @@ msgstr "Couldn't load projects. Check your connection and try again."
 msgid "Couldn't reach the server"
 msgstr "Couldn't reach the server"
 
-#: src/features/setup/components/setup-page.tsx:91
+#: src/features/session/components/sign-in-page.tsx:43
+#: src/features/setup/components/setup-page.tsx:109
 msgid "Couldn't reach the server. Check your connection and try again."
 msgstr "Couldn't reach the server. Check your connection and try again."
 
 #: src/ui/confirm-delete/index.tsx:192
 msgid "Counting what will be deleted with it…"
 msgstr "Counting what will be deleted with it…"
+
+#: src/features/projects/components/project-overview.tsx:34
+msgid "Create an API key"
+msgstr "Create an API key"
+
+#: src/features/api-keys/components/keys-page.tsx:26
+#: src/features/api-keys/components/keys-page.tsx:125
+#: src/features/projects/components/project-overview.tsx:38
+msgid "Create API key"
+msgstr "Create API key"
+
+#: src/features/api-keys/components/keys-page.tsx:135
+msgid "Create key"
+msgstr "Create key"
+
+#: src/features/setup/components/owner-step.tsx:118
+msgid "Create owner account"
+msgstr "Create owner account"
+
+#: src/features/projects/components/organization-page.tsx:142
+msgid "Create project"
+msgstr "Create project"
+
+#: src/features/api-keys/components/keys-page.tsx:36
+msgid "Create your first key"
+msgstr "Create your first key"
+
+#: src/features/projects/components/organization-page.tsx:36
+msgid "Create your first project"
+msgstr "Create your first project"
+
+#: src/features/api-keys/components/keys-page.tsx:70
+msgid "Created"
+msgstr "Created"
+
+#: src/features/projects/components/organization-page.tsx:82
+msgid "Creating"
+msgstr "Creating"
 
 #: src/ui/kbd.tsx:55
 msgctxt "keyboard key"
@@ -383,6 +500,10 @@ msgstr "Delete user"
 msgid "Delete webhook"
 msgstr "Delete webhook"
 
+#: src/features/projects/components/organization-page.tsx:84
+msgid "Deleting"
+msgstr "Deleting"
+
 #: src/ui/shell/account-menu.tsx:68
 #: src/ui/shell/palette-actions.ts:47
 msgid "Density"
@@ -404,9 +525,47 @@ msgstr "Dismiss"
 msgid "Don't ask again for this table this session"
 msgstr "Don't ask again for this table this session"
 
+#: src/features/api-keys/components/keys-page.tsx:132
+msgid "Done"
+msgstr "Done"
+
+#: src/features/session/components/sign-in-page.tsx:77
+#: src/features/setup/components/owner-step.tsx:99
+msgid "Email"
+msgstr "Email"
+
+#: src/features/api-keys/schemas/create-key.ts:32
+msgid "Enter a key name."
+msgstr "Enter a key name."
+
+#: src/features/projects/schemas/create-project.ts:13
+msgid "Enter a project name."
+msgstr "Enter a project name."
+
+#: src/features/setup/schemas/owner.ts:22
+msgid "Enter a valid email address."
+msgstr "Enter a valid email address."
+
+#: src/features/setup/schemas/owner.ts:28
+msgid "Enter an organization name."
+msgstr "Enter an organization name."
+
 #: src/features/setup/schemas/setup-token.ts:13
 msgid "Enter the setup token."
 msgstr "Enter the setup token."
+
+#: src/features/session/schemas/sign-in.ts:13
+#: src/features/setup/schemas/owner.ts:20
+msgid "Enter your email."
+msgstr "Enter your email."
+
+#: src/features/setup/schemas/owner.ts:13
+msgid "Enter your name."
+msgstr "Enter your name."
+
+#: src/features/session/schemas/sign-in.ts:16
+msgid "Enter your password."
+msgstr "Enter your password."
 
 #: src/ui/shell/resource-layout.tsx:102
 msgid "Expand list"
@@ -416,9 +575,17 @@ msgstr "Expand list"
 msgid "Expand sidebar"
 msgstr "Expand sidebar"
 
+#: src/features/api-keys/components/keys-page.tsx:99
+msgid "Expired"
+msgstr "Expired"
+
 #: src/ui/status-chip.tsx:40
 msgid "Failed"
 msgstr "Failed"
+
+#: src/features/api-keys/components/keys-page.tsx:157
+msgid "For your servers. Never put it in a browser or an app."
+msgstr "For your servers. Never put it in a browser or an app."
 
 #: src/ui/shell/nav-registry.ts:39
 msgid "Functions"
@@ -451,6 +618,10 @@ msgstr "Hide password"
 msgid "I've copied it"
 msgstr "I've copied it"
 
+#: src/features/projects/components/connect-panel.tsx:24
+msgid "Install command"
+msgstr "Install command"
+
 #: src/ui/error-copy.tsx:75
 msgid "It changed while you were here"
 msgstr "It changed while you were here"
@@ -462,6 +633,10 @@ msgstr "It may have been deleted, or the link is out of date."
 #: src/ui/form/unsaved-changes-guard.tsx:56
 msgid "Keep editing"
 msgstr "Keep editing"
+
+#: src/features/api-keys/components/keys-page.tsx:67
+msgid "Key"
+msgstr "Key"
 
 #: src/ui/shell/account-menu.tsx:79
 #: src/ui/shortcut-help/index.tsx:23
@@ -503,10 +678,19 @@ msgstr "Messages"
 msgid "Messaging"
 msgstr "Messaging"
 
+#: src/features/api-keys/components/keys-page.tsx:65
+#: src/features/api-keys/components/keys-page.tsx:147
+#: src/features/projects/components/organization-page.tsx:54
+#: src/features/projects/components/organization-page.tsx:150
+msgid "Name"
+msgstr "Name"
+
 #: src/ui/shell/switcher.tsx:66
 msgid "New organization"
 msgstr "New organization"
 
+#: src/features/projects/components/organization-page.tsx:26
+#: src/features/projects/components/organization-page.tsx:133
 #: src/ui/shell/switcher.tsx:79
 msgid "New project"
 msgstr "New project"
@@ -522,6 +706,10 @@ msgstr "No matching actions"
 #: src/ui/shell/activity-indicator.tsx:71
 msgid "No messages yet"
 msgstr "No messages yet"
+
+#: src/features/shell/components/no-organization.tsx:10
+msgid "No organization"
+msgstr "No organization"
 
 #: src/ui/shell/switcher.tsx:63
 msgid "No organizations match"
@@ -547,6 +735,10 @@ msgstr "Nothing matches “{filter}”"
 msgid "Notifications"
 msgstr "Notifications"
 
+#: src/features/setup/components/setup-page.tsx:224
+msgid "Now create the owner account. It can do everything in this install."
+msgstr "Now create the owner account. It can do everything in this install."
+
 #: src/ui/shell/palette-actions.ts:135
 msgid "Open help"
 msgstr "Open help"
@@ -563,13 +755,21 @@ msgstr "Open the {product} docs"
 msgid "Open the command palette"
 msgstr "Open the command palette"
 
-#: src/features/setup/components/setup-page.tsx:88
+#: src/features/setup/components/setup-page.tsx:106
 msgid "Open the console at its own address, the one in {PUBLIC_URL_SETTING}, not at an IP address or another name. Then use the setup link again."
 msgstr "Open the console at its own address, the one in {PUBLIC_URL_SETTING}, not at an IP address or another name. Then use the setup link again."
+
+#: src/features/session/components/sign-in-page.tsx:40
+msgid "Open the console at its own address, then try again."
+msgstr "Open the console at its own address, then try again."
 
 #: src/ui/shell/primary-sidebar.tsx:30
 msgid "Organization"
 msgstr "Organization"
+
+#: src/features/setup/components/owner-step.tsx:107
+msgid "Organization name"
+msgstr "Organization name"
 
 #: src/ui/shell/nav-registry.ts:48
 msgid "Organization settings"
@@ -579,11 +779,6 @@ msgstr "Organization settings"
 msgid "Organizations"
 msgstr "Organizations"
 
-#: src/features/welcome/components/welcome-page.tsx:9
-#: src/shared/i18n/index.test.ts:23
-msgid "Orvano console"
-msgstr "Orvano console"
-
 #: src/ui/error-page.tsx:71
 msgid "Orvano couldn't start"
 msgstr "Orvano couldn't start"
@@ -592,11 +787,17 @@ msgstr "Orvano couldn't start"
 msgid "Orvano home"
 msgstr "Orvano home"
 
+#: src/routes/_shell/$orgId/$projectId/index.tsx:7
 #: src/ui/shell/nav-registry.ts:34
 msgid "Overview"
 msgstr "Overview"
 
-#: src/features/setup/components/setup-page.tsx:159
+#: src/features/session/components/sign-in-page.tsx:80
+#: src/features/setup/components/owner-step.tsx:112
+msgid "Password"
+msgstr "Password"
+
+#: src/features/setup/components/setup-page.tsx:177
 msgid "Paste the setup token from the install output or the server log, or make a new one on the server with <0>{SETUP_TOKEN_COMMAND}</0>."
 msgstr "Paste the setup token from the install output or the server log, or make a new one on the server with <0>{SETUP_TOKEN_COMMAND}</0>."
 
@@ -624,10 +825,26 @@ msgstr "Profile"
 msgid "Project"
 msgstr "Project"
 
+#: src/features/projects/components/project-overview.tsx:25
+msgid "Project details"
+msgstr "Project details"
+
+#: src/features/projects/components/project-overview.tsx:27
+msgid "Project ID"
+msgstr "Project ID"
+
+#: src/features/projects/components/organization-page.tsx:32
+#: src/features/projects/components/organization-page.tsx:51
+#: src/routes/_shell/$orgId/index.tsx:7
 #: src/ui/shell/nav-registry.ts:46
 #: src/ui/shell/switcher.tsx:74
 msgid "Projects"
 msgstr "Projects"
+
+#: src/features/api-keys/components/keys-page.tsx:79
+#: src/features/api-keys/components/keys-page.tsx:161
+msgid "Publishable"
+msgstr "Publishable"
 
 #: src/ui/status-chip.tsx:37
 msgid "Queued"
@@ -668,6 +885,10 @@ msgstr "Request ID: <0>{requestId}</0>"
 msgid "Retry"
 msgstr "Retry"
 
+#: src/features/api-keys/components/keys-page.tsx:101
+msgid "Revoked"
+msgstr "Revoked"
+
 #: src/ui/status-chip.tsx:38
 msgid "Running"
 msgstr "Running"
@@ -676,6 +897,18 @@ msgstr "Running"
 #: src/ui/shell/activity-indicator.tsx:58
 msgid "Running jobs"
 msgstr "Running jobs"
+
+#: src/features/api-keys/components/keys-page.tsx:162
+msgid "Safe in client code. It gets every client API."
+msgstr "Safe in client code. It gets every client API."
+
+#: src/features/api-keys/components/keys-page.tsx:174
+msgid "Scopes"
+msgstr "Scopes"
+
+#: src/features/projects/components/connect-panel.tsx:14
+msgid "SDK"
+msgstr "SDK"
 
 #: src/ui/command-palette/index.tsx:122
 #: src/ui/command-palette/index.tsx:134
@@ -690,6 +923,11 @@ msgstr "Search organizations"
 msgid "Search projects"
 msgstr "Search projects"
 
+#: src/features/api-keys/components/keys-page.tsx:79
+#: src/features/api-keys/components/keys-page.tsx:156
+msgid "Secret"
+msgstr "Secret"
+
 #: src/ui/shell/nav-registry.ts:51
 msgid "Security"
 msgstr "Security"
@@ -698,19 +936,25 @@ msgstr "Security"
 msgid "Select"
 msgstr "Select"
 
-#: src/features/setup/components/setup-page.tsx:50
+#: src/features/setup/components/setup-page.tsx:28
+#: src/features/setup/components/setup-page.tsx:58
 msgid "Set up Orvano"
 msgstr "Set up Orvano"
 
+#: src/routes/_shell/$orgId/$projectId/settings/route.tsx:5
 #: src/ui/shell/nav-registry.ts:44
 msgid "Settings"
 msgstr "Settings"
 
-#: src/features/setup/components/setup-page.tsx:170
+#: src/features/projects/components/connect-panel.tsx:26
+msgid "Setup code"
+msgstr "Setup code"
+
+#: src/features/setup/components/setup-page.tsx:188
 msgid "Setup token"
 msgstr "Setup token"
 
-#: src/features/setup/components/setup-page.tsx:203
+#: src/features/setup/components/setup-page.tsx:221
 msgid "Setup token accepted"
 msgstr "Setup token accepted"
 
@@ -740,6 +984,13 @@ msgstr "Show shortcuts"
 msgid "Show the full path"
 msgstr "Show the full path"
 
+#: src/features/session/components/sign-in-page.tsx:21
+#: src/features/session/components/sign-in-page.tsx:71
+#: src/features/session/components/sign-in-page.tsx:82
+#: src/shared/i18n/index.test.ts:23
+msgid "Sign in"
+msgstr "Sign in"
+
 #: src/ui/shell/account-menu.tsx:82
 msgid "Sign out"
 msgstr "Sign out"
@@ -760,6 +1011,11 @@ msgstr "Someone else changed it. Reload the page to see the latest version."
 #: src/ui/error-page.tsx:83
 msgid "Something went wrong"
 msgstr "Something went wrong"
+
+#: src/features/api-keys/components/keys-page.tsx:69
+#: src/features/projects/components/organization-page.tsx:56
+msgid "Status"
+msgstr "Status"
 
 #: src/ui/shell/nav-registry.ts:37
 msgid "Storage"
@@ -785,27 +1041,37 @@ msgstr "Switch project: {name}"
 msgid "System"
 msgstr "System"
 
+#: src/features/projects/components/organization-page.tsx:156
+msgid "The browser origins your app runs on, one per line. You can change them later."
+msgstr "The browser origins your app runs on, one per line. You can change them later."
+
 #: src/ui/error-page.tsx:72
 msgid "The console couldn't load what it needs from the server. Check that the server is running, then reload."
 msgstr "The console couldn't load what it needs from the server. Check that the server is running, then reload."
 
-#: src/features/setup/components/setup-page.tsx:206
-msgid "The next step, creating the owner account, comes in a later version of the console. Keep this page open, or make a new setup link when you come back."
-msgstr "The next step, creating the owner account, comes in a later version of the console. Keep this page open, or make a new setup link when you come back."
+#: src/features/session/components/sign-in-page.tsx:29
+msgid "The email or password is wrong."
+msgstr "The email or password is wrong."
+
+#: src/features/api-keys/components/keys-page.tsx:118
+msgid "The key wasn't created. Try again in a moment."
+msgstr "The key wasn't created. Try again in a moment."
+
+#: src/features/projects/components/organization-page.tsx:126
+msgid "The project wasn't created. Try again in a moment."
+msgstr "The project wasn't created. Try again in a moment."
 
 #: src/ui/error-copy.tsx:82
 msgid "The request wasn't valid"
 msgstr "The request wasn't valid"
 
-#: src/features/welcome/components/welcome-page.tsx:12
-msgid "The server and console are running. Screens arrive with the next features."
-msgstr "The server and console are running. Screens arrive with the next features."
-
 #: src/ui/error-copy.tsx:115
 msgid "The server had a problem"
 msgstr "The server had a problem"
 
-#: src/features/setup/components/setup-page.tsx:93
+#: src/features/session/components/sign-in-page.tsx:45
+#: src/features/setup/components/owner-step.tsx:72
+#: src/features/setup/components/setup-page.tsx:111
 msgid "The server had a problem. Try again in a moment."
 msgstr "The server had a problem. Try again in a moment."
 
@@ -826,7 +1092,15 @@ msgstr "This deletes {name}. You can't undo this."
 msgid "This page ran into a problem. Reload to try again."
 msgstr "This page ran into a problem. Reload to try again."
 
-#: src/features/setup/components/setup-page.tsx:113
+#: src/features/setup/components/owner-step.tsx:62
+msgid "This password is too common. Choose another."
+msgstr "This password is too common. Choose another."
+
+#: src/features/setup/components/owner-step.tsx:64
+msgid "This password is too long."
+msgstr "This password is too long."
+
+#: src/features/setup/components/setup-page.tsx:131
 msgid "This setup link or token is not valid any more. Make a new one with {SETUP_TOKEN_COMMAND}."
 msgstr "This setup link or token is not valid any more. Make a new one with {SETUP_TOKEN_COMMAND}."
 
@@ -834,7 +1108,9 @@ msgstr "This setup link or token is not valid any more. Make a new one with {SET
 msgid "Too many requests"
 msgstr "Too many requests"
 
-#: src/features/setup/components/setup-page.tsx:79
+#: src/features/session/components/sign-in-page.tsx:32
+#: src/features/setup/components/owner-step.tsx:70
+#: src/features/setup/components/setup-page.tsx:97
 msgid "Too many tries. Wait a moment, then try again."
 msgstr "Too many tries. Wait a moment, then try again."
 
@@ -856,6 +1132,11 @@ msgstr "Trying again won't help. Check what you entered and change it."
 msgid "Trying again won't help. If you didn't expect this, share the request ID with your administrator."
 msgstr "Trying again won't help. If you didn't expect this, share the request ID with your administrator."
 
+#: src/features/api-keys/components/keys-page.tsx:68
+#: src/features/api-keys/components/keys-page.tsx:152
+msgid "Type"
+msgstr "Type"
+
 #: src/ui/confirm-delete/index.tsx:154
 msgid "Type {typePrompt} to confirm"
 msgstr "Type {typePrompt} to confirm"
@@ -876,6 +1157,11 @@ msgstr "Type the number of rows to confirm."
 msgid "Usage"
 msgstr "Usage"
 
+#: src/features/setup/components/owner-step.tsx:65
+#: src/features/setup/schemas/owner.ts:31
+msgid "Use at least 8 characters."
+msgstr "Use at least 8 characters."
+
 #: src/ui/shell/palette-actions.ts:104
 msgid "Use comfortable density"
 msgstr "Use comfortable density"
@@ -883,6 +1169,10 @@ msgstr "Use comfortable density"
 #: src/ui/shell/palette-actions.ts:116
 msgid "Use compact density"
 msgstr "Use compact density"
+
+#: src/features/projects/components/organization-page.tsx:122
+msgid "Use exact origins such as https://app.example.com, one per line."
+msgstr "Use exact origins such as https://app.example.com, one per line."
 
 #: src/ui/shell/palette-actions.ts:92
 msgid "Use the dark theme"
@@ -899,6 +1189,10 @@ msgstr "Use the system theme"
 #: src/ui/error-copy.tsx:94
 msgid "Wait a moment, then try again."
 msgstr "Wait a moment, then try again."
+
+#: src/features/shell/components/no-organization.tsx:11
+msgid "You aren't a member of any organization."
+msgstr "You aren't a member of any organization."
 
 #: src/ui/confirm-delete/index.tsx:276
 msgid "You can't undo this."
@@ -936,6 +1230,10 @@ msgstr "You're signed out"
 #: src/ui/form/unsaved-changes-guard.tsx:48
 msgid "Your changes haven't been saved. If you leave now, they'll be lost."
 msgstr "Your changes haven't been saved. If you leave now, they'll be lost."
+
+#: src/features/setup/components/owner-step.tsx:94
+msgid "Your name"
+msgstr "Your name"
 
 #: src/ui/error-copy.tsx:60
 msgid "Your session ended. Sign in again to continue."

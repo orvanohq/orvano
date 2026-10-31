@@ -11,30 +11,36 @@ import {
 } from "@tanstack/react-router";
 import { render } from "vitest-browser-react";
 import { consoleConfigQuery, type ConsoleConfig } from "@/features/console-config/api/queries";
+import { connectSessionToken, sessionQuery, type Session } from "@/features/session/api/queries";
 import { createAppRouter } from "@/router";
 import { UnsavedChangesGuard } from "@/ui/form/unsaved-changes-guard";
 import { UiRouterProvider } from "@/ui/router-provider";
 import { activateLocale, i18n } from "@/shared/i18n";
+import { testConfig, testSession } from "./handlers";
 
 /**
  * Spec 0003 QA-3: renders the real route tree at an in app URL (`/`, not `/console/`: memory history does not apply
  * the router's base path), with a fresh query client that never retries. The API answers through MSW (QA-2,
- * `src/test/msw.ts`). `config` is what boot loaded (RTE-10); by default setup is done, so pages render as themselves.
- * `strict` renders in StrictMode, as main.tsx does, for code that must survive its doubled effects.
+ * `src/test/msw.ts`). `config` and `session` are what boot loaded (RTE-10); by default setup is done and an owner is
+ * signed in, so pages render as themselves. `strict` renders in StrictMode, as main.tsx does, for code that must
+ * survive its doubled effects.
  */
 export async function renderWithProviders(
   url: string,
   {
-    config = { setupRequired: false },
+    config,
+    session = testSession,
     strict = false,
-  }: { config?: ConsoleConfig; strict?: boolean } = {},
+  }: { config?: Partial<ConsoleConfig>; session?: Session | null; strict?: boolean } = {},
 ) {
   // The boot step from main.tsx (RTE-10): I18nProvider renders nothing until a locale is active.
   if (!i18n.locale) await activateLocale("en");
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    defaultOptions: { queries: { retry: false, staleTime: 30_000 }, mutations: { retry: false } },
   });
-  queryClient.setQueryData(consoleConfigQuery().queryKey, config);
+  queryClient.setQueryData(consoleConfigQuery().queryKey, { ...testConfig, ...config });
+  queryClient.setQueryData(sessionQuery().queryKey, session);
+  connectSessionToken(queryClient);
   const router = createAppRouter({
     queryClient,
     history: createMemoryHistory({ initialEntries: [url] }),

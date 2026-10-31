@@ -20,6 +20,9 @@ public static class AccessErrors
     public static Error Unauthorized { get; } =
         Error.Unauthorized(ErrorCodes.Unauthorized, "The credential is missing, invalid, expired, or not for this project.");
 
+    /// <summary>A console session that ended; the console opens the sign in dialog over the page (spec 0017 SES-4, SES-9).</summary>
+    public static Error SessionExpired { get; } = Error.Unauthorized(ErrorCodes.SessionExpired, "Your session has ended. Sign in again.");
+
     /// <summary>
     /// A grant or scope list in the request body that broke a rule: one <c>invalid_value</c> field error per bad token,
     /// each message naming it (spec 0014 PRB-3).

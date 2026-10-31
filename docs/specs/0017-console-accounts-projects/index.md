@@ -1,7 +1,7 @@
 # 0017. Console accounts and projects
 
 **Date**: 2026-10-30
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
