@@ -66,7 +66,14 @@ export default function ReauthDialog() {
         <form.Form>
           <form.ErrorSummary />
           <form.AppField name="password">
-            {(field) => <field.PasswordField label={t`Password`} autoComplete="current-password" />}
+            {(field) => (
+              <field.PasswordField
+                label={t`Password`}
+                autoComplete="current-password"
+                // oxlint-disable-next-line jsx-a11y/no-autofocus -- the prompt asks for this one thing, and it interrupts an action
+                autoFocus
+              />
+            )}
           </form.AppField>
         </form.Form>
       </form.AppForm>

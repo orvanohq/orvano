@@ -15,6 +15,7 @@ import {
   FieldErrorText,
   FieldLabel,
   fieldColumn,
+  textArea,
   textInput,
   useFieldWiring,
   type FieldProps,
@@ -64,6 +65,8 @@ export function TextField({
 
 export interface PasswordFieldProps extends FieldProps {
   autoComplete?: "current-password" | "new-password";
+  /** Takes focus when it appears: for a prompt with nothing else to fill in. */
+  autoFocus?: boolean;
 }
 
 /** A text field whose value is hidden until its show button is pressed. */
@@ -126,7 +129,7 @@ export function TextArea({ label, description, isOptional, rows = 4, ...props }:
     >
       <FieldLabel label={label} isOptional={isOptional} />
       <FieldDescription>{description}</FieldDescription>
-      <AriaTextArea rows={rows} className={cx(textInput, "h-auto py-1.5")} />
+      <AriaTextArea rows={rows} className={textArea} />
       <FieldErrorText>{field.error}</FieldErrorText>
     </AriaTextField>
   );

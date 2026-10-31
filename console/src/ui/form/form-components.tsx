@@ -71,6 +71,7 @@ export function SubmitButton({ children, isUpdate = false }: SubmitButtonProps) 
       form={formId}
       isPending={isSubmitting}
       unavailableReason={isUpdate && isUnchanged ? msg`Nothing has changed.` : undefined}
+      reasonMayChange={isUpdate}
     >
       {children}
     </Button>

@@ -179,7 +179,7 @@ describe("the keys page", () => {
     await screen.getByRole("button", { name: "Create key" }).click();
 
     const dialog = screen.getByRole("dialog", { name: "Confirm your password" });
-    await expect.element(dialog).toBeVisible();
+    await expect.element(dialog.getByLabelText("Password")).toHaveFocus();
     await userEvent.fill(dialog.getByLabelText("Password"), "wrong password");
     await dialog.getByRole("button", { name: "Confirm" }).click();
     await expect.element(dialog.getByText("That password is wrong.").first()).toBeVisible();
@@ -288,6 +288,8 @@ describe("a key's actions", () => {
     await dialog.getByRole("button", { name: "Regenerate key" }).click();
 
     await expect.element(screen.getByRole("textbox", { name: "API key" })).toHaveValue(KEY);
+    await userEvent.keyboard("{Escape}"); // the old key is gone, so this one can't be lost by a stray press
+    await expect.element(screen.getByRole("textbox", { name: "API key" })).toBeVisible();
     await screen.getByRole("button", { name: "I've copied it" }).click();
     await screen.getByRole("button", { name: "Done" }).click();
     expect(screen.container.textContent).not.toContain(KEY);

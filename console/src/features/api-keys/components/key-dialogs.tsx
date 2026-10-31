@@ -96,6 +96,8 @@ export function RegenerateKeyDialog({ projectId, apiKey, onClose }: KeyDialogPro
         title={t`New key for ${name}`}
         size="md"
         isOpen
+        // The old key has stopped, so a stray press mustn't lose the only sight of this one.
+        isDismissDisabled
         onOpenChange={(isOpen) => {
           if (!isOpen) onClose();
         }}

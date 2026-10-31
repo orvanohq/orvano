@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { msg } from "@lingui/core/macro";
 import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
@@ -10,7 +11,33 @@ import { CloseIcon } from "./icons";
 
 const reason = msg`You need the Admin role to delete tables.`;
 
+function SavesOnce() {
+  const [isSaved, setSaved] = useState(false);
+  return (
+    <Button
+      unavailableReason={isSaved ? reason : undefined}
+      reasonMayChange
+      onPress={() => {
+        setSaved(true);
+      }}
+    >
+      Update
+    </Button>
+  );
+}
+
 describe("Button", () => {
+  it("0003 FRM-5: keeps focus when an unavailable reason arrives", async () => {
+    const { screen } = await renderInRouter(<SavesOnce />);
+    const button = screen.getByRole("button", { name: "Update" });
+    await focusElement(button);
+
+    await userEvent.keyboard("{Enter}");
+
+    await expect.element(button).toHaveAttribute("aria-disabled", "true");
+    await expect.element(button).toHaveFocus();
+  });
+
   it("0015 AC-15: every variant and size passes axe in both themes", async () => {
     const { screen } = await renderInRouter(
       <div>

@@ -143,6 +143,40 @@ describe("ProjectSwitcher", () => {
     await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("0015 AC-9: with a current project, pressing another one navigates and closes", async () => {
+    const { search } = fakeSearch(matching);
+    const { router, screen } = await renderSwitcher(search, "billing");
+    await screen.getByRole("button", { name: "Switch project: Storefront" }).click();
+
+    await screen.getByRole("option", { name: "Analytics" }).click();
+
+    await expect.poll(() => router.state.location.pathname).toBe("/projects/analytics");
+    await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("0015 AC-9: with a current project, Enter on another one navigates and closes", async () => {
+    const { search } = fakeSearch(matching);
+    const { router, screen } = await renderSwitcher(search, "billing");
+    await screen.getByRole("button", { name: "Switch project: Storefront" }).click();
+    await expect.element(screen.getByRole("option", { name: "Billing" })).toBeVisible();
+
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+
+    await expect.poll(() => router.state.location.pathname).toBe("/projects/analytics");
+    await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("0015 AC-9: pressing the current project only closes the switcher", async () => {
+    const { search } = fakeSearch(matching);
+    const { router, screen } = await renderSwitcher(search, "billing");
+    await screen.getByRole("button", { name: "Switch project: Storefront" }).click();
+
+    await screen.getByRole("option", { name: "Billing" }).click();
+
+    await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/");
+  });
+
   it("0015 AC-9: marks the current project with a check and aria-current, and the highlight starts on it", async () => {
     const { search } = fakeSearch(matching);
     const { screen } = await renderSwitcher(search, "billing");

@@ -11,6 +11,7 @@ import {
   ListBox,
   ListBoxItem,
   SearchField,
+  type Key,
 } from "react-aria-components";
 import { announce } from "../announcer";
 import { Button } from "../button";
@@ -181,6 +182,13 @@ function SwitcherPanel({
   const [request, setRequest] = useState({ attempt: 0, immediate: true });
   const [result, setResult] = useState<Result>({ status: "loading", items: [] });
 
+  const choose = (key: Key) => {
+    const item = result.items.find((candidate) => candidate.id === key);
+    if (!item) return;
+    close();
+    void router.navigate(linkOptions(item.link));
+  };
+
   useEffect(() => {
     const controller = new AbortController();
     const run = async () => {
@@ -234,17 +242,17 @@ function SwitcherPanel({
           aria-busy={result.status === "loading" || undefined}
           items={result.items}
           // The current org or project is selected, so the highlight starts on it once the results arrive (SHL-12).
-          // Selection never changes here: pressing an item navigates.
+          // Selection never changes here: pressing an item navigates, and pressing the current one only closes.
           selectionMode={currentId === undefined ? undefined : "single"}
           selectedKeys={currentId === undefined ? undefined : [currentId]}
-          disallowEmptySelection
           // oxlint-disable-next-line jsx-a11y/no-autofocus -- SHL-12: virtual focus only (the search box keeps DOM focus); it starts the highlight on the current item
           autoFocus
-          onAction={(key) => {
-            const item = result.items.find((candidate) => candidate.id === key);
-            if (!item) return;
-            close();
-            void router.navigate(linkOptions(item.link));
+          // With an item selected, React Aria gives a press to selection and never calls `onAction`.
+          onAction={currentId === undefined ? choose : undefined}
+          onSelectionChange={(keys) => {
+            const [key] = keys;
+            if (key === undefined) close();
+            else choose(key);
           }}
           // The error shows below the list, not as a list item.
           renderEmptyState={

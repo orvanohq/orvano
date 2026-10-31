@@ -72,6 +72,7 @@ export function CreateKeySheet({ projectId, onClose }: { projectId: string; onCl
               url={config.publicUrl ?? window.location.origin}
               projectId={projectId}
               keyType={created.type}
+              isInSheet
             />
           </Suspense>
         </div>

@@ -7,12 +7,14 @@ export interface TooltipProps {
   /** A focusable design system control (`Button`, `IconButton`, `Link`). */
   children: ReactElement;
   placement?: "top" | "bottom" | "start" | "end";
+  /** Never opens: for a control whose reason to have a tooltip comes and goes, since remounting it would drop focus. */
+  isDisabled?: boolean;
 }
 
 /** Opens on hover and keyboard focus, stays while hovered, closes on Escape (design.md _Foundations_). */
-export function Tooltip({ content, children, placement = "top" }: TooltipProps) {
+export function Tooltip({ content, children, placement = "top", isDisabled }: TooltipProps) {
   return (
-    <TooltipTrigger delay={500} closeDelay={150}>
+    <TooltipTrigger delay={500} closeDelay={150} isDisabled={isDisabled}>
       {children}
       <AriaTooltip
         placement={placement}

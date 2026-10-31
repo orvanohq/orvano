@@ -19,6 +19,26 @@ const tabUntil = async (element: Element) => {
 };
 
 describe("Menu", () => {
+  it("0015 PRM-4: a danger item reads apart from a neutral one", async () => {
+    const { screen } = await renderInRouter(
+      <MenuTrigger trigger={<Button>Actions</Button>}>
+        <Menu aria-label="Actions">
+          <MenuItem id="rename">Rename</MenuItem>
+          <MenuItem id="delete" tone="danger">
+            Delete
+          </MenuItem>
+        </Menu>
+      </MenuTrigger>,
+    );
+
+    await screen.getByRole("button", { name: "Actions" }).click();
+    const color = (name: string) =>
+      getComputedStyle(screen.getByRole("menuitem", { name }).element()).color;
+
+    await expect.element(screen.getByRole("menuitem", { name: "Delete" })).toBeVisible();
+    expect(color("Delete")).not.toBe(color("Rename"));
+  });
+
   it("0015 AC-15: opens from its button, moves by arrows, runs an item on Enter, and returns focus", async () => {
     const rename = vi.fn<() => void>();
     const { screen } = await renderInRouter(

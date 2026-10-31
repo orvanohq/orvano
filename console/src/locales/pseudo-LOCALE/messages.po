@@ -86,12 +86,12 @@ msgid "{count, plural, one {# messaging topic} other {# messaging topics}}"
 msgstr ""
 
 #: src/ui/confirm-delete/dependents.ts:20
-#: src/ui/shell/switcher.tsx:68
+#: src/ui/shell/switcher.tsx:69
 msgid "{count, plural, one {# organization} other {# organizations}}"
 msgstr ""
 
 #: src/ui/confirm-delete/dependents.ts:21
-#: src/ui/shell/switcher.tsx:80
+#: src/ui/shell/switcher.tsx:81
 msgid "{count, plural, one {# project} other {# projects}}"
 msgstr ""
 
@@ -123,7 +123,7 @@ msgstr ""
 msgid "{count, plural, one {Delete # row} other {Delete # rows}}"
 msgstr ""
 
-#: src/ui/form/form-components.tsx:137
+#: src/ui/form/form-components.tsx:138
 msgid "{count, plural, one {Fix this problem to continue} other {Fix these # problems to continue}}"
 msgstr ""
 
@@ -216,11 +216,11 @@ msgstr ""
 msgid "All of {name}"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:65
+#: src/ui/shell/switcher.tsx:66
 msgid "All organizations"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:78
+#: src/ui/shell/switcher.tsx:79
 msgid "All projects"
 msgstr ""
 
@@ -255,7 +255,7 @@ msgid "API address"
 msgstr ""
 
 #: src/features/api-keys/components/create-key-sheet.tsx:69
-#: src/features/api-keys/components/key-dialogs.tsx:104
+#: src/features/api-keys/components/key-dialogs.tsx:106
 msgid "API key"
 msgstr ""
 
@@ -283,7 +283,7 @@ msgid "Breadcrumb"
 msgstr ""
 
 #: src/features/api-keys/components/key-dialogs.tsx:53
-#: src/features/api-keys/components/key-dialogs.tsx:150
+#: src/features/api-keys/components/key-dialogs.tsx:152
 #: src/features/organizations/components/organization-dialogs.tsx:47
 #: src/features/organizations/components/organization-dialogs.tsx:103
 #: src/features/projects/components/organization-page.tsx:174
@@ -351,7 +351,8 @@ msgstr ""
 msgid "Confirm your password"
 msgstr ""
 
-#: src/features/projects/components/connect-panel.tsx:18
+#: src/features/projects/components/connect-panel.tsx:44
+#: src/features/projects/components/connect-panel.tsx:48
 msgid "Connect"
 msgstr ""
 
@@ -380,11 +381,11 @@ msgstr ""
 msgid "Couldn't delete"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:64
+#: src/ui/shell/switcher.tsx:65
 msgid "Couldn't load organizations. Check your connection and try again."
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:77
+#: src/ui/shell/switcher.tsx:78
 msgid "Couldn't load projects. Check your connection and try again."
 msgstr ""
 
@@ -574,7 +575,7 @@ msgid "Don't ask again for this table this session"
 msgstr ""
 
 #: src/features/api-keys/components/create-key-sheet.tsx:59
-#: src/features/api-keys/components/key-dialogs.tsx:102
+#: src/features/api-keys/components/key-dialogs.tsx:104
 msgid "Done"
 msgstr ""
 
@@ -632,7 +633,7 @@ msgstr ""
 msgid "Expired"
 msgstr ""
 
-#: src/features/api-keys/components/create-key-sheet.tsx:138
+#: src/features/api-keys/components/create-key-sheet.tsx:139
 #: src/features/api-keys/components/keys-page.tsx:105
 msgid "Expires"
 msgstr ""
@@ -641,7 +642,7 @@ msgstr ""
 msgid "Failed"
 msgstr ""
 
-#: src/features/api-keys/components/create-key-sheet.tsx:100
+#: src/features/api-keys/components/create-key-sheet.tsx:101
 msgid "For your servers. Never put it in a browser or an app."
 msgstr ""
 
@@ -676,7 +677,7 @@ msgstr ""
 msgid "Help"
 msgstr ""
 
-#: src/ui/form/text-fields.tsx:95
+#: src/ui/form/text-fields.tsx:98
 msgid "Hide password"
 msgstr ""
 
@@ -684,19 +685,19 @@ msgstr ""
 msgid "I've copied it"
 msgstr ""
 
-#: src/features/api-keys/components/create-key-sheet.tsx:141
+#: src/features/api-keys/components/create-key-sheet.tsx:142
 msgid "In 30 days"
 msgstr ""
 
-#: src/features/api-keys/components/create-key-sheet.tsx:143
+#: src/features/api-keys/components/create-key-sheet.tsx:144
 msgid "In 365 days"
 msgstr ""
 
-#: src/features/api-keys/components/create-key-sheet.tsx:142
+#: src/features/api-keys/components/create-key-sheet.tsx:143
 msgid "In 90 days"
 msgstr ""
 
-#: src/features/projects/components/connect-panel.tsx:30
+#: src/features/projects/components/connect-panel.tsx:32
 msgid "Install command"
 msgstr ""
 
@@ -739,11 +740,11 @@ msgstr ""
 msgid "Loading"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:62
+#: src/ui/shell/switcher.tsx:63
 msgid "Loading organizations…"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:75
+#: src/ui/shell/switcher.tsx:76
 msgid "Loading projects…"
 msgstr ""
 
@@ -765,8 +766,8 @@ msgstr ""
 msgid "Messaging"
 msgstr ""
 
-#: src/features/api-keys/components/create-key-sheet.tsx:83
-#: src/features/api-keys/components/key-dialogs.tsx:160
+#: src/features/api-keys/components/create-key-sheet.tsx:84
+#: src/features/api-keys/components/key-dialogs.tsx:162
 #: src/features/api-keys/components/keys-page.tsx:99
 #: src/features/organizations/components/organization-dialogs.tsx:57
 #: src/features/organizations/components/organization-dialogs.tsx:113
@@ -776,7 +777,7 @@ msgstr ""
 msgid "Name"
 msgstr ""
 
-#: src/features/api-keys/components/create-key-sheet.tsx:140
+#: src/features/api-keys/components/create-key-sheet.tsx:141
 #: src/features/api-keys/components/keys-page.tsx:124
 #: src/features/api-keys/components/keys-page.tsx:131
 msgid "Never"
@@ -787,13 +788,13 @@ msgid "New key for {name}"
 msgstr ""
 
 #: src/features/organizations/components/organization-dialogs.tsx:41
-#: src/ui/shell/switcher.tsx:66
+#: src/ui/shell/switcher.tsx:67
 msgid "New organization"
 msgstr ""
 
 #: src/features/projects/components/organization-page.tsx:45
 #: src/features/projects/components/organization-page.tsx:167
-#: src/ui/shell/switcher.tsx:79
+#: src/ui/shell/switcher.tsx:80
 msgid "New project"
 msgstr ""
 
@@ -813,11 +814,11 @@ msgstr ""
 msgid "No organization"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:63
+#: src/ui/shell/switcher.tsx:64
 msgid "No organizations match"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:76
+#: src/ui/shell/switcher.tsx:77
 msgid "No projects match"
 msgstr ""
 
@@ -895,7 +896,7 @@ msgstr ""
 msgid "Organization settings"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:61
+#: src/ui/shell/switcher.tsx:62
 msgid "Organizations"
 msgstr ""
 
@@ -920,7 +921,7 @@ msgstr ""
 msgid "Overview"
 msgstr ""
 
-#: src/features/session/components/reauth-dialog.tsx:69
+#: src/features/session/components/reauth-dialog.tsx:71
 #: src/features/session/components/sign-in-page.tsx:80
 #: src/features/setup/components/owner-step.tsx:112
 msgid "Password"
@@ -971,11 +972,11 @@ msgstr ""
 #: src/features/projects/components/organization-page.tsx:82
 #: src/routes/_shell/$orgId/index.tsx:7
 #: src/ui/shell/nav-registry.ts:46
-#: src/ui/shell/switcher.tsx:74
+#: src/ui/shell/switcher.tsx:75
 msgid "Projects"
 msgstr ""
 
-#: src/features/api-keys/components/create-key-sheet.tsx:104
+#: src/features/api-keys/components/create-key-sheet.tsx:105
 #: src/features/api-keys/components/keys-page.tsx:116
 msgid "Publishable"
 msgstr ""
@@ -1026,11 +1027,11 @@ msgstr ""
 msgid "Regenerate"
 msgstr ""
 
-#: src/features/api-keys/components/key-dialogs.tsx:110
+#: src/features/api-keys/components/key-dialogs.tsx:112
 msgid "Regenerate {name}?"
 msgstr ""
 
-#: src/features/api-keys/components/key-dialogs.tsx:112
+#: src/features/api-keys/components/key-dialogs.tsx:114
 msgid "Regenerate key"
 msgstr ""
 
@@ -1042,14 +1043,14 @@ msgstr ""
 msgid "Remove member"
 msgstr ""
 
-#: src/features/api-keys/components/key-dialogs.tsx:152
+#: src/features/api-keys/components/key-dialogs.tsx:154
 #: src/features/api-keys/components/keys-page.tsx:176
 #: src/features/organizations/components/organization-dialogs.tsx:105
 #: src/features/organizations/components/organization-settings.tsx:32
 msgid "Rename"
 msgstr ""
 
-#: src/features/api-keys/components/key-dialogs.tsx:142
+#: src/features/api-keys/components/key-dialogs.tsx:144
 msgid "Rename key"
 msgstr ""
 
@@ -1067,7 +1068,7 @@ msgid "Request ID: <0>{requestId}</0>"
 msgstr ""
 
 #: src/ui/banner.tsx:127
-#: src/ui/shell/switcher.tsx:293
+#: src/ui/shell/switcher.tsx:301
 #: src/ui/states.tsx:93
 msgid "Retry"
 msgstr ""
@@ -1101,16 +1102,16 @@ msgstr ""
 msgid "Running jobs"
 msgstr ""
 
-#: src/features/api-keys/components/create-key-sheet.tsx:105
+#: src/features/api-keys/components/create-key-sheet.tsx:106
 msgid "Safe in client code."
 msgstr ""
 
-#: src/features/api-keys/components/create-key-sheet.tsx:113
-#: src/features/api-keys/components/create-key-sheet.tsx:117
+#: src/features/api-keys/components/create-key-sheet.tsx:114
+#: src/features/api-keys/components/create-key-sheet.tsx:118
 msgid "Scopes"
 msgstr ""
 
-#: src/features/projects/components/connect-panel.tsx:20
+#: src/features/projects/components/connect-panel.tsx:22
 msgid "SDK"
 msgstr ""
 
@@ -1119,15 +1120,15 @@ msgstr ""
 msgid "Search actions"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:60
+#: src/ui/shell/switcher.tsx:61
 msgid "Search organizations"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:73
+#: src/ui/shell/switcher.tsx:74
 msgid "Search projects"
 msgstr ""
 
-#: src/features/api-keys/components/create-key-sheet.tsx:99
+#: src/features/api-keys/components/create-key-sheet.tsx:100
 #: src/features/api-keys/components/keys-page.tsx:116
 msgid "Secret"
 msgstr ""
@@ -1154,7 +1155,7 @@ msgstr ""
 msgid "Settings"
 msgstr ""
 
-#: src/features/projects/components/connect-panel.tsx:32
+#: src/features/projects/components/connect-panel.tsx:34
 msgid "Setup code"
 msgstr ""
 
@@ -1180,7 +1181,7 @@ msgstr ""
 msgid "Show list"
 msgstr ""
 
-#: src/ui/form/text-fields.tsx:95
+#: src/ui/form/text-fields.tsx:98
 msgid "Show password"
 msgstr ""
 
@@ -1249,19 +1250,19 @@ msgstr ""
 msgid "Subscribe to realtime"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:58
+#: src/ui/shell/switcher.tsx:59
 msgid "Switch organization"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:59
+#: src/ui/shell/switcher.tsx:60
 msgid "Switch organization: {name}"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:71
+#: src/ui/shell/switcher.tsx:72
 msgid "Switch project"
 msgstr ""
 
-#: src/ui/shell/switcher.tsx:72
+#: src/ui/shell/switcher.tsx:73
 msgid "Switch project: {name}"
 msgstr ""
 
@@ -1305,11 +1306,11 @@ msgstr ""
 msgid "The key wasn't created. Try again in a moment."
 msgstr ""
 
-#: src/features/api-keys/components/key-dialogs.tsx:136
+#: src/features/api-keys/components/key-dialogs.tsx:138
 msgid "The key wasn't renamed. Try again in a moment."
 msgstr ""
 
-#: src/features/api-keys/components/key-dialogs.tsx:111
+#: src/features/api-keys/components/key-dialogs.tsx:113
 msgid "The old key stops at once. The new one has the same scopes and expiry. You can't undo this."
 msgstr ""
 
@@ -1413,7 +1414,7 @@ msgstr ""
 msgid "Trying again won't help. If you didn't expect this, share the request ID with your administrator."
 msgstr ""
 
-#: src/features/api-keys/components/create-key-sheet.tsx:95
+#: src/features/api-keys/components/create-key-sheet.tsx:96
 #: src/features/api-keys/components/keys-page.tsx:102
 msgid "Type"
 msgstr ""
@@ -1537,16 +1538,16 @@ msgstr ""
 msgid "You need the {role} role for this."
 msgstr ""
 
-#: src/ui/form/fields.test.tsx:280
+#: src/ui/form/fields.test.tsx:287
 msgid "You need the Admin role to change this."
 msgstr ""
 
-#: src/ui/button.test.tsx:11
+#: src/ui/button.test.tsx:12
 msgid "You need the Admin role to delete tables."
 msgstr ""
 
-#: src/ui/menu.test.tsx:57
-#: src/ui/menu.test.tsx:84
+#: src/ui/menu.test.tsx:77
+#: src/ui/menu.test.tsx:104
 msgid "You need the Admin role to export rows."
 msgstr ""
 
