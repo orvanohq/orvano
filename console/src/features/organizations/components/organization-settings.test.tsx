@@ -76,9 +76,13 @@ describe("organizations", () => {
 
   it("0017 CNS-5, ORG-3, AC-9: rename is a one field dialog that sends the version", async () => {
     const sent: { body: unknown; ifMatch: string | null }[] = [];
+    let sessionReads = 0;
     worker.use(
       ...shellHandlers,
-      sessionRead,
+      http.get("/v1/console/session", ({ response }) => {
+        sessionReads += 1;
+        return response(200).json(testSession);
+      }),
       http.patch("/v1/console/organizations/{organizationId}", async ({ request, response }) => {
         sent.push({ body: await request.clone().json(), ifMatch: request.headers.get("If-Match") });
         return response(200).json({ ...organization, name: "Acme Corp" });
@@ -97,6 +101,7 @@ describe("organizations", () => {
       .element(screen.getByRole("button", { name: "Switch organization: Acme Corp" }))
       .toBeVisible();
     expect(sent).toEqual([{ body: { name: "Acme Corp" }, ifMatch: `"${organization.version}"` }]);
+    await expect.poll(() => sessionReads).toBe(1); // the session lists organization names
   });
 
   it("0001 UX-30: an organization the operator can't change keeps its button, unavailable", async () => {
