@@ -2,6 +2,7 @@
 
 **Date**: 2026-10-30
 **Status**: In Progress
+**Updated**: 2026-10-30, from milestone 2: SDK-3's `keys.current.bad_key` sends its wrong key through the scenario's `client: { key: ... }`; SDK-4 and step 11 cover the six SDK repos, not the templates; SDK-5 and step 12 gain the per project policy in `OrvanoCorsPolicyProvider`, and step 17 keeps the origins page and cache invalidation; AC-16 and step 13 name the runtimes CI really runs, with Deno and Bun nightly a Follow-up (rationale.md, "Found while building").
 
 ## Summary
 
@@ -37,7 +38,7 @@ Builds on spec [0001](../0001-console-ux-patterns/index.md) (console UX), [0002]
 - **AC-13**: Creating a key answers `201` with the full key exactly once. Only its SHA-256 hash, 15 character prefix, and last 4 characters are stored, and no other route returns it. A secret key needs at least one scope and starts with none ticked; a publishable key defaults to every client scope. An empty list, a scope outside the type's ceiling, and `users.impersonate` each fail with `validation_failed`. The response is `no-store` and the console keeps the key only in `SecretReveal` (AKY-1 to AKY-4).
 - **AC-14**: Revoking a key answers `200`, a second revoke changes nothing, and the key answers `401` on its next request on every instance. Regenerate replaces an active key in one transaction with the same type, name, scopes, and expiry. Rename changes only the name. An expired key answers `401` (AKY-5 to AKY-8).
 - **AC-15**: `GET /v1/projects/{projectId}/keys/current` answers `200` with the project id, key type, and scopes for a publishable or secret key of that project. A key of another project, a bad, revoked, or expired key, a key of a project that isn't `active`, a secret key with an `Origin` header, and a secret key with a bearer token each answer `401 unauthorized` (SDK-1, SDK-2, AKY-9 to AKY-11).
-- **AC-16**: The live scenarios for `keys.current` pass in all six SDKs, in every runtime CNF-5 names, against a project from the bootstrap command, and `api/conformance/pending.json` stays empty. The operation carries `x-orvano-metered`. This criterion closes after merge, because the regenerate PRs need the `sha-<commit>` image (SDK-3 to SDK-6).
+- **AC-16**: The live scenarios for `keys.current` pass in all six SDKs, in the runtimes CI really runs (Node, Hermes, Chromium, workerd, the Dart VM, and .NET), against a project from the bootstrap command, and `api/conformance/pending.json` stays empty. CNF-5 also names Deno and Bun nightly, but no workflow runs them yet, so they're reported as not run and stay a follow up. The operation carries `x-orvano-metered`. This criterion closes after merge, because the regenerate PRs need the `sha-<commit>` image (SDK-3 to SDK-6).
 - **AC-17**: `orvano admin bootstrap-project` on an install with setup open completes setup and creates an owner, organization, project, one publishable key, and one secret key, printing them as one JSON object. On a finished install it adds a project for that owner. It isn't reachable over HTTP (BST-1 to BST-4).
 - **AC-18**: `orvano admin reset-operator --email <email>` prints a one time link that lives 30 minutes. Setting a new password through it ends every session of that operator, and a used, expired, or replaced link answers `401 reset_token_invalid` (RST-1 to RST-4).
 - **AC-19**: The account page changes name, email, language, and password. A password change needs the current password, ends every other session, and gives this one a new cookie and CSRF token (ACC-1 to ACC-3).
@@ -161,9 +162,9 @@ These change spec 0012, and its rule text is amended in this PR.
 
 - **SDK-1 (MUST)**: `GET /v1/projects/{projectId}/keys/current` carries `.RequireProjectKey()`, `.WithSdk("keys", "current")`, `.WithErrors()`, and `.WithMeter("platform.keys.read")`, and answers `{ projectId, type, scopes }` from the caller. It reads nothing else. `keys` joins PTH-1's service list.
 - **SDK-2 (MUST)**: It's public in the contract, so all five generator targets emit `keys.current()`. The SDKs already send `Orvano-Key` and take the project from the client.
-- **SDK-3 (MUST)**: `api/conformance/scenarios/keys.yaml` adds live scenarios, each with `requires: [project]`: `keys.current.client` (client audience), `keys.current.server` (server audience), and `keys.current.bad_key` (both, a wrong key through `options.headers`, expecting `401 unauthorized`).
-- **SDK-4 (MUST)**: Runners learn `requires: [project]` first. In each of the six SDK repos and the three templates, when the run list holds a scenario that requires it, the runner runs `docker compose exec -T orvano /app/orvano admin bootstrap-project ...` (CNF-7) once, reads the JSON, and builds the client with the publishable key (client audience) or the secret key (server audience). Browser mode's pinned origin goes in as `--origin`.
-- **SDK-5 (MUST)**: Order matters: runner changes merge first and do nothing until a scenario requires a project. Then the core PR merges the operation, the command, and the scenarios, and the regenerate PRs of RGN-4 run the scenarios in each repo. `sdk-nextjs` follows through its catch up (RGN-9). So AC-16 closes after merge, since the `sha-<commit>` image exists only then. A failing SDK is a fix forward PR, and milestone 2 stays open until all six pass.
+- **SDK-3 (MUST)**: `api/conformance/scenarios/keys.yaml` adds live scenarios, each with `requires: [project]`: `keys.current.client` (client audience), `keys.current.server` (server audience), and `keys.current.bad_key` (both, a wrong key through the scenario's `client: { key: not-a-real-key }`, as `health.get.ignores_bad_key` does, expecting `401 unauthorized`). It can't go through `options.headers`: every SDK refuses `Orvano-Key` in per call headers before sending (spec 0005 SHP-7, spec 0004 CLN-8, and `OrvanoTransport`'s reserved headers in `sdk-dotnet`).
+- **SDK-4 (MUST)**: Runners learn `requires: [project]` first. In each of the six SDK repos (`sdk-flutter`, `sdk-dart`, `sdk-js`, `sdk-js-server`, `sdk-nextjs`, `sdk-dotnet`), when the run list holds a scenario that requires it, the runner runs `docker compose exec -T orvano /app/orvano admin bootstrap-project ...` (CNF-7) once, reads the JSON, and builds the client with the publishable key (client audience) or the secret key (server audience). A scenario's own `client.key` wins over that key, and the project stays the bootstrap one. Browser mode's pinned origin goes in as `--origin`. The three templates change nothing: they have no runner, no `conformance/` folder, and no conformance job, and they export from `tooling/starters/**` (spec 0010 TPL-2).
+- **SDK-5 (MUST)**: Order matters: runner changes merge first and do nothing until a scenario requires a project. Then the core PR merges the operation, the command, the per project CORS policy (PJT-6, which Chromium browser mode needs), and the scenarios, and the regenerate PRs of RGN-4 run the scenarios in each repo. `sdk-nextjs` follows through its catch up (RGN-9). So AC-16 closes after merge, since the `sha-<commit>` image exists only then. A failing SDK is a fix forward PR, and milestone 2 stays open until all six pass.
 - **SDK-6 (MUST)**: Billing: `keys.current` is the only public operation in this feature, and it's metered so it's countable from day one. Console routes are the control plane and aren't billable. Feature 45 counts by the name.
 
 #### BST: the bootstrap command
@@ -397,16 +398,16 @@ Tracer Bullet: milestone 1 runs one thin thread from the owner form to a key tha
 **Milestone 2: every SDK**
 
 10. `orvano admin bootstrap-project` with its tests (BST-1 to BST-4); satisfies **AC-17**.
-11. Runners in the six SDK repos and three templates learn `requires: [project]`, each as a small PR, merged first (SDK-4, SDK-5); satisfies **AC-16**.
-12. In this repo: `.WithSdk`, `.WithErrors`, `.WithMeter`, the PTH-1 `keys` service, `scenarios/keys.yaml`, and generator output checked for all five targets (SDK-1 to SDK-3, SDK-6); satisfies **AC-15**, **AC-16**.
-13. Merge, then see the regenerate PRs pass in all six repos, across every CNF-5 runtime, and report any skip (SDK-5); satisfies **AC-16**.
+11. Runners in the six SDK repos (`sdk-flutter`, `sdk-dart`, `sdk-js`, `sdk-js-server`, `sdk-nextjs`, `sdk-dotnet`) learn `requires: [project]`, each as a small PR, merged first; the templates get no PR (SDK-4, SDK-5); satisfies **AC-16**.
+12. In this repo: `.WithSdk`, `.WithErrors`, `.WithMeter`, the PTH-1 `keys` service, `scenarios/keys.yaml`, the per project policy in `OrvanoCorsPolicyProvider` (the provider half of PJT-6), and generator output checked for all five targets (SDK-1 to SDK-3, SDK-6, PJT-6); satisfies **AC-15**, **AC-16**.
+13. Merge, then see the regenerate PRs pass in all six repos, across the runtimes CI really runs (Node, Hermes, Chromium, workerd, the Dart VM, and .NET), report Deno and Bun as not run, and report any skip (SDK-5); satisfies **AC-16**.
 
 **Milestone 3: keys, projects, organizations**
 
 14. Re-auth: `RequireRecentReauth`, `session/reauth`, `ReauthDialog`, `withReauth`, applied to key create (SES-8); satisfies **AC-8**.
 15. Key revoke, regenerate, rename, expiry, and status, with their Tier 2 confirms (AKY-5 to AKY-8); satisfies **AC-8**, **AC-14**.
 16. The full create form: scope checklist, publishable defaults, expiry, snippet (AKY-4); satisfies **AC-13**.
-17. Project rename, the origins page, per project CORS, and cache invalidation (PJT-4 to PJT-6); satisfies **AC-11**.
+17. Project rename, the origins page, and cache invalidation (PJT-4, PJT-5; step 12 builds PJT-6's per project policy, and milestone 1 built its origin validation); satisfies **AC-11**.
 18. Project delete, `project.teardown`, the failure path, dependents, Tier 1 confirm, and polling (PJT-2, PJT-7, PJT-8); satisfies **AC-8**, **AC-10**, **AC-12**.
 19. Organizations in full, switcher search, `allowedActions` and `useCan`, and the sidebar (ORG-1 to ORG-3, CNS-3 to CNS-5); satisfies **AC-9**, **AC-21**.
 20. TEN-5 matrix, the SCR-4 test over new responses, and the CSRF sweep test; satisfies **AC-7**, **AC-25**.
@@ -447,7 +448,7 @@ Tracer Bullet: milestone 1 runs one thin thread from the owner form to a key tha
 - The Arabic draft isn't native reviewed yet, and Arabic browsers get it by default.
 - `keys.current` is one more public operation to keep in every SDK.
 - Two new requirement kinds make spec 0012's access vocabulary larger.
-- Six SDK repos and three templates change for a thin strand.
+- Six SDK repos change for a thin strand.
 
 **Neutral**:
 
@@ -466,3 +467,4 @@ Tracer Bullet: milestone 1 runs one thin thread from the owner form to a key tha
 - [ ] Features 17 and 18: tell an operator by email about a password or email change; decide on email password reset (RST-4).
 - [ ] A sessions list with revoke on the account page, if asked for.
 - [ ] Before "Console translations" ships more languages: a native review of `ar` (verify.md VFY-4).
+- [ ] Deno and Bun nightly (spec 0014 CNF-5, spec 0005 SQA-3), a separate task, not yet run: no SDK repo has a nightly conformance workflow, so AC-16 closes without them. The same workflow picks up the rest of SQA-3's nightly line, the other Node lines and browsers.
