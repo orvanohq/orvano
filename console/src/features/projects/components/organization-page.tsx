@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
+import { NewOrganizationDialog } from "@/features/organizations";
+import { useCan } from "@/shared/access";
 import { ApiError } from "@/shared/api/errors";
 import { Badge, Button, Dialog, EmptyState, Link, PageHeader } from "@/ui";
 import { useAppForm } from "@/ui/form";
@@ -9,18 +11,35 @@ import { Cell, Column, Row, Table, TableBody, TableHeader } from "@/ui/table";
 import { useCreateProject } from "../api/mutations";
 import { projectsQuery, type Project } from "../api/queries";
 import { createProjectSchema, toCreateProjectRequest } from "../schemas/create-project";
+import { useOrganizationView } from "./use-organization-view";
 
-/** Spec 0017 CNS-5: an organization's projects, and "New project". */
+/** Spec 0003 QRY-10: how often the list looks again while a project is going away. */
+const DELETING_POLL_MS = 2000;
+
+/**
+ * Spec 0017 CNS-5: an organization's projects, and "New project". The `create` search param opens either create dialog,
+ * so a switcher can link to it.
+ */
 export function OrganizationPage() {
   const { t } = useLingui();
   const { orgId } = useParams({ from: "/_shell/$orgId/" });
-  const { data } = useSuspenseQuery(projectsQuery(orgId));
-  const [isCreating, setCreating] = useState(false);
+  const { creating, open } = useOrganizationView();
+  const { data } = useSuspenseQuery({
+    ...projectsQuery(orgId),
+    refetchInterval: (query) =>
+      query.state.data?.items.some((project) => project.status === "deleting")
+        ? DELETING_POLL_MS
+        : false,
+  });
+  const canCreate = useCan("organization", "projects.create");
   const create = (
     <Button
       variant="primary"
+      unavailableReason={
+        canCreate ? undefined : msg`You don't have permission to create projects here.`
+      }
       onPress={() => {
-        setCreating(true);
+        open("project");
       }}
     >
       {t`New project`}
@@ -40,7 +59,19 @@ export function OrganizationPage() {
       ) : (
         <ProjectsTable orgId={orgId} projects={data.items} />
       )}
-      <NewProjectDialog orgId={orgId} isOpen={isCreating} onOpenChange={setCreating} />
+      <NewProjectDialog
+        orgId={orgId}
+        isOpen={creating === "project"}
+        onOpenChange={(isOpen) => {
+          open(isOpen ? "project" : undefined);
+        }}
+      />
+      <NewOrganizationDialog
+        isOpen={creating === "organization"}
+        onOpenChange={(isOpen) => {
+          open(isOpen ? "organization" : undefined);
+        }}
+      />
     </div>
   );
 }
@@ -59,9 +90,13 @@ function ProjectsTable({ orgId, projects }: { orgId: string; projects: readonly 
         {projects.map((project) => (
           <Row key={project.id} id={project.id}>
             <Cell>
-              <Link to="/$orgId/$projectId" params={{ orgId, projectId: project.id }}>
-                {project.name}
-              </Link>
+              {project.status === "deleting" ? (
+                project.name
+              ) : (
+                <Link to="/$orgId/$projectId" params={{ orgId, projectId: project.id }}>
+                  {project.name}
+                </Link>
+              )}
             </Cell>
             <Cell>
               <ProjectStatus status={project.status} />
@@ -105,7 +140,6 @@ function NewProjectDialog({
         const project = await createProject.mutateAsync(
           toCreateProjectRequest(createProjectSchema.parse(value)),
         );
-        onOpenChange(false);
         await navigate({
           to: "/$orgId/$projectId",
           params: { orgId, projectId: project.id },

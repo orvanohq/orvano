@@ -7,6 +7,11 @@ export interface ConnectSnippet {
   code: (values: { url: string; projectId: string; key: string }) => string;
 }
 
+export const keyPlaceholders = {
+  publishable: "YOUR_PUBLISHABLE_KEY",
+  secret: "YOUR_SECRET_KEY",
+};
+
 export const connectSnippets: readonly ConnectSnippet[] = [
   {
     id: "javascript",

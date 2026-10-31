@@ -23,11 +23,17 @@ public sealed class ContractDocumentTests(ContractHostFixture host) : IClassFixt
         Paths(console).ShouldBe(
         [
             "/v1/console/config", // spec 0016 FRS-1
-            "/v1/console/organizations/{organizationId}", // spec 0017
+            "/v1/console/organizations", // spec 0017
+            "/v1/console/organizations/{organizationId}",
             "/v1/console/organizations/{organizationId}/projects",
             "/v1/console/projects/{projectId}",
+            "/v1/console/projects/{projectId}/dependents",
             "/v1/console/projects/{projectId}/keys",
+            "/v1/console/projects/{projectId}/keys/{keyId}",
+            "/v1/console/projects/{projectId}/keys/{keyId}/regenerate",
+            "/v1/console/projects/{projectId}/keys/{keyId}/revoke",
             "/v1/console/session",
+            "/v1/console/session/reauth",
             "/v1/console/setup/owner",
             "/v1/console/setup/token", // spec 0016 STP-7
         ]);

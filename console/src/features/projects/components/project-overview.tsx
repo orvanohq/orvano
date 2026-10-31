@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
@@ -6,8 +6,7 @@ import { apiKeysQuery } from "@/features/api-keys";
 import { consoleConfigQuery } from "@/features/console-config";
 import { ContentSkeleton, CopyField, EmptyState, Link, PageHeader, SettingsCard } from "@/ui";
 import { projectQuery } from "../api/queries";
-
-const ConnectPanel = lazy(() => import("./connect-panel"));
+import { ConnectPanel } from "./lazy-connect-panel";
 
 /** Spec 0017 CNS-6: the project id, the API address, the keys, and how to connect. */
 export function ProjectOverview() {

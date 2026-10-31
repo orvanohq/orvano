@@ -11,7 +11,7 @@ import type { SwitcherItem, SwitcherSearch } from "./types";
 const item = (name: string): SwitcherItem => ({
   id: name.toLowerCase(),
   name,
-  link: { to: "/projects/$projectId", params: { projectId: name.toLowerCase() } },
+  link: { to: "/projects/$projectId" as "/", params: { projectId: name.toLowerCase() } },
 });
 const all = ["Storefront", "Billing", "Analytics"].map(item);
 
@@ -40,7 +40,7 @@ async function renderSwitcher(search: SwitcherSearch, currentId?: string) {
       name="Storefront"
       currentId={currentId}
       search={search}
-      links={{ all: { to: "/projects" }, create: { to: "/projects/new" } }}
+      links={{ all: { to: "/projects" as "/" }, create: { to: "/projects/new" as "/" } }}
     />,
     [{ path: "/projects" }, { path: "/projects/new" }, { path: "/projects/$projectId" }],
   );

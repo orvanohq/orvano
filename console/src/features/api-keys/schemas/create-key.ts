@@ -4,7 +4,7 @@ import { z } from "@/shared/zod";
 
 type CreateApiKeyRequest = components["schemas"]["CreateApiKeyRequest"];
 
-/** Spec 0012 SCP-1: what a secret key can hold. The grouped checklist comes with build plan step 16. */
+/** Spec 0012 SCP-1: what a secret key can hold. */
 export const SECRET_SCOPES = [
   "databases.read",
   "databases.write",
@@ -22,7 +22,35 @@ export const SECRET_SCOPES = [
   "users.write",
 ] as const;
 
-/** Spec 0017 AKY-1: a secret key needs a scope, and none starts ticked; a publishable key defaults to every client API. */
+/** Spec 0012 SCP-2: what a publishable key can hold, each one a client API switch. */
+export const PUBLISHABLE_SCOPES = [
+  "client.auth",
+  "client.auth.signup",
+  "client.databases",
+  "client.functions",
+  "client.realtime",
+  "client.storage",
+] as const;
+
+export type Scope = (typeof SECRET_SCOPES)[number] | (typeof PUBLISHABLE_SCOPES)[number];
+
+/** Spec 0017 AKY-4: a secret key starts with none ticked, and a publishable key with all of them. */
+export function defaultScopes(type: "publishable" | "secret"): string[] {
+  return type === "secret" ? [] : [...PUBLISHABLE_SCOPES];
+}
+
+/** Spec 0012 SCP-2: `client.auth.signup` goes with `client.auth`. */
+export function withScope(scopes: readonly string[], scope: string, isOn: boolean): string[] {
+  if (isOn) return scopes.includes(scope) ? [...scopes] : [...scopes, scope];
+  return scopes.filter(
+    (item) => item !== scope && !(scope === "client.auth" && item === "client.auth.signup"),
+  );
+}
+
+/** Spec 0017 AKY-4: the expiry the form offers. */
+export const EXPIRIES = ["never", "30", "90", "365"] as const;
+
+/** Spec 0017 AKY-1: a key needs a scope, of either type: an empty list is refused. */
 export const createKeySchema = z
   .object({
     name: z
@@ -34,9 +62,10 @@ export const createKeySchema = z
       ),
     type: z.enum(["publishable", "secret"]),
     scopes: z.array(z.string()),
+    expiry: z.enum(EXPIRIES),
   })
   .check(
-    z.refine((value) => value.type === "publishable" || value.scopes.length > 0, {
+    z.refine((value) => value.scopes.length > 0, {
       path: ["scopes"],
       error: () => t`Choose at least one scope.`,
     }),
@@ -45,7 +74,10 @@ export const createKeySchema = z
 export type CreateKeyValues = z.input<typeof createKeySchema>;
 
 export function toCreateKeyRequest(values: z.output<typeof createKeySchema>): CreateApiKeyRequest {
-  return values.type === "publishable"
-    ? { type: values.type, name: values.name, scopes: undefined, expiresInDays: undefined }
-    : { type: values.type, name: values.name, scopes: values.scopes, expiresInDays: undefined };
+  return {
+    type: values.type,
+    name: values.name,
+    scopes: values.scopes,
+    expiresInDays: values.expiry === "never" ? undefined : Number(values.expiry),
+  };
 }

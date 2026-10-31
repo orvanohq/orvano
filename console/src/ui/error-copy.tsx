@@ -7,6 +7,7 @@ import { Plural, useLingui } from "@lingui/react/macro";
  */
 export interface ErrorDetails {
   kind?: string;
+  code?: string;
   requestId?: string;
   requiredRole?: string;
   retryAfter?: number;
@@ -21,6 +22,7 @@ export function errorDetails(error: unknown): ErrorDetails {
   const fields = error as Record<string, unknown>;
   return {
     kind: text(fields.kind),
+    code: text(fields.code),
     requestId: text(fields.requestId),
     requiredRole: text(fields.requiredRole),
     retryAfter: typeof fields.retryAfter === "number" ? fields.retryAfter : undefined,
@@ -44,6 +46,14 @@ export function useErrorCopy(error: unknown, title?: string): ErrorCopy {
   const { t } = useLingui();
   const details = errorDetails(error);
   const role = details.requiredRole;
+  if (details.code === "reauth_required") {
+    return {
+      details,
+      retryable: false,
+      title: t`Confirm your password`,
+      body: t`This needs your password. Try again and enter it.`,
+    };
+  }
   switch (details.kind) {
     case "not_found":
       return {

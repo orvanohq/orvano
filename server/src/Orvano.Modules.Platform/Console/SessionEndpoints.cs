@@ -20,7 +20,7 @@ using Orvano.SharedKernel.Data;
 
 namespace Orvano.Modules.Platform.Console;
 
-/// <summary>Sign in, the session read, and sign out (spec 0017 SES-3, SES-5, SES-6).</summary>
+/// <summary>Sign in, the session read, sign out, and the recent password check (spec 0017 SES-3, SES-5, SES-6, SES-8).</summary>
 internal static class SessionEndpoints
 {
     public const string RateLimitPolicy = "platform.sign-in";
@@ -61,6 +61,18 @@ internal static class SessionEndpoints
             .WithSummary("Sign out.")
             .WithDescription("Ends this session at once and clears its cookie.")
             .WithErrors()
+            .Produces(StatusCodes.Status204NoContent);
+
+        console.MapPost("/session/reauth", ReauthAsync)
+            .RequireOperator()
+            .WithName("Platform_Reauth")
+            .WithSummary("Confirm the password.")
+            .WithDescription("Lets this session do what needs a recent password check for the next 10 minutes. A wrong "
+                + "password fails on `password` with `invalid_password` and counts toward the sign in throttle.")
+            .WithErrors(ErrorCodes.ValidationFailed)
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .Produces(StatusCodes.Status204NoContent);
         return console;
     }
@@ -145,6 +157,49 @@ internal static class SessionEndpoints
     {
         IConsoleSessionFeature session = http.Features.GetRequiredFeature<IConsoleSessionFeature>();
         return TypedResults.Ok(await sessions.DescribeAsync(caller.Current.OperatorId!.Value, session.CsrfToken, session.ExpiresAt, cancellationToken));
+    }
+
+    internal static async Task<Results<NoContent, ErrorProblemResult>> ReauthAsync(
+        ReauthRequest request,
+        PlatformDbContext db,
+        IPasswordWork passwords,
+        SignInThrottle throttle,
+        ConsoleAudit audit,
+        ICallerContext caller,
+        TimeProvider clock,
+        HttpContext http,
+        CancellationToken cancellationToken)
+    {
+        Guid operatorId = caller.Current.OperatorId!.Value;
+        var account = await db.Operators.AsNoTracking()
+            .Where(x => x.Id == operatorId)
+            .Select(x => new { x.EmailNormalized, x.PasswordHash })
+            .SingleAsync(cancellationToken);
+        if (throttle.Check(account.EmailNormalized, http.Connection.RemoteIpAddress) is { } wait)
+        {
+            return Error.RateLimited(ErrorCodes.RateLimited, "Too many wrong passwords; wait and try again.", wait).ToProblem();
+        }
+
+        Result<bool> verified = await passwords.VerifyAsync(request.Password, account.PasswordHash, cancellationToken);
+        if (!verified.IsSuccess)
+        {
+            return verified.Error.ToProblem();
+        }
+
+        if (!verified.Value)
+        {
+            throttle.RecordAccountFailure(account.EmailNormalized);
+            await audit.RecordAsync(http, AuditActions.Reauth, operatorId, "operator", operatorId, result: AuditResult.Failure);
+            return ConsoleFields.Invalid("password", FieldCodes.InvalidPassword).ToProblem();
+        }
+
+        Guid sessionId = http.Features.GetRequiredFeature<IConsoleSessionFeature>().SessionId;
+        DateTimeOffset now = clock.GetUtcNow();
+        await db.OperatorSessions
+            .Where(x => x.Id == sessionId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.LastReauthAt, now), cancellationToken);
+        await audit.RecordAsync(http, AuditActions.Reauth, operatorId, "operator", operatorId);
+        return TypedResults.NoContent();
     }
 
     internal static async Task<NoContent> SignOutAsync(

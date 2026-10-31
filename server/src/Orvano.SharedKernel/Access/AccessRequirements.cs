@@ -26,6 +26,9 @@ internal sealed record ProjectKeyRequirement : AccessRequirement;
 /// <summary>What <see cref="AccessEndpointFilters.AllowPublicAccess{TBuilder}"/> adds (EPT-5).</summary>
 internal sealed record PublicAccess;
 
+/// <summary>What <see cref="AccessEndpointFilters.RequireRecentReauth{TBuilder}"/> adds: a modifier, not a requirement kind (spec 0017 SES-8).</summary>
+internal sealed record RecentReauthModifier;
+
 /// <summary>
 /// EPT-3: whether an endpoint declares its access properly. The startup check, the access layer middleware, and the
 /// endpoint list test in <c>Orvano.Host.IntegrationTests</c> (EPT-4) all ask this.
@@ -38,6 +41,11 @@ public static class AccessDeclaration
         ArgumentNullException.ThrowIfNull(endpoint);
         IReadOnlyList<AccessRequirement> requirements = endpoint.Metadata.GetOrderedMetadata<AccessRequirement>();
         bool isPublic = IsPublic(endpoint);
+        if (RequiresRecentReauth(endpoint) && !(RequiresOperator(endpoint) && ChangesStateOnly(endpoint)))
+        {
+            return "RequireRecentReauth belongs on an operator route that changes state (spec 0017 SES-8)";
+        }
+
         if (requirements.Count == 0)
         {
             if (isPublic && ChangesConsoleStateWithoutOrigin(endpoint))
@@ -86,6 +94,13 @@ public static class AccessDeclaration
         return endpoint.Metadata.GetOrderedMetadata<AccessRequirement>().Any(requirement => requirement is OperatorRequirement or ConsolePermissionRequirement);
     }
 
+    /// <summary>Whether the endpoint needs a recent password check, which the state change check enforces (spec 0017 SES-8).</summary>
+    public static bool RequiresRecentReauth(Endpoint endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        return endpoint.Metadata.GetMetadata<RecentReauthModifier>() is not null;
+    }
+
     /// <summary>Whether <paramref name="method"/> changes state (spec 0017 SES-7, ACX-4).</summary>
     public static bool ChangesState(string method) =>
         !(HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method));
@@ -120,6 +135,9 @@ public static class AccessDeclaration
                 _ => null,
             };
     }
+
+    private static bool ChangesStateOnly(Endpoint endpoint) =>
+        endpoint.Metadata.GetMetadata<HttpMethodMetadata>() is { HttpMethods: { Count: > 0 } methods } && methods.All(ChangesState);
 
     // ACX-4: nothing but the Origin check stands between a browser and a public console endpoint that changes state.
     private static bool ChangesConsoleStateWithoutOrigin(Endpoint endpoint) =>

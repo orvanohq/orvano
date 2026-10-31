@@ -9,10 +9,11 @@ namespace Orvano.Modules.Platform.Projects;
 
 /// <summary>
 /// Spec 0011 TXN-1, spec 0017 PJT-1: commit the project as <c>creating</c>, run each participant in its own transaction,
-/// then flip to <c>active</c>. The one way a project is made, for the API and the bootstrap command alike.
+/// then flip to <c>active</c>. The one way a project is made, for the API and the bootstrap command alike. A participant
+/// that throws sends the project to teardown (PJT-2), and the error surfaces.
 /// </summary>
 internal sealed class ProjectCreation(
-    PlatformDbContext db, IEnumerable<IProjectLifecycleParticipant> participants, ICacheInvalidator invalidator)
+    PlatformDbContext db, IEnumerable<IProjectLifecycleParticipant> participants, ProjectDeletion deletion, ICacheInvalidator invalidator)
 {
     public async Task<Project> CreateAsync(Guid organizationId, string name, string[] allowedOrigins, CancellationToken cancellationToken)
     {
@@ -27,9 +28,18 @@ internal sealed class ProjectCreation(
             },
             cancellationToken);
 
-        foreach (IProjectLifecycleParticipant participant in participants)
+        try
         {
-            await participant.CreateAsync(project.Id, cancellationToken);
+            foreach (IProjectLifecycleParticipant participant in participants)
+            {
+                await participant.CreateAsync(project.Id, cancellationToken);
+            }
+        }
+        catch (Exception)
+        {
+            // Not the caller's token: a request that's gone must still leave the project on its way out.
+            await db.InTransactionAsync(token => deletion.MarkAsync(project, token), CancellationToken.None);
+            throw;
         }
 
         return await db.InTransactionAsync(

@@ -43,8 +43,8 @@ public sealed record ProjectResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-/// <summary>What a list of projects is narrowed by.</summary>
-public sealed record ProjectFilterQuery
+/// <summary>What a list of organizations or projects is narrowed by.</summary>
+public sealed record NameFilterQuery
 {
     [FromQuery(Name = "query")]
     [MaxLength(128, ErrorMessage = FieldCodes.TooLong)]
@@ -57,6 +57,33 @@ public sealed record ProjectFilterQuery
 public sealed record CreateProjectRequest(
     [property: Required(ErrorMessage = FieldCodes.Required), MaxLength(Project.MaxNameLength, ErrorMessage = FieldCodes.TooLong)] string Name,
     IReadOnlyList<string>? AllowedOrigins);
+
+/// <summary>A change to a project. A field left out stays as it is.</summary>
+/// <param name="Name">Its new name.</param>
+/// <param name="AllowedOrigins">The exact browser origins it accepts, at most 100.</param>
+public sealed record UpdateProjectRequest(
+    [property: OptionalValue<MaxLengthAttribute>(Project.MaxNameLength, ErrorMessage = FieldCodes.TooLong)] Optional<string> Name,
+    Optional<IReadOnlyList<string>> AllowedOrigins);
+
+/// <summary>A new organization.</summary>
+/// <param name="Name">Its name.</param>
+public sealed record CreateOrganizationRequest(
+    [property: Required(ErrorMessage = FieldCodes.Required), MaxLength(Organization.MaxNameLength, ErrorMessage = FieldCodes.TooLong)] string Name);
+
+/// <summary>A change to an organization. A field left out stays as it is.</summary>
+/// <param name="Name">Its new name.</param>
+public sealed record UpdateOrganizationRequest(
+    [property: OptionalValue<MaxLengthAttribute>(Organization.MaxNameLength, ErrorMessage = FieldCodes.TooLong)] Optional<string> Name);
+
+/// <summary>One kind of thing that goes with a resource when it's deleted (spec 0014 CPX-2).</summary>
+/// <param name="Kind">The kind of thing, as a snake_case resource name.</param>
+/// <param name="Count">How many.</param>
+/// <param name="Estimated">Whether the count is an estimate.</param>
+public sealed record DependentResponse(string Kind, int Count, bool Estimated);
+
+/// <summary>What goes with a resource when it's deleted (spec 0014 CPX-2).</summary>
+/// <param name="Items">Each kind of thing and its count.</param>
+public sealed record DependentsResponse(IReadOnlyList<DependentResponse> Items);
 
 /// <summary>Where a key stands, read from its dates.</summary>
 public enum ApiKeyStatus
@@ -141,6 +168,11 @@ public sealed record CreateApiKeyRequest(
     [property: Required(ErrorMessage = FieldCodes.Required), MaxLength(ApiKey.MaxNameLength, ErrorMessage = FieldCodes.TooLong)] string Name,
     IReadOnlyList<string>? Scopes,
     [property: Range(1, 3650, ErrorMessage = FieldCodes.OutOfRange)] int? ExpiresInDays);
+
+/// <summary>A new name for an API key.</summary>
+/// <param name="Name">Its new name.</param>
+public sealed record RenameApiKeyRequest(
+    [property: Required(ErrorMessage = FieldCodes.Required), MaxLength(ApiKey.MaxNameLength, ErrorMessage = FieldCodes.TooLong)] string Name);
 
 /// <summary>A key's own view of itself.</summary>
 /// <param name="ProjectId">The project the key belongs to.</param>

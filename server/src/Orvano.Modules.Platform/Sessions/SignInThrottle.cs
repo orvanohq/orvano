@@ -44,6 +44,16 @@ internal sealed class SignInThrottle(TimeProvider clock)
         }
     }
 
+    /// <summary>A wrong password from a signed in operator, which counts against their account only (LIM-1).</summary>
+    public void RecordAccountFailure(string normalizedEmail)
+    {
+        DateTimeOffset now = clock.GetUtcNow();
+        lock (_lock)
+        {
+            Record(AccountKey(normalizedEmail), AccountLimit, now);
+        }
+    }
+
     /// <summary>A successful sign in clears the account's entry; the address keeps its count.</summary>
     public void Clear(string normalizedEmail)
     {

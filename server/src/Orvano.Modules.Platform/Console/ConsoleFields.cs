@@ -17,6 +17,7 @@ internal static class ConsoleFields
         FieldCodes.TooShort => "Use at least 8 characters.",
         FieldCodes.TooLong => "Use at most 1024 bytes.",
         FieldCodes.PasswordTooCommon => "This password is too common. Choose another.",
+        FieldCodes.InvalidPassword => "This password is wrong.",
         _ => "This value is not valid.",
     };
 }

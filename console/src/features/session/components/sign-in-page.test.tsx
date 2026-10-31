@@ -36,7 +36,9 @@ describe("the sign in page", () => {
     await expect.element(screen.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
     await signIn(screen);
 
-    await expect.element(screen.getByRole("heading", { level: 1, name: "API keys" })).toBeVisible();
+    await expect
+      .element(screen.getByRole("heading", { level: 1, name: "Project settings" }))
+      .toBeVisible();
     expect(screen.router.state.location.pathname).toBe(path);
   });
 
