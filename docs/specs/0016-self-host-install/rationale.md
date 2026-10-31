@@ -176,6 +176,16 @@ Minor fixes: rootless Docker and a `docker` alias to Podman, rerun flag conflict
 
 **Reworded the row, not the rule.** STP-3 was narrowed on purpose by the cross check, so that a reboot never breaks a setup in progress, and AC-6, AC-9, and SMK-3 all depend on it. Host L showed the code doing exactly that. The row was the mistake. Its new text also greps the logs for the newest banner, because the first start's long banner stays in the logs of the same container, holding a token `install.sh` already replaced.
 
+### Settled after the first manual install (2026-10-30)
+
+**The incident.** Starting the manual verify rows, you ran the one line install with `--local` from `orvanohq/`. The default `./orvano` resolved to your git checkout of this repo. Only BND-3's five bundle paths were refused, and the checkout's root had none of them, so the install wrote its bundle into the checkout, set the folder to 0700, and left `root.key` and `.env` untracked in the repo. On a host with SELinux labels it would have been worse, because `:z` relabels everything in `--dir`, as SEL-3 warns. The guide only asked for an empty folder.
+
+**Why the check is in `install.sh` (ISH-9).** The relabel happens when the engine sets up the mount, before init's first line, so a check inside init would come too late. `install.sh` is the last thing that runs before that mount, so the check sits there, after the writable check and before ISH-8's volume check, the pull, and any `docker run`.
+
+**Why `orvano init` stays as it is.** On the manual path the mount is the operator's own command and the relabel would happen first anyway, so a refusal in init would only look like protection. Its BND-3 refusal still stops it from overwriting a bundle file.
+
+**Decided while writing.** Only `.DS_Store` and `lost+found` are ignored, so a Finder visit or a fresh volume doesn't block an install. Every other hidden file counts, a dangling symlink among them, because a folder holding only `.git` is still a repo. A folder that can be written but not listed stops too, rather than passing as empty. The folder test is a shell glob, not `ls`, so an odd file name can't pass as one of the ignored names. The note about the default appears when the folder is `$PWD/orvano`, however it was given, so the script needs no record of which flags were passed. The suggestion is `$HOME/orvano-install`, not the `$HOME/orvano` of the unwritable folder message, because running from your home folder with a clone at `~/orvano` would otherwise suggest the very folder it just refused. There is no flag to override the check: nobody asked for one, and moving the files out is one command.
+
 ### Agent skills
 
 `docker-compose-patterns` shapes the profiles and health waits; `containerize-aspnetcore` the Dockerfile change (spec 0007 IMG-2 and IMG-4 win over its curl health checks); `authoring-github-workflows` and `github-actions-hardening` the CI job; `aspnet-minimal-api-openapi` the two endpoints (spec 0014 wins). No new tool was chosen, so no skill or MCP search ran. `shellcheck` is preinstalled on GitHub's Ubuntu runners and adds no dependency.

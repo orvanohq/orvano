@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs Orvano with one command (spec 0016 ISH-1 to ISH-8): checks the host, runs `orvano init` from the image,
+# Installs Orvano with one command (spec 0016 ISH-1 to ISH-9): checks the host, runs `orvano init` from the image,
 # and starts the reference compose. It never installs packages, never runs sudo, and changes nothing outside --dir.
 #
 #   curl -fsSL https://raw.githubusercontent.com/orvanohq/orvano/main/deploy/install.sh | sh -s -- --local
@@ -34,7 +34,7 @@ Modes (pass exactly one):
   --domain <domain>     a server with a real HTTPS certificate, on ports 80 and 443
 
 Options:
-  --dir <path>          the install folder (default ./orvano)
+  --dir <path>          a new or empty install folder (default ./orvano)
   --version <tag>       the image tag to install from (default edge)
   --http-port <port>    --local only: the port on 127.0.0.1 (default 80)
   --public-url <url>    --domain only: the https URL clients use (default https://<domain>)
@@ -320,6 +320,36 @@ read_state() {
   fi
 }
 
+# ISH-9 on a first run: init takes the folder over. The mount's :z relabels everything in it before init even runs, and
+# init sets it to 0700, so this has to stop here. A Finder visit and a fresh volume's lost+found do not count.
+check_new_dir() {
+  if [ ! -e "$DIR" ]; then
+    return
+  fi
+  if [ ! -r "$DIR" ] || [ ! -x "$DIR" ]; then
+    fail "You cannot read $DIR, so it may not be empty." "Pass a --dir you own, such as \$HOME/orvano, without sudo."
+  fi
+  for entry in "$DIR"/* "$DIR"/.[!.]* "$DIR"/..?*; do
+    if [ ! -e "$entry" ] && [ ! -L "$entry" ]; then
+      continue
+    fi
+    case "${entry##*/}" in
+      .DS_Store | lost+found) ;;
+      *) refuse_dir ;;
+    esac
+  done
+}
+
+# Anyone can land in the default folder without choosing it, so the message says when this is the one.
+refuse_dir() {
+  default_note=""
+  if [ "$DIR" = "$PWD/orvano" ]; then
+    default_note=" It is the default install folder: ./orvano, under the folder you ran this from."
+  fi
+  fail "$DIR is not empty, so Orvano will not install there.$default_note" \
+    "Pass --dir with a new folder, such as --dir \$HOME/orvano-install."
+}
+
 # Reads KEY from the install's .env with sed, never by sourcing it (ISH-2, ISH-6).
 env_value() {
   sed -n "s/^$1=//p" "$DIR/.env" | tail -n 1
@@ -474,6 +504,7 @@ main() {
   if [ -n "$RERUN" ]; then
     check_rerun_flags
   else
+    check_new_dir
     check_first_run
     run_init
   fi

@@ -1,8 +1,8 @@
 #!/bin/sh
 # Spec 0016 SMK-5 and the script refusals of its Critical test scenarios: init's mount label, install.sh --help, every
-# refusal that needs no running install, and a server mode bundle (AC-2). Each refusal must stop before the install
-# folder exists. It starts no stack; CI's install job runs it before install-smoke.sh. Run it from the repo root, on a
-# machine with no other Orvano install:
+# refusal that needs no running install, and a server mode bundle (AC-2). Each refusal must stop before a new install
+# folder exists, and must leave an existing one as it was. It starts no stack; CI's install job runs it before
+# install-smoke.sh. Run it from the repo root, on a machine with no other Orvano install:
 #
 #   docker build -f deploy/Dockerfile --build-arg ORVANO_IMAGE_VERSION=ci -t orvano:ci .
 #   sh tooling/scripts/install-checks.sh
@@ -42,6 +42,45 @@ refused() {
   pass "refused: $*"
 }
 
+# A folder's mode, its entries, and every file's content, to show that a refused run changed nothing. A folder ls cannot
+# read prints the same error both times.
+snapshot() {
+  {
+    ls -ldn "$1"
+    ls -lAnR "$1"
+    find "$1" -type f -exec cksum {} +
+  } 2>&1 || true
+}
+
+# Fails unless install.sh, run from inside folder $2 and fed on standard input as curl | sh does, exits non zero, prints
+# the expected text, and leaves that folder as it was. The folder's own mode counts, so give it one other than 0700.
+refused_in() {
+  expected="$1"
+  folder="$2"
+  shift 2
+  before="$(snapshot "$folder")"
+  if output="$( (cd "$folder" && sh -s -- "$@" --engine "$ENGINE" --image "$IMAGE" --version "$VERSION") <"$INSTALL_SCRIPT" 2>&1)"; then
+    fail "install.sh accepted '$*' in $folder"
+  fi
+  case "$output" in
+    *"$expected"*) ;;
+    *) fail "install.sh refused '$*' in $folder without saying '$expected': $output" ;;
+  esac
+  [ "$(snapshot "$folder")" = "$before" ] || fail "the refused run '$*' changed $folder"
+  pass "refused in ${folder#"$WORK"/}: $*"
+}
+
+# A new folder under $WORK, mode 0755, holding the named empty files.
+folder_with() {
+  made="$WORK/$1"
+  shift
+  mkdir -p "$made"
+  chmod 755 "$made"
+  for name in "$@"; do
+    : >"$made/$name"
+  done
+}
+
 check_flags() {
   sh "$INSTALL_SCRIPT" --help >/dev/null || fail "install.sh --help failed"
   refused "Unknown option" --no-such-flag
@@ -70,6 +109,46 @@ check_no_engine() {
   esac
 }
 
+# AC-11, ISH-9: a first install stops in a folder that is not empty, and a checkout is the case that prompted this.
+check_not_empty() {
+  folder_with checkout README.md .gitignore
+  mkdir "$WORK/checkout/.git"
+  : >"$WORK/checkout/.git/HEAD"
+  refused_in "is not empty" "$WORK/checkout" --local --dir "$WORK/checkout"
+  case "$output" in
+    *"default install folder"*) fail "a folder given with --dir was called the default: $output" ;;
+  esac
+  folder_with hidden .hidden
+  refused_in "is not empty" "$WORK/hidden" --domain orvano.example --dir .
+  folder_with beside-ignored .DS_Store notes.txt
+  refused_in "is not empty" "$WORK/beside-ignored" --local --dir "$WORK/beside-ignored"
+  folder_with dangling
+  ln -s "$WORK/nowhere" "$WORK/dangling/link"
+  refused_in "is not empty" "$WORK/dangling" --local --dir "$WORK/dangling"
+  # The default folder, which the person never named.
+  folder_with default/orvano README.md
+  refused_in "default install folder" "$WORK/default" --local
+  if [ "$(id -u)" != 0 ]; then
+    folder_with locked
+    mkdir "$WORK/locked/inner"
+    chmod 300 "$WORK/locked/inner"
+    refused_in "You cannot read" "$WORK/locked" --local --dir inner
+    chmod 700 "$WORK/locked/inner"
+  fi
+}
+
+# ISH-7: a folder with both files is a rerun whatever else it holds, and one with a single file keeps its own refusal,
+# so neither ever meets ISH-9's check. install-smoke.sh proves a real rerun.
+check_rerun_folders() {
+  folder_with rerun compose.yaml root.key
+  printf 'COMPOSE_PROFILES=local\n' >"$WORK/rerun/.env"
+  refused_in "is a local mode install" "$WORK/rerun" --domain orvano.example --dir "$WORK/rerun"
+  folder_with only-env .env notes.txt
+  refused_in "has .env but no root.key" "$WORK/only-env" --local --dir "$WORK/only-env"
+  folder_with only-key root.key notes.txt
+  refused_in "has root.key but no .env" "$WORK/only-key" --local --dir "$WORK/only-key"
+}
+
 # AC-11, ISH-2: a port known to be taken.
 check_busy_port() {
   command -v nc >/dev/null 2>&1 || fail "the busy port check needs nc, which ISH-2's check uses"
@@ -85,6 +164,12 @@ check_busy_port() {
     sleep 0.1
   done
   refused "Port $BUSY_PORT on 127.0.0.1 is already in use" --local --http-port "$BUSY_PORT" --engine "$ENGINE" --image "$IMAGE" --version "$VERSION"
+  # ISH-9: these folders get past the folder check, so the taken port is what stops them.
+  folder_with empty
+  refused_in "Port $BUSY_PORT on 127.0.0.1" "$WORK/empty" --local --http-port "$BUSY_PORT" --dir .
+  folder_with ignored .DS_Store
+  mkdir "$WORK/ignored/lost+found"
+  refused_in "Port $BUSY_PORT on 127.0.0.1" "$WORK/ignored" --local --http-port "$BUSY_PORT" --dir "$WORK/ignored"
   kill "$LISTENER"
   LISTENER=""
 }
@@ -150,6 +235,8 @@ main() {
   check_mount_label
   check_flags
   check_no_engine
+  check_not_empty
+  check_rerun_folders
   check_busy_port
   check_low_port
   check_server_bundle
