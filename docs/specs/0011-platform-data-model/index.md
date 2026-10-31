@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-18
 **Status**: Accepted
-**Updated**: 2026-10-18, for spec 0012 (access control model): CAT-2 gains `databases.table` and the grant columns on buckets, files, and functions; `api_key.scopes` takes spec 0012's scope lists with a CHECK per key type; `audit_event.actor_kind` gains `function`; the feature 9 follow up is closed. 2026-10-30, for spec 0016: `platform.instance` is built by feature 12 and gains `setup_token_expires_at`; CAT-1's table header changes from (13) to (12); the feature 13 follow up no longer creates `Orvano.Modules.Platform` (it already exists) but still creates the other CAT-1 tables. The text below is not changed yet; spec 0016 wins.
+**Updated**: 2026-10-18, for spec 0012 (access control model): CAT-2 gains `databases.table` and the grant columns on buckets, files, and functions; `api_key.scopes` takes spec 0012's scope lists with a CHECK per key type; `audit_event.actor_kind` gains `function`; the feature 9 follow up is closed. 2026-10-30, for spec 0016: `platform.instance` is built by feature 12 and gains `setup_token_expires_at`; `Orvano.Modules.Platform` already exists, so the feature 13 follow up creates only the other CAT-1 tables. 2026-10-30, for spec 0017: `platform.operator` gains `locale` and its TOTP columns move to feature 62 with `operator_recovery_code`, `platform.operator_reset_token` is new, `api_key` gains `last4`, `allowed_origins` is capped at 100, `crypto` comes with feature 14, `IProjectDirectory` lives in SharedKernel (LIF-4), and FLT-1 gains its read.
 
 ## Summary
 
@@ -55,7 +55,7 @@ Each rule has an ID so reviews and later specs can cite it. **MUST** fails the r
 
 #### MOD: modules and schemas
 
-- **MOD-1 (MUST)**: One schema per module, named after it (spec 0002 DAT-1): `platform` (new `Orvano.Modules.Platform`: console accounts, organizations, projects, API keys), `auth` (end users), `jobs` and `crypto` (`Orvano.Infrastructure`, each with its own `DbContext`), `databases`, `storage`, `realtime` (webhooks too), `functions`, `sites`, `messaging`, `operations` (audit, usage, request logs, privacy requests).
+- **MOD-1 (MUST)**: One schema per module, named after it (spec 0002 DAT-1): `platform` (`Orvano.Modules.Platform`, created by feature 12: the install's setup state, console accounts, organizations, projects, API keys), `auth` (end users), `jobs` and `crypto` (`Orvano.Infrastructure`, each with its own `DbContext`), `databases`, `storage`, `realtime` (webhooks too), `functions`, `sites`, `messaging`, `operations` (audit, usage, request logs, privacy requests).
 - **MOD-2 (MUST)**: `MigrationOrder` (DAT-10) is `jobs`, `crypto`, `platform`, `auth`, `databases`, `storage`, `realtime`, `functions`, `sites`, `messaging`, `operations`. A module is added to the list by the feature that creates its first table.
 - **MOD-3 (MUST)**: A module reads and writes only its own schema (LAY-4). An FK into another schema (REF) is a constraint, not a read path: code never joins across schemas.
 
@@ -105,7 +105,7 @@ Each rule has an ID so reviews and later specs can cite it. **MUST** fails the r
   6. Delete the project's `crypto.data_key` rows, which leaves every remaining project secret unreadable.
   7. Delete the `platform.project` row. Its cascade is now small.
 - **LIF-3 (MUST)**: An organization can be deleted only when it has no projects, including projects in `creating` or `deleting`. The `RESTRICT` FK enforces it in the database; the API says which projects remain.
-- **LIF-4 (MUST)**: While a project is `creating` or `deleting`, the Platform contract `IProjectDirectory` returns no project for it, so keys, tokens, CORS, and every SDK call fail exactly as for an unknown project. Token checks consult `IProjectDirectory` after the `kid` lookup (TOK-3), so a cached `kid` cannot outlive the flip. Only the create flow, the teardown job, and the console's project list (which shows the state) see such a project.
+- **LIF-4 (MUST)**: While a project is `creating` or `deleting`, `IProjectDirectory` (declared in `Orvano.SharedKernel` beside the participant interface, implemented by Platform) returns no project for it, so keys, tokens, CORS, and every SDK call fail exactly as for an unknown project. Token checks consult `IProjectDirectory` after the `kid` lookup (TOK-3), so a cached `kid` cannot outlive the flip. Only the create flow, the teardown job, and the console's project list (which shows the state) see such a project.
 - **LIF-5 (MUST)**: Each organization always has at least one membership with role `owner`. A change that removes or demotes an owner first locks the organization row (`SELECT ... FOR UPDATE`), counts owners, and refuses with `Conflict` if it would leave none. Deleting an operator locks every organization they belong to, in `id` order (so two deletes cannot deadlock), checks each the same way, and refuses if they are the last owner of any. An integration test runs two concurrent demotions of the last two owners and expects exactly one to succeed.
 - **LIF-6 (MUST)**: Deleting an end user deletes the `auth.user` row. Its identities, sessions, refresh tokens, one time tokens, and messaging targets cascade. File authorship is set to null. Rows in project databases are feature 49's job. In one transaction, the delete:
   1. locks the user row (`SELECT ... FOR UPDATE`), so a sign in racing with the delete waits or fails;
@@ -131,7 +131,7 @@ Each rule has an ID so reviews and later specs can cite it. **MUST** fails the r
 
 - **ENC-1 (MUST)**: A secret is stored on the row that uses it, as a `bytea` column of type `EncryptedValue` (spec 0006 SCR-1 envelope: format version, data key id, nonce, tag, ciphertext). The EF converter for `EncryptedValue` only passes bytes through (with a value comparer), because a converter cannot see the row; it refuses an empty envelope on save, so a secret left at `default` fails instead of storing an empty `bytea`. `ToString` and JSON both write only the marker `EncryptedValue(<n> bytes)`, never the bytes, and reading one from JSON throws, so an envelope never travels as JSON (spec 0006 LOG-2, LOG-3). Encrypting and decrypting happen in handlers through `ISecretProtector.Protect(plaintext, projectId, rowId, purpose)` and `Unprotect(...)`. The authenticated extra data is the project id (empty for platform scope), the row id, and the purpose, so a value copied to another row or purpose does not decrypt.
 - **ENC-2 (MUST)**: The purpose is a fixed string constant set once in code (`[DataClass(DataClass.Secret, Purpose = "auth.signing_key.private")]`), never derived from table or column names, so a rename does not break stored secrets.
-- **ENC-3 (MUST)**: `crypto.data_key` and `crypto.key_check` follow SCR-1 and SCR-2 exactly, in schema `crypto` owned by `Orvano.Infrastructure`, which also implements `ISecretProtector` (declared in `Orvano.SharedKernel`). The feature that stores the first secret (feature 13 for operator TOTP, else feature 14 for signing keys) creates them.
+- **ENC-3 (MUST)**: `crypto.data_key` and `crypto.key_check` follow SCR-1 and SCR-2 exactly, in schema `crypto` owned by `Orvano.Infrastructure`, which also implements `ISecretProtector` (declared in `Orvano.SharedKernel`). Feature 14 creates them for signing keys, the first stored secret (spec 0017 leaves operator TOTP to feature 62).
 - **ENC-4 (MUST)**: Short codes (`email_code`, `sms_code`, operator recovery codes) are too small for a plain hash: a leaked row could be reversed by trying every code. They are stored as HMAC-SHA256 under a key derived from the root key (HKDF, info `orvano.code-hmac.v1`). Link tokens, session tokens, and API keys (32 random bytes) stay plain SHA-256 (TOK-1, KEY-2).
 
 #### CLS: data classes
@@ -141,7 +141,7 @@ Each rule has an ID so reviews and later specs can cite it. **MUST** fails the r
 
 #### FLT: query filter exceptions
 
-- **FLT-1 (MUST)**: These lookups have no project context yet, or work across projects by design. Each one uses `IgnoreQueryFilters(["project"])` with a `// Deviation DAT-2a` comment and is limited to the exact columns named: API key lookup by `api_key.hash`; signing key lookup by `signing_key.id` (the `kid`); the startup load of `auth.session_revocation`; the control plane reads of an organization's projects (membership checked instead, TEN-2); and the teardown and cleanup jobs. Any other bypass needs a spec change.
+- **FLT-1 (MUST)**: These lookups have no project context yet, or work across projects by design. Each one uses `IgnoreQueryFilters(["project"])` with a `// Deviation DAT-2a` comment and is limited to the exact columns named: API key lookup by `api_key.hash`; the `IProjectDirectory` read of `project_settings` by `project_id` (spec 0017 PJT-3); signing key lookup by `signing_key.id` (the `kid`); the startup load of `auth.session_revocation`; the control plane reads of an organization's projects (membership checked instead, TEN-2); and the teardown and cleanup jobs. Any other bypass needs a spec change.
 
 #### VOL: high volume tables
 
@@ -154,7 +154,7 @@ Each rule has an ID so reviews and later specs can cite it. **MUST** fails the r
 - **RET-1 (MUST)**: Defaults, each settable by the feature that owns the table:
   - ended end user and operator sessions (with their refresh tokens): 7 days after `absolute_expires_at` or `revoked_at`;
   - used refresh tokens of a live session: 7 days after `used_at`;
-  - one time tokens: 1 day after expiry or use;
+  - one time tokens, and operator reset tokens: 1 day after expiry or use;
   - `auth.session_revocation` rows: at their `expires_at`;
   - signing keys: deleted at `retire_at`;
   - `operations.audit_event`: 365 days;
@@ -169,31 +169,32 @@ Each rule has an ID so reviews and later specs can cite it. **MUST** fails the r
 
 #### CAT-1: tier 1 tables (full columns; built by the feature in brackets)
 
-**`platform.instance`** (13): singleton.
+**`platform.instance`** (12): singleton.
 
-| Column               | Type          | Null | Class | Notes                               |
-| -------------------- | ------------- | ---- | ----- | ----------------------------------- |
-| `id`                 | `smallint`    | no   |       | PK, CHECK `id = 1`                  |
-| `setup_token_hash`   | `bytea`       | yes  | S     | CON-6; cleared when setup completes |
-| `setup_completed_at` | `timestamptz` | yes  |       |                                     |
-| Std                  |               |      |       |                                     |
+| Column                   | Type          | Null | Class | Notes                                  |
+| ------------------------ | ------------- | ---- | ----- | -------------------------------------- |
+| `id`                     | `smallint`    | no   |       | PK, CHECK `id = 1`                     |
+| `setup_token_hash`       | `bytea`       | yes  | S     | CON-6; cleared when setup completes    |
+| `setup_token_expires_at` | `timestamptz` | yes  |       | spec 0016 STP-1; cleared with the hash |
+| `setup_completed_at`     | `timestamptz` | yes  |       |                                        |
+| Std                      |               |      |       |                                        |
 
 **`platform.operator`** (13)
 
-| Column                | Type          | Null | Class | Notes                                       |
-| --------------------- | ------------- | ---- | ----- | ------------------------------------------- |
-| `id`                  | `uuid`        | no   |       | PK                                          |
-| `email`               | `text`        | no   | P     | as typed, up to 254                         |
-| `email_normalized`    | `text`        | no   | P     | unique                                      |
-| `name`                | `text`        | no   | P     | 1 to 128                                    |
-| `password_hash`       | `text`        | no   | S     | PHC string (PWD-1)                          |
-| `password_changed_at` | `timestamptz` | no   |       |                                             |
-| `status`              | `text`        | no   |       | `active`, `disabled`                        |
-| `totp_secret`         | `bytea`       | yes  | S     | `EncryptedValue`, platform data key (CON-4) |
-| `totp_last_step`      | `bigint`      | yes  |       | replay guard                                |
-| `mfa_enabled_at`      | `timestamptz` | yes  |       |                                             |
-| `last_sign_in_at`     | `timestamptz` | yes  |       |                                             |
-| Std                   |               |      |       |                                             |
+| Column                | Type          | Null | Class | Notes                                                 |
+| --------------------- | ------------- | ---- | ----- | ----------------------------------------------------- |
+| `id`                  | `uuid`        | no   |       | PK                                                    |
+| `email`               | `text`        | no   | P     | as typed, up to 254                                   |
+| `email_normalized`    | `text`        | no   | P     | unique                                                |
+| `name`                | `text`        | no   | P     | 1 to 128                                              |
+| `password_hash`       | `text`        | no   | S     | PHC string (PWD-1)                                    |
+| `password_changed_at` | `timestamptz` | no   |       |                                                       |
+| `status`              | `text`        | no   |       | `active`, `disabled`                                  |
+| `locale`              | `text`        | yes  |       | up to 35; null follows the browser (spec 0003 I18N-6) |
+| `last_sign_in_at`     | `timestamptz` | yes  |       |                                                       |
+| Std                   |               |      |       |                                                       |
+
+Feature 62 adds `totp_secret` (`bytea`, S, `EncryptedValue`, platform data key, CON-4), `totp_last_step` (`bigint`, replay guard), and `mfa_enabled_at` (`timestamptz`), all nullable.
 
 **`platform.operator_session`** (13)
 
@@ -211,7 +212,9 @@ Each rule has an ID so reviews and later specs can cite it. **MUST** fails the r
 | `ip`             | `inet`        | yes  | P     |                                                                                                                 |
 | `user_agent`     | `text`        | yes  | P     | up to 512                                                                                                       |
 
-**`platform.operator_recovery_code`** (13): `id` PK · `operator_id` FK cascade · `code_hash bytea` S (HMAC, ENC-4) · `used_at` null · `created_at`. Unique `(operator_id, code_hash)`. Regenerating deletes the old set.
+**`platform.operator_recovery_code`** (62): `id` PK · `operator_id` FK cascade · `code_hash bytea` S (HMAC, ENC-4) · `used_at` null · `created_at`. Unique `(operator_id, code_hash)`. Regenerating deletes the old set.
+
+**`platform.operator_reset_token`** (13): `id` PK · `operator_id` FK cascade · `token_hash bytea` S, unique (TOK-9) · `expires_at` · `used_at` null · `created_at`. Issuing deletes the operator's unused rows, and use is atomic (spec 0017 RST-1, RST-3).
 
 **`platform.organization`** (13): `id` PK · `name text` 1 to 128 · Std.
 
@@ -236,7 +239,7 @@ Each rule has an ID so reviews and later specs can cite it. **MUST** fails the r
 | `deletion_requested_at` | `timestamptz` | yes  |       | CHECK `(status = 'deleting') = (deletion_requested_at IS NOT NULL)` |
 | Std                     |               |      |       | index `(organization_id, id)`                                       |
 
-**`platform.project_settings`** (13): `project_id` PK and FK cascade · `allowed_origins text[]` not null, default empty (exact origins, spec 0007 COR-1) · Std.
+**`platform.project_settings`** (13): `project_id` PK and FK cascade · `allowed_origins text[]` not null, default empty, CHECK `cardinality(allowed_origins) <= 100` (exact origins, spec 0007 COR-1) · Std.
 
 **`platform.api_key`** (13)
 
@@ -248,6 +251,7 @@ Each rule has an ID so reviews and later specs can cite it. **MUST** fails the r
 | `name`                   | `text`        | no   |       | 1 to 128                                                                                                                                                            |
 | `hash`                   | `bytea`       | no   | S     | SHA-256, unique (KEY-2)                                                                                                                                             |
 | `prefix`                 | `text`        | no   |       | 15 characters, CHECK                                                                                                                                                |
+| `last4`                  | `text`        | no   |       | 4 characters, CHECK; the key's last 4, for spec 0001 UX-33's display                                                                                                |
 | `scopes`                 | `text[]`      | no   |       | spec 0012 SCP-1 (secret) or SCP-2 (publishable); CHECK per `type`, `scopes <@ ARRAY[...]` of that type's ceiling (SCP-3); `users.impersonate` never allowed (SCP-4) |
 | `created_by_operator_id` | `uuid`        | yes  |       | FK operator, set null                                                                                                                                               |
 | `last_used_at`           | `timestamptz` | yes  |       | written at most once a minute (KEY-3)                                                                                                                               |
@@ -340,7 +344,7 @@ Rotation runs as one transaction in two statements, so the non deferrable unique
 
 **`auth.project_settings`** (14): `project_id` PK and FK cascade · `access_token_lifetime` `int` seconds, default 900, CHECK 300 to 3600 (TOK-2) · `refresh_idle_lifetime` `int` seconds, default 30 days · `refresh_absolute_lifetime` `int` seconds, default 90 days · `signing_key_rotation` `int` days, default 180 · `enabled_methods text[]`, default `{email_password}` · Std. Later auth features add columns here.
 
-**`crypto.data_key`** (13 or 14, ENC-2): `id` PK (the key id) · `scope text` (`platform`, `project`) · `project_id` null, plain id (REF-4), CHECK null exactly when scope is `platform` · `version int` · `wrapped_key bytea` S · `root_key_id text` · `created_at` · `retired_at` null. Unique `(scope, project_id, version) NULLS NOT DISTINCT`.
+**`crypto.data_key`** (14, ENC-3): `id` PK (the key id) · `scope text` (`platform`, `project`) · `project_id` null, plain id (REF-4), CHECK null exactly when scope is `platform` · `version int` · `wrapped_key bytea` S · `root_key_id text` · `created_at` · `retired_at` null. Unique `(scope, project_id, version) NULLS NOT DISTINCT`.
 
 **`crypto.key_check`** (same feature): `id smallint` PK, CHECK `id = 1` · `root_key_id text` · `check_value bytea` S · `created_at`.
 
@@ -505,13 +509,13 @@ Tracer Bullet: feature 8 is a thin shared strand, and the first real thread thro
 
 **Neutral**:
 
-- The new Platform module (`Orvano.Modules.Platform`, log block 9000) and the Operations module (8000) are created by features 13 and 45 to 48, not here.
+- The Platform module (`Orvano.Modules.Platform`, log block 9000) and the Operations module (8000) are created by feature 12 and by features 45 to 48, not here.
 - `crypto` needs its own `DbContext` in Infrastructure beside `jobs`.
 
 ## Follow-up
 
 - [x] Feature 9: the scope list for `api_key.scopes`, the permission columns for buckets and tables, and whether `IProjectScoped` filtering is refined (DAT-2a). Closed by spec 0012 (2026-10-18): scopes from SCP-1 and SCP-2 with a CHECK per type (SCP-3), grant columns on `databases.table`, `storage.bucket`, `storage.file`, and `functions.function` in CAT-2, and DAT-2a stays as written (spec 0012 PRJ-3 only fixes who sets `IProjectContext`).
-- [ ] Feature 13: create `Orvano.Modules.Platform`, the `IProjectDirectory` and `IProjectLifecycleParticipant` contracts (TXN-1, TXN-2, LIF-4), and the CAT-1 platform tables; create `crypto` (ENC-2) if operator TOTP ships there.
+- [ ] Feature 13: create the `IProjectDirectory` and `IProjectLifecycleParticipant` contracts (TXN-1, TXN-2, LIF-4), and the other CAT-1 platform tables (feature 12 made `Orvano.Modules.Platform` and `platform.instance`).
 - [ ] Feature 14: the CAT-1 auth tables, the cleanup schedule (RET-1), and `auth.session_revocation` loading for TOK-6.
 - [ ] Feature 15: `databases.database`, naming of `db_name` and `role_name`, and the `server` setting's values.
 - [ ] Feature 23: where throttle counters live (memory per replica, or a table); not part of this catalog.

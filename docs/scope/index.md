@@ -31,7 +31,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 10  | [API contract & SDK generation](sdks.md)          | Foundation    | done        |
 | 11  | [Design system & console shell](foundations.md)   | Foundation    | in-progress |
 | 12  | [Self host install](platform.md)                  | Slice 1       | in-progress |
-| 13  | [Console accounts & projects](platform.md)        | Slice 1       | planned     |
+| 13  | [Console accounts & projects](platform.md)        | Slice 1       | in-progress |
 | 14  | [Email and password auth](auth.md)                | Slice 1       | planned     |
 | 15  | [Project databases](databases.md)                 | Slice 1       | planned     |
 | 16  | [Tables and rows API](databases.md)               | Slice 1       | planned     |
@@ -72,6 +72,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 49  | [End user data export & delete](operations.md)    | Slice 9       | planned     |
 | 50  | [Backups & restore](operations.md)                | Slice 9       | planned     |
 | 51  | [Console team members & roles](platform.md)       | Slice 9       | planned     |
+| 62  | [Console two factor sign in](platform.md)         | Slice 9       | planned     |
 | 52  | [SDK publishing & versioning](sdks.md)            | Alpha release | planned     |
 | 59  | [Server releases](platform.md)                    | Alpha release | planned     |
 | 60  | [Example apps & starters](sdks.md)                | Alpha release | planned     |
@@ -88,14 +89,14 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 - **Slice 6, functions (37 to 39):** run user code safely.
 - **Slice 7, sites (40 to 42):** host web apps and attach domains.
 - **Slice 8, messaging (43 to 44):** email, SMS, and push to end users.
-- **Slice 9, operations and trust (45 to 51):** usage, logs, monitoring, audit, privacy, backups, and console teams.
+- **Slice 9, operations and trust (45 to 51, plus 62):** usage, logs, monitoring, audit, privacy, backups, console teams, and console two factor sign in.
 - **Alpha release (52, 53, 59, 60):** publish the SDKs and the server, ship example apps, and give testers a safe upgrade path.
 
 ## Epics
 
 - [Foundations](foundations.md): 14 features, 13 done
 - [SDKs](sdks.md): 5 features, 1 done
-- [Platform](platform.md): 7 features, 0 done
+- [Platform](platform.md): 8 features, 0 done
 - [Auth](auth.md): 6 features, 0 done
 - [Databases](databases.md): 7 features, 0 done
 - [Storage](storage.md): 3 features, 0 done
