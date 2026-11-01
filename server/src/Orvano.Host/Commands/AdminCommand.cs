@@ -21,7 +21,7 @@ namespace Orvano.Host.Commands;
 
 /// <summary>
 /// <c>orvano admin &lt;command&gt;</c>: operator commands that need host access (spec 0007 RUN-1).
-/// Spec 0006's <c>reset-operator</c> and <c>reset-secrets</c> arrive with the features that own them. Each reads the same
+/// Spec 0006's <c>reset-secrets</c> arrives with the feature that owns it. Each reads the same
 /// configuration as <c>serve</c>, and host access is the gate: none is reachable over HTTP.
 /// </summary>
 internal static class AdminCommand
@@ -57,7 +57,13 @@ internal static class AdminCommand
             [.. parseResult.UnmatchedTokens],
             cancellationToken));
 
-        return new Command("admin", "Operator commands.") { selfTest, setupToken, bootstrapProject };
+        var email = new Option<string>("--email") { Description = "The operator's email.", Required = true };
+        var resetOperator = new Command("reset-operator", "Make a one time password reset link that lives 30 minutes (spec 0017 RST-1).") { email };
+        resetOperator.TreatUnmatchedTokensAsErrors = false;
+        resetOperator.SetAction((parseResult, cancellationToken) => ResetOperatorAsync(
+            parseResult.GetRequiredValue(email), [.. parseResult.UnmatchedTokens], cancellationToken));
+
+        return new Command("admin", "Operator commands.") { selfTest, setupToken, bootstrapProject, resetOperator };
     }
 
     /// <summary>Exit code of <c>admin setup-token</c> once setup is complete (STP-5); <c>install.sh</c> reads it (ISH-6).</summary>
@@ -99,6 +105,26 @@ internal static class AdminCommand
             }
 
             await Console.Out.WriteLineAsync(ToJson(result.Value));
+            return 0;
+        });
+
+    /// <summary>
+    /// RST-1: prints the link to standard output, so the output is the link alone, as <c>setup-token</c>'s is. The note goes
+    /// to standard error. An unknown email exits 1. Like the setup link, this never goes through <c>ILogger</c>.
+    /// </summary>
+    private static Task<int> ResetOperatorAsync(string email, string[] configArgs, CancellationToken cancellationToken) => WithHostAsync(
+        configArgs,
+        "Could not make a reset link",
+        async host =>
+        {
+            if (await PlatformSetup.IssueResetLinkAsync(host.Services, email, cancellationToken) is not { } link)
+            {
+                await Console.Error.WriteLineAsync("No operator has that email.");
+                return 1;
+            }
+
+            await Console.Out.WriteLineAsync(link);
+            await Console.Error.WriteLineAsync("The operator's sessions end when the link is used.");
             return 0;
         });
 

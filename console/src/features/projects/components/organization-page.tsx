@@ -5,9 +5,10 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import { NewOrganizationDialog } from "@/features/organizations";
 import { useCan } from "@/shared/access";
 import { ApiError } from "@/shared/api/errors";
+import { PAGE_SIZES } from "@/shared/url/paging";
 import { Badge, Button, Dialog, EmptyState, Link, PageHeader } from "@/ui";
 import { useAppForm } from "@/ui/form";
-import { Cell, Column, Row, Table, TableBody, TableHeader } from "@/ui/table";
+import { Cell, Column, Pagination, Row, Table, TableBody, TableHeader } from "@/ui/table";
 import { useCreateProject } from "../api/mutations";
 import { projectsQuery, type Project } from "../api/queries";
 import { createProjectSchema, toCreateProjectRequest } from "../schemas/create-project";
@@ -23,15 +24,17 @@ const DELETING_POLL_MS = 2000;
 export function OrganizationPage() {
   const { t } = useLingui();
   const { orgId } = useParams({ from: "/_shell/$orgId/" });
-  const { creating, open } = useOrganizationView();
+  const { creating, open, page, paging } = useOrganizationView();
   const { data } = useSuspenseQuery({
-    ...projectsQuery(orgId),
+    ...projectsQuery(orgId, page),
     refetchInterval: (query) =>
       query.state.data?.items.some((project) => project.status === "deleting")
         ? DELETING_POLL_MS
         : false,
   });
+  const { nextCursor } = data;
   const canCreate = useCan("organization", "projects.create");
+  const isFirstUse = data.items.length === 0 && page.cursor === undefined;
   const create = (
     <Button
       variant="primary"
@@ -48,8 +51,8 @@ export function OrganizationPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={t`Projects`} actions={data.items.length > 0 ? create : undefined} />
-      {data.items.length === 0 ? (
+      <PageHeader title={t`Projects`} actions={isFirstUse ? undefined : create} />
+      {isFirstUse ? (
         <EmptyState
           kind="first-use"
           title={t`Create your first project`}
@@ -57,7 +60,22 @@ export function OrganizationPage() {
           action={create}
         />
       ) : (
-        <ProjectsTable orgId={orgId} projects={data.items} />
+        <>
+          <ProjectsTable orgId={orgId} projects={data.items} />
+          <Pagination
+            pageSize={paging.pageSize}
+            pageSizes={PAGE_SIZES}
+            onPageSizeChange={paging.setPageSize}
+            onPrevious={paging.previous}
+            onNext={
+              nextCursor === null
+                ? undefined
+                : () => {
+                    paging.next(nextCursor);
+                  }
+            }
+          />
+        </>
       )}
       <NewProjectDialog
         orgId={orgId}

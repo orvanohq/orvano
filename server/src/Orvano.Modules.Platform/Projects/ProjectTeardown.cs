@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 using Orvano.Modules.Platform.Console;
 using Orvano.Modules.Platform.Data;
+using Orvano.Modules.Platform.Sessions;
 using Orvano.SharedKernel.Jobs;
 using Orvano.SharedKernel.Projects;
 
@@ -55,4 +56,5 @@ internal sealed class ProjectTeardownHandler(
 /// <summary>The platform module's job payloads (spec 0002 JSN-1).</summary>
 [JsonSourceGenerationOptions(UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
 [JsonSerializable(typeof(ProjectTeardown))]
+[JsonSerializable(typeof(PlatformCleanup))]
 internal sealed partial class PlatformJsonContext : JsonSerializerContext;

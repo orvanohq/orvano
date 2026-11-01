@@ -24,4 +24,8 @@ internal static partial class PlatformLog
     // Spec 0017 AKY-11: a failed write never fails the request.
     [LoggerMessage(EventId = LogEventIds.Platform + 4, Level = LogLevel.Warning, Message = "last_used_at was not written for API key {KeyId}: {ExceptionType}")]
     public static partial void KeyUsageNotWritten(this ILogger logger, Guid keyId, string exceptionType);
+
+    [LoggerMessage(EventId = LogEventIds.Platform + 5, Level = LogLevel.Information,
+        Message = "Platform cleanup removed {Sessions} sessions and {ResetTokens} reset tokens, and sent {Projects} stuck projects to teardown")]
+    public static partial void PlatformCleanedUp(this ILogger logger, int sessions, int resetTokens, int projects);
 }

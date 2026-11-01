@@ -18,6 +18,9 @@ public static class PlatformErrorCodes
     [ErrorCode(ErrorKind.Forbidden, "This needs a recent password check; confirm the password, then try again.")]
     public const string ReauthRequired = "reauth_required";
 
+    [ErrorCode(ErrorKind.Unauthorized, "The reset link is wrong, expired, used, or replaced; make a new one with orvano admin reset-operator.")]
+    public const string ResetTokenInvalid = "reset_token_invalid";
+
     [ErrorCode(ErrorKind.Conflict, "The project is being created or deleted, so this can't be done now.")]
     public const string ProjectNotActive = "project_not_active";
 

@@ -1,15 +1,14 @@
-import { plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useRouter, useSearch } from "@tanstack/react-router";
 import { consoleConfigQuery } from "@/features/console-config";
-import { ApiError } from "@/shared/api/errors";
 import { AuthLayout } from "@/ui";
 import { useDocumentTitle } from "@/ui/shell/use-document-title";
 import { useAppForm } from "@/ui/form";
 import { signIn } from "../api/mutations";
 import { sessionQuery } from "../api/queries";
 import { signInSchema, toSignInRequest } from "../schemas/sign-in";
+import { signInFailure } from "./sign-in-failure";
 
 /** Spec 0017 SES-3, AC-5: the sign in page. It never says which of the two was wrong (PWD-5). */
 export function SignInPage() {
@@ -22,30 +21,6 @@ export function SignInPage() {
     instanceName: consoleConfig.instanceName,
   });
 
-  function failureMessage(error: unknown): string {
-    const kind = error instanceof ApiError ? error.kind : undefined;
-    switch (kind) {
-      case "unauthenticated":
-        return t`The email or password is wrong.`;
-      case "rate_limited": {
-        const retryAfter = error instanceof ApiError ? error.retryAfter : undefined;
-        if (retryAfter === undefined) return t`Too many tries. Wait a moment, then try again.`;
-        const minutes = Math.ceil(retryAfter / 60);
-        return plural(minutes, {
-          one: "Too many tries. Try again in # minute.",
-          other: "Too many tries. Try again in # minutes.",
-        });
-      }
-      case "forbidden":
-        return t`Open the console at its own address, then try again.`;
-      case "network":
-      case "timeout":
-        return t`Couldn't reach the server. Check your connection and try again.`;
-      default:
-        return t`The server had a problem. Try again in a moment.`;
-    }
-  }
-
   const form = useAppForm({
     defaultValues: { email: "", password: "" },
     schema: signInSchema,
@@ -55,7 +30,7 @@ export function SignInPage() {
         queryClient.setQueryData(sessionQuery().queryKey, session);
       } catch (error) {
         if (signal.aborted) return undefined;
-        return { form: failureMessage(error) };
+        return { form: signInFailure(error) };
       }
       // The form is saved, so the unsaved changes guard has nothing to ask. `href` takes the path with its search, as
       // the guard saved it; the types only know `to`.

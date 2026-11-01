@@ -4,7 +4,8 @@ import createClient, {
   type MethodResponse,
 } from "openapi-fetch";
 import { config } from "@/shared/config";
-import { ApiError, apiErrorFromResponse } from "./errors";
+import { sessionEnded } from "@/shared/stores/session";
+import { ApiError, apiErrorFromResponse, isSessionEnded } from "./errors";
 import type { paths } from "./schema.gen";
 
 // Spec 0003 QRY-1: the console's one HTTP client, typed by schema.gen.ts (`pnpm api:gen` from api/console.openapi.json).
@@ -64,7 +65,12 @@ async function send(
     if (signal?.aborted) throw error;
     throw timeout.aborted ? ApiError.timeout(error) : ApiError.network(error);
   }
-  if (!result.response.ok) throw apiErrorFromResponse(result.response, result.error);
+  if (!result.response.ok) {
+    const error = apiErrorFromResponse(result.response, result.error);
+    // QRY-8: only with a session to lose. At boot, a 401 just means signed out (RTE-10).
+    if (readCsrfToken() && isSessionEnded(error)) sessionEnded.set(true);
+    throw error;
+  }
   return result.data;
 }
 

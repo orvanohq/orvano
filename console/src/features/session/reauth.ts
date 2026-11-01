@@ -1,8 +1,5 @@
-import { ApiError } from "@/shared/api/errors";
-import { createStore } from "@/shared/stores/create-store";
-
-/** The writes waiting on the password prompt, which `ReauthHost` shows while there are any. */
-export const reauthPrompt = createStore<readonly ((confirmed: boolean) => void)[]>([]);
+import { ApiError, isSessionEnded } from "@/shared/api/errors";
+import { reauthPrompt, sessionEnded } from "@/shared/stores/session";
 
 function askForPassword(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -21,15 +18,32 @@ export function isReauthRequired(error: unknown): boolean {
   return error instanceof ApiError && error.code === "reauth_required";
 }
 
+/** Resolves once the sign in dialog has signed the same operator back in. */
+function signedInAgain(): Promise<void> {
+  return new Promise((resolve) => {
+    const stop = sessionEnded.subscribe(() => {
+      if (sessionEnded.get()) return;
+      stop();
+      resolve();
+    });
+    if (!sessionEnded.get()) {
+      stop();
+      resolve();
+    }
+  });
+}
+
 /**
- * Spec 0017 SES-8: runs a write; on `reauth_required` it asks for the password and runs it once more. If the prompt is
- * dismissed, or the second run is refused too, the caller gets that error.
+ * Spec 0017 SES-8, SES-9, spec 0003 QRY-8: runs a write; on `reauth_required` it asks for the password, and on an ended
+ * session it waits for the sign in dialog, then runs it once more. If the prompt is dismissed, or the second run is
+ * refused too, the caller gets that error.
  */
 export async function withReauth<Result>(write: () => Promise<Result>): Promise<Result> {
   try {
     return await write();
   } catch (error) {
-    if (!isReauthRequired(error) || !(await askForPassword())) throw error;
+    if (isSessionEnded(error)) await signedInAgain();
+    else if (!isReauthRequired(error) || !(await askForPassword())) throw error;
   }
   return write();
 }

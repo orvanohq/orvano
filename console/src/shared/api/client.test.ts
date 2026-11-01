@@ -2,12 +2,16 @@ import { HttpResponse, delay } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { http, problem, testConfig } from "@/test/handlers";
 import { worker } from "@/test/msw";
+import { sessionEnded } from "@/shared/stores/session";
 import { connectCsrfToken, get, post } from "./client";
 import { ApiError, apiErrorFromResponse, kindFromStatus, type FieldError } from "./errors";
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
+
+const readSession = () =>
+  get("/v1/console/session", { signal: new AbortController().signal }).catch(() => undefined);
 
 // Spec 0003 QRY-1 and FLT-1: the one client returns the data or throws an ApiError, mapped from spec 0014 PRB-1.
 describe("the API client", () => {
@@ -21,6 +25,31 @@ describe("the API client", () => {
     await expect(
       get("/v1/console/config", { signal: new AbortController().signal }),
     ).resolves.toEqual({ ...testConfig, setupRequired: true });
+  });
+
+  it("0003 QRY-8: a dead session's 401 raises the event, only while there's a session to lose", async () => {
+    worker.use(http.get("/v1/console/session", () => problem(401, "session_expired")));
+    await readSession();
+    expect(sessionEnded.get()).toBe(false); // at boot it just means signed out (RTE-10)
+
+    connectCsrfToken(() => "the-token");
+    await readSession();
+    connectCsrfToken(() => undefined);
+
+    expect(sessionEnded.get()).toBe(true);
+    sessionEnded.set(false);
+  });
+
+  it("0003 QRY-8: no other 401 raises it", async () => {
+    worker.use(http.post("/v1/console/session", () => problem(401, "invalid_credentials")));
+    connectCsrfToken(() => "the-token");
+
+    await post("/v1/console/session", { body: { email: "a", password: "b" } }).catch(
+      () => undefined,
+    );
+    connectCsrfToken(() => undefined);
+
+    expect(sessionEnded.get()).toBe(false);
   });
 
   it("0017 SES-7: sends the session's CSRF token on a state change, and never on a read", async () => {

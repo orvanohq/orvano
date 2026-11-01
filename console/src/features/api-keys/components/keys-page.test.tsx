@@ -355,3 +355,134 @@ describe("a key's actions", () => {
       .toHaveAttribute("aria-disabled", "true");
   });
 });
+
+const keyNamed = (name: string, id: string): ApiKey => {
+  const { key: _key, ...listed } = created;
+  return {
+    ...listed,
+    scopes: [...listed.scopes],
+    allowedActions: [...listed.allowedActions],
+    id,
+    name,
+  };
+};
+
+/** Two pages, as the API hands them out: only the next cursor (spec 0014 PAG-2). */
+function twoPages(requests: { cursor: string | null; limit: string | null }[] = []) {
+  return http.get("/v1/console/projects/{projectId}/keys", ({ request, response }) => {
+    const { searchParams } = new URL(request.url);
+    const cursor = searchParams.get("cursor");
+    requests.push({ cursor, limit: searchParams.get("limit") });
+    return cursor === "page-2"
+      ? response(200).json({
+          items: [keyNamed("Second", "01970000-0000-7000-8000-00000000000e")],
+          nextCursor: null,
+          total: null,
+        })
+      : response(200).json({
+          items: [keyNamed("First", "01970000-0000-7000-8000-00000000000d")],
+          nextCursor: "page-2",
+          total: null,
+        });
+  });
+}
+
+// Spec 0001 UX-14, UX-27, spec 0003 URL-3, URL-4, spec 0014 PAG-2: a key past the first page can be reached.
+describe("paging the keys page", () => {
+  it("0001 UX-14: Next and Previous move between pages, each a history entry the URL can restore", async () => {
+    worker.use(twoPages(), ...shellHandlers);
+    const screen = await renderWithProviders(path);
+
+    await expect.element(screen.getByRole("rowheader", { name: "First" })).toBeVisible();
+    await expect
+      .element(screen.getByRole("button", { name: "Previous" }))
+      .toHaveAttribute("aria-disabled", "true");
+
+    await screen.getByRole("button", { name: "Next" }).click();
+    await expect.element(screen.getByRole("rowheader", { name: "Second" })).toBeVisible();
+    expect(screen.router.state.location.search).toEqual({ cursor: "page-2" });
+    await expect
+      .element(screen.getByRole("button", { name: "Next" }))
+      .toHaveAttribute("aria-disabled", "true");
+
+    await screen.getByRole("button", { name: "Previous" }).click();
+    await expect.element(screen.getByRole("rowheader", { name: "First" })).toBeVisible();
+    expect(screen.router.state.location.search).toEqual({});
+
+    screen.router.history.back();
+    await expect.element(screen.getByRole("rowheader", { name: "Second" })).toBeVisible();
+  });
+
+  it("0001 UX-27: a pasted link opens on its page, and Previous goes to the first", async () => {
+    worker.use(twoPages(), ...shellHandlers);
+    const screen = await renderWithProviders(`${path}?cursor=page-2`);
+
+    await expect.element(screen.getByRole("rowheader", { name: "Second" })).toBeVisible();
+    await screen.getByRole("button", { name: "Previous" }).click();
+
+    await expect.element(screen.getByRole("rowheader", { name: "First" })).toBeVisible();
+  });
+
+  it("0001 UX-14: a new page size sends its limit and goes back to the first page", async () => {
+    const requests: { cursor: string | null; limit: string | null }[] = [];
+    worker.use(twoPages(requests), ...shellHandlers);
+    const screen = await renderWithProviders(`${path}?cursor=page-2`);
+
+    await expect.element(screen.getByRole("rowheader", { name: "Second" })).toBeVisible();
+    await screen.getByRole("button", { name: "50 per page" }).click();
+    await screen.getByRole("menuitemradio", { name: "25" }).click();
+
+    await expect.element(screen.getByRole("rowheader", { name: "First" })).toBeVisible();
+    expect(screen.router.state.location.search).toEqual({ size: 25 });
+    expect(requests.at(-1)).toEqual({ cursor: null, limit: "25" });
+  });
+
+  it("0003 URL-1: a size the picker doesn't offer falls back to the default", async () => {
+    const requests: { cursor: string | null; limit: string | null }[] = [];
+    worker.use(twoPages(requests), ...shellHandlers);
+    await renderWithProviders(`${path}?size=7`);
+
+    expect(requests.at(-1)).toEqual({ cursor: null, limit: "50" });
+  });
+
+  it("0003 URL-4: a cursor the API refuses falls back to the first page with a toast", async () => {
+    worker.use(
+      http.get("/v1/console/projects/{projectId}/keys", ({ request, response }) =>
+        new URL(request.url).searchParams.get("cursor")
+          ? problem(400, "invalid_cursor")
+          : response(200).json({
+              items: [keyNamed("First", "01970000-0000-7000-8000-00000000000d")],
+              nextCursor: null,
+              total: null,
+            }),
+      ),
+      ...shellHandlers,
+    );
+    const screen = await renderWithProviders(`${path}?cursor=stale`);
+
+    await expect.element(screen.getByRole("rowheader", { name: "First" })).toBeVisible();
+    await expect
+      .element(screen.getByText("This link's page expired, showing the first page"))
+      .toBeVisible();
+    expect(screen.router.state.location.search).toEqual({});
+  });
+
+  it("0003 QRY-6: a write to a key on a later page patches that page", async () => {
+    worker.use(
+      twoPages(),
+      ...shellHandlers,
+      http.patch("/v1/console/projects/{projectId}/keys/{keyId}", ({ response }) =>
+        response(200).json(keyNamed("Renamed", "01970000-0000-7000-8000-00000000000e")),
+      ),
+    );
+    const screen = await renderWithProviders(`${path}?cursor=page-2`);
+
+    await screen.getByRole("button", { name: "Actions for Second" }).click();
+    await screen.getByRole("menuitem", { name: "Rename" }).click();
+    const dialog = screen.getByRole("dialog");
+    await userEvent.fill(dialog.getByRole("textbox", { name: "Name" }), "Renamed");
+    await dialog.getByRole("button", { name: "Rename" }).click();
+
+    await expect.element(screen.getByRole("rowheader", { name: "Renamed" })).toBeVisible();
+  });
+});

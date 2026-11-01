@@ -192,6 +192,7 @@ export function AppShell({ model, crumbs, resourceList, banner, children }: AppS
           >
             <AccountMenu
               user={model.user}
+              onShowAccount={model.onShowAccount}
               onSignOut={model.onSignOut}
               onShowShortcuts={openShortcuts}
             />
@@ -240,7 +241,7 @@ export function AppShell({ model, crumbs, resourceList, banner, children }: AppS
             id="main"
             tabIndex={-1}
             // SHL-8: the toast region publishes its height, so focus never lands under a toast.
-            className="min-w-0 flex-1 scroll-pb-(--toast-inset) overflow-auto px-4 py-6 outline-none lg:px-6"
+            className="relative min-w-0 flex-1 scroll-pb-(--toast-inset) overflow-auto px-4 py-6 outline-none lg:px-6"
           >
             {resourceList && !isWide && (
               <div className="mb-4">

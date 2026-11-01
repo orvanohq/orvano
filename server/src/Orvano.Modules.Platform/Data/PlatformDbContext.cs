@@ -26,6 +26,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
 
     internal DbSet<OperatorSession> OperatorSessions => Set<OperatorSession>();
 
+    internal DbSet<OperatorResetToken> OperatorResetTokens => Set<OperatorResetToken>();
+
     internal DbSet<Organization> Organizations => Set<Organization>();
 
     internal DbSet<Membership> Memberships => Set<Membership>();
@@ -69,6 +71,14 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             });
             session.HasOne<Operator>().WithMany().HasForeignKey(x => x.OperatorId).OnDelete(DeleteBehavior.Cascade);
             session.HasIndex(x => x.TokenHash).IsUnique();
+        });
+
+        modelBuilder.Entity<OperatorResetToken>(token =>
+        {
+            token.ToTable("operator_reset_token", table =>
+                table.HasCheckConstraint("ck_operator_reset_token_token_hash_length", "octet_length(token_hash) = 32"));
+            token.HasOne<Operator>().WithMany().HasForeignKey(x => x.OperatorId).OnDelete(DeleteBehavior.Cascade);
+            token.HasIndex(x => x.TokenHash).IsUnique();
         });
 
         modelBuilder.Entity<Organization>(organization =>

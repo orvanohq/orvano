@@ -77,6 +77,16 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Spec 0003 QRY-8: the session has ended. `unauthorized` counts too: the first refusal clears the cookie (spec 0017
+ * SES-4), so every later request, and every other tab, gets the plain 401.
+ */
+export function isSessionEnded(error: unknown): boolean {
+  return (
+    error instanceof ApiError && (error.code === "session_expired" || error.code === "unauthorized")
+  );
+}
+
 /** The English text of what went wrong, for logs; UI code shows wording by `kind`, never this (FLT-1). */
 function messageOf(cause: unknown, fallback: string): string {
   return cause instanceof Error && cause.message !== "" ? cause.message : fallback;

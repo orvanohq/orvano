@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
+using Orvano.Modules.Platform.Sessions;
 using Orvano.SharedKernel;
 using Orvano.SharedKernel.Configuration;
 
@@ -31,6 +32,20 @@ public static class PlatformSetup
         return await tokens.GetStateAsync(cancellationToken) == SetupState.Complete
             ? null
             : throw new InvalidOperationException("platform.instance has no row. Run `orvano migrate` first.");
+    }
+
+    /// <summary>
+    /// RST-1: replaces the operator's unused reset links with a new one and returns it, or null when no operator has
+    /// <paramref name="email"/>. The link holds the only copy of the token, in its fragment (URL-5).
+    /// </summary>
+    public static async Task<string?> IssueResetLinkAsync(IServiceProvider services, string email, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        string? publicUrl = ConsoleAddress.PublicUrl(services.GetRequiredService<IConfiguration>());
+
+        await using AsyncServiceScope scope = services.CreateAsyncScope();
+        string? token = await scope.ServiceProvider.GetRequiredService<OperatorResets>().IssueAsync(email, cancellationToken);
+        return token is null ? null : $"{publicUrl}/console/reset#token={token}";
     }
 
     /// <summary>Prepares a project and its keys from the host (BST-2 to BST-4).</summary>
