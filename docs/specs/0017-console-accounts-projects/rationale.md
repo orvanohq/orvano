@@ -50,22 +50,22 @@ Option 1 wins because the hard design work is already in specs 0006, 0011, and 0
 
 ### Decisions the engineer made
 
-| Decision     | Choice                                                           | Why it wins                                                                                            | Runner up                             |
-| ------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------- |
-| Sign up      | Setup owner only                                                 | No stranger can join; a second account path isn't worth securing before feature 23 and feature 17      | Optional open sign up, off by default |
-| First org    | One form, signed in after                                        | One transaction, no state with an operator and no organization                                         | An automatic default organization     |
-| Operator MFA | Own feature (62), before alpha                                   | Not in Done when; pulls in crypto tables, a second sign in step, and recovery codes                    | All of CON-4 here                     |
-| Lifecycle    | Delete projects, not organizations                               | Teardown is needed anyway for a failed create, and test projects must be clearable                     | Delete both                           |
-| SDK strand   | `keys.current`                                                   | Proves the key resolver, KEY-6, and PRJ-1 from every SDK now, so feature 14 starts on a running thread | Bootstrap only, SDKs unchanged        |
-| First keys   | None made for you                                                | Nothing secret exists until asked for, and only one place reveals a key                                | Auto create a publishable key         |
-| Key form     | Pick scopes, optional expiry, fixed after creation               | Least privilege by default, and a key's power never shifts under a running app                         | Editable scopes                       |
-| `ar`         | A real catalog                                                   | Proves Arabic text, not only mirrored layout, and settles FRS-7                                        | RTL-1's proof only                    |
-| Audit        | `IAuditSink`, logs for now                                       | The event shape is fixed at the call sites now, and feature 48 swaps the sink                          | Building `audit_event` now            |
-| Throttle     | In memory, per process                                           | Same shape as STP-8, and one replica is the reference install                                          | Counted in the database               |
-| Reset        | One time link                                                    | No password passes through a terminal, and the page serves a later email reset                         | Printing a generated password         |
-| Bootstrap    | Unattended setup command                                         | Same image as production, and it doubles as automated install                                          | A test only command                   |
-| Data model   | CAT-1, less TOTP, plus `locale`, `last4`, `operator_reset_token` | Every addition answers a rule that had no source                                                       | Keeping unused TOTP columns           |
-| Account page | Name, email, language, password                                  | A mistyped owner email must be fixable, and `reset-operator` looks up by email                         | Language and password only            |
+| Decision     | Choice                                                                 | Why it wins                                                                                            | Runner up                             |
+| ------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| Sign up      | Setup owner only                                                       | No stranger can join; a second account path isn't worth securing before feature 23 and feature 17      | Optional open sign up, off by default |
+| First org    | One form, signed in after                                              | One transaction, no state with an operator and no organization                                         | An automatic default organization     |
+| Operator MFA | Own feature (62), before alpha                                         | Not in Done when; pulls in crypto tables, a second sign in step, and recovery codes                    | All of CON-4 here                     |
+| Lifecycle    | Delete projects, not organizations                                     | Teardown is needed anyway for a failed create, and test projects must be clearable                     | Delete both                           |
+| SDK strand   | `keys.current`                                                         | Proves the key resolver, KEY-6, and PRJ-1 from every SDK now, so feature 14 starts on a running thread | Bootstrap only, SDKs unchanged        |
+| First keys   | None made for you                                                      | Nothing secret exists until asked for, and only one place reveals a key                                | Auto create a publishable key         |
+| Key form     | Pick scopes, optional expiry, fixed after creation                     | Least privilege by default, and a key's power never shifts under a running app                         | Editable scopes                       |
+| `ar`         | A real catalog (reversed 2026-11-01, see "Reversed: the `ar` catalog") | Proves Arabic text, not only mirrored layout, and settles FRS-7                                        | RTL-1's proof only                    |
+| Audit        | `IAuditSink`, logs for now                                             | The event shape is fixed at the call sites now, and feature 48 swaps the sink                          | Building `audit_event` now            |
+| Throttle     | In memory, per process                                                 | Same shape as STP-8, and one replica is the reference install                                          | Counted in the database               |
+| Reset        | One time link                                                          | No password passes through a terminal, and the page serves a later email reset                         | Printing a generated password         |
+| Bootstrap    | Unattended setup command                                               | Same image as production, and it doubles as automated install                                          | A test only command                   |
+| Data model   | CAT-1, less TOTP, plus `locale`, `last4`, `operator_reset_token`       | Every addition answers a rule that had no source                                                       | Keeping unused TOTP columns           |
+| Account page | Name, email, language, password                                        | A mistyped owner email must be fixable, and `reset-operator` looks up by email                         | Language and password only            |
 
 ### Decisions made while writing the spec
 
@@ -94,12 +94,12 @@ Option 1 wins because the hard design work is already in specs 0006, 0011, and 0
 
 Commit 1 of the PR fixes what `/sync` flagged. Commit 2 holds this spec, its amendments below, and the scope.
 
-- **Spec 0003**: I18N-3, because `ar` must now stay complete.
+- **Spec 0003**: I18N-3, because `ar` must now stay complete (reversed 2026-11-01).
 - **Spec 0006**: KEY-2's stored fields and mixed credential answer; CON-2's pre session exceptions; CON-4's timing; CON-6's reset.
 - **Spec 0011**: CAT-1 per Data model sketch; ENC-3; LIF-4; FLT-1; RET-1; the feature 13 follow up.
 - **Spec 0012**: CPL-6 (new), EPT-2, EPT-3, EPT-5, SCP-5, RSV-2, AC-13, and the API table, per ACX-1 to ACX-3 and SES-8.
 - **Spec 0014**: PTH-1's services, PRB-8's `session_expired`, XTN-1's audience, XTN-3's implied codes, CPX-3's payloads, CNF-7's command name, and CNC-1's exception for API keys.
-- **Spec 0015**: RTL-1, since the real catalog now exists.
+- **Spec 0015**: RTL-1, since the real catalog now exists (reversed 2026-11-01).
 
 Spec 0016's Follow-up for feature 13 stays open until the code lands.
 
@@ -112,6 +112,30 @@ Spec 0016's Follow-up for feature 13 stays open until the code lands.
 - **The per project CORS policy moves up to the milestone 2 core PR (PJT-6, SDK-5, steps 12 and 17).** Chromium browser mode reaches a project route cross origin, so `keys.current` fails there without the policy, and AC-16 needs it. Step 17 was too late, since milestone 2 closes first. Step 17 keeps the origins page and cache invalidation. Nothing can change a project's origins before then, so the policy has nothing to invalidate until that step, and origin validation already came with milestone 1.
 - **AC-16 closes on the runtimes CI really runs (AC-16, step 13).** CNF-5 and SQA-3 name Deno and Bun nightly, but no SDK repo has a nightly conformance workflow, and the feature 10 notes list them as not done. Holding AC-16 for them would tie this feature to work that has no owner, so Deno and Bun are reported as not run and become a separate task (Follow-up).
 - **CNF-5 and SQA-3 keep their rule and gain a note.** The nightly runs are still the target, so the rules stand. Read alone, though, they say something runs that doesn't, so each one now says it isn't built and points to the Follow-up here.
+
+### Reversed: the `ar` catalog (2026-11-01)
+
+The engineer dropped the real `ar` catalog on 2026-11-01, before milestone 5 built it. The `ar` row in "Decisions the engineer made" stays as the record of the first choice.
+
+Nobody set out to ship Arabic. Spec 0016 FRS-7 said strings are "in the `ar` catalogue", which conflicted with spec 0015 RTL-1, and this spec settled that conflict by adding a catalog. Correcting FRS-7 would have settled it too, and that's what happens now.
+
+Why the catalog goes:
+
+- **It taxes every later string.** Under LOC-1, each new console string needs Arabic, plurals included, or `pnpm check` fails. Every feature after this one would pay that.
+- **Nobody can review it.** No native reviewer is available, so VFY-4 couldn't run, and Arabic browsers would get an unreviewed draft by default.
+- **First load is nearly full.** After milestone 4 it sat at 229.63 KB of BDL-1's 230 KB, about 370 B of room, and LOC-2 added React Aria's `ar` strings to it.
+
+What stays:
+
+- Right to left support and translation readiness. AC-23 keeps right to left and axe on every new page in both themes through RTL-1's proof, and the pseudo locale for 30% longer text.
+- LOC-4's error messages by code, the `operator.locale` column, ACC-1's values, and `resolveLocale`. The Language field reads `shippedLocales` and is hidden while one locale ships, so a later catalog needs no migration or contract change.
+
+What moves with it:
+
+- LOC-1 and LOC-2 are marked removed, and VFY-4 too, so no other rule or row is renumbered. CI covers VFY-4's right to left half (LOC-5), and its native review has nothing left to read.
+- AC-19 and ACC-3 no longer promise a Language field that's hidden.
+- Spec 0016 FRS-7 and its step 13 now match RTL-1, which settles F-7 in [the verify report](../../reviews/2026-10-30-verify-self-host-install.md). Spec 0015 RTL-1 and spec 0003 I18N-3 lose what they said about the catalog.
+- The scope's "Console translations" idea owns any later language, including who reviews it and how complete it must stay.
 
 ### Cross check (2026-10-30)
 
