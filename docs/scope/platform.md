@@ -23,7 +23,7 @@ spec [0016](../specs/0016-self-host-install/index.md)
 - [x] Test it: `/test self host install` (#152, #153)
 - [x] Review it (fresh model): `/check review self host install` (#154: approve with nits; its medium findings are fixed in #155)
 - [x] Document it: `/document self host install`
-- [ ] Deferred until before feature 59: the real host verify rows (spec 0016 step 20; VFY-6 to VFY-10 and VFY-12; AC-1, AC-2, AC-9, AC-12, AC-17). Decided 2026-10-30 so they don't hold up slice 1. Real certificates, SELinux hosts, rootful Podman, and WSL2 stay unproven until these run, and feature 12 can't be `done` before then. Also due before feature 59: R-4 to R-10 (R-4 holds for `--engine` too) and suspicions S-1 to S-8 in [the review](../reviews/2026-10-30-review-self-host-install.md), and F-3 and F-5 to F-8 in [the verify report](../reviews/2026-10-30-verify-self-host-install.md).
+- [ ] Deferred until before feature 59: the real host verify rows (spec 0016 step 20; VFY-6 to VFY-10 and VFY-12; AC-1, AC-2, AC-9, AC-12, AC-17). Decided 2026-10-30 so they don't hold up slice 1. Real certificates, SELinux hosts, rootful Podman, and WSL2 stay unproven until these run, and feature 12 can't be `done` before then. Also due before feature 59: R-4 to R-10 (R-4 holds for `--engine` too) and suspicions S-1 to S-8 in [the review](../reviews/2026-10-30-review-self-host-install.md), and F-3, F-5, F-6, and F-8 in [the verify report](../reviews/2026-10-30-verify-self-host-install.md).
 
 ### 13. Console accounts & projects · in-progress
 
@@ -37,7 +37,7 @@ spec [0017](../specs/0017-console-accounts-projects/index.md)
   - [x] Milestone 2, every SDK: `orvano admin bootstrap-project`, the runners in six SDK repos, the per project CORS policy, the `keys.current` scenarios, and the regenerate PRs passing everywhere (steps 10 to 13; AC-15 to AC-17)
   - [x] Milestone 3, keys, projects, organizations: re-auth, revoke, regenerate, rename, expiry, the full key form, the origins page and cache invalidation, project delete and teardown, organizations and switchers, `allowedActions`, and the leak tests (steps 14 to 20; AC-7 to AC-14, AC-21, AC-25)
   - [x] Milestone 4, account and recovery: the account page, `orvano admin reset-operator`, the session expired dialog, sign out across tabs, and the cleanup job (steps 21 to 24; AC-6, AC-8, AC-10, AC-18, AC-19, AC-26)
-  - [x] Milestone 5, Arabic, budget, sign off: the `ar` catalog, right to left and axe, removing the shell probe, the CSP test, the guide, and the manual runs (steps 25 to 29; AC-17, AC-18, AC-23, AC-24, AC-27)
+  - [x] Milestone 5, budget, sign off: the hidden Language field, error messages by code, right to left and axe, removing the shell probe, the CSP test, the guide, and the manual runs (steps 25 to 29; AC-17, AC-18, AC-19, AC-23, AC-24, AC-27)
 - [ ] Verify it: `/check verify console accounts & projects`
 - [ ] Test it: `/test console accounts & projects`
 - [ ] Review it (fresh model): `/check review console accounts & projects`
