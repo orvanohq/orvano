@@ -33,7 +33,8 @@ export function CodeSnippet({ label, code }: CodeSnippetProps) {
             "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-solid focus-visible:outline-focus",
           )}
         >
-          <pre ref={pre} className="font-mono text-sm text-fg">
+          {/* Code stays left to right on a right to left page, or its punctuation moves (RTL-3). */}
+          <pre ref={pre} dir="ltr" className="font-mono text-sm text-fg">
             <code>{code}</code>
           </pre>
         </section>

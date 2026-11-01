@@ -202,12 +202,12 @@ msgstr ""
 msgid "Actions"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:183
 #: src/features/api-keys/components/keys-page.tsx:185
+#: src/features/api-keys/components/keys-page.tsx:187
 msgid "Actions for {name}"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:223
+#: src/features/api-keys/components/keys-page.tsx:225
 #: src/features/projects/components/organization-page.tsx:133
 msgid "Active"
 msgstr ""
@@ -381,12 +381,12 @@ msgstr ""
 msgid "Copied"
 msgstr ""
 
-#: src/ui/code-snippet.tsx:44
+#: src/ui/code-snippet.tsx:45
 #: src/ui/copy-field.tsx:71
 msgid "Copy {label}"
 msgstr ""
 
-#: src/ui/secret-reveal.tsx:54
+#: src/ui/secret-reveal.tsx:56
 msgid "Copy this secret now"
 msgstr ""
 
@@ -656,7 +656,7 @@ msgstr ""
 msgid "Expand sidebar"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:225
+#: src/features/api-keys/components/keys-page.tsx:227
 msgid "Expired"
 msgstr ""
 
@@ -708,7 +708,7 @@ msgstr ""
 msgid "Hide password"
 msgstr ""
 
-#: src/ui/secret-reveal.tsx:66
+#: src/ui/secret-reveal.tsx:68
 msgid "I've copied it"
 msgstr ""
 
@@ -736,7 +736,7 @@ msgstr ""
 msgid "It may have been deleted, or the link is out of date."
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:180
+#: src/features/api-keys/components/keys-page.tsx:182
 msgid "It's already revoked."
 msgstr ""
 
@@ -811,8 +811,8 @@ msgid "Name"
 msgstr ""
 
 #: src/features/api-keys/components/create-key-sheet.tsx:142
-#: src/features/api-keys/components/keys-page.tsx:141
-#: src/features/api-keys/components/keys-page.tsx:148
+#: src/features/api-keys/components/keys-page.tsx:143
+#: src/features/api-keys/components/keys-page.tsx:150
 msgid "Never"
 msgstr ""
 
@@ -896,7 +896,7 @@ msgstr ""
 msgid "One per line, such as https://app.example.com."
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:178
+#: src/features/api-keys/components/keys-page.tsx:180
 #: src/ui/error-copy.tsx:88
 msgid "Only an active key can be regenerated."
 msgstr ""
@@ -1045,7 +1045,7 @@ msgid "Projects"
 msgstr ""
 
 #: src/features/api-keys/components/create-key-sheet.tsx:106
-#: src/features/api-keys/components/keys-page.tsx:133
+#: src/features/api-keys/components/keys-page.tsx:135
 msgid "Publishable"
 msgstr ""
 
@@ -1091,7 +1091,7 @@ msgstr ""
 msgid "Recent"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:202
+#: src/features/api-keys/components/keys-page.tsx:204
 msgid "Regenerate"
 msgstr ""
 
@@ -1116,7 +1116,7 @@ msgid "Remove member"
 msgstr ""
 
 #: src/features/api-keys/components/key-dialogs.tsx:155
-#: src/features/api-keys/components/keys-page.tsx:193
+#: src/features/api-keys/components/keys-page.tsx:195
 #: src/features/organizations/components/organization-dialogs.tsx:105
 #: src/features/organizations/components/organization-settings.tsx:32
 msgid "Rename"
@@ -1151,7 +1151,7 @@ msgstr ""
 msgid "Retry"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:212
+#: src/features/api-keys/components/keys-page.tsx:214
 msgid "Revoke"
 msgstr ""
 
@@ -1163,7 +1163,7 @@ msgstr ""
 msgid "Revoke key"
 msgstr ""
 
-#: src/features/api-keys/components/keys-page.tsx:227
+#: src/features/api-keys/components/keys-page.tsx:229
 msgid "Revoked"
 msgstr ""
 
@@ -1211,7 +1211,7 @@ msgid "Search projects"
 msgstr ""
 
 #: src/features/api-keys/components/create-key-sheet.tsx:101
-#: src/features/api-keys/components/keys-page.tsx:133
+#: src/features/api-keys/components/keys-page.tsx:135
 msgid "Secret"
 msgstr ""
 
@@ -1671,7 +1671,7 @@ msgstr ""
 msgid "You need the Admin role to export rows."
 msgstr ""
 
-#: src/ui/secret-reveal.tsx:55
+#: src/ui/secret-reveal.tsx:57
 msgid "You won't be able to see it again. Store it somewhere safe."
 msgstr ""
 

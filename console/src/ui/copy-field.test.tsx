@@ -56,6 +56,12 @@ afterEach(() => {
 });
 
 describe("CopyField", () => {
+  it("0015 RTL-3: the value takes its own direction", async () => {
+    const { screen } = await renderInRouter(<CopyField label="Project ID" value="prj_1234" />);
+
+    await expect.element(screen.getByRole("textbox")).toHaveAttribute("dir", "auto");
+  });
+
   it("0015 AC-24: copies through the clipboard and announces Copied", async () => {
     const writeText = stubClipboard(() => Promise.resolve());
     const { screen } = await renderInRouter(
@@ -165,6 +171,16 @@ describe("SecretReveal", () => {
 });
 
 describe("CodeSnippet", () => {
+  it("0015 RTL-3: code stays left to right on a right to left page", async () => {
+    const { screen } = await renderInRouter(
+      <CodeSnippet label="Install command" code="npm install @orvano/sdk;" />,
+    );
+
+    await expect
+      .element(screen.getByText("npm install @orvano/sdk;").element().closest("pre")!)
+      .toHaveAttribute("dir", "ltr");
+  });
+
   it("0015 AC-24: copies the code, and without the clipboard selects it and shows the hint", async () => {
     const writeText = stubClipboard(() => Promise.reject(new Error("refused")));
     const { screen } = await renderInRouter(

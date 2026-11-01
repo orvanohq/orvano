@@ -64,7 +64,7 @@ export function CopyField({ label, value }: CopyFieldProps) {
     <TextField isReadOnly value={value} className={fieldColumn}>
       <Label className="font-medium text-fg">{label}</Label>
       <div className="flex min-w-0 gap-2">
-        <Input ref={input} className={cx(textInput, "font-mono")} />
+        <Input ref={input} dir="auto" className={cx(textInput, "font-mono")} />
         <IconButton
           variant="secondary"
           icon={state === "copied" ? CheckIcon : CopyIcon}
