@@ -10,6 +10,7 @@ import {
 } from "../api/mutations";
 import type { ApiKey } from "../api/queries";
 import { renameKeySchema } from "../schemas/rename-key";
+import { keyFailure } from "./key-failure";
 import { maskedKey } from "./masked-key";
 
 interface KeyDialogProps {
@@ -134,8 +135,8 @@ export function RenameKeyDialog({ projectId, apiKey, onClose }: KeyDialogProps) 
         await rename.mutateAsync(renameKeySchema.parse(value).name);
         onClose();
         return undefined;
-      } catch {
-        return { form: t`The key wasn't renamed. Try again in a moment.` };
+      } catch (error) {
+        return { form: keyFailure(error, t`The key wasn't renamed. Try again in a moment.`) };
       }
     },
   });

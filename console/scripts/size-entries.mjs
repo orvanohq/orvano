@@ -1,7 +1,5 @@
 // Spec 0003 BDL-1, spec 0015 STY-4, spec 0008 CI-2: turns the Vite manifest from the last build into size-limit
 // entries, so the budgets follow hashed file names. Run after `vite build`; size-limit reads the .size-limit.json it writes.
-// Spec 0015 STY-9: it also reads the shell probe build (`vite build --mode size-probe`), until feature 13 adds the
-// `_shell` routes and this probe goes away.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const firstLoadLimit = "230 KB"; // spec 0015 STY-8
@@ -9,7 +7,7 @@ const perFileLimit = "80 KB";
 const cssLimit = "30 KB";
 
 // The first load (BDL-1): the root, shell, org, project, and project overview route files, plus the `en` catalog
-// main.tsx loads before the first render. Routes that don't exist yet match nothing.
+// main.tsx loads before the first render (spec 0017 CNS-7).
 const firstLoadRoutes = [
   /^src\/locales\/en\/messages\.po$/,
   /^src\/routes\/__root\.tsx/,
@@ -19,14 +17,11 @@ const firstLoadRoutes = [
   /^src\/routes\/_shell\/\$orgId\/\$projectId\/index\.tsx/,
 ];
 
-// STY-9: the probe renders AppShell from the `_shell` index page, so its first load is the root and that route's files.
-const probeRoutes = [/^src\/routes\/__root\.tsx/, /^src\/routes\/_shell\/index\.tsx/];
-
 /** @typedef {Record<string, { file: string, isEntry?: boolean, imports?: string[] }>} Manifest */
 
 /** @returns {Manifest} */
-function readManifest(outDir) {
-  const path = `${outDir}/.vite/manifest.json`;
+function readManifest() {
+  const path = "dist/.vite/manifest.json";
   if (!existsSync(path)) {
     console.error(`size-entries: ${path} is missing. Run the build that writes it first.`);
     process.exit(1);
@@ -60,18 +55,16 @@ const javascriptOf = (manifest) =>
     .toSorted();
 
 /** One 80 KB entry per JavaScript file (BDL-1). */
-const perFileEntries = (manifest, outDir) =>
+const perFileEntries = (manifest) =>
   javascriptOf(manifest).map((file) => ({
-    name: `${outDir === "dist" ? file : `${outDir}/${file}`} (BDL-1, one file)`,
-    path: `${outDir}/${file}`,
+    name: `${file} (BDL-1, one file)`,
+    path: `dist/${file}`,
     limit: perFileLimit,
     gzip: true,
   }));
 
-const manifest = readManifest("dist");
-const probe = readManifest("dist-size-probe");
+const manifest = readManifest();
 const firstLoad = firstLoadOf(manifest, firstLoadRoutes);
-const probeFirstLoad = firstLoadOf(probe, probeRoutes);
 
 const entries = [
   {
@@ -80,7 +73,7 @@ const entries = [
     limit: firstLoadLimit,
     gzip: true,
   },
-  ...perFileEntries(manifest, "dist"),
+  ...perFileEntries(manifest),
   // STY-4: the one stylesheet (build.cssCodeSplit is off).
   {
     name: "CSS (STY-4)",
@@ -90,47 +83,8 @@ const entries = [
     limit: cssLimit,
     gzip: true,
   },
-  // STY-9: the shell's first load (AC-3), and every probe file's own limit.
-  {
-    name: "Shell first load (AC-3, probe)",
-    path: [...probeFirstLoad]
-      .filter((file) => file.endsWith(".js"))
-      .map((file) => `dist-size-probe/${file}`),
-    limit: firstLoadLimit,
-    gzip: true,
-  },
-  ...perFileEntries(probe, "dist-size-probe"),
 ];
 
 writeFileSync(".size-limit.json", `${JSON.stringify(entries, null, 2)}\n`);
 
-// STY-9, AC-3: the ten largest modules of the shell's first load, from the probe build's module sizes
-// (vite.config.ts), printed and saved for CI to upload. Rendered sizes, before minify and gzip.
-const modulesPath = "dist-size-probe/.vite/modules.json";
-const largestPath = "dist-size-probe/shell-largest-modules.txt";
-if (existsSync(modulesPath)) {
-  /** @type {Record<string, Record<string, number>>} */
-  const modules = JSON.parse(readFileSync(modulesPath, "utf8"));
-  const largest = [...probeFirstLoad]
-    .flatMap((file) =>
-      Object.entries(modules[file] ?? {}).map(([id, size]) => ({
-        // node_modules/.pnpm/<package>@<version>/node_modules/<package>/x.js → <package>/x.js
-        id: id.replace(/^.*node_modules\//, "").replace(/^\0/, ""),
-        file,
-        size,
-      })),
-    )
-    .toSorted((first, second) => second.size - first.size)
-    .slice(0, 10);
-  const report = [
-    "The ten largest modules of the shell's first load (rendered bytes, before minify and gzip):",
-    ...largest.map(({ id, file, size }) => `${String(size).padStart(9)}  ${id}  (${file})`),
-  ].join("\n");
-  writeFileSync(largestPath, `${report}\n`);
-  console.log(report);
-} else {
-  console.log(`size-entries: no ${modulesPath}, so no module breakdown.`);
-}
-console.log(
-  `size-entries: ${entries.length} entries (${firstLoad.size} first load files, ${probeFirstLoad.size} probe first load files)`,
-);
+console.log(`size-entries: ${entries.length} entries (${firstLoad.size} first load files)`);

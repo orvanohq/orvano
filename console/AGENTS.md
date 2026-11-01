@@ -28,7 +28,7 @@ Run these from `console/`, or from the root as `pnpm --filter @orvano/console <s
 - Feature code imports primitives from `@/ui` (`src/ui/index.ts`); only the lazy ones (PRM-10) and heavy ones (BDL-2) are imported by their own path.
 - `package.json` `sideEffects` lists the only files with import side effects (CSS, the two entries, `src/shared/zod.ts`). A new module with a top level side effect goes on that list, or the build drops it.
 - Zod only through `zod/mini`, imported as `z` from `@/shared/zod`; lint fails any direct `zod` import, tests included (spec 0015 STY-8).
-- The first load with the shell is at most 230 KB gzip (spec 0015 STY-8, spec 0003 BDL-1). `pnpm size` checks it on the shell probe build (STY-9), which goes away once feature 13 adds the `_shell` routes. Run it when you touch anything the shell or the root route loads.
+- The first load with the shell is at most 230 KB gzip (spec 0015 STY-8, spec 0003 BDL-1). `pnpm size` checks it on the real `_shell` routes (spec 0017 CNS-7). Run it when you touch anything the shell or the root route loads.
 - When you add a restriction, add its fixture and put its rule ID in the expected list in `tooling/scripts/console-restrictions.test.mjs` and the count in `tooling/scripts/check-lint-fixtures.test.mjs`.
 - After moving strings or the files that hold them, run `pnpm extract` again: the catalogs keep `#:` line references, so a move alone fails `pnpm check`. On a rebase conflict in `messages.po`, run `pnpm extract` rather than merge by hand.
 

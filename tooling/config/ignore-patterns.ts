@@ -22,7 +22,6 @@ export const ignorePatterns = [
   "console/src/locales/**",
   // build output
   "**/dist/**",
-  "console/dist-size-probe/**", // spec 0015 STY-9
   "**/bin/**",
   "**/obj/**",
   "**/.vitest/**",

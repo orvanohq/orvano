@@ -1,6 +1,5 @@
-import { relative } from "node:path";
 import { fileURLToPath, URL } from "node:url";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig } from "vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
@@ -16,38 +15,7 @@ const consolePolicy =
   "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; " +
   "base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
-// Spec 0015 STY-9, AC-3: the probe build writes each chunk's modules with their rendered size (before minify), so
-// `pnpm size` can name the largest modules of the shell's first load.
-const moduleSizes: Plugin = {
-  name: "orvano:module-sizes",
-  generateBundle(_options, bundle) {
-    const root = fileURLToPath(new URL(".", import.meta.url));
-    const chunks = Object.fromEntries(
-      Object.values(bundle).flatMap((output) =>
-        output.type === "chunk"
-          ? [
-              [
-                output.fileName,
-                Object.fromEntries(
-                  Object.entries(output.modules).map(([id, module]) => [
-                    relative(root, id),
-                    module.renderedLength,
-                  ]),
-                ),
-              ],
-            ]
-          : [],
-      ),
-    );
-    this.emitFile({
-      type: "asset",
-      fileName: ".vite/modules.json",
-      source: `${JSON.stringify(chunks, null, 2)}\n`,
-    });
-  },
-};
-
-export default defineConfig(({ mode }) => ({
+export default defineConfig({
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }), // spec 0003 RTE-1: before react()
     // Spec 0003 I18N-6: React Aria's own strings only for the shipped locales; the rest fall back to en-US.
@@ -61,7 +29,6 @@ export default defineConfig(({ mode }) => ({
       presets: [reactCompilerPreset()],
     }),
     tailwindcss(), // spec 0015 STY-1: the one stylesheet, src/ui/theme.css
-    ...(mode === "size-probe" ? [moduleSizes] : []),
   ],
   base: "/console/", // spec 0003 WEB-8, spec 0007 CSL-1
   server: {
@@ -78,21 +45,7 @@ export default defineConfig(({ mode }) => ({
     headers: { "Content-Security-Policy": consolePolicy, "Referrer-Policy": "same-origin" },
   },
   resolve: {
-    // Spec 0015 STY-9: the size probe build renders AppShell in place of the `_shell` index page, so `pnpm size` measures
-    // the shell's first load. The route files stay the same, so src/routeTree.gen.ts doesn't change.
-    alias: [
-      ...(mode === "size-probe"
-        ? [
-            {
-              find: "@/features/shell/components/no-organization",
-              replacement: fileURLToPath(
-                new URL("./src/size-probe/shell-probe.tsx", import.meta.url),
-              ),
-            },
-          ]
-        : []),
-      { find: "@", replacement: fileURLToPath(new URL("./src", import.meta.url)) },
-    ],
+    alias: [{ find: "@", replacement: fileURLToPath(new URL("./src", import.meta.url)) }],
   },
   build: {
     manifest: true, // spec 0003 BDL-1
@@ -134,7 +87,7 @@ export default defineConfig(({ mode }) => ({
             {
               name: "shell-core",
               priority: 1,
-              test: /src[\\/](ui[\\/](?!command-palette|docs-pane|shortcut-help|confirm-delete|side-sheet|table|form[\\/]|tabs|route-tabs|relative-time|status-chip|progress|secret-reveal|code-snippet)|shared[\\/](?!url[\\/]use-paging))/,
+              test: /src[\\/](ui[\\/](?!command-palette|docs-pane|shortcut-help|confirm-delete|side-sheet|table|form[\\/]|tabs|route-tabs|relative-time|status-chip|progress|secret-reveal|code-snippet)|shared[\\/](?!url[\\/](use-paging|link-token)|access[\\/]))/,
             },
             // Every route's loader reads one of these, so they load together rather than as one small file each.
             { name: "queries", test: /src[\\/]features[\\/][^\\/]+[\\/]api[\\/]queries\.ts/ },
@@ -144,4 +97,4 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
-}));
+});

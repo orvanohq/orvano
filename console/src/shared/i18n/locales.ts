@@ -1,4 +1,4 @@
-// Spec 0003 I18N-6: the one locale module. The account's setting (feature 13) will come first.
+// Spec 0003 I18N-6: the one locale module.
 export const sourceLocale = "en";
 
 export const shippedLocales = ["en"] as const;
@@ -6,6 +6,9 @@ export type Locale = (typeof shippedLocales)[number] | "pseudo-LOCALE";
 
 // React Aria keys its own strings by region tag, so each shipped language maps to the tag whose strings it reads.
 const reactAriaRegions: Readonly<Record<string, string>> = { en: "en-US" };
+
+/** The Language field shows only when there's a language to choose (spec 0017 ACC-3). */
+export const hasLanguageChoice = (shippedLocales as readonly Locale[]).length > 1;
 
 /** The React Aria locales the build keeps, one per shipped catalog (vite.config.ts, I18N-6). */
 export const reactAriaLocales = shippedLocales.map((locale) => reactAriaRegions[locale] ?? locale);

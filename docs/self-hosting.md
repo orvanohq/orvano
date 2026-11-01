@@ -83,7 +83,7 @@ Rootless Docker and rootless Podman run `init` differently: see [Rootless engine
 
 The link looks like `http://localhost/console/setup#token=orv_setup_...`. Anyone who holds a valid link can claim your install, so use it soon and do not share it. The token sits after the `#`, so it never reaches a server log, and the page removes it from the address bar as soon as it loads.
 
-The page checks the token and shows that it was accepted. The owner account form that comes next is not built yet.
+The page checks the token and shows that it was accepted. Then it asks for the owner account: your name, your email, a password of at least 8 characters, and the name of your first organization. Submitting the form finishes setup and signs you in. There is one owner, the setup page never opens again, and `orvano admin setup-token` then exits with code 3.
 
 A link stops working 24 hours after it was made, or as soon as a newer one is made. Make a new one in the install folder at any time:
 
@@ -92,6 +92,51 @@ docker compose exec orvano /app/orvano admin setup-token
 ```
 
 `orvano` also prints a link to its log on its first start, and `install.sh` replaces that one straight away, so use the link the script printed. A later restart leaves a valid token alone. With more than one `api` replica, only one prints a link and the others say setup is waiting, so use `admin setup-token`.
+
+## Sign in and recovery
+
+After setup, sign in at `<ORVANO_PUBLIC_URL>/console/sign-in` with the owner's email and password. There is no public sign up: the owner is the only account for now.
+
+A session ends after 12 idle hours or 14 days, whichever comes first. You can change both, see [The `.env` file](#the-env-file). Creating, revoking, or regenerating a key, deleting a project, and changing your email ask for your password again if you last gave it more than 10 minutes ago.
+
+### Lost password
+
+Orvano sends no email yet, so a reset needs access to the host. Run this in the install folder:
+
+```bash
+docker compose exec orvano /app/orvano admin reset-operator --email you@example.com
+```
+
+It prints a link that works once and lives 30 minutes. A newer link replaces an older one. Setting a password through the link ends every session of that account, so open it only when you are ready to sign in again. Treat the link like a password: anyone who holds it can take the account.
+
+### Too many sign in tries
+
+Five failed tries for one account, or 50 from one address, within 15 minutes stop further sign ins for that account or address until the oldest failure is 15 minutes old. Even the right password is refused until then, and the error says how long to wait. Two limits follow from how this works today, until a shared rate limit replaces it:
+
+- Each server process keeps its own counts. With several `api` replicas the real limit is that many times higher.
+- Anyone who knows the owner's email can keep that account throttled by trying wrong passwords. A hard lock would be worse, so the account never locks.
+
+The way out of a throttled account is `reset-operator`: setting a new password through the link clears the count on the process that served it. With several replicas, also restart them, since the counts live in memory:
+
+```bash
+docker compose restart orvano
+```
+
+### Create a project from the command line
+
+For unattended installs and test runs, `bootstrap-project` makes a project and its keys without the console:
+
+```bash
+docker compose exec -T orvano /app/orvano admin bootstrap-project --owner-email you@example.com --organization Acme --project Shop --origin https://app.example.com
+```
+
+`--origin` is optional and you can repeat it. The command prints one JSON object, `{ organizationId, projectId, publishableKey, secretKey, allowedOrigins }`. The publishable key has every client scope and the secret key has every server scope. This output is the only time the keys are shown, so save them right away, and don't paste them into a log.
+
+On a finished install, the owner with that email must already exist. The command reuses an organization of that name they own, or creates one, and always makes a new project.
+
+> **Warning:** on an install whose setup is still open, this command takes the setup over. It finishes setup with that email as the owner, and the setup link stops working. Nobody knows that owner's password, because the command throws it away, so nobody can sign in until you run `reset-operator` for that email.
+
+This command only exists on the host. Nothing like it can be reached over HTTP.
 
 ## Reference
 
@@ -176,14 +221,19 @@ docker compose -p orvano down -v
 
 The server reads more settings from its environment. To change one, add it to the `orvano` service's `environment` in `compose.yaml`. Any key also takes a `_FILE` form that reads its value from a file:
 
-| Variable                                         | What it does                                                                    |
-| ------------------------------------------------ | ------------------------------------------------------------------------------- |
-| `ORVANO_ROLES`                                   | The roles this process runs, `api`, `worker`, or both (the default).            |
-| `ORVANO_DATABASE__POOLSIZE`                      | The platform connection pool. Default 30, at least 6.                           |
-| `ORVANO_DATABASE__SSLMODE`                       | TLS to PostgreSQL.                                                              |
-| `ORVANO_PROJECTDB__MAXCONNECTIONS`               | Read once project databases arrive: the cap on their connections. Default 150.  |
-| `ORVANO_TLS__CERTFILE` and `ORVANO_TLS__KEYFILE` | PEM files for HTTPS without Caddy. See [HTTPS](#https).                         |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`                    | Sends traces, metrics, and logs over OTLP. Export stays off until you set this. |
+| Variable                                         | What it does                                                                                          |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `ORVANO_ROLES`                                   | The roles this process runs, `api`, `worker`, or both (the default).                                  |
+| `ORVANO_DATABASE__POOLSIZE`                      | The platform connection pool. Default 30, at least 6.                                                 |
+| `ORVANO_DATABASE__SSLMODE`                       | TLS to PostgreSQL.                                                                                    |
+| `ORVANO_PROJECTDB__MAXCONNECTIONS`               | Read once project databases arrive: the cap on their connections. Default 150.                        |
+| `ORVANO_TLS__CERTFILE` and `ORVANO_TLS__KEYFILE` | PEM files for HTTPS without Caddy. See [HTTPS](#https).                                               |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`                    | Sends traces, metrics, and logs over OTLP. Export stays off until you set this.                       |
+| `ORVANO_INSTANCE__NAME`                          | The name the console shows. Default `Orvano`.                                                         |
+| `ORVANO_CONSOLE__SESSIONIDLEHOURS`               | Idle hours before a console session ends. Default 12.                                                 |
+| `ORVANO_CONSOLE__SESSIONABSOLUTEDAYS`            | Days before a console session ends however active it is. Default 14.                                  |
+| `ORVANO_AUTH__HASHCONCURRENCY`                   | How many password hashes run at once. Past this, a request waits up to 5 seconds, then answers `503`. |
+| `ORVANO_KEYS__ALLOWSECRETKEYFROMBROWSER`         | `true` lets a secret key work with an `Origin` header. Default `false`.                               |
 
 ### HTTPS
 

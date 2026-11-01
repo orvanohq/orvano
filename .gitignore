@@ -4,7 +4,6 @@ docs/.agent-cache/
 # Build output
 node_modules/
 console/dist/
-console/dist-size-probe/
 bin/
 obj/
 BenchmarkDotNet.Artifacts/

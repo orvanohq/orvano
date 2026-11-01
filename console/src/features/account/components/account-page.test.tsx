@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
-import { i18n } from "@/shared/i18n";
 import { announceSessionChanged, signOutEverywhere } from "@/shared/session-channel";
 import { expectNoAxeViolations } from "@/test/axe";
 import { http, problem, shellHandlers, testSession } from "@/test/handlers";
@@ -40,7 +39,7 @@ function cardOf(screen: Awaited<ReturnType<typeof renderWithProviders>>, name: s
 
 // Spec 0017 ACC-1 to ACC-3, AC-8, AC-19.
 describe("the account page", () => {
-  it("0017 ACC-3: shows the profile, language, password, and sign out cards, and the account menu links here", async () => {
+  it("0017 ACC-3: shows the profile, password, and sign out cards, and the account menu links here", async () => {
     worker.use(
       ...shellHandlers,
       http.get("/v1/console/organizations/{organizationId}/projects", ({ response }) =>
@@ -55,9 +54,11 @@ describe("the account page", () => {
     await expect.element(screen.getByRole("heading", { level: 1, name: "Account" })).toBeVisible();
     expect(screen.router.state.resolvedLocation?.pathname).toBe("/account");
     expect(document.title).toBe("Account · Orvano");
-    for (const name of ["Profile", "Language", "Password", "Sign out"]) {
+    for (const name of ["Profile", "Password", "Sign out"]) {
       await expect.element(cardOf(screen, name)).toBeVisible();
     }
+    // Only one language ships, so there's nothing to choose.
+    expect(screen.getByRole("region", { name: "Language" }).elements()).toEqual([]);
     await expectNoAxeViolations();
   });
 
@@ -142,31 +143,6 @@ describe("the account page", () => {
     await expect
       .element(screen.getByText("Reload the page, then try again.").first())
       .toBeVisible();
-  });
-
-  it("0017 AC-19: the language saves, and Use my browser sends null", async () => {
-    const sent: unknown[] = [];
-    worker.use(
-      ...shellHandlers,
-      http.patch("/v1/console/account", async ({ request, response }) => {
-        const body = (await request.clone().json()) as { locale: string | null };
-        sent.push(body);
-        return response(200).json({ ...saved, locale: body.locale });
-      }),
-    );
-    const screen = await renderWithProviders("/account", {
-      session: { ...testSession, operator: { ...testSession.operator, locale: "en" } },
-    });
-    const card = cardOf(screen, "Language");
-
-    await card.getByRole("button", { name: /English/ }).click();
-    await screen.getByRole("option", { name: "Use my browser" }).click();
-    await card.getByRole("button", { name: "Update" }).click();
-
-    await vi.waitFor(() => {
-      expect(sent).toEqual([{ locale: null }]);
-    });
-    expect(i18n.locale).toBe("en");
   });
 
   it("0017 ACC-2, AC-19: a password change keeps the new CSRF token, tells the other tabs, and empties the fields", async () => {

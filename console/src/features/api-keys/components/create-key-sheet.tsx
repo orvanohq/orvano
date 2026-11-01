@@ -13,6 +13,7 @@ import {
   toCreateKeyRequest,
   type CreateKeyValues,
 } from "../schemas/create-key";
+import { keyFailure } from "./key-failure";
 import { maskedKey } from "./masked-key";
 import { ScopeChecklist } from "./scope-checklist";
 
@@ -41,7 +42,7 @@ export function CreateKeySheet({ projectId, onClose }: { projectId: string; onCl
         return {
           form: isReauthRequired(error)
             ? t`The key wasn't created, because your password wasn't confirmed.`
-            : t`The key wasn't created. Try again in a moment.`,
+            : keyFailure(error, t`The key wasn't created. Try again in a moment.`),
         };
       }
     },
