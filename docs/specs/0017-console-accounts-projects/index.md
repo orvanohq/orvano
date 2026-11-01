@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-30
 **Status**: In Progress
-**Updated**: 2026-10-30, from milestone 2: SDK-3's `keys.current.bad_key` sends its wrong key through the scenario's `client: { key: ... }`; SDK-4 and step 11 cover the six SDK repos, not the templates; SDK-5 and step 12 gain the per project policy in `OrvanoCorsPolicyProvider`, and step 17 keeps the origins page and cache invalidation; AC-16 and step 13 name the runtimes CI really runs, with Deno and Bun nightly a Follow-up (rationale.md, "Found while building").
+**Updated**: 2026-10-30, from milestone 2: SDK-3's `keys.current.bad_key` sends its wrong key through the scenario's `client: { key: ... }`; SDK-4 and step 11 cover the six SDK repos, not the templates; SDK-5 and step 12 gain the per project policy in `OrvanoCorsPolicyProvider`, and step 17 keeps the origins page and cache invalidation; AC-16 and step 13 name the runtimes CI really runs, with Deno and Bun nightly a Follow-up (rationale.md, "Found while building"). 2026-11-01, the real `ar` catalog is dropped: LOC-1 and LOC-2 are removed; the user story, AC-19, AC-23, ACC-1, ACC-3, LOC-3 to LOC-5, the scope table, the test scenarios, milestone 5's title and steps 25 and 26, Consequences, and the translations Follow-up change; verify.md's VFY-4 is removed; and specs 0003, 0015, and 0016 change to match (rationale.md, "Reversed: the `ar` catalog").
 
 ## Summary
 
@@ -19,7 +19,7 @@ Builds on spec [0001](../0001-console-ux-patterns/index.md) (console UX), [0002]
 - As an operator, I want to revoke a key and have it stop working on the next request, so that I can act on a leak.
 - As an operator who lost a password, I want a recovery path that needs host access, so that I'm not locked out and nobody else can get in.
 - As the engineer of feature 14, I want a working project, keys, and a live scenario in every SDK, so that auth starts on a thread that already runs.
-- As an Arabic reading operator, I want the console in Arabic and laid out right to left.
+- As a translator adding a language later, I want every page to hold right to left and with longer text, so that a new catalog needs no layout work.
 
 **Acceptance criteria**:
 
@@ -41,11 +41,11 @@ Builds on spec [0001](../0001-console-ux-patterns/index.md) (console UX), [0002]
 - **AC-16**: The live scenarios for `keys.current` pass in all six SDKs, in the runtimes CI really runs (Node, Hermes, Chromium, workerd, the Dart VM, and .NET), against a project from the bootstrap command, and `api/conformance/pending.json` stays empty. CNF-5 also names Deno and Bun nightly, but no workflow runs them yet, so they're reported as not run and stay a follow up. The operation carries `x-orvano-metered`. This criterion closes after merge, because the regenerate PRs need the `sha-<commit>` image (SDK-3 to SDK-6).
 - **AC-17**: `orvano admin bootstrap-project` on an install with setup open completes setup and creates an owner, organization, project, one publishable key, and one secret key, printing them as one JSON object. On a finished install it adds a project for that owner. It isn't reachable over HTTP (BST-1 to BST-4).
 - **AC-18**: `orvano admin reset-operator --email <email>` prints a one time link that lives 30 minutes. Setting a new password through it ends every session of that operator, and a used, expired, or replaced link answers `401 reset_token_invalid` (RST-1 to RST-4).
-- **AC-19**: The account page changes name, email, language, and password. A password change needs the current password, ends every other session, and gives this one a new cookie and CSRF token (ACC-1 to ACC-3).
+- **AC-19**: The account page changes name, email, and password, and language when more than one locale ships. A password change needs the current password, ends every other session, and gives this one a new cookie and CSRF token (ACC-1 to ACC-3, LOC-3).
 - **AC-20**: `GET /v1/console/config` also returns `instanceName`, `publicUrl`, and `features`, the same for every caller, and the public read stays free of any session (BOT-1).
 - **AC-21**: The console has the `_auth` and `_shell` routes, the organization page, project overview, project settings (General, API keys, Allowed origins), and account page. `ShellModel`, crumbs, and both switchers come from real data, controls follow `allowedActions`, and every page has its first use, empty, loading, and error states (CNS-1 to CNS-6, spec 0014 CPX-1).
 - **AC-22**: Sign in success and failure, sign out, password change and reset, session revoke, operator create and change, organization and project create and delete, and key create, regenerate, and revoke each emit one event through `IAuditSink`, with actor, action, target, and result and no secret (AUS-1 to AUS-3).
-- **AC-23**: Every console string is in a real `ar` catalog that `pnpm check` keeps complete. With `ar` active, each new page renders Arabic text right to left and passes axe in both themes, and the pseudo locale still holds at 30% longer text (LOC-1 to LOC-5).
+- **AC-23**: Through RTL-1's proof, each new page renders right to left and passes axe in both themes, and the pseudo locale still holds at 30% longer text (LOC-3 to LOC-5).
 - **AC-24**: The shell probe is gone. `pnpm size` measures the real `_shell` routes within BDL-1's 230 KB and 80 KB, and the CSP test of spec 0015 AC-23 loads every new route with no violation (CNS-7, CNS-8).
 - **AC-25**: Each new table and route has TEN-5 leak tests: project A's key on project B, an operator of organization A on B's routes, and a key id of project A on project B's key routes all deny. The SCR-4 architecture test proves that only the two create key responses hold a key.
 - **AC-26**: A scheduled job removes ended sessions 7 days after they end and reset tokens 1 day after expiry or use (RET-1), and sweeps stuck `creating` projects (CLN-1).
@@ -67,14 +67,14 @@ Reasoning and options: see [rationale.md](rationale.md).
 
 ### Scope and boundaries
 
-| In feature 13                                                                                                             | Elsewhere                                                                                         |
-| ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| The owner form, sign in, sign out, the session, CON-1 to CON-3, CON-5, CON-7, password rules PWD-1 to PWD-5 for operators | End user auth (feature 14); TOK-1 to TOK-6 for end users (feature 14)                             |
-| The other CAT-1 `platform` tables; `operator_reset_token`                                                                 | `operator_recovery_code`, the TOTP columns, `crypto.*` (features 62 and 14)                       |
-| Organizations: create, list, search, rename. Projects: create, list, rename, origins, delete                              | Organization delete, invites, other roles, disabling an operator (feature 51)                     |
-| API keys: create, list, rename, revoke, regenerate; the key resolver; `keys.current` in every SDK                         | Operator TOTP (feature 62, CON-4); public sign up (none planned); operator email reset (after 17) |
-| `orvano admin bootstrap-project`, `orvano admin reset-operator`                                                           | `orvano admin reset-secrets` (feature 14 or later, with the first stored secret)                  |
-| The rest of `GET /v1/console/config`, `GET /v1/console/session`, the `_auth` and `_shell` routes, the real `ar` catalog   | Audit storage (feature 48), usage counting (feature 45), the shared throttle engine (feature 23)  |
+| In feature 13                                                                                                                     | Elsewhere                                                                                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The owner form, sign in, sign out, the session, CON-1 to CON-3, CON-5, CON-7, password rules PWD-1 to PWD-5 for operators         | End user auth (feature 14); TOK-1 to TOK-6 for end users (feature 14)                                                                                   |
+| The other CAT-1 `platform` tables; `operator_reset_token`                                                                         | `operator_recovery_code`, the TOTP columns, `crypto.*` (features 62 and 14)                                                                             |
+| Organizations: create, list, search, rename. Projects: create, list, rename, origins, delete                                      | Organization delete, invites, other roles, disabling an operator (feature 51)                                                                           |
+| API keys: create, list, rename, revoke, regenerate; the key resolver; `keys.current` in every SDK                                 | Operator TOTP (feature 62, CON-4); public sign up (none planned); operator email reset (after 17)                                                       |
+| `orvano admin bootstrap-project`, `orvano admin reset-operator`                                                                   | `orvano admin reset-secrets` (feature 14 or later, with the first stored secret)                                                                        |
+| The rest of `GET /v1/console/config`, `GET /v1/console/session`, the `_auth` and `_shell` routes, right to left on every new page | Audit storage (feature 48), usage counting (feature 45), the shared throttle engine (feature 23), any real translation catalog ("Console translations") |
 
 ### Rules
 
@@ -183,9 +183,9 @@ These change spec 0012, and its rule text is amended in this PR.
 
 #### ACC: the account page
 
-- **ACC-1 (MUST)**: `PATCH /v1/console/account` (`RequireOperator`, `.WithConcurrency()`) takes `name`, `email`, and `locale` as `Optional<T>` (JSW-9). A changed `email` needs a recent check (`reauth_required`, in the handler, since only it knows the value changed), and a taken one fails on the field with `not_unique`. `locale` is `en`, `ar`, or `null` for "use my browser".
+- **ACC-1 (MUST)**: `PATCH /v1/console/account` (`RequireOperator`, `.WithConcurrency()`) takes `name`, `email`, and `locale` as `Optional<T>` (JSW-9). A changed `email` needs a recent check (`reauth_required`, in the handler, since only it knows the value changed), and a taken one fails on the field with `not_unique`. `locale` is `en`, `ar`, or `null` for "use my browser". `ar` stays a valid value though no `ar` catalog ships, so a later catalog needs no contract change, and LOC-3 says what a stored value with no catalog does.
 - **ACC-2 (MUST)**: `POST /v1/console/account/password` (`RequireOperator`) takes `currentPassword` and `newPassword`. A wrong current password fails with `invalid_password` and counts toward LIM-1. On success, in one transaction, it stores the hash, deletes the operator's unused reset tokens (TOK-9), revokes every other session, and replaces this one (TOK-6, TOK-10), answering `200` with `SessionResponse` and a new cookie. The console puts the new CSRF token in the session query.
-- **ACC-3 (MUST)**: `routes/_shell/account.tsx` shows Profile (name, email), Language, Password, and Sign out, as `SettingsCard`s. The account menu links to it.
+- **ACC-3 (MUST)**: `routes/_shell/account.tsx` shows Profile (name, email), Password, and Sign out, as `SettingsCard`s, plus Language when more than one locale ships (LOC-3). The account menu links to it.
 
 #### BOT: boot and config
 
@@ -203,13 +203,13 @@ These change spec 0012, and its rule text is amended in this PR.
 - **CNS-7 (MUST)**: The shell probe goes: delete `src/size-probe/`, the `size-probe` mode, the `moduleSizes` plugin, and their lines in `vite.config.ts`, `lingui.config.ts`, and any lint or type config; `pnpm size` runs on the real build, and `scripts/size-entries.mjs` matches the `__root`, `_shell`, `$orgId`, `$projectId`, and overview route files (BDL-1).
 - **CNS-8 (MUST)**: The CSP test (spec 0015 AC-23) visits every route above.
 
-#### LOC: the `ar` catalog
+#### LOC: locale and right to left
 
-- **LOC-1 (MUST)**: `lingui.config.ts` adds `ar`. `src/locales/ar/messages.po` holds every message in the source catalog, including the shell's and setup's, with Arabic's six plural categories where a message has plurals. `lingui check sync` in `check:js` (CI-2) fails on a missing translation.
-- **LOC-2 (MUST)**: `ar` loads lazily, as I18N-3 has for every catalog but `en`, so it stays out of BDL-1's first load. React Aria's pruned strings gain `ar` (I18N-6); measure that against the budget in CNS-7.
-- **LOC-3 (MUST)**: `resolveLocale` takes the account's `locale`, then `navigator.languages`, then `en` (I18N-6), and `getDirection` gives `rtl` for `ar`. The account page's Language field offers "Use my browser", English, and `العربية`, each language written in its own script.
-- **LOC-4 (MUST)**: Known error codes render the console's own message, not the English `detail` (PRB-1), so an error reads in Arabic too.
-- **LOC-5 (MUST)**: Component and end to end tests load the real `ar` catalog: every new page renders right to left and passes axe in both themes. RTL-1's gallery proof stays, and the pseudo locale stays the check for text growth. The first draft of the translation is written by whoever builds the screen and marked for native review (verify.md VFY-4).
+- **LOC-1 (removed 2026-11-01)**: No real `ar` catalog ships. Only `en` and the development pseudo locale exist, so there's no `src/locales/ar/messages.po` to keep complete (rationale.md, "Reversed: the `ar` catalog").
+- **LOC-2 (removed 2026-11-01)**: Gone with LOC-1: there's no `ar` catalog to load lazily, and React Aria's strings stay pruned to `en` (I18N-6).
+- **LOC-3 (MUST)**: `resolveLocale` takes the account's `locale`, then `navigator.languages`, then `en` (I18N-6). It matches only `shippedLocales`, so a stored locale with no catalog falls through to the next one. `getDirection` gives `rtl` for `ar`. The account page's Language field offers "Use my browser" and each entry in `shippedLocales`, each language written in its own script, and it's hidden while only one locale ships. A later catalog added to `shippedLocales` brings the field back with no migration or contract change.
+- **LOC-4 (MUST)**: Known error codes render the console's own message, not the English `detail` (PRB-1), so an error can be translated like any other string.
+- **LOC-5 (MUST)**: Component and end to end tests use RTL-1's proof, not a translation: with `dir="rtl"` and React Aria's real locale `ar` while Lingui keeps the active catalog, every new page renders right to left and passes axe in both themes. The pseudo locale stays the check for text growth.
 
 #### AUS: audit until feature 48
 
@@ -376,7 +376,8 @@ Commands (not HTTP): `orvano admin bootstrap-project` (BST), `orvano admin reset
 - Leaks: TEN-5's matrix over every new route; verifies **AC-25**.
 - Conformance: `keys.current.*` in all six SDKs; verifies **AC-16**.
 - Bootstrap and reset: open and complete setup, a used link refused, sessions ended; verifies **AC-17**, **AC-18**.
-- `ar`: real catalog, right to left, axe in both themes; verifies **AC-23**.
+- Right to left: every new page under RTL-1's proof, axe in both themes, and the pseudo locale at 30% longer text; verifies **AC-23**.
+- Language: with one shipped locale the field is hidden, and a stored `ar` falls through to the browser's language, then `en`; verifies **AC-19**.
 - Budget: `pnpm size` on the real shell; verifies **AC-24**.
 
 ## Build plan
@@ -419,10 +420,10 @@ Tracer Bullet: milestone 1 runs one thin thread from the owner form to a key tha
 23. QRY-8's dialog and QRY-9's sign out across tabs (SES-6, SES-9); satisfies **AC-6**.
 24. `platform.cleanup` (CLN-1); satisfies **AC-10**, **AC-26**.
 
-**Milestone 5: Arabic, budget, sign off**
+**Milestone 5: budget, sign off**
 
-25. The `ar` catalog, `resolveLocale`, the Language field, and error messages by code (LOC-1 to LOC-4); satisfies **AC-23**.
-26. Right to left and axe on every new page with the real catalog (LOC-5); satisfies **AC-23**.
+25. `resolveLocale`, the Language field hidden while one locale ships, and error messages by code (LOC-3, LOC-4); satisfies **AC-19**, **AC-23**.
+26. Right to left and axe on every new page through RTL-1's proof (LOC-5); satisfies **AC-23**.
 27. Remove the shell probe, measure the real routes, and extend the CSP test (CNS-7, CNS-8); satisfies **AC-24**.
 28. `docs/self-hosting.md`: sign in, `reset-operator`, `bootstrap-project` and its takeover of an open setup, the new variables, LIM-3's limits and the way out; `.env.example`; satisfies **AC-17**, **AC-18**.
 29. Run [verify.md](verify.md) and record results; satisfies **AC-27**.
@@ -435,7 +436,7 @@ Tracer Bullet: milestone 1 runs one thin thread from the owner form to a key tha
 - A stolen database gives no usable credential.
 - A revoke or a project delete stops a key on the next request on every instance.
 - The bootstrap command also gives unattended installs a path.
-- FRS-7's `ar` gap closes, and the probe goes.
+- FRS-7 now matches RTL-1, and the probe goes.
 
 **Negative / tradeoffs**:
 
@@ -445,7 +446,7 @@ Tracer Bullet: milestone 1 runs one thin thread from the owner form to a key tha
 - The throttle is per process, so several replicas weaken it (LIM-3).
 - A project's allowed origins can lag by up to 60 seconds if the signal is lost.
 - Every key request reads the database, and so does every console request. That's one indexed read each, and a cache can come when a measurement asks for it.
-- The Arabic draft isn't native reviewed yet, and Arabic browsers get it by default.
+- The console ships in English only until "Console translations" adds a language. Right to left is proven, but no reader sees it yet.
 - `keys.current` is one more public operation to keep in every SDK.
 - Two new requirement kinds make spec 0012's access vocabulary larger.
 - Six SDK repos change for a thin strand.
@@ -466,5 +467,5 @@ Tracer Bullet: milestone 1 runs one thin thread from the owner form to a key tha
 - [ ] Feature 51: invites, roles, organization delete, operator disable, `services` by role.
 - [ ] Features 17 and 18: tell an operator by email about a password or email change; decide on email password reset (RST-4).
 - [ ] A sessions list with revoke on the account page, if asked for.
-- [ ] Before "Console translations" ships more languages: a native review of `ar` (verify.md VFY-4).
+- [ ] "Console translations" (needs a decision): a first real catalog needs a native reviewer, a rule for how complete it must stay, and room in BDL-1's first load for its React Aria strings.
 - [ ] Deno and Bun nightly (spec 0014 CNF-5, spec 0005 SQA-3), a separate task, not yet run: no SDK repo has a nightly conformance workflow, so AC-16 closes without them. The same workflow picks up the rest of SQA-3's nightly line, the other Node lines and browsers.
