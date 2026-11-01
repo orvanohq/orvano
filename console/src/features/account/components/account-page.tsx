@@ -2,7 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { passwordFailure, sessionQuery, type Session } from "@/features/session";
 import { ApiError } from "@/shared/api/errors";
-import { accountLocale, activateLocale, shippedLocales } from "@/shared/i18n";
+import { accountLocale, activateLocale, hasLanguageChoice, shippedLocales } from "@/shared/i18n";
 import { announceSessionChanged, signOutEverywhere } from "@/shared/session-channel";
 import { Button, notify, PageHeader, SettingsCard } from "@/ui";
 import { useAppForm } from "@/ui/form";
@@ -40,7 +40,7 @@ export function AccountPage() {
     <div className="flex flex-col gap-6">
       <PageHeader title={t`Account`} />
       <ProfileCard operator={session.operator} />
-      <LanguageCard operator={session.operator} />
+      {hasLanguageChoice ? <LanguageCard operator={session.operator} /> : null}
       <PasswordCard />
       <SettingsCard
         title={t`Sign out`}

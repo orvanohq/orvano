@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { getDirection, reactAriaLocales, resolveLocale, sourceLocale } from "./locales";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  accountLocale,
+  getDirection,
+  reactAriaLocales,
+  resolveLocale,
+  sourceLocale,
+} from "./locales";
 
 // Spec 0003 I18N-6: navigator languages matched to the shipped catalogs, else en.
 describe("resolveLocale", () => {
@@ -25,6 +31,23 @@ describe("resolveLocale", () => {
 
   it("skips malformed tags and keeps looking", () => {
     expect(resolveLocale(["", "-", "en"])).toBe("en");
+  });
+});
+
+// Spec 0017 LOC-3: a stored language with no catalog falls through.
+describe("accountLocale", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("0017 LOC-3: a stored `ar` ends at the source locale, since no catalog ships for it", () => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["ar-EG", "fr"]);
+    expect(accountLocale("ar")).toBe(sourceLocale);
+  });
+
+  it("follows the browser when the account has no language", () => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-GB"]);
+    expect(accountLocale(null)).toBe("en");
   });
 });
 

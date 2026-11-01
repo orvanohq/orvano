@@ -18,7 +18,6 @@ extend-exclude = [
   "console/src/locales/",
   "server/src/Orvano.Modules.Auth/Passwords/CommonPasswords.txt",
   "dist/",
-  "console/dist-size-probe/",
   "bin/",
   "obj/",
   ".vitest/",

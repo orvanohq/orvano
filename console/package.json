@@ -21,7 +21,7 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:stack": "playwright test --config playwright.stack.config.ts",
-    "size": "vite build --mode size-probe --outDir dist-size-probe && node scripts/size-entries.mjs && size-limit",
+    "size": "node scripts/size-entries.mjs && size-limit",
     "test:coverage": "vitest run --coverage --browser.name=chromium",
     "test:engines": "vitest run --project \"ui (firefox)\" --project \"ui (webkit)\""
   },

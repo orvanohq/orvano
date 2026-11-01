@@ -130,10 +130,9 @@ export default defineConfig(
   // LNT-3: restrictions, one rule set per region; an allowed home leaves out only its own restriction.
   ...regionRules(),
 
-  // Spec 0015 GAL-3: the gallery's placeholder text stays out of the catalog, so I18N-8 doesn't apply there. The size
-  // probe's labels get the same exemption (STY-9).
+  // Spec 0015 GAL-3: the gallery's placeholder text stays out of the catalog, so I18N-8 doesn't apply there.
   {
-    files: ["console/src/gallery/**/*.{ts,tsx}", "console/src/size-probe/**/*.{ts,tsx}"],
+    files: ["console/src/gallery/**/*.{ts,tsx}"],
     rules: { "lingui/no-unlocalized-strings": "off" },
   },
 

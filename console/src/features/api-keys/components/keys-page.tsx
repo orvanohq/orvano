@@ -128,7 +128,9 @@ function KeysTable({
           <Row key={key.id} id={key.id}>
             <Cell>{key.name}</Cell>
             <Cell>
-              <span className="font-mono">{maskedKey(key)}</span>
+              <span dir="auto" className="font-mono">
+                {maskedKey(key)}
+              </span>
             </Cell>
             <Cell>{key.type === "secret" ? t`Secret` : t`Publishable`}</Cell>
             <Cell>

@@ -83,7 +83,12 @@ export function useErrorCopy(error: unknown, title?: string): ErrorCopy {
         details,
         retryable: false,
         title: t`It changed while you were here`,
-        body: t`Someone else changed it. Reload the page to see the latest version.`,
+        body:
+          details.code === "api_key_not_active"
+            ? t`Only an active key can be regenerated.`
+            : details.code === "project_not_active"
+              ? t`This project is being deleted, so it can't change.`
+              : t`Someone else changed it. Reload the page to see the latest version.`,
       };
     case "validation":
       return {

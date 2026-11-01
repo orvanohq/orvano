@@ -45,7 +45,9 @@ export function SecretReveal({ label, secret, masked, onDone }: SecretRevealProp
     return (
       <div ref={maskedRef} tabIndex={-1} className={cx(fieldColumn, "outline-none")}>
         <span className="font-medium text-fg">{label}</span>
-        <span className="font-mono text-fg">{masked}</span>
+        <span dir="auto" className="font-mono text-fg">
+          {masked}
+        </span>
       </div>
     );
   }
