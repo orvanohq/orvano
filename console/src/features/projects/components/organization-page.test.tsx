@@ -130,6 +130,25 @@ describe("paging the organization page", () => {
     await expectNoAxeViolations(document.body);
   });
 
+  it("0015 SHL-8: a long list scrolls inside the content area, never the whole page", async () => {
+    const items = Array.from({ length: 50 }, (_, index) => ({
+      ...testProject,
+      id: `01970000-0000-7000-8000-0000000001${String(index).padStart(2, "0")}`,
+      name: `Project ${String(index + 1)}`,
+    }));
+    worker.use(page(items), ...shellHandlers);
+    const screen = await renderWithProviders(`/${testOrgId}`);
+    screen.container.style.height = "100dvh"; // what `#root` has in the real page
+
+    // A button with nowhere to go keeps its reason in hidden text, the case that once escaped the content area.
+    await expect
+      .element(screen.getByRole("button", { name: "Previous" }))
+      .toHaveAttribute("aria-disabled", "true");
+    const { clientHeight, scrollHeight } = document.documentElement;
+
+    expect(scrollHeight).toBe(clientHeight);
+  });
+
   it("0017 CNS-5: an empty later page is no first use: Previous stays there", async () => {
     worker.use(page([]), ...shellHandlers);
     const screen = await renderWithProviders(`/${testOrgId}?cursor=page-2`);
