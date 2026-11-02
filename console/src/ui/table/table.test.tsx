@@ -46,6 +46,23 @@ function KeysTable({ selectionMode }: { selectionMode?: "none" | "multiple" }) {
   );
 }
 
+function OneRow({ name, isBusy }: { name: string; isBusy: boolean }) {
+  return (
+    <Table aria-label={name} isBusy={isBusy}>
+      <TableHeader>
+        <Column id="name" isRowHeader>
+          Name
+        </Column>
+      </TableHeader>
+      <TableBody>
+        <Row id="ci">
+          <Cell>CI deploys</Cell>
+        </Row>
+      </TableBody>
+    </Table>
+  );
+}
+
 const rowNames = () =>
   Array.from(document.querySelectorAll("tbody [role='rowheader']")).map((cell) => cell.textContent);
 
@@ -220,6 +237,22 @@ describe("Table", () => {
     expect(getComputedStyle(name.element()).direction).toBe("ltr");
     // Other content sets its own direction, so it isn't wrapped.
     expect(screen.getByText("Active").element().parentElement?.tagName).not.toBe("BDI");
+  });
+
+  it("0001 UX-21: a busy table marks its region, and a table at rest isn't marked", async () => {
+    const { screen } = await renderInRouter(
+      <>
+        <OneRow name="Loading" isBusy />
+        <OneRow name="Loaded" isBusy={false} />
+      </>,
+    );
+
+    await expect
+      .element(screen.getByRole("region", { name: "Loading" }))
+      .toHaveAttribute("aria-busy");
+    await expect
+      .element(screen.getByRole("region", { name: "Loaded" }))
+      .not.toHaveAttribute("aria-busy");
   });
 
   it("0001 UX-20: an empty table shows its empty state", async () => {

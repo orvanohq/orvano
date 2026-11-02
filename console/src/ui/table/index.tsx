@@ -38,6 +38,8 @@ export interface TableProps {
   onSelectionChange?: (keys: Selection) => void;
   /** Opens a row (its detail page) on Enter or a click. */
   onRowAction?: (key: Key) => void;
+  /** The rows on screen are being refreshed or replaced (UX-21). */
+  isBusy?: boolean;
 }
 
 /**
@@ -50,11 +52,13 @@ export function Table({
   "aria-label": label,
   children,
   selectionMode = "none",
+  isBusy,
   ...props
 }: TableProps) {
   return (
     <section
       aria-label={label}
+      aria-busy={isBusy || undefined}
       className="min-h-0 min-w-0 scroll-pt-(--row-height) overflow-auto rounded-md border pb-3"
     >
       <AriaTable

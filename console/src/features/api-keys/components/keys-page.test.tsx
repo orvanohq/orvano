@@ -467,6 +467,62 @@ describe("paging the keys page", () => {
     expect(screen.router.state.location.search).toEqual({});
   });
 
+  it("0003 URL-4: a cursor refused on a page turn falls back to the first page with a toast", async () => {
+    worker.use(
+      http.get("/v1/console/projects/{projectId}/keys", ({ request, response }) =>
+        new URL(request.url).searchParams.get("cursor")
+          ? problem(400, "invalid_cursor")
+          : response(200).json({
+              items: [keyNamed("First", "01970000-0000-7000-8000-00000000000d")],
+              nextCursor: "stale",
+              total: null,
+            }),
+      ),
+      ...shellHandlers,
+    );
+    const screen = await renderWithProviders(path);
+
+    await screen.getByRole("button", { name: "Next" }).click();
+
+    await expect
+      .element(screen.getByText("This link's page expired, showing the first page"))
+      .toBeVisible();
+    await expect.element(screen.getByRole("rowheader", { name: "First" })).toBeVisible();
+    await expect.poll(() => screen.router.state.location.search).toEqual({});
+  });
+
+  it("0001 UX-22: a page that fails on a page turn shows the error, and Retry brings it", async () => {
+    let isDown = true;
+    worker.use(
+      http.get("/v1/console/projects/{projectId}/keys", ({ request, response }) =>
+        new URL(request.url).searchParams.get("cursor")
+          ? isDown
+            ? problem(500, "internal_error")
+            : response(200).json({
+                items: [keyNamed("Second", "01970000-0000-7000-8000-00000000000e")],
+                nextCursor: null,
+                total: null,
+              })
+          : response(200).json({
+              items: [keyNamed("First", "01970000-0000-7000-8000-00000000000d")],
+              nextCursor: "page-2",
+              total: null,
+            }),
+      ),
+      ...shellHandlers,
+    );
+    const screen = await renderWithProviders(path);
+
+    await screen.getByRole("button", { name: "Next" }).click();
+    const retry = screen.getByRole("button", { name: "Retry" });
+    await expect.element(retry).toBeVisible();
+
+    isDown = false;
+    await retry.click();
+
+    await expect.element(screen.getByRole("rowheader", { name: "Second" })).toBeVisible();
+  });
+
   it("0003 QRY-6: a write to a key on a later page patches that page", async () => {
     worker.use(
       twoPages(),
