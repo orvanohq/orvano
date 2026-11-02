@@ -23,6 +23,7 @@ const scenes = [
   "/data",
   "/boot-error",
   "/root-error",
+  "/frame-skeleton",
   "/auth-layout",
 ];
 

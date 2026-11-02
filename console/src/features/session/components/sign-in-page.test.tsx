@@ -92,8 +92,51 @@ describe("the sign in page", () => {
     ["//evil.example", undefined],
     ["/\\evil.example", undefined],
     ["https://evil.example", undefined],
+    ["/\t/evil.example", undefined],
+    ["/\n/evil.example", undefined],
+    ["/\r/evil.example", undefined],
+    ["/acme\t", undefined],
     [7, undefined],
   ])("0017 AC-6: redirect %s stays on this origin", (value, expected) => {
     expect(safeRedirect(value)).toBe(expected);
+  });
+
+  // The route, not only `safeRedirect`: the router lays `validateSearch`'s result over the raw search, so a value the
+  // route drops has to be overwritten. e2e/sign-in-redirect.spec.ts follows these to where a real browser lands.
+  it.each([
+    "https://evil.example/landing",
+    "http://evil.example/landing",
+    " https://evil.example/landing",
+    "ht\ttps://evil.example/landing",
+    "//evil.example/landing",
+    "/\t/evil.example/landing",
+    "javascript:alert(1)",
+    "data:text/html,x",
+  ])("0017 AC-6: the route drops redirect %j", async (value) => {
+    const screen = await renderWithProviders(`/sign-in?redirect=${encodeURIComponent(value)}`, {
+      session: null,
+    });
+
+    await expect.element(screen.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+    const match = screen.router.state.matches.find(({ routeId }) => routeId === "/_auth/sign-in");
+    expect(match?.search).not.toHaveProperty("redirect", value);
+    expect(screen.router.state.location.search).not.toHaveProperty("redirect", value);
+  });
+
+  it("0017 AC-6: after a dropped redirect, a sign in goes home instead of staying on the page", async () => {
+    worker.use(
+      ...shellHandlers,
+      emptyProjects,
+      http.post("/v1/console/session", () => Response.json(testSession, { status: 201 })),
+    );
+    const screen = await renderWithProviders(
+      `/sign-in?redirect=${encodeURIComponent("javascript:alert(1)")}`,
+      { session: null },
+    );
+
+    await signIn(screen);
+
+    await expect.element(screen.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
+    expect(screen.router.state.location.pathname).toBe(`/${testOrgId}`);
   });
 });

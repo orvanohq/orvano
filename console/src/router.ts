@@ -3,14 +3,15 @@ import { createRouter, type RouterHistory } from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
 import type { ApiError } from "@/shared/api/errors";
 import { config } from "@/shared/config";
+import { PageSkeleton } from "@/ui/skeleton";
 import { routeTree } from "./routeTree.gen";
 
 export interface RouterContext {
   queryClient: QueryClient;
 }
 
-// Spec 0003 RTE-3. The search serializer (URL-2), pending skeleton, and error and not found components come with
-// shared/url and the design system (feature 11).
+// Spec 0003 RTE-3. The search serializer (URL-2) and the error and not found components come with shared/url and the
+// design system (feature 11).
 export function createAppRouter(opts: { queryClient: QueryClient; history?: RouterHistory }) {
   return createRouter({
     routeTree,
@@ -19,6 +20,7 @@ export function createAppRouter(opts: { queryClient: QueryClient; history?: Rout
     basepath: config.basePath,
     defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
+    defaultPendingComponent: PageSkeleton,
     defaultPendingMs: 300,
     defaultPendingMinMs: 500,
     scrollRestoration: true,

@@ -13,6 +13,7 @@ import { Announcer } from "@/ui/announcer";
 import { RootErrorPage } from "@/ui/error-page";
 import { LocaleProvider } from "@/ui/locale-provider";
 import { UiRouterProvider } from "@/ui/router-provider";
+import { FrameSkeleton } from "@/ui/skeleton";
 import { ToastRegion } from "@/ui/toast";
 
 const SETUP_PATH = "/setup";
@@ -27,6 +28,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     if (!setupRequired && onSetup) redirect({ to: "/", replace: true, throw: true });
   },
   component: Root,
+  pendingComponent: FrameSkeleton, // spec 0003 RTE-4: before the shell can render
   errorComponent: RootError, // spec 0003 FLT-2
 });
 

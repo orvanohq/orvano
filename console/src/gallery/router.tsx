@@ -11,7 +11,7 @@ import { Announcer } from "@/ui/announcer";
 import { UiRouterProvider } from "@/ui/router-provider";
 import { ToastRegion } from "@/ui/toast";
 import { GalleryFrame, useScrollToTop } from "./frame";
-import { BootErrorPage, RootErrorPage } from "@/ui";
+import { BootErrorPage, FrameSkeleton, RootErrorPage } from "@/ui";
 import { AuthScene } from "./scenes/auth-scene";
 import { DataScene } from "./scenes/data-scene";
 import { FeedbackScene } from "./scenes/feedback-scene";
@@ -115,6 +115,15 @@ const rootErrorRoute = createRoute({
   },
 });
 
+const frameSkeletonRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/frame-skeleton",
+  component: function FrameSkeletonScene() {
+    useSceneTitle("Frame skeleton");
+    return <FrameSkeleton />;
+  },
+});
+
 const authRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/auth-layout",
@@ -192,6 +201,7 @@ const routeTree = rootRoute.addChildren([
   feedbackRoute,
   dataRoute,
   bootErrorRoute,
+  frameSkeletonRoute,
   rootErrorRoute,
   authRoute,
   accountRoute,

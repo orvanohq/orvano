@@ -23,7 +23,10 @@ export async function requireSignedOut({ context }: { context: { queryClient: Qu
   }
 }
 
-/** Only a path on this origin may come back from `?redirect=` (spec 0017 AC-6). */
+/**
+ * Only a path on this origin may come back from `?redirect=` (spec 0017 AC-6, spec 0003 URL-5). URL parsers drop tabs and
+ * line breaks, so `/<tab>/example.com` would read as `//example.com`.
+ */
 export function safeRedirect(value: unknown): string | undefined {
-  return typeof value === "string" && /^\/(?![/\\])/.test(value) ? value : undefined;
+  return typeof value === "string" && /^\/(?![/\\])[^\t\n\r]*$/.test(value) ? value : undefined;
 }

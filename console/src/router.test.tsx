@@ -14,6 +14,7 @@ import { sessionQuery } from "@/features/session/api/queries";
 import { messages as sourceMessages } from "@/locales/en/messages.po";
 import { routeTree } from "@/routeTree.gen";
 import { activateLocale, getDirection, i18n } from "@/shared/i18n";
+import { deferred } from "@/test/deferred";
 import { focusElement } from "@/test/focus";
 import { renderWithProviders } from "@/test/render";
 import { Progress, Tab, TabList, TabPanel, Tabs } from "@/ui";
@@ -22,6 +23,35 @@ import { worker } from "@/test/msw";
 
 // Spec 0003 RTE-3: the router runs under the /console base path and handles unknown paths itself.
 describe("createAppRouter", () => {
+  it("0017 AC-21: a client navigation to a slow page shows a skeleton in the shell, then the page", async () => {
+    const keys = deferred<undefined>();
+    worker.use(
+      http.get("/v1/console/projects/{projectId}/keys", async ({ response }) => {
+        await keys.promise;
+        return response(200).json({ items: [], nextCursor: null, total: null });
+      }),
+      ...shellHandlers,
+    );
+    const settings = `/${testOrgId}/${testProjectId}/settings`;
+    const screen = await renderWithProviders(`${settings}/general`);
+    await expect.element(screen.getByRole("textbox", { name: "Name" })).toBeVisible();
+
+    await screen.getByRole("link", { name: "API keys" }).click();
+
+    await expect.element(screen.getByRole("main").getByText("Loading")).toBeInTheDocument();
+    await expect.element(screen.getByRole("textbox", { name: "Name" })).not.toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("navigation", { name: "Breadcrumb" }).getByText("API keys"))
+      .toBeVisible();
+    await expect
+      .element(screen.getByRole("heading", { level: 1, name: "Project settings" }))
+      .toBeVisible();
+
+    keys.resolve(undefined);
+    await expect.element(screen.getByRole("main").getByText("Loading")).not.toBeInTheDocument();
+    expect(screen.router.state.location.pathname).toBe(`${settings}/keys`);
+  });
+
   it("shows a not found view when the path matches no route", async () => {
     worker.use(...shellHandlers);
     const screen = await renderWithProviders(`/${testOrgId}/${testProjectId}/no-such-page`);

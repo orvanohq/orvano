@@ -136,3 +136,27 @@ export function ContentSkeleton() {
     </Busy>
   );
 }
+
+/** The router's `defaultPendingComponent`: a page that's loading, inside the shell (spec 0003 RTE-3, RTE-4, UX-21). */
+export function PageSkeleton() {
+  return (
+    <div aria-busy="true">
+      <ContentSkeleton />
+    </div>
+  );
+}
+
+/**
+ * The root route's pending component. A `beforeLoad` waiting on frame data (RTE-4, RTE-9) keeps every route pending,
+ * the root too, so the shell can't render yet: this draws where its top bar and content will be.
+ */
+export function FrameSkeleton() {
+  return (
+    <div className="grid h-full grid-rows-[auto_minmax(0,1fr)] bg-bg">
+      <div className="h-topbar border-b bg-bg-subtle" />
+      <main className="min-w-0 overflow-auto px-4 py-6 lg:px-6">
+        <PageSkeleton />
+      </main>
+    </div>
+  );
+}

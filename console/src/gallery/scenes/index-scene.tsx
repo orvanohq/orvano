@@ -11,6 +11,7 @@ const scenes = [
   { to: "/data", label: "Data display (table, settings, copy, secrets, time)" },
   { to: "/boot-error", label: "Boot error page" },
   { to: "/root-error", label: "Root error page" },
+  { to: "/frame-skeleton", label: "Frame skeleton (before the shell can render)" },
   { to: "/acme/storefront/databases", label: "Shell, project scope (with a resource list)" },
   { to: "/acme/storefront/databases/users", label: "Shell, a table open (page header, tabs)" },
   { to: "/acme/storefront", label: "Shell, project scope (Overview, with a banner)" },

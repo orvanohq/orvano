@@ -86,7 +86,8 @@ describe("the session expired dialog", () => {
     expect(reloadConsole).not.toHaveBeenCalled();
   });
 
-  it("0003 QRY-8: a different operator gets a full reload, since the page holds the first one's data", async () => {
+  // e2e/session-dialog.spec.ts proves no leave prompt appears: only a real document load fires one.
+  it("0003 QRY-8: a different operator gets a full reload past the guard, since the page holds the first one's data", async () => {
     const someoneElse = {
       ...testSession,
       operator: { ...testSession.operator, id: "01970000-0000-7000-8000-000000000002" },
@@ -97,6 +98,7 @@ describe("the session expired dialog", () => {
       http.post("/v1/console/session", () => Response.json(someoneElse, { status: 201 })),
     );
     const screen = await renderWithProviders("/account");
+    const navigate = vi.spyOn(screen.router, "navigate").mockResolvedValue();
 
     await changePassword(screen);
     const dialog = screen.getByRole("dialog", { name: "Your session ended" });
@@ -105,7 +107,11 @@ describe("the session expired dialog", () => {
     await dialog.getByRole("button", { name: "Sign in" }).click();
 
     await vi.waitFor(() => {
-      expect(reloadConsole).toHaveBeenCalledOnce();
+      expect(navigate).toHaveBeenCalledExactlyOnceWith({
+        to: "/",
+        reloadDocument: true,
+        ignoreBlocker: true,
+      });
     });
   });
 

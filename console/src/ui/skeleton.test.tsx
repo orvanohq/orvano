@@ -5,7 +5,9 @@ import { expectNoAxeViolations } from "@/test/axe";
 import { renderInRouter } from "@/test/render";
 import {
   ContentSkeleton,
+  FrameSkeleton,
   GridSkeleton,
+  PageSkeleton,
   PENDING_DELAY_MS,
   PENDING_MINIMUM_MS,
   useDelayedPending,
@@ -102,6 +104,17 @@ describe("GridSkeleton and ContentSkeleton", () => {
     expect(grid?.children[1]?.children).toHaveLength(3);
     await expect.element(screen.getByText("Loading").first()).toBeInTheDocument();
     expect(screen.getByText("Loading").all()).toHaveLength(2);
+    await expectNoAxeViolations();
+  });
+
+  it.each([
+    ["PageSkeleton", <PageSkeleton key="page" />],
+    ["FrameSkeleton", <FrameSkeleton key="frame" />],
+  ])("0017 AC-21: %s marks the page busy and is named Loading", async (_name, element) => {
+    const { screen } = await renderInRouter(element);
+
+    await expect.element(screen.getByText("Loading")).toBeInTheDocument();
+    expect(document.querySelectorAll("[aria-busy='true']")).toHaveLength(1);
     await expectNoAxeViolations();
   });
 });

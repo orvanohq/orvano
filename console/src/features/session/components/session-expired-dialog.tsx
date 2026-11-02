@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { announceSessionChanged, reloadConsole } from "@/shared/session-channel";
+import { announceSessionChanged } from "@/shared/session-channel";
 import { sessionEnded } from "@/shared/stores/session";
 import { Dialog } from "@/ui";
 import { useAppForm } from "@/ui/form";
@@ -34,7 +34,9 @@ export default function SessionExpiredDialog() {
         return { form: signInFailure(error) };
       }
       if (session.operator.id !== held?.operator.id) {
-        reloadConsole();
+        // The cookie is already theirs, so nothing on this page can be saved, and staying would show one operator's data
+        // under another's session. `ignoreBlocker` keeps the unsaved changes guard from asking on the way out.
+        await router.navigate({ to: "/", reloadDocument: true, ignoreBlocker: true });
         return undefined;
       }
       queryClient.setQueryData(sessionQuery().queryKey, session);
