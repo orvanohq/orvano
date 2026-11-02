@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useCan } from "@/shared/access";
+import { keepListPage } from "@/shared/api/placeholder";
 import { PAGE_SIZES } from "@/shared/url/paging";
 import {
   Badge,
@@ -14,6 +15,7 @@ import {
   MenuItem,
   MenuTrigger,
   MoreIcon,
+  PageSkeleton,
   RelativeTime,
 } from "@/ui";
 import { Cell, Column, Pagination, Row, Table, TableBody, TableHeader } from "@/ui/table";
@@ -32,8 +34,10 @@ export function KeysPage() {
   const { t } = useLingui();
   const { projectId } = useParams({ from: "/_shell/$orgId/$projectId/settings/keys" });
   const { page, paging } = useKeysView();
-  const { data } = useSuspenseQuery(apiKeysQuery(projectId, page));
-  const { nextCursor } = data;
+  const { data, isFetching, isPlaceholderData } = useQuery({
+    ...apiKeysQuery(projectId, page),
+    ...keepListPage(projectId),
+  });
   const canWrite = useCan("project", "keys.write");
   const [isCreating, setCreating] = useState(false);
   const [acting, setActing] = useState<{ action: KeyAction; key: ApiKey }>();
@@ -53,9 +57,12 @@ export function KeysPage() {
   };
   const dialog = acting && { projectId, apiKey: acting.key, onClose: close };
 
+  if (data === undefined) return <PageSkeleton />;
+  const { nextCursor } = data;
+
   return (
     <div className="flex flex-col gap-4">
-      {data.items.length === 0 && page.cursor === undefined ? (
+      {data.items.length === 0 && page.cursor === undefined && !isPlaceholderData ? (
         <EmptyState
           kind="first-use"
           title={t`Create your first key`}
@@ -67,6 +74,7 @@ export function KeysPage() {
           <div className="flex justify-end">{create}</div>
           <KeysTable
             keys={data.items}
+            isBusy={isFetching}
             onAction={(action, key) => {
               setActing({ action, key });
             }}
@@ -74,6 +82,7 @@ export function KeysPage() {
           <Pagination
             pageSize={paging.pageSize}
             pageSizes={PAGE_SIZES}
+            isPending={isPlaceholderData}
             onPageSizeChange={paging.setPageSize}
             onPrevious={paging.previous}
             onNext={
@@ -103,14 +112,16 @@ export function KeysPage() {
 
 function KeysTable({
   keys,
+  isBusy,
   onAction,
 }: {
   keys: readonly ApiKey[];
+  isBusy: boolean;
   onAction: (action: KeyAction, key: ApiKey) => void;
 }) {
   const { t } = useLingui();
   return (
-    <Table aria-label={t`API keys`}>
+    <Table aria-label={t`API keys`} isBusy={isBusy}>
       <TableHeader>
         <Column id="name" isRowHeader>
           {t`Name`}

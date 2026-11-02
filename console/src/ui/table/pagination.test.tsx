@@ -1,17 +1,27 @@
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { expectNoAxeViolations } from "@/test/axe";
+import { focusElement } from "@/test/focus";
 import { renderInRouter } from "@/test/render";
 import { Pagination } from ".";
 
-function Paged({ onPrevious, onNext }: { onPrevious?: () => void; onNext?: () => void }) {
+function Paged({
+  onPrevious,
+  onNext,
+  isPending,
+}: {
+  onPrevious?: () => void;
+  onNext?: () => void;
+  isPending?: boolean;
+}) {
   const [pageSize, setPageSize] = useState(50);
   return (
     <Pagination
       pageSize={pageSize}
       pageSizes={[25, 50, 100]}
       onPageSizeChange={setPageSize}
+      isPending={isPending}
       onPrevious={onPrevious}
       onNext={onNext}
     />
@@ -30,6 +40,19 @@ describe("Pagination", () => {
     const previous = page.getByRole("button", { name: "Previous" });
     await expect.element(previous).toHaveAttribute("aria-disabled", "true");
     await expect.element(previous).toHaveAccessibleDescription("No more pages.");
+    await expectNoAxeViolations();
+  });
+
+  it("0001 UX-21: while a page loads, Next keeps focus and ignores a press", async () => {
+    const onNext = vi.fn<() => void>();
+    await renderInRouter(<Paged onNext={onNext} isPending />);
+
+    const next = page.getByRole("button", { name: "Next" });
+    await focusElement(next);
+    await userEvent.keyboard("{Enter}");
+
+    expect(onNext).not.toHaveBeenCalled();
+    await expect.element(next).toHaveFocus();
     await expectNoAxeViolations();
   });
 

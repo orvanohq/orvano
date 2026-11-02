@@ -1,12 +1,13 @@
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { NewOrganizationDialog } from "@/features/organizations";
 import { useCan } from "@/shared/access";
 import { ApiError } from "@/shared/api/errors";
+import { keepListPage } from "@/shared/api/placeholder";
 import { PAGE_SIZES } from "@/shared/url/paging";
-import { Badge, Button, Dialog, EmptyState, Link, PageHeader } from "@/ui";
+import { Badge, Button, Dialog, EmptyState, Link, PageHeader, PageSkeleton } from "@/ui";
 import { useAppForm } from "@/ui/form";
 import { Cell, Column, Pagination, Row, Table, TableBody, TableHeader } from "@/ui/table";
 import { useCreateProject } from "../api/mutations";
@@ -25,16 +26,15 @@ export function OrganizationPage() {
   const { t } = useLingui();
   const { orgId } = useParams({ from: "/_shell/$orgId/" });
   const { creating, open, page, paging } = useOrganizationView();
-  const { data } = useSuspenseQuery({
+  const { data, isFetching, isPlaceholderData } = useQuery({
     ...projectsQuery(orgId, page),
+    ...keepListPage(orgId),
     refetchInterval: (query) =>
       query.state.data?.items.some((project) => project.status === "deleting")
         ? DELETING_POLL_MS
         : false,
   });
-  const { nextCursor } = data;
   const canCreate = useCan("organization", "projects.create");
-  const isFirstUse = data.items.length === 0 && page.cursor === undefined;
   const create = (
     <Button
       variant="primary"
@@ -49,6 +49,10 @@ export function OrganizationPage() {
     </Button>
   );
 
+  if (data === undefined) return <PageSkeleton />;
+  const { nextCursor } = data;
+  const isFirstUse = data.items.length === 0 && page.cursor === undefined && !isPlaceholderData;
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title={t`Projects`} actions={isFirstUse ? undefined : create} />
@@ -61,10 +65,11 @@ export function OrganizationPage() {
         />
       ) : (
         <>
-          <ProjectsTable orgId={orgId} projects={data.items} />
+          <ProjectsTable orgId={orgId} projects={data.items} isBusy={isFetching} />
           <Pagination
             pageSize={paging.pageSize}
             pageSizes={PAGE_SIZES}
+            isPending={isPlaceholderData}
             onPageSizeChange={paging.setPageSize}
             onPrevious={paging.previous}
             onNext={
@@ -94,10 +99,18 @@ export function OrganizationPage() {
   );
 }
 
-function ProjectsTable({ orgId, projects }: { orgId: string; projects: readonly Project[] }) {
+function ProjectsTable({
+  orgId,
+  projects,
+  isBusy,
+}: {
+  orgId: string;
+  projects: readonly Project[];
+  isBusy: boolean;
+}) {
   const { t } = useLingui();
   return (
-    <Table aria-label={t`Projects`}>
+    <Table aria-label={t`Projects`} isBusy={isBusy}>
       <TableHeader>
         <Column id="name" isRowHeader>
           {t`Name`}

@@ -117,6 +117,17 @@ export function DataScene() {
         />
       </Section>
 
+      <Section title="Pagination, next page loading">
+        <Pagination
+          pageSize={pageSize}
+          pageSizes={[25, 50, 100]}
+          onPageSizeChange={setPageSize}
+          isPending
+          onPrevious={() => undefined}
+          onNext={() => undefined}
+        />
+      </Section>
+
       <Section title="SettingsCard and DangerZone">
         <NameSettingsCard
           title="General"

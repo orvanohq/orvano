@@ -10,6 +10,8 @@ export interface PaginationProps {
   /** What the picker offers (spec 0001 UX-14: 25, 50, 100). */
   pageSizes: readonly number[];
   onPageSizeChange: (pageSize: number) => void;
+  /** The next page is on its way: Previous and Next show it, keep focus, and ignore presses (UX-21, FRM-4). */
+  isPending?: boolean;
   /** Left out on the first page. */
   onPrevious?: () => void;
   /** Left out on the last page. */
@@ -24,6 +26,7 @@ export function Pagination({
   pageSize,
   pageSizes,
   onPageSizeChange,
+  isPending,
   onPrevious,
   onNext,
 }: PaginationProps) {
@@ -50,11 +53,17 @@ export function Pagination({
       <Button
         unavailableReason={onPrevious ? undefined : noPage}
         reasonMayChange
+        isPending={isPending}
         onPress={onPrevious}
       >
         {t`Previous`}
       </Button>
-      <Button unavailableReason={onNext ? undefined : noPage} reasonMayChange onPress={onNext}>
+      <Button
+        unavailableReason={onNext ? undefined : noPage}
+        reasonMayChange
+        isPending={isPending}
+        onPress={onNext}
+      >
         {t`Next`}
       </Button>
     </nav>
