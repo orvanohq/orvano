@@ -38,10 +38,11 @@ spec [0017](../specs/0017-console-accounts-projects/index.md)
   - [x] Milestone 3, keys, projects, organizations: re-auth, revoke, regenerate, rename, expiry, the full key form, the origins page and cache invalidation, project delete and teardown, organizations and switchers, `allowedActions`, and the leak tests (steps 14 to 20; AC-7 to AC-14, AC-21, AC-25)
   - [x] Milestone 4, account and recovery: the account page, `orvano admin reset-operator`, the session expired dialog, sign out across tabs, and the cleanup job (steps 21 to 24; AC-6, AC-8, AC-10, AC-18, AC-19, AC-26)
   - [x] Milestone 5, budget, sign off: the hidden Language field, error messages by code, right to left and axe, removing the shell probe, the CSP test, the guide, and the manual runs (steps 25 to 29; AC-17, AC-18, AC-19, AC-23, AC-24, AC-27)
-- [ ] Verify it: `/check verify console accounts & projects`
+- [ ] Verify it: `/check verify console accounts & projects` (ran in #169, #171, and #172; every AC met, blocked only on the deferred rows below, so run it again once they have results)
 - [ ] Test it: `/test console accounts & projects`
 - [ ] Review it (fresh model): `/check review console accounts & projects`
 - [ ] Document it: `/document console accounts & projects`
+- [ ] Deferred until before feature 59: VFY-5, the screen reader run (spec 0017 `verify.md`; VoiceOver on Safari and NVDA on Firefox; AC-21), with a person's keyboard pass of VFY-6, which has passed by script only. Decided 2026-11-01 so it doesn't hold up slice 1. Feature 13 can't be `done` before then. Listen first at the key reveal: focus doesn't land on the secret, and its warning may not be read aloud (`docs/reviews/2026-11-01-reverify-console-accounts-projects.md`).
 
 ## Slice 3: Database breadth
 

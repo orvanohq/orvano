@@ -10,6 +10,29 @@ The block is only the rows below, the same way feature 12's box waits on its row
 
 Next, as a recommendation: you could run or defer the rows below, and run `/debug` on R-1. Scope: nothing ticked, and `verify.md`, the spec, and `docs/scope/platform.md` are unchanged.
 
+## Update: the person rows, run on request
+
+You asked this session to run VFY-2, VFY-5, and VFY-6. **VFY-2 now passes, VFY-6 passed by script, and VFY-5 can't be run from here.** So AC-5 and AC-6 are fully met, and only AC-21 still rests on a row: 26 criteria are met, 1 is met here with rows owed, and 0 failed. You then deferred VFY-5 until before feature 59, with a person's pass of VFY-6, so `Verify it` stays unticked with a note in the scope, as feature 12's does. The image is `orvano:reverify-13`, on a fresh `install.sh --local` each time.
+
+| Row   | Result        | What happened                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| VFY-2 | Pass          | Real Safari 26.6.1 on macOS 15.7.4, driven through `safaridriver`, from the link `install.sh` printed. `orvano_session` is kept, `HttpOnly`, `SameSite=Lax`, not `Secure`. A reload stayed signed in, after the owner form and after signing in through the page. Sign out cleared the cookie. The run was driven by WebDriver, with no person watching, in Safari's automation window.                                                                                                                   |
+| VFY-6 | Scripted pass | Keyboard only from setup to project delete in Chromium 156, Firefox 157, and WebKit 27.2, 12 of 12 in each: the owner form, New project, the scope checklist, both Tier confirms, both switchers, and the skip link. Every checked stop shows a focus ring, and nothing traps the keyboard. The keys list is a grid, so Tab enters once and arrow keys reach Actions. It's a script, and `verify.md` says that doesn't replace a person, so whether it counts is your call. It didn't run in real Safari. |
+| VFY-5 | Not run       | NVDA needs Windows, and this Mac has no VM. I can't drive or hear VoiceOver from here. What follows is what a screen reader would be given, and it's supporting evidence, not a pass.                                                                                                                                                                                                                                                                                                                     |
+
+What the VFY-5 evidence shows, in Chromium and WebKit:
+
+- Form errors look sound. Focus moves to a group named "Fix this problem to continue", and the field has `aria-invalid` and its message in `aria-describedby`.
+- **Listen for this at the key reveal.** Focus lands on Close in Chromium and on `<body>` in WebKit, not on the secret or its warning. The warning sits in a `status` region that appears with its text already in it, which screen readers often skip. It may not be read aloud, and VFY-5 asks for exactly that.
+- After setup, focus falls to `<body>`, and nothing is announced.
+
+Two earlier results changed with real Safari:
+
+- F-1: `https://evil.example/landing` stays on the console in Safari too.
+- F-9: opening the key sheet reported no CSP violation in real Safari, so it may be specific to Playwright's WebKit build. It stays low, and now looks smaller.
+
+F-10 reproduced in Chromium, Firefox, and WebKit.
+
 ## What a person still owes
 
 | Row                      | State   | What is missing                                                         | Criteria it holds up |
