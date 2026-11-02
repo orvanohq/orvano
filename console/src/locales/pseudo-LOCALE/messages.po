@@ -601,7 +601,7 @@ msgid "Done"
 msgstr ""
 
 #: src/features/account/components/account-page.tsx:90
-#: src/features/session/components/session-expired-dialog.tsx:65
+#: src/features/session/components/session-expired-dialog.tsx:67
 #: src/features/session/components/sign-in-page.tsx:52
 #: src/features/setup/components/owner-step.tsx:90
 msgid "Email"
@@ -980,7 +980,7 @@ msgstr ""
 
 #: src/features/account/components/account-page.tsx:183
 #: src/features/session/components/reauth-dialog.tsx:71
-#: src/features/session/components/session-expired-dialog.tsx:70
+#: src/features/session/components/session-expired-dialog.tsx:72
 #: src/features/session/components/sign-in-page.tsx:55
 #: src/features/setup/components/owner-step.tsx:103
 msgid "Password"
@@ -1277,7 +1277,7 @@ msgstr ""
 
 #: src/features/api-keys/components/scope-checklist.tsx:23
 #: src/features/session/components/reset-page.tsx:66
-#: src/features/session/components/session-expired-dialog.tsx:57
+#: src/features/session/components/session-expired-dialog.tsx:59
 #: src/features/session/components/sign-in-page.tsx:20
 #: src/features/session/components/sign-in-page.tsx:46
 #: src/features/session/components/sign-in-page.tsx:57
@@ -1285,7 +1285,7 @@ msgstr ""
 msgid "Sign in"
 msgstr ""
 
-#: src/features/session/components/session-expired-dialog.tsx:52
+#: src/features/session/components/session-expired-dialog.tsx:54
 msgid "Sign in to carry on. What you typed is kept."
 msgstr ""
 
@@ -1697,7 +1697,7 @@ msgstr ""
 msgid "Your password couldn't be checked. Try again in a moment."
 msgstr ""
 
-#: src/features/session/components/session-expired-dialog.tsx:51
+#: src/features/session/components/session-expired-dialog.tsx:53
 msgid "Your session ended"
 msgstr ""
 

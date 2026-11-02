@@ -7,6 +7,7 @@ import {
   EmptyState,
   ErrorState,
   GridSkeleton,
+  PageSkeleton,
   InlineError,
   notify,
   Progress,
@@ -169,6 +170,7 @@ export function FeedbackScene() {
         </div>
         <GridSkeleton columns={5} />
         <ContentSkeleton />
+        <PageSkeleton />
         <DelayedPendingDemo />
       </Section>
 
