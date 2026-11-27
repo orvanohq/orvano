@@ -36,6 +36,8 @@ dotnet run --project server/src/Orvano.AppHost
 
 1. Branch from `main` (for example `feat/storage-buckets` or `fix/token-expiry`).
 2. Keep to the rules in the nearest `AGENTS.md`. The architecture tests in `server/tests/Orvano.ArchitectureTests` check which projects may reference which, so run the tests before you push.
+   - `pnpm install` sets up a pre commit hook that formats and lints only the files you staged. `pnpm format` formats everything, and `pnpm lint` and `pnpm typecheck` check the console and docs site.
+   - C# warnings are errors, and the style rules in `.editorconfig` fail the build. CI runs the same checks plus the full build and tests on every push and pull request.
 3. Add or update tests. Integration tests run against a real Postgres through Testcontainers.
 4. Write commit messages in the [Conventional Commits](https://www.conventionalcommits.org/) style, for example `feat(auth): add sign in with email`.
 5. Sign off every commit (see below), push, and open a pull request against `main`.

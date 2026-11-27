@@ -22,7 +22,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | # | Feature | Phase | Status |
 |---|---------|-------|--------|
 | 1 | Stack & architecture | M0 | done |
-| 2 | Coding standards & tooling | M0 | planned |
+| 2 | Coding standards & tooling | M0 | in-progress |
 | 3 | Open repo basics | M0 | done |
 | 4 | Compose stack skeleton | M0 | planned |
 | 5 | Console shell & design foundation | M0 | planned |
