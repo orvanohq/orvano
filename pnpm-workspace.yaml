@@ -8,3 +8,4 @@ packages:
 allowBuilds:
   sharp: false
   unrs-resolver: false
+  simple-git-hooks: false
