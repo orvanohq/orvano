@@ -11,11 +11,12 @@ Spec [0001](../specs/0001-stack-architecture/index.md) · code in `Orvano.slnx`,
 - [x] Decide the stack (spec): `/architect stack & architecture`
 - [x] Scaffold from the decision: `/develop stack & architecture`
 
-### 2. Coding standards & tooling
+### 2. Coding standards & tooling · in-progress
 Capture conventions and tooling choices from the real scaffold, folding in `docs/design/agent-rules.md`, then install lint, format, analyzers, commit hooks and the CI checks.
 **Done when:** root and nested `AGENTS.md` files reflect the real project and point the console at the design system and mockups; lint, format, build and test checks run clean locally and in CI.
+Code in `.editorconfig`, `Directory.Build.props`, `lint-staged.config.mjs`, `.prettierrc.json`, `console/eslint.config.mjs`, `website/eslint.config.mjs`, `.github/workflows/ci.yml`
 - [ ] Capture conventions and tooling choices: `/audit`
-- [ ] Install the tooling: `/develop tooling`
+- [x] Install the tooling: `/develop tooling`
 
 ### 3. Open repo basics · done
 The repo is public from M0, so the legal and contributor basics land before the first public commit.

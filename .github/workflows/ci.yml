@@ -1,0 +1,57 @@
+# Build, lint, format check and test on every push and pull request (AGENTS.md, Tooling).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dotnet:
+    name: .NET build, format and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Restore
+        run: dotnet restore Orvano.slnx
+      - name: Check formatting and analyzers
+        run: dotnet format Orvano.slnx --no-restore --verify-no-changes
+      - name: Build (warnings are errors)
+        run: dotnet build Orvano.slnx --no-restore -c Release
+      - name: Test
+        run: dotnet test --solution Orvano.slnx --no-build -c Release
+
+  web:
+    name: Console and docs lint, typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Check formatting
+        run: pnpm exec prettier --check console website
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Build
+        run: pnpm build
