@@ -1,0 +1,13 @@
+<Project>
+  <!-- Defaults for every .NET project in the repo. See docs/specs/0001-stack-architecture/index.md -->
+  <PropertyGroup>
+    <!-- One product version for the server, the CLI and the images. The release pipeline overrides it from the git tag (feature 40). -->
+    <Version>0.1.0-dev</Version>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Authors>Orvano contributors</Authors>
+    <Product>Orvano</Product>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,22 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.5">
+
+  <!-- Contributors only. Users run Docker Compose (feature 4).
+       Start everything with dotnet run, pointing it at the server/src/Orvano.AppHost project.
+       A global Aspire CLI is optional: with the CLI bundle on, dotnet run uses a compatible aspire on PATH,
+       or else fetches the Aspire CLI version paired with this SDK through dnx (from nuget.org). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AspireUseCliBundle>true</AspireUseCliBundle>
+    <UserSecretsId>98eb98c3-071f-4bd6-8fe3-0bebed6df990</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orvano.Host\Orvano.Host.csproj" />
+    <ProjectReference Include="..\Orvano.Executor\Orvano.Executor.csproj" />
+  </ItemGroup>
+
+</Project>

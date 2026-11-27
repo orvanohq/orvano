@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Interfaces modules use to talk to each other, and their events. No ASP.NET Core, EF Core, Npgsql or modules. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orvano.Wire\Orvano.Wire.csproj" />
+  </ItemGroup>
+
+</Project>

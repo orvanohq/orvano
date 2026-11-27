@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Code shared with the MIT licensed CLI: IDs, the error shape, event payloads and the JSON source generator context.
+       Base class library and System.Text.Json only. No ASP.NET Core, EF Core or Npgsql, ever.
+       The Native AOT CLI compiles this project, so it must stay AOT safe. -->
+  <PropertyGroup>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+</Project>

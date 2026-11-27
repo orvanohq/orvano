@@ -4,12 +4,12 @@ The ground every later slice stands on: the recorded stack, the scaffold, the st
 
 ## M0 (Phase 1: Foundation)
 
-### 1. Stack & architecture · in-progress · Beta
+### 1. Stack & architecture · done · Beta
 Record the stack the design spec already locked, settle the one open choice (the durable job queue), and scaffold the monorepo so every later slice lands in real structure.
 **Done when:** the stack and the job queue choice are recorded in a spec with no comparison of settled parts, and the scaffold (server solution, console, CLI, docs site, deploy and contract folders) builds from a clean clone.
-Spec [0001](../specs/0001-stack-architecture/index.md)
+Spec [0001](../specs/0001-stack-architecture/index.md) · code in `Orvano.slnx`, `server/`, `cli/`, `console/`, `website/`
 - [x] Decide the stack (spec): `/architect stack & architecture`
-- [ ] Scaffold from the decision: `/develop stack & architecture`
+- [x] Scaffold from the decision: `/develop stack & architecture`
 
 ### 2. Coding standards & tooling
 Capture conventions and tooling choices from the real scaffold, folding in `docs/design/agent-rules.md`, then install lint, format, analyzers, commit hooks and the CI checks.

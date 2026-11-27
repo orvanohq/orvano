@@ -1,7 +1,7 @@
 # 0001. Orvano stack and architecture, with its own Postgres job queue
 
 **Date**: 2026-11-27
-**Status**: Proposed
+**Status**: Accepted
 
 ## Summary
 

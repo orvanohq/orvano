@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Placeholder until feature 5 maps docs/design/design-system/tokens.css. */
+body {
+  font-family: system-ui, sans-serif;
+}

@@ -1,0 +1,26 @@
+<Project>
+  <!-- Central NuGet package versions for every .NET project. Projects list packages without a Version. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Aspire major 13 is pinned by spec 0001. Keep this in step with the Sdk attribute in Orvano.AppHost.csproj, which brings Aspire.Hosting.AppHost itself. -->
+    <AspireVersion>13.6.5</AspireVersion>
+    <OpenTelemetryVersion>1.21.0</OpenTelemetryVersion>
+  </PropertyGroup>
+  <ItemGroup Label="Aspire">
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="$(AspireVersion)" />
+  </ItemGroup>
+  <ItemGroup Label="OpenTelemetry">
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="$(OpenTelemetryVersion)" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="$(OpenTelemetryVersion)" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="$(OpenTelemetryVersion)" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="$(OpenTelemetryVersion)" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="$(OpenTelemetryVersion)" />
+  </ItemGroup>
+  <ItemGroup Label="CLI">
+    <PackageVersion Include="System.CommandLine" Version="3.0.0" />
+  </ItemGroup>
+  <ItemGroup Label="Testing">
+    <!-- dotnet test runs on Microsoft.Testing.Platform (see global.json), so no VSTest adapter packages. -->
+    <PackageVersion Include="xunit.v3" Version="4.0.3" />
+  </ItemGroup>
+</Project>

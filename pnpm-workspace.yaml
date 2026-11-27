@@ -1,0 +1,10 @@
+# One pnpm workspace for every JavaScript package in the repo.
+# Later: sdks/ts/* (feature 17) and cli/npm (feature 73).
+packages:
+  - console
+  - website
+
+# Dependencies allowed (true) or not allowed (false) to run install scripts.
+allowBuilds:
+  sharp: false
+  unrs-resolver: false

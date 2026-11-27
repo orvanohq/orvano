@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The orvano CLI. MIT licensed, compiled ahead of time to one native binary.
+       It may reference Orvano.Wire and nothing else under server/.
+       Publish for your platform: dotnet publish cli/Orvano.Cli -c Release -r <rid> -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>orvano</AssemblyName>
+    <RootNamespace>Orvano.Cli</RootNamespace>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Print the product version exactly as Directory.Build.props sets it. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\server\src\Orvano.Wire\Orvano.Wire.csproj" />
+  </ItemGroup>
+
+</Project>

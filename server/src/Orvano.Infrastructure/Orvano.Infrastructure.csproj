@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shared server building blocks (outbox writer, jobs, Data Protection keys). Never references a module or Orvano.Host. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orvano.Wire\Orvano.Wire.csproj" />
+    <ProjectReference Include="..\Orvano.Contracts\Orvano.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

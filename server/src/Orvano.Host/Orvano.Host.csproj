@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- The orvano container: API, realtime, worker, scheduler, MCP and console files in one process.
+       Modules are added here as each feature creates its Orvano.Modules.<Name> project. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orvano.ServiceDefaults\Orvano.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\Orvano.Wire\Orvano.Wire.csproj" />
+    <ProjectReference Include="..\Orvano.Contracts\Orvano.Contracts.csproj" />
+    <ProjectReference Include="..\Orvano.Infrastructure\Orvano.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
