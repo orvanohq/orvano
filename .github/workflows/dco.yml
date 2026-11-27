@@ -1,0 +1,34 @@
+# Developer Certificate of Origin check: every commit in a pull request needs a
+# Signed-off-by line that matches its author email. See CONTRIBUTING.md.
+name: DCO
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  dco:
+    name: DCO sign off
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Get the check script from the base branch
+        # Read the script from the base branch, so a pull request cannot change the check it is judged by.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          gh api "repos/$REPO/contents/.github/scripts/check-dco.sh?ref=$BASE_SHA" \
+            -H "Accept: application/vnd.github.raw" > check-dco.sh
+      - name: Check every commit is signed off
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/commits?per_page=100" | bash check-dco.sh

@@ -17,10 +17,11 @@ Capture conventions and tooling choices from the real scaffold, folding in `docs
 - [ ] Capture conventions and tooling choices: `/audit`
 - [ ] Install the tooling: `/develop tooling`
 
-### 3. Open repo basics
+### 3. Open repo basics · in-progress
 The repo is public from M0, so the legal and contributor basics land before the first public commit.
 **Done when:** licence files (`Apache-2.0` for the server, MIT per folder for SDKs and CLI), a `NOTICE`, a DCO sign off check on pull requests, a contributing guide, a security policy and a clear pre alpha notice are in place.
-- [ ] Build it: `/develop open repo basics`
+Code in `LICENSE`, `NOTICE`, `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `.github/`
+- [x] Build it: `/develop open repo basics`
 
 ### 4. Compose stack skeleton · needs a decision
 The thinnest real thread through the deployment: Caddy in front, the `orvano` host with health checks, Postgres behind it, an executor placeholder beside it. Nothing is faked; it is only narrow.

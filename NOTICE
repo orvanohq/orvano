@@ -1,0 +1,11 @@
+Orvano
+Copyright 2026 The Orvano Authors
+
+This product includes software developed by The Orvano Authors
+(https://github.com/orvanohq/orvano). The Orvano Authors are the
+people and organizations listed in this repository's git history.
+
+The Orvano server is licensed under the Apache License, Version 2.0
+(see LICENSE). Folders that carry their own LICENSE file, such as
+cli/, server/src/Orvano.Wire/ and the SDKs under sdks/, are licensed
+under the MIT License instead.
