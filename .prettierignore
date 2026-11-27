@@ -1,0 +1,13 @@
+# Prettier formats the console and the docs site only (AGENTS.md, Tooling).
+# Generated output and lockfiles are never formatted.
+node_modules/
+.next/
+out/
+dist/
+.astro/
+next-env.d.ts
+pnpm-lock.yaml
+
+# Agent context files are edited line by line by /audit and /sync; keep them as written.
+AGENTS.md
+CLAUDE.md
