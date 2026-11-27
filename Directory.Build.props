@@ -10,4 +10,18 @@
     <Authors>Orvano contributors</Authors>
     <Product>Orvano</Product>
   </PropertyGroup>
+
+  <!-- Strictness and analyzers (feature 2). Style rules live in .editorconfig. -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- Also lets IDE0005 (unused usings) run during the build, not just in the editor. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- XML docs are required on public types only in the public surface projects (AGENTS.md, "Document public APIs"). -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' != 'Orvano.Wire' and '$(MSBuildProjectName)' != 'Orvano.Contracts'">
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
 </Project>

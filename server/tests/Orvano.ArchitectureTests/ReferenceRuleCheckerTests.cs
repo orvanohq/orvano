@@ -16,19 +16,19 @@ public sealed class ReferenceRuleCheckerTests
         string[]? frameworks = null,
         bool test = false,
         string? outputType = null) => new()
-    {
-        Name = name,
-        RelativePath = path ?? $"server/src/{name}/{name}.csproj",
-        Sdk = sdk,
-        OutputType = outputType,
-        IsTestProject = test,
-        DirectProjects = (direct ?? []).ToHashSet(),
-        AllProjects = (all ?? direct ?? []).ToHashSet(),
-        AllPackages = (packages ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase),
-        FrameworkReferences = (frameworks ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase),
-    };
+        {
+            Name = name,
+            RelativePath = path ?? $"server/src/{name}/{name}.csproj",
+            Sdk = sdk,
+            OutputType = outputType,
+            IsTestProject = test,
+            DirectProjects = (direct ?? []).ToHashSet(),
+            AllProjects = (all ?? direct ?? []).ToHashSet(),
+            AllPackages = (packages ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase),
+            FrameworkReferences = (frameworks ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase),
+        };
 
-    private static IReadOnlyDictionary<string, ProjectInfo> Repo(params ProjectInfo[] projects) =>
+    private static Dictionary<string, ProjectInfo> Repo(params ProjectInfo[] projects) =>
         projects.ToDictionary(p => p.Name);
 
     private static IReadOnlyList<string> CheckFirst(params ProjectInfo[] projects) =>
