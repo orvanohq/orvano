@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orvano · Approval queue</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+a{color:#2F5BFF;text-decoration:none}a:hover{color:#2449D8}
+button{font-family:inherit;cursor:pointer}
+</style>
+</head>
+<body>
+
+<div style="min-height: 820px; background: #F7F8FA; color: #0F172A; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; line-height: 20px; display: flex; flex-direction: column">
+  <header style="height: 48px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 12px; background: #FFFFFF; border-bottom: 1px solid #E2E6EC; flex-wrap: wrap">
+    <a href="Projects.html" style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; color: #0F172A"><span style="width: 10px; height: 10px; border-radius: 4px; background: #2F5BFF"></span>Orvano</a>
+    <span style="color: #CBD2DC">/</span>
+    <button style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #0F172A; font-size: 14px; font-weight: 500">recipes-prod<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+    <div style="flex: 1"></div>
+    <span style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; background: #FDF3E2; color: #B45309; font-size: 12px; font-weight: 500"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5z"/><path d="M12 8v4M12 16h.01"/></svg>2 pending approvals</span>
+    <button aria-label="Search or run a command" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; width: 220px; border: 1px solid #CBD2DC; border-radius: 6px; background: #FFFFFF; color: #6B7280; font-size: 13px">Search or run…<span style="margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 12px">⌘K</span></button>
+    <span style="width: 28px; height: 28px; border-radius: 9999px; background: #EBF0FF; color: #1E3FBF; display: grid; place-items: center; font-size: 12px; font-weight: 600">AK</span>
+  </header>
+  <div style="display: flex; flex: 1; flex-wrap: wrap">
+    <nav aria-label="Project" style="width: 56px; box-sizing: border-box; padding: 12px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; background: #F0F2F5; border-right: 1px solid #E2E6EC">
+      
+        <a href="#" aria-label="Overview" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></a>
+      
+        <a href="#" aria-label="Auth" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M15 7a4 4 0 1 1-3.9 5H3v4h4v-2h3"/></svg></a>
+      
+        <a href="TableEditor.html" aria-label="Database" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></a>
+      
+        <a href="#" aria-label="Storage" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></a>
+      
+        <a href="#" aria-label="Realtime" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 12a7 7 0 0 1 14 0M8 12a4 4 0 0 1 8 0M12 12h.01"/></svg></a>
+      
+        <a href="#" aria-label="Functions" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 4h16v16H4zM9 17c2 0 2-10 4-10M9 11h5"/></svg></a>
+      
+        <a href="#" aria-label="Sites" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c2.5 3 2.5 15 0 18"/></svg></a>
+      
+        <a href="#" aria-label="Webhooks" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M18 16a4 4 0 1 1-4-4M6 16a4 4 0 1 0 4-4M12 4a4 4 0 0 0-2 7.5"/></svg></a>
+      
+        <a href="#" aria-label="Email" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 6h18v12H3zM3 7l9 6 9-6"/></svg></a>
+      
+        <a href="#" aria-label="AI" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; background: #EBF0FF; color: #2F5BFF"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/></svg></a>
+      
+        <a href="#" aria-label="Logs" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></a>
+      
+        <a href="#" aria-label="Settings" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3"/></svg></a>
+      
+    </nav>
+    <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 24px; display: flex; flex-direction: column; gap: 24px; max-width: 1280px">
+      <div>
+        <div style="font-size: 12px; line-height: 16px; font-weight: 500; color: #4B5563">AI</div>
+        <h1 style="margin: 0; font-size: 24px; line-height: 32px; font-weight: 600">Approvals</h1>
+        <p style="margin: 4px 0 0; color: #4B5563">Destructive changes requested by AI agents wait here until a person approves them.</p>
+      </div>
+      
+        <article style="border: 1px solid #E2E6EC; border-radius: 10px; background: #FFFFFF; overflow: hidden">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #FDF3E2; color: #B45309; font-size: 13px; flex-wrap: wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/></svg>
+            <span style="font-weight: 500">Pending approval</span>
+            <span style="color: #4B5563">·</span>
+            <span style="color: #0F172A">Claude Code · alex@acme.dev</span>
+            <span style="padding: 0 6px; border-radius: 4px; background: #FFFFFF; color: #4B5563; font-size: 12px; font-weight: 500">via MCP</span>
+            <span style="margin-left: auto; color: #4B5563">3 min ago</span>
+          </div>
+          <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px">
+            <h2 style="margin: 0; font-size: 15px; line-height: 22px; font-weight: 600">Drop column legacy_slug from recipes</h2>
+            <p style="margin: 0; color: #4B5563">The agent replaced slugs with generated IDs and wants to remove the old column.</p>
+            <pre style="margin: 0; padding: 12px; border-radius: 6px; background: #F0F2F5; font-family: 'IBM Plex Mono', monospace; font-size: 13px; line-height: 20px; overflow-x: auto; white-space: pre">-- migration 0014_drop_legacy_slug (planned)
+ALTER TABLE recipes DROP COLUMN legacy_slug;
+
+-- rows affected: 1,204   indexes dropped: recipes_legacy_slug_idx</pre>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+              <span style="padding: 2px 8px; border-radius: 4px; background: #FDECEC; color: #DC2626; font-size: 12px; font-weight: 500">Destructive</span>
+              <span style="color: #4B5563; font-size: 13px">Data in this column cannot be recovered except from the nightly backup (02:00).</span>
+              <div style="flex: 1"></div>
+              <button style="height: 36px; padding: 0 14px; border: 1px solid #CBD2DC; border-radius: 6px; background: #FFFFFF; color: #0F172A; font-size: 14px; font-weight: 500">Reject</button>
+              <button style="height: 36px; padding: 0 14px; border: 0; border-radius: 6px; background: #2F5BFF; color: #FFFFFF; font-size: 14px; font-weight: 500">Approve change</button>
+            </div>
+          </div>
+        </article>
+      
+        <article style="border: 1px solid #E2E6EC; border-radius: 10px; background: #FFFFFF; overflow: hidden">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #FDF3E2; color: #B45309; font-size: 13px; flex-wrap: wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/></svg>
+            <span style="font-weight: 500">Pending approval</span>
+            <span style="color: #4B5563">·</span>
+            <span style="color: #0F172A">Cursor · sam@acme.dev</span>
+            <span style="padding: 0 6px; border-radius: 4px; background: #FFFFFF; color: #4B5563; font-size: 12px; font-weight: 500">via MCP</span>
+            <span style="margin-left: auto; color: #4B5563">18 min ago</span>
+          </div>
+          <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px">
+            <h2 style="margin: 0; font-size: 15px; line-height: 22px; font-weight: 600">Delete bucket tmp-uploads</h2>
+            <p style="margin: 0; color: #4B5563">The agent says this bucket was only used for local testing.</p>
+            <pre style="margin: 0; padding: 12px; border-radius: 6px; background: #F0F2F5; font-family: 'IBM Plex Mono', monospace; font-size: 13px; line-height: 20px; overflow-x: auto; white-space: pre">DELETE bucket tmp-uploads
+  files: 86 (412 MB)   last upload: 9 days ago
+  referenced by: no tables</pre>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+              <span style="padding: 2px 8px; border-radius: 4px; background: #FDECEC; color: #DC2626; font-size: 12px; font-weight: 500">Destructive</span>
+              <span style="color: #4B5563; font-size: 13px">All 86 files will be deleted permanently.</span>
+              <div style="flex: 1"></div>
+              <button style="height: 36px; padding: 0 14px; border: 1px solid #CBD2DC; border-radius: 6px; background: #FFFFFF; color: #0F172A; font-size: 14px; font-weight: 500">Reject</button>
+              <button style="height: 36px; padding: 0 14px; border: 0; border-radius: 6px; background: #2F5BFF; color: #FFFFFF; font-size: 14px; font-weight: 500">Approve change</button>
+            </div>
+          </div>
+        </article>
+      
+      <section>
+        <h2 style="margin: 0 0 8px; font-size: 18px; line-height: 26px; font-weight: 600">Recent decisions</h2>
+        <div style="border: 1px solid #E2E6EC; border-radius: 6px; background: #FFFFFF; overflow-x: auto">
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px">
+            <thead><tr style="background: #F0F2F5; text-align: left; font-size: 12px; color: #4B5563"><th style="padding: 8px 12px; font-weight: 500">Change</th><th style="padding: 8px 12px; font-weight: 500">Agent</th><th style="padding: 8px 12px; font-weight: 500">Decision</th><th style="padding: 8px 12px; font-weight: 500">By</th><th style="padding: 8px 12px; font-weight: 500; text-align: right">When</th></tr></thead>
+            <tbody>
+              
+                <tr style="border-top: 1px solid #E2E6EC; height: 36px"><td style="padding: 0 12px">Rename column title to name in ingredients</td><td style="padding: 0 12px; color: #4B5563">Claude Code</td><td style="padding: 0 12px"><span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #15803D"><span style="width: 8px; height: 8px; border-radius: 9999px; background: #15803D"></span>Approved</span></td><td style="padding: 0 12px; color: #4B5563">Alex Kim</td><td style="padding: 0 12px; color: #4B5563; text-align: right">Today, 10:42</td></tr>
+              
+                <tr style="border-top: 1px solid #E2E6EC; height: 36px"><td style="padding: 0 12px">Delete function cleanup-sessions</td><td style="padding: 0 12px; color: #4B5563">Cursor</td><td style="padding: 0 12px"><span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #DC2626"><span style="width: 8px; height: 8px; border-radius: 9999px; background: #DC2626"></span>Rejected</span></td><td style="padding: 0 12px; color: #4B5563">Alex Kim</td><td style="padding: 0 12px; color: #4B5563; text-align: right">Yesterday, 16:05</td></tr>
+              
+                <tr style="border-top: 1px solid #E2E6EC; height: 36px"><td style="padding: 0 12px">Rotate API key ork_…f3a2</td><td style="padding: 0 12px; color: #4B5563">Claude Code</td><td style="padding: 0 12px"><span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #15803D"><span style="width: 8px; height: 8px; border-radius: 9999px; background: #15803D"></span>Approved</span></td><td style="padding: 0 12px; color: #4B5563">Sam Lee</td><td style="padding: 0 12px; color: #4B5563; text-align: right">Nov 25, 09:18</td></tr>
+              
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orvano · Setup check</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+a{color:#2F5BFF;text-decoration:none}a:hover{color:#2449D8}
+button{font-family:inherit;cursor:pointer}
+</style>
+</head>
+<body>
+
+<div style="min-height: 820px; background: #F7F8FA; color: #0F172A; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; line-height: 20px; display: flex; flex-direction: column; align-items: center; box-sizing: border-box; padding: 48px 16px">
+  <div style="width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 24px">
+    <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px"><span style="width: 10px; height: 10px; border-radius: 4px; background: #2F5BFF"></span>Orvano</div>
+    <div>
+      <h1 style="margin: 0; font-size: 32px; line-height: 40px; font-weight: 600">Finish setting up Orvano</h1>
+      <p style="margin: 8px 0 0; color: #4B5563">Your admin account is ready. Orvano checked the server; fix what's left, then create your first project.</p>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px">
+      <div style="flex: 1; height: 6px; border-radius: 9999px; background: #E2E6EC; overflow: hidden"><div style="width: 71%; height: 100%; background: #2F5BFF"></div></div>
+      <span style="font-size: 13px; color: #4B5563">5 of 7 required checks passed</span>
+    </div>
+    <ol style="margin: 0; padding: 0; list-style: none; border: 1px solid #E2E6EC; border-radius: 10px; background: #FFFFFF">
+      
+        <li style="display: flex; gap: 12px; padding: 16px; border-top: 0; align-items: flex-start; flex-wrap: wrap">
+          <span style="width: 24px; height: 24px; border-radius: 9999px; display: grid; place-items: center; background: #E8F6EE; color: #15803D; flex: none" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg></span>
+          <div style="flex: 1 1 320px; min-width: 0">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span style="font-weight: 500">Domain</span><span style="font-size: 12px; font-weight: 500; color: #15803D">Passed</span></div>
+            <div style="margin-top: 2px; color: #4B5563; font-size: 13px; line-height: 18px">orvano.example.com resolves to this server.</div>
+            
+          </div>
+          
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid #E2E6EC; align-items: flex-start; flex-wrap: wrap">
+          <span style="width: 24px; height: 24px; border-radius: 9999px; display: grid; place-items: center; background: #E8F6EE; color: #15803D; flex: none" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg></span>
+          <div style="flex: 1 1 320px; min-width: 0">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span style="font-weight: 500">HTTPS</span><span style="font-size: 12px; font-weight: 500; color: #15803D">Passed</span></div>
+            <div style="margin-top: 2px; color: #4B5563; font-size: 13px; line-height: 18px">Caddy issued a Let's Encrypt certificate. Renews automatically.</div>
+            
+          </div>
+          
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid #E2E6EC; align-items: flex-start; flex-wrap: wrap">
+          <span style="width: 24px; height: 24px; border-radius: 9999px; display: grid; place-items: center; background: #E8F6EE; color: #15803D; flex: none" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg></span>
+          <div style="flex: 1 1 320px; min-width: 0">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span style="font-weight: 500">Function runner</span><span style="font-size: 12px; font-weight: 500; color: #15803D">Passed</span></div>
+            <div style="margin-top: 2px; color: #4B5563; font-size: 13px; line-height: 18px">orvano-executor reached Docker through the socket proxy. Node, Dart and .NET images pulled.</div>
+            
+          </div>
+          
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid #E2E6EC; align-items: flex-start; flex-wrap: wrap">
+          <span style="width: 24px; height: 24px; border-radius: 9999px; display: grid; place-items: center; background: #E8F6EE; color: #15803D; flex: none" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg></span>
+          <div style="flex: 1 1 320px; min-width: 0">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span style="font-weight: 500">Database and backups</span><span style="font-size: 12px; font-weight: 500; color: #15803D">Passed</span></div>
+            <div style="margin-top: 2px; color: #4B5563; font-size: 13px; line-height: 18px">PostgreSQL 17 connected. Nightly backup at 02:00 to /opt/orvano/backups, kept 7 days.</div>
+            
+          </div>
+          
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid #E2E6EC; align-items: flex-start; flex-wrap: wrap">
+          <span style="width: 24px; height: 24px; border-radius: 9999px; display: grid; place-items: center; background: #E8F6EE; color: #15803D; flex: none" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg></span>
+          <div style="flex: 1 1 320px; min-width: 0">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span style="font-weight: 500">Admin account</span><span style="font-size: 12px; font-weight: 500; color: #15803D">Passed</span></div>
+            <div style="margin-top: 2px; color: #4B5563; font-size: 13px; line-height: 18px">alex@acme.dev is the instance admin.</div>
+            
+          </div>
+          
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid #E2E6EC; align-items: flex-start; flex-wrap: wrap">
+          <span style="width: 24px; height: 24px; border-radius: 9999px; display: grid; place-items: center; background: #FDF3E2; color: #B45309; flex: none" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 7v6M12 17h.01"/></svg></span>
+          <div style="flex: 1 1 320px; min-width: 0">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span style="font-weight: 500">Email (SMTP)</span><span style="font-size: 12px; font-weight: 500; color: #B45309">Needs attention</span></div>
+            <div style="margin-top: 2px; color: #4B5563; font-size: 13px; line-height: 18px">Settings saved but not tested. Auth emails (magic links, passcodes, resets) need a working SMTP server.</div>
+            
+          </div>
+          
+            <button style="height: 32px; padding: 0 12px; border: 1px solid #CBD2DC; border-radius: 6px; background: #FFFFFF; color: #0F172A; font-size: 13px; font-weight: 500">Send test email</button>
+          
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid #E2E6EC; align-items: flex-start; flex-wrap: wrap">
+          <span style="width: 24px; height: 24px; border-radius: 9999px; display: grid; place-items: center; background: #FDF3E2; color: #B45309; flex: none" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 7v6M12 17h.01"/></svg></span>
+          <div style="flex: 1 1 320px; min-width: 0">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span style="font-weight: 500">Wildcard DNS for sites</span><span style="font-size: 12px; font-weight: 500; color: #B45309">Needs attention</span></div>
+            <div style="margin-top: 2px; color: #4B5563; font-size: 13px; line-height: 18px">Add this record so hosted sites and preview links get their own addresses.</div>
+            
+              <div style="margin-top: 8px; padding: 8px 12px; border-radius: 6px; background: #F0F2F5; font-family: 'IBM Plex Mono', monospace; font-size: 12px; line-height: 16px">*.sites.example.com   A   203.0.113.24</div>
+            
+          </div>
+          
+            <button style="height: 32px; padding: 0 12px; border: 1px solid #CBD2DC; border-radius: 6px; background: #FFFFFF; color: #0F172A; font-size: 13px; font-weight: 500">Check again</button>
+          
+        </li>
+      
+        <li style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid #E2E6EC; align-items: flex-start; flex-wrap: wrap">
+          <span style="width: 24px; height: 24px; border-radius: 9999px; display: grid; place-items: center; background: #F0F2F5; color: #4B5563; flex: none" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/></svg></span>
+          <div style="flex: 1 1 320px; min-width: 0">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span style="font-weight: 500">GitHub deploys</span><span style="font-size: 12px; font-weight: 500; color: #4B5563">Optional</span></div>
+            <div style="margin-top: 2px; color: #4B5563; font-size: 13px; line-height: 18px">Create a GitHub App for this instance to deploy functions and sites on push.</div>
+            
+          </div>
+          
+            <button style="height: 32px; padding: 0 12px; border: 1px solid #CBD2DC; border-radius: 6px; background: #FFFFFF; color: #0F172A; font-size: 13px; font-weight: 500">Connect GitHub</button>
+          
+        </li>
+      
+    </ol>
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+      <span style="flex: 1; min-width: 240px; font-size: 13px; color: #4B5563">You can skip optional checks and come back from Instance settings.</span>
+      <a href="Projects.html" style="height: 36px; padding: 0 14px; border-radius: 6px; background: #2F5BFF; color: #FFFFFF; font-size: 14px; font-weight: 500; display: flex; align-items: center">Create first project</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

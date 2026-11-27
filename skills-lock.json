@@ -1,0 +1,61 @@
+{
+  "version": 2,
+  "skills": {
+    "aspire": {
+      "source": "microsoft/aspire-skills",
+      "commit": "e529b608336cd41c1b1262aa76d00d9e4ef1bff8",
+      "sourceType": "github",
+      "skillPath": "skills/aspire/SKILL.md",
+      "computedHash": "69c79e9b25c5e63f5f34aa38db59eb839f188b0b2b5d0191437f3de66f5e38a9"
+    },
+    "docker-compose-patterns": {
+      "source": "docker/skills",
+      "commit": "19943770ff36bcc38582d7df221e9c3679072705",
+      "sourceType": "github",
+      "skillPath": "skills/docker-compose-patterns/SKILL.md",
+      "computedHash": "fd752b44e789bbf42f8c0edd92df89c84871d46aee92785230e5260f866e8f99"
+    },
+    "dotnet-aot-compat": {
+      "source": "dotnet/skills",
+      "commit": "a273ceb823340c260b796ef49113b399430472a9",
+      "sourceType": "github",
+      "skillPath": "plugins/dotnet-upgrade/skills/dotnet-aot-compat/SKILL.md",
+      "computedHash": "61d074150b7d1c469388ba4d3264463ddd8639d0e99f61df18bf780957aecb94"
+    },
+    "dotnet-webapi": {
+      "source": "dotnet/skills",
+      "commit": "a273ceb823340c260b796ef49113b399430472a9",
+      "sourceType": "github",
+      "skillPath": "plugins/dotnet-aspnetcore/skills/dotnet-webapi/SKILL.md",
+      "computedHash": "2aedc615b14b3027800a556a4bf0c28f28f21b09ffc7a546c3865f08a26b79b0"
+    },
+    "playwright-cli": {
+      "source": "microsoft/playwright-cli",
+      "commit": "dc5f4d5616ab5a28ded12fd7101a4d49bd59a820",
+      "sourceType": "github",
+      "skillPath": "skills/playwright-cli/SKILL.md",
+      "computedHash": "54c3f1e47b2566ecc3a2c1515823f77f4609edfe8029351924311dafc0d2ba66"
+    },
+    "postgresql-best-practices": {
+      "source": "microsoft/postgres-skills",
+      "commit": "b7908c0b53b2a292fb8286d4d4bdba7ea4690291",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/postgresql-best-practices/SKILL.md",
+      "computedHash": "4b4a87152b2ab4cc4d9f7725f14c1d745646d14431971316e9858cfea4c4eb62"
+    },
+    "shadcn": {
+      "source": "shadcn-ui/ui",
+      "commit": "0e5b2e621a9ee4cf6a604bbe6c5c0d5b70561eb4",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "388962d16c7a4f13aaeee0d8f128e50a87df8553d42ef7988c39c0e1c74a40e8"
+    },
+    "testcontainers-dotnet": {
+      "source": "testcontainers/claude-skills",
+      "commit": "5263fe47160c3ef187b93de4b21d2d7380bce12e",
+      "sourceType": "github",
+      "skillPath": "plugins/testcontainers/skills/testcontainers-dotnet/SKILL.md",
+      "computedHash": "0a494a61abcecb73cc741ad942501c47497fc5572608fef701b316b36ad68efa"
+    }
+  }
+}

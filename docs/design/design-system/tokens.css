@@ -1,0 +1,83 @@
+/* Orvano — generated from tokens.json */
+:root {
+  --bg: #F7F8FA;
+  --surface: #FFFFFF;
+  --surface-subtle: #F0F2F5;
+  --border: #E2E6EC;
+  --border-strong: #CBD2DC;
+  --ink: #0F172A;
+  --ink-muted: #4B5563;
+  --ink-subtle: #6B7280;
+  --brand: #2F5BFF;
+  --brand-hover: #2449D8;
+  --on-brand: #FFFFFF;
+  --brand-subtle: #EBF0FF;
+  --brand-ink: #1E3FBF;
+  --success: #15803D;
+  --success-subtle: #E8F6EE;
+  --warning: #B45309;
+  --warning-subtle: #FDF3E2;
+  --danger: #DC2626;
+  --danger-subtle: #FDECEC;
+  --overlay: rgba(15,23,42,0.48);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-full: 9999px;
+  --shadow-popover: 0 8px 24px rgba(15,23,42,0.12);
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0E1116;
+    --surface: #151A21;
+    --surface-subtle: #1C222B;
+    --border: #2A313C;
+    --border-strong: #3A4352;
+    --ink: #E6EAF0;
+    --ink-muted: #9AA4B2;
+    --ink-subtle: #7D8796;
+    --brand: #5B7FFF;
+    --brand-hover: #7593FF;
+    --on-brand: #0B1020;
+    --brand-subtle: #18233F;
+    --brand-ink: #A9BCFF;
+    --success: #3FB96B;
+    --success-subtle: #12261A;
+    --warning: #E5A13A;
+    --warning-subtle: #2B2111;
+    --danger: #F26363;
+    --danger-subtle: #2E1515;
+    --overlay: rgba(0,0,0,0.6);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1116;
+  --surface: #151A21;
+  --surface-subtle: #1C222B;
+  --border: #2A313C;
+  --border-strong: #3A4352;
+  --ink: #E6EAF0;
+  --ink-muted: #9AA4B2;
+  --ink-subtle: #7D8796;
+  --brand: #5B7FFF;
+  --brand-hover: #7593FF;
+  --on-brand: #0B1020;
+  --brand-subtle: #18233F;
+  --brand-ink: #A9BCFF;
+  --success: #3FB96B;
+  --success-subtle: #12261A;
+  --warning: #E5A13A;
+  --warning-subtle: #2B2111;
+  --danger: #F26363;
+  --danger-subtle: #2E1515;
+  --overlay: rgba(0,0,0,0.6);
+}

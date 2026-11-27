@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+  html, body { margin: 0; height: 288px; background: var(--bg); overflow: hidden; }
+  .cover { position: relative; width: 960px; height: 288px; }
+  .art { position: absolute; left: 480px; top: 0; width: 480px; height: 288px; }
+  .brand { fill: var(--brand); }
+  .ink { fill: var(--ink); }
+  .tint { fill: var(--brand-subtle); }
+  .dot { fill: var(--brand); }
+  .tile { rx: var(--radius-lg); }
+  .text { position: absolute; left: 40px; bottom: 40px; max-width: 440px; }
+  .name { margin: 0; font-family: "IBM Plex Sans", system-ui, sans-serif; font-weight: 600; font-size: 120px; line-height: .92; letter-spacing: -0.02em; color: var(--ink); }
+  .tag { margin: 16px 0 0; font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 14px; line-height: 20px; color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<div class="cover">
+  <svg class="art" viewBox="0 0 480 288" aria-hidden="true">
+    <!--
+      blocks: brand 160x208 (slab, bleeds top), ink 184x112 (bleeds top-right), brand-subtle 184x160 (bleeds bottom-right)
+      arrangement: one tall cobalt slab with two satellites stacked to its right, flush on a space-4 (16px) gap
+      pattern: dot grid at space-6 pitch, chosen because the README calls the system precise, dense and on a 4px grid
+      steps and radii: gaps space-4 (16), pitch space-6 (24), dot r = space-1/2, corners radius-lg
+    -->
+    <rect class="brand tile" x="120" y="-10" width="160" height="218"/>
+    <rect class="ink tile" x="296" y="-10" width="194" height="122"/>
+    <rect class="tint tile" x="296" y="128" width="194" height="170"/>
+    <g>
+      <circle class="dot" cx="24" cy="24" r="2"/><circle class="dot" cx="48" cy="24" r="2"/><circle class="dot" cx="72" cy="24" r="2"/><circle class="dot" cx="96" cy="24" r="2"/>
+      <circle class="dot" cx="24" cy="48" r="2"/><circle class="dot" cx="48" cy="48" r="2"/><circle class="dot" cx="72" cy="48" r="2"/><circle class="dot" cx="96" cy="48" r="2"/>
+      <circle class="dot" cx="24" cy="72" r="2"/><circle class="dot" cx="48" cy="72" r="2"/><circle class="dot" cx="72" cy="72" r="2"/><circle class="dot" cx="96" cy="72" r="2"/>
+      <circle class="dot" cx="24" cy="96" r="2"/><circle class="dot" cx="48" cy="96" r="2"/><circle class="dot" cx="72" cy="96" r="2"/><circle class="dot" cx="96" cy="96" r="2"/>
+      <circle class="dot" cx="24" cy="120" r="2"/><circle class="dot" cx="48" cy="120" r="2"/><circle class="dot" cx="72" cy="120" r="2"/><circle class="dot" cx="96" cy="120" r="2"/>
+      <circle class="dot" cx="24" cy="144" r="2"/><circle class="dot" cx="48" cy="144" r="2"/><circle class="dot" cx="72" cy="144" r="2"/><circle class="dot" cx="96" cy="144" r="2"/>
+      <circle class="dot" cx="24" cy="168" r="2"/><circle class="dot" cx="48" cy="168" r="2"/><circle class="dot" cx="72" cy="168" r="2"/><circle class="dot" cx="96" cy="168" r="2"/>
+      <circle class="dot" cx="24" cy="192" r="2"/><circle class="dot" cx="48" cy="192" r="2"/><circle class="dot" cx="72" cy="192" r="2"/><circle class="dot" cx="96" cy="192" r="2"/>
+      <circle class="dot" cx="24" cy="216" r="2"/><circle class="dot" cx="48" cy="216" r="2"/><circle class="dot" cx="72" cy="216" r="2"/><circle class="dot" cx="96" cy="216" r="2"/>
+      <circle class="dot" cx="24" cy="240" r="2"/><circle class="dot" cx="48" cy="240" r="2"/><circle class="dot" cx="72" cy="240" r="2"/><circle class="dot" cx="96" cy="240" r="2"/>
+      <circle class="dot" cx="144" cy="240" r="2"/><circle class="dot" cx="168" cy="240" r="2"/><circle class="dot" cx="192" cy="240" r="2"/><circle class="dot" cx="216" cy="240" r="2"/><circle class="dot" cx="240" cy="240" r="2"/><circle class="dot" cx="264" cy="240" r="2"/>
+      <circle class="dot" cx="144" cy="264" r="2"/><circle class="dot" cx="168" cy="264" r="2"/><circle class="dot" cx="192" cy="264" r="2"/><circle class="dot" cx="216" cy="264" r="2"/><circle class="dot" cx="240" cy="264" r="2"/><circle class="dot" cx="264" cy="264" r="2"/>
+    </g>
+  </svg>
+  <div class="text">
+    <h1 class="name">Orvano</h1>
+    <p class="tag">The AI-native backend you host yourself.</p>
+  </div>
+</div>
+</body>
+</html>

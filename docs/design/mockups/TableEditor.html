@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orvano · Table editor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+a{color:#2F5BFF;text-decoration:none}a:hover{color:#2449D8}
+button{font-family:inherit;cursor:pointer}
+</style>
+</head>
+<body>
+
+<div style="min-height: 820px; background: #F7F8FA; color: #0F172A; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; line-height: 20px; display: flex; flex-direction: column">
+  <header style="height: 48px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 12px; background: #FFFFFF; border-bottom: 1px solid #E2E6EC; flex-wrap: wrap">
+    <a href="Projects.html" style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; color: #0F172A"><span style="width: 10px; height: 10px; border-radius: 4px; background: #2F5BFF"></span>Orvano</a>
+    <span style="color: #CBD2DC">/</span>
+    <button style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #0F172A; font-size: 14px; font-weight: 500">recipes-prod<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+    <div style="flex: 1"></div>
+    <a href="Approvals.html" style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; background: #FDF3E2; color: #B45309; font-size: 12px; font-weight: 500">2 pending approvals</a>
+    <button aria-label="Search or run a command" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; width: 220px; border: 1px solid #CBD2DC; border-radius: 6px; background: #FFFFFF; color: #6B7280; font-size: 13px">Search or run…<span style="margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 12px">⌘K</span></button>
+    <span style="width: 28px; height: 28px; border-radius: 9999px; background: #EBF0FF; color: #1E3FBF; display: grid; place-items: center; font-size: 12px; font-weight: 600">AK</span>
+  </header>
+  <div style="display: flex; flex: 1; flex-wrap: wrap">
+    <nav aria-label="Project" style="width: 56px; box-sizing: border-box; padding: 12px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; background: #F0F2F5; border-right: 1px solid #E2E6EC">
+      
+        <a href="#" aria-label="Overview" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></a>
+      
+        <a href="#" aria-label="Auth" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M15 7a4 4 0 1 1-3.9 5H3v4h4v-2h3"/></svg></a>
+      
+        <a href="#" aria-label="Database" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; background: #EBF0FF; color: #2F5BFF"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></a>
+      
+        <a href="#" aria-label="Storage" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></a>
+      
+        <a href="#" aria-label="Realtime" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 12a7 7 0 0 1 14 0M8 12a4 4 0 0 1 8 0M12 12h.01"/></svg></a>
+      
+        <a href="#" aria-label="Functions" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 4h16v16H4zM9 17c2 0 2-10 4-10M9 11h5"/></svg></a>
+      
+        <a href="#" aria-label="Sites" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c2.5 3 2.5 15 0 18"/></svg></a>
+      
+        <a href="#" aria-label="Webhooks" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M18 16a4 4 0 1 1-4-4M6 16a4 4 0 1 0 4-4M12 4a4 4 0 0 0-2 7.5"/></svg></a>
+      
+        <a href="#" aria-label="Email" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 6h18v12H3zM3 7l9 6 9-6"/></svg></a>
+      
+        <a href="Approvals.html" aria-label="AI" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/></svg></a>
+      
+        <a href="#" aria-label="Logs" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></a>
+      
+        <a href="#" aria-label="Settings" style="width: 40px; height: 40px; border-radius: 6px; display: grid; place-items: center; color: #4B5563"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3"/></svg></a>
+      
+    </nav>
+    <aside aria-label="Tables" style="width: 220px; box-sizing: border-box; padding: 16px 8px; background: #FFFFFF; border-right: 1px solid #E2E6EC; display: flex; flex-direction: column; gap: 2px">
+      <div style="display: flex; align-items: center; padding: 0 8px 8px">
+        <span style="flex: 1; font-size: 12px; font-weight: 500; color: #4B5563">Tables</span>
+        <button aria-label="New table" style="border: 0; background: transparent; color: #4B5563; padding: 2px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+      </div>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: 6px; color: #0F172A; "><span style="flex: 1; font-family: 'IBM Plex Mono', monospace; font-size: 13px">comments</span><span style="font-size: 12px; color: #4B5563">8,931</span></a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: 6px; color: #0F172A; "><span style="flex: 1; font-family: 'IBM Plex Mono', monospace; font-size: 13px">ingredients</span><span style="font-size: 12px; color: #4B5563">3,420</span></a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: 6px; color: #0F172A; "><span style="flex: 1; font-family: 'IBM Plex Mono', monospace; font-size: 13px">profiles</span><span style="font-size: 12px; color: #4B5563">1,206</span></a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: 6px; color: #0F172A; background: #EBF0FF; color: #1E3FBF"><span style="flex: 1; font-family: 'IBM Plex Mono', monospace; font-size: 13px">recipes</span><span style="font-size: 12px; color: #4B5563">1,204</span></a>
+      
+        <a href="#" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: 6px; color: #0F172A; "><span style="flex: 1; font-family: 'IBM Plex Mono', monospace; font-size: 13px">saved_recipes</span><span style="font-size: 12px; color: #4B5563">5,118</span></a>
+      
+      <div style="margin-top: 16px; padding: 8px; font-size: 12px; line-height: 16px; color: #4B5563">Schema changes create a migration you can review before applying.</div>
+    </aside>
+    <main style="flex: 999 1 480px; min-width: 0; box-sizing: border-box; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap">
+        <div style="flex: 1; min-width: 200px">
+          <div style="font-size: 12px; line-height: 16px; font-weight: 500; color: #4B5563">Database</div>
+          <h1 style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 24px; line-height: 32px; font-weight: 500">recipes</h1>
+        </div>
+        <button style="height: 36px; padding: 0 14px; border: 1px solid #CBD2DC; border-radius: 6px; background: #FFFFFF; color: #0F172A; font-size: 14px; font-weight: 500">Add column</button>
+        <button style="height: 36px; padding: 0 14px; border: 0; border-radius: 6px; background: #2F5BFF; color: #FFFFFF; font-size: 14px; font-weight: 500">Insert row</button>
+      </div>
+      <div role="tablist" style="display: flex; gap: 4px; border-bottom: 1px solid #E2E6EC">
+        <button role="tab" aria-selected="true" style="height: 36px; padding: 0 12px; border: 0; border-bottom: 2px solid #2F5BFF; background: transparent; color: #0F172A; font-size: 14px; font-weight: 500">Rows</button>
+        <button role="tab" style="height: 36px; padding: 0 12px; border: 0; background: transparent; color: #4B5563; font-size: 14px">Schema</button>
+        <button role="tab" style="height: 36px; padding: 0 12px; border: 0; background: transparent; color: #4B5563; font-size: 14px">Permissions</button>
+        <button role="tab" style="height: 36px; padding: 0 12px; border: 0; background: transparent; color: #4B5563; font-size: 14px">Indexes</button>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+        <span style="display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 4px; background: #EBF0FF; color: #1E3FBF; font-size: 13px"><span style="font-family: 'IBM Plex Mono', monospace">published = true</span><button aria-label="Remove filter" style="border: 0; background: transparent; color: #1E3FBF; padding: 0; font-size: 14px">×</button></span>
+        <button style="height: 28px; padding: 0 10px; border: 1px dashed #CBD2DC; border-radius: 4px; background: transparent; color: #4B5563; font-size: 13px">+ Filter</button>
+        <button style="height: 28px; padding: 0 10px; border: 1px solid #CBD2DC; border-radius: 4px; background: #FFFFFF; color: #0F172A; font-size: 13px">Sort: created_at ↓</button>
+        <div style="flex: 1"></div>
+        <span style="font-size: 13px; color: #4B5563">1–10 of 1,204 rows</span>
+      </div>
+      <div style="border: 1px solid #E2E6EC; border-radius: 6px; background: #FFFFFF; overflow-x: auto">
+        <table style="width: 100%; min-width: 760px; border-collapse: collapse">
+          <thead><tr style="background: #F0F2F5; text-align: left; font-size: 12px; color: #4B5563">
+            <th style="width: 36px; padding: 8px 12px"><input type="checkbox" aria-label="Select all rows"></th>
+            <th style="padding: 8px 12px; font-weight: 500">id <span style="color: #6B7280">uuid</span></th>
+            <th style="padding: 8px 12px; font-weight: 500">title <span style="color: #6B7280">text</span></th>
+            <th style="padding: 8px 12px; font-weight: 500">author_id <span style="color: #6B7280">→ profiles</span></th>
+            <th style="padding: 8px 12px; font-weight: 500">cuisine <span style="color: #6B7280">enum</span></th>
+            <th style="padding: 8px 12px; font-weight: 500">published <span style="color: #6B7280">bool</span></th>
+            <th style="padding: 8px 12px; font-weight: 500; text-align: right">created_at</th>
+          </tr></thead>
+          <tbody>
+            
+              <tr style="height: 36px; border-top: 1px solid #E2E6EC">
+                <td style="padding: 0 12px"><input type="checkbox" aria-label="Select row"></td>
+                <td style="padding: 0 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #4B5563">018f3a2c-7d41…</td>
+                <td style="padding: 0 12px">Charred leek gratin</td>
+                <td style="padding: 0 12px"><span style="padding: 2px 6px; border-radius: 4px; background: #F0F2F5; font-size: 12px">mira.s</span></td>
+                <td style="padding: 0 12px"><span style="padding: 2px 8px; border-radius: 4px; background: #EBF0FF; color: #1E3FBF; font-size: 12px; font-weight: 500">French</span></td>
+                <td style="padding: 0 12px"><input type="checkbox" checked aria-label="Published"></td>
+                <td style="padding: 0 12px; text-align: right; color: #4B5563; font-size: 13px">Nov 27, 13:58</td>
+              </tr>
+            
+              <tr style="height: 36px; border-top: 1px solid #E2E6EC">
+                <td style="padding: 0 12px"><input type="checkbox" aria-label="Select row"></td>
+                <td style="padding: 0 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #4B5563">018f3a1e-02bb…</td>
+                <td style="padding: 0 12px">Smoky black bean tacos</td>
+                <td style="padding: 0 12px"><span style="padding: 2px 6px; border-radius: 4px; background: #F0F2F5; font-size: 12px">jonah</span></td>
+                <td style="padding: 0 12px"><span style="padding: 2px 8px; border-radius: 4px; background: #EBF0FF; color: #1E3FBF; font-size: 12px; font-weight: 500">Mexican</span></td>
+                <td style="padding: 0 12px"><input type="checkbox" checked aria-label="Published"></td>
+                <td style="padding: 0 12px; text-align: right; color: #4B5563; font-size: 13px">Nov 27, 12:40</td>
+              </tr>
+            
+              <tr style="height: 36px; border-top: 1px solid #E2E6EC; background: #EBF0FF">
+                <td style="padding: 0 12px"><input type="checkbox" aria-label="Select row"></td>
+                <td style="padding: 0 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #4B5563">018f39f7-c9a0…</td>
+                <td style="padding: 0 12px">Miso butter noodles</td>
+                <td style="padding: 0 12px"><span style="padding: 2px 6px; border-radius: 4px; background: #F0F2F5; font-size: 12px">aiko.t</span></td>
+                <td style="padding: 0 12px"><span style="padding: 2px 8px; border-radius: 4px; background: #EBF0FF; color: #1E3FBF; font-size: 12px; font-weight: 500">Japanese</span></td>
+                <td style="padding: 0 12px"><input type="checkbox" checked aria-label="Published"></td>
+                <td style="padding: 0 12px; text-align: right; color: #4B5563; font-size: 13px">Nov 27, 09:12</td>
+              </tr>
+            
+              <tr style="height: 36px; border-top: 1px solid #E2E6EC">
+                <td style="padding: 0 12px"><input type="checkbox" aria-label="Select row"></td>
+                <td style="padding: 0 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #4B5563">018f38d4-4e17…</td>
+                <td style="padding: 0 12px">Lemon ricotta pancakes</td>
+                <td style="padding: 0 12px"><span style="padding: 2px 6px; border-radius: 4px; background: #F0F2F5; font-size: 12px">mira.s</span></td>
+                <td style="padding: 0 12px"><span style="padding: 2px 8px; border-radius: 4px; background: #EBF0FF; color: #1E3FBF; font-size: 12px; font-weight: 500">American</span></td>
+                <td style="padding: 0 12px"><input type="checkbox" checked aria-label="Published"></td>
+                <td style="padding: 0 12px; text-align: right; color: #4B5563; font-size: 13px">Nov 26, 18:33</td>
+              </tr>
+            
+              <tr style="height: 36px; border-top: 1px solid #E2E6EC">
+                <td style="padding: 0 12px"><input type="checkbox" aria-label="Select row"></td>
+                <td style="padding: 0 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #4B5563">018f37b0-91fe…</td>
+                <td style="padding: 0 12px">Chana masala</td>
+                <td style="padding: 0 12px"><span style="padding: 2px 6px; border-radius: 4px; background: #F0F2F5; font-size: 12px">priya</span></td>
+                <td style="padding: 0 12px"><span style="padding: 2px 8px; border-radius: 4px; background: #EBF0FF; color: #1E3FBF; font-size: 12px; font-weight: 500">Indian</span></td>
+                <td style="padding: 0 12px"><input type="checkbox" checked aria-label="Published"></td>
+                <td style="padding: 0 12px; text-align: right; color: #4B5563; font-size: 13px">Nov 26, 11:05</td>
+              </tr>
+            
+              <tr style="height: 36px; border-top: 1px solid #E2E6EC">
+                <td style="padding: 0 12px"><input type="checkbox" aria-label="Select row"></td>
+                <td style="padding: 0 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #4B5563">018f36a1-3c62…</td>
+                <td style="padding: 0 12px">Roasted squash risotto</td>
+                <td style="padding: 0 12px"><span style="padding: 2px 6px; border-radius: 4px; background: #F0F2F5; font-size: 12px">leo.b</span></td>
+                <td style="padding: 0 12px"><span style="padding: 2px 8px; border-radius: 4px; background: #EBF0FF; color: #1E3FBF; font-size: 12px; font-weight: 500">Italian</span></td>
+                <td style="padding: 0 12px"><input type="checkbox" checked aria-label="Published"></td>
+                <td style="padding: 0 12px; text-align: right; color: #4B5563; font-size: 13px">Nov 25, 19:47</td>
+              </tr>
+            
+              <tr style="height: 36px; border-top: 1px solid #E2E6EC">
+                <td style="padding: 0 12px"><input type="checkbox" aria-label="Select row"></td>
+                <td style="padding: 0 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #4B5563">018f3592-a8d4…</td>
+                <td style="padding: 0 12px">Gochujang chicken wings</td>
+                <td style="padding: 0 12px"><span style="padding: 2px 6px; border-radius: 4px; background: #F0F2F5; font-size: 12px">jonah</span></td>
+                <td style="padding: 0 12px"><span style="padding: 2px 8px; border-radius: 4px; background: #EBF0FF; color: #1E3FBF; font-size: 12px; font-weight: 500">Korean</span></td>
+                <td style="padding: 0 12px"><input type="checkbox" checked aria-label="Published"></td>
+                <td style="padding: 0 12px; text-align: right; color: #4B5563; font-size: 13px">Nov 25, 14:20</td>
+              </tr>
+            
+              <tr style="height: 36px; border-top: 1px solid #E2E6EC">
+                <td style="padding: 0 12px"><input type="checkbox" aria-label="Select row"></td>
+                <td style="padding: 0 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #4B5563">018f3460-5b19…</td>
+                <td style="padding: 0 12px">Shakshuka</td>
+                <td style="padding: 0 12px"><span style="padding: 2px 6px; border-radius: 4px; background: #F0F2F5; font-size: 12px">nadia</span></td>
+                <td style="padding: 0 12px"><span style="padding: 2px 8px; border-radius: 4px; background: #EBF0FF; color: #1E3FBF; font-size: 12px; font-weight: 500">Middle Eastern</span></td>
+                <td style="padding: 0 12px"><input type="checkbox" checked aria-label="Published"></td>
+                <td style="padding: 0 12px; text-align: right; color: #4B5563; font-size: 13px">Nov 24, 08:56</td>
+              </tr>
+            
+              <tr style="height: 36px; border-top: 1px solid #E2E6EC">
+                <td style="padding: 0 12px"><input type="checkbox" aria-label="Select row"></td>
+                <td style="padding: 0 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #4B5563">018f3377-e2c0…</td>
+                <td style="padding: 0 12px">Brown butter banana bread</td>
+                <td style="padding: 0 12px"><span style="padding: 2px 6px; border-radius: 4px; background: #F0F2F5; font-size: 12px">aiko.t</span></td>
+                <td style="padding: 0 12px"><span style="padding: 2px 8px; border-radius: 4px; background: #EBF0FF; color: #1E3FBF; font-size: 12px; font-weight: 500">American</span></td>
+                <td style="padding: 0 12px"><input type="checkbox" checked aria-label="Published"></td>
+                <td style="padding: 0 12px; text-align: right; color: #4B5563; font-size: 13px">Nov 23, 16:31</td>
+              </tr>
+            
+              <tr style="height: 36px; border-top: 1px solid #E2E6EC">
+                <td style="padding: 0 12px"><input type="checkbox" aria-label="Select row"></td>
+                <td style="padding: 0 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #4B5563">018f3251-77ad…</td>
+                <td style="padding: 0 12px">Green curry with tofu</td>
+                <td style="padding: 0 12px"><span style="padding: 2px 6px; border-radius: 4px; background: #F0F2F5; font-size: 12px">priya</span></td>
+                <td style="padding: 0 12px"><span style="padding: 2px 8px; border-radius: 4px; background: #EBF0FF; color: #1E3FBF; font-size: 12px; font-weight: 500">Thai</span></td>
+                <td style="padding: 0 12px"><input type="checkbox" checked aria-label="Published"></td>
+                <td style="padding: 0 12px; text-align: right; color: #4B5563; font-size: 13px">Nov 23, 10:02</td>
+              </tr>
+            
+          </tbody>
+        </table>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; justify-content: flex-end">
+        <button style="height: 32px; padding: 0 12px; border: 1px solid #CBD2DC; border-radius: 6px; background: #FFFFFF; color: #6B7280; font-size: 13px">Previous</button>
+        <button style="height: 32px; padding: 0 12px; border: 1px solid #CBD2DC; border-radius: 6px; background: #FFFFFF; color: #0F172A; font-size: 13px">Next</button>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>
