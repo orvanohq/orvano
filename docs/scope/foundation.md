@@ -29,10 +29,10 @@ The thinnest real thread through the deployment: Caddy in front, the `orvano` ho
 **Done when:** `docker compose up` on a clean machine serves `/healthz` and `/readyz` through Caddy over HTTPS, with readiness reflecting Postgres; the executor placeholder answers its own health check; the contributor AppHost starts the same pieces with one command; CI builds every image; logs are structured JSON.
 Spec [0002](../specs/0002-compose-stack-skeleton/index.md) · code in `deploy/`, `server/src/`, `server/tests/Orvano.IntegrationTests/`, `.github/workflows/ci.yml`
 - [x] Design it (spec): `/architect compose stack skeleton`
-- [ ] Build it: `/develop compose stack skeleton`
-  - [ ] The thread: `/healthz` through Caddy over HTTPS, then Postgres readiness, volumes and required settings (AC-1, AC-2, AC-3, AC-5, AC-8, AC-11, AC-12)
-  - [ ] Host integration tests and the test reference rule exception (AC-3, AC-5, AC-8, AC-13)
-  - [ ] Executor placeholder, JSON logs, network split and hardening (AC-4, AC-6, AC-7, AC-11)
-  - [ ] Contributor AppHost wiring (AC-9)
-  - [ ] Smoke test, CI image builds for both processor types, and the deploy README (AC-1 to AC-4, AC-6 to AC-8, AC-10 to AC-12)
+- [x] Build it: `/develop compose stack skeleton`
+  - [x] The thread: `/healthz` through Caddy over HTTPS, then Postgres readiness, volumes and required settings (AC-1, AC-2, AC-3, AC-5, AC-8, AC-11, AC-12)
+  - [x] Host integration tests and the test reference rule exception (AC-3, AC-5, AC-8, AC-13)
+  - [x] Executor placeholder, JSON logs, network split and hardening (AC-4, AC-6, AC-7, AC-11)
+  - [x] Contributor AppHost wiring (AC-9)
+  - [x] Smoke test, CI image builds for both processor types, and the deploy README (AC-1 to AC-4, AC-6 to AC-8, AC-10 to AC-12)
 - [ ] Verify it: `/check verify compose stack skeleton`
