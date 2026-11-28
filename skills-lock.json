@@ -8,6 +8,14 @@
       "skillPath": "skills/aspire/SKILL.md",
       "computedHash": "69c79e9b25c5e63f5f34aa38db59eb839f188b0b2b5d0191437f3de66f5e38a9"
     },
+    "caddy-reverse-proxy": {
+      "source": "dimdasci/vps-setup",
+      "commit": "5bf5acaed23cd221a5b2e6e0f64a03091db89e8d",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/caddy-reverse-proxy/SKILL.md",
+      "computedHash": "f4bf85e8c145e2f3dad4dcf1cc15f1b9f71e25062b134c9da7a98cca73f8b633",
+      "installMode": "copy"
+    },
     "docker-compose-patterns": {
       "source": "docker/skills",
       "commit": "19943770ff36bcc38582d7df221e9c3679072705",

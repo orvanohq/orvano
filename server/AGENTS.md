@@ -13,9 +13,12 @@ The .NET side of Orvano: the `orvano` host (API, realtime, worker, scheduler, MC
 | `src/Orvano.Wire/` | IDs, error shape, event payloads, JSON context. MIT, AOT safe, shared with the CLI |
 | `src/Orvano.Contracts/` | Interfaces and events modules use to talk to each other |
 | `src/Orvano.Infrastructure/` | Shared building blocks: outbox writer, jobs, Data Protection keys |
-| `src/Orvano.ServiceDefaults/Extensions.cs` | OpenTelemetry setup only, maps no endpoints |
+| `src/Orvano.ServiceDefaults/Extensions.cs` | OpenTelemetry, JSON console logs outside Development, the health check service |
+| `src/Orvano.ServiceDefaults/HealthEndpoints.cs`, `HealthProbe.cs` | `/healthz` mapping, the shared health response writer, the container `healthcheck` probe |
+| `src/Orvano.Infrastructure/Database/` | `AddOrvanoDatabase` (the `NpgsqlDataSource` from `ConnectionStrings:orvano`) and the Postgres readiness check behind `/readyz` |
 | `src/Orvano.AppHost/AppHost.cs` | Contributor orchestration: Postgres 17, `orvano`, `orvano-executor` |
 | `tests/Orvano.ArchitectureTests/ReferenceRules.cs` | The project reference rules from spec 0001, as code |
+| `tests/Orvano.IntegrationTests/` | Starts `Orvano.Host` in memory (`WebApplicationFactory`) against Testcontainers Postgres |
 
 ## Commands
 
@@ -32,7 +35,7 @@ dotnet test --solution Orvano.slnx               # run from the repo root
 - One transaction never spans two modules. Cross module side effects travel as outbox events; the outbox writer takes the caller's open connection and transaction (EF Core or raw Npgsql alike).
 - Background work (worker, scheduler, realtime) runs as `BackgroundService` classes in the Host.
 - Package versions live only in the root `Directory.Packages.props`; a `.csproj` lists `PackageReference` without a version. Add every new project to `Orvano.slnx`.
-- Tests use xUnit v3 and real Postgres through Testcontainers, never a fake database. Test projects reference library projects only, never an executable.
+- Tests use xUnit v3 and real Postgres through Testcontainers, never a fake database. Test projects reference library projects only, never an executable (one exception: `Orvano.IntegrationTests` may reference `Orvano.Host`, spec 0002).
 
 ## Gotchas
 
@@ -41,6 +44,10 @@ dotnet test --solution Orvano.slnx               # run from the repo root
 - xunit.v3 4.x runs only on Microsoft.Testing.Platform (`global.json` sets the runner), so `dotnet test` needs `--solution`, not a positional `.slnx`.
 - The architecture tests read each project's `obj/project.assets.json`; restore before running them on their own.
 - MSBuild XML comments cannot contain `--`, so do not paste command flags into `.csproj` comments.
+- Each `Program.cs` checks `HealthProbe.IsRequested(args)` before `WebApplication.CreateBuilder`: the chiseled images have no shell, so the container health check runs the binary with `healthcheck`.
+- Health bodies carry `status` only. `/healthz` checks nothing; `/readyz` runs the checks tagged `ready`. Required settings are validated with `ValidateOnStart` and the error names the setting.
+- `AddOrvanoDatabase` turns Npgsql GSS encryption off unless the connection string sets it: the chiseled image has no Kerberos library, and the failed load prints a plain text line that breaks the all JSON logs rule.
+- The integration tests need Docker running. The test platform has no TRX reporter here; use `dotnet test --solution Orvano.slnx --output Detailed` for per test results.
 
 ## Agent skills
 
@@ -50,10 +57,13 @@ dotnet test --solution Orvano.slnx               # run from the repo root
 - [testcontainers-dotnet](../.claude/skills/testcontainers-dotnet/): `testcontainers/claude-skills`, integration tests against a real Postgres container
 - [dotnet-aot-compat](../.claude/skills/dotnet-aot-compat/): `dotnet/skills`, keep `Orvano.Wire` trim and AOT safe (the CLI compiles it)
 
+Declined: Npgsql skill (no credible one exists yet; `postgresql-best-practices` covers Postgres itself)
+
 MCP servers: Aspire (recommended, `aspire agent init --mcp`)
 
 ## Related specs
 
 - [0001 Stack and architecture](../docs/specs/0001-stack-architecture/index.md)
+- [0002 Compose stack skeleton](../docs/specs/0002-compose-stack-skeleton/index.md)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
