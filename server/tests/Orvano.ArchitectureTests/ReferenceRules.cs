@@ -17,6 +17,7 @@ public static class ReferenceRules
     private const string Executor = "Orvano.Executor";
     private const string AppHost = "Orvano.AppHost";
     private const string Cli = "Orvano.Cli";
+    private const string IntegrationTests = "Orvano.IntegrationTests";
     private const string ModulePrefix = "Orvano.Modules.";
 
     /// <summary>Package families. A package belongs to one when its id equals the prefix or starts with the prefix and a dot.</summary>
@@ -136,6 +137,13 @@ public static class ReferenceRules
                 {
                     foreach (var reference in project.DirectProjects)
                     {
+                        // The one exception (spec 0002, AC-13): the integration tests start the host in memory.
+                        // Spec 0001 also names Orvano.ContractTests; add it here when feature 9 creates that project.
+                        if (name == IntegrationTests && reference == Host)
+                        {
+                            continue;
+                        }
+
                         if (all.TryGetValue(reference, out var target) && target.IsExecutable)
                         {
                             violations.Add($"{name} references {reference}, an executable project. Test projects reference library projects only.");

@@ -181,6 +181,26 @@ public sealed class ReferenceRuleCheckerTests
     }
 
     [Fact]
+    public void IntegrationTests_referencing_the_host_passes()
+    {
+        var violations = CheckFirst(
+            Project("Orvano.IntegrationTests", path: "server/tests/Orvano.IntegrationTests/Orvano.IntegrationTests.csproj", direct: ["Orvano.Host"], test: true, outputType: "Exe"),
+            Project("Orvano.Host", sdk: "Microsoft.NET.Sdk.Web"));
+
+        Assert.Empty(violations);
+    }
+
+    [Fact]
+    public void IntegrationTests_referencing_another_executable_is_caught()
+    {
+        var violations = CheckFirst(
+            Project("Orvano.IntegrationTests", path: "server/tests/Orvano.IntegrationTests/Orvano.IntegrationTests.csproj", direct: ["Orvano.Executor"], test: true, outputType: "Exe"),
+            Project("Orvano.Executor", sdk: "Microsoft.NET.Sdk.Web"));
+
+        Assert.Contains(violations, v => v.Contains("executable"));
+    }
+
+    [Fact]
     public void Unlisted_project_referencing_server_src_is_caught()
     {
         var violations = CheckFirst(
