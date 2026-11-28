@@ -24,7 +24,7 @@ The repo is public from M0, so the legal and contributor basics land before the 
 Code in `LICENSE`, `NOTICE`, `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `.github/`
 - [x] Build it: `/develop open repo basics`
 
-### 4. Compose stack skeleton · in-progress
+### 4. Compose stack skeleton · done
 The thinnest real thread through the deployment: Caddy in front, the `orvano` host with health checks, Postgres behind it, an executor placeholder beside it. Nothing is faked; it is only narrow.
 **Done when:** `docker compose up` on a clean machine serves `/healthz` and `/readyz` through Caddy over HTTPS, with readiness reflecting Postgres; the executor placeholder answers its own health check; the contributor AppHost starts the same pieces with one command; CI builds every image; logs are structured JSON.
 Spec [0002](../specs/0002-compose-stack-skeleton/index.md) · code in `deploy/`, `server/src/`, `server/tests/Orvano.IntegrationTests/`, `.github/workflows/ci.yml`
@@ -35,4 +35,4 @@ Spec [0002](../specs/0002-compose-stack-skeleton/index.md) · code in `deploy/`,
   - [x] Executor placeholder, JSON logs, network split and hardening (AC-4, AC-6, AC-7, AC-11)
   - [x] Contributor AppHost wiring (AC-9)
   - [x] Smoke test, CI image builds for both processor types, and the deploy README (AC-1 to AC-4, AC-6 to AC-8, AC-10 to AC-12)
-- [ ] Verify it: `/check verify compose stack skeleton`
+- [x] Verify it: `/check verify compose stack skeleton`
