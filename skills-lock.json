@@ -37,6 +37,22 @@
       "skillPath": "plugins/dotnet-aspnetcore/skills/dotnet-webapi/SKILL.md",
       "computedHash": "2aedc615b14b3027800a556a4bf0c28f28f21b09ffc7a546c3865f08a26b79b0"
     },
+    "nextjs-app-router-patterns": {
+      "source": "wshobson/agents",
+      "commit": "c96b5f6552dba32e4492307493ee613581430715",
+      "sourceType": "github",
+      "skillPath": "plugins/frontend-mobile-development/skills/nextjs-app-router-patterns/SKILL.md",
+      "computedHash": "39b84480d3a62355fd1199173dc70b97efe1daf6dbfae560cc7b85e127934a98",
+      "installMode": "copy"
+    },
+    "playwright-best-practices": {
+      "source": "currents-dev/playwright-best-practices-skill",
+      "commit": "0b75b5835a87de1fdd202ba965f3bc5a27738fdf",
+      "sourceType": "github",
+      "skillPath": "playwright-best-practices/SKILL.md",
+      "computedHash": "111e9d3e9d63dea34814120fb6583c0b28ee45371662801d8e8d8bdf4b05dcb0",
+      "installMode": "copy"
+    },
     "playwright-cli": {
       "source": "microsoft/playwright-cli",
       "commit": "dc5f4d5616ab5a28ded12fd7101a4d49bd59a820",
@@ -51,6 +67,14 @@
       "skillPath": "plugin/skills/postgresql-best-practices/SKILL.md",
       "computedHash": "4b4a87152b2ab4cc4d9f7725f14c1d745646d14431971316e9858cfea4c4eb62"
     },
+    "react-hook-form": {
+      "source": "pproenca/dot-skills",
+      "commit": "cf93c57cac89d6fc3e4194686000411567f5caf3",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/react-hook-form/SKILL.md",
+      "computedHash": "1bf04dd22b6b89e075c1418fe864698ae9973fdd6a0a93d76c69bdd7edcacb27",
+      "installMode": "copy"
+    },
     "shadcn": {
       "source": "shadcn-ui/ui",
       "commit": "0e5b2e621a9ee4cf6a604bbe6c5c0d5b70561eb4",
@@ -58,12 +82,36 @@
       "skillPath": "skills/shadcn/SKILL.md",
       "computedHash": "388962d16c7a4f13aaeee0d8f128e50a87df8553d42ef7988c39c0e1c74a40e8"
     },
+    "tailwind-4-docs": {
+      "source": "Lombiq/Tailwind-Agent-Skills",
+      "commit": "634ec184c36e495fae1d8cf7975df7e6969e3a89",
+      "sourceType": "github",
+      "skillPath": "skills/tailwind-4-docs/SKILL.md",
+      "computedHash": "263961b82698e3defdb26dd6a1b7328044517e67a3bbe91c1b33bb2a4273f4ee",
+      "installMode": "copy"
+    },
+    "tanstack-query": {
+      "source": "tanstack-skills/tanstack-skills",
+      "commit": "6f5521ecbdfbfa3d54d335eba6c8b4df0b804c03",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-query/skills/tanstack-query/SKILL.md",
+      "computedHash": "b27696896a18acff7cb9099d753effb74bdf4b4339881f941fea4cca56abb1fa",
+      "installMode": "copy"
+    },
     "testcontainers-dotnet": {
       "source": "testcontainers/claude-skills",
       "commit": "5263fe47160c3ef187b93de4b21d2d7380bce12e",
       "sourceType": "github",
       "skillPath": "plugins/testcontainers/skills/testcontainers-dotnet/SKILL.md",
       "computedHash": "0a494a61abcecb73cc741ad942501c47497fc5572608fef701b316b36ad68efa"
+    },
+    "zod": {
+      "source": "pproenca/dot-skills",
+      "commit": "cf93c57cac89d6fc3e4194686000411567f5caf3",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/zod/SKILL.md",
+      "computedHash": "0dda8a9c32affa99f4981924798d7399f0f5bd3ecc37910cfc4b05f260f442cd",
+      "installMode": "copy"
     }
   }
 }
