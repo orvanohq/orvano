@@ -14,5 +14,6 @@
   </Folder>
   <Folder Name="/server/tests/">
     <Project Path="server/tests/Orvano.ArchitectureTests/Orvano.ArchitectureTests.csproj" />
+    <Project Path="server/tests/Orvano.IntegrationTests/Orvano.IntegrationTests.csproj" />
   </Folder>
 </Solution>
