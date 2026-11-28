@@ -4,7 +4,7 @@ The shell and the shared pages of the dashboard. Each service's own pages live i
 
 ## M0 (Phase 1: Foundation)
 
-### 5. Console shell & design foundation · in-progress
+### 5. Console shell & design foundation · done
 The design system wired into the real console, and the empty app shell served by the host. It closes the M0 thread at the UI end.
 **Done when:** the console static export is served at `/console` through Caddy; the tokens from `docs/design/design-system/` are mapped onto the component library's variables; the app shell (service rail, top bar with a project switcher slot and an approvals badge slot, theme toggle) renders in light and dark; base components (button, badge, table, form, side sheet, code block) handle focus and keyboard.
 Spec [0003](../specs/0003-console-shell-design-foundation/index.md) · code in `console/`, `server/src/Orvano.Host/ConsoleFiles/`, `server/src/Orvano.AppHost/`, `server/tests/Orvano.IntegrationTests/`, `deploy/orvano.Dockerfile`, `deploy/smoke-test.sh`, `.github/workflows/ci.yml`
