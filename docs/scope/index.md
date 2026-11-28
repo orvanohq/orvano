@@ -127,7 +127,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 
 Each area has its own file with the feature sections. Numbers are the build order from the table above.
 
-- [Foundation](foundation.md): features 1 to 4 · 0 of 4 done
+- [Foundation](foundation.md): features 1 to 4 · 4 of 4 done
 - [Platform core](platform.md): features 7 to 16, 29, 59 · 0 of 12 done
 - [Auth](auth.md): features 18, 20, 23, 24, 27, 28 · 0 of 6 done
 - [Database](database.md): features 30 to 35, 37 · 0 of 7 done
