@@ -43,13 +43,14 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title.md`, or a folder with `i
 
 - Lint and format: `.editorconfig`, built in .NET analyzers at the latest recommended level, `dotnet format`; ESLint (Next config) and Prettier for `console/` and `website/`.
 - Before each commit: format and lint the staged files only. The full build, typecheck and tests run in CI.
-- CI: GitHub Actions in `.github/workflows/` on every push and pull request: build, lint, test, `pnpm -r build`.
+- CI: GitHub Actions in `.github/workflows/` on every push and pull request: build, lint, test, `pnpm -r build`, both container images (amd64 and arm64, not pushed) and the Compose smoke test (`deploy/smoke-test.sh`).
 
 ## Git
 
 - integration: on
 - branch prefix: feat/
 - commit: per-milestone
+- sign off: every commit carries `Signed-off-by` (`git commit -s`); the DCO check in CI fails the pull request otherwise
 
 ## Agent skills
 
