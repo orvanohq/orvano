@@ -25,7 +25,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 2 | Coding standards & tooling | M0 | done |
 | 3 | Open repo basics | M0 | done |
 | 4 | Compose stack skeleton | M0 | done |
-| 5 | Console shell & design foundation | M0 | in-progress |
+| 5 | Console shell & design foundation | M0 | done |
 | 6 | Docs site skeleton | M0 | planned |
 | 7 | Platform data model & tenancy | M1 | planned |
 | 8 | API conventions | M1 | planned |
@@ -140,7 +140,7 @@ Each area has its own file with the feature sections. Numbers are the build orde
 - [AI layer](ai.md): features 38, 39, 70, 72, 74 to 80 · 0 of 11 done
 - [SDKs](sdks.md): features 17, 21, 22, 25, 26, 69 · 0 of 6 done
 - [CLI](cli.md): features 36, 66, 67, 68, 71, 73 · 0 of 6 done
-- [Console](console.md): features 5, 86 to 89 · 0 of 5 done
+- [Console](console.md): features 5, 86 to 89 · 1 of 5 done
 - [Docs](docs.md): features 6, 90, 91, 92 · 0 of 4 done
 - [Operations & release](operations.md): features 40, 41, 93 to 101 · 0 of 11 done
 
