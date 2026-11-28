@@ -131,7 +131,7 @@ These rules are the architecture. "May reference" is an allow list of repo proje
 | `Orvano.Executor` | `Orvano.Wire`, `Orvano.ServiceDefaults` | `Orvano.Contracts`, `Orvano.Infrastructure`, any module (feature 54 may widen this) |
 | `Orvano.Cli` | `Orvano.Wire` | Anything else under `server/` |
 | `Orvano.AppHost` | `Orvano.Host`, `Orvano.Executor` as Aspire resources | |
-| Test projects | Library projects they test. Never an executable project | |
+| Test projects | Library projects they test. Never an executable project, with one exception: `Orvano.IntegrationTests` and `Orvano.ContractTests` may reference `Orvano.Host`, to start the real app in memory (added by [spec 0002](../0002-compose-stack-skeleton/index.md)) | |
 | Any project not listed | Nothing under `server/src/` until a spec adds its row | |
 
 `Orvano.Wire` sets `IsAotCompatible` to `true`, because the Native AOT CLI compiles it. Feature 3 gives `server/src/Orvano.Wire/` its own MIT `LICENSE` file.
@@ -158,7 +158,7 @@ The target for `/develop stack & architecture`. It derives its own steps from th
 - Seven server projects that build: `Orvano.AppHost`, `Orvano.ServiceDefaults`, `Orvano.Host`, `Orvano.Executor`, `Orvano.Wire`, `Orvano.Contracts`, `Orvano.Infrastructure`. No module projects.
 - `Orvano.Host` and `Orvano.Executor` use the Web SDK (`Microsoft.NET.Sdk.Web`). The others are class libraries, except the AppHost.
 - `Orvano.AppHost`: a csproj AppHost whose `Sdk` attribute carries the pinned Aspire 13 version. It runs Postgres with an explicit `17` image tag, `Orvano.Host` and `Orvano.Executor`. The documented contributor command stays `dotnet run --project server/src/Orvano.AppHost`. The Aspire CLI is optional.
-- `Orvano.ServiceDefaults`: OpenTelemetry setup only. It maps no endpoints. The Aspire template's `/health` and `/alive` are removed, because feature 4 adds `/healthz` and `/readyz`.
+- `Orvano.ServiceDefaults`: OpenTelemetry setup only. It maps no endpoints. The Aspire template's `/health` and `/alive` are removed, because feature 4 adds `/healthz` and `/readyz`. ([Spec 0002](../0002-compose-stack-skeleton/index.md) later puts JSON logging, the `/healthz` mapping and the container health probe in this project.)
 - `Orvano.ArchitectureTests`, with the reference rules above as real tests.
 - `cli/Orvano.Cli/`: `AssemblyName` is `orvano`. It sets `PublishAot` but no `RuntimeIdentifier` (that is passed at publish time). It builds, publishes as Native AOT, and prints the version from `Directory.Build.props`.
 - `console/`: a Next.js app set to static export with base path `/console`, which builds. The design system mapping is feature 5.
