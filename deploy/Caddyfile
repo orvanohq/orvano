@@ -1,0 +1,17 @@
+# One global option and one site block (spec 0002).
+{
+	# Without this, a localhost site makes Caddy try to install its root certificate in the
+	# container's trust store, which prints plain text warnings.
+	skip_install_trust
+}
+
+# Caddy picks the certificate source: its local authority for localhost, Let's Encrypt for a real domain.
+{$ORVANO_DOMAIN:localhost} {
+	encode zstd gzip
+	reverse_proxy orvano:8080
+
+	log {
+		output stdout
+		format json
+	}
+}
