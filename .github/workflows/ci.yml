@@ -1,4 +1,5 @@
-# Build, lint, format check and test on every push and pull request (AGENTS.md, Tooling).
+# Build, lint, format check and test on every push and pull request (AGENTS.md, Tooling),
+# plus both container images and the Compose smoke test (spec 0002).
 # The repo only allows actions pinned to a full commit SHA; the version is in the comment.
 name: CI
 
@@ -56,3 +57,36 @@ jobs:
         run: pnpm typecheck
       - name: Build
         run: pnpm build
+
+  images:
+    name: Image ${{ matrix.image }} (amd64 and arm64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [orvano, orvano-executor]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The default driver cannot build several platforms. No QEMU: the final stage has no RUN step.
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build without pushing
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/${{ matrix.image }}.Dockerfile
+          platforms: linux/amd64,linux/arm64
+          build-args: VERSION=0.1.0-dev
+          push: false
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  smoke:
+    name: Compose smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Starts the whole stack through Caddy over HTTPS. Prints every container log when it fails.
+      - name: Run deploy/smoke-test.sh
+        run: deploy/smoke-test.sh
