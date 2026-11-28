@@ -143,3 +143,27 @@ test("the code block copies its code and announces it", async ({
   );
   await expect(block.getByRole("status")).toHaveText("", { timeout: 4000 });
 });
+
+test("a code block wider than its box is a labelled tab stop that scrolls by keyboard", async ({
+  page,
+}) => {
+  // The short SQL block fits, so it adds no tab stop.
+  const sql = page
+    .getByRole("region", { name: "Code block" })
+    .locator("pre")
+    .first();
+  await expect(sql).not.toHaveAttribute("tabindex");
+
+  await page.getByRole("button", { name: "dlv_01JF8K2M4Q02" }).click();
+  const sheet = page.getByRole("dialog", { name: "dlv_01JF8K2M4Q02" });
+  await expect(sheet).toHaveCSS("width", "480px");
+  const json = sheet.getByRole("group", { name: "json code" });
+  await sheet.getByRole("button", { name: "Copy code" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(json).toBeFocused();
+  await page.keyboard.press("End");
+  await page.keyboard.press("ArrowRight");
+  await expect
+    .poll(() => json.evaluate((node) => node.scrollLeft))
+    .toBeGreaterThan(0);
+});
