@@ -28,7 +28,7 @@ Run the Compose stack (`deploy/smoke-test.sh` leaves nothing running; for a manu
 - [x] `pnpm --filter @orvano/console build && pnpm --filter @orvano/console test:e2e` → all Playwright and axe tests pass (axe: zero violations on three pages in light and dark) → AC-6 to AC-13
 - [x] `dotnet run --project server/src/Orvano.AppHost` → a `console` resource runs; its link opens `/console/`; editing a file under `console/src` shows without a restart → AC-14
 - [x] `deploy/smoke-test.sh` → passes, including the "Spec 0003" step → AC-15
-- [ ] CI on the pull request → `web` (lint with token and colour checks), `console-e2e`, both `images` (amd64 and arm64) and `smoke` are green → AC-15
+- [x] CI on the pull request → `web` (lint with token and colour checks), `console-e2e`, both `images` (amd64 and arm64) and `smoke` are green → AC-15
 
 ## Value sourcing
 

@@ -15,7 +15,7 @@ Spec [0003](../specs/0003-console-shell-design-foundation/index.md) · code in `
   - [x] Shell and routes: rails, top bar, drawer, skip link, page titles, project guard, stubs, not found (AC-8, AC-9, AC-10, AC-11)
   - [x] Base components and the kit page (AC-12)
   - [x] Playwright and axe tests, the console CI job, the AppHost console resource (AC-13, AC-14, AC-15)
-- [ ] Verify it: `/check verify console shell & design foundation`
+- [x] Verify it: `/check verify console shell & design foundation`
 
 ## M9 (Phase 3: Launch)
 
