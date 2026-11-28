@@ -16,7 +16,8 @@ The .NET side of Orvano: the `orvano` host (API, realtime, worker, scheduler, MC
 | `src/Orvano.ServiceDefaults/Extensions.cs` | OpenTelemetry, JSON console logs outside Development, the health check service |
 | `src/Orvano.ServiceDefaults/HealthEndpoints.cs`, `HealthProbe.cs` | `/healthz` mapping, the shared health response writer, the container `healthcheck` probe |
 | `src/Orvano.Infrastructure/Database/` | `AddOrvanoDatabase` (the `NpgsqlDataSource` from `ConnectionStrings:orvano`) and the Postgres readiness check behind `/readyz` |
-| `src/Orvano.AppHost/AppHost.cs` | Contributor orchestration: Postgres 17, `orvano`, `orvano-executor` |
+| `src/Orvano.AppHost/AppHost.cs` | Contributor orchestration: Postgres 17, `orvano`, `orvano-executor`, and the console dev server as the `console` resource |
+| `src/Orvano.Host/ConsoleFiles/` | Serves the console export at `/console` (redirects, 404 page, 503 `console_not_built`, headers, caching); folder from `Console:RootPath` |
 | `tests/Orvano.ArchitectureTests/ReferenceRules.cs` | The project reference rules from spec 0001, as code |
 | `tests/Orvano.IntegrationTests/` | Starts `Orvano.Host` in memory (`WebApplicationFactory`) against Testcontainers Postgres |
 
@@ -47,6 +48,8 @@ dotnet test --solution Orvano.slnx               # run from the repo root
 - Each `Program.cs` checks `HealthProbe.IsRequested(args)` before `WebApplication.CreateBuilder`: the chiseled images have no shell, so the container health check runs the binary with `healthcheck`.
 - Health bodies carry `status` only. `/healthz` checks nothing; `/readyz` runs the checks tagged `ready`. Required settings are validated with `ValidateOnStart` and the error names the setting.
 - `AddOrvanoDatabase` turns Npgsql GSS encryption off unless the connection string sets it: the chiseled image has no Kerberos library, and the failed load prints a plain text line that breaks the all JSON logs rule.
+- `dotnet run --project server/src/Orvano.Host` applies `Properties/launchSettings.json` (Development, its own port), which overrides `ASPNETCORE_URLS`; add `--no-launch-profile` when you set the address or environment yourself.
+- To see a console build through the host, set `Console__RootPath` to `console/out` (an absolute path, or relative to `server/src/Orvano.Host`). The folder is the namespace `ConsoleFiles`, not `Console`, which would shadow `System.Console`.
 - The integration tests need Docker running. The test platform has no TRX reporter here; use `dotnet test --solution Orvano.slnx --output Detailed` for per test results.
 
 ## Agent skills
@@ -65,5 +68,6 @@ MCP servers: Aspire (recommended, `aspire agent init --mcp`)
 
 - [0001 Stack and architecture](../docs/specs/0001-stack-architecture/index.md)
 - [0002 Compose stack skeleton](../docs/specs/0002-compose-stack-skeleton/index.md)
+- [0003 Console shell and design foundation](../docs/specs/0003-console-shell-design-foundation/index.md)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

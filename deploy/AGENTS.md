@@ -13,6 +13,7 @@ What a self hoster runs: the Docker Compose file, the Caddyfile and the Dockerfi
 - `compose.yaml` names images only and never holds `build`; `compose.build.yaml` holds nothing but `build`. Required settings use `${NAME:?NAME is required}`, and no setting has a default password.
 - Only `caddy` publishes ports. Three networks: `edge` (caddy, orvano), `data` and `executor` (both `internal: true`); the executor never joins `data`.
 - The Orvano images are chiseled (no shell), run as `$APP_UID`, and get `read_only`, a `/tmp` tmpfs and `cap_drop: [ALL]`. Their final Dockerfile stage has no `RUN` step, which keeps the arm64 build free of emulation.
+- The `orvano` image builds the console in a `console` stage on the builder's own platform and copies `console/out` to `/app/console`. Keep its Node image in step with `.nvmrc` and its pnpm with the root `packageManager`; `--ignore-scripts` is needed because the root `prepare` script installs git hooks.
 - After any change here, run `deploy/smoke-test.sh` (needs Docker, bash, curl, jq, openssl; publishes ports 80 and 443). CI runs it on every push and pull request.
 
 ## Gotchas
@@ -30,5 +31,6 @@ Declined: docker-buildx and docker-cicd skills (`full-stack-skills/docker-skills
 
 - [0001 Stack and architecture](../docs/specs/0001-stack-architecture/index.md)
 - [0002 Compose stack skeleton](../docs/specs/0002-compose-stack-skeleton/index.md)
+- [0003 Console shell and design foundation](../docs/specs/0003-console-shell-design-foundation/index.md)
 
 _Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

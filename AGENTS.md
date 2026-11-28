@@ -20,6 +20,7 @@ dotnet restore Orvano.slnx && pnpm install       # install
 dotnet run --project server/src/Orvano.AppHost   # run Postgres, orvano and the executor (needs Docker)
 dotnet build Orvano.slnx && pnpm -r build        # build everything
 dotnet test --solution Orvano.slnx               # test (Microsoft.Testing.Platform; plain `dotnet test` also works)
+pnpm --filter @orvano/console test:e2e           # console Playwright and axe tests (build the console first)
 dotnet publish cli/Orvano.Cli -c Release -r <rid> # native CLI binary
 ```
 
@@ -56,7 +57,7 @@ Stored in `docs/specs/`. Format: `docs/specs/NNNN-title.md`, or a folder with `i
 
 Installed skills are area specific and listed in each area's AGENTS.md below.
 MCP servers: Aspire (recommended, `aspire agent init --mcp`), Playwright (recommended, `claude mcp add playwright npx @playwright/mcp@latest`)
-Candidates found by `/architect`, not installed (read before trusting): `aaronontheweb/dotnet-skills@efcore-patterns`, `lombiq/tailwind-agent-skills@tailwind-4-docs`, `astrolicious/agent-skills@astro`, `tanstack-skills/tanstack-skills@tanstack-query`, `wshobson/agents@nextjs-app-router-patterns`, `currents-dev/playwright-best-practices-skill@playwright-best-practices`
+Candidates found by `/architect`, not installed (read before trusting): `aaronontheweb/dotnet-skills@efcore-patterns`, `astrolicious/agent-skills@astro`
 
 ## Context files
 
