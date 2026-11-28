@@ -15,7 +15,7 @@ Run the Compose stack (`deploy/smoke-test.sh` leaves nothing running; for a manu
 - [x] Narrow the window below 768px → rail hidden, "Open navigation" opens a 240px drawer with labels; Tab stays inside, Escape closes, focus returns to the button → AC-11
 - [x] Theme menu: System follows the OS (change the OS setting with the page open); Light and Dark override it both ways; reload keeps the choice with no flash → AC-6
 - [x] DevTools Network on `/console/`, a project stub and `/console/kit/` → every request is under `/console/`; Plex Sans and Plex Mono load from `/console/_next/static/` → AC-7
-- [ ] `/console/kit/` by keyboard only: every button, badge, status dot, table ID button (opens a 480px sheet, Escape returns focus), select, checkbox, the bucket name error (shown inline and announced), the delete gate (enables only on `recipes-dev`), and Copy code (announces "Copied") → AC-12
+- [x] `/console/kit/` by keyboard only: every button, badge, status dot, table ID button (opens a 480px sheet, Escape returns focus), select, checkbox, the bucket name error (shown inline and announced), the delete gate (enables only on `recipes-dev`), and Copy code (announces "Copied") → AC-12
 - [x] Turn on reduced motion in the OS → sheets, tooltips and hovers change with no transition → AC-13
 - [x] Press Tab once on any page → "Skip to main content" appears first; Enter moves focus to the main region → AC-13
 
