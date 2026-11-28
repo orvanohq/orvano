@@ -1,5 +1,6 @@
 // The orvano host. It wires every module into one process.
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Orvano.Host.ConsoleFiles;
 using Orvano.Host.Executor;
 using Orvano.Infrastructure.Database;
 
@@ -18,6 +19,7 @@ builder.Services.AddHealthChecks()
     .AddCheck<PostgresReadinessCheck>(PostgresReadinessCheck.Name, tags: [ReadinessTag.Ready]);
 
 builder.Services.AddExecutorOptions();
+builder.Services.AddConsoleFilesOptions();
 
 var app = builder.Build();
 
@@ -27,6 +29,7 @@ app.MapHealthChecks("/readyz", new HealthCheckOptions
     Predicate = registration => registration.Tags.Contains(ReadinessTag.Ready),
     ResponseWriter = HealthEndpoints.WriteResponseAsync,
 });
+app.MapConsoleFiles();
 
 await app.RunAsync();
 return 0;

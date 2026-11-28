@@ -3,6 +3,21 @@
 # Build with the repo root as context: docker build -f deploy/orvano.Dockerfile .
 # Spec 0002, "Images". The final stage has no RUN step, so arm64 builds without emulation.
 
+# Console stage (spec 0003, "Docker image"). The static export is the same for every processor, so it builds
+# once on the builder's own platform. Keep the Node version in step with .nvmrc and pnpm with package.json.
+FROM --platform=$BUILDPLATFORM node:26.13.0-slim AS console
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm install -g pnpm@12.23.0
+WORKDIR /src
+# Every workspace manifest, so the frozen lockfile matches. --ignore-scripts: the root prepare script
+# installs git hooks, and there is no .git here.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY console/package.json console/
+COPY website/package.json website/
+RUN pnpm install --frozen-lockfile --ignore-scripts --filter @orvano/console...
+COPY console ./console
+RUN pnpm --filter @orvano/console build
+
 # Build stage. Always runs on the builder's own processor and cross publishes for the target.
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.404 AS build
 ARG TARGETARCH
@@ -31,6 +46,7 @@ LABEL org.opencontainers.image.source="https://github.com/orvanohq/orvano" \
 
 WORKDIR /app
 COPY --from=build /app ./
+COPY --from=console /src/console/out /app/console
 
 USER $APP_UID
 EXPOSE 8080
