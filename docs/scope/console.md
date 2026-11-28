@@ -4,10 +4,18 @@ The shell and the shared pages of the dashboard. Each service's own pages live i
 
 ## M0 (Phase 1: Foundation)
 
-### 5. Console shell & design foundation · needs a decision
+### 5. Console shell & design foundation · in-progress
 The design system wired into the real console, and the empty app shell served by the host. It closes the M0 thread at the UI end.
 **Done when:** the console static export is served at `/console` through Caddy; the tokens from `docs/design/design-system/` are mapped onto the component library's variables; the app shell (service rail, top bar with a project switcher slot and an approvals badge slot, theme toggle) renders in light and dark; base components (button, badge, table, form, side sheet, code block) handle focus and keyboard.
-- [ ] Design it (spec): `/architect console shell & design foundation`
+Spec [0003](../specs/0003-console-shell-design-foundation/index.md)
+- [x] Design it (spec): `/architect console shell & design foundation`
+- [ ] Build it: `/develop console shell & design foundation`
+  - [ ] The thread: the host serves the export at `/console` (redirects, not found, missing files, headers, caching), the Node stage in the image, smoke and host tests (AC-1, AC-2, AC-3, AC-4, AC-15)
+  - [ ] Design foundation: generated tokens and colour check, shadcn mapping, fonts, favicon, theme menu, providers (AC-5, AC-6, AC-7)
+  - [ ] Shell and routes: rails, top bar, drawer, skip link, page titles, project guard, stubs, not found (AC-8, AC-9, AC-10, AC-11)
+  - [ ] Base components and the kit page (AC-12)
+  - [ ] Playwright and axe tests, the console CI job, the AppHost console resource (AC-13, AC-14, AC-15)
+- [ ] Verify it: `/check verify console shell & design foundation`
 
 ## M9 (Phase 3: Launch)
 
