@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Copy } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -16,6 +16,8 @@ const announcement: Record<CopyState, string> = {
 /**
  * Code in mono on surface-subtle with its language label and a copy button. A polite live region says
  * "Copied" for two seconds, or "Copy failed" when the clipboard is not available.
+ * When the code is wider than the block, the code area becomes a labelled tab stop, so keyboard users can
+ * scroll it with the arrow keys (WCAG 2.1.1). Code that fits adds no extra tab stop.
  */
 export function CodeBlock({
   code,
@@ -25,6 +27,8 @@ export function CodeBlock({
   language: string;
 }) {
   const [state, setState] = useState<CopyState>("idle");
+  const codeArea = useRef<HTMLPreElement>(null);
+  const scrollable = useOverflows(codeArea, code);
 
   useEffect(() => {
     if (state === "idle") {
@@ -64,7 +68,13 @@ export function CodeBlock({
           {state === "failed" ? "Copy failed" : "Copy code"}
         </Button>
       </figcaption>
-      <pre className="overflow-x-auto p-3 font-mono text-mono text-ink">
+      <pre
+        ref={codeArea}
+        {...(scrollable
+          ? { tabIndex: 0, role: "group", "aria-label": `${language} code` }
+          : {})}
+        className="overflow-x-auto rounded-b-md p-3 font-mono text-mono text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+      >
         <code>{code}</code>
       </pre>
       <span role="status" aria-live="polite" className="sr-only">
@@ -72,4 +82,27 @@ export function CodeBlock({
       </span>
     </figure>
   );
+}
+
+/** True while the element's content is wider than the element. Measured again on resize and when the content changes. */
+function useOverflows(
+  ref: RefObject<HTMLElement | null>,
+  content: string,
+): boolean {
+  const [overflows, setOverflows] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) {
+      return;
+    }
+    const measure = () =>
+      setOverflows(element.scrollWidth > element.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref, content]);
+
+  return overflows;
 }

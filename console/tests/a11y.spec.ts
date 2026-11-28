@@ -34,6 +34,27 @@ for (const colorScheme of ["light", "dark"] as const) {
   }
 }
 
+for (const colorScheme of ["light", "dark"] as const) {
+  test(`axe finds no WCAG A or AA violations with the kit side sheet open in ${colorScheme}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme });
+    await page.goto(path("/kit/"));
+    await hydrated(page);
+    await page.getByRole("button", { name: "dlv_01JF8K2M4Q02" }).click();
+    await expect(page.getByRole("dialog")).toHaveCSS("width", "480px");
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(
+      results.violations.map((v) => ({
+        id: v.id,
+        nodes: v.nodes.map((n) => n.target),
+      })),
+    ).toEqual([]);
+  });
+}
+
 test("the skip link is the first tab stop and moves focus to main", async ({
   page,
 }) => {
