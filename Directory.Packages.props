@@ -7,6 +7,7 @@
     <OpenTelemetryVersion>1.21.0</OpenTelemetryVersion>
   </PropertyGroup>
   <ItemGroup Label="Aspire">
+    <PackageVersion Include="Aspire.Hosting.JavaScript" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="$(AspireVersion)" />
   </ItemGroup>
   <ItemGroup Label="OpenTelemetry">
