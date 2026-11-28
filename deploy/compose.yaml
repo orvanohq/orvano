@@ -1,0 +1,106 @@
+# What a self hoster runs (spec 0002). Images only: compose.build.yaml adds the build steps.
+# From this folder: docker compose -f compose.yaml -f compose.build.yaml up --build --wait
+# Settings come from .env (see .env.example). Only caddy publishes ports.
+name: orvano
+
+# Every service: restart policy, no privilege gain, rotated JSON file logs.
+x-defaults: &defaults
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "5"
+
+# The two Orvano containers also run with a read only root filesystem and no Linux capabilities.
+# Their health check lives in the image (Dockerfile HEALTHCHECK), so it is not repeated here.
+x-orvano: &orvano
+  <<: *defaults
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop:
+    - ALL
+  stop_grace_period: 30s
+
+services:
+  caddy:
+    <<: *defaults
+    image: caddy:2.11
+    environment:
+      ORVANO_DOMAIN: ${ORVANO_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - edge
+    depends_on:
+      orvano:
+        condition: service_healthy
+    healthcheck:
+      # Caddy's admin port, local to the container.
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  orvano:
+    <<: *orvano
+    image: ghcr.io/orvanohq/orvano:${ORVANO_VERSION:?ORVANO_VERSION is required}
+    environment:
+      ConnectionStrings__orvano: Host=postgres;Port=5432;Database=orvano;Username=orvano;Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      Executor__BaseUrl: http://orvano-executor:8080
+    networks:
+      - edge
+      - data
+      - executor
+    # Not on the executor: a broken executor must not stop the API.
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  orvano-executor:
+    <<: *orvano
+    image: ghcr.io/orvanohq/orvano-executor:${ORVANO_VERSION:?ORVANO_VERSION is required}
+    networks:
+      - executor
+
+  postgres:
+    <<: *defaults
+    image: postgres:17
+    environment:
+      POSTGRES_USER: orvano
+      POSTGRES_DB: orvano
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - data
+    healthcheck:
+      # -h matters: without it the check passes against the socket only server the image runs on first start.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "orvano", "-d", "orvano"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+# caddy reaches orvano only. The executor has no route to Postgres. data and executor have no route outside.
+networks:
+  edge: {}
+  data:
+    internal: true
+  executor:
+    internal: true
+
+volumes:
+  postgres-data: {}
+  caddy-data: {}
+  caddy-config: {}

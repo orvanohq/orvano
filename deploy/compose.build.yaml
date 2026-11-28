@@ -1,0 +1,16 @@
+# Adds the build steps to compose.yaml, for contributors and CI (spec 0002). Nothing but build.
+# The built image keeps its name from compose.yaml: ghcr.io/orvanohq/<image>:<ORVANO_VERSION>.
+services:
+  orvano:
+    build:
+      context: ..
+      dockerfile: deploy/orvano.Dockerfile
+      args:
+        VERSION: ${ORVANO_VERSION}
+
+  orvano-executor:
+    build:
+      context: ..
+      dockerfile: deploy/orvano-executor.Dockerfile
+      args:
+        VERSION: ${ORVANO_VERSION}

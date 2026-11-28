@@ -1,0 +1,12 @@
+# Keeps the image build context small (spec 0002). The **/ prefix matters: a bare obj matches only
+# at the root, and a host obj/project.assets.json (built for your machine) breaks publish --no-restore.
+.git
+docs
+**/bin/
+**/obj/
+**/node_modules/
+**/out/
+**/.next/
+**/TestResults/
+**/.env
+**/.DS_Store
