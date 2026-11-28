@@ -11,3 +11,6 @@ pnpm-lock.yaml
 # Agent context files are edited line by line by /audit and /sync; keep them as written.
 AGENTS.md
 CLAUDE.md
+
+# Generated from docs/design/design-system/tokens.json by console/scripts/tokens.mjs.
+console/src/styles/tokens.css

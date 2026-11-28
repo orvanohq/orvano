@@ -1,6 +1,144 @@
+/*
+ * The console's styles (spec 0003, "Design foundation"). Every colour comes from src/styles/tokens.css,
+ * which is generated from docs/design/design-system/tokens.json. No colour literal belongs in this file:
+ * `pnpm --filter @orvano/console lint` fails on one.
+ */
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "../styles/tokens.css";
 
-/* Placeholder until feature 5 maps docs/design/design-system/tokens.css. */
-body {
-  font-family: system-ui, sans-serif;
+/* next-themes writes data-theme="light" or "dark" on <html>; System resolves to one of them. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/*
+ * shadcn/ui variables mapped onto the tokens, as the design system README lists.
+ * --border is both the token and the shadcn variable (same name, same meaning), so it is not mapped again.
+ */
+:root {
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: var(--on-brand);
+  --secondary: var(--surface);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface-subtle);
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--surface-subtle);
+  --accent-foreground: var(--ink);
+  --input: var(--border-strong);
+  --ring: var(--brand);
+  /* The README says white text on danger; dark danger with white fails AA, so on-brand is used (spec 0003). */
+  --destructive: var(--danger);
+  --destructive-foreground: var(--on-brand);
+  --radius: var(--radius-md);
+  --sidebar: var(--surface-subtle);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--on-brand);
+  --sidebar-accent: var(--brand-subtle);
+  --sidebar-accent-foreground: var(--brand-ink);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--brand);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Colour utilities point at the variables (inline), so switching data-theme takes effect live. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Token colours shadcn has no name for. Text on any -subtle background uses brand-ink or ink, never the strong colour. */
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-on-brand: var(--on-brand);
+  --color-brand-subtle: var(--brand-subtle);
+  --color-brand-ink: var(--brand-ink);
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-danger: var(--danger);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-overlay: var(--overlay);
+}
+
+/*
+ * shadcn components use text-sm and text-xs. They land on the type scale: text-sm is body (14/20),
+ * text-xs is caption (12/16). tokens.css adds text-small (13/18) and the rest of the scale.
+ */
+@theme {
+  --text-sm: var(--text-body);
+  --text-sm--line-height: var(--text-body--line-height);
+  --text-xs: var(--text-caption);
+  --text-xs--line-height: var(--text-caption--line-height);
+  --font-heading: var(--font-sans);
+  /* Motion: 120 to 160ms ease out for hovers, tooltips and sheets. */
+  --default-transition-duration: 140ms;
+  --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-body text-foreground antialiased;
+  }
+}
+
+/* One rule turns motion off everywhere: sheets, tooltips and hovers get no transition or animation. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
 }
