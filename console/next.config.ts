@@ -5,6 +5,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "export",
   basePath: "/console",
+  // Every page exports as <route>/index.html, so the host's static file rules serve it (spec 0003).
+  trailingSlash: true,
   images: { unoptimized: true },
   turbopack: {
     rules: {

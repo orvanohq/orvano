@@ -4,7 +4,7 @@
 #
 # It uses its own project name (orvano-smoke) and its own temporary env file, so it never touches a stack
 # you already run. It does publish ports 80 and 443, so stop your own stack first if it holds them.
-# Covers AC-1 to AC-4, AC-6 to AC-8, AC-11 and AC-12. Waits are poll loops with a deadline, never fixed sleeps.
+# Covers AC-1 to AC-4, AC-6 to AC-8, AC-11 and AC-12 of spec 0002, and AC-1, AC-2 and AC-4 of spec 0003. Waits are poll loops with a deadline, never fixed sleeps.
 set -euo pipefail
 
 # Runner variables must not hide a missing setting: start again without them.
@@ -124,6 +124,60 @@ expect_response /readyz '200 {"status":"ok"}'
 redirect="$(curl -sS --max-time 10 --resolve localhost:80:127.0.0.1 -o /dev/null -w '%{http_code} %{redirect_url}' http://localhost/healthz)"
 [[ "$redirect" =~ ^30[178]\ https://localhost/healthz$ ]] || fail "HTTP did not redirect to HTTPS: '$redirect'"
 pass "HTTP redirects to HTTPS ($redirect)"
+
+# ---------------------------------------------------------------------------------------------------------
+step "Spec 0003, AC-1, AC-2 and AC-4: the console through Caddy"
+# GET through Caddy, keeping headers and body apart. Prints the status code.
+console_get() { # path
+  curl -sS --max-time 10 --cacert "$ROOT_CERT" --resolve localhost:443:127.0.0.1 \
+    -D "$WORK/console.headers" -o "$WORK/console.body" -w '%{http_code}' "https://localhost$1" || true
+}
+header_value() { # name; from the last console_get
+  grep -i "^$1:" "$WORK/console.headers" | head -n1 | cut -d: -f2- | tr -d '\r' | sed 's/^ *//'
+}
+expect_console_headers() { # path, expected Cache-Control
+  [[ "$(header_value X-Content-Type-Options)" == nosniff ]] || fail "$1: X-Content-Type-Options missing"
+  [[ "$(header_value Referrer-Policy)" == strict-origin-when-cross-origin ]] || fail "$1: Referrer-Policy missing"
+  [[ "$(header_value X-Frame-Options)" == DENY ]] || fail "$1: X-Frame-Options missing"
+  [[ "$(header_value Content-Security-Policy)" == "frame-ancestors 'none'" ]] || fail "$1: Content-Security-Policy missing"
+  [[ "$(header_value Cache-Control)" == "$2" ]] || fail "$1: Cache-Control is '$(header_value Cache-Control)', expected '$2'"
+}
+
+[[ "$(console_get /console/)" == 200 ]] || fail "GET /console/ did not return 200"
+grep -q '<title>Projects · Orvano</title>' "$WORK/console.body" || fail "/console/ has no 'Projects · Orvano' title"
+expect_console_headers /console/ no-cache
+pass "GET /console/ -> 200, title 'Projects · Orvano', security headers, no-cache"
+
+[[ "$(console_get /console)" == 308 ]] || fail "GET /console did not redirect with 308"
+[[ "$(header_value Location)" == /console/ ]] || fail "GET /console redirects to '$(header_value Location)'"
+pass "GET /console -> 308 /console/"
+
+[[ "$(console_get /console/project/database)" == 301 ]] || fail "GET /console/project/database did not redirect with 301"
+[[ "$(header_value Location)" == /console/project/database/ ]] || fail "it redirects to '$(header_value Location)'"
+pass "GET /console/project/database -> 301 /console/project/database/"
+
+[[ "$(console_get '/console/project/database/?project=prj_smoke')" == 200 ]] || fail "a project page did not render on reload"
+pass "GET /console/project/database/?project=prj_smoke -> 200"
+
+[[ "$(console_get /console/index.txt)" == 200 ]] || fail "the route data file /console/index.txt did not return 200"
+expect_console_headers /console/index.txt no-cache
+pass "GET /console/index.txt (Next route data) -> 200"
+
+[[ "$(console_get /console/)" == 200 ]] || fail "GET /console/ failed"
+asset="$(grep -oE '/console/_next/static/[^"]+\.js' "$WORK/console.body" | head -n1)"
+[[ -n "$asset" ]] || fail "/console/ references no script under /console/_next/static/"
+[[ "$(console_get "$asset")" == 200 ]] || fail "GET $asset did not return 200"
+expect_console_headers "$asset" "public, max-age=31536000, immutable"
+pass "GET $asset -> 200, immutable"
+
+[[ "$(console_get /console/no-such-page/)" == 404 ]] || fail "a missing console page did not return 404"
+grep -q 'Page not found' "$WORK/console.body" || fail "the 404 is not the console's not found page"
+expect_console_headers /console/no-such-page/ no-cache
+pass "GET /console/no-such-page/ -> 404, the not found page"
+
+console_get /healthz >/dev/null
+[[ -z "$(header_value X-Frame-Options)" ]] || fail "/healthz carries console headers"
+pass "/healthz carries no console headers"
 
 # ---------------------------------------------------------------------------------------------------------
 step "AC-4 and AC-7: the executor answers privately, only Caddy publishes ports, the networks are split"

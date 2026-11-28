@@ -1,7 +1,7 @@
 # 0003. Console shell and design foundation
 
 **Date**: 2026-11-27
-**Status**: Proposed
+**Status**: In Progress
 
 ## Summary
 
